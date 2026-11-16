@@ -107,7 +107,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Gói và thuê bao | `POST /billing-periods/{id}/pay` (trả tiền qua cổng của nhà vận hành) | 35 | Chưa có nút "Trả tiền" |
 | [x] | Tên miền | `GET/POST/DELETE /kernel/domains`, `POST /{id}/verify` | 33 | **Đã nối** (16/11, W-032): danh sách, thêm, bản ghi TXT, kiểm tra ngay, gỡ; chế độ một khách hiện lời giải thích |
 | [ ] | Tên miền | Gắn tên miền với nút: `PATCH /kernel/domains/{id} {org_id}` | 33, 34 | Chỉ hiện nút, chưa đổi được |
-| [ ] | Kết nối đối tác | `GET /kernel/settings`, `PUT/DELETE /settings/{name}`; tên setting theo nhà cung cấp (SMS, cổng thanh toán, hoá đơn điện tử) | 33 (tên setting: 36, 39) | Đã nối `GET/PUT/DELETE /kernel/settings` (W-027 của web); tên setting theo nhà cung cấp chờ bước 36, 39 |
+| [ ] | Kết nối đối tác | `GET /kernel/settings`, `PUT/DELETE /settings/{name}`; tên setting theo nhà cung cấp (SMS, cổng thanh toán, hoá đơn điện tử) | 33 (tên setting: 36, 39) | Đã nối `GET/PUT/DELETE /kernel/settings` (W-027 của web); tên setting theo nhà cung cấp chờ bước 36, 39. Cùng component nay dùng cho `GET/PUT/DELETE /kernel/tenants/{id}/settings` ở trang chi tiết khách của nền tảng (D-296, W-035 của web) |
 | [ ] | Kết nối đối tác | `POST /kernel/settings/{name}/test`, `last_used_at`, `last_error` | mới (đề xuất ở `ui-trace-roadmap.md`, chưa vào lộ trình) | Dữ liệu mẫu |
 | [ ] | Kết nối đối tác | "Địa chỉ công khai" dùng trong link email, theo khách | mới | Chưa dựng |
 | [ ] | Job | `GET /kernel/jobs?status=` (theo khách, tóm tắt, tiến độ, người yêu cầu), `POST /jobs/{id}/retry` có audit | 52 | Dữ liệu mẫu (`src/sample/settings.ts`); core hiện chỉ có lệnh CLI `autoxide jobs` |
@@ -249,14 +249,14 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 |---|---|---|---|
 | [ ] | Mọi màn | Biết người đăng nhập thuộc khách nền tảng (`GET /kernel/tenant`) để hiện mặt điều khiển; permission của nhân sự vận hành | 33, 34 — Đã nối `GET /kernel/tenant` để hiện mặt điều khiển (W-027 của web); permission của nhân sự nền tảng chờ bước 34 |
 | [ ] | Mọi màn | Sổ điều hướng của core có khái niệm không gian (khách / nền tảng) | 51 |
-| [x] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 — Đã nối (W-027 của web): màn Khách hàng và Đội database đọc API thật, ghép với dữ liệu mẫu cho trường core chưa có |
+| [x] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 — Đã nối (W-027 của web): màn Khách hàng và Đội database đọc API thật, ghép với dữ liệu mẫu cho trường core chưa có. Đã nối thêm lọc `read_only`, `placement_kind`, `schema_state` và `expand=placement` (D-296, W-035 của web) |
 | [ ] | Khách hàng | Trường của khách `business_model`, `primary_domain`; của placement `pending_migrations`, `location` | mới |
-| [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới |
+| [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới — hợp đồng đã có (`expand=usage`, `near_limit`, D-296) nhưng trả `null` / rỗng tới bước 35; giao diện nối khi có dữ liệu |
 | [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) — `PATCH {status}` đã nối (W-027 của web); `reason` để ghi audit vẫn thiếu |
 | [x] | Chi tiết khách | Dời khách chung ↔ riêng qua API: `POST /kernel/tenants/{id}/move` `{to, dry_run}` | mới (33 mới có CLI) — **đã nối** (16/11, W-032): chạy thử, dời ngay khi `ready`, theo dõi `GET …/moves/{id}` |
 | [ ] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Quyền dùng của một khách bất kỳ: `GET /plans/tenants/{id}/entitlements` | mới |
-| [ ] | Chi tiết khách, Thuê bao | Lịch sử thuê bao; đặt / bỏ chỉ đọc; kỳ thanh toán theo khách cho nhà vận hành | mới |
+| [ ] | Chi tiết khách, Thuê bao | Lịch sử thuê bao; đặt / bỏ chỉ đọc; kỳ thanh toán theo khách cho nhà vận hành | mới — **đặt / bỏ chỉ đọc đã nối** (cờ của nhà vận hành, D-296, W-035 của web); lịch sử thuê bao và kỳ thanh toán chờ bước 35 |
 | [ ] | Thuê bao | `GET /plans/subscriptions`, `PUT` / `cancel` thuê bao của khách, `POST /billing-periods/{id}/mark-paid` | 35 |
 | [ ] | Gói và giá | `GET/POST/PUT` gói, `retire`, `prices`, `deactivate`; `subscriber_count` | 35 (`subscriber_count`: mới) |
 | [ ] | Ghi đè | Danh sách ghi đè của mọi khách (`GET /plans/overrides`) | mới |
@@ -451,6 +451,11 @@ Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc gi�
 | [x] | `GET /kernel/client-config`, `content.post_path_prefix` | ví dụ `/blog/` | `blog` (không có dấu `/`) — **đã sửa mô tả** (16/11): giá trị là đoạn đầu của đường dẫn, không có `/`; `blog` cho `/blog/<slug>` |
 | [x] | `CommentDetail.target_title` | — | chỉ có khi đích đang công khai; bình luận trên bài nháp chỉ có id (nên ghi rõ trong mô tả) — **đã ghi rõ** (16/11) |
 | [ ] | `TenantMovePlan.files` | `0` khi hai placement dùng chung nơi lưu | `0` cả khi khách không có file nào — nên ghi cả hai trường hợp trong mô tả |
+| [ ] | `Tenant.read_only`, `CurrentTenant.read_only` (D-296) | trường tuỳ chọn | core luôn trả — nên khai `required` để client khỏi phải coi thiếu là `false` |
+| [ ] | `TenantExpanded` (D-296) | `placement`, `subscription`, `usage` tuỳ chọn | có `expand` thì cả ba luôn có mặt (có thể `null`) — nên khai `required` |
+| [ ] | `PATCH /kernel/tenants/{id}` `read_only` cho khách nền tảng | chỉ nói bằng lời "cannot be made read-only" | 422 `validation_failed`, lỗi ô `read_only` — nên ghi vào mô tả response 422 |
+| [ ] | `PATCH /kernel/tenants/{id}` | — | `id` chỉ nhận UUID, trong khi `…/tenants/{id}/settings` và `…/move` nhận cả slug — nên thống nhất (hoặc ghi rõ ở mô tả tham số) |
+| [ ] | Mô tả của `TenantSettingState.description` (D-296) | — | vài mô tả có chuỗi nhiều dấu cách liền nhau giữa câu (vd `comments.banned_words`: "ignoring case      and accents") — do xuống dòng trong chuỗi nguồn |
 
 ## Website bán hàng (`apps/storefront`, W-026 của web)
 
