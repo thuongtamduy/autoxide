@@ -7266,3 +7266,59 @@ một subagent mỗi lúc). Ngoại lệ lần hai cho luật "chỉ merge khi g
 được merge (D-296, D-297) đã qua `./gate.sh --quick`, và test của các crate bị sửa đã chạy trên Postgres; gate đầy đủ
 gần nhất xanh ở `11bbef0`. Bước 33 chưa đóng: phiên kế tiếp chạy `./gate.sh` đầy đủ trên `main` mới trước khi làm tiếp
 (đo đường nóng, hướng dẫn viết module, changelog); đỏ thì sửa trước mọi việc khác. Không phát hành.
+
+## D-299 · Làm nhanh vòng "viết → test": tối ưu thư viện trong bản test, gate nhanh so với lần xanh gần nhất, chạy file test song song — 2026-11-16 — chủ dự án yêu cầu, agent chọn cách
+
+Bối cảnh: chủ dự án (16/11/2026) thấy bước 31–33 lâu "ở việc làm xong phải test, test xong rồi làm tiếp", hỏi có cách nhanh
+hơn trước khi làm bước 34. Đo trên một máy 4 nhân, cache build nóng, cùng commit (`f62f5a2` + thay đổi này):
+
+| Đo                                                  | Trước      | Sau      |
+| --------------------------------------------------- | ---------- | -------- |
+| Mọi test trên SQLite (59 file test)                 | 149 s      | 37 s     |
+| Mọi test trên Postgres                              | 136 s      | 75 s     |
+| Riêng file test của `auth` (băm mật khẩu)           | 43 s       | 11 s     |
+| Gate nhanh khi nhánh đã sửa `kernel`, commit chỉ sửa `media` | chạy cả 59 file | 6 file, 41 s |
+| Build lại test sau khi sửa `kernel` / một module    | 43 s / 12 s | 43 s / 12 s (không đổi) |
+| Build test từ đầu (một lần mỗi máy)                 | 256 s      | khoảng 390 s |
+
+Tìm ra: thời gian không nằm ở build lại mà ở **chạy** test. (1) Thư viện chạy ở bản không tối ưu — `argon2` (cố tình chậm)
+chậm gấp nhiều lần; mỗi test của app dựng database và chạy migration của mọi module qua sqlx / sea-orm không tối ưu.
+(2) `cargo test` chạy 59 file test **lần lượt**, file chậm nhất (app, 39–55 s) làm cả máy chờ. (3) Gate nhanh so với
+`origin/main`: suốt phần B của bước 33, `kernel` đã đổi từ commit đầu nhánh nên **mọi** lần gate nhanh chạy lại test
+của cả 17 crate, kể cả commit chỉ sửa một module.
+
+Quyết định:
+
+1. `Cargo.toml`: `[profile.dev.package."*"] opt-level = 1` (mọi thư viện ngoài; crate của workspace vẫn `opt-level = 0`
+   nên build lại sau khi sửa code không chậm đi) và `opt-level = 3` cho `argon2`, `blake2`. Giá: build từ đầu lâu hơn
+   khoảng 2 phút, một lần mỗi máy. Bản release không đổi.
+2. `cargo xtask test-affected` (gate nhanh) so với **cây file của lần chạy xanh gần nhất**: ghi ở ref cục bộ
+   `refs/autoxide/quick-green` (git không push ref này), chưa có thì so với `origin/main` như cũ; `--base <ref>` giữ cách
+   cũ. Vẫn đúng: crate không bị chạm có mã nguồn và phụ thuộc y hệt lúc nó đã xanh. File dùng chung (`Cargo.toml`,
+   `Cargo.lock`…) đổi thì vẫn chạy hết.
+3. File test chạy song song, tối đa `min(số nhân, 8)` file cùng lúc; output của file xanh không in, file đỏ in đủ.
+   Gate đầy đủ dùng `cargo xtask test-all` (cùng cách chạy, giữ `TEST_DATABASE_URL` và S3); doc-test chạy một lần ở
+   lượt SQLite (`--doc`). Trên Postgres tổng số test chạy cùng lúc giới hạn 16 (chia đều cho các file): đo 16 test cùng
+   lúc ≈ 141 kết nối đỉnh, gate đặt trần 300.
+
+Luật không đổi: gate đầy đủ xanh trên cả SQLite và Postgres mới merge; gate nhanh trước mỗi commit; không bỏ test.
+
+Cách làm việc từ bước 34 (ghi trong skill `next-step`, `split-work`):
+
+- **Không ngồi chờ test.** Chạy gate (nhanh hay đầy đủ) ở chế độ nền; trong lúc chờ chỉ đọc và chuẩn bị mục kế (đặc tả,
+  code liên quan, tra API thư viện), không sửa file — gate đang đọc chính thư mục làm việc.
+- **Viết test theo danh sách "Test bắt buộc" của đặc tả cùng lúc với code**, chạy riêng bài đang làm
+  (`cargo test -p <crate> <tên>`) trong lúc viết; gate nhanh một lần cho mỗi nhóm việc (D-263).
+- **Chia agent theo đặc tả** khi máy đủ CPU, RAM và **đĩa** (mỗi worktree biên dịch cần khoảng 25–30 GB): mục nào thuộc
+  crate riêng và không phụ thuộc nhau thì làm song song. Bước 34: `address` (mục 2) song song với nền kernel (mục 1);
+  hồ sơ công khai của nút (11) song song với `content`/`media`/`forms`/`menus` (12). Các mục 4, 6–10 cùng sửa `auth`:
+  một agent, làm nối tiếp.
+
+Đã cân nhắc: `cargo-nextest` — nhanh tương tự nhưng người lạ phải cài thêm (D-173 đã loại), chạy song song tự viết chỉ
+khoảng 100 dòng; tối ưu cả crate của workspace (`opt-level = 1` toàn bộ) — test nhanh hơn nữa nhưng mỗi lần sửa code
+build lại chậm hơn, đúng vòng mà chủ dự án thấy lâu; gộp 36 file test của `kernel` thành một (D-172 để sau) — build lại
+sau khi sửa `kernel` vẫn 43 s, chỗ chậm không nằm ở link; chạy test ở worktree riêng song song với việc viết mục kế —
+tốn thêm một bộ `target/` (hơn 20 GB) và tranh CPU, lợi không rõ khi test giờ chỉ còn khoảng một phút; chạy lượt SQLite
+và Postgres của gate đầy đủ cùng lúc — máy 4 nhân đã chạy kín CPU, chưa đo được lợi.
+
+Bổ sung: D-173 (gate hai mức), D-263 (nhịp gate), D-172 (profile dev).

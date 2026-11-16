@@ -32,6 +32,7 @@ theo **máy đang chạy phiên này, tại thời điểm này**. Đo trước 
 ```bash
 nproc                                   # số CPU logic
 free -g | awk 'NR==2{print $7}'         # RAM còn dùng được (GB)
+df -h .                                 # đĩa còn trống
 ```
 
 (macOS: `sysctl -n hw.ncpu` và `memory_pressure`; Windows: dùng WSL.)
@@ -44,6 +45,10 @@ phát gợi ý:
 | -------------------------------------------- | --------------------------------------------------- |
 | **Có biên dịch** (viết code, chạy test)      | `min(nproc / 4, RAM còn dùng được / 4)`, tối thiểu 1 |
 | **Chỉ đọc** (tra cứu, đọc code, rà soát)     | khoảng `nproc / 2`                                  |
+
+**Đĩa** cũng là trần: mỗi worktree biên dịch có `target/` riêng, khoảng 25–30 GB sau một lượt test đầy đủ (thư viện
+ở bản tối ưu nhẹ cộng cache incremental). Số agent biên dịch không vượt `đĩa trống / 30 GB`; hết đĩa thì xoá
+`target/` của worktree đã xong trước.
 
 Đây là điểm xuất phát, không phải trần cứng. Máy mạnh thì chia nhiều hơn, máy yếu
 thì ít hơn; máy đang bận việc khác thì tính theo phần còn rảnh. Rồi **nhìn máy mà
@@ -58,6 +63,10 @@ khó nhưng liền một khối thì thường cần **một** agent làm kỹ c
 không phải nhiều agent cùng làm.
 
 Không ghi số đo của một máy cụ thể vào repo: nó sai với người dev kế tiếp.
+
+Đặc tả bước (`docs/steps/`) đã xếp thứ tự làm: mục nào chỉ sửa một crate mới hay crate không ai khác sửa trong
+bước thì là ứng viên chạy song song (vd bước 34: module `address` song song với nền kernel). Các mục cùng sửa một crate
+(vd nhiều mục của `auth`) thì một agent làm nối tiếp.
 
 ## 3. Chia thế nào cho không giẫm nhau
 

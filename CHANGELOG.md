@@ -173,6 +173,10 @@ endpoints are marked deprecated with a sunset date first.
   feature like `content` and `auth`, and the kernel's files sit in private groups (`contracts`, `data`,
   `security`, `ops`, `values`). Every public path (`autoxide_kernel::ai::TextModel`, …) is unchanged, and a
   test keeps it so.
+- For contributors: the tests run about twice as fast. Dependencies are built with `opt-level = 1` (and the password
+  hash `argon2` with `opt-level = 3`) in dev and test builds — your own code stays unoptimised, so rebuilds take
+  as long as before. `./gate.sh --quick` tests only what changed since its last green run (not since `main`), and
+  both gates run the test binaries in parallel (`cargo xtask test-all` in the full gate).
 
 ### Fixed
 

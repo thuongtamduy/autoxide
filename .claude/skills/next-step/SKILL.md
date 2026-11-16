@@ -34,6 +34,10 @@ hứng, đừng nhảy cóc.
 
 ## 3. Làm
 
+- Đặc tả của bước có thứ tự làm và danh sách "Test bắt buộc": trước khi code, xem mục nào thuộc crate riêng và
+  không phụ thuộc nhau — đủ CPU, RAM, đĩa thì giao song song theo skill `split-work` (D-299).
+- Viết test của mục cùng lúc với code (lấy tên từ "Test bắt buộc"), chạy riêng bài đang làm
+  (`cargo test -p <crate> <tên>`) trong lúc viết; chạm database thì chạy thêm bài đó trên Postgres.
 - Làm trọn một mục `[ ]`, kèm test của nó. Mục quá lớn thì chia thành nhiều
   commit, nhưng chỉ đánh dấu `[x]` khi cả mục xong.
 - Gặp lựa chọn có ảnh hưởng lâu dài (đổi thư viện, thêm quy ước, cần ngoại lệ cho
@@ -48,6 +52,10 @@ hứng, đừng nhảy cóc.
 ./gate.sh           # mục cuối của bước, trước khi phát hành: đầy đủ, cả hai database
 ```
 
+- **Không ngồi chờ gate** (D-299): chạy nó ở chế độ nền. Trong lúc chờ chỉ đọc và chuẩn bị mục kế (đặc tả, code
+  liên quan, `check-library-api`) — không sửa file, vì gate đang đọc chính thư mục làm việc.
+- Gate nhanh chỉ test crate đổi kể từ lần nó xanh gần nhất (ref cục bộ `refs/autoxide/quick-green`), nên chạy nó
+  một lần mỗi nhóm việc là đủ (D-263).
 - Đỏ thì sửa code. Không nới gate, không tắt lint, không đánh dấu test bỏ qua.
 - `gate.sh` chưa tồn tại (đang ở bước 0): tạo nó là một mục của bước 0; trước đó
   chạy tay `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,

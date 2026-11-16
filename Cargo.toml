@@ -219,6 +219,18 @@ proptest = { version = "1.12", default-features = false, features = ["std"] }
 [profile.dev]
 debug = "line-tables-only"
 
+# Thư viện ngoài (`"*"` không gồm crate của workspace) được tối ưu nhẹ trong bản dev và test: test chạy
+# nhanh gần gấp đôi, còn sửa code của mình thì build lại nhanh như cũ vì crate của workspace vẫn không tối ưu.
+# Hàm băm mật khẩu cố tình chậm nên tối ưu hết cỡ. Số đo ở D-299.
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
 # Bản release vẫn kiểm tràn số nguyên (D-179): mặc định của Rust chỉ kiểm ở bản dev, bản release
 # cộng tràn `i64` sẽ âm thầm quay vòng (số dư dương lớn thành âm). Kiểm tràn biến lỗi đó thành
 # panic có log thay vì dữ liệu sai; tiền đi qua `Money` còn trả lỗi trước cả khi tràn. Số đo
