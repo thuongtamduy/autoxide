@@ -77,6 +77,94 @@ Entity dùng SeaORM (`src/entity.rs`). Đọc bằng `Database::read()`, ghi b�
 `Database::write()`, nhiều lệnh ghi đi cùng nhau thì `Database::begin_write()`. Giữ
 transaction ghi ngắn: không gọi mạng, không hash mật khẩu bên trong.
 
+### Đa khách: phân loại mọi bảng, lọc mọi truy vấn
+
+Một bản cài phục vụ nhiều khách hàng (tenant) mà dữ liệu không bao giờ được lẫn nhau. Dữ liệu
+của một khách có thể nằm ở database chính (chung với khách khác) hay ở database riêng; code của
+module giống nhau trong cả hai trường hợp. Chế độ mặc định (`AUTOXIDE_TENANCY_MODE=single`) chỉ
+có một khách và không tốn thêm gì mỗi request.
+
+**Phân loại từng bảng.** Mỗi bảng của module thuộc một trong ba loại:
+
+| Loại | Có `tenant_id` | Ví dụ |
+| --- | --- | --- |
+| Cấp khách hàng (hầu hết mọi bảng) | có, `NOT NULL`, không giá trị mặc định | `notes_note`, `<m>_events`, `<m>_jobs` |
+| Lịch sử migration | không | `<m>_migrations` |
+| Mặt điều khiển (hiếm: mô tả nền tảng, không thuộc một khách) | không — khai ở `Module::control_plane_tables` | `kernel_tenants` |
+
+Với bảng cấp khách hàng:
+
+- Thêm cột `tenant_id` (UUID, `NOT NULL`, không giá trị mặc định) — quên đặt khi insert thì lỗi
+  ngay, thay vì lặng lẽ rơi vào khách khác.
+- Mọi khoá unique và index bắt đầu bằng `tenant_id`: `(tenant_id, email)`, không phải `(email)`.
+  Cùng một tiêu đề hay email có thể có ở hai khách. Hai ngoại lệ: khoá chỉ gồm UUID (khoá chính
+  `id`, duy nhất toàn cục), và index quét cả database (hết hạn, hàng đợi, giữ lại theo thời hạn)
+  — không bắt đầu bằng `tenant_id` và tên kết thúc bằng `_sweep_idx`.
+- Danh sách của một khách sắp theo `id` (`fetch_page` trên `.scoped(&tenant)`, không có bộ lọc chọn lọc
+  khác) cần index `(tenant_id, id)`; thêm bằng
+  `autoxide_kernel::tenancy::migration::list_index("m00NN_…", vec!["<bảng>"])`.
+- Các helper `outbox_migration`, `jobs_migration` và các bảng khác của kernel đã theo sẵn luật này.
+
+Testkit và `cargo xtask check` chặn bảng hay entity thiếu `tenant_id` mà không khai là loại khác,
+và index sai luật trên.
+
+**Lọc mọi truy vấn.** Entity cài `TenantScoped` (một dòng nêu cột), service nhận `TenantContext`
+của khách — handler nhận nó như một extractor cạnh `Principal`; event mang nó ở `event.tenant`;
+job ở `JobContext::tenant`:
+
+```rust
+impl autoxide_kernel::tenancy::TenantScoped for Entity {
+    fn tenant_column() -> Self::Column {
+        Column::TenantId
+    }
+}
+
+// Trong service: database lấy từ khách, mọi truy vấn thêm `.scoped(tenant)`.
+let note = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
+let transaction = tenant.database().begin_write().await?;
+ActiveModel { id: Set(Uuid::now_v7()), tenant_id: Set(tenant.id().as_uuid()), /* … */ }
+    .insert(&transaction)
+    .await?;
+```
+
+`.scoped` dùng được cho `find`, `find_also_related`, `update_many`, `delete_many` và cho
+`Entity::update(model).validate()?` / `Entity::delete(model).validate()?`. Insert không có bộ lọc:
+tự đặt `tenant_id`. Hàm của trait trong `api` đọc hay đổi dữ liệu cũng nhận `&TenantContext`. Đưa
+job vào hàng đợi bằng `JobQueue::enqueue(…, tenant, …)` trong transaction của thay đổi; việc dọn
+dẹp quét mọi khách dùng `enqueue_database` và một index `_sweep_idx`.
+
+**Khách mới bắt đầu với gì.** Dữ liệu khách cần trước request đầu tiên (role `admin`, dòng khoá,
+bộ đếm) do `Module::seed_tenant` tạo — một `TenantSeed` chạy khi tạo khách. Nó phải chạy lại được:
+`autoxide tenant provision` làm lại lần tạo khách hỏng giữa chừng.
+
+**Cấu hình theo khách.** Cấu hình khách tự đổi được khai ở `Module::tenant_settings` (tên
+`<module>.<khoá>`) và đọc bằng `context.require::<dyn TenantSettings>()`; khách chưa đặt thì dùng
+cấu hình của máy chủ. Cấu hình kết nối tới dịch vụ đối tác thuộc `CONNECTION_GROUP` và được lưu
+mã hoá.
+
+**File và khoá.** Giữ file của khách bằng `TenantStorage` (tiền tố riêng) và dẫn xuất khoá ký theo
+khách bằng `SecretKey::derive_for(tenant, purpose)`.
+
+**Bài rò rỉ.** Mọi module có một test ghi dữ liệu ở khách A rồi gọi mọi endpoint `GET` và mọi tool
+MCP chỉ đọc bằng người của khách B — người này không được thấy gì của A:
+
+```rust
+let app = TestApp::builder(test)
+    .tenant("a")                      // khách trên database chung
+    .tenant_dedicated("b")            // khách có database riêng
+    .user_in("a", "admin-a", 1, &all)
+    .user_in("b", "admin-b", 2, &all)
+    .module(crate::module())
+    .build()
+    .await
+    .unwrap();
+// … tạo dữ liệu bằng "admin-a", có một chuỗi đánh dấu trong nội dung …
+let leaks = autoxide_testkit::leak_check(&app, "admin-b", marker, &[("id", id)]).await.unwrap();
+assert_eq!(leaks, Vec::<String>::new());
+```
+
+`cursor_leak_check` làm như vậy với con trỏ pagination. Xem `modules/comments/src/http/tests.rs`.
+
 ### 3. Permission
 
 Khai trong `src/permissions.rs` dạng `<module>.<việc>` và trả từ `Module::permissions`.
@@ -387,5 +475,7 @@ Luật core tự giữ:
 - [ ] Dữ liệu về người dùng được xuất (`PersonalData`) và xoá khi nhận `USER_DELETED`
 - [ ] Tiền dùng `Money`; số dư đổi bằng `rows::adjust`, khoá dòng theo thứ tự id, lệnh có
       hậu quả lâu dài chống trùng bằng `reference`
+- [ ] Bảng cấp khách hàng có `tenant_id` đứng đầu mọi khoá và index; mọi truy vấn `.scoped`;
+      `seed_tenant` chạy lại được; có bài rò rỉ (`leak_check`)
 - [ ] Test trên cả hai database, kể cả ghi đồng thời
 - [ ] Đã sinh lại `docs/openapi.json` và `.env.example`; gate xanh

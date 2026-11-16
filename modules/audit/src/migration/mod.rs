@@ -29,5 +29,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 TenantTable::new("audit_chain").primary_key(["tenant_id", "name"]),
             ],
         ),
+        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-301).
+        autoxide_kernel::tenancy::migration::list_index(
+            "m0006_tenant_list_index",
+            vec!["audit_entry"],
+        ),
     ]
 }

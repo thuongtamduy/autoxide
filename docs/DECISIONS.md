@@ -7343,3 +7343,33 @@ tìm commit gây ra hơn. Bản phát hành vẫn luôn xanh trên cả hai data
 
 Thay: phần "chỉ merge vào `main` khi gate đầy đủ xanh" của D-173, D-248, D-263 (mục 3). Các ngoại lệ một lần D-273,
 D-295, D-298 không còn cần.
+
+## D-301 · Đo đường nóng sau bước 33; index `(tenant_id, id)` cho danh sách theo khách — 2026-11-16 — agent quyết
+
+Bối cảnh: đặc tả 33 mục C4 đòi đo `scripts/loadtest.sh` trước / sau, cả hai database, kèm bài đo chế độ `multi`; tiêu
+chí xong: đường nóng `single` không chậm hơn ngoài dao động (±20%, D-179, mỗi bài 3 lần lấy trung vị). Số đo đầy đủ ở
+`docs/BENCHMARKS.md` "Sau bước 33". Mốc cũ đo trên máy khác nên đo lại bản `b5435c7` trên cùng máy với bản mới.
+
+Quyết định:
+
+1. **Index `<bảng>_tenant_list_idx (tenant_id, id)`** cho 20 bảng có danh sách của một khách sắp theo `id`
+   (`audit_entry`, `auth_user`, `auth_role`, `media_item`, `media_folder`, `media_tag`, `content_entries`,
+   `content_redirects`, `content_terms`, `content_authors`, `comments_comments`, `comments_bans`, `comments_reports`,
+   `forms_forms`, `newsletter_lists`, `newsletter_subscribers`, `newsletter_campaigns`, `newsletter_suppressions`,
+   `webhooks_endpoint`, `menus_menus`) qua helper mới `tenancy::migration::list_index`, mỗi module một migration. Đo
+   được: danh sách audit trên SQLite từ −47% về −11% (trước: SQLite đọc hết dòng của khách rồi sắp xếp tạm — `EXPLAIN
+   QUERY PLAN` báo `USE TEMP B-TREE FOR ORDER BY`; sau: chỉ `SEARCH … USING INDEX …_tenant_list_idx`). Quy ước từ nay:
+   bảng cấp khách hàng có danh sách `fetch_page` theo `id` mà bộ lọc chính chỉ là khách thì có index `(tenant_id, id)`.
+2. **Phần chung mọi request của đa khách nằm trong dao động** — kiểm sức khoẻ, tải file, ghi, danh sách audit: −0 đến
+   −18%. Bước 33 đạt tiêu chí cho phần nó thêm vào.
+3. **Hai chỗ chậm không do đa khách, ghi thành việc ở bước 39** (không sửa trong bước 33, vì không thuộc phạm vi của nó):
+   `GET /auth/me`, `auth.whoami`, `GET /auth/users` chậm 35–46% vì trả thêm trường cho giao diện (3 → 6 câu SQL cho
+   một `GET /auth/me`); lượt đăng nhập bị login throttling chặn trên Postgres chậm (8500 → 232 request/s khi 16 kết
+   nối dồn vào một email) vì bộ đếm cập nhật một dòng bằng nhiều câu `UPDATE` nối tiếp.
+4. **Chế độ `multi`** đo bằng `LOADTEST_TENANCY=multi` (100 khách chung + 10 khách SQLite riêng, thêm vào
+   `scripts/loadtest.sh`): người dùng của khách chung và khách riêng chạy ngang nhau, không lỗi.
+
+Đã cân nhắc: so với số mốc cũ ghi sẵn — khác máy, lệch tới 20% ngay ở bài không đổi code (`/health/ready`); sửa ngay
+hai chỗ chậm của mục 3 — là tối ưu tính năng của bước khác, cần đo riêng, để bước 39 (vận hành, hiệu năng) làm cùng
+các việc đo khác; index `(tenant_id, id)` cho mọi bảng cấp khách hàng (75 bảng) — phần lớn chỉ tra theo khoá khác hay
+theo bản ghi cha, thêm index chỉ tốn chỗ và chậm ghi.

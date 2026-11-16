@@ -119,6 +119,61 @@ impl TenantTable {
     }
 }
 
+/// Migration `name` thêm index `<bảng>_tenant_list_idx (tenant_id, id)` cho mỗi bảng trong `tables`.
+///
+/// Danh sách của một khách sắp theo `id` (`fetch_page` với `.scoped(&tenant)`) cần index này: thiếu
+/// nó, SQLite đọc mọi dòng của khách rồi sắp xếp tạm, Postgres quét khoá chính bỏ qua dòng của khách
+/// khác — chậm dần theo cỡ bảng (đo ở bước 33 C, D-301). Bảng có danh sách như vậy mà chưa có index
+/// nào bắt đầu bằng `(tenant_id, id)` thì thêm bằng helper này.
+pub fn list_index(name: &'static str, tables: Vec<&'static str>) -> Box<dyn MigrationTrait> {
+    Box::new(ListIndex { name, tables })
+}
+
+struct ListIndex {
+    name: &'static str,
+    tables: Vec<&'static str>,
+}
+
+impl MigrationName for ListIndex {
+    fn name(&self) -> &str {
+        self.name
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for ListIndex {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for table in &self.tables {
+            manager
+                .create_index(
+                    // Đường dẫn đủ: tên `Index` trong file này là kiểu riêng.
+                    sea_orm::sea_query::Index::create()
+                        .name(format!("{table}_tenant_list_idx"))
+                        .table(Alias::new(*table))
+                        .col("tenant_id")
+                        .col("id")
+                        .to_owned(),
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for table in &self.tables {
+            manager
+                .drop_index(
+                    sea_orm::sea_query::Index::drop()
+                        .name(format!("{table}_tenant_list_idx"))
+                        .table(Alias::new(*table))
+                        .to_owned(),
+                )
+                .await?;
+        }
+        Ok(())
+    }
+}
+
 /// Migration `name` nâng các bảng `tables` (cha trước con khi có khoá ngoại giữa chúng).
 pub fn adopt(name: &'static str, tables: Vec<TenantTable>) -> Box<dyn MigrationTrait> {
     Box::new(Adopt { name, tables })

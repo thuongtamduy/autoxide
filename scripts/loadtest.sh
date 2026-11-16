@@ -14,6 +14,11 @@
 # trong thời gian đó, đo bộ nhớ (RSS), số file đang mở của máy chủ và số kết nối
 # PostgreSQL mỗi 30 giây, rồi kết luận có rò rỉ hay không — thay cho các bài đo ngắn.
 #
+# Chế độ nhiều khách (bước 33): LOADTEST_TENANCY=multi chạy máy chủ ở AUTOXIDE_TENANCY_MODE=multi
+# với 100 khách trên database chính và 10 khách có database SQLite riêng, rồi thêm bài đo đọc /
+# list / ghi của người dùng một khách chung và một khách riêng (chọn khách bằng credential).
+# LOADTEST_TENANTS (100) và LOADTEST_DEDICATED (10) đổi số khách.
+#
 # Máy tạo tải và máy chủ chạy chung một máy nên tranh CPU: số đo là cận dưới, dùng để so
 # trước / sau một thay đổi trên cùng máy.
 
@@ -59,10 +64,35 @@ export AUTOXIDE_LOG_LEVEL=warn
 export AUTOXIDE_AUTH_TOKEN_SECRET="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
 export AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS=86400
 export AUTOXIDE_FILES_MAX_BYTES=1048576
+TENANCY="${LOADTEST_TENANCY:-single}"
+if [ "$TENANCY" = multi ]; then
+  export AUTOXIDE_TENANCY_MODE=multi
+  export AUTOXIDE_SECRET_KEY="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+fi
 
 "$BINARY" migrate up >/dev/null
 printf '%s' "$PASSWORD" | "$BINARY" user create --email admin@example.com --name Admin \
   --admin --password-stdin >/dev/null
+if [ "$TENANCY" = multi ]; then
+  # Khách chung: dữ liệu nằm cùng database chính. Khách riêng: mỗi khách một file SQLite.
+  # Lệnh CLI in cảnh báo cấu hình (chưa đặt SMTP…) ra stderr: bỏ đi cho bảng kết quả gọn.
+  for i in $(seq 1 "${LOADTEST_TENANTS:-100}"); do
+    "$BINARY" tenant create --slug "s$i" --name "Shared $i" >/dev/null 2>&1
+  done
+  mkdir -p dedicated
+  for i in $(seq 1 "${LOADTEST_DEDICATED:-10}"); do
+    printf '%s' "sqlite://$PWD/dedicated/d$i.sqlite?mode=rwc" \
+      | "$BINARY" placement add "d$i" --kind dedicated --url - >/dev/null 2>&1
+  done
+  "$BINARY" migrate up --all >/dev/null 2>&1
+  for i in $(seq 1 "${LOADTEST_DEDICATED:-10}"); do
+    "$BINARY" tenant create --slug "d$i" --name "Dedicated $i" --placement "d$i" >/dev/null 2>&1
+  done
+  for slug in s1 d1; do
+    printf '%s' "$PASSWORD" | "$BINARY" user create --tenant "$slug" --email "admin@$slug.example" \
+      --name Admin --admin --password-stdin >/dev/null 2>&1
+  done
+fi
 "$BINARY" serve >serve.log 2>&1 &
 SERVER=$!
 for _ in $(seq 1 100); do curl -sf "$BASE/health/ready" >/dev/null && break; sleep 0.1; done
@@ -70,7 +100,8 @@ for _ in $(seq 1 100); do curl -sf "$BASE/health/ready" >/dev/null && break; sle
 json() { python3 -c "import sys,json; print(json.load(sys.stdin)$1)"; }
 post() { curl -sf "$BASE$1" -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d "$2"; }
 
-TOKEN="$(curl -sf "$BASE/api/v1/auth/login" -H 'content-type: application/json' \
+# Chế độ multi: trước khi đăng nhập, request chọn khách bằng header (khách nền tảng tên `default`).
+TOKEN="$(curl -sf "$BASE/api/v1/auth/login" -H 'content-type: application/json' -H 'autoxide-tenant: default' \
   -d "{\"email\":\"admin@example.com\",\"password\":\"$PASSWORD\"}" | json '["data"]["access_token"]')"
 API_KEY="$(post /api/v1/auth/api-keys "{\"name\":\"loadtest\",\"permissions\":[\"auth.users.read\"],\"current_password\":\"$PASSWORD\"}" \
   | json '["data"]["key"]')"
@@ -174,7 +205,7 @@ if [ -n "${LOADTEST_SOAK:-}" ]; then
   echo "Dòng ERROR trong log máy chủ: $(grep -c 'ERROR' serve.log || true)"
   exit 0
 fi
-echo "## $backend — $(nproc) CPU, ${DURATION} mỗi bài"
+echo "## $backend ($TENANCY) — $(nproc) CPU, ${DURATION} mỗi bài"
 echo
 echo "| Bài đo                             | Kết nối |  Request/s |   p50 ms |   p95 ms |   p99 ms |  Thành công |"
 echo "| ---------------------------------- | ----: | --------: | -------: | -------: | -------: | ------: |"
@@ -187,7 +218,7 @@ run "GET /files/{id}/content (16 KiB)"    "$CONNECTIONS" -H "$AUTH" "$BASE/api/v
 run "MCP tools/call auth.whoami"          "$CONNECTIONS" -m POST -H "$AUTH" -H 'accept: application/json, text/event-stream' -T application/json -d "$MCP_BODY" "$BASE/mcp"
 run "PATCH /auth/users/{id} (ghi + event)" "$CONNECTIONS" -m PATCH -H "$AUTH" -T application/json -d '{"name":"Robert"}' "$BASE/api/v1/auth/users/$BOB"
 run "POST /files (4 KiB, ghi)"            "$CONNECTIONS" -m POST -H "$AUTH" -T application/octet-stream -D small.bin "$BASE/api/v1/files?name=load.bin"
-run "POST /auth/login (Argon2id)"         16 -m POST -T application/json -d "{\"email\":\"admin@example.com\",\"password\":\"$PASSWORD\"}" "$BASE/api/v1/auth/login"
+run "POST /auth/login (Argon2id)"         16 -m POST -H 'autoxide-tenant: default' -T application/json -d "{\"email\":\"admin@example.com\",\"password\":\"$PASSWORD\"}" "$BASE/api/v1/auth/login"
 
 echo
 echo "### Tăng dần số kết nối: đọc (GET /auth/me) và ghi (PATCH /auth/users/{id})"
@@ -200,6 +231,31 @@ done
 for connections in $RAMP; do
   run "ghi" "$connections" -m PATCH -H "$AUTH" -T application/json -d '{"name":"Robert"}' "$BASE/api/v1/auth/users/$BOB"
 done
+
+if [ "$TENANCY" = multi ]; then
+  echo
+  echo "### Người dùng của một khách (máy chủ có $((${LOADTEST_TENANTS:-100} + ${LOADTEST_DEDICATED:-10} + 1)) khách)"
+  echo
+  echo "| Bài đo                             | Kết nối |  Request/s |   p50 ms |   p95 ms |   p99 ms |  Thành công |"
+  echo "| ---------------------------------- | ----: | --------: | -------: | -------: | -------: | ------: |"
+  for slug in s1 d1; do
+    kind="chung"; [ "$slug" = d1 ] && kind="riêng"
+    # Đăng nhập chọn khách bằng header; request sau đó lấy khách từ chính token.
+    tenant_token="$(curl -sf "$BASE/api/v1/auth/login" -H 'content-type: application/json' \
+      -H "autoxide-tenant: $slug" \
+      -d "{\"email\":\"admin@$slug.example\",\"password\":\"$PASSWORD\"}" | json '["data"]["access_token"]')"
+    for i in $(seq 1 20); do
+      curl -sf "$BASE/api/v1/auth/users" -H "authorization: Bearer $tenant_token" \
+        -H 'content-type: application/json' -d "{\"email\":\"user$i@$slug.example\",\"name\":\"User $i\"}" >/dev/null
+    done
+    member="$(curl -sf "$BASE/api/v1/auth/users" -H "authorization: Bearer $tenant_token" \
+      -H 'content-type: application/json' -d "{\"email\":\"bob@$slug.example\",\"name\":\"Bob\"}" \
+      | json '["data"]["id"]')"
+    run "khách $kind: GET /auth/me"        "$CONNECTIONS" -H "authorization: Bearer $tenant_token" "$BASE/api/v1/auth/me"
+    run "khách $kind: GET /auth/users"     "$CONNECTIONS" -H "authorization: Bearer $tenant_token" "$BASE/api/v1/auth/users?limit=50"
+    run "khách $kind: PATCH /auth/users"   "$CONNECTIONS" -m PATCH -H "authorization: Bearer $tenant_token" -T application/json -d '{"name":"Robert"}' "$BASE/api/v1/auth/users/$member"
+  done
+fi
 
 # Máy chủ còn khoẻ sau tải, và log không có lỗi.
 curl -sf "$BASE/health/ready" >/dev/null && echo && echo "Máy chủ vẫn sẵn sàng sau tải."
