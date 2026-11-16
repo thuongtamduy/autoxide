@@ -341,6 +341,50 @@ into a new database.
 Check the configuration without starting anything: `autoxide config`. It lists every
 setting with its value (secrets hidden) and reports every problem at once.
 
+## Settings and state of each tenant
+
+With several tenants (`AUTOXIDE_TENANCY_MODE=multi`), the settings above apply to every tenant.
+Some behaviour of the modules can also be set per tenant, replacing the server's value for that
+tenant only:
+
+| Tenant setting | Replaces |
+| --- | --- |
+| `kernel.public_url` | `AUTOXIDE_HTTP_PUBLIC_URL` in links sent by mail |
+| `mail.smtp_url`, `mail.from` | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` |
+| `ai.api_key`, `ai.model` | the AI provider of the server |
+| `comments.banned_words`, `comments.suspect_words`, `comments.max_links`, `comments.guest_moderation`, `comments.user_moderation` | the same `AUTOXIDE_COMMENTS_…` settings ([comments](COMMENTS.md#per-tenant)) |
+| `forms.retention_days` | `AUTOXIDE_FORMS_RETENTION_DAYS` ([forms](FORMS.md#settings)) |
+| `content.locales`, `content.default_locale` | `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CONTENT_DEFAULT_LOCALE` ([content](CONTENT.md#languages)) |
+| `media.alt_locales` | `AUTOXIDE_MEDIA_ALT_LOCALES` ([media](MEDIA.md)) |
+
+`GET /api/v1/kernel/settings` lists them with what the current tenant set. A tenant's
+administrator (permission `kernel.settings.manage`) sets one with
+`PUT /api/v1/kernel/settings/{name}` and `{"value": "…"}`, and removes it (back to the server's
+value) with `DELETE`. Platform staff do the same for any tenant under
+`/api/v1/kernel/tenants/{id}/settings` (`kernel.tenants.read` to list, `kernel.tenants.manage` to
+change). Values are checked when they are set; secret ones are stored encrypted and never shown
+again. Other servers use a new value within `AUTOXIDE_TENANCY_CACHE_SECONDS`.
+
+A tenant can be stopped in two ways, independent of each other:
+
+- **Suspended** — `autoxide tenant suspend <tenant>` (back with `resume`), or `PATCH
+  /api/v1/kernel/tenants/{id}` with `{"status": "suspended"}`: every request to the tenant, reads
+  included, answers `403 tenant_suspended`, and its domains get no new certificates.
+- **Read-only** — `autoxide tenant read-only <tenant>` (back with `writable`), or `{"read_only":
+  true}`: reads work, its users can still sign in, reset their password, export their data and use
+  the links in mails (confirm an address, unsubscribe); every other change answers `403
+  tenant_read_only`, and so do MCP tools that are not read-only. Use it, for example, while a
+  customer has not paid.
+
+Background jobs and events of either kind of tenant keep running: they finish work that was
+accepted before, and deletions after the retention times keep happening. The platform tenant can
+be neither suspended nor read-only.
+
+`GET /api/v1/kernel/tenants` (platform staff) takes filters for a control panel — `status`,
+`read_only`, `placement_kind`, `schema_state`, and `subscription_status` / `near_limit`, which
+match no tenant until the plans module (subscriptions and limits) is installed — and
+`expand=placement` to get each tenant's placement in the same answer.
+
 ## Custom domains of tenants
 
 With several tenants (`AUTOXIDE_TENANCY_MODE=multi`), each tenant can serve its site on its own

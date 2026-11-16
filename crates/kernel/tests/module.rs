@@ -245,7 +245,9 @@ async fn module_nhan_database_va_khai_route() {
                     "/tenants".to_owned(),
                     "/tenants/{id}".to_owned(),
                     "/tenants/{id}/move".to_owned(),
-                    "/tenants/{id}/moves/{move_id}".to_owned()
+                    "/tenants/{id}/moves/{move_id}".to_owned(),
+                    "/tenants/{id}/settings".to_owned(),
+                    "/tenants/{id}/settings/{name}".to_owned()
                 ],
                 vec!["/token".to_owned()],
                 vec![],

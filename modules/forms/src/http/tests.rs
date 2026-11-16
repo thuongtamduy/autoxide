@@ -573,3 +573,84 @@ async fn hai_khach_cung_key_form_khong_ro_ri() {
     .await
     .unwrap();
 }
+
+/// Cấu hình theo khách (đối chiếu thiết kế 2, A-b7): `forms.retention_days` của khách thay
+/// `AUTOXIDE_FORMS_RETENTION_DAYS` (mặc định 0: giữ mãi) cho riêng khách đó; `retention_days` của
+/// form vẫn thắng; giá trị sai bị từ chối lúc đặt.
+#[tokio::test]
+async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
+    TestDatabase::run(async |test| {
+        let mailer: Arc<dyn Mailer> = Arc::new(FakeMailer::default());
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new());
+        let all = ["forms.read", "forms.manage", "forms.review", "forms.export"];
+        let mut admin = all.to_vec();
+        admin.push("kernel.settings.manage");
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant("b")
+            .user_in("a", "admin-a", 1, &admin)
+            .user_in("a", "site-a", 2, &["forms.submit"])
+            .user_in("b", "admin-b", 3, &admin)
+            .user_in("b", "site-b", 4, &["forms.submit"])
+            .provide::<dyn Mailer>(mailer)
+            .provide::<dyn Storage>(storage)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        // Khách B giữ bài 1 ngày; khách A không đặt (biến môi trường: giữ mãi).
+        let path = "/api/v1/kernel/settings/forms.retention_days";
+        let refused =
+            app.put(path).token("admin-b").json(json!({"value": "forever"})).send().await.unwrap();
+        assert_eq!(refused.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", refused.json());
+        assert_eq!(refused.json()["errors"][0]["field"], "value");
+        let set = app.put(path).token("admin-b").json(json!({"value": "1"})).send().await.unwrap();
+        assert_eq!(set.status(), StatusCode::OK, "{}", set.json());
+
+        // Mỗi khách: form `contact` (theo khách) và form `kept` tự đặt giữ mãi.
+        let mut submissions = Vec::new();
+        for (admin, site) in [("admin-a", "site-a"), ("admin-b", "site-b")] {
+            for (key, retention) in [("contact", Value::Null), ("kept", json!(0))] {
+                let body = json!({"key": key, "name": key, "retention_days": retention, "fields": [
+                    {"key": "message", "type": "textarea", "label": {"en": "Message"}, "required": true}
+                ]});
+                let created = app.post("/api/v1/forms").token(admin).json(body).send().await;
+                let created = created.unwrap();
+                assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+                let sent = app
+                    .post(&format!("/api/v1/forms/public/{key}/submissions"))
+                    .token(site)
+                    .json(json!({"data": {"message": "hello"}}))
+                    .send()
+                    .await
+                    .unwrap();
+                assert_eq!(sent.status(), StatusCode::CREATED, "{}", sent.json());
+                submissions.push((admin, sent.json()["data"]["id"].as_str().unwrap().to_owned()));
+            }
+        }
+
+        let settings = app.api::<dyn autoxide_kernel::tenancy::TenantSettings>().unwrap();
+        let antispam = autoxide_kernel::antispam::AntispamConfig::default();
+        let config = crate::config::FormsConfig::default();
+        assert_eq!(config.retention_days, 0);
+        let (service, _, _, _) =
+            crate::testing::service_with_settings(test, config, antispam, settings).await;
+        let later = chrono::Utc::now() + chrono::Duration::days(2);
+        let cleaned = service.cleanup(app.registry(), app.database(), later).await.unwrap();
+        assert_eq!(cleaned.expired, 1);
+        // Chỉ bài của form `contact` ở khách B hết hạn.
+        for (index, (admin, id)) in submissions.iter().enumerate() {
+            let found = app
+                .get(&format!("/api/v1/forms/submissions/{id}"))
+                .token(admin)
+                .send()
+                .await
+                .unwrap()
+                .status();
+            let expected = if index == 2 { StatusCode::NOT_FOUND } else { StatusCode::OK };
+            assert_eq!(found, expected, "submission {index}");
+        }
+    })
+    .await
+    .unwrap();
+}

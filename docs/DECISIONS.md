@@ -7199,3 +7199,34 @@ Chủ dự án bảo "merge luôn" để team giao diện dùng ngay các sửa 
 bước 33, trong lúc `./gate.sh` đầy đủ còn đang chạy. Ngoại lệ một lần cho luật "chỉ merge khi gate đầy đủ xanh"
 (CLAUDE.md): mọi commit đã qua `./gate.sh --quick`; gate đầy đủ lần trước (sau phần B) xanh; test Postgres của kernel và
 app đã chạy cho C1, C2. Gate đầy đủ vẫn chạy tiếp; đỏ thì sửa ngay trên nhánh làm việc và merge bản sửa. Không phát hành.
+
+## D-296 · Đối chiếu thiết kế 2 của bước 33: cấu hình nghiệp vụ theo khách, lọc danh sách khách, tách tạm khoá khỏi chỉ đọc — 2026-11-16 — agent quyết
+
+1. **Cấu hình theo khách (A-b7).** `comments.banned_words`, `comments.suspect_words` (`-` = không từ nào),
+   `comments.max_links`, `comments.guest_moderation`, `comments.user_moderation`; `forms.retention_days`;
+   `content.locales`, `content.default_locale`; `media.alt_locales`. Biến môi trường là mặc định của mọi khách.
+   `TenantSetting::checked` kiểm giá trị lúc đặt (422, lỗi ô `value`); module đọc bằng `parsed_setting` — giá trị đã lưu
+   mà nay sai thì `warn` và dùng giá trị chung. Kernel cache cấu hình theo khách (một truy vấn mỗi khách, TTL
+   `AUTOXIDE_TENANCY_CACHE_SECONDS`, xoá khi đặt / bỏ trên máy chủ này). Ưu tiên: chế độ duyệt theo loại đích của máy chủ
+   > chế độ của khách; `retention_days` của form > khách > máy chủ; ngôn ngữ mặc định của khách không thuộc danh sách thì
+   dùng mặc định của máy chủ nếu thuộc, không thì ngôn ngữ đầu. Nhân sự nền tảng:
+   `GET/PUT/DELETE /kernel/tenants/{id}/settings[/{name}]` (`kernel.tenants.read` / `kernel.tenants.manage`; khách
+   `moving` → `tenant_moving`). `GET /kernel/client-config` nhận khách tuỳ chọn, module gắn `TenantClientSection` để thay
+   trường theo khách. `GET /comments/public/settings` cần khách của request (chế độ `multi` không nêu khách → 400).
+2. **Danh sách khách (A-c7).** Lọc `read_only`, `placement_kind`, `schema_state`, `subscription_status`, `near_limit`;
+   `expand=placement,subscription,usage` → trường `expanded`. Hai truy vấn mỗi trang. Chưa có module `plans` (bước 35)
+   thì `subscription_status` / `near_limit=true` trả trang rỗng và `subscription` / `usage` là `null` — đúng sự thật,
+   hợp đồng không đổi khi bước 35 thêm dữ liệu. Tool MCP `list_tenants` chưa nhận các lọc mới.
+3. **Tạm khoá ≠ chỉ đọc (A-3.11).** Cột `kernel_tenants.read_only` (migration `m0013_tenant_read_only`), độc lập
+   `status`; đặt qua `PATCH /kernel/tenants/{id}` hay `autoxide tenant read-only|writable`; khách nền tảng không chỉ đọc
+   được. Cưỡng chế một chỗ ở `tenancy::request::tenant()`: `ensure_serving` (403 `tenant_suspended`) rồi
+   `ensure_writable` (lệnh ghi — không phải GET/HEAD/OPTIONS — trên route không gắn `AllowedWhileReadOnly` → **403
+   `tenant_read_only`**). Lệch mục bổ sung của đặc tả 33 (ghi 402 `plans.subscription_past_due`): theo đặc tả 35, vì
+   kernel không phát mã `plans.`. MCP kiểm theo cờ `read_only` của tool. Vẫn ghi được khi chỉ đọc: đăng nhập, refresh,
+   logout, đặt lại mật khẩu, link trong thư (xác nhận, huỷ đăng ký — rút lại đồng ý luôn phải làm được; Luật Bảo vệ dữ
+   liệu cá nhân 91/2025/QH15, cần đối chiếu văn bản gốc), tạo bản xuất của `forms`. Idempotency không lưu câu trả lời
+   khi khách chỉ đọc hay không phục vụ. Job và event vẫn chạy; bước 35 thêm hoãn job / bỏ event theo `always_enabled`
+   và cộng chỉ đọc do thuê bao vào `ensure_writable` (cờ của nhà vận hành giữ riêng).
+
+Chưa làm: test ở `auth` khẳng định đăng nhập chạy khi khách chỉ đọc (cơ chế miễn đã có test ở kernel bằng route giả);
+lọc mới cho tool `list_tenants`; `kernel.public_url` theo khách trong client-config.

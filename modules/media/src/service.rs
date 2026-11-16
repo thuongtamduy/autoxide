@@ -155,6 +155,9 @@ pub(crate) struct MediaService {
     pub(crate) config: MediaConfig,
     /// Sổ đối tượng của kernel: tên người tải lên (`auth.user`) mà không biết module `auth`.
     pub(crate) resources: autoxide_kernel::resource::ResourceDirectory,
+    /// Cấu hình theo khách của kernel (`media.alt_locales`); `None` (test dựng tay): chỉ dùng
+    /// cấu hình của máy chủ.
+    pub(crate) settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
 }
 
 impl MediaService {
@@ -166,7 +169,32 @@ impl MediaService {
         config: MediaConfig,
     ) -> Self {
         let resources = autoxide_kernel::resource::ResourceDirectory::default();
-        MediaService { storage, outbox, jobs, ai, config, resources }
+        MediaService { storage, outbox, jobs, ai, config, resources, settings: None }
+    }
+
+    /// Đọc cấu hình theo khách từ `settings` của kernel.
+    pub(crate) fn with_settings(
+        mut self,
+        settings: Arc<dyn autoxide_kernel::tenancy::TenantSettings>,
+    ) -> Self {
+        self.settings = Some(settings);
+        self
+    }
+
+    /// Ngôn ngữ dịch `alt` của khách `tenant`: `media.alt_locales` của khách, thiếu thì
+    /// `AUTOXIDE_MEDIA_ALT_LOCALES`. Đọc qua cache của kernel.
+    pub(crate) async fn alt_locales(&self, tenant: &TenantContext) -> Result<Vec<String>, Error> {
+        let Some(settings) = &self.settings else {
+            return Ok(self.config.alt_locales.clone());
+        };
+        let own = autoxide_kernel::tenancy::parsed_setting(
+            settings.as_ref(),
+            tenant,
+            &crate::config::TENANT_ALT_LOCALES,
+            crate::config::tenant_alt_locales,
+        )
+        .await?;
+        Ok(own.unwrap_or_else(|| self.config.alt_locales.clone()))
     }
 
     /// Nơi lưu nội dung của khách `tenant`: khoá có tiền tố khách (`tenants/<id>/…`), khách mặc
@@ -816,7 +844,7 @@ impl crate::api::Media for MediaService {
     ) -> Result<Vec<crate::api::MediaRef>, Error> {
         let mut found = self.find_many(tenant, ids).await?;
         // Ngôn ngữ không được khai thì không có bản dịch nào: giữ `alt` mặc định.
-        let Ok(locale) = self.alt_locale(locale) else {
+        let Ok(locale) = self.alt_locale(tenant, locale).await else {
             return Ok(found);
         };
         let ids: Vec<Uuid> = found.iter().map(|item| item.id).collect();

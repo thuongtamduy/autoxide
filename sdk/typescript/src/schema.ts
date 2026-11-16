@@ -326,11 +326,17 @@ export type ChangePasswordRequest = {
 export type ClientConfigResponse = {
   /** Content settings an interface needs. */
   content: {
-    /** Language of a new entry when none is given. */
+    /**
+     * Language of a new entry when none is given: the tenant's `content.default_locale`,
+     * otherwise the server's `AUTOXIDE_CONTENT_DEFAULT_LOCALE`.
+     */
     default_locale: string;
     /** Hosts whose videos and posts may be embedded in an entry (`AUTOXIDE_CONTENT_EMBED_HOSTS`). */
     embed_hosts: string[];
-    /** Languages entries may be written in (`AUTOXIDE_CONTENT_LOCALES`), the default first. */
+    /**
+     * Languages entries may be written in: the tenant's `content.locales` setting, otherwise
+     * the server's `AUTOXIDE_CONTENT_LOCALES`.
+     */
     locales: string[];
     /** Largest entry body accepted, in bytes. */
     max_body_bytes: number;
@@ -368,8 +374,8 @@ export type ClientConfigResponse = {
      */
     allowed_types: string[];
     /**
-     * Languages of `alt` translations (`AUTOXIDE_MEDIA_ALT_LOCALES`): show one alt field per
-     * language.
+     * Languages of `alt` translations: the tenant's `media.alt_locales` setting, otherwise the
+     * server's `AUTOXIDE_MEDIA_ALT_LOCALES`. Show one alt field per language.
      */
     alt_locales: string[];
     /** Widths of the smaller copies made of images, in pixels. */
@@ -886,6 +892,8 @@ export type CurrentTenant = {
   name: string;
   /** Whether this is the platform tenant (the operator's own). */
   platform: boolean;
+  /** Read-only: data can be read but every change is refused with `403 tenant_read_only`. */
+  read_only?: boolean;
   slug: string;
   status: string;
 };
@@ -1344,6 +1352,8 @@ export type Data_CurrentTenant = {
     name: string;
     /** Whether this is the platform tenant (the operator's own). */
     platform: boolean;
+    /** Read-only: data can be read but every change is refused with `403 tenant_read_only`. */
+    read_only?: boolean;
     slug: string;
     status: string;
   };
@@ -2482,15 +2492,24 @@ export type Data_Tenant = {
   /** A customer (tenant) of the platform. */
   data: {
     created_at: string;
+    expanded?: TenantExpanded | null;
     id: string;
     name: string;
     /** Parent tenant, when the tenant belongs to a chain. */
     parent_id?: string | null;
     /** Name of the placement (database) that keeps its data. */
     placement: string;
+    /**
+     * Read-only: its data can be read (and its users can sign in and export), but every change
+     * is refused with `403 tenant_read_only`. Independent of `status`.
+     */
+    read_only?: boolean;
     /** Short name: lower-case letters, digits and `-`; unique on the platform. */
     slug: string;
-    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    /**
+     * `provisioning`, `active`, `suspended` (every request is refused with
+     * `403 tenant_suspended`), `maintenance` or `moving`.
+     */
     status: string;
     updated_at: string;
   };
@@ -4995,15 +5014,24 @@ export type Page_Tenant = {
   /** The items of this page, in the requested order. */
   data: {
     created_at: string;
+    expanded?: TenantExpanded | null;
     id: string;
     name: string;
     /** Parent tenant, when the tenant belongs to a chain. */
     parent_id?: string | null;
     /** Name of the placement (database) that keeps its data. */
     placement: string;
+    /**
+     * Read-only: its data can be read (and its users can sign in and export), but every change
+     * is refused with `403 tenant_read_only`. Independent of `status`.
+     */
+    read_only?: boolean;
     /** Short name: lower-case letters, digits and `-`; unique on the platform. */
     slug: string;
-    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    /**
+     * `provisioning`, `active`, `suspended` (every request is refused with
+     * `403 tenant_suspended`), `maintenance` or `moving`.
+     */
     status: string;
     updated_at: string;
   }[];
@@ -6338,15 +6366,24 @@ export type Taxonomy = "category" | "tag";
 /** A customer (tenant) of the platform. */
 export type Tenant = {
   created_at: string;
+  expanded?: TenantExpanded | null;
   id: string;
   name: string;
   /** Parent tenant, when the tenant belongs to a chain. */
   parent_id?: string | null;
   /** Name of the placement (database) that keeps its data. */
   placement: string;
+  /**
+   * Read-only: its data can be read (and its users can sign in and export), but every change
+   * is refused with `403 tenant_read_only`. Independent of `status`.
+   */
+  read_only?: boolean;
   /** Short name: lower-case letters, digits and `-`; unique on the platform. */
   slug: string;
-  /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+  /**
+   * `provisioning`, `active`, `suspended` (every request is refused with
+   * `403 tenant_suspended`), `maintenance` or `moving`.
+   */
   status: string;
   updated_at: string;
 };
@@ -6354,7 +6391,13 @@ export type Tenant = {
 /** Changes to a tenant; omitted fields stay as they are. */
 export type TenantChanges = {
   name?: string | null;
-  /** `active` or `suspended`. */
+  /**
+   * `true`: the tenant can only read (its users still sign in and export their data), every
+   * change is refused with `403 tenant_read_only`; `false`: writable again. Independent of
+   * `status`. The platform tenant cannot be made read-only.
+   */
+  read_only?: boolean | null;
+  /** `active` or `suspended`. A suspended tenant refuses every request, reads included. */
   status?: string | null;
 };
 
@@ -6394,6 +6437,21 @@ export type TenantDomainRecord = {
   type: string;
   /** Exact value of the record. */
   value: string;
+};
+
+/** Related records of a tenant, asked for with `expand`. */
+export type TenantExpanded = {
+  placement?: Placement | null;
+  /**
+   * The tenant's subscription (`expand=subscription`). Always `null` for now: subscriptions
+   * come with the plans module (step 35); without it no tenant has one.
+   */
+  subscription?: Record<string, unknown> | null;
+  /**
+   * The tenant's use of its plan's limits (`expand=usage`). Always `null` for now, like
+   * `subscription`.
+   */
+  usage?: Record<string, unknown> | null;
 };
 
 /** A move of a tenant to another placement. */
@@ -7860,6 +7918,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_CommentSettings;
+        400: Problem;
         default: Problem;
       };
     };
@@ -9070,7 +9129,9 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_ClientConfigResponse;
+        403: Problem;
         500: Problem;
+        503: Problem;
         default: Problem;
       };
     };
@@ -9228,7 +9289,7 @@ export interface paths {
   "/api/v1/kernel/tenants": {
     /** List the tenants of the platform. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; parent_id?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; parent_id?: string; read_only?: boolean; placement_kind?: string; schema_state?: string; subscription_status?: string; near_limit?: boolean; expand?: string }; };
       responses: {
         200: Page_Tenant;
         401: Problem;
@@ -9306,6 +9367,48 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/settings": {
+    /** List a tenant's settings (platform staff). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_TenantSettingState;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/settings/{name}": {
+    /** Set a setting of a tenant (platform staff). */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; name: string }; };
+      requestBody: TenantSettingValue;
+      responses: {
+        200: Data_TenantSettingState;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a setting of a tenant (platform staff). */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; name: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

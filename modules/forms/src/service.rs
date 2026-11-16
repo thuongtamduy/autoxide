@@ -15,7 +15,7 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::public_url::PublicUrl;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::storage::{Storage, TenantStorage};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{TenantContext, TenantSettings, parsed_setting};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{DbErr, SqlErr};
 
@@ -34,6 +34,8 @@ pub(crate) struct FormsService {
     /// Địa chỉ công khai của API, để link tải bản xuất là link tuyệt đối khi đã cấu hình.
     pub(crate) public_url: Arc<PublicUrl>,
     pub(crate) config: FormsConfig,
+    /// Cấu hình theo khách của kernel (`forms.retention_days`).
+    pub(crate) settings: Arc<dyn TenantSettings>,
 }
 
 /// Thứ service cần từ kernel và module khác.
@@ -46,6 +48,7 @@ pub(crate) struct Parts {
     pub storage: Arc<dyn Storage>,
     pub jobs: JobQueue,
     pub public_url: Arc<PublicUrl>,
+    pub settings: Arc<dyn TenantSettings>,
 }
 
 impl FormsService {
@@ -60,7 +63,22 @@ impl FormsService {
             jobs: parts.jobs,
             public_url: parts.public_url,
             config,
+            settings: parts.settings,
         }
+    }
+
+    /// Thời hạn giữ bài mặc định của khách `tenant` (form không tự đặt): `forms.retention_days` của
+    /// khách, thiếu thì `AUTOXIDE_FORMS_RETENTION_DAYS`.
+    pub(crate) async fn retention_days(&self, tenant: &TenantContext) -> Result<u32, Error> {
+        let setting = &crate::config::TENANT_RETENTION_DAYS;
+        let days = parsed_setting(
+            self.settings.as_ref(),
+            tenant,
+            setting,
+            crate::config::tenant_retention_days,
+        )
+        .await?;
+        Ok(days.unwrap_or(self.config.retention_days))
     }
 
     /// Nơi lưu file xuất của khách `tenant` (khoá có tiền tố khách, D-259).

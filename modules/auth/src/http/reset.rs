@@ -18,7 +18,11 @@ use validator::Validate;
 use super::HttpState;
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
-    OpenApiRouter::new().routes(routes!(request_reset)).routes(routes!(confirm_reset))
+    // Khách chỉ đọc: quên mật khẩu vẫn lấy lại được để đăng nhập xem dữ liệu (A-3.11).
+    OpenApiRouter::new()
+        .routes(routes!(request_reset))
+        .routes(routes!(confirm_reset))
+        .layer(autoxide_kernel::tenancy::allowed_while_read_only())
 }
 
 /// The account whose password to reset.

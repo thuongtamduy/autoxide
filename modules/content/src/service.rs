@@ -11,11 +11,11 @@ use autoxide_kernel::ai::{Embedder, TextModel};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::job::JobQueue;
-use autoxide_kernel::tenancy::DatabaseRegistry;
+use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, TenantSettings, parsed_setting};
 use autoxide_media::api::Media;
 use chrono::{DateTime, SubsecRound, Utc};
 
-use crate::config::ContentConfig;
+use crate::config::{self, ContentConfig, Languages};
 
 // Không giữ `Database`: mọi hàm chạm dữ liệu nhận `&TenantContext` và dùng database của khách
 // (bước 33).
@@ -30,6 +30,8 @@ pub(crate) struct ContentService {
     /// Embedding của module `ai`: tìm theo ý nghĩa.
     pub(crate) embedder: Arc<dyn Embedder>,
     pub(crate) config: ContentConfig,
+    /// Cấu hình theo khách của kernel (`content.locales`, `content.default_locale`).
+    pub(crate) settings: Arc<dyn TenantSettings>,
     /// Vector và câu tìm giữ trong bộ nhớ của tiến trình (tìm theo ý nghĩa).
     pub(crate) search_cache: crate::ai::semantic::SearchCache,
     /// Bản dịch của chương trình: câu kết quả kiểm SEO theo `Accept-Language` (D-264).
@@ -41,6 +43,7 @@ pub(crate) struct Dependencies {
     pub media: Arc<dyn Media>,
     pub ai: Arc<dyn TextModel>,
     pub embedder: Arc<dyn Embedder>,
+    pub settings: Arc<dyn TenantSettings>,
 }
 
 impl ContentService {
@@ -51,7 +54,7 @@ impl ContentService {
         dependencies: Dependencies,
         config: ContentConfig,
     ) -> Self {
-        let Dependencies { media, ai, embedder } = dependencies;
+        let Dependencies { media, ai, embedder, settings } = dependencies;
         let search_cache = crate::ai::semantic::SearchCache::default();
         ContentService {
             databases,
@@ -61,6 +64,7 @@ impl ContentService {
             ai,
             embedder,
             config,
+            settings,
             search_cache,
             translations: Default::default(),
         }
@@ -75,26 +79,46 @@ impl ContentService {
         self
     }
 
-    /// `locale` đã chuẩn hoá nếu được hỗ trợ; không thì thêm lỗi `field`.
+    /// Ngôn ngữ của khách `tenant`: cấu hình `content.locales` / `content.default_locale` của
+    /// khách, thiếu thì `AUTOXIDE_CONTENT_LOCALES` / `AUTOXIDE_CONTENT_DEFAULT_LOCALE`. Đọc qua cache
+    /// của kernel (không thêm truy vấn mỗi request).
+    pub(crate) async fn languages(&self, tenant: &TenantContext) -> Result<Languages, Error> {
+        let settings = self.settings.as_ref();
+        let locales =
+            parsed_setting(settings, tenant, &config::TENANT_LOCALES, config::tenant_locales)
+                .await?;
+        let default = parsed_setting(
+            settings,
+            tenant,
+            &config::TENANT_DEFAULT_LOCALE,
+            config::tenant_default_locale,
+        )
+        .await?;
+        Ok(Languages::resolve(&self.config, locales, default))
+    }
+
+    /// `locale` đã chuẩn hoá nếu nằm trong `languages`; không thì thêm lỗi `field` (và trả ngôn
+    /// ngữ mặc định để kiểm tiếp các ô khác). Không gửi: ngôn ngữ mặc định.
     pub(crate) fn check_locale(
         &self,
+        languages: &Languages,
         raw: Option<&str>,
         field: &str,
         problems: &mut Vec<FieldError>,
     ) -> String {
         let Some(raw) = raw else {
-            return self.config.default_locale.clone();
+            return languages.default.clone();
         };
         match crate::config::canonical_locale(raw.trim())
-            .filter(|locale| self.config.locales.contains(locale))
+            .filter(|locale| languages.locales.contains(locale))
         {
             Some(locale) => locale,
             None => {
                 problems.push(
                     FieldError::new(field, "locale_not_supported", "must be one of: {allowed}")
-                        .with_param("allowed", self.config.locales.join(", ")),
+                        .with_param("allowed", languages.locales.join(", ")),
                 );
-                self.config.default_locale.clone()
+                languages.default.clone()
             }
         }
     }

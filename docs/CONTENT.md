@@ -128,6 +128,17 @@ The website only adds its domain and, if it uses one, a language prefix (`/vi/�
 Languages are set by `AUTOXIDE_CONTENT_LOCALES` (default `en,vi`, BCP 47 codes) and
 `AUTOXIDE_CONTENT_DEFAULT_LOCALE` (default `en`).
 
+With several tenants, these are the default of every tenant: a tenant can set its own
+`content.locales` and `content.default_locale` (its administrator with
+`PUT /api/v1/kernel/settings/{name}`, permission `kernel.settings.manage`; platform staff with
+`PUT /api/v1/kernel/tenants/{id}/settings/{name}`). Its languages then apply to everything of that
+tenant: what entries, terms, menus and redirects accept, the `locale` of public routes, and the
+`content` part of `GET /api/v1/kernel/client-config` for requests that name the tenant. When the
+tenant's default language is not one of its languages, the server's default is used if it is one of
+them, otherwise the first of them. Entries already written in a language a tenant drops stay as
+they are. Wrong codes are refused when they are set; `DELETE` a setting to go back to the
+server's value.
+
 - Each translation is its own entry, with its own slug, status and history, linked to the
   others by `translation_group_id`. Create one with `POST …/entries/{id}/translations`
   (`{"locale": "vi", "title": …}`). A subpage can be translated only once its parent is.

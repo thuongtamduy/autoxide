@@ -120,14 +120,15 @@ impl CommentsService {
         {
             return Err(banned());
         }
-        if text::contains_word(&body, &self.config.banned_words) {
+        let rules = self.rules(tenant).await?;
+        if text::contains_word(&body, &rules.banned_words) {
             return Err(banned_word());
         }
         let mut holds = Vec::new();
-        if text::contains_word(&body, &self.config.suspect_words) {
+        if text::contains_word(&body, &rules.suspect_words) {
             holds.push("suspect_word");
         }
-        if text::links(&body, format) > self.config.max_links {
+        if text::links(&body, format) > rules.max_links {
             holds.push("too_many_links");
         }
         // Bình luận đang hiện mà sửa: dính từ nghi ngờ / quá nhiều link thì giữ lại; không thì

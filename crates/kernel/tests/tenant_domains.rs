@@ -304,8 +304,8 @@ async fn request_theo_ten_mien_da_xac_minh() {
         let admin = app.api::<autoxide_kernel::tenancy::TenantAdmin>().unwrap();
         let locked = app.tenant("locked").await.unwrap();
         let changes = autoxide_kernel::tenancy::TenantChanges {
-            name: None,
             status: Some("suspended".to_owned()),
+            ..Default::default()
         };
         let actor = autoxide_kernel::event::Actor::system();
         admin.update(actor, locked.id().as_uuid(), changes, None).await.unwrap();

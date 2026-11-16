@@ -151,8 +151,8 @@ Cả hai cần `forms.export`. File được ghi vào nơi lưu file chung (modu
 Thời hạn giữ dữ liệu là cấu hình, không cài cứng trong code. Form liên hệ có cần xin đồng ý không,
 được giữ bài gửi bao lâu, phải trả lời yêu cầu về dữ liệu trong bao lâu tuỳ luật áp dụng cho bạn
 (vd Luật Bảo vệ dữ liệu cá nhân 2025 và Nghị định 356/2025 của Việt Nam): **hãy tự kiểm văn bản
-gốc cho trường hợp của mình** rồi đặt `AUTOXIDE_FORMS_RETENTION_DAYS` (hoặc `retention_days` của
-từng form) cho phù hợp.
+gốc cho trường hợp của mình** rồi đặt `AUTOXIDE_FORMS_RETENTION_DAYS` (hoặc `forms.retention_days`
+của khách, hoặc `retention_days` của từng form) cho phù hợp.
 
 ## AI agent (MCP)
 
@@ -188,3 +188,10 @@ tool gửi form.
 Mỗi form có thể đặt riêng `ip_limit_per_hour`, `email_limit_per_hour` và `retention_days`. Lớp
 chống spam (`AUTOXIDE_ANTISPAM_*`) dùng chung cho mọi module. Mọi biến được mô tả trong
 [`.env.example`](../.env.example).
+
+Khi có nhiều khách hàng (tenant), mỗi khách có thể thay `AUTOXIDE_FORMS_RETENTION_DAYS` bằng
+`forms.retention_days` của mình (`0` đến `36500`; quản trị của khách gọi
+`PUT /api/v1/kernel/settings/forms.retention_days`, permission `kernel.settings.manage`; nhân sự nền
+tảng gọi `PUT /api/v1/kernel/tenants/{id}/settings/forms.retention_days`). Thứ tự áp dụng:
+`retention_days` của form, rồi cấu hình của khách, rồi của máy chủ. Giá trị sai bị từ chối ngay lúc
+đặt; gọi `DELETE` cấu hình đó để về giá trị của máy chủ.

@@ -46,7 +46,7 @@ async fn hai_khach_cung_dich_cung_ten_khong_dung_nhau_token_mang_khach() {
             .build()
             .await
             .unwrap();
-        let h = service_in(test, open_config(), app.registry().clone()).await;
+        let h = service_in(test, open_config(), &app).await;
         let other = app.tenant("other").await.unwrap();
         let other_id = other.id().as_uuid().simple().to_string();
         let o = Harness { tenant: other, ..h.clone() };
@@ -140,6 +140,91 @@ async fn hai_khach_cung_dich_cung_ten_khong_dung_nhau_token_mang_khach() {
         // Dọn theo thời hạn chạy một lần cho database, theo từng khách.
         let later = crate::service::now() + chrono::Duration::days(400);
         h.service.cleanup(app.registry(), &h.database, later).await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Cấu hình theo khách (đối chiếu thiết kế 2, A-b7): khách đặt từ cấm, số link, chế độ duyệt thì
+/// thay biến môi trường cho riêng khách đó; khách chưa đặt dùng biến môi trường; giá trị sai bị
+/// từ chối lúc đặt; bỏ cấu hình thì về giá trị chung.
+#[tokio::test]
+async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
+    TestDatabase::run(async |test| {
+        let mailer: Arc<dyn Mailer> = Arc::new(crate::testing::FakeMailer::default());
+        let app = TestApp::builder(test)
+            .tenant("other")
+            .user("platform", 1, &["kernel.tenants.manage"])
+            .provide::<dyn Mailer>(mailer)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let h = service_in(test, open_config(), &app).await;
+        let o = Harness { tenant: app.tenant("other").await.unwrap(), ..h.clone() };
+        let base = "/api/v1/kernel/tenants/other/settings";
+        for (name, value) in [
+            ("comments.banned_words", "casino"),
+            ("comments.max_links", "0"),
+            ("comments.user_moderation", "pre"),
+        ] {
+            let response = app
+                .put(&format!("{base}/{name}"))
+                .token("platform")
+                .json(serde_json::json!({ "value": value }))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), 200, "{}", response.text());
+        }
+        // Giá trị sai bị từ chối lúc đặt, lỗi ở ô `value`.
+        let refused = app
+            .put(&format!("{base}/comments.max_links"))
+            .token("platform")
+            .json(serde_json::json!({ "value": "500" }))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(refused.status(), 422);
+        assert_eq!(refused.json()["errors"][0]["field"], "value");
+
+        let ada = user(&["post"]);
+        for harness in [&h, &o] {
+            harness.service.set_profile(&harness.tenant, &ada, "Ada").await.unwrap();
+        }
+        let client = visitor("203.0.113.9");
+        // Khách mặc định: biến môi trường (không từ cấm, 2 link, hiện ngay).
+        let mine =
+            h.service.post(&h.tenant, Some(&ada), &client, signed("casino https://a.example"));
+        assert_eq!(mine.await.unwrap().shown, Status::Published);
+        // Khách kia: từ cấm của khách.
+        let theirs = o.service.post(&o.tenant, Some(&ada), &client, signed("Chơi casino"));
+        assert_eq!(theirs.await.unwrap_err().code(), "comments.banned_word");
+        // Khách kia: một link đã quá (0) — giữ lại vì link, không phải vì chế độ duyệt.
+        let linked = o.service.post(&o.tenant, Some(&ada), &client, signed("https://a.example"));
+        let linked = linked.await.unwrap();
+        assert_eq!(linked.shown, Status::Pending);
+        let stored = o.service.find(&o.tenant, linked.comment.row.id).await.unwrap();
+        assert_eq!(stored.hold_reason.as_deref(), Some("too_many_links"));
+        // Khách kia: chế độ `pre` cho người dùng đăng nhập.
+        let plain = o.service.post(&o.tenant, Some(&ada), &client, signed("Bài hay"));
+        let plain = plain.await.unwrap();
+        let stored = o.service.find(&o.tenant, plain.comment.row.id).await.unwrap();
+        assert_eq!(stored.hold_reason.as_deref(), Some("moderation"));
+
+        // Cài đặt công khai cho website theo khách của request.
+        let settings = |slug: &'static str| {
+            app.get("/api/v1/comments/public/settings").header("autoxide-tenant", slug).send()
+        };
+        assert_eq!(settings("other").await.unwrap().json()["data"]["max_links"], 0);
+        assert_eq!(settings("default").await.unwrap().json()["data"]["max_links"], 2);
+
+        // Bỏ cấu hình: về biến môi trường.
+        let removed =
+            app.delete(&format!("{base}/comments.banned_words")).token("platform").send().await;
+        assert_eq!(removed.unwrap().status(), 204);
+        let again = o.service.post(&o.tenant, Some(&ada), &client, signed("Chơi casino"));
+        assert!(again.await.is_ok());
     })
     .await
     .unwrap();

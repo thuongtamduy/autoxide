@@ -113,7 +113,19 @@ impl Module for ContentModule {
     fn client_config(
         &self,
     ) -> Result<Option<autoxide_kernel::module::ClientSection>, autoxide_kernel::error::Error> {
-        self.config.as_ref().map_or(Ok(None), client_config::section)
+        let Some(config) = &self.config else { return Ok(None) };
+        let section = client_config::section(config)?;
+        // Ngôn ngữ là cấu hình theo khách: request xác định được khách thì lấy của khách.
+        Ok(match &self.service {
+            Some(service) => section.map(|section| {
+                section.per_tenant(Arc::new(client_config::TenantLanguages(service.clone())))
+            }),
+            None => section,
+        })
+    }
+
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::TENANT_LOCALES, config::TENANT_DEFAULT_LOCALE]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -134,6 +146,7 @@ impl Module for ContentModule {
             media: context.require::<dyn Media>()?,
             ai: context.require::<dyn autoxide_kernel::ai::TextModel>()?,
             embedder: context.require::<dyn autoxide_kernel::ai::Embedder>()?,
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
         };
         let service = Arc::new(
             ContentService::new(
@@ -300,15 +313,17 @@ pub(crate) mod testing {
         build(test, config, ai, embedder, None).await
     }
 
-    /// Như [`service_with`], tra khách qua sổ `registry` (vd sổ nhiều khách của một `TestApp`).
+    /// Như [`service_with`], tra khách qua sổ và đọc cấu hình theo khách của `app` (một `TestApp`
+    /// nhiều khách): cấu hình đặt qua REST của `app` có hiệu lực ở service này.
     pub async fn service_in(
         test: &TestDatabase,
         config: ContentConfig,
         ai: Arc<dyn autoxide_kernel::ai::TextModel>,
         embedder: Arc<dyn autoxide_kernel::ai::Embedder>,
-        registry: DatabaseRegistry,
+        app: &autoxide_testkit::TestApp,
     ) -> (Arc<ContentService>, Arc<FakeMedia>, Database) {
-        build(test, config, ai, embedder, Some(registry)).await
+        let settings = app.api::<dyn autoxide_kernel::tenancy::TenantSettings>().unwrap();
+        build(test, config, ai, embedder, Some((app.registry().clone(), settings))).await
     }
 
     async fn build(
@@ -316,8 +331,11 @@ pub(crate) mod testing {
         config: ContentConfig,
         ai: Arc<dyn autoxide_kernel::ai::TextModel>,
         embedder: Arc<dyn autoxide_kernel::ai::Embedder>,
-        registry: Option<DatabaseRegistry>,
+        tenancy: Option<(DatabaseRegistry, Arc<dyn autoxide_kernel::tenancy::TenantSettings>)>,
     ) -> (Arc<ContentService>, Arc<FakeMedia>, Database) {
+        let (registry, settings) = tenancy.unzip();
+        let settings =
+            settings.unwrap_or_else(|| Arc::new(autoxide_testkit::FakeTenantSettings::default()));
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
         let kernel = Config::read(&mut reader);
@@ -329,7 +347,8 @@ pub(crate) mod testing {
             .await
             .unwrap();
         let media = Arc::new(FakeMedia::default());
-        let dependencies = crate::service::Dependencies { media: media.clone(), ai, embedder };
+        let dependencies =
+            crate::service::Dependencies { media: media.clone(), ai, embedder, settings };
         let service = ContentService::new(
             registry.unwrap_or_else(|| DatabaseRegistry::single(database.clone())),
             Outbox::standalone("content"),

@@ -1,7 +1,10 @@
 //! Phần của `content` trong cấu hình cho giao diện (D-271).
 
+use std::sync::Arc;
+
 use autoxide_kernel::error::Error;
-use autoxide_kernel::module::ClientSection;
+use autoxide_kernel::module::{ClientSection, TenantClientSection};
+use autoxide_kernel::tenancy::TenantContext;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -11,10 +14,12 @@ use crate::config::ContentConfig;
 #[derive(Debug, Clone, Serialize, ToSchema)]
 #[schema(as = ContentClientConfig)]
 struct ContentClientConfig {
-    /// Languages entries may be written in (`AUTOXIDE_CONTENT_LOCALES`), the default first.
+    /// Languages entries may be written in: the tenant's `content.locales` setting, otherwise
+    /// the server's `AUTOXIDE_CONTENT_LOCALES`.
     #[schema(example = json!(["en", "vi"]))]
     locales: Vec<String>,
-    /// Language of a new entry when none is given.
+    /// Language of a new entry when none is given: the tenant's `content.default_locale`,
+    /// otherwise the server's `AUTOXIDE_CONTENT_DEFAULT_LOCALE`.
     #[schema(example = "en")]
     default_locale: String,
     /// First segment of the address of every post (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), without
@@ -37,4 +42,21 @@ pub(crate) fn section(config: &ContentConfig) -> Result<Option<ClientSection>, E
         max_body_bytes: u64::try_from(config.max_body_bytes).unwrap_or(u64::MAX),
     };
     ClientSection::new(&section).map(Some)
+}
+
+/// Ngôn ngữ của khách cho phần `content` (cấu hình `content.locales`, `content.default_locale`).
+pub(crate) struct TenantLanguages(pub(crate) Arc<crate::service::ContentService>);
+
+#[async_trait::async_trait]
+impl TenantClientSection for TenantLanguages {
+    async fn overrides(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<serde_json::Map<String, serde_json::Value>, Error> {
+        let languages = self.0.languages(tenant).await?;
+        let mut fields = serde_json::Map::new();
+        fields.insert("locales".to_owned(), serde_json::json!(languages.locales));
+        fields.insert("default_locale".to_owned(), serde_json::json!(languages.default));
+        Ok(fields)
+    }
 }

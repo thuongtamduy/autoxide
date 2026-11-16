@@ -255,3 +255,22 @@ có tool xoá hẳn (dùng REST).
 
 Lớp chống spam (`AUTOXIDE_ANTISPAM_*`) dùng chung cho mọi module. Mọi biến được mô tả trong
 [`.env.example`](../.env.example).
+
+### Theo từng khách
+
+Khi có nhiều khách hàng (tenant), các biến trên là giá trị mặc định của mọi khách. Mỗi khách có thể
+thay một số biến bằng giá trị riêng (quản trị của khách gọi `PUT /api/v1/kernel/settings/{name}`,
+permission `kernel.settings.manage`; nhân sự nền tảng gọi
+`PUT /api/v1/kernel/tenants/{id}/settings/{name}`):
+
+| Cấu hình của khách           | Thay cho                               | Giá trị                                         |
+| ---------------------------- | -------------------------------------- | ----------------------------------------------- |
+| `comments.banned_words`      | `AUTOXIDE_COMMENTS_BANNED_WORDS`       | các từ cách nhau bằng dấu phẩy; `-` là không có |
+| `comments.suspect_words`     | `AUTOXIDE_COMMENTS_SUSPECT_WORDS`      | các từ cách nhau bằng dấu phẩy; `-` là không có |
+| `comments.max_links`         | `AUTOXIDE_COMMENTS_MAX_LINKS`          | `0` đến `100`                                   |
+| `comments.guest_moderation`  | `AUTOXIDE_COMMENTS_GUEST_MODERATION`   | `pre`, `first_time` hay `post`                  |
+| `comments.user_moderation`   | `AUTOXIDE_COMMENTS_USER_MODERATION`    | `pre`, `first_time` hay `post`                  |
+
+Giá trị sai bị từ chối ngay lúc đặt (`422`, lỗi nằm trong `errors`). Chế độ duyệt riêng theo loại
+đích (`AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`) vẫn thắng chế độ duyệt của khách. Gọi `DELETE` cấu hình
+đó để về giá trị của máy chủ. `GET /api/v1/comments/public/settings` trả `max_links` của chính khách.

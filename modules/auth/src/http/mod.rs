@@ -54,6 +54,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(reset::routes())
         .merge(email::routes())
         .merge(passkeys::routes())
+        .merge(passkeys::login_routes())
         .merge(sessions::routes())
         .with_state(Arc::new(state))
         // Response của `auth` hay chứa secret chỉ trả một lần (token, API key mới, secret TOTP,

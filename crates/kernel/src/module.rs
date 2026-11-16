@@ -15,7 +15,7 @@
 //! job, tool MCP) thêm một hàm vào [`Module`], luôn kèm cài đặt mặc định "không
 //! có gì" — module cũ không phải sửa khi hợp đồng thêm hàm mới.
 
-pub use crate::ops::client_config::ClientSection;
+pub use crate::ops::client_config::{ClientSection, TenantClientSection};
 use std::any::{Any, TypeId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;

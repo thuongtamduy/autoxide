@@ -42,6 +42,8 @@ pub(crate) struct KernelModule {
     tenant_settings: crate::tenancy::settings::Catalog,
     /// Service cấu hình theo khách; có sau `start`.
     settings: Option<Arc<crate::tenancy::settings::SettingsService>>,
+    /// Sổ database; có sau `start` (nhân sự nền tảng đặt cấu hình của khách khác).
+    registry: Option<crate::tenancy::DatabaseRegistry>,
     /// Bộ gieo dữ liệu cho khách mới của mọi module.
     seeds: crate::tenancy::admin::Seeds,
     /// Service quản lý khách; có sau `start`.
@@ -80,6 +82,7 @@ impl KernelModule {
             keys,
             tenant_settings,
             settings: None,
+            registry: None,
             seeds,
             admin: None,
             public_url: PublicUrl::default(),
@@ -132,6 +135,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::moves::CreateTenantMoves),
             // Số lần kiểm lại hằng ngày liên tiếp không thấy bản ghi TXT của tên miền đã xác minh.
             Box::new(crate::tenancy::domains::AddCheckFailures),
+            // Khách chỉ đọc, tách khỏi tạm khoá (đối chiếu thiết kế 2, A-3.11).
+            Box::new(crate::tenancy::admin::AddReadOnly),
         ]
     }
 
@@ -204,8 +209,9 @@ impl Module for KernelModule {
         let catalog = self.catalog_state().map_or_else(OpenApiRouter::new, module_catalog::routes);
         let mut routes =
             catalog.merge(crate::ops::client_config::routes(self.client_configs.clone()));
-        if let Some(settings) = &self.settings {
-            routes = routes.merge(crate::tenancy::settings::routes(settings.clone()));
+        if let (Some(settings), Some(registry)) = (&self.settings, &self.registry) {
+            routes =
+                routes.merge(crate::tenancy::settings::routes(settings.clone(), registry.clone()));
         }
         if let Some(admin) = &self.admin {
             routes = routes.merge(crate::tenancy::admin::routes(admin.clone()));
@@ -289,7 +295,9 @@ impl Module for KernelModule {
             self.tenant_settings.clone(),
             key.clone(),
             context.outbox()?,
+            std::time::Duration::from_secs(context.tenancy().config().cache_seconds),
         ));
+        self.registry = Some(context.tenancy().clone());
         self.settings = Some(settings.clone());
         let admin = Arc::new(crate::tenancy::TenantAdmin::new(
             context.tenancy().clone(),

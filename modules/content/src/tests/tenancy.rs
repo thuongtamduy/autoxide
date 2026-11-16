@@ -40,8 +40,7 @@ async fn two_tenants(
         .build()
         .await
         .unwrap();
-    let (content, _, _) =
-        service_in(test, config(&[]), text, embedder, app.registry().clone()).await;
+    let (content, _, _) = service_in(test, config(&[]), text, embedder, &app).await;
     let a = app.tenant("a").await.unwrap();
     let b = app.tenant("b").await.unwrap();
     (app, content, a, b)
@@ -212,6 +211,98 @@ async fn lich_dang_chay_dung_khach() {
         // Job của cả database: chỉ chạm khách có dữ liệu trên database đó.
         assert_eq!(content.prune_revisions(a.database()).await.unwrap(), 0);
         assert_eq!(content.prune_revisions(b.database()).await.unwrap(), 0);
+    })
+    .await
+    .unwrap();
+}
+
+/// Cấu hình theo khách (đối chiếu thiết kế 2, A-b7): ngôn ngữ của khách `b` thay
+/// `AUTOXIDE_CONTENT_LOCALES` / `AUTOXIDE_CONTENT_DEFAULT_LOCALE` cho riêng `b` — kiểm dữ liệu
+/// vào, ngôn ngữ của bài mới, route công khai và `GET /kernel/client-config`; khách `a` chưa đặt
+/// dùng biến môi trường; giá trị sai bị từ chối lúc đặt.
+#[tokio::test]
+async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant_dedicated("b")
+            .user("platform", 1, &["kernel.tenants.manage", "kernel.tenants.read"])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text.clone())
+            .provide::<dyn Embedder>(embedder.clone())
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let (content, _, _) = service_in(test, config(&[]), text, embedder, &app).await;
+        let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
+        let base = "/api/v1/kernel/tenants/b/settings";
+        let set = |name: &'static str, value: &'static str| {
+            app.put(&format!("{base}/{name}")).token("platform").json(json!({ "value": value }))
+        };
+        let refused = set("content.locales", "vi, english").send().await.unwrap();
+        assert_eq!(refused.status(), 422, "{}", refused.text());
+        assert_eq!(refused.json()["errors"][0]["field"], "value");
+        for (name, value) in [("content.locales", "vi, FR"), ("content.default_locale", "fr")] {
+            let response = set(name, value).send().await.unwrap();
+            assert_eq!(response.status(), 200, "{}", response.text());
+        }
+        let listed = app.get(base).token("platform").send().await.unwrap().json();
+        let locales = listed["data"].as_array().unwrap();
+        let locales = locales.iter().find(|s| s["name"] == "content.locales").unwrap();
+        assert_eq!(locales["value"], "vi, FR");
+
+        // Bài mới không nêu ngôn ngữ: mặc định của khách; `fr` chỉ hợp lệ ở `b`, `en` chỉ ở `a`.
+        let ada = editor();
+        assert_eq!(content.create(&b, &ada, post("Bonjour")).await.unwrap().locale, "fr");
+        assert_eq!(content.create(&a, &ada, post("Hello")).await.unwrap().locale, "en");
+        let in_language = |locale: &str| {
+            let mut entry = post("Xin chào");
+            entry.locale = Some(locale.to_owned());
+            entry
+        };
+        let error = content.create(&a, &ada, in_language("fr")).await.unwrap_err();
+        assert_eq!(error.fields()[0].code, "locale_not_supported");
+        let error = content.create(&b, &ada, in_language("en")).await.unwrap_err();
+        assert_eq!(error.fields()[0].code, "locale_not_supported");
+        content.create(&b, &ada, in_language("vi")).await.unwrap();
+
+        // Route công khai và cấu hình cho giao diện theo khách của request.
+        let public = |slug: &'static str, locale: &'static str| {
+            app.get(&format!("/api/v1/content/public/posts?locale={locale}"))
+                .header("autoxide-tenant", slug)
+                .send()
+        };
+        assert_eq!(public("b", "fr").await.unwrap().status(), 200);
+        assert_eq!(public("a", "fr").await.unwrap().status(), 422);
+        let client = |slug: Option<&'static str>| {
+            let request = app.get("/api/v1/kernel/client-config");
+            let request = match slug {
+                Some(slug) => request.header("autoxide-tenant", slug),
+                None => request,
+            };
+            async move { request.send().await.unwrap().json()["data"]["content"].clone() }
+        };
+        let theirs = client(Some("b")).await;
+        assert_eq!(
+            (theirs["locales"].clone(), theirs["default_locale"].clone()),
+            (json!(["vi", "fr"]), json!("fr"))
+        );
+        let ours = client(Some("a")).await;
+        assert_eq!(
+            (ours["locales"].clone(), ours["default_locale"].clone()),
+            (json!(["en", "vi"]), json!("en"))
+        );
+        // Request không nêu khách: cấu hình của máy chủ.
+        assert_eq!(client(None).await["locales"], json!(["en", "vi"]));
+
+        // Bỏ cấu hình: về biến môi trường.
+        let removed = app.delete(&format!("{base}/content.locales")).token("platform").send();
+        assert_eq!(removed.await.unwrap().status(), 204);
+        assert_eq!(content.create(&b, &ada, post("Hi")).await.unwrap().locale, "en");
     })
     .await
     .unwrap();

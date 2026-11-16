@@ -1,6 +1,6 @@
 //! Job dọn dẹp hằng ngày `forms.cleanup`: xoá bài spam quá `AUTOXIDE_FORMS_SPAM_RETENTION_DAYS`,
-//! xoá bài quá thời hạn giữ của form (`retention_days`, mặc định theo
-//! `AUTOXIDE_FORMS_RETENTION_DAYS`; 0 là giữ mãi), xoá dấu vết IP quá
+//! xoá bài quá thời hạn giữ của form (`retention_days`, mặc định theo cấu hình
+//! `forms.retention_days` của khách, thiếu thì `AUTOXIDE_FORMS_RETENTION_DAYS`; 0 là giữ mãi), xoá dấu vết IP quá
 //! `AUTOXIDE_FORMS_IP_RETENTION_DAYS`, xoá bài "mồ côi" (form của nó không còn — lưới an toàn,
 //! vì không có foreign key), xoá bản xuất CSV quá `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` (file
 //! trước, dòng sau), và dọn nonce, bộ đếm đã hết hạn. Chạy lại bao nhiêu lần cũng ra
@@ -141,6 +141,7 @@ impl FormsService {
     ) -> Result<(), Error> {
         let spam_before = now - chrono::Duration::days(i64::from(self.config.spam_retention_days));
         let forms = form::Entity::find().scoped(tenant).all(tenant.database().read()).await?;
+        let default_days = self.retention_days(tenant).await?;
         for form in &forms {
             cleaned.spam += self
                 .expire(tenant, form, spam_before, Some(SubmissionStatus::Spam), "spam")
@@ -148,7 +149,7 @@ impl FormsService {
             let days = form
                 .retention_days
                 .and_then(|days| u32::try_from(days).ok())
-                .unwrap_or(self.config.retention_days);
+                .unwrap_or(default_days);
             if days > 0 {
                 let before = now - chrono::Duration::days(i64::from(days));
                 cleaned.expired += self.expire(tenant, form, before, None, "retention").await?;

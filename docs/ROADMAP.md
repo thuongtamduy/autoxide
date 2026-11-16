@@ -114,7 +114,7 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
       chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
       chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
       các khách trong database chung (một khách không chiếm hết job queue)
-- [ ] Đối chiếu thiết kế 2 (D-210, D-218 mục 33): cấu hình nghiệp vụ của module theo khách (`Module::tenant_settings`
+- [x] Đối chiếu thiết kế 2 (D-210, D-218 mục 33): cấu hình nghiệp vụ của module theo khách (`Module::tenant_settings`
       cho `comments`, `forms`, `content`, `media`); `GET /kernel/tenants` có lọc và `expand`; API job di chuyển
       database chỉ cho nhân sự nền tảng, dry-run mặc định; tách "tạm khoá" (chặn mọi route) khỏi "chỉ đọc"
 - [ ] Đối chiếu đợt 2 (D-223…D-227): gắn tên miền với nút; cấu hình kết nối đối tác theo nhóm `connection` với

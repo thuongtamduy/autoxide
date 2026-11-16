@@ -44,7 +44,8 @@ use crate::error::Error;
 
 pub use admin::{
     CurrentTenant, NewTenant, PLACEMENTS_READ, Placement, PlacementStorage, TENANTS_MANAGE,
-    TENANTS_READ, Tenant, TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
+    TENANTS_READ, Tenant, TenantAdmin, TenantChanges, TenantExpanded, TenantFilter, TenantSeed,
+    require_platform,
 };
 pub use config::{TenancyConfig, WorkerPlacements};
 pub use domains::{
@@ -61,7 +62,10 @@ pub use registry::{
 };
 pub use request::{TENANT_HEADER, TenantHint};
 pub use scope::{ScopeExt, TenantScoped};
-pub use settings::{PUBLIC_URL, SETTINGS_MANAGE, SettingValue, TenantSetting, TenantSettings};
+pub use settings::{
+    PUBLIC_URL, SETTINGS_MANAGE, SettingCheck, SettingValue, TenantSetting, TenantSettings,
+    parsed_setting,
+};
 
 pub(crate) use config::read_setting;
 
@@ -250,6 +254,8 @@ struct Inner {
     schema_ready: bool,
     /// Nơi lưu file riêng của placement (`autoxide placement storage`); `None`: nơi lưu chung.
     storage: Option<Arc<dyn crate::storage::Storage>>,
+    /// Chỉ đọc (`kernel_tenants.read_only`): lệnh ghi bị chặn ở chỗ giải khách của request.
+    read_only: bool,
 }
 
 impl TenantContext {
@@ -271,6 +277,7 @@ impl TenantContext {
             database,
             schema_ready: true,
             storage: None,
+            read_only: false,
         }))
     }
 
@@ -305,6 +312,19 @@ impl TenantContext {
     /// Placement của khách đã áp dụng đủ migration.
     pub fn schema_ready(&self) -> bool {
         self.0.schema_ready
+    }
+
+    /// Cùng khách, đánh dấu chỉ đọc (sổ database dựng từ `kernel_tenants.read_only`; test dựng).
+    #[must_use]
+    pub fn with_read_only(self, read_only: bool) -> Self {
+        let inner = Arc::unwrap_or_clone(self.0);
+        TenantContext(Arc::new(Inner { read_only, ..inner }))
+    }
+
+    /// Khách chỉ đọc: đọc được, lệnh ghi qua REST / MCP bị chặn (`tenant_read_only`). Job và event
+    /// của khách vẫn chạy (việc đã nhận trước đó, dọn dẹp theo luật).
+    pub fn read_only(&self) -> bool {
+        self.0.read_only
     }
 
     /// Khách mặc định trên `database` — chế độ `single`, và đường chuyển tiếp cho code chưa nhận
@@ -383,6 +403,7 @@ impl fmt::Debug for TenantContext {
             .field("id", &self.0.id)
             .field("slug", &self.0.slug)
             .field("status", &self.0.status)
+            .field("read_only", &self.0.read_only)
             .field("placement", &self.0.placement)
             .finish_non_exhaustive()
     }
@@ -410,6 +431,14 @@ pub mod errors {
         Error::forbidden(
             "tenant_suspended",
             "This tenant is suspended. Contact the service provider.",
+        )
+    }
+
+    pub fn tenant_read_only() -> Error {
+        Error::forbidden(
+            "tenant_read_only",
+            "This tenant is read-only for now: its data can be read and exported, but not \
+             changed. Contact the service provider.",
         )
     }
 
@@ -668,6 +697,37 @@ pub fn ensure_serving(tenant: &TenantContext) -> Result<(), Error> {
             Err(errors::tenant_maintenance(30))
         }
     }
+}
+
+/// Đánh dấu route vẫn ghi được khi khách chỉ đọc: đăng nhập, làm mới / kết thúc phiên, đặt lại mật
+/// khẩu, link trong thư (xác nhận, huỷ đăng ký — rút lại đồng ý luôn phải làm được), xuất dữ liệu.
+/// Gắn bằng [`allowed_while_read_only`] trên router con chứa đúng các route đó.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AllowedWhileReadOnly;
+
+/// Lớp gắn [`AllowedWhileReadOnly`] cho các route đã thêm vào router trước nó:
+/// `OpenApiRouter::new().routes(routes!(login)).layer(allowed_while_read_only())`.
+pub fn allowed_while_read_only() -> axum::Extension<AllowedWhileReadOnly> {
+    axum::Extension(AllowedWhileReadOnly)
+}
+
+/// Kiểm request (`method`, `extensions`) có được làm với `tenant`: khách chỉ đọc chỉ nhận `GET`,
+/// `HEAD`, `OPTIONS`, và route đánh dấu [`AllowedWhileReadOnly`]; còn lại `tenant_read_only`.
+/// Kernel gọi ở chỗ giải khách của request (extractor `TenantContext`, `OptionalTenant`); tool
+/// MCP kiểm theo cờ `read_only` của tool.
+pub fn ensure_writable(
+    tenant: &TenantContext,
+    method: &axum::http::Method,
+    extensions: &axum::http::Extensions,
+) -> Result<(), Error> {
+    use axum::http::Method;
+    if !tenant.read_only()
+        || [Method::GET, Method::HEAD, Method::OPTIONS].contains(method)
+        || extensions.get::<AllowedWhileReadOnly>().is_some()
+    {
+        return Ok(());
+    }
+    Err(errors::tenant_read_only())
 }
 
 #[cfg(test)]

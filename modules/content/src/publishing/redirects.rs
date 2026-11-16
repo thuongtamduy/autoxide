@@ -216,7 +216,12 @@ impl ContentService {
         now: DateTime<Utc>,
     ) -> Result<Redirect, Error> {
         let mut problems = Vec::new();
-        let locale = self.check_locale(input.locale.as_deref(), "locale", &mut problems);
+        let locale = self.check_locale(
+            &self.languages(tenant).await?,
+            input.locale.as_deref(),
+            "locale",
+            &mut problems,
+        );
         let from = paths::normalize(&input.from_path);
         if from.is_none() {
             problems.push(FieldError::new(
@@ -368,7 +373,12 @@ impl ContentService {
                 .with_param("path", path)
         };
         let mut problems = Vec::new();
-        let locale = self.check_locale(Some(locale), "locale", &mut problems);
+        let locale = self.check_locale(
+            &self.languages(tenant).await?,
+            Some(locale),
+            "locale",
+            &mut problems,
+        );
         let normalized = paths::normalize(path);
         if normalized.is_none() {
             problems.push(FieldError::new("path", "invalid", "must be a path starting with `/`"));

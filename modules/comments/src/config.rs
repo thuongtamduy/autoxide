@@ -7,6 +7,8 @@
 use std::collections::BTreeMap;
 
 use autoxide_kernel::config::{ConfigReader, Invalid, Setting, parse_in_range};
+use autoxide_kernel::error::FieldError;
+use autoxide_kernel::tenancy::TenantSetting;
 
 pub(crate) const ENABLED: Setting = Setting::new(
     "AUTOXIDE_COMMENTS_ENABLED",
@@ -195,6 +197,107 @@ pub(crate) const VERIFY_MAILS_PER_DAY: Setting = Setting::new(
 )
 .with_default("3");
 
+// --- Cấu hình theo khách (đối chiếu thiết kế 2, A-b7) ---------------------------------------
+//
+// Biến môi trường ở trên là giá trị chung cho mọi khách; khách đặt các cấu hình dưới đây (qua
+// `PUT /api/v1/kernel/settings/{name}`) thì giá trị của khách thay giá trị chung. Giá trị được
+// kiểm lúc đặt bằng cùng hàm dịch dùng lúc đọc.
+
+pub(crate) const TENANT_BANNED_WORDS: TenantSetting = TenantSetting::new(
+    "comments.banned_words",
+    "Comma-separated words or phrases that make a comment refused (whole words, ignoring case      and accents), instead of the server's AUTOXIDE_COMMENTS_BANNED_WORDS. `-` means none.",
+);
+
+pub(crate) const TENANT_SUSPECT_WORDS: TenantSetting = TenantSetting::new(
+    "comments.suspect_words",
+    "Comma-separated words or phrases that hold a comment for approval, instead of the      server's AUTOXIDE_COMMENTS_SUSPECT_WORDS. `-` means none.",
+);
+
+pub(crate) const TENANT_MAX_LINKS: TenantSetting = TenantSetting::new(
+    "comments.max_links",
+    "A comment with more links than this is held for approval (0 to 100), instead of the      server's AUTOXIDE_COMMENTS_MAX_LINKS.",
+)
+.checked(|raw| tenant_max_links(raw).map(|_| ()));
+
+pub(crate) const TENANT_GUEST_MODERATION: TenantSetting = TenantSetting::new(
+    "comments.guest_moderation",
+    "When a guest's comment needs approval: `pre`, `first_time` or `post`, instead of the      server's AUTOXIDE_COMMENTS_GUEST_MODERATION. Overrides per target kind      (AUTOXIDE_COMMENTS_MODERATION_BY_TYPE) still apply.",
+)
+.checked(|raw| tenant_mode(raw).map(|_| ()));
+
+pub(crate) const TENANT_USER_MODERATION: TenantSetting = TenantSetting::new(
+    "comments.user_moderation",
+    "When a signed-in user's comment needs approval: `pre`, `first_time` or `post`, instead of      the server's AUTOXIDE_COMMENTS_USER_MODERATION. Overrides per target kind      (AUTOXIDE_COMMENTS_MODERATION_BY_TYPE) still apply.",
+)
+.checked(|raw| tenant_mode(raw).map(|_| ()));
+
+/// Mọi cấu hình theo khách của module.
+pub(crate) fn tenant_settings() -> Vec<TenantSetting> {
+    vec![
+        TENANT_BANNED_WORDS,
+        TENANT_SUSPECT_WORDS,
+        TENANT_MAX_LINKS,
+        TENANT_GUEST_MODERATION,
+        TENANT_USER_MODERATION,
+    ]
+}
+
+/// Danh sách từ của khách: `-` là không từ nào.
+pub(crate) fn tenant_words(raw: &str) -> Result<Vec<String>, FieldError> {
+    if raw.trim() == "-" {
+        return Ok(Vec::new());
+    }
+    // `words` không bao giờ hỏng: mọi chuỗi là một danh sách từ.
+    Ok(words(raw).unwrap_or_default())
+}
+
+pub(crate) fn tenant_max_links(raw: &str) -> Result<usize, FieldError> {
+    raw.trim().parse::<usize>().ok().filter(|links| *links <= 100).ok_or_else(|| {
+        FieldError::new("value", "range", "must be a whole number from {min} to {max}")
+            .with_param("min", 0)
+            .with_param("max", 100)
+    })
+}
+
+pub(crate) fn tenant_mode(raw: &str) -> Result<Mode, FieldError> {
+    Mode::parse(raw)
+        .ok_or_else(|| FieldError::new("value", "invalid", "must be `pre`, `first_time` or `post`"))
+}
+
+/// Luật kiểm duyệt đang áp cho một khách: cấu hình của khách, thiếu thì của máy chủ.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Rules {
+    /// Đã `search::fold`.
+    pub banned_words: Vec<String>,
+    pub suspect_words: Vec<String>,
+    pub max_links: usize,
+    pub guest_mode: Mode,
+    pub user_mode: Mode,
+}
+
+impl Rules {
+    /// Luật của máy chủ (khách chưa đặt gì).
+    pub(crate) fn of(config: &CommentsConfig) -> Self {
+        Rules {
+            banned_words: config.banned_words.clone(),
+            suspect_words: config.suspect_words.clone(),
+            max_links: config.max_links,
+            guest_mode: config.guest_mode,
+            user_mode: config.user_mode,
+        }
+    }
+
+    /// Chế độ duyệt cho loại đích `kind`: chế độ riêng theo loại đích của máy chủ
+    /// (`AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`) thắng, rồi chế độ của khách / máy chủ.
+    pub(crate) fn mode(&self, config: &CommentsConfig, kind: &str, guest: bool) -> Mode {
+        config.mode_overrides.get(&(kind.to_owned(), guest)).copied().unwrap_or(if guest {
+            self.guest_mode
+        } else {
+            self.user_mode
+        })
+    }
+}
+
 /// Khi nào bình luận cần duyệt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Mode {
@@ -368,15 +471,6 @@ impl CommentsConfig {
         })
     }
 
-    /// Chế độ duyệt cho loại đích `kind`, khách hay người dùng đăng nhập.
-    pub(crate) fn mode(&self, kind: &str, guest: bool) -> Mode {
-        self.mode_overrides.get(&(kind.to_owned(), guest)).copied().unwrap_or(if guest {
-            self.guest_mode
-        } else {
-            self.user_mode
-        })
-    }
-
     /// Mail báo trả lời bật khi có đủ trang xác minh và trang huỷ theo dõi.
     pub(crate) fn reply_mails(&self) -> bool {
         self.verify_url.is_some() && self.unsubscribe_url.is_some()
@@ -488,6 +582,20 @@ mod tests {
     }
 
     #[test]
+    fn gia_tri_theo_khach_duoc_kiem() {
+        assert_eq!(tenant_words("-").unwrap(), Vec::<String>::new());
+        assert_eq!(tenant_words("Mua Bán, casino").unwrap(), ["mua ban", "casino"]);
+        assert_eq!(tenant_max_links(" 0 ").unwrap(), 0);
+        assert_eq!(tenant_max_links("101").unwrap_err().code, "range");
+        assert!(tenant_max_links("-1").is_err());
+        assert_eq!(tenant_mode("post").unwrap(), Mode::Post);
+        assert_eq!(tenant_mode("never").unwrap_err().code, "invalid");
+        for setting in tenant_settings() {
+            assert!(setting.name().starts_with("comments."));
+        }
+    }
+
+    #[test]
     fn mac_dinh_chay_duoc_va_giong_default() {
         assert_eq!(read(&[]).unwrap(), CommentsConfig::default());
         assert!(!CommentsConfig::default().reply_mails());
@@ -517,10 +625,15 @@ mod tests {
             ("AUTOXIDE_COMMENTS_BANNED_WORDS", "Mua Bán, , CASINO"),
         ])
         .unwrap();
-        assert_eq!(config.mode("content.entry", true), Mode::Pre);
-        assert_eq!(config.mode("content.entry", false), Mode::FirstTime);
-        assert_eq!(config.mode("media.item", true), Mode::Post);
-        assert_eq!(config.mode("media.item", false), Mode::Pre);
+        let rules = Rules::of(&config);
+        assert_eq!(rules.mode(&config, "content.entry", true), Mode::Pre);
+        assert_eq!(rules.mode(&config, "content.entry", false), Mode::FirstTime);
+        assert_eq!(rules.mode(&config, "media.item", true), Mode::Post);
+        assert_eq!(rules.mode(&config, "media.item", false), Mode::Pre);
         assert_eq!(config.banned_words, ["mua ban", "casino"]);
+        // Khách đặt chế độ chung khác: chế độ theo loại đích của máy chủ vẫn thắng.
+        let tenant = Rules { guest_mode: Mode::Post, ..rules };
+        assert_eq!(tenant.mode(&config, "content.entry", true), Mode::Post);
+        assert_eq!(tenant.mode(&config, "media.item", false), Mode::Pre);
     }
 }

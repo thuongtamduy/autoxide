@@ -79,7 +79,8 @@ impl ContentService {
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&CONTENT_READ)?;
         let mut problems = Vec::new();
-        let locale = self.check_locale(locale, "locale", &mut problems);
+        let locale =
+            self.check_locale(&self.languages(tenant).await?, locale, "locale", &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -103,7 +104,8 @@ impl ContentService {
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&CONTENT_MANAGE)?;
         let mut problems = Vec::new();
-        let locale = self.check_locale(locale, "locale", &mut problems);
+        let locale =
+            self.check_locale(&self.languages(tenant).await?, locale, "locale", &mut problems);
         if key.is_empty()
             || key.len() > 64
             || !key
@@ -228,14 +230,15 @@ impl ContentService {
         locale: &str,
     ) -> Result<(Menu, Vec<PublicNode>), Error> {
         let mut problems = Vec::new();
-        let locale = self.check_locale(Some(locale), "locale", &mut problems);
+        let languages = self.languages(tenant).await?;
+        let locale = self.check_locale(&languages, Some(locale), "locale", &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
         let found = match self.find_menu(tenant, key, &locale).await? {
             Some(found) => found,
             None => self
-                .find_menu(tenant, key, &self.config.default_locale)
+                .find_menu(tenant, key, &languages.default)
                 .await?
                 .ok_or_else(|| menu_not_found(key, &locale))?,
         };
@@ -303,10 +306,11 @@ impl ContentService {
             .filter(crate::entity::term_translation::Column::TermId.eq(id))
             .all(tenant.database().read())
             .await?;
+        let default = self.languages(tenant).await?.default;
         let chosen = texts
             .iter()
             .find(|text| text.locale == locale)
-            .or_else(|| texts.iter().find(|text| text.locale == self.config.default_locale))
+            .or_else(|| texts.iter().find(|text| text.locale == default))
             .or_else(|| texts.first())
             .ok_or_else(|| crate::taxonomy::terms::term_not_found(id))?;
         Ok(crate::taxonomy::terms::TermRef {

@@ -83,7 +83,12 @@ impl ContentService {
             .ok_or_else(|| entry_not_found(source_id))?;
         permissions::require_write(principal, &source)?;
         let mut problems = Vec::new();
-        let target_locale = self.check_locale(Some(locale), "locale", &mut problems);
+        let target_locale = self.check_locale(
+            &self.languages(tenant).await?,
+            Some(locale),
+            "locale",
+            &mut problems,
+        );
         if problems.is_empty() && target_locale == source.locale {
             problems.push(FieldError::new(
                 "locale",

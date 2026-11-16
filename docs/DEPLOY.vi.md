@@ -338,6 +338,47 @@ database mới.
 Kiểm cấu hình mà không khởi động gì: `autoxide config`. Lệnh liệt kê mọi biến kèm giá
 trị (secret được giấu) và báo mọi vấn đề cùng một lượt.
 
+## Cấu hình và trạng thái của từng khách
+
+Khi chạy nhiều khách hàng (`AUTOXIDE_TENANCY_MODE=multi`), các biến trên áp cho mọi khách. Một số
+hành vi của module còn đặt được theo từng khách, thay giá trị của máy chủ cho riêng khách đó:
+
+| Cấu hình của khách | Thay cho |
+| --- | --- |
+| `kernel.public_url` | `AUTOXIDE_HTTP_PUBLIC_URL` trong link gửi qua mail |
+| `mail.smtp_url`, `mail.from` | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` |
+| `ai.api_key`, `ai.model` | nhà cung cấp AI của máy chủ |
+| `comments.banned_words`, `comments.suspect_words`, `comments.max_links`, `comments.guest_moderation`, `comments.user_moderation` | các biến `AUTOXIDE_COMMENTS_…` tương ứng ([bình luận](COMMENTS.vi.md#theo-từng-khách)) |
+| `forms.retention_days` | `AUTOXIDE_FORMS_RETENTION_DAYS` ([form](FORMS.vi.md)) |
+| `content.locales`, `content.default_locale` | `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CONTENT_DEFAULT_LOCALE` ([nội dung](CONTENT.vi.md#ngôn-ngữ)) |
+| `media.alt_locales` | `AUTOXIDE_MEDIA_ALT_LOCALES` ([media](MEDIA.vi.md)) |
+
+`GET /api/v1/kernel/settings` liệt kê chúng kèm giá trị khách hiện tại đã đặt. Quản trị của khách
+(permission `kernel.settings.manage`) đặt một cấu hình bằng `PUT /api/v1/kernel/settings/{name}` với
+`{"value": "…"}`, và bỏ (về giá trị của máy chủ) bằng `DELETE`. Nhân sự nền tảng làm như vậy cho khách
+bất kỳ dưới `/api/v1/kernel/tenants/{id}/settings` (`kernel.tenants.read` để xem,
+`kernel.tenants.manage` để đổi). Giá trị được kiểm ngay lúc đặt; giá trị secret lưu mã hoá và không
+bao giờ hiện lại. Máy chủ khác dùng giá trị mới trong vòng `AUTOXIDE_TENANCY_CACHE_SECONDS`.
+
+Có hai cách dừng một khách, độc lập với nhau:
+
+- **Tạm khoá** — `autoxide tenant suspend <khách>` (mở lại bằng `resume`), hoặc `PATCH
+  /api/v1/kernel/tenants/{id}` với `{"status": "suspended"}`: mọi request tới khách, kể cả đọc, nhận
+  `403 tenant_suspended`, và tên miền của khách không được cấp chứng chỉ mới.
+- **Chỉ đọc** — `autoxide tenant read-only <khách>` (gỡ bằng `writable`), hoặc `{"read_only":
+  true}`: đọc được, người dùng của khách vẫn đăng nhập, đặt lại mật khẩu, xuất dữ liệu và dùng link
+  trong mail (xác nhận địa chỉ, huỷ đăng ký); mọi thay đổi khác nhận `403 tenant_read_only`, tool MCP
+  không chỉ đọc cũng vậy. Dùng khi, ví dụ, khách chưa thanh toán.
+
+Job nền và event của khách ở cả hai trạng thái vẫn chạy: chúng làm nốt việc đã nhận trước đó, và
+việc xoá theo thời hạn giữ vẫn diễn ra. Khách nền tảng không tạm khoá được, cũng không đặt chỉ đọc
+được.
+
+`GET /api/v1/kernel/tenants` (nhân sự nền tảng) có bộ lọc cho mặt điều khiển — `status`,
+`read_only`, `placement_kind`, `schema_state`, và `subscription_status` / `near_limit` (chưa khớp
+khách nào tới khi cài module gói dịch vụ: thuê bao và hạn mức) — và `expand=placement` để lấy luôn
+placement của từng khách trong cùng câu trả lời.
+
 ## Tên miền riêng của khách hàng
 
 Khi chạy nhiều khách hàng (`AUTOXIDE_TENANCY_MODE=multi`), mỗi khách có thể phục vụ trang của mình ở
