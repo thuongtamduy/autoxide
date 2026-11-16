@@ -30,6 +30,15 @@ People who fill in a form need none: everything under `/api/v1/forms/public/` is
 - Give `forms.submit` only to the API key of a website server; being signed in is not enough
   to skip the anti-spam checks (see [The website](#the-website)).
 
+## Stores and sellers
+
+With an organization tree (module `organizations`), a form may belong to a unit: `org_id` when
+creating it; omitted, it is a form of the whole tenant. `forms.read`, `forms.manage`,
+`forms.review` and `forms.export` follow the scope of the role: a store's staff see and manage
+only their store's forms and submissions, and forms of the whole tenant need a tenant-wide scope.
+Exporting or deleting every submission of an email touches every form, so it needs `forms.export`
+for the whole tenant. Filter the list with `owner_org`.
+
 ## Define a form
 
 ```bash

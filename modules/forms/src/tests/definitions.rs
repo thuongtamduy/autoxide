@@ -102,7 +102,7 @@ async fn vong_doi_form_phien_ban_va_bai_cu_doc_dung_nhan_cu() {
             Some("Full name")
         );
 
-        let listed = service.list_forms(&tenant, &reader, None, &page()).await.unwrap();
+        let listed = service.list_forms(&tenant, &reader, None, None, &page()).await.unwrap();
         assert_eq!(listed.data.len(), 1);
         // Xoá form: mất cả bài gửi.
         let current = service.get_form(&tenant, &admin, form.row.id).await.unwrap();
@@ -223,6 +223,77 @@ async fn doi_noi_nhan_mail_bao_can_quyen_doc() {
         let removed = FormInput { notify_emails: Some(Vec::new()), ..FormInput::default() };
         let refused = service.update_form(&tenant, &manager, form.row.id, removed, None).await;
         assert_eq!(refused.unwrap_err().code(), "permission_denied");
+    })
+    .await
+    .unwrap();
+}
+
+/// Form theo nút (bước 34, D-208): người của cửa hàng B không thấy, không sửa form của A, không tạo
+/// được form của cả khách; xuất / xoá theo email cần quyền cho cả khách.
+#[tokio::test]
+async fn form_theo_nut_va_nhanh() {
+    use autoxide_kernel::access::{Grant, Principal, Scope};
+    use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree};
+
+    TestDatabase::run(async |test| {
+        let (service, _, database) = service(test, FormsConfig::default()).await;
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+        let org = || OrgId::from_uuid(Uuid::now_v7());
+        let (a, b) = (org(), org());
+        let write = database.begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, a, root, 8).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, b, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+        let shop_b = Principal::with_grants(
+            Uuid::now_v7(),
+            ["forms.read", "forms.manage", "forms.review", "forms.export"]
+                .map(|name| (name.to_owned(), Grant::new(b, Scope::Subtree))),
+        );
+        let admin = admin();
+
+        let whole = service.create_form(&tenant, &admin, contact("whole")).await.unwrap();
+        assert_eq!(whole.row.org_id, None);
+        let mut in_a = contact("shop-a");
+        in_a.org_id = Some(a.as_uuid());
+        let in_a = service.create_form(&tenant, &admin, in_a).await.unwrap();
+        assert_eq!(in_a.row.org_id, Some(a.as_uuid()));
+
+        // B không thấy form của A hay của cả khách.
+        let listed = service.list_forms(&tenant, &shop_b, None, None, &page()).await.unwrap();
+        assert!(listed.data.is_empty());
+        for id in [in_a.row.id, whole.row.id] {
+            let error = service.get_form(&tenant, &shop_b, id).await.unwrap_err();
+            assert_eq!(error.code(), "forms.not_found");
+            let error = service
+                .list_submissions(&tenant, &shop_b, id, &Default::default(), &page())
+                .await
+                .unwrap_err();
+            assert_eq!(error.code(), "forms.not_found");
+        }
+        // B không tạo được form của cả khách hay của A; tạo được form của mình.
+        let error = service.create_form(&tenant, &shop_b, contact("mine")).await.unwrap_err();
+        assert_eq!(error.code(), "org_out_of_scope");
+        let mut for_a = contact("for-a");
+        for_a.org_id = Some(a.as_uuid());
+        assert_eq!(
+            service.create_form(&tenant, &shop_b, for_a).await.unwrap_err().code(),
+            "org_out_of_scope"
+        );
+        let mut own = contact("shop-b");
+        own.org_id = Some(b.as_uuid());
+        let own = service.create_form(&tenant, &shop_b, own).await.unwrap();
+        let listed = service.list_forms(&tenant, &shop_b, None, None, &page()).await.unwrap();
+        assert_eq!(listed.data.len(), 1);
+        assert_eq!(listed.data[0].row.id, own.row.id);
+        // Lọc theo nút ở danh sách của admin.
+        let by_a =
+            service.list_forms(&tenant, &admin, None, Some(a.as_uuid()), &page()).await.unwrap();
+        assert_eq!(by_a.data.len(), 1);
+        // Xuất / xoá mọi bài của một email chạm mọi form: cần quyền cho cả khách.
+        let error =
+            service.submissions_of_email(&tenant, &shop_b, "x@example.com").await.unwrap_err();
+        assert_eq!(error.code(), "org_out_of_scope");
     })
     .await
     .unwrap();

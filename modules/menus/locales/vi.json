@@ -30,7 +30,7 @@
   "menus.ref_unknown_kind": "Có mục trỏ tới một loại đối tượng không module nào cung cấp; xem `errors`.",
   "text:A website menu was created.": "Một menu website được tạo.",
   "text:A website menu was deleted.": "Một menu website bị xoá.",
-  "text:Create, change and delete website menus.": "Tạo, sửa và xoá menu website.",
-  "text:See website menus as they are saved.": "Xem menu website như đã lưu.",
+  "text:Create, change and delete the website menus in your scope.": "Tạo, sửa và xoá menu website trong phạm vi của bạn.",
+  "text:See the website menus in your scope as they are saved.": "Xem menu website trong phạm vi của bạn như đã lưu.",
   "text:The items of a website menu were replaced.": "Các mục của một menu website được thay."
 }

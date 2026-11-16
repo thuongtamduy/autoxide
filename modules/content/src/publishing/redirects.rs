@@ -365,6 +365,7 @@ impl ContentService {
     pub(crate) async fn resolve(
         &self,
         tenant: &TenantContext,
+        site: &autoxide_kernel::tenancy::Site,
         locale: &str,
         path: &str,
     ) -> Result<Resolved, Error> {
@@ -387,10 +388,12 @@ impl ContentService {
             return Err(Error::validation(problems));
         };
         let read = tenant.database().read();
+        // Website (bước 34): chỉ bài của nút của website và của các nút cấp trên.
         if let Some(found) = published::Entity::find()
             .scoped(tenant)
             .filter(published::Column::Locale.eq(locale.as_str()))
             .filter(published::Column::Path.eq(path.as_str()))
+            .filter(published::Column::OrgId.is_in(site.lineage_ids()))
             .one(read)
             .await?
         {

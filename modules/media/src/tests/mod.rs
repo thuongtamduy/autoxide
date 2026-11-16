@@ -34,6 +34,7 @@ use crate::testing::{body, editor, limits, service, user};
 
 fn upload(name: &str, content_type: &str) -> NewUpload {
     NewUpload {
+        org_id: None,
         name: name.to_owned(),
         folder_id: None,
         content_type: Some(content_type.to_owned()),

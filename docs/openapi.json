@@ -1988,6 +1988,14 @@
                   "null"
                 ]
               },
+              "org_id": {
+                "description": "The organization unit (store, seller) that owns the entry; you need `content.write` there.\nOmit when you work in one unit only (or for the whole tenant).",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "parent_id": {
                 "description": "Parent page (pages only).",
                 "format": "uuid",
@@ -2101,6 +2109,14 @@
             },
             "type": [
               "array",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The organization unit (store, seller) that owns the form; you need `forms.manage` there.\nOmitted: a form of the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -2235,6 +2251,14 @@
           "locale": {
             "description": "The menu's language; omitted: the default language.",
             "example": "vi",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The website (organization unit) the menu is for; you need `menus.manage` there. Omitted:\nthe website of the whole tenant, used by every website without a menu of its own.",
+            "format": "uuid",
             "type": [
               "string",
               "null"
@@ -4409,6 +4433,14 @@
                 },
                 "type": "array"
               },
+              "org_id": {
+                "description": "The organization unit that owns the form; `null`: a form of the whole tenant.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "reply_to_field": {
                 "description": "Key of the `email` field used as `Reply-To` of the notification and to find\nsubmissions by email; `null`: the first `email` field.",
                 "type": [
@@ -6564,6 +6596,11 @@
                 "example": "vi",
                 "type": "string"
               },
+              "org_id": {
+                "description": "The website (organization unit) of the menu; the id of the tenant for the whole tenant.",
+                "format": "uuid",
+                "type": "string"
+              },
               "updated_at": {
                 "format": "date-time",
                 "type": "string"
@@ -6571,6 +6608,7 @@
             },
             "required": [
               "id",
+              "org_id",
               "key",
               "locale",
               "items",
@@ -9880,6 +9918,14 @@
             },
             "type": "array"
           },
+          "org_id": {
+            "description": "The organization unit that owns the form; `null`: a form of the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "reply_to_field": {
             "description": "Key of the `email` field used as `Reply-To` of the notification and to find\nsubmissions by email; `null`: the first `email` field.",
             "type": [
@@ -13011,6 +13057,14 @@
                   },
                   "type": "array"
                 },
+                "org_id": {
+                  "description": "The organization unit that owns the form; `null`: a form of the whole tenant.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "reply_to_field": {
                   "description": "Key of the `email` field used as `Reply-To` of the notification and to find\nsubmissions by email; `null`: the first `email` field.",
                   "type": [
@@ -14343,6 +14397,11 @@
                   "example": "vi",
                   "type": "string"
                 },
+                "org_id": {
+                  "description": "The website (organization unit) of the menu.",
+                  "format": "uuid",
+                  "type": "string"
+                },
                 "updated_at": {
                   "format": "date-time",
                   "type": "string"
@@ -14358,6 +14417,7 @@
               },
               "required": [
                 "id",
+                "org_id",
                 "key",
                 "locale",
                 "item_count",
@@ -17876,6 +17936,11 @@
             "example": "vi",
             "type": "string"
           },
+          "org_id": {
+            "description": "The website (organization unit) of the menu; the id of the tenant for the whole tenant.",
+            "format": "uuid",
+            "type": "string"
+          },
           "updated_at": {
             "format": "date-time",
             "type": "string"
@@ -17883,6 +17948,7 @@
         },
         "required": [
           "id",
+          "org_id",
           "key",
           "locale",
           "items",
@@ -18095,6 +18161,11 @@
             "example": "vi",
             "type": "string"
           },
+          "org_id": {
+            "description": "The website (organization unit) of the menu.",
+            "format": "uuid",
+            "type": "string"
+          },
           "updated_at": {
             "format": "date-time",
             "type": "string"
@@ -18110,6 +18181,7 @@
         },
         "required": [
           "id",
+          "org_id",
           "key",
           "locale",
           "item_count",
@@ -31113,6 +31185,26 @@
             }
           },
           {
+            "description": "Only entries of this organization unit (store, seller).",
+            "in": "query",
+            "name": "owner_org",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only entries shown on the website of this organization unit: its own and those of the\nunits above it.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
             "example": 50,
             "in": "query",
@@ -34836,6 +34928,16 @@
             }
           },
           {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -35067,6 +35169,16 @@
             }
           },
           {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -35228,6 +35340,16 @@
             "name": "path",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -35472,6 +35594,16 @@
                 "asc",
                 "desc"
               ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -38063,7 +38195,7 @@
     },
     "/api/v1/forms": {
       "get": {
-        "description": "Requires `forms.read`. Newest first; follow `pagination.next_cursor` for more.",
+        "description": "Requires `forms.read`; you see the forms its scope covers (forms of the whole tenant only with\na tenant-wide scope). Newest first; follow `pagination.next_cursor` for more.",
         "operationId": "forms_list_forms",
         "parameters": [
           {
@@ -38077,6 +38209,16 @@
                 "open",
                 "closed"
               ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the forms of this organization unit.",
+            "in": "query",
+            "name": "owner_org",
+            "required": false,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -43209,6 +43351,16 @@
             }
           },
           {
+            "description": "Only the items of this organization unit (store, seller).",
+            "in": "query",
+            "name": "owner_org",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "description": "`true`: only images missing a text alternative (an image whose default `alt` is empty and\nthat is not marked `decorative`). `false`: every other item.",
             "in": "query",
             "name": "alt_missing",
@@ -43377,6 +43529,16 @@
             "description": "Folder to put the item in. Omit for the root.",
             "in": "query",
             "name": "folder_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The organization unit (store, seller) that owns the item; you need `media.write` there.\nOmit when you work in one unit only (or for the whole tenant).",
+            "in": "query",
+            "name": "org_id",
             "required": false,
             "schema": {
               "format": "uuid",
@@ -46423,6 +46585,16 @@
         "operationId": "menus_list_menus",
         "parameters": [
           {
+            "description": "Only the menus of this website (organization unit).",
+            "in": "query",
+            "name": "owner_org",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
             "example": 50,
             "in": "query",
@@ -46687,6 +46859,16 @@
             "name": "locale",
             "required": false,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },

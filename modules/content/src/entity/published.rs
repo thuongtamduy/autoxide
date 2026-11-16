@@ -9,6 +9,8 @@ pub struct Model {
     /// Khách sở hữu dòng (bước 33), cột đầu của khoá chính.
     #[sea_orm(primary_key, auto_increment = false)]
     pub tenant_id: Uuid,
+    /// Nút sở hữu, chép từ mục khi đăng (bước 34): đọc công khai lọc theo website.
+    pub org_id: Option<Uuid>,
     #[sea_orm(primary_key, auto_increment = false)]
     pub entry_id: Uuid,
     pub kind: String,

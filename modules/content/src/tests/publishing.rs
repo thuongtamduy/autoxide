@@ -8,7 +8,14 @@ async fn resolve(
     content: &crate::service::ContentService,
     path: &str,
 ) -> Result<Resolved, autoxide_kernel::error::Error> {
-    content.resolve(&content.databases.default_tenant(), "en", path).await
+    content
+        .resolve(
+            &content.databases.default_tenant(),
+            &autoxide_kernel::tenancy::Site::whole(&content.databases.default_tenant()),
+            "en",
+            path,
+        )
+        .await
 }
 
 fn entry_path(resolved: Resolved) -> String {

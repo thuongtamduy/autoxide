@@ -22,6 +22,14 @@ mang theo cả hai.
 
 Gán cho một role bằng `PUT /api/v1/auth/roles/{id}`. Role `admin` có đủ.
 
+## Cửa hàng và người bán
+
+Ở khách có cây tổ chức (module `organizations`), mỗi item thuộc một nút: `org_id` khi tải lên (bỏ
+trống: nút duy nhất của bạn, hay nút gốc khi role của bạn phủ cả khách). Permission áp theo độ sâu
+của role — người bán có `media.write` ở gian hàng của mình (`subtree`) chỉ thấy và sửa item của
+gian hàng đó; `own` là item bạn tải lên. Item ngoài phạm vi trả 404, kể cả link tải riêng tư. Lọc
+danh sách bằng `owner_org`. Thư mục và nhãn dùng chung cả khách.
+
 ## Tải lên
 
 Gửi file thô làm thân request (không phải form multipart), loại của nó trong

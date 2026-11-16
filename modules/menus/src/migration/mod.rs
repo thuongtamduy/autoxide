@@ -3,6 +3,7 @@
 
 mod m0001_create_menus;
 mod m0005_add_updated_by;
+mod m0008_org;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -36,5 +37,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0007_tenant_list_index",
             vec!["menus_menus"],
         ),
+        // Menu theo website: nút của cây tổ chức (bước 34).
+        Box::new(m0008_org::Migration),
     ]
 }

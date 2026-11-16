@@ -7465,3 +7465,38 @@ Quyết định:
 Đã cân nhắc: membership trong bảng riêng `auth_membership` — trùng nghĩa với `auth_user_role`, phải chép dữ liệu và đổi
 mọi câu truy vấn; giữ `PUT /users/{id}/roles` thay mọi membership — xoá mất membership ở nút khác của người dùng khi
 giao diện cũ gọi.
+
+## D-305 · Nội dung, media, form, menu theo nút và website (bước 34 mục 3) — 2026-11-16 — agent quyết
+
+Quyết định (thực hiện D-208, D-238):
+
+1. **Website của request** là extractor `autoxide_kernel::tenancy::Site`: tên miền đã xác minh gắn với nút N → website
+   của N; tham số `?site=<id nút>` (thắng tên miền) cho client không gọi qua tên miền riêng; còn lại là website của cả
+   khách (nút gốc). Nút lạ → 404 `site_not_found`. Sổ database nhớ (khách, nút) của tên miền trong cùng cache với
+   khách (`DatabaseRegistry::domain_site`). `SiteQuery` chỉ để mô tả tham số trong OpenAPI.
+2. **Website hiện dữ liệu của nút đó và của mọi nút cấp trên** (`Site::lineage`): bài của trụ sở hiện ở mọi cửa hàng,
+   bài của cửa hàng A không bao giờ hiện ở cửa hàng B. Không có cờ "chia sẻ xuống" riêng: một bài muốn hiện ở nhiều
+   cửa hàng thì đặt ở nút cha chung. Menu công khai lấy menu của chính website, không có thì của website cấp trên gần
+   nhất (`tenancy::nearest`).
+3. **`org_id`**: `content_entries` (chép sang `content_published` khi đăng, để đọc công khai lọc không cần nối bảng),
+   `media_item`, `menus_menus` (khoá unique thêm `org_id`: mỗi website một menu `main`), đều điền nút gốc cho dòng cũ;
+   `forms_forms` NULL được — NULL là form của cả khách (chỉ người có phạm vi toàn khách thấy). Thư mục, nhãn media,
+   danh mục, thẻ, tác giả, chuyển hướng của `content` giữ cấp khách.
+4. **Permission theo nút:** `content.read/write/write_own/publish/publish_own/delete`, `media.read/write/purge`,
+   `menus.read/manage`, `forms.read/manage/review/export` thành `scoped()`; `content.manage`, `forms.submit` giữ cấp
+   khách. Độ sâu `own` dùng người tạo (`created_by` của bài, `uploaded_by` của media). Ngoài phạm vi đọc → 404 (không
+   lộ tồn tại); đọc được mà không ghi được, hay tạo ở nút ngoài phạm vi → 403 `org_out_of_scope`. Xuất / xoá mọi bài
+   gửi của một email cần `forms.export` toàn khách.
+5. **Nút mặc định khi tạo** (bài, item, ghi chú): `Principal::home_org(tenant, permission)` — gốc khi có quyền toàn khách,
+   nút duy nhất khi mọi grant ở một nút, còn lại người tạo phải nêu `org_id`.
+6. **Kiểm nút đang khoá ngoài transaction ghi:** `OrgTree::ensure_writable_unlocked` (chỉ đọc, không khoá) cho các lệnh
+   ghi của `content` mà chỗ kiểm quyền nằm trước transaction; lệnh tạo kiểm lại trong transaction. Lý do: SQLite chỉ có
+   một kết nối ghi, kiểm trên kết nối ghi trong lúc chỗ gọi giữ transaction thì treo.
+7. Bộ lọc quản trị: `owner_org` (bài, media, form, menu), `site` (bài hiện trên một website).
+
+Để sau, ghi vào lộ trình: ngôn ngữ bật theo website (cần cài đặt kế thừa theo cây — mục 4); đường dẫn công khai duy nhất
+theo website thay vì cả khách (hiện hai cửa hàng không cùng có `/about`); tìm theo ý nghĩa công khai lọc theo website.
+
+Đã cân nhắc: cờ "chia sẻ xuống" trên từng bài — thêm một khái niệm mà đặt bài ở nút cha đã làm được; kiểm phạm vi trong
+mọi hàm của `content` bằng transaction ghi — đổi thứ tự khoá của hàng chục lệnh; tra website trong handler — handler
+không được truy vấn database (luật kiến trúc 5), extractor của kernel giải một lần cho mọi module.

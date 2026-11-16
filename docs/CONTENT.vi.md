@@ -161,6 +161,19 @@ Permission `content.manage`.
   trỏ được tới đối tượng của module bất kỳ; chép menu sang bằng
   `autoxide task menus.import_content_menus` ([`MENUS.vi.md`](MENUS.vi.md)).
 
+## Cửa hàng và website
+
+Ở khách có cây tổ chức (module `organizations`), mỗi mục thuộc một nút: `org_id` khi tạo (bỏ
+trống: nút duy nhất của bạn, hay nút gốc khi role của bạn phủ cả khách). Các permission trên áp
+theo độ sâu của role: người có `content.write` ở một cửa hàng (`subtree`) chỉ viết mục của cửa hàng
+đó và các nút bên dưới; mục ngoài phạm vi trả 404. Lọc danh sách quản trị bằng `owner_org` (một
+nút) hay `site` (những gì một website hiện).
+
+Mỗi nút có thể có website: tên miền gắn với nút (`PATCH /api/v1/kernel/domains/{id}` với
+`org_id`), hay `?site=<id của nút>` ở các endpoint công khai. Website hiện mục của nút đó và của mọi
+nút cấp trên — bài của trụ sở hiện trên website của mọi cửa hàng, bài của một cửa hàng không bao
+giờ hiện trên website của cửa hàng khác. Đường dẫn vẫn duy nhất trong cả khách.
+
 ## Website: endpoint công khai
 
 Không cần đăng nhập. Chỉ trả bản đã đăng — không bao giờ trả bản nháp.

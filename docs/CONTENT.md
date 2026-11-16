@@ -167,6 +167,20 @@ Permission `content.manage`.
   `menus` module, whose items can point to objects of any module; copy yours with
   `autoxide task menus.import_content_menus` ([`MENUS.md`](MENUS.md)).
 
+## Stores and websites
+
+In a tenant with an organization tree (module `organizations`), each entry belongs to a unit:
+`org_id` when creating it (omitted: your only unit, or the root when your role covers the whole
+tenant). The permissions above follow the scope of the role: someone with `content.write` on a
+store (`subtree`) writes only entries of that store and the units below it; entries outside their
+scope answer 404. Filter the admin list with `owner_org` (one unit) or `site` (what a website
+shows).
+
+Each unit can have a website: its domain bound to the unit (`PATCH /api/v1/kernel/domains/{id}`
+with `org_id`), or `?site=<unit id>` on the public endpoints. A website shows the entries of its
+unit and of every unit above it — head-office posts appear on every store's website, a store's
+posts never on another store's. Addresses stay unique in the whole tenant.
+
 ## The website: public endpoints
 
 No sign-in needed. Only published versions are ever returned — drafts never.

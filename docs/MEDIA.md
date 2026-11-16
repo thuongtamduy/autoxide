@@ -21,6 +21,15 @@ texts, folder) are in the database. `autoxide backup` and `autoxide restore` car
 
 Give them to a role with `PUT /api/v1/auth/roles/{id}`. The `admin` role has them all.
 
+## Stores and sellers
+
+With an organization tree (module `organizations`), each item belongs to a unit: `org_id` when
+uploading (omitted: your only unit, or the root when your role covers the whole tenant). The
+permissions follow the scope of the role — a seller with `media.write` on their shop (`subtree`)
+sees and changes only that shop's items; `own` means the items you uploaded. Items outside your
+scope answer 404, also for the private download link. Filter the list with `owner_org`. Folders
+and tags are shared by the whole tenant.
+
 ## Upload
 
 Send the raw file as the body (not a multipart form), its type as `Content-Type` and its

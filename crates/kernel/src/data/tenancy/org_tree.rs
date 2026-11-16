@@ -348,6 +348,32 @@ impl OrgTree {
         Ok(())
     }
 
+    /// Như [`ensure_writable`](Self::ensure_writable) nhưng chỉ đọc, không khoá — cho chỗ không có
+    /// transaction ghi (kiểm sớm trước khi mở transaction, kết nối đọc). Không chặn được lệnh khoá
+    /// nút xen giữa: lệnh ghi thật vẫn nên kiểm lại bằng `ensure_writable` trong transaction.
+    pub async fn ensure_writable_unlocked<C: ConnectionTrait>(
+        connection: &C,
+        tenant: TenantId,
+        id: OrgId,
+    ) -> Result<(), Error> {
+        let lineage = Query::select()
+            .column(closure::Column::AncestorId)
+            .from(closure::Entity)
+            .and_where(closure::Column::TenantId.eq(tenant.as_uuid()))
+            .and_where(closure::Column::DescendantId.eq(id.as_uuid()))
+            .to_owned();
+        let frozen = unit::Entity::find()
+            .filter(unit::Column::TenantId.eq(tenant.as_uuid()))
+            .filter(unit::Column::Id.in_subquery(lineage))
+            .filter(unit::Column::Writable.eq(false))
+            .count(connection)
+            .await?;
+        if frozen > 0 {
+            return Err(org_frozen(id));
+        }
+        Ok(())
+    }
+
     /// Điều kiện SeaORM "cột `column` là một nút trong nhánh của một trong `roots`": `column IN
     /// (SELECT descendant_id FROM kernel_org_closure WHERE tenant_id = … AND ancestor_id IN …)`.
     /// Một subquery có index, không đổ danh sách ID ra bộ nhớ.

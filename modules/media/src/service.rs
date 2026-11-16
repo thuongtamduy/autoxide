@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use autoxide_kernel::access::Principal;
+use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::job::JobQueue;
@@ -21,7 +21,7 @@ use autoxide_kernel::pagination::{
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::rows;
 use autoxide_kernel::storage::{Storage, StoredFile, TenantStorage};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -112,6 +112,8 @@ pub(crate) struct ItemFilter {
     pub search: Option<String>,
     /// Chỉ item mang nhãn này (không phân biệt hoa thường).
     pub tag: Option<String>,
+    /// Chỉ item của nút này (bộ lọc `owner_org`).
+    pub owner_org: Option<Uuid>,
     /// `true`: chỉ ảnh thiếu `alt` (ảnh, `alt` trống, không phải ảnh trang trí); `false`: mọi item
     /// còn lại.
     pub alt_missing: Option<bool>,
@@ -221,7 +223,13 @@ impl MediaService {
         page: &PageRequest,
     ) -> Result<Page<Item>, Error> {
         principal.require(&MEDIA_READ)?;
-        let mut select = Entity::find().scoped(tenant);
+        // Theo nút (bước 34): chỉ item trong phạm vi `media.read`; `own` = item mình tải lên.
+        let scope =
+            principal.scope_condition(&MEDIA_READ, Column::OrgId, Some(Column::UploadedBy))?;
+        let mut select = Entity::find().filter(scope).scoped(tenant);
+        if let Some(org) = filter.owner_org {
+            select = select.filter(Column::OrgId.eq(org));
+        }
         select = if filter.trashed {
             select.filter(Column::TrashedAt.is_not_null())
         } else {
@@ -316,11 +324,27 @@ impl MediaService {
         id: Uuid,
     ) -> Result<Item, Error> {
         principal.require(&MEDIA_READ)?;
-        Entity::find_by_id(id)
+        let item = Entity::find_by_id(id)
             .scoped(tenant)
             .one(tenant.database().read())
             .await?
-            .ok_or_else(|| item_not_found(id))
+            .ok_or_else(|| item_not_found(id))?;
+        self.check_item(tenant, principal, &item).await?;
+        Ok(item)
+    }
+
+    /// `media.read` phủ item; không phủ → như không có item (404, không lộ item tồn tại).
+    pub(crate) async fn check_item(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        item: &Item,
+    ) -> Result<(), Error> {
+        let read = tenant.database().read();
+        match principal.require_at(read, &MEDIA_READ, item_target(tenant, item)).await {
+            Err(error) if error.code() == "org_out_of_scope" => Err(item_not_found(item.id)),
+            other => other,
+        }
     }
 
     /// Item `id` nếu người gọi được tải nội dung của nó: item công khai ngoài thùng rác thì
@@ -332,12 +356,22 @@ impl MediaService {
         principal: Option<&Principal>,
         id: Uuid,
     ) -> Result<Item, Error> {
-        let item = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
-        let reader = principal.is_some_and(|principal| principal.has(&MEDIA_READ));
-        item.filter(|item| {
-            reader || (Visibility::of(item) == Visibility::Public && item.trashed_at.is_none())
-        })
-        .ok_or_else(|| item_not_found(id))
+        let item = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(|| item_not_found(id))?;
+        if Visibility::of(&item) == Visibility::Public && item.trashed_at.is_none() {
+            return Ok(item);
+        }
+        // Item riêng tư: chỉ người có `media.read` phủ item (bước 34).
+        match principal {
+            Some(principal) if principal.has(&MEDIA_READ) => {
+                self.check_item(tenant, principal, &item).await?;
+                Ok(item)
+            }
+            _ => Err(item_not_found(id)),
+        }
     }
 
     /// Nội dung hiện tại của `item`, cả file hoặc đoạn `range`.
@@ -406,6 +440,10 @@ impl MediaService {
             .one(&transaction)
             .await?
             .ok_or_else(|| item_not_found(id))?;
+        self.check_item(tenant, principal, &before).await?;
+        principal
+            .require_write_at(&transaction, &MEDIA_WRITE, item_target(tenant, &before))
+            .await?;
         if before.trashed_at.is_some() {
             return Err(in_trash(id));
         }
@@ -507,6 +545,10 @@ impl MediaService {
             .one(&transaction)
             .await?
             .ok_or_else(|| item_not_found(id))?;
+        self.check_item(tenant, principal, &before).await?;
+        principal
+            .require_write_at(&transaction, &MEDIA_WRITE, item_target(tenant, &before))
+            .await?;
         let now = now();
         let mut row = before.clone().into_active_model();
         row.trashed_at = Set(trash.then_some(now));
@@ -552,6 +594,9 @@ impl MediaService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(|| item_not_found(id))?;
+        self.check_item(tenant, principal, &item).await?;
+        let read = tenant.database().read();
+        principal.require_at(read, &MEDIA_PURGE, item_target(tenant, &item)).await?;
         if item.trashed_at.is_none() {
             return Err(not_in_trash(id));
         }
@@ -711,6 +756,12 @@ impl EventHandler for MediaService {
         tracing::info!(user_id = %user_id, items = updated.rows_affected, "media items of a deleted user unlinked");
         Ok(())
     }
+}
+
+/// Đích kiểm quyền của item: nút sở hữu và người tải lên.
+pub(crate) fn item_target(tenant: &TenantContext, item: &Item) -> OrgTarget {
+    let org = item.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid);
+    OrgTarget::new(org, item.uploaded_by)
 }
 
 /// Khoá dòng thư mục `folder` tới hết `transaction` (`rows::lock_one`, D-181), nên lệnh xoá thư mục chạy cùng lúc phải chờ rồi thấy item / thư mục con

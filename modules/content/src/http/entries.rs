@@ -234,6 +234,11 @@ pub(crate) struct EntriesQuery {
     /// Only entries with no translation into this language yet (a BCP 47 code).
     #[param(example = "en")]
     pub missing_locale: Option<String>,
+    /// Only entries of this organization unit (store, seller).
+    pub owner_org: Option<Uuid>,
+    /// Only entries shown on the website of this organization unit: its own and those of the
+    /// units above it.
+    pub site: Option<Uuid>,
 }
 
 impl EntriesQuery {
@@ -258,6 +263,8 @@ impl EntriesQuery {
             ),
         };
         EntryFilter {
+            owner_org: self.owner_org,
+            site: self.site,
             review_requested: self.review_requested,
             scheduled: self.scheduled,
             created_by,
@@ -354,6 +361,9 @@ pub(crate) struct CreateEntryRequest {
     pub locale: Option<String>,
     /// Parent page (pages only).
     pub parent_id: Option<Uuid>,
+    /// The organization unit (store, seller) that owns the entry; you need `content.write` there.
+    /// Omit when you work in one unit only (or for the whole tenant).
+    pub org_id: Option<Uuid>,
     #[serde(flatten)]
     pub fields: EntryFieldsInput,
 }
@@ -432,6 +442,7 @@ pub(crate) async fn create_entry(
         kind: input.kind,
         locale: input.locale,
         parent_id: input.parent_id,
+        org_id: input.org_id,
         fields: input.fields.into(),
     };
     let entry = service.create(&tenant, &principal, new).await?;

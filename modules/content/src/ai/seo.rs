@@ -99,6 +99,8 @@ impl ContentService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(|| entry_not_found(id))?;
+        crate::permissions::require_org(principal, tenant, &entry, crate::permissions::Need::Read)
+            .await?;
         let mut findings = Vec::new();
         check_fields(&entry, &mut findings);
         let body: Value = serde_json::from_str(&entry.body).unwrap_or(Value::Null);
@@ -172,6 +174,7 @@ impl ContentService {
             .await?
             .ok_or_else(|| entry_not_found(id))?;
         permissions::require_write(principal, &entry)?;
+        permissions::require_org(principal, tenant, &entry, permissions::Need::Write).await?;
         self.ai.ready()?;
         let terms: Vec<(Uuid, String)> = term_translation::Entity::find()
             .scoped(tenant)

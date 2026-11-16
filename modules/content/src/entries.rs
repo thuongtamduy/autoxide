@@ -136,6 +136,8 @@ pub(crate) struct NewEntry {
     pub locale: Option<String>,
     /// Trang cha (chỉ trang).
     pub parent_id: Option<Uuid>,
+    /// Nút sở hữu (bước 34); `None`: nút duy nhất của người tạo (gốc khi có quyền cả khách).
+    pub org_id: Option<Uuid>,
     pub fields: EntryFields,
 }
 
@@ -193,6 +195,10 @@ pub(crate) struct EntryFilter {
     pub ai_generated: Option<bool>,
     /// Chỉ bài chưa có bản dịch sang ngôn ngữ này (không mục nào cùng nhóm bản dịch mang nó).
     pub missing_locale: Option<String>,
+    /// Chỉ mục của nút này (bộ lọc quản trị `owner_org`, bước 34).
+    pub owner_org: Option<Uuid>,
+    /// Chỉ mục hiện trên website của nút này: nút đó và các nút cấp trên (bộ lọc quản trị `site`).
+    pub site: Option<Uuid>,
 }
 
 impl ContentService {
@@ -235,6 +241,24 @@ impl ContentService {
         let mut candidate =
             blank(tenant, id, input.kind, &locale, input.parent_id, principal.user_id(), now);
         candidate.created_by_api_key_id = principal.api_key_id();
+        // Nút: người tạo nêu, hay nút duy nhất họ viết được (bước 34). Kiểm phạm vi trong `insert`.
+        let writer = if principal.has(&permissions::CONTENT_WRITE) {
+            &permissions::CONTENT_WRITE
+        } else {
+            &permissions::CONTENT_WRITE_OWN
+        };
+        match input
+            .org_id
+            .map(autoxide_kernel::tenancy::OrgId::from_uuid)
+            .or_else(|| principal.home_org(tenant.id(), writer))
+        {
+            Some(org) => candidate.org_id = Some(org.as_uuid()),
+            None => problems.push(FieldError::new(
+                "org_id",
+                "required",
+                "you work in several organization units: choose the unit of the entry",
+            )),
+        }
         let auto_slug = input.fields.slug.is_none();
         self.apply(tenant, &mut candidate, input.fields, &mut problems).await?;
         mark_agent_written(principal, &mut candidate);
@@ -261,6 +285,8 @@ impl ContentService {
         let base = candidate.slug.clone();
         for _ in 0..SLUG_ATTEMPTS {
             let transaction = tenant.database().begin_write().await?;
+            // Nút của mục mới phải trong phạm vi viết của người tạo, và đang hoạt động (bước 34).
+            permissions::require_write_at(principal, &transaction, tenant, &candidate).await?;
             if let Some(parent) = candidate.parent_id {
                 // Khoá cây của ngôn ngữ (cùng khoá với xoá, chuyển, đăng) rồi kiểm lại trang cha
                 // trong transaction: không tạo được trang con dưới một trang đang bị xoá, và độ
@@ -346,11 +372,13 @@ impl ContentService {
         id: Uuid,
     ) -> Result<Entry, Error> {
         principal.require(&CONTENT_READ)?;
-        Entity::find_by_id(id)
+        let entry = Entity::find_by_id(id)
             .scoped(tenant)
             .one(tenant.database().read())
             .await?
-            .ok_or_else(|| entry_not_found(id))
+            .ok_or_else(|| entry_not_found(id))?;
+        permissions::require_org(principal, tenant, &entry, permissions::Need::Read).await?;
+        Ok(entry)
     }
 
     /// Một trang mục theo bộ lọc. Cần `content.read`.
@@ -362,7 +390,21 @@ impl ContentService {
         page: &PageRequest,
     ) -> Result<Page<Entry>, Error> {
         principal.require(&CONTENT_READ)?;
-        let mut select = Entity::find().scoped(tenant);
+        // Theo nút (bước 34): chỉ mục trong phạm vi `content.read`; `own` = mục mình tạo.
+        let scope =
+            principal.scope_condition(&CONTENT_READ, Column::OrgId, Some(Column::CreatedBy))?;
+        let mut select = Entity::find().filter(scope).scoped(tenant);
+        if let Some(org) = filter.owner_org {
+            select = select.filter(Column::OrgId.eq(org));
+        }
+        if let Some(org) = filter.site {
+            let site = autoxide_kernel::tenancy::Site::of(
+                tenant,
+                autoxide_kernel::tenancy::OrgId::from_uuid(org),
+            )
+            .await?;
+            select = select.filter(Column::OrgId.is_in(site.lineage_ids()));
+        }
         if let Some(kind) = filter.kind {
             select = select.filter(Column::Kind.eq(kind.as_str()));
         }
@@ -492,6 +534,7 @@ impl ContentService {
             .await?
             .ok_or_else(|| entry_not_found(id))?;
         permissions::require_write(principal, &before)?;
+        permissions::require_org(principal, tenant, &before, permissions::Need::Write).await?;
         if expected.is_some_and(|expected| expected != before.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -771,6 +814,7 @@ impl ContentService {
             .await?
             .ok_or_else(|| entry_not_found(source_id))?;
         permissions::require_write(principal, &source)?;
+        permissions::require_org(principal, tenant, &source, permissions::Need::Write).await?;
         let mut problems = Vec::new();
         let target = self.check_locale(
             &self.languages(tenant).await?,
@@ -898,6 +942,7 @@ pub(crate) fn blank(
     Entry {
         id,
         tenant_id: tenant.id().as_uuid(),
+        org_id: Some(autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid()),
         kind: kind.as_str().to_owned(),
         locale: locale.to_owned(),
         translation_group_id: id,

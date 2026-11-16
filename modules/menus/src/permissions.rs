@@ -4,10 +4,12 @@
 use autoxide_kernel::access::Permission;
 
 pub(crate) const MENUS_READ: Permission =
-    Permission::new("menus.read", "See website menus as they are saved.");
+    Permission::new("menus.read", "See the website menus in your scope as they are saved.")
+        .scoped();
 
 pub(crate) const MENUS_MANAGE: Permission =
-    Permission::new("menus.manage", "Create, change and delete website menus.");
+    Permission::new("menus.manage", "Create, change and delete the website menus in your scope.")
+        .scoped();
 
 pub(crate) fn all() -> Vec<Permission> {
     vec![MENUS_READ, MENUS_MANAGE]

@@ -140,6 +140,10 @@ impl ContentService {
         id: Uuid,
     ) -> Result<Revision, Error> {
         principal.require(&CONTENT_READ)?;
+        // Mục ngoài phạm vi theo nút: như không có (bước 34).
+        self.get(tenant, principal, entry_id).await.map_err(|error| {
+            if error.code() == "content.not_found" { revision_not_found(id) } else { error }
+        })?;
         revision::Entity::find_by_id(id)
             .scoped(tenant)
             .one(tenant.database().read())

@@ -252,10 +252,11 @@ pub(crate) fn public_cache(mut response: Response) -> Response {
 pub(crate) async fn resolution(
     service: &ContentService,
     tenant: &TenantContext,
+    site: &Site,
     locale: &str,
     path: &str,
 ) -> Result<(Resolution, Option<DateTime<Utc>>), Error> {
-    Ok(match service.resolve(tenant, locale, path).await? {
+    Ok(match service.resolve(tenant, site, locale, path).await? {
         Resolved::Entry(row) => {
             let version = row.updated_at;
             let view = service.public_views(tenant, vec![*row]).await?.into_iter().next();
@@ -281,7 +282,7 @@ pub(crate) async fn resolution(
     extensions(("x-public" = json!(true))),
     operation_id = "resolve_content_path",
     security((), ("bearer" = [])),
-    params(ResolveQuery),
+    params(ResolveQuery, SiteQuery),
     responses(
         (status = 200, description = "What lives at the address: `type` is `entry`, `redirect` or `gone`.", body = Data<Resolution>, headers(("ETag" = String, description = "Fingerprint of the whole answer (for an entry, including its terms, authors and translations); send it in `If-None-Match` to get 304."))),
         (status = 404, description = "Nothing at this address; code `content.not_found`.", body = Problem),
@@ -291,10 +292,12 @@ pub(crate) async fn resolution(
 pub(crate) async fn resolve(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
+    site: Site,
     _principal: Option<Principal>,
     Query(query): Query<ResolveQuery>,
 ) -> Result<Response, Error> {
-    let (resolution, version) = resolution(&service, &tenant, &query.locale, &query.path).await?;
+    let (resolution, version) =
+        resolution(&service, &tenant, &site, &query.locale, &query.path).await?;
     let data = Data { data: resolution };
     // ETag là dấu vân tay của CẢ câu trả lời, không phải `updated_at` của bản công khai: câu
     // trả lời còn gộp danh mục, thẻ, tác giả, bản dịch, ảnh — đổi những thứ đó không chạm
@@ -326,7 +329,7 @@ fn fingerprint<T: Serialize>(tenant: &TenantContext, value: &T) -> Result<String
 }
 
 use autoxide_kernel::pagination::{Page, PageQuery};
-use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
+use autoxide_kernel::tenancy::{OptionalTenant, Site, SiteQuery, TenantContext};
 use axum::extract::Path;
 
 use super::page_request;
@@ -370,7 +373,7 @@ pub(crate) struct PostsQuery {
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_content_posts",
     security((), ("bearer" = [])),
-    params(PostsQuery, PageQuery),
+    params(PostsQuery, PageQuery, SiteQuery),
     responses(
         (status = 200, description = "One page of published posts.", body = Page<PublicEntryResponse>),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
@@ -379,6 +382,7 @@ pub(crate) struct PostsQuery {
 pub(crate) async fn list_posts(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
+    site: Site,
     _principal: Option<Principal>,
     Query(query): Query<PostsQuery>,
     Query(paging): Query<PageQuery>,
@@ -403,8 +407,13 @@ pub(crate) async fn list_posts(
         );
     }
     let page = page_request(paging, problems)?;
-    let filter =
-        PostFilter { locale, term_id: query.term_id, author_id: query.author_id, search: query.q };
+    let filter = PostFilter {
+        locale,
+        site: site.lineage_ids(),
+        term_id: query.term_id,
+        author_id: query.author_id,
+        search: query.q,
+    };
     let page =
         views(&service, &tenant, service.public_posts(&tenant, &filter, &page).await?).await?;
     Ok(public_cache(page.into_response()))
@@ -695,7 +704,7 @@ pub(crate) struct SitemapQuery {
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_content_sitemap",
     security((), ("bearer" = [])),
-    params(SitemapQuery, PageQuery),
+    params(SitemapQuery, PageQuery, SiteQuery),
     responses(
         (status = 200, description = "One page of addresses.", body = Page<SitemapItem>),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
@@ -704,6 +713,7 @@ pub(crate) struct SitemapQuery {
 pub(crate) async fn sitemap(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
+    site: Site,
     _principal: Option<Principal>,
     Query(query): Query<SitemapQuery>,
     Query(paging): Query<PageQuery>,
@@ -715,7 +725,7 @@ pub(crate) async fn sitemap(
         .as_deref()
         .map(|locale| service.check_locale(&languages, Some(locale), "locale", &mut problems));
     let page = page_request(paging, problems)?;
-    let found = service.sitemap(&tenant, locale.as_deref(), &page).await?;
+    let found = service.sitemap(&tenant, &site, locale.as_deref(), &page).await?;
     let mut translations = service.translations_of(&tenant, &found.data).await?;
     let page = found.map(|row| SitemapItem {
         translations: translations
@@ -755,7 +765,7 @@ pub(crate) struct FeedQuery {
     extensions(("x-public" = json!(true))),
     operation_id = "get_public_content_feed",
     security((), ("bearer" = [])),
-    params(FeedQuery),
+    params(FeedQuery, SiteQuery),
     responses(
         (status = 200, description = "The newest posts, newest first.", body = Data<Vec<PublicEntryResponse>>),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
@@ -764,6 +774,7 @@ pub(crate) struct FeedQuery {
 pub(crate) async fn feed(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
+    site: Site,
     _principal: Option<Principal>,
     Query(query): Query<FeedQuery>,
 ) -> Result<Response, Error> {
@@ -785,7 +796,7 @@ pub(crate) async fn feed(
     if !problems.is_empty() {
         return Err(Error::validation(problems));
     }
-    let rows = service.feed(&tenant, &locale, limit).await?;
+    let rows = service.feed(&tenant, &site, &locale, limit).await?;
     let data: Vec<PublicEntryResponse> =
         service.public_views(&tenant, rows).await?.into_iter().map(public_entry).collect();
     Ok(public_cache(Data { data }.into_response()))

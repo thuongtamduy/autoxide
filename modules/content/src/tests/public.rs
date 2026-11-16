@@ -48,7 +48,11 @@ async fn bai_cong_khai_sitemap_feed() {
             .unwrap();
 
         let first = PageRequest::first(2, Order::Desc);
-        let filter = PostFilter { locale: "en".into(), ..Default::default() };
+        let filter = PostFilter {
+            locale: "en".into(),
+            site: autoxide_kernel::tenancy::Site::whole(&tenant).lineage_ids(),
+            ..Default::default()
+        };
         let page1 = content.public_posts(&tenant, &filter, &first).await.unwrap();
         let titles: Vec<&str> = page1.data.iter().map(|row| row.title.as_str()).collect();
         assert_eq!(titles, ["Cà phê trứng", "Bún chả"]);
@@ -81,11 +85,19 @@ async fn bai_cong_khai_sitemap_feed() {
             content.public_posts(&tenant, &secret, &first).await.unwrap().data.is_empty(),
             "drafts never listed"
         );
-        let vi_posts = PostFilter { locale: "vi".into(), ..Default::default() };
+        let vi_posts = PostFilter { locale: "vi".into(), ..filter.clone() };
         assert_eq!(content.public_posts(&tenant, &vi_posts, &first).await.unwrap().data.len(), 1);
 
-        let all =
-            content.sitemap(&tenant, None, &PageRequest::first(50, Order::Asc)).await.unwrap().data;
+        let all = content
+            .sitemap(
+                &tenant,
+                &autoxide_kernel::tenancy::Site::whole(&tenant),
+                None,
+                &PageRequest::first(50, Order::Asc),
+            )
+            .await
+            .unwrap()
+            .data;
         assert_eq!(all.len(), 5, "3 posts, 1 page, 1 translation");
         assert!(all.iter().all(|row| row.entry_id != draft.id));
         let translations = content.translations_of(&tenant, &all).await.unwrap();
@@ -95,7 +107,12 @@ async fn bai_cong_khai_sitemap_feed() {
         );
         assert_eq!(
             content
-                .sitemap(&tenant, Some("vi"), &PageRequest::first(50, Order::Asc))
+                .sitemap(
+                    &tenant,
+                    &autoxide_kernel::tenancy::Site::whole(&tenant),
+                    Some("vi"),
+                    &PageRequest::first(50, Order::Asc)
+                )
                 .await
                 .unwrap()
                 .data
@@ -103,7 +120,10 @@ async fn bai_cong_khai_sitemap_feed() {
             1
         );
 
-        let feed = content.feed(&tenant, "en", 2).await.unwrap();
+        let feed = content
+            .feed(&tenant, &autoxide_kernel::tenancy::Site::whole(&tenant), "en", 2)
+            .await
+            .unwrap();
         assert_eq!(
             feed.iter().map(|row| row.entry_id).collect::<Vec<_>>(),
             [published[2].id, published[1].id]
@@ -196,6 +216,91 @@ async fn xem_truoc() {
             content.preview(Some(&tenant), &token).await.unwrap_err().code(),
             "content.preview_token_invalid"
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Nội dung theo website và nút (bước 34, D-208): website của cửa hàng A hiện bài của A và bài
+/// của cả khách (nút cấp trên), không bao giờ hiện bài của cửa hàng B; người viết của B không
+/// thấy, không sửa được bài của A.
+#[tokio::test]
+async fn bai_cua_cua_hang_a_khong_hien_tren_website_cua_cua_hang_b() {
+    use autoxide_kernel::access::{Grant, Principal, Scope};
+    use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, Site};
+
+    TestDatabase::run(async |test| {
+        let (content, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
+        let org = || OrgId::from_uuid(Uuid::now_v7());
+        let (shop_a, shop_b) = (org(), org());
+        let write = database.begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, shop_a, root, 8).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, shop_b, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+        let ada = editor();
+        let publish = async |title: &str, org: Option<OrgId>| {
+            let mut new = post(title);
+            new.org_id = org.map(|org| org.as_uuid());
+            let entry = content.create(&tenant, &ada, new).await.unwrap();
+            content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
+            entry
+        };
+        let whole = publish("Whole chain", None).await;
+        let of_a = publish("Shop A news", Some(shop_a)).await;
+        let of_b = publish("Shop B news", Some(shop_b)).await;
+        assert_eq!(of_a.org_id, Some(shop_a.as_uuid()));
+
+        let titles = async |site: &Site| -> Vec<String> {
+            let filter =
+                PostFilter { locale: "en".into(), site: site.lineage_ids(), ..Default::default() };
+            let page = PageRequest::first(10, Order::Asc);
+            let rows = content.public_posts(&tenant, &filter, &page).await.unwrap().data;
+            rows.into_iter().map(|row| row.title).collect()
+        };
+        let site_a = Site::of(&tenant, shop_a).await.unwrap();
+        let site_b = Site::of(&tenant, shop_b).await.unwrap();
+        assert_eq!(titles(&site_a).await, ["Whole chain", "Shop A news"]);
+        assert_eq!(titles(&site_b).await, ["Whole chain", "Shop B news"]);
+        assert_eq!(titles(&Site::whole(&tenant)).await, ["Whole chain"]);
+
+        // Địa chỉ bài của A trên website của B: không có.
+        let path_of = |entry: &crate::entries::Entry| format!("/blog/{}", entry.slug);
+        let on_b = content.resolve(&tenant, &site_b, "en", &path_of(&of_a)).await;
+        assert_eq!(on_b.unwrap_err().code(), "content.not_found");
+        assert!(content.resolve(&tenant, &site_a, "en", &path_of(&of_a)).await.is_ok());
+        assert!(content.resolve(&tenant, &site_b, "en", &path_of(&whole)).await.is_ok());
+        let sitemap =
+            content.sitemap(&tenant, &site_b, None, &PageRequest::first(10, Order::Asc)).await;
+        assert_eq!(sitemap.unwrap().data.len(), 2);
+
+        // Người viết của cửa hàng B: chỉ thấy bài của B; bài của A như không có.
+        let writer_b = Principal::with_grants(
+            Uuid::now_v7(),
+            ["content.read", "content.write", "content.publish"]
+                .map(|name| (name.to_owned(), Grant::new(shop_b, Scope::Subtree))),
+        );
+        let page = PageRequest::first(10, Order::Asc);
+        let listed = content.list(&tenant, &writer_b, &Default::default(), &page).await.unwrap();
+        let ids: Vec<Uuid> = listed.data.iter().map(|entry| entry.id).collect();
+        assert_eq!(ids, [of_b.id]);
+        assert_eq!(
+            content.get(&tenant, &writer_b, of_a.id).await.unwrap_err().code(),
+            "content.not_found"
+        );
+        let unpublish = content.unpublish(&tenant, &writer_b, of_a.id, None).await;
+        assert_eq!(unpublish.unwrap_err().code(), "content.not_found");
+        // Viết vào nút A: 403.
+        let mut into_a = post("Not mine");
+        into_a.org_id = Some(shop_a.as_uuid());
+        assert_eq!(
+            content.create(&tenant, &writer_b, into_a).await.unwrap_err().code(),
+            "org_out_of_scope"
+        );
+        // Không nêu nút: nút duy nhất của người viết.
+        let own = content.create(&tenant, &writer_b, post("Mine")).await.unwrap();
+        assert_eq!(own.org_id, Some(shop_b.as_uuid()));
     })
     .await
     .unwrap();

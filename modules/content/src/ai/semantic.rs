@@ -456,6 +456,24 @@ impl ContentService {
         }
         let ids: Vec<Uuid> = fused.keys().copied().collect();
         let mut hits = self.describe_hits(tenant, scope, &ids, query.kind, &fused).await?;
+        // Tìm bản nháp: chỉ mục trong phạm vi `content.read` của người gọi (bước 34).
+        if let (false, Some(principal)) = (public, principal) {
+            let scope = principal.scope_condition(
+                &CONTENT_READ,
+                entry::Column::OrgId,
+                Some(entry::Column::CreatedBy),
+            )?;
+            let permitted: std::collections::HashSet<Uuid> = entry::Entity::find()
+                .filter(scope)
+                .filter(entry::Column::Id.is_in(hits.iter().map(|hit| hit.entry_id)))
+                .scoped(tenant)
+                .all(tenant.database().read())
+                .await?
+                .into_iter()
+                .map(|row| row.id)
+                .collect();
+            hits.retain(|hit| permitted.contains(&hit.entry_id));
+        }
         hits.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.entry_id.cmp(&b.entry_id)));
         hits.truncate(limit as usize);
         Ok(hits)

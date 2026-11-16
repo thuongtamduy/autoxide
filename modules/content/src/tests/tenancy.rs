@@ -96,7 +96,16 @@ async fn trung_ten_o_hai_khach_duoc_phep() {
             content.create_redirect(tenant, &ada, redirect()).await.unwrap();
         }
         for (tenant, id) in [(&a, published[0]), (&b, published[1])] {
-            match content.resolve(tenant, "en", "/blog/hello").await.unwrap() {
+            match content
+                .resolve(
+                    tenant,
+                    &autoxide_kernel::tenancy::Site::whole(tenant),
+                    "en",
+                    "/blog/hello",
+                )
+                .await
+                .unwrap()
+            {
                 Resolved::Entry(row) => assert_eq!(row.entry_id, id),
                 other => panic!("expected an entry, got {other:?}"),
             }
@@ -200,10 +209,18 @@ async fn lich_dang_chay_dung_khach() {
 
         assert_eq!(content.get(&b, &ada, entry.id).await.unwrap().status, "published");
         assert!(matches!(
-            content.resolve(&b, "en", "/blog/later").await.unwrap(),
+            content
+                .resolve(&b, &autoxide_kernel::tenancy::Site::whole(&b), "en", "/blog/later")
+                .await
+                .unwrap(),
             Resolved::Entry(_)
         ));
-        assert!(content.resolve(&a, "en", "/blog/later").await.is_err());
+        assert!(
+            content
+                .resolve(&a, &autoxide_kernel::tenancy::Site::whole(&a), "en", "/blog/later")
+                .await
+                .is_err()
+        );
         let events = events_of(&b).await;
         assert!(events.contains(&"content.entry_published".to_owned()), "{events:?}");
         assert!(events_of(&a).await.is_empty());

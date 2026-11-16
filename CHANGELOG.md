@@ -180,6 +180,14 @@ endpoints are marked deprecated with a sunset date first.
   `scoped`. An API key can be bound to a unit (`org_id`): it then acts only on that unit and the units below it.
   Existing roles, role assignments and keys keep their meaning (the whole tenant); `PUT /users/{id}/roles` sets the
   roles at the root unit.
+- Content, media, forms and menus per organization unit and website. Entries, media items and menus belong to a unit
+  (`org_id` when creating; existing data belongs to the root), forms may (`null`: the whole tenant). Their permissions
+  follow the scope of the role; data outside the scope answers 404. Admin lists filter by `owner_org` (and entries by
+  `site`). Public endpoints (`/api/v1/content/public/resolve`, `/posts`, `/sitemap`, `/feed`,
+  `/api/v1/menus/public/{key}`) serve the website of the request: a domain bound to a unit, or `?site=<unit id>`;
+  a website shows the content of its unit and of the units above it, and the menu of the nearest website that has one.
+  New error codes `site_not_found`, `invalid_site`. For module authors: `autoxide_kernel::tenancy::{Site, SiteQuery}`,
+  `Principal::home_org`, `OrgTree::ensure_writable_unlocked`.
 - For module authors (testkit): `branch_leak_check(&app, token, marker, ids)` — the leak test between two sibling
   units of one tenant: a person of one branch calls every `GET` and read-only MCP tool and must see nothing of the
   other. Module guide: a section "Data of organization units" (`org_id`, `.scoped()`, `scope_condition`,

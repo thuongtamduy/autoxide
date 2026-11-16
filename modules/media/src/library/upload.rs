@@ -7,11 +7,11 @@
 
 use std::sync::{Arc, Mutex};
 
-use autoxide_kernel::access::Principal;
+use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::storage::{ByteStream, Storage as _};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -25,8 +25,8 @@ use crate::events::{self, Change};
 use crate::library::sniff;
 use crate::permissions::MEDIA_WRITE;
 use crate::service::{
-    Item, MediaService, Visibility, check_name, folder_gone, in_trash, item_not_found, now,
-    snapshot, too_large, touch_folder,
+    Item, MediaService, Visibility, check_name, folder_gone, in_trash, item_not_found, item_target,
+    now, snapshot, too_large, touch_folder,
 };
 
 /// Một lần tải lên.
@@ -40,6 +40,8 @@ pub(crate) struct NewUpload {
     pub content_type: Option<String>,
     /// Nhãn gắn ngay khi tải lên.
     pub tags: Vec<String>,
+    /// Nút sở hữu item; `None`: nút duy nhất của người tải (gốc khi có quyền cho cả khách).
+    pub org_id: Option<Uuid>,
 }
 
 /// Kết quả tải lên: item mới, và các item đã có cùng nội dung.
@@ -83,6 +85,17 @@ impl MediaService {
         principal.require(&MEDIA_WRITE)?;
         let mut problems = Vec::new();
         let name = check_name(&input.name, &mut problems);
+        let org = match input.org_id {
+            Some(org) => Some(OrgId::from_uuid(org)),
+            None => principal.home_org(tenant.id(), &MEDIA_WRITE),
+        };
+        if org.is_none() {
+            problems.push(FieldError::new(
+                "org_id",
+                "required",
+                "you work in several organization units: choose the unit of the item",
+            ));
+        }
         if let Some(folder) = input.folder_id {
             self.check_folder_exists(tenant, folder, "folder_id", &mut problems).await?;
         }
@@ -100,7 +113,7 @@ impl MediaService {
                 tenant,
                 principal,
                 (id, version_id),
-                NewUpload { name, tags, ..input },
+                NewUpload { name, tags, org_id: org.map(|org| org.as_uuid()), ..input },
                 received,
             )
             .await;
@@ -134,6 +147,7 @@ impl MediaService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(|| item_not_found(id))?;
+        self.check_item(tenant, principal, &current).await?;
         if current.trashed_at.is_some() {
             return Err(in_trash(id));
         }
@@ -174,10 +188,14 @@ impl MediaService {
         received: Received,
     ) -> Result<Item, Error> {
         // `checked`: tên đã chuẩn hoá, nhãn đã kiểm (`upload`).
-        let NewUpload { name, folder_id, tags, .. } = checked;
+        let NewUpload { name, folder_id, tags, org_id, .. } = checked;
+        let org = org_id.map_or(root_of(tenant.id()), OrgId::from_uuid);
         let now = now();
         let folder = stored_folder(folder_id);
         let transaction = tenant.database().begin_write().await?;
+        // Nút do người tải nêu (hay nút mặc định): ngoài phạm vi → 403; nút đang khoá → `org_frozen`.
+        let at = OrgTarget::new(org, Some(principal.user_id()));
+        principal.require_write_at(&transaction, &MEDIA_WRITE, at).await?;
         if !touch_folder(&transaction, tenant, folder).await? {
             // Thư mục vừa bị xoá giữa lúc kiểm và lúc ghi.
             return Err(folder_gone("folder_id"));
@@ -200,6 +218,7 @@ impl MediaService {
             visibility: Set(Visibility::Private.as_str().to_owned()),
             version_id: Set(version_id),
             uploaded_by: Set(Some(principal.user_id())),
+            org_id: Set(Some(org.as_uuid())),
             created_at: Set(now),
             updated_at: Set(now),
             trashed_at: Set(None),
@@ -235,6 +254,9 @@ impl MediaService {
             .one(&transaction)
             .await?
             .ok_or_else(|| item_not_found(id))?;
+        principal
+            .require_write_at(&transaction, &MEDIA_WRITE, item_target(tenant, &before))
+            .await?;
         let mut row = before.clone().into_active_model();
         row.content_type = Set(received.content_type);
         row.size = Set(received.size);

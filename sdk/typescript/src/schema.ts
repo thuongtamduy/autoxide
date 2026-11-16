@@ -778,6 +778,11 @@ export type CreateEntryRequest = EntryFieldsInput & {
   kind: Kind;
   /** Language; omitted: the default language. */
   locale?: string | null;
+  /**
+   * The organization unit (store, seller) that owns the entry; you need `content.write` there.
+   * Omit when you work in one unit only (or for the whole tenant).
+   */
+  org_id?: string | null;
   /** Parent page (pages only). */
   parent_id?: string | null;
 };
@@ -814,6 +819,11 @@ export type CreateFormRequest = {
    * Setting them also needs the permission `forms.read`.
    */
   notify_emails?: string[] | null;
+  /**
+   * The organization unit (store, seller) that owns the form; you need `forms.manage` there.
+   * Omitted: a form of the whole tenant.
+   */
+  org_id?: string | null;
   /** Key of an `email` field. */
   reply_to_field?: string | null;
   /** 0 (keep) to 36500. */
@@ -847,6 +857,11 @@ export type CreateSiteMenuRequest = {
   key: string;
   /** The menu's language; omitted: the default language. */
   locale?: string | null;
+  /**
+   * The website (organization unit) the menu is for; you need `menus.manage` there. Omitted:
+   * the website of the whole tenant, used by every website without a menu of its own.
+   */
+  org_id?: string | null;
 };
 
 /** An address to suppress by hand. */
@@ -1640,6 +1655,8 @@ export type Data_FormResponse = {
     name: string;
     /** Addresses mailed for each new submission. Never shown by the public endpoint. */
     notify_emails: string[];
+    /** The organization unit that owns the form; `null`: a form of the whole tenant. */
+    org_id?: string | null;
     /**
      * Key of the `email` field used as `Reply-To` of the notification and to find
      * submissions by email; `null`: the first `email` field.
@@ -2402,6 +2419,8 @@ export type Data_SiteMenu = {
     items: SiteMenuItem[];
     key: string;
     locale: string;
+    /** The website (organization unit) of the menu; the id of the tenant for the whole tenant. */
+    org_id: string;
     updated_at: string;
   };
 };
@@ -3547,6 +3566,8 @@ export type FormResponse = {
   name: string;
   /** Addresses mailed for each new submission. Never shown by the public endpoint. */
   notify_emails: string[];
+  /** The organization unit that owns the form; `null`: a form of the whole tenant. */
+  org_id?: string | null;
   /**
    * Key of the `email` field used as `Reply-To` of the notification and to find
    * submissions by email; `null`: the first `email` field.
@@ -4654,6 +4675,8 @@ export type Page_FormResponse = {
     name: string;
     /** Addresses mailed for each new submission. Never shown by the public endpoint. */
     notify_emails: string[];
+    /** The organization unit that owns the form; `null`: a form of the whole tenant. */
+    org_id?: string | null;
     /**
      * Key of the `email` field used as `Reply-To` of the notification and to find
      * submissions by email; `null`: the first `email` field.
@@ -5102,6 +5125,8 @@ export type Page_SiteMenuSummary = {
     item_count: number;
     key: string;
     locale: string;
+    /** The website (organization unit) of the menu. */
+    org_id: string;
     updated_at: string;
     /**
      * Who created the menu or last replaced its items; `null` when unknown (menus saved
@@ -6340,6 +6365,8 @@ export type SiteMenu = {
   items: SiteMenuItem[];
   key: string;
   locale: string;
+  /** The website (organization unit) of the menu; the id of the tenant for the whole tenant. */
+  org_id: string;
   updated_at: string;
 };
 
@@ -6406,6 +6433,8 @@ export type SiteMenuSummary = {
   item_count: number;
   key: string;
   locale: string;
+  /** The website (organization unit) of the menu. */
+  org_id: string;
   updated_at: string;
   /**
    * Who created the menu or last replaced its items; `null` when unknown (menus saved
@@ -8546,7 +8575,7 @@ export interface paths {
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_EntryResponse;
         401: Problem;
@@ -8951,7 +8980,7 @@ export interface paths {
   "/api/v1/content/public/feed": {
     /** The newest posts of a language, for RSS, Atom or JSON Feed (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; limit?: number; site?: string }; };
       responses: {
         200: Data_Vec_PublicEntryResponse;
         422: Problem;
@@ -8974,7 +9003,7 @@ export interface paths {
   "/api/v1/content/public/posts": {
     /** List published posts (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; term_id?: string; author_id?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; term_id?: string; author_id?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
       responses: {
         200: Page_PublicEntryResponse;
         422: Problem;
@@ -8997,7 +9026,7 @@ export interface paths {
   "/api/v1/content/public/resolve": {
     /** Look up an address (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; path: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; path: string; site?: string }; };
       responses: {
         200: Data_Resolution;
         404: Problem;
@@ -9021,7 +9050,7 @@ export interface paths {
   "/api/v1/content/public/sitemap": {
     /** List every published address, for a sitemap (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
       responses: {
         200: Page_SitemapItem;
         422: Problem;
@@ -9306,7 +9335,7 @@ export interface paths {
   "/api/v1/forms": {
     /** List forms. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: "open" | "closed"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: "open" | "closed"; owner_org?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_FormResponse;
         401: Problem;
@@ -9889,7 +9918,7 @@ export interface paths {
   "/api/v1/media": {
     /** List media items. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; alt_missing?: boolean; include?: "uploader"; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; owner_org?: string; alt_missing?: boolean; include?: "uploader"; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_MediaItemResponse;
         401: Problem;
@@ -9900,7 +9929,7 @@ export interface paths {
     };
     /** Upload a media item. */
     post: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { name: string; folder_id?: string; tags?: string }; };
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { name: string; folder_id?: string; org_id?: string; tags?: string }; };
       requestBody: Blob;
       responses: {
         201: Data_UploadedResponse;
@@ -10204,7 +10233,7 @@ export interface paths {
   "/api/v1/menus": {
     /** List website menus. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { owner_org?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_SiteMenuSummary;
         401: Problem;
@@ -10230,7 +10259,7 @@ export interface paths {
   "/api/v1/menus/public/{key}": {
     /** Get a website menu, ready to show (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: string; site?: string }; };
       responses: {
         200: Data_PublicSiteMenu;
         304: void;

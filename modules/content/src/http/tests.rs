@@ -351,8 +351,15 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
         );
         content.handle(&deleted).await.unwrap();
         content.handle(&deleted).await.unwrap();
-        let (resolution, _) =
-            super::public::resolution(&content, &tenant, "en", "/blog/reviewed").await.unwrap();
+        let (resolution, _) = super::public::resolution(
+            &content,
+            &tenant,
+            &autoxide_kernel::tenancy::Site::whole(&tenant),
+            "en",
+            "/blog/reviewed",
+        )
+        .await
+        .unwrap();
         let shown = serde_json::to_value(resolution).unwrap();
         assert_eq!(
             (shown["entry"]["ai_generated"].as_bool(), shown["entry"]["ai_reviewed"].as_bool()),

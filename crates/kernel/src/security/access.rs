@@ -442,6 +442,18 @@ impl Principal {
         self
     }
 
+    /// Nút mặc định cho bản ghi mới khi người tạo không chọn (bước 34): nút gốc nếu họ có
+    /// `permission` cho cả khách; nút duy nhất nếu mọi grant của nó ở một nút; `None` khi họ làm ở
+    /// nhiều nút (phải chọn) hay không có `permission`.
+    pub fn home_org(&self, tenant: TenantId, permission: &Permission) -> Option<OrgId> {
+        let grants = self.grants(permission);
+        let first = grants.first()?;
+        if grants.iter().any(|grant| grant.scope == Scope::Tenant) {
+            return Some(root_of(tenant));
+        }
+        grants.iter().all(|grant| grant.org == first.org).then_some(first.org)
+    }
+
     /// Mọi grant theo permission (tên → grant); `None` khi có mọi permission ở độ sâu `tenant`.
     pub fn grant_map(&self) -> Option<&BTreeMap<String, Vec<Grant>>> {
         match &self.grants {

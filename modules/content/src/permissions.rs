@@ -4,37 +4,47 @@
 //! tạo — cùng người dùng **và** cùng API key (hai agent dùng hai key của một người không đụng
 //! bài của nhau).
 
-use autoxide_kernel::access::{Permission, Principal, Risk};
+use autoxide_kernel::access::{OrgTarget, Permission, Principal, Risk};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
 
 use crate::entries::Entry;
 
 pub(crate) const CONTENT_READ: Permission =
-    Permission::new("content.read", "Read drafts, revisions and schedules of posts and pages.");
+    Permission::new("content.read", "Read drafts, revisions and schedules of posts and pages.")
+        .scoped();
 pub(crate) const CONTENT_WRITE: Permission = Permission::new(
     "content.write",
     "Create posts and pages, edit drafts, add translations, restore revisions, make preview links.",
-);
+)
+.scoped();
 pub(crate) const CONTENT_WRITE_OWN: Permission = Permission::new(
     "content.write_own",
     "Like content.write, but only on entries the caller created (same user and same API key). \
      Meant for AI agents.",
-);
+)
+.scoped();
 pub(crate) const CONTENT_PUBLISH: Permission = Permission::new(
     "content.publish",
     "Publish, unpublish, archive and schedule posts and pages; move published pages; change the \
      terms and authors of published entries.",
-);
+)
+.scoped();
 pub(crate) const CONTENT_PUBLISH_OWN: Permission = Permission::new(
     "content.publish_own",
     "Publish and unpublish only entries the caller created (same user and same API key); no \
      archive, delete, move or schedule. Meant for AI agents.",
-);
+)
+.scoped();
 pub(crate) const CONTENT_DELETE: Permission =
     Permission::new("content.delete", "Delete posts and pages for good.")
-        .with_risk(Risk::Destructive);
+        .with_risk(Risk::Destructive)
+        .scoped();
 pub(crate) const CONTENT_MANAGE: Permission =
     Permission::new("content.manage", "Manage categories, tags, authors, menus and redirects.");
+
+// Theo nút (bước 34, D-208): đọc, viết, đăng, xoá áp theo độ sâu — người của một cửa hàng chỉ làm
+// trên bài của cửa hàng mình. `content.manage` (danh mục, thẻ, tác giả, chuyển hướng) giữ cấp khách.
 
 pub(crate) fn all() -> Vec<Permission> {
     vec![
@@ -117,4 +127,79 @@ pub(crate) fn not_owner() -> Error {
         "This entry was created by someone else (or with another API key); your permission only \
          covers entries you created.",
     )
+}
+
+/// Việc cần làm trên một mục, để chọn permission khi kiểm phạm vi theo nút.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Need {
+    Read,
+    Write,
+    Publish,
+    Delete,
+}
+
+/// Đích kiểm quyền của mục: nút sở hữu và người tạo.
+pub(crate) fn target(tenant: &TenantContext, entry: &Entry) -> OrgTarget {
+    let org = entry.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid);
+    OrgTarget::new(org, entry.created_by)
+}
+
+/// Permission dùng cho việc `need` của `principal` (bản `_own` khi chỉ có bản đó).
+fn permission_for(principal: &Principal, need: Need) -> &'static Permission {
+    match need {
+        Need::Read => &CONTENT_READ,
+        Need::Write if principal.has(&CONTENT_WRITE) => &CONTENT_WRITE,
+        Need::Write => &CONTENT_WRITE_OWN,
+        Need::Publish if principal.has(&CONTENT_PUBLISH) => &CONTENT_PUBLISH,
+        Need::Publish => &CONTENT_PUBLISH_OWN,
+        Need::Delete => &CONTENT_DELETE,
+    }
+}
+
+/// Phạm vi theo nút của `principal` phủ mục `entry` cho việc `need` (bước 34). Gọi SAU kiểm
+/// permission thường (`require_write`, `require_publish`…). Không đọc được mục → 404
+/// `content.not_found` (không lộ mục tồn tại); đọc được mà không ghi được → 403
+/// `org_out_of_scope`. Việc ghi còn từ chối nút đang khoá (`org_frozen`).
+pub(crate) async fn require_org(
+    principal: &Principal,
+    tenant: &TenantContext,
+    entry: &Entry,
+    need: Need,
+) -> Result<(), Error> {
+    let at = target(tenant, entry);
+    let read = tenant.database().read();
+    let hidden = |error: Error| {
+        if error.code() == "org_out_of_scope" {
+            crate::service::entry_not_found(entry.id)
+        } else {
+            error
+        }
+    };
+    if need == Need::Read || !principal.has(&CONTENT_READ) {
+        // Không có `content.read`: chỉ phạm vi của chính việc này quyết thấy hay không.
+        let permission = permission_for(principal, need);
+        principal.require_at(read, permission, at).await.map_err(hidden)?;
+    } else {
+        principal.require_at(read, &CONTENT_READ, at).await.map_err(hidden)?;
+    }
+    if need == Need::Read {
+        return Ok(());
+    }
+    // Kiểm trên kết nối đọc, không khoá: chỗ gọi có thể đang giữ transaction ghi (SQLite chỉ một
+    // kết nối ghi). Tạo mục mới kiểm lại trong transaction (`require_write_at`).
+    let permission = permission_for(principal, need);
+    principal.require_at(read, permission, at).await?;
+    autoxide_kernel::tenancy::OrgTree::ensure_writable_unlocked(read, tenant.id(), at.org).await
+}
+
+/// Như [`require_org`] cho việc viết, TRONG transaction ghi `transaction` (tạo mục: nút do người
+/// tạo nêu, ngoài phạm vi → 403).
+pub(crate) async fn require_write_at<C: sea_orm::ConnectionTrait>(
+    principal: &Principal,
+    transaction: &C,
+    tenant: &TenantContext,
+    entry: &Entry,
+) -> Result<(), Error> {
+    let permission = permission_for(principal, Need::Write);
+    principal.require_write_at(transaction, permission, target(tenant, entry)).await
 }

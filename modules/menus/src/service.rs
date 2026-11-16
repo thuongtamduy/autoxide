@@ -8,12 +8,12 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use autoxide_content::api::LegacyMenus;
-use autoxide_kernel::access::Principal;
+use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::resource::ResourceDirectory;
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, Site, TenantContext, root_of};
 use autoxide_media::api::Media;
 use chrono::{DateTime, Utc};
 use sea_orm::{
@@ -38,6 +38,8 @@ pub(crate) type Menu = menu::Model;
 pub(crate) struct NewMenu {
     pub key: String,
     pub locale: Option<String>,
+    /// Website (nút) của menu; `None`: website của cả khách (nút gốc).
+    pub org_id: Option<Uuid>,
     pub items: Vec<ItemInput>,
 }
 
@@ -78,11 +80,16 @@ impl MenuService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
+        owner_org: Option<Uuid>,
         page: &PageRequest,
     ) -> Result<Page<(Menu, u64)>, Error> {
         principal.require(&MENUS_READ)?;
         let read = tenant.database().read();
-        let select = menu::Entity::find().scoped(tenant);
+        let scope = principal.scope_condition(&MENUS_READ, menu::Column::OrgId, None)?;
+        let mut select = menu::Entity::find().filter(scope).scoped(tenant);
+        if let Some(org) = owner_org {
+            select = select.filter(menu::Column::OrgId.eq(org));
+        }
         let page = fetch_page(select, menu::Column::Id, |row| row.id, page, read).await?;
         let ids: Vec<Uuid> = page.data.iter().map(|menu| menu.id).collect();
         let counts: HashMap<Uuid, i64> = if ids.is_empty() {
@@ -116,7 +123,9 @@ impl MenuService {
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&MENUS_READ)?;
         let found = self.find(tenant, id).await?;
-        let items = self.items_of(tenant.database().read(), tenant, id).await?;
+        let read = tenant.database().read();
+        hidden(principal.require_at(read, &MENUS_READ, target(tenant, &found)).await, id)?;
+        let items = self.items_of(read, tenant, id).await?;
         Ok((found, tree(items)))
     }
 
@@ -129,7 +138,7 @@ impl MenuService {
         input: NewMenu,
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&MENUS_MANAGE)?;
-        self.create_checked(tenant, Actor::from(principal), input, true).await
+        self.create_checked(tenant, Some(principal), input, true).await
     }
 
     /// Như [`create`](Self::create), không kiểm permission. `check_targets`: hỏi sổ đối tượng
@@ -138,10 +147,12 @@ impl MenuService {
     pub(crate) async fn create_checked(
         &self,
         tenant: &TenantContext,
-        actor: Actor,
+        principal: Option<&Principal>,
         input: NewMenu,
         check_targets: bool,
     ) -> Result<(Menu, Vec<Node>), Error> {
+        let actor = principal.map_or_else(Actor::system, Actor::from);
+        let org = input.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid);
         let mut problems = Vec::new();
         let locale = self.check_locale(input.locale.as_deref(), &mut problems);
         let key = input.key.trim().to_owned();
@@ -167,9 +178,15 @@ impl MenuService {
         }
         let now = micros(Utc::now());
         let transaction = tenant.database().begin_write().await?;
+        // Website do người gọi nêu: ngoài phạm vi → 403; nút đang khoá → `org_frozen`.
+        if let Some(principal) = principal {
+            let at = OrgTarget::new(org, None);
+            principal.require_write_at(&transaction, &MENUS_MANAGE, at).await?;
+        }
         let saved = menu::Model {
             id: Uuid::now_v7(),
             tenant_id: tenant.id().as_uuid(),
+            org_id: Some(org.as_uuid()),
             key: key.clone(),
             locale: locale.clone(),
             created_at: now,
@@ -210,6 +227,8 @@ impl MenuService {
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&MENUS_MANAGE)?;
         let found = self.find(tenant, id).await?;
+        let read = tenant.database().read();
+        hidden(principal.require_at(read, &MENUS_READ, target(tenant, &found)).await, id)?;
         let mut problems = Vec::new();
         let flat = flatten(&items, &mut problems);
         // Chỉ giữ được id của mục đang thuộc chính menu này.
@@ -239,6 +258,7 @@ impl MenuService {
         }
         let now = micros(Utc::now());
         let transaction = tenant.database().begin_write().await?;
+        principal.require_write_at(&transaction, &MENUS_MANAGE, target(tenant, &found)).await?;
         // Kiểm phiên bản trong chính câu UPDATE: hai người sửa cùng lúc thì một người nhận 412.
         let editor = Actor::from(principal).user_id;
         let updated = menu::Entity::update_many()
@@ -297,6 +317,8 @@ impl MenuService {
             .one(&transaction)
             .await?
             .ok_or_else(|| menu_not_found(id))?;
+        hidden(principal.require_at(&transaction, &MENUS_READ, target(tenant, &found)).await, id)?;
+        principal.require_write_at(&transaction, &MENUS_MANAGE, target(tenant, &found)).await?;
         let count = item::Entity::delete_many()
             .scoped(tenant)
             .filter(item::Column::MenuId.eq(id))
@@ -321,19 +343,29 @@ impl MenuService {
         Ok(())
     }
 
-    /// Menu theo khoá và ngôn ngữ (đọc công khai, nhập menu cũ).
+    /// Menu theo khoá và ngôn ngữ của website `site` (đọc công khai, nhập menu cũ): menu của
+    /// chính website, không có thì của website cấp trên gần nhất (menu của cả khách dùng chung cho
+    /// mọi website chưa có menu riêng).
     pub(crate) async fn find_by_key(
         &self,
         tenant: &TenantContext,
+        site: &Site,
         key: &str,
         locale: &str,
     ) -> Result<Option<Menu>, Error> {
-        Ok(menu::Entity::find()
+        let found = menu::Entity::find()
             .scoped(tenant)
             .filter(menu::Column::Key.eq(key))
             .filter(menu::Column::Locale.eq(locale))
-            .one(tenant.database().read())
-            .await?)
+            .filter(menu::Column::OrgId.is_in(site.lineage_ids()))
+            .all(tenant.database().read())
+            .await?;
+        let root = root_of(tenant.id()).as_uuid();
+        let nearest = autoxide_kernel::tenancy::nearest(
+            site.lineage(),
+            found.into_iter().map(|menu| (OrgId::from_uuid(menu.org_id.unwrap_or(root)), menu)),
+        );
+        Ok(nearest.map(|(_, menu)| menu))
     }
 
     pub(crate) async fn items_of<C: ConnectionTrait>(
@@ -513,6 +545,18 @@ fn invalid(problems: Vec<FieldError>) -> Error {
         error = error.with_field(problem);
     }
     error
+}
+
+/// Đích kiểm quyền của menu: website (nút) của nó.
+fn target(tenant: &TenantContext, menu: &Menu) -> OrgTarget {
+    OrgTarget::new(menu.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid), None)
+}
+
+/// Menu ngoài phạm vi đọc báo như không có.
+fn hidden(result: Result<(), Error>, id: Uuid) -> Result<(), Error> {
+    result.map_err(
+        |error| if error.code() == "org_out_of_scope" { menu_not_found(id) } else { error },
+    )
 }
 
 pub(crate) fn menu_not_found(id: Uuid) -> Error {

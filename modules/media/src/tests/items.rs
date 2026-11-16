@@ -37,6 +37,7 @@ async fn tai_len_moi_dinh_dang_anh() {
 
         // Không khai loại: tự nhận.
         let auto = NewUpload {
+            org_id: None,
             name: "doc.pdf".into(),
             folder_id: None,
             content_type: None,
@@ -67,6 +68,7 @@ async fn noi_dung_sai_bi_tu_choi_khong_de_lai_gi() {
         let ada = editor();
         let refuse = async |name: &str, declared: Option<&str>, bytes: &[u8]| {
             let input = NewUpload {
+                org_id: None,
                 name: name.into(),
                 folder_id: None,
                 content_type: declared.map(str::to_owned),
@@ -117,6 +119,7 @@ async fn noi_dung_sai_bi_tu_choi_khong_de_lai_gi() {
         assert_eq!(refuse("x.png", Some("png"), b"x").await.1, "media.invalid_content_type");
         // Tên sai và thư mục không có: báo cùng lúc, trước khi đọc nội dung.
         let input = NewUpload {
+            org_id: None,
             name: " ".into(),
             folder_id: Some(Uuid::now_v7()),
             content_type: Some("image/png".into()),
@@ -344,6 +347,7 @@ async fn danh_sach_loc_sap_lat_trang() {
             ("cat.gif", "image/gif", samples::gif(1, 1), Some(folder.id)),
         ] {
             let input = NewUpload {
+                org_id: None,
                 name: name.into(),
                 folder_id,
                 content_type: Some(declared.into()),
@@ -629,6 +633,7 @@ async fn tim_khong_dau() {
         let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
         let ada = editor();
         let input = NewUpload {
+            org_id: None,
             name: "Đường đến Đà Lạt.png".into(),
             folder_id: None,
             content_type: Some("image/png".into()),
@@ -708,6 +713,73 @@ async fn khoa_file_co_tien_to_khach() {
         assert_eq!(media.clean_orphans(&registry, Utc::now()).await.unwrap(), 0);
         assert!(storage.get(&orphan).await.unwrap().is_some());
         assert!(storage.get(&prefixed).await.unwrap().is_some());
+    })
+    .await
+    .unwrap();
+}
+
+/// Media theo nút (bước 34, D-208): người bán trên sàn chỉ thấy, sửa, tải được media của gian hàng
+/// mình; item của người khác báo như không có (cả qua link tải riêng tư).
+#[tokio::test]
+async fn nguoi_ban_chi_thay_media_cua_minh() {
+    use autoxide_kernel::access::{Grant, Principal, Scope};
+    use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree};
+
+    TestDatabase::run(async |test| {
+        let (media, _, database) = service(test, limits()).await;
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+        let org = || OrgId::from_uuid(Uuid::now_v7());
+        let (seller_a, seller_b) = (org(), org());
+        let write = database.begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, seller_a, root, 8).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, seller_b, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+        let seller = |unit: OrgId| {
+            Principal::with_grants(
+                Uuid::now_v7(),
+                ["media.read", "media.write", "media.purge"]
+                    .map(|name| (name.to_owned(), Grant::new(unit, Scope::Subtree))),
+            )
+        };
+        let (a, b) = (seller(seller_a), seller(seller_b));
+        let png = samples::png(8, 8);
+
+        // Không nêu nút: nút duy nhất của người bán.
+        let of_a =
+            media.upload(&tenant, &a, upload("a.png", "image/png"), body(&png)).await.unwrap().item;
+        assert_eq!(of_a.org_id, Some(seller_a.as_uuid()));
+        let of_b =
+            media.upload(&tenant, &b, upload("b.png", "image/png"), body(&png)).await.unwrap().item;
+        // Tải vào gian hàng người khác: 403.
+        let mut elsewhere = upload("x.png", "image/png");
+        elsewhere.org_id = Some(seller_a.as_uuid());
+        let error = media.upload(&tenant, &b, elsewhere, body(&png)).await.unwrap_err();
+        assert_eq!(error.code(), "org_out_of_scope");
+
+        let names = |page: autoxide_kernel::pagination::Page<Item>| -> Vec<String> {
+            page.data.into_iter().map(|item| item.name).collect()
+        };
+        let listed = media.list(&tenant, &a, &ItemFilter::default(), &page(10)).await.unwrap();
+        assert_eq!(names(listed), ["a.png"]);
+        let listed =
+            media.list(&tenant, &editor(), &ItemFilter::default(), &page(10)).await.unwrap();
+        assert_eq!(listed.data.len(), 2, "người có quyền cả khách thấy hết");
+        let only_b = ItemFilter { owner_org: Some(seller_b.as_uuid()), ..Default::default() };
+        assert_eq!(
+            names(media.list(&tenant, &editor(), &only_b, &page(10)).await.unwrap()),
+            ["b.png"]
+        );
+
+        // Item của B với A: như không có — đọc, sửa, bỏ vào thùng rác, tải nội dung riêng tư.
+        let missing =
+            |error: autoxide_kernel::error::Error| assert_eq!(error.code(), "media.item_not_found");
+        missing(media.get(&tenant, &a, of_b.id).await.unwrap_err());
+        let rename = ItemChanges { name: Some("mine.png".to_owned()), ..Default::default() };
+        missing(media.update(&tenant, &a, of_b.id, rename, None).await.unwrap_err());
+        missing(media.trash(&tenant, &a, of_b.id).await.unwrap_err());
+        missing(media.viewable(&tenant, Some(&a), of_b.id).await.unwrap_err());
+        assert!(media.viewable(&tenant, Some(&a), of_a.id).await.is_ok());
     })
     .await
     .unwrap();

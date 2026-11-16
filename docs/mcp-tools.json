@@ -1205,6 +1205,14 @@
               "null"
             ]
           },
+          "org_id": {
+            "description": "The organization unit that owns the entry; omit when you work in one unit only.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "parent_id": {
             "description": "Parent page (pages only).",
             "format": "uuid",
@@ -1535,6 +1543,14 @@
           "path": {
             "description": "The address, without domain or language prefix, e.g. `/blog/my-post`.",
             "type": "string"
+          },
+          "site": {
+            "description": "The website (organization unit) to look on; omitted: the website of the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -2116,6 +2132,14 @@
             },
             "type": [
               "array",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The organization unit that owns the form; omitted: the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -3321,6 +3345,14 @@
             "description": "File name, 1 to 255 characters, without `/` or `\\`.",
             "type": "string"
           },
+          "org_id": {
+            "description": "The organization unit that owns the item; omit when you work in one unit only.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "tags": {
             "description": "Tags for the item.",
             "items": {
@@ -3370,6 +3402,14 @@
           },
           "locale": {
             "description": "The menu's language, e.g. `vi`; omitted: the default language.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The website (organization unit) the menu is for; omitted: the whole tenant.",
+            "format": "uuid",
             "type": [
               "string",
               "null"

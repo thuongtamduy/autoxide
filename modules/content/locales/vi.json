@@ -112,6 +112,7 @@
   "field:tags are flat; only categories have a parent": "thẻ không phân cấp; chỉ danh mục mới có danh mục cha",
   "field:the entry is in another language; point to its translation in this language": "bài này bằng ngôn ngữ khác; hãy trỏ tới bản dịch của nó bằng ngôn ngữ này",
   "field:with `content.write_own` you may only add author profiles linked to your own account": "với `content.write_own`, bạn chỉ thêm được hồ sơ tác giả gắn với tài khoản của chính bạn",
+  "field:you work in several organization units: choose the unit of the entry": "bạn làm ở nhiều nút tổ chức: hãy chọn nút của bài",
   "text:A category or tag was created, changed or deleted.": "Một danh mục hay thẻ được tạo, sửa hay xoá.",
   "text:A navigation menu was replaced.": "Một menu điều hướng được thay.",
   "text:A page moved under another parent; its address and those of its subpages may have changed.": "Một trang được chuyển sang trang cha khác; địa chỉ của nó và các trang con có thể đã đổi.",

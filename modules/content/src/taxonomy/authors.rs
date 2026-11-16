@@ -357,6 +357,8 @@ impl ContentService {
         crate::permissions::require_create(principal)?;
         let entry = self.load_checked(tenant, entry_id, None).await?;
         crate::permissions::require_write(principal, &entry)?;
+        crate::permissions::require_org(principal, tenant, &entry, crate::permissions::Need::Write)
+            .await?;
         let mut ids: Vec<Uuid> = Vec::new();
         for id in author_ids {
             if !ids.contains(&id) {
@@ -376,6 +378,13 @@ impl ContentService {
             // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
             // đang công khai thì cần quyền đăng.
             crate::permissions::require_publish(principal, &entry)?;
+            crate::permissions::require_org(
+                principal,
+                tenant,
+                &entry,
+                crate::permissions::Need::Publish,
+            )
+            .await?;
         }
         let profiles = author::Entity::find()
             .scoped(tenant)

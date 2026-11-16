@@ -29,6 +29,14 @@ Người điền form không cần permission nào: mọi thứ dưới `/api/v1
 - Chỉ cấp `forms.submit` cho API key của máy chủ website; đăng nhập thôi chưa đủ để bỏ qua lớp
   chống spam (xem [Website](#website)).
 
+## Cửa hàng và người bán
+
+Ở khách có cây tổ chức (module `organizations`), form có thể thuộc một nút: `org_id` khi tạo; bỏ
+trống là form của cả khách. `forms.read`, `forms.manage`, `forms.review` và `forms.export` áp theo
+độ sâu của role: nhân viên một cửa hàng chỉ thấy và quản lý form, bài gửi của cửa hàng mình; form
+của cả khách cần phạm vi toàn khách. Xuất hay xoá mọi bài gửi của một email chạm mọi form nên cần
+`forms.export` cho cả khách. Lọc danh sách bằng `owner_org`.
+
 ## Định nghĩa form
 
 ```bash

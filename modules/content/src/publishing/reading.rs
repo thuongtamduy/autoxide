@@ -133,6 +133,8 @@ use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 #[derive(Debug, Clone, Default)]
 pub(crate) struct PostFilter {
     pub locale: String,
+    /// Website (bước 34): nút của website và các nút cấp trên — chỉ bài của các nút này.
+    pub site: Vec<Uuid>,
     pub term_id: Option<Uuid>,
     pub author_id: Option<Uuid>,
     pub search: Option<String>,
@@ -149,7 +151,8 @@ impl ContentService {
         let mut select = published::Entity::find()
             .scoped(tenant)
             .filter(published::Column::Kind.eq("post"))
-            .filter(published::Column::Locale.eq(filter.locale.as_str()));
+            .filter(published::Column::Locale.eq(filter.locale.as_str()))
+            .filter(published::Column::OrgId.is_in(filter.site.iter().copied()));
         if let Some(term) = filter.term_id {
             select = select.filter(crate::taxonomy::terms::published_has_term(tenant, term));
         }
@@ -178,10 +181,13 @@ impl ContentService {
     pub(crate) async fn sitemap(
         &self,
         tenant: &TenantContext,
+        site: &autoxide_kernel::tenancy::Site,
         locale: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<Published>, Error> {
-        let mut select = published::Entity::find().scoped(tenant);
+        let mut select = published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::OrgId.is_in(site.lineage_ids()));
         if let Some(locale) = locale {
             select = select.filter(published::Column::Locale.eq(locale));
         }
@@ -199,10 +205,15 @@ impl ContentService {
     pub(crate) async fn feed(
         &self,
         tenant: &TenantContext,
+        site: &autoxide_kernel::tenancy::Site,
         locale: &str,
         limit: u32,
     ) -> Result<Vec<Published>, Error> {
-        let filter = PostFilter { locale: locale.to_owned(), ..Default::default() };
+        let filter = PostFilter {
+            locale: locale.to_owned(),
+            site: site.lineage_ids(),
+            ..Default::default()
+        };
         let page = PageRequest::first(limit, autoxide_kernel::pagination::Order::Desc);
         Ok(self.public_posts(tenant, &filter, &page).await?.data)
     }

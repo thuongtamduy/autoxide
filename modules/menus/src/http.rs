@@ -9,7 +9,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
@@ -138,6 +138,9 @@ pub(crate) struct CreateSiteMenuRequest {
     /// The menu's language; omitted: the default language.
     #[schema(example = "vi")]
     locale: Option<String>,
+    /// The website (organization unit) the menu is for; you need `menus.manage` there. Omitted:
+    /// the website of the whole tenant, used by every website without a menu of its own.
+    org_id: Option<Uuid>,
     #[serde(default)]
     items: Vec<SiteMenuItemInput>,
 }
@@ -147,6 +150,7 @@ impl From<CreateSiteMenuRequest> for NewMenu {
         NewMenu {
             key: input.key,
             locale: input.locale,
+            org_id: input.org_id,
             items: input.items.into_iter().map(ItemInput::from).collect(),
         }
     }
@@ -169,6 +173,8 @@ impl ReplaceSiteMenuItemsRequest {
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub(crate) struct SiteMenu {
     id: Uuid,
+    /// The website (organization unit) of the menu; the id of the tenant for the whole tenant.
+    org_id: Uuid,
     #[schema(example = "main")]
     key: String,
     #[schema(example = "vi")]
@@ -230,6 +236,7 @@ fn items(nodes: Vec<Node>) -> Vec<SiteMenuItem> {
 pub(crate) fn menu_response(menu: Menu, nodes: Vec<Node>) -> SiteMenu {
     SiteMenu {
         id: menu.id,
+        org_id: menu.org_id.unwrap_or(menu.tenant_id),
         key: menu.key,
         locale: menu.locale,
         items: items(nodes),
@@ -242,6 +249,8 @@ pub(crate) fn menu_response(menu: Menu, nodes: Vec<Node>) -> SiteMenu {
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub(crate) struct SiteMenuSummary {
     id: Uuid,
+    /// The website (organization unit) of the menu.
+    org_id: Uuid,
     #[schema(example = "main")]
     key: String,
     #[schema(example = "vi")]
@@ -260,6 +269,7 @@ impl SiteMenuSummary {
     pub(crate) fn new(menu: Menu, item_count: u64) -> Self {
         SiteMenuSummary {
             id: menu.id,
+            org_id: menu.org_id.unwrap_or(menu.tenant_id),
             key: menu.key,
             locale: menu.locale,
             item_count,
@@ -280,7 +290,7 @@ impl SiteMenuSummary {
     extensions(("x-permissions" = json!(["menus.read"]))),
     operation_id = "list_menus",
     security(("bearer" = [])),
-    params(PageQuery),
+    params(MenusQuery, PageQuery),
     responses(
         (status = 200, description = "One page of menus.", body = Page<SiteMenuSummary>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -292,9 +302,11 @@ async fn list_menus(
     State(service): State<Arc<MenuService>>,
     tenant: TenantContext,
     principal: Principal,
+    Query(filter): Query<MenusQuery>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<SiteMenuSummary>, Error> {
-    let page = service.list(&tenant, &principal, &PageRequest::try_from(query)?).await?;
+    let page = PageRequest::try_from(query)?;
+    let page = service.list(&tenant, &principal, filter.owner_org, &page).await?;
     Ok(page.map(|(menu, items)| SiteMenuSummary::new(menu, items)))
 }
 
@@ -421,6 +433,14 @@ async fn delete_menu(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Which menus to list.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct MenusQuery {
+    /// Only the menus of this website (organization unit).
+    owner_org: Option<Uuid>,
+}
+
 /// The language of a public menu.
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -444,7 +464,7 @@ pub(crate) struct PublicQuery {
     extensions(("x-public" = json!(true))),
     operation_id = "get_public_menu",
     security((), ("bearer" = [])),
-    params(("key" = String, Path, description = "Key of the menu, e.g. `main`."), PublicQuery),
+    params(("key" = String, Path, description = "Key of the menu, e.g. `main`."), PublicQuery, SiteQuery),
     responses(
         (status = 200, description = "The menu.", body = Data<PublicSiteMenu>, headers(("ETag" = String, description = "Fingerprint of the whole answer; send it in `If-None-Match` to get 304."), ("Cache-Control" = String, description = "How long the answer may be reused: until the next badge starts or ends, at most `AUTOXIDE_MENUS_PUBLIC_CACHE_SECONDS`."))),
         (status = 304, description = "The menu has not changed since the `ETag` sent in `If-None-Match`."),
@@ -455,11 +475,12 @@ pub(crate) struct PublicQuery {
 async fn get_public_menu(
     State(service): State<Arc<MenuService>>,
     tenant: TenantContext,
+    site: Site,
     Path(key): Path<String>,
     Query(query): Query<PublicQuery>,
 ) -> Result<Response, Error> {
     let now = Utc::now();
-    let ready = service.public_menu(&tenant, &key, query.locale.as_deref(), now).await?;
+    let ready = service.public_menu(&tenant, &site, &key, query.locale.as_deref(), now).await?;
     let seconds = (ready.expires_at - now).num_seconds();
     let cache =
         if seconds > 0 { format!("public, max-age={seconds}") } else { "no-cache".to_owned() };

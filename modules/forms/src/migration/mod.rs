@@ -3,6 +3,7 @@
 
 mod m0001_create_forms;
 mod m0007_create_exports;
+mod m0011_org;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -64,5 +65,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0010_tenant_list_index",
             vec!["forms_forms"],
         ),
+        // Form có thể thuộc một nút của cây tổ chức (bước 34, D-208).
+        Box::new(m0011_org::Migration),
     ]
 }

@@ -29,6 +29,7 @@ impl ContentService {
         permissions::require_create(principal)?;
         let entry = self.load_checked(tenant, id, None).await?;
         permissions::require_write(principal, &entry)?;
+        permissions::require_org(principal, tenant, &entry, permissions::Need::Write).await?;
         crate::publishing::check_version(&entry, expected)?;
         let now = now();
         let transaction = tenant.database().begin_write().await?;
