@@ -334,7 +334,7 @@ fn parse_minor(text: &str) -> Result<i64, Error> {
     text.parse::<i64>().map_err(|_| overflow())
 }
 
-fn overflow() -> Error {
+pub(crate) fn overflow() -> Error {
     Error::new(
         ErrorKind::Validation,
         "money.overflow",

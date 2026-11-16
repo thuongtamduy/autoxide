@@ -7814,3 +7814,26 @@ SQLite cùng khoá 2509–2544 → 4323–4617 lượt/s, khác khoá 2401–252
 6787–6800; Postgres cùng khoá 2642–3090 → 2576–3300 (không đổi: các lượt xếp hàng trên khoá của cùng một dòng — giới
 hạn tự nhiên của "một bộ đếm cho một email", chấp nhận). Bài `POST /auth/login` của `scripts/loadtest.sh` đo Argon2 và
 thời điểm khoá kích hoạt, không đo bộ đếm: đọc kèm ghi chú này.
+
+## D-322 · `rust_decimal` cho tính toán tiền, thuế, tỉ giá (bước 36 mục 1) — 2026-11-16 — chủ dự án bảo làm trước
+
+Bối cảnh: mục 1 của bước 36 (D-188), làm trước theo lời chủ dự án; không phụ thuộc bước nào.
+
+Quyết định:
+
+1. **Thư viện `rust_decimal` 1.43** (đã có trong `Cargo.lock` qua `sea-orm-migration`), khai ở
+   `[workspace.dependencies]` chỉ với feature `std`; **không** bật `with-rust_decimal` của SeaORM — cột số thập phân lưu
+   dạng chữ, không dùng kiểu thập phân của database (SQLite không có; luật dữ liệu "tiền không dùng kiểu thập phân của
+   database" giữ nguyên). Ghi `STACK.md`.
+2. **`autoxide_kernel::decimal`**: `Decimal` (re-export), `Rounding { HalfUp, HalfEven, Down, Up, Floor, Ceiling }` —
+   mỗi chỗ đổi về `Money` nêu một quy tắc, không có mặc định ngầm; `parse` (chặt: `-?[0-9]+(\.[0-9]+)?`, tối đa 28 chữ
+   số, sai → `decimal.invalid` 422); `to_column` / `from_column` (chữ đã chuẩn hoá); `DecimalString` cho JSON (chuỗi,
+   số JSON bị từ chối, schema có `pattern`).
+3. **`Money::{to_decimal, from_decimal, apply_rate, convert}`**: đổi chính xác theo số chữ số lẻ của từng loại tiền
+   (VND 0, USD 2, KWD 3); nhân có kiểm tràn; ngoài khoảng `i64` → `money.overflow`. Không bao giờ đi qua `f64`.
+4. Bảng làm tròn theo chỗ dùng (thuế GTGT `HalfUp` theo nhóm thuế suất rồi `allocate`, chiết khấu `Down`…) là việc của
+   module / gói thuế ở các mục sau của bước 36 — kernel chỉ cho công cụ.
+
+Đã cân nhắc: tự viết số thập phân cố định trên `i128` — phải tự làm chia, làm tròn sáu kiểu, đọc / in chữ, dễ sai;
+`rust_decimal` đã có trong cây phụ thuộc, không thêm gì vào binary. `bigdecimal` — độ chính xác tuỳ ý không cần cho
+tiền, chậm hơn, chưa có trong cây.

@@ -367,6 +367,13 @@ Module giữ số tiền, số dư hay giao dịch dùng các công cụ của k
   `{"amount": "1999", "currency": "USD"}` — `amount` là chuỗi, vì JavaScript làm tròn số lớn
   hơn 2^53. Dùng thẳng `Money` trong kiểu request và response; schema OpenAPI của nó nói rõ
   điều này.
+- **Tính bằng số thập phân, không bao giờ bằng `f64`**: thuế suất, tỉ giá hay số lượng là
+  `autoxide_kernel::decimal::Decimal`. `Money::apply_rate(rate, rounding)` và
+  `Money::convert(rate, to, rounding)` nhân rồi làm tròn về đơn vị nhỏ nhất;
+  `Money::to_decimal` / `Money::from_decimal(value, currency, rounding)` đổi qua lại chính xác.
+  Mỗi lần đổi nêu một `Rounding` (`HalfUp`, `HalfEven`, `Down`, `Up`, `Floor`, `Ceiling`) —
+  không có mặc định ngầm. Lưu số thập phân dạng chữ bằng `decimal::to_column` / `from_column`;
+  trong JSON dùng `DecimalString` (chuỗi như `"0.08"`; đầu vào sai là `decimal.invalid`).
 - **Đổi số dư bằng một câu cập nhật có điều kiện**, không bao giờ "đọc, kiểm, ghi":
   `rows::adjust::<Entity, _>(&transaction, Column::BalanceMinor, Column::Id.eq(id), -amount,
   Bounds::NON_NEGATIVE)` trả `0` khi không đủ số dư (hay dòng không còn) và không bao giờ để

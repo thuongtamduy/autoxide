@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Decimal numbers for calculating with money (tax rates, exchange rates, quantities) in
+  `autoxide_kernel::decimal`: `Money::apply_rate`, `Money::convert`, `Money::to_decimal` / `from_decimal`, each with
+  an explicit `Rounding`; decimals are strings in JSON (`DecimalString`, error `decimal.invalid`) and text in the
+  database. Amounts are still stored as integers of minor units.
 - Security headers on every response, including errors, health checks and `/mcp`:
   `X-Content-Type-Options: nosniff`, `Referrer-Policy` (`AUTOXIDE_HTTP_REFERRER_POLICY`, default `no-referrer`),
   `X-Frame-Options: DENY` and a strict `Content-Security-Policy` (the API reference page gets its own);

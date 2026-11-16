@@ -374,6 +374,14 @@ databases.
   `{"amount": "1999", "currency": "USD"}` — `amount` is a string, because JavaScript
   rounds numbers above 2^53. Use `Money` directly in request and response types; its
   OpenAPI schema says this.
+- **Calculate with decimals, never with `f64`**: a tax rate, an exchange rate or a quantity
+  is an `autoxide_kernel::decimal::Decimal`. `Money::apply_rate(rate, rounding)` and
+  `Money::convert(rate, to, rounding)` multiply and round back to minor units;
+  `Money::to_decimal` / `Money::from_decimal(value, currency, rounding)` convert exactly.
+  Every conversion names a `Rounding` (`HalfUp`, `HalfEven`, `Down`, `Up`, `Floor`,
+  `Ceiling`) — there is no hidden default. Store a decimal as text with
+  `decimal::to_column` / `from_column`; in JSON use `DecimalString` (a string such as
+  `"0.08"`; bad input is `decimal.invalid`).
 - **Change a balance with one conditional update**, never "read, check, write":
   `rows::adjust::<Entity, _>(&transaction, Column::BalanceMinor, Column::Id.eq(id), -amount,
   Bounds::NON_NEGATIVE)` returns `0` when the balance is not enough (or the row is gone)

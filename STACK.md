@@ -53,6 +53,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | Validate đầu vào   | `validator`                     | 0.21      |                                                     |
 | ID                 | `uuid` (v7)                     | 1.29      |                                                     |
 | Thời gian          | `chrono`                        | 0.4       | Lưu UTC                                             |
+| Số thập phân       | `rust_decimal` (chỉ `std`)      | 1.43      | Chỉ để TÍNH tiền, thuế, tỉ giá; lưu tiền vẫn là số nguyên `Money`, lưu số thập phân dạng chữ (D-322). Đã có trong cây phụ thuộc qua SeaORM |
 | Múi giờ IANA       | `chrono-tz` (chỉ `std`)         | 0.10      | Kiểm tên múi giờ của nút (`organizations.timezone`, D-306) |
 | CLI                | `clap`                          | 4.6       | `serve`, `migrate`, `user`, `db copy`…              |
 | Đọc file `.env`    | `dotenvy`                       | 0.15      | Chỉ đọc thành cặp tên / giá trị; biến môi trường thật thắng |

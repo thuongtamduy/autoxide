@@ -95,7 +95,7 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
 Thiết kế: trụ 4. Bắt đầu SAU bước 34 (làm song song với 35 được; mục tính tiền của 35 dùng cổng
 thanh toán của bước này). Core không bao giờ tự giữ tiền.
 
-- [ ] Số thập phân `rust_decimal` cho tính toán (ghi `STACK.md`), quy tắc làm tròn theo từng chỗ
+- [x] Số thập phân `rust_decimal` cho tính toán (ghi `STACK.md`), quy tắc làm tròn theo từng chỗ
       dùng, chuyển qua lại với `Money` không mất đơn vị
 - [ ] Module `ledger`: tài khoản theo khách / nút / người bán, bút toán nợ = có, chỉ thêm, đảo
       bút toán để sửa, số dư suy từ bút toán, khoá dòng khi ghi đồng thời; test đồng thời trên cả

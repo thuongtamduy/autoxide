@@ -81,6 +81,7 @@
   "length_required": "Request cần header `content-length`.",
   "method_not_allowed": "Endpoint này không hỗ trợ HTTP method này. Xem header `allow`.",
   "money.allocation_invalid": "Chỉ chia được một số tiền theo ít nhất một tỉ lệ, và không được mọi tỉ lệ đều bằng 0.",
+  "decimal.invalid": "Số thập phân phải là chuỗi như \"12.5\": chữ số, dấu chấm và phần lẻ tuỳ chọn; không dùng dấu phẩy, khoảng trắng, số mũ hay số JSON, tối đa 28 chữ số; giá trị nhận được dài {length} ký tự và không phải dạng đó.",
   "money.amount_invalid": "Số tiền phải là số nguyên đơn vị nhỏ nhất viết dưới dạng chuỗi, như \"1999\" cho 19,99 USD hay \"-500\"; giá trị nhận được dài {length} ký tự và không phải dạng đó.",
   "money.currency_mismatch": "Không cộng trừ được số tiền {left} với {right}; hãy đổi về cùng một loại tiền trước.",
   "money.currency_unknown": "`{code}` không phải mã tiền tệ ISO 4217 đang lưu hành; hãy dùng mã ba chữ cái như `USD`, `EUR` hay `VND`.",
