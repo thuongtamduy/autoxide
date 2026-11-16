@@ -456,6 +456,8 @@ Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc gi�
 | [ ] | `PATCH /kernel/tenants/{id}` `read_only` cho khách nền tảng | chỉ nói bằng lời "cannot be made read-only" | 422 `validation_failed`, lỗi ô `read_only` — nên ghi vào mô tả response 422 |
 | [ ] | `PATCH /kernel/tenants/{id}` | — | `id` chỉ nhận UUID, trong khi `…/tenants/{id}/settings` và `…/move` nhận cả slug — nên thống nhất (hoặc ghi rõ ở mô tả tham số) |
 | [ ] | Mô tả của `TenantSettingState.description` (D-296) | — | vài mô tả có chuỗi nhiều dấu cách liền nhau giữa câu (vd `comments.banned_words`: "ignoring case      and accents") — do xuống dòng trong chuỗi nguồn |
+| [ ] | Chọn khách của endpoint công khai (core nhiều khách), mục "Conventions" | chỉ nêu `tenant_suspended`, `tenant_read_only`, `tenant_maintenance` | tên miền chưa gắn khách nào: `400 tenant_required`; `Autoxide-Tenant` trỏ tới khách không có: `404 tenant_not_found`. Client (website bán hàng) phải rẽ nhánh theo hai mã này (web trả 404 cho cả trang, W-038 của web) — nên ghi vào "Conventions" cùng cách core chọn khách (credential, `Autoxide-Tenant`, tên miền / `X-Forwarded-Host` từ proxy tin cậy) |
+| [ ] | Thiếu tham số query bắt buộc (vd `locale` của `GET /content/public/posts`) | `422` "A parameter is invalid; see `errors`" (và Conventions: lỗi kiểm dữ liệu liệt kê mọi trường một lần) | `400 bad_request`, `detail` là thông báo thô của thư viện bằng tiếng Anh ("Failed to deserialize query string: missing field `locale`"), không có `errors`, không theo `Accept-Language`. Giá trị sai (vd `limit=abc`) thì đúng `422 validation_failed` — nên trả cùng dạng cho tham số thiếu |
 
 ## Website bán hàng (`apps/storefront`, W-026 của web)
 
