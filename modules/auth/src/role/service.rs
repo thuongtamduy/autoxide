@@ -1295,23 +1295,19 @@ pub(crate) async fn has_second_factor(
 
 /// Tài khoản `user_id` có role bắt buộc MFA mà chưa bật MFA: quyền của các role đó đang bị giữ.
 pub(crate) async fn mfa_pending(tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
-    let read = tenant.database().read();
-    let held: Vec<Uuid> = user_role::Entity::find()
-        .filter(user_role::Column::UserId.eq(user_id))
-        .scoped(tenant)
-        .all(read)
-        .await?
-        .into_iter()
-        .map(|row| row.role_id)
-        .collect();
-    if held.is_empty() {
-        return Ok(false);
-    }
+    // Một câu (đường nóng của `GET /me`, đo ở D-317): role bắt buộc MFA trong các role người
+    // dùng giữ; chỉ khi có mới tra MFA của tài khoản.
+    let held = Query::select()
+        .column(user_role::Column::RoleId)
+        .from(user_role::Entity)
+        .and_where(user_role::Column::UserId.eq(user_id))
+        .and_where(user_role::Column::TenantId.eq(tenant.id().as_uuid()))
+        .to_owned();
     let flagged = role::Entity::find()
-        .filter(role::Column::Id.is_in(held))
         .filter(role::Column::RequiresMfa.eq(true))
+        .filter(role::Column::Id.in_subquery(held))
         .scoped(tenant)
-        .one(read)
+        .one(tenant.database().read())
         .await?;
     Ok(flagged.is_some() && !has_second_factor(tenant, user_id).await?)
 }

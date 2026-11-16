@@ -7715,3 +7715,14 @@ Quyết định:
 
 Đặc tả 34 ghi rõ mục này làm ở bước 45 (cần token xem đơn của `orders`, D-202) nhưng lộ trình liệt kê nó trong bước 34
 nên bước 34 không đóng được. Chuyển mục sang danh sách bước 45 (giữ nguyên nội dung), đánh dấu ở bước 34 là đã chuyển.
+
+## D-317 · Số đo đường nóng sau bước 34 — 2026-11-16 — agent quyết
+
+Đo theo đặc tả 34 (thứ tự làm, mục 14): bản đóng bước 33 (`15a6de4`) và bản cuối bước 34, cùng máy, trung vị 3 lần
+(`docs/BENCHMARKS.md`, "Sau bước 34"). `GET /auth/me` bằng access token 4269 → 3200 req/s (-25%), bằng API key 3286 →
+2664 (-19%); bản đầu của bước 34 là -35% — `GET /me` đọc lại dòng người dùng cho ngôn ngữ / múi giờ và kiểm role bắt
+buộc MFA bằng hai câu; đã gộp: ngôn ngữ, múi giờ nằm trong `api::User` (một lần đọc), kiểm MFA một câu có subquery.
+Xác thực mỗi request (`principal`) vẫn một câu cho người không có role bắt buộc MFA; vào khách khác (uỷ quyền, hỗ trợ)
+chỉ thêm câu khi có header `Autoxide-Tenant` khác khách nhà. Không gộp ba câu tính `Principal` bằng `UNION ALL`
+(khuyến nghị 3): đường vào khác chỉ chạy khi có header, không làm chậm đường thường. Phần tối ưu `GET /me` còn lại để
+mục sẵn có ở bước 39.

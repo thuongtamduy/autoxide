@@ -52,6 +52,8 @@ impl From<Model> for User {
             created_at: model.created_at,
             updated_at: model.updated_at,
             realm: realm_of(&model.realm),
+            locale: model.locale,
+            time_zone: model.time_zone,
         }
     }
 }

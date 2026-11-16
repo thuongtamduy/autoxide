@@ -50,13 +50,6 @@ pub(crate) struct NewUser {
     pub password: Option<String>,
 }
 
-/// Ngôn ngữ và múi giờ ưa thích (D-308).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct Preferences {
-    pub locale: Option<String>,
-    pub time_zone: Option<String>,
-}
-
 /// Thay đổi cho một người dùng; trường `None` giữ nguyên.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct UserChanges {
@@ -575,16 +568,6 @@ impl UserService {
     /// Dữ kiện tài khoản của những người `ids` cho trang quản trị (có mật khẩu chưa, đã bật đăng
     /// nhập hai bước chưa, lần đăng nhập cuối) — hai câu truy vấn cho cả trang, không theo từng
     /// người (đề bài giao diện B1).
-    /// Ngôn ngữ và múi giờ ưa thích của người dùng `id` (D-308); `None` khi không có tài khoản.
-    pub(crate) async fn preferences(
-        &self,
-        tenant: &TenantContext,
-        id: Uuid,
-    ) -> Result<Option<Preferences>, Error> {
-        let row = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
-        Ok(row.map(|row| Preferences { locale: row.locale, time_zone: row.time_zone }))
-    }
-
     /// Ngôn ngữ cho mail gửi chậm tới người dùng `id`: ngôn ngữ ưa thích nếu đã đặt, không thì
     /// `fallback` (ngôn ngữ của request gốc) (D-308).
     pub(crate) async fn mail_language(
@@ -593,7 +576,7 @@ impl UserService {
         id: Uuid,
         fallback: autoxide_kernel::i18n::Language,
     ) -> Result<autoxide_kernel::i18n::Language, Error> {
-        let preferred = self.preferences(tenant, id).await?.and_then(|found| found.locale);
+        let preferred = self.get(tenant, id).await?.and_then(|found| found.locale);
         Ok(preferred
             .as_deref()
             .and_then(autoxide_kernel::i18n::Language::from_tag)

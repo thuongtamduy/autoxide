@@ -30,6 +30,10 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
     /// Nhân sự (có role) hay người mua của khách (không permission nào) — bước 34, D-309.
     pub realm: autoxide_kernel::access::Realm,
+    /// Ngôn ngữ ưa thích (`en`, `vi`) cho mail, thông báo gửi chậm; `None`: theo request (D-308).
+    pub locale: Option<String>,
+    /// Múi giờ IANA ưa thích; `None`: chưa đặt.
+    pub time_zone: Option<String>,
 }
 
 impl User {

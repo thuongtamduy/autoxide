@@ -191,7 +191,6 @@ impl MeResponse {
         let facts =
             state.users.facts(tenant, &[user.id]).await?.remove(&user.id).unwrap_or_default();
         let pending = state.verifications.pending_change(tenant, &user).await?;
-        let preferences = state.users.preferences(tenant, user.id).await?.unwrap_or_default();
         let mfa_required = crate::role::mfa_pending(tenant, user.id).await?;
         Ok(MeResponse {
             id: user.id,
@@ -203,8 +202,8 @@ impl MeResponse {
             permissions: principal.permissions(),
             has_password: facts.has_password,
             pending_email: pending.map(|(email, expires_at)| PendingEmail { email, expires_at }),
-            locale: preferences.locale,
-            time_zone: preferences.time_zone,
+            locale: user.locale,
+            time_zone: user.time_zone,
             mfa_required,
         })
     }

@@ -496,8 +496,8 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
 - [ ] Ảnh AVIF (D-232): đo so với WebP trên bộ ảnh mẫu; chỉ thêm (job, tắt mặc định) khi nhẹ hơn ≥ 20% ở chất
       lượng tương đương, không thì ghi "không làm" kèm số đo
 - [ ] Rút số câu SQL của `GET /auth/me`, `auth.whoami`, `GET /auth/users` (D-302: 3 → 6 câu cho một `GET /auth/me`,
-      chậm 35–46%): lấy `has_password`, `last_sign_in_at` từ chính dòng người dùng đã đọc, gộp cờ MFA và email đang chờ
-      đổi vào một câu; đo lại bằng `scripts/loadtest.sh`, mục tiêu trong ±20% của mốc trước bước 33
+      chậm 35–46%; bước 34 thêm một câu kiểm role bắt buộc MFA, D-317): lấy `has_password`, `last_sign_in_at` từ chính
+      dòng người dùng đã đọc, gộp cờ MFA, role bắt buộc MFA và email đang chờ đổi vào một câu; đo lại bằng `scripts/loadtest.sh`, mục tiêu trong ±20% của mốc trước bước 33
 - [ ] Login throttling trên Postgres khi bị dò dồn dập một email (D-302: 8500 → 232 request/s cho lượt bị chặn): bộ
       đếm cập nhật một dòng bằng một câu thay vì nhiều câu `UPDATE` nối tiếp; trả 429 không cần khoá dòng khi đã bị khoá
 

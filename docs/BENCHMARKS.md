@@ -381,3 +381,28 @@ một khách, chọn khách bằng credential; database chính có 111 khách.
 | khách riêng: PATCH /auth/users     |    64 |      1297 |    47.81 |    57.61 |    60.68 | 100.00% |
 
 Khách riêng (database SQLite của riêng nó) chạy ngang khách chung; máy chủ không lỗi dòng nào trong cả hai lượt.
+
+## Sau bước 34 (tổ chức, danh tính) — 16/11/2026
+
+So bản `15a6de4` (đóng bước 33) với bản cuối bước 34, cùng máy 4 CPU, máy tạo tải chạy chung, SQLite chế độ
+`single`, 6 giây mỗi bài, mỗi bản 3 lần xen kẽ, lấy trung vị (D-179: dao động ±20%). `scripts/loadtest.sh` với
+`LOADTEST_BINARY`, `LOADTEST_RAMP=64`.
+
+| Bài đo | Kết nối | Trước bước 34 (req/s) | Sau bước 34 (req/s) | Đổi | p50 trước → sau (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| GET /health/ready | 64 | 22486 | 22766 | +1% | 3.13 → 3.08 |
+| GET /auth/me (access token) | 64 | 4269 | 3200 | -25% | 14.61 → 19.34 |
+| GET /auth/me (API key) | 64 | 3286 | 2664 | -19% | 19.11 → 23.59 |
+| GET /auth/users?limit=50 | 64 | 1625 | 1394 | -14% | 39.07 → 45.36 |
+| GET /audit?limit=50 | 64 | 1599 | 1556 | -3% | 39.55 → 41.10 |
+| GET /files/{id}/content (16 KiB) | 64 | 5202 | 4997 | -4% | 11.98 → 12.58 |
+| MCP tools/call auth.whoami | 64 | 4019 | 3080 | -23% | 15.61 → 20.44 |
+| PATCH /auth/users/{id} (ghi + event) | 64 | 1542 | 1377 | -11% | 39.94 → 45.30 |
+| POST /files (4 KiB, ghi) | 64 | 1653 | 1669 | +1% | 38.52 → 38.70 |
+| POST /auth/login (Argon2id) | 16 | 4984 | 4955 | -1% | 3.02 → 3.06 |
+| đọc | 64 | 3581 | 2770 | -23% | 17.50 → 22.77 |
+| ghi | 64 | 1548 | 1379 | -11% | 40.38 → 44.90 |
+
+`GET /auth/me` (và `auth.whoami`, bài "đọc") thêm một câu: role bắt buộc MFA chưa bật (D-308) — lần đo đầu là -35%
+vì `GET /me` còn đọc lại dòng người dùng và kiểm MFA bằng hai câu; gộp lại còn -25% (D-317). Phần còn lại thuộc mục
+"Rút số câu SQL của `GET /auth/me`" của bước 39. Đường ghi, file, audit trong khoảng dao động.
