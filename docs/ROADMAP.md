@@ -730,6 +730,10 @@ bước 35.
       bảng xổ là danh sách sản phẩm công khai lọc theo danh mục, sắp `best_selling`
 - [ ] Tạo sản phẩm nháp từ ảnh bằng AI (tên, mô tả, danh mục trong cây của khách, thuộc tính, SEO — D-229);
       khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối (bước 67)
+- [ ] Website bán hàng (web-build-api-gaps, 16/11/2026): thông tin hiển thị theo biến thể trong `by-slug`, theo
+      ngôn ngữ (vd số người dùng, trong hộp có gì, cách dùng / chăm sóc, dùng được máy rửa bát) — thuộc tính khai
+      theo loại sản phẩm, không viết cứng ngành nào; catalog công khai lọc theo người bán và đường dẫn trang sản
+      phẩm cho hàng người bán (cùng 46)
 
 ## 42. Kho (`inventory`)
 
@@ -799,6 +803,8 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [ ] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
 - [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67);
       `promotions.promotion` trong sổ đối tượng (chỉ công khai khi đang chạy) để menu của website trỏ tới (D-238)
+- [ ] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
+      mức giảm tối đa theo luật đang áp (dữ liệu có ngày hiệu lực, luật số hai)
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -823,6 +829,8 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
 - [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang sản
       phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
 - [ ] Câu trả lời tự động về hành trình vận đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
+- [ ] Website bán hàng (16/11/2026): phí và ngày giao dự kiến theo tỉnh khi chưa có giỏ (trang sản phẩm), kèm giờ
+      chốt đơn trong ngày của nơi bán
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
 
@@ -876,6 +884,10 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       `buyer_input`; checkout kiểm cùng bộ gom lỗi; mail xác nhận đọc được các trường này
 - [ ] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,
       người bán huỷ hoàn đủ, người mua huỷ theo điều kiện công bố; không mặc định là "đặt cọc" (BLDS Điều 328)
+- [ ] Website bán hàng (16/11/2026): báo giá giỏ trả thêm số điểm tối đa dùng được, cách trả dùng được cho giỏ
+      (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán; đơn có sẵn `return_until`,
+      `buyer_cancel_until`; đánh giá: số đếm có ảnh và theo biến thể, "chủ đề người mua hay nhắc" kèm bản tóm tắt AI
+      đã được người duyệt (D-109: AI chỉ là gợi ý)
 
 ## 46. Sàn (`marketplace`)
 
@@ -902,6 +914,10 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
       dõi gian hàng (đồng ý riêng cho tin hàng mới); huy hiệu chỉ từ dữ liệu thật
 - [ ] Quyết toán theo ai trả tiền giảm giá (D-222): voucher sàn thì người bán nhận đủ, voucher shop trừ doanh
       thu người bán; gốc tính phí sàn là dữ liệu có ngày hiệu lực; người bán đồng ý trước khi cùng chịu chi phí
+- [ ] Website bán hàng (16/11/2026): hồ sơ người bán công khai có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn,
+      trạng thái tạm ngừng; phí sàn công khai (không cần `marketplace.sell`); đăng ký bán trước khi có tài khoản;
+      endpoint công khai báo vi phạm cho sản phẩm, đánh giá, livestream (lý do theo danh sách cố định; cơ chế tiếp
+      nhận phản ánh của sàn theo luật thương mại điện tử — cần đối chiếu văn bản gốc)
 
 ## 47. Khách hàng và giữ chân khách (`customers`)
 
@@ -925,6 +941,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
       `grant_voucher`, gọi lại không cấp thêm
 - [ ] Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (D-233): người mua tự bật, đồng ý riêng, chỉ giảm thật
       ≥ ngưỡng so với giá mốc, tối đa 1 lần / 7 ngày mỗi sản phẩm, gom lô theo khung giờ
+- [ ] Website bán hàng (16/11/2026): đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay
+      passkey (gửi SMS qua đối tác, không giữ secret trong code)
 
 ## 48. Bán đa kênh (`channels`)
 
@@ -961,6 +979,7 @@ liên kết (bước 37).
 - [ ] Phiên livestream: người phát đã xác thực, sản phẩm gắn trong phiên, đơn ghi nhận theo phiên,
       lưu vết phiên theo yêu cầu của luật
 - [ ] Đối chiếu đợt 2: `paid_on` khi đánh dấu đã chi
+- [ ] Website bán hàng (16/11/2026): danh sách phiên livestream công khai (lịch phát), không chỉ một phiên theo id
 
 ## 55. Giao diện cửa hàng qua API: banner, bộ sưu tập, thông tin cửa hàng (D-219)
 

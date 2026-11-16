@@ -405,6 +405,67 @@ pub(crate) async fn list_posts(
     Ok(public_cache(page.into_response()))
 }
 
+/// Which categories or tags to list.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct PublicTermsQuery {
+    /// Language of the posts counted, and of the names returned (the default language when a
+    /// term is not translated).
+    #[param(example = "vi")]
+    locale: String,
+    /// `category` or `tag`; omitted: both.
+    taxonomy: Option<Taxonomy>,
+}
+
+/// A category or tag with the number of its published posts.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct PublicTermCount {
+    #[serde(flatten)]
+    term: PublicTerm,
+    /// Published posts in `locale` that carry the term.
+    #[schema(example = 12)]
+    posts: u64,
+}
+
+/// List categories and tags that have published posts (public).
+///
+/// No sign-in needed. Only terms with at least one published post in `locale` are listed, each
+/// with that count, so a blog can show its topics and the size of each; follow `next_cursor`
+/// for more. Get a term's posts with `GET /api/v1/content/public/posts?term_id=`.
+#[utoipa::path(
+    get,
+    path = "/public/terms",
+    extensions(("x-public" = json!(true))),
+    operation_id = "list_public_content_terms",
+    security((), ("bearer" = [])),
+    params(PublicTermsQuery, PageQuery),
+    responses(
+        (status = 200, description = "One page of terms with their post counts.", body = Page<PublicTermCount>),
+        (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+pub(crate) async fn list_terms(
+    State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
+    _principal: Option<Principal>,
+    Query(query): Query<PublicTermsQuery>,
+    Query(paging): Query<PageQuery>,
+) -> Result<Response, Error> {
+    let page = page_request(paging, Vec::new())?;
+    let found = service.public_terms(&tenant, &query.locale, query.taxonomy, &page).await?;
+    let page = found.map(|(term, posts)| PublicTermCount {
+        term: PublicTerm {
+            id: term.id,
+            taxonomy: term.taxonomy,
+            name: term.name,
+            slug: term.slug,
+            locale: term.locale,
+        },
+        posts,
+    });
+    Ok(public_cache(page.into_response()))
+}
+
 /// A navigation menu as readers see it.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct PublicMenu {

@@ -4689,6 +4689,16 @@ export type Page_PublicEntryResponse = {
 };
 
 /** One page of a list. */
+export type Page_PublicTermCount = {
+  /** The items of this page, in the requested order. */
+  data: (PublicTerm & {
+    /** Published posts in `locale` that carry the term. */
+    posts: number;
+  })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_RedirectResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -5667,6 +5677,12 @@ export type PublicTerm = {
   slug: string;
   /** `category` or `tag`. */
   taxonomy: string;
+};
+
+/** A category or tag with the number of its published posts. */
+export type PublicTermCount = PublicTerm & {
+  /** Published posts in `locale` that carry the term. */
+  posts: number;
 };
 
 /** A category or tag as readers see it. */
@@ -8537,6 +8553,17 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_SitemapItem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/public/terms": {
+    /** List categories and tags that have published posts (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_PublicTermCount;
         422: Problem;
         default: Problem;
       };

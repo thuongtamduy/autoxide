@@ -294,6 +294,28 @@ async fn etag_resolve_theo_ca_cau_tra_loi() {
         .await;
         assert_eq!(linked.status(), StatusCode::OK, "{}", linked.json());
 
+        // Danh sách thẻ công khai: thẻ có bài đã đăng, kèm số bài; thẻ chưa có bài thì không hiện.
+        let unused = json!({"taxonomy": "tag", "locale": "en", "name": "Unused"});
+        let unused = send(&app, "POST", "/terms", Some("admin"), &[], Some(unused)).await;
+        assert_eq!(unused.status(), StatusCode::CREATED, "{}", unused.json());
+        let terms = send(&app, "GET", "/public/terms?locale=en", None, &[], None).await;
+        assert_eq!(terms.status(), StatusCode::OK, "{}", terms.json());
+        let listed = terms.json()["data"].clone();
+        assert_eq!(listed.as_array().unwrap().len(), 1, "{listed}");
+        assert_eq!(
+            (listed[0]["id"].as_str(), listed[0]["posts"].as_u64()),
+            (Some(tag_id.as_str()), Some(1))
+        );
+        assert_eq!(
+            (listed[0]["name"].as_str(), listed[0]["taxonomy"].as_str()),
+            (Some("Food"), Some("tag"))
+        );
+        let categories =
+            send(&app, "GET", "/public/terms?locale=en&taxonomy=category", None, &[], None).await;
+        assert_eq!(categories.json()["data"], json!([]));
+        let bad = send(&app, "GET", "/public/terms?locale=fr", None, &[], None).await;
+        assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
         let again = send(&app, "GET", path, None, &[("if-none-match", &first_etag)], None).await;
         assert_eq!(again.status(), StatusCode::OK, "the tag changed the answer");
         assert_ne!(again.header(header::ETAG), first_etag);

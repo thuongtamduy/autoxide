@@ -625,6 +625,74 @@ impl ContentService {
         Ok(())
     }
 
+    /// Danh mục / thẻ đang có ít nhất một bài đã đăng ở `locale`, mỗi cái kèm số bài đó (cho
+    /// trang blog công khai). Một trang theo ID; số bài đếm bằng một câu `GROUP BY` cho cả trang.
+    pub(crate) async fn public_terms(
+        &self,
+        tenant: &TenantContext,
+        locale: &str,
+        taxonomy: Option<Taxonomy>,
+        page: &PageRequest,
+    ) -> Result<Page<(TermRef, u64)>, Error> {
+        let mut problems = Vec::new();
+        let locale = self.check_locale(Some(locale), "locale", &mut problems);
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
+        }
+        let posts = || {
+            Query::select()
+                .column(published::Column::EntryId)
+                .from(published::Entity)
+                .and_where(published::Column::TenantId.eq(tenant.id().as_uuid()))
+                .and_where(published::Column::Kind.eq("post"))
+                .and_where(published::Column::Locale.eq(locale.as_str()))
+                .to_owned()
+        };
+        let used = Query::select()
+            .column(entry_term::Column::TermId)
+            .from(entry_term::Entity)
+            .and_where(entry_term::Column::TenantId.eq(tenant.id().as_uuid()))
+            .and_where(entry_term::Column::EntryId.in_subquery(posts()))
+            .to_owned();
+        let mut select =
+            term::Entity::find().scoped(tenant).filter(term::Column::Id.in_subquery(used));
+        if let Some(taxonomy) = taxonomy {
+            select = select.filter(term::Column::Taxonomy.eq(taxonomy.as_str()));
+        }
+        let found =
+            fetch_page(select, term::Column::Id, |row| row.id, page, tenant.database().read())
+                .await?;
+        let ids: Vec<Uuid> = found.data.iter().map(|term| term.id).collect();
+        let counts: HashMap<Uuid, i64> = if ids.is_empty() {
+            HashMap::new()
+        } else {
+            entry_term::Entity::find()
+                .scoped(tenant)
+                .select_only()
+                .column(entry_term::Column::TermId)
+                .column_as(entry_term::Column::EntryId.count(), "posts")
+                .filter(entry_term::Column::TermId.is_in(ids.iter().copied()))
+                .filter(entry_term::Column::EntryId.in_subquery(posts()))
+                .group_by(entry_term::Column::TermId)
+                .into_tuple::<(Uuid, i64)>()
+                .all(tenant.database().read())
+                .await?
+                .into_iter()
+                .collect()
+        };
+        let texts: Vec<TermText> =
+            self.texts_of(tenant, &ids).await?.into_values().flatten().collect();
+        let Page { data, pagination } = found;
+        let mut shown = Vec::with_capacity(data.len());
+        for term in data {
+            let named = pick(&texts, term.id, &locale, &self.config.default_locale)
+                .ok_or_else(|| Error::internal("a term without names"))?;
+            let count = counts.get(&term.id).copied().unwrap_or(0);
+            shown.push((named, u64::try_from(count).unwrap_or(0)));
+        }
+        Ok(Page { data: shown, pagination })
+    }
+
     /// Term công khai theo slug trong `locale` (thiếu bản dịch thì tìm ở ngôn ngữ mặc định).
     pub(crate) async fn term_by_slug(
         &self,

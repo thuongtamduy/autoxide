@@ -459,22 +459,22 @@ giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi c�
 | [ ] | Màn | Cần | Bước | Website đang làm gì |
 |---|---|---|---|---|
 | [ ] | Chân trang, đầu trang | Hồ sơ công khai của khách: tên, thông tin pháp lý (mã số doanh nghiệp, địa chỉ), logo đã thông báo Bộ Công Thương, cấu hình giao diện (kiểu `market` / `minimal` / `luxe`) | 34 (+ 55) | Ô `[…]`; kiểu giao diện đặt bằng biến `AUTOXIDE_STOREFRONT_THEME` |
-| [ ] | `/blog` | Danh sách danh mục và thẻ công khai của `content` (kèm số bài) | mới | Gom chủ đề từ các bài trên trang đang xem |
+| [x] | `/blog` | Danh sách danh mục và thẻ công khai của `content` (kèm số bài) | mới | Gom chủ đề từ các bài trên trang đang xem — **đã có** (16/11): `GET /api/v1/content/public/terms?locale=&taxonomy=` trả danh mục / thẻ có bài đã đăng, kèm `posts`; bài của một thẻ: `GET /public/posts?term_id=` |
 | [ ] | Bài viết | Nhúng bản ghi trong nội dung (khối sản phẩm trong bài) | 51 | Khối "sản phẩm nhắc tới trong bài" là dữ liệu mẫu |
-| [ ] | Menu | Bộ biểu tượng của menu có biểu tượng ngành hàng (chảo, nồi, dao…) | mới (`menus`) | Dùng biểu tượng chung |
+| [x] | Menu | Bộ biểu tượng của menu có biểu tượng ngành hàng (chảo, nồi, dao…) | mới (`menus`) | Dùng biểu tượng chung — **không cần core đổi** (16/11): mục menu đã có `icon` (chuỗi tự do); bộ biểu tượng ngành hàng là tài nguyên của giao diện, website ánh xạ tên → biểu tượng |
 | [ ] | Địa chỉ đã gỡ | `resolve` trả 410 cho địa chỉ đã gỡ; website (App Router) chưa trả được 410 nên đang trả 404 | — (ghi để biết) | 404 |
 | [ ] | Trang chủ, danh mục, sản phẩm, giỏ, đặt hàng, gian hàng | Catalog, giá theo cửa hàng, tồn theo cửa hàng, giá khi áp mã, giỏ, đơn, người bán (công khai) | 41–46 | Dữ liệu mẫu |
-| [ ] | Livestream | Danh sách phiên livestream công khai (lịch phát), không chỉ một phiên theo id | 49 (mới) | Dữ liệu mẫu (`src/sample/live.ts`) |
-| [ ] | Sản phẩm › Đánh giá | Số đếm đánh giá có ảnh và theo biến thể; "chủ đề người mua hay nhắc" kèm bản tóm tắt AI đã duyệt | 45 (mới) | Dữ liệu mẫu |
-| [ ] | Sản phẩm, đánh giá, livestream | Endpoint công khai để báo vi phạm (lý do theo danh sách cố định) | mới | Dữ liệu mẫu |
-| [ ] | Sản phẩm | Thông tin hiển thị theo biến thể trong `by-slug` (số người ăn, trong hộp có gì, cách dùng / chăm sóc theo ngôn ngữ, máy rửa bát) | 41 (mới) | Dữ liệu mẫu |
-| [ ] | Sản phẩm | Phí và ngày giao theo tỉnh khi chưa có giỏ, kèm giờ chốt đơn trong ngày | 44 (mới) | Dữ liệu mẫu, giờ chốt 16:00 |
-| [ ] | Khuyến mại | Số thông báo Sở Công Thương và trần giảm theo luật trong `GET /public/promotions` | 43 (mới) | Dữ liệu mẫu |
-| [ ] | Tài khoản người mua | Đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay passkey | 47 (mới) | Mẫu: số điện thoại + mã cố định, không nhận mật khẩu |
-| [ ] | Đặt hàng | Endpoint công khai cho đơn vị hành chính của module `address` (tỉnh, phường) | D-193 (mới) | Dữ liệu mẫu |
-| [ ] | Giỏ, đặt hàng | Báo giá giỏ trả thêm: số điểm tối đa dùng được, cách trả dùng được cho giỏ (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán | 45 (mới) | Dữ liệu mẫu |
-| [ ] | Đơn của tôi | `return_until`, `buyer_cancel_until` có sẵn trong đơn | 45 (mới) | Tự tính hạn 7 ngày |
-| [ ] | Gian hàng người bán | Catalog công khai lọc theo người bán và đường dẫn trang sản phẩm cho hàng người bán; hồ sơ người bán có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn, trạng thái tạm ngừng | 41, 46 (mới) | Dữ liệu mẫu; hàng người bán mở ở gian hàng |
-| [ ] | Mời người bán | Phí sàn công khai (hiện `/fee-rules/preview` cần `marketplace.sell`); đăng ký bán trước khi có tài khoản | 46 (mới) | Dữ liệu mẫu; form đăng ký dùng `forms/public/ban-tren-cho` nếu cửa hàng đã tạo |
+| [ ] | Livestream | Danh sách phiên livestream công khai (lịch phát), không chỉ một phiên theo id | 49 (mới) | Dữ liệu mẫu (`src/sample/live.ts`) — đã thêm vào lộ trình bước 49 (16/11) |
+| [ ] | Sản phẩm › Đánh giá | Số đếm đánh giá có ảnh và theo biến thể; "chủ đề người mua hay nhắc" kèm bản tóm tắt AI đã duyệt | 45 (mới) | Dữ liệu mẫu — đã thêm vào lộ trình bước 45 (16/11) |
+| [ ] | Sản phẩm, đánh giá, livestream | Endpoint công khai để báo vi phạm (lý do theo danh sách cố định) | mới | Dữ liệu mẫu — đã thêm vào lộ trình bước 46 (16/11) |
+| [ ] | Sản phẩm | Thông tin hiển thị theo biến thể trong `by-slug` (số người ăn, trong hộp có gì, cách dùng / chăm sóc theo ngôn ngữ, máy rửa bát) | 41 (mới) | Dữ liệu mẫu — đã thêm vào lộ trình bước 41 (16/11) |
+| [ ] | Sản phẩm | Phí và ngày giao theo tỉnh khi chưa có giỏ, kèm giờ chốt đơn trong ngày | 44 (mới) | Dữ liệu mẫu, giờ chốt 16:00 — đã thêm vào lộ trình bước 44 (16/11) |
+| [ ] | Khuyến mại | Số thông báo Sở Công Thương và trần giảm theo luật trong `GET /public/promotions` | 43 (mới) | Dữ liệu mẫu — đã thêm vào lộ trình bước 43 (16/11) |
+| [ ] | Tài khoản người mua | Đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay passkey | 47 (mới) | Mẫu: số điện thoại + mã cố định, không nhận mật khẩu — đã thêm vào lộ trình bước 47 (16/11) |
+| [ ] | Đặt hàng | Endpoint công khai cho đơn vị hành chính của module `address` (tỉnh, phường) | D-193 (mới) | Dữ liệu mẫu — đã có trong lộ trình bước 34 (dòng `address`: endpoint công khai tỉnh, xã theo tỉnh) |
+| [ ] | Giỏ, đặt hàng | Báo giá giỏ trả thêm: số điểm tối đa dùng được, cách trả dùng được cho giỏ (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán | 45 (mới) | Dữ liệu mẫu — đã thêm vào lộ trình bước 45 (16/11) |
+| [ ] | Đơn của tôi | `return_until`, `buyer_cancel_until` có sẵn trong đơn | 45 (mới) | Tự tính hạn 7 ngày — đã thêm vào lộ trình bước 45 (16/11) |
+| [ ] | Gian hàng người bán | Catalog công khai lọc theo người bán và đường dẫn trang sản phẩm cho hàng người bán; hồ sơ người bán có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn, trạng thái tạm ngừng | 41, 46 (mới) | Dữ liệu mẫu; hàng người bán mở ở gian hàng — đã thêm vào lộ trình bước 41, 46 (16/11) |
+| [ ] | Mời người bán | Phí sàn công khai (hiện `/fee-rules/preview` cần `marketplace.sell`); đăng ký bán trước khi có tài khoản | 46 (mới) | Dữ liệu mẫu; form đăng ký dùng `forms/public/ban-tren-cho` nếu cửa hàng đã tạo — đã thêm vào lộ trình bước 46 (16/11) |
 | [ ] | Quyền riêng tư của người mua | Đối chiếu đủ endpoint tải về / xoá dữ liệu cá nhân từ website | 37 | Dữ liệu mẫu |
 

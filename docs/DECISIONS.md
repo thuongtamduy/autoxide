@@ -7179,3 +7179,16 @@ bản backup. Chế độ `single` không đổi gì.
    là trượt (sự cố DNS không lấy mất tên miền của khách); một lần thấy bản ghi thì đếm lại từ 0.
 
 Chưa làm: `autoxide doctor` kiểm nơi lưu riêng của từng placement; `autoxide backup` chép nơi lưu riêng (bước 39).
+
+## D-294 · Yêu cầu website bán hàng (web-build-api-gaps, 16/11/2026): danh mục / thẻ công khai, xếp phần thương mại vào lộ trình — 2026-11-16 — agent quyết
+
+- `GET /api/v1/content/public/terms?locale=&taxonomy=` (công khai): danh mục / thẻ có **ít nhất một bài đã đăng** ở
+  `locale`, mỗi cái kèm `posts` (số bài đó) — term chưa có bài công khai không hiện (trang blog không có chủ đề rỗng).
+  Phân trang theo ID như mọi danh sách; số bài đếm bằng một câu `GROUP BY` cho cả trang. Tên theo `locale`, thiếu bản
+  dịch thì ngôn ngữ mặc định (như `get_term`).
+- Biểu tượng menu: core không đổi — mục menu đã có `icon` (chuỗi tự do); bộ biểu tượng là tài nguyên của giao diện.
+- Phần thương mại của website ("mới" trong file yêu cầu) thành dòng lộ trình ở đúng bước 41, 43–47, 49 — làm theo thứ tự
+  lộ trình, không nhảy bước. Endpoint công khai đơn vị hành chính đã có ở bước 34 (`address`).
+- Bốn chỗ "core trả khác mô tả OpenAPI": sửa mô tả cho khớp giá trị (`LastDelivery.status` = `succeeded`,
+  `post_path_prefix` không có `/`, `target_title` chỉ khi đích công khai) — giá trị không đổi nên không phá client;
+  `Location` của `POST /kernel/tenants` vốn có `/api/v1`, thêm test giữ hành vi.
