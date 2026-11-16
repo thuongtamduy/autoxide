@@ -40,7 +40,16 @@ pub(crate) struct ContentService {
     /// Cây tổ chức (module `organizations`): ngôn ngữ của từng website (D-307). `None` khi app
     /// không đăng ký `organizations` (test của riêng module): mọi website dùng ngôn ngữ của khách.
     pub(crate) orgs: Option<Arc<dyn OrgDirectory>>,
+    /// Tính năng theo gói (bước 35): gợi ý AI cần `content.ai_suggestions`.
+    pub(crate) entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
 }
+
+/// Tính năng theo gói (bước 35): gợi ý và bản nháp do AI soạn (SEO, dịch).
+pub(crate) const AI_SUGGESTIONS: autoxide_kernel::entitlement::Feature =
+    autoxide_kernel::entitlement::Feature::new(
+        "content.ai_suggestions",
+        "AI suggestions and drafts for content: SEO checks and translations.",
+    );
 
 /// Những gì service dùng từ module khác.
 pub(crate) struct Dependencies {
@@ -75,10 +84,20 @@ impl ContentService {
             search_cache,
             translations: Default::default(),
             orgs: None,
+            entitlements: Default::default(),
         }
     }
 
     /// Dịch câu kết quả kiểm SEO bằng `translations`.
+    /// Tính năng theo gói (bước 35).
+    pub(crate) fn with_entitlements(
+        mut self,
+        entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+    ) -> Self {
+        self.entitlements = entitlements;
+        self
+    }
+
     pub(crate) fn with_orgs(mut self, orgs: Option<Arc<dyn OrgDirectory>>) -> Self {
         self.orgs = orgs;
         self

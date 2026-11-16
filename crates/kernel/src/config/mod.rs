@@ -22,7 +22,7 @@ mod trace;
 
 pub use database::{DatabaseBackend, DatabaseConfig, DatabaseUrl, redact_password};
 pub use env_example::render_env_example;
-pub use http::{CorsOrigins, HttpConfig, IpRange, RateLimit};
+pub use http::{CorsOrigins, HttpConfig, IpRange, RateLimit, SecurityHeaders};
 pub use log::{LogConfig, LogFormat, LogLevel};
 pub use process::{ProcessConfig, ProcessRole};
 pub use reader::{

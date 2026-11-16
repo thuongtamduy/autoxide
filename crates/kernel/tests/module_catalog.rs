@@ -126,6 +126,17 @@ impl Module for Notes {
         vec![Deprecation::new(Method::GET, "/{id}", "2026-11-01").successor("/api/v2/notes/{id}")]
     }
 
+    fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
+        vec![autoxide_kernel::entitlement::Feature::new("notes.sharing", "Share notes by link.")]
+    }
+
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![
+            autoxide_kernel::entitlement::Limit::count("notes.notes", "Notes kept."),
+            autoxide_kernel::entitlement::Limit::amount("notes.bytes", "Text stored.", "bytes"),
+        ]
+    }
+
     fn tools(&self) -> Vec<Tool> {
         vec![
             Tool::new(
@@ -222,6 +233,7 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
         let names: Vec<&str> = modules.iter().map(|m| m["name"].as_str().unwrap()).collect();
         assert_eq!(names, ["kernel", "antispam", "notes"]);
         assert_eq!(modules[0]["internal"], true);
+        assert_eq!(modules[0]["always_enabled"], true, "module nội bộ luôn bật");
         assert_eq!(modules[0]["permissions"][0]["name"], "kernel.modules.read");
         let tools: Vec<&str> =
             modules[0]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
@@ -273,6 +285,13 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
                 "languages": ["vi"],
                 // Danh sách không đọc database.
                 "migrations": [{ "name": "m0001_create_items", "applied": null }],
+                "features": [{ "key": "notes.sharing", "description": "Share notes by link." }],
+                "limits": [
+                    { "key": "notes.notes", "description": "Notes kept.", "kind": "count", "unit": null, "period": null },
+                    { "key": "notes.bytes", "description": "Text stored.", "kind": "amount", "unit": "bytes", "period": null },
+                ],
+                "always_enabled": false,
+                "requires": [],
             })
         );
     })

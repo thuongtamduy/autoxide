@@ -61,6 +61,15 @@ impl Module for FilesModule {
         "files"
     }
 
+    // Module nền: không gói nào tắt được (bước 35, D-323).
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![service::STORAGE_LIMIT]
+    }
+
+    fn always_enabled(&self) -> bool {
+        true
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }
@@ -108,7 +117,10 @@ impl Module for FilesModule {
         self.probe = Some(Arc::new(doctor::StorageProbe { storage: storage.clone(), location }));
         let outbox = context.outbox()?;
         self.databases = Some(context.tenancy());
-        let service = Arc::new(FileService::new(storage.clone(), outbox, config.limits));
+        let mut service = FileService::new(storage.clone(), outbox, config.limits);
+        service.entitlements = context.entitlements();
+        context.usage_counter(&service::STORAGE_LIMIT, Arc::new(service::StorageCounter))?;
+        let service = Arc::new(service);
         self.service = Some(service.clone());
         context.personal_data(service)?;
         // Nơi lưu riêng của placement (bước 33) mở bằng cùng cài đặt.

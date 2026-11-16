@@ -4,8 +4,9 @@
 //!
 //! - `inline` CHỈ cho ảnh raster (JPEG, PNG, GIF, WebP, AVIF); mọi loại khác — kể cả SVG,
 //!   HTML, PDF, có thể chứa script — là `attachment`;
-//! - luôn có `X-Content-Type-Options: nosniff` và `Content-Security-Policy: default-src
-//!   'none'; sandbox`: dù trình duyệt có mở, nội dung không chạy được script;
+//! - luôn có `X-Content-Type-Options: nosniff` và CSP có `sandbox` (lớp header bảo mật chung của
+//!   kernel, `autoxide_kernel::http::API_CSP`, D-320): dù trình duyệt có mở, nội dung không chạy được
+//!   script;
 //! - `ETag` là SHA-256 của nội dung; `If-None-Match` khớp thì 304;
 //! - `Accept-Ranges: bytes`; một khoảng `Range` hợp lệ thì 206, nằm ngoài nội dung thì 416;
 //! - URL kèm đúng phiên bản hiện tại (`?v=<version_id>`) thì cache một năm, `immutable`;
@@ -254,8 +255,6 @@ async fn serve(
     set(header::CONTENT_TYPE, content_type)?;
     set(header::CONTENT_DISPOSITION, content_disposition(disposition, &item.name))?;
     set(header::ACCEPT_RANGES, "bytes".to_owned())?;
-    set(header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_owned())?;
-    set(header::CONTENT_SECURITY_POLICY, "default-src 'none'; sandbox".to_owned())?;
 
     let range = match requested_range(request, &etag, size) {
         Requested::Whole => None,

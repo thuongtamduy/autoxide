@@ -74,7 +74,9 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         );
     }
     let background = modules.dispatcher().and_then(|dispatcher| {
-        let worker = modules.worker(config.process.job_concurrency)?;
+        let worker = modules
+            .worker(config.process.job_concurrency)?
+            .blocked_delay(std::time::Duration::from_secs(config.process.job_blocked_delay));
         Ok((dispatcher, worker))
     });
     let (dispatcher, worker) = match background {
@@ -120,6 +122,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         .translations(modules.translations().clone())
         .deprecations(modules.deprecations())
         .body_limits(modules.body_limits())
+        .entitlements(modules.entitlements())
         .tools(tools);
     if let Some(registry) = modules.tenancy() {
         extras = extras.tenancy(registry);

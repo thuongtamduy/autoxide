@@ -68,6 +68,34 @@ pub struct Worker {
     last_cleanup: Mutex<Option<Instant>>,
     /// Điểm bắt đầu xoay vòng giữa các khách; tăng mỗi lượt chia chỗ.
     turn: AtomicUsize,
+    /// Quyền dùng theo khách (bước 35): job của module mà gói của khách không có bị hoãn.
+    gate: Gate,
+}
+
+/// Điều kiện chạy job theo gói của khách (bước 35, D-325).
+#[derive(Clone, Default)]
+pub(crate) struct Gate {
+    pub entitlements: crate::entitlement::EntitlementsHandle,
+    /// Hoãn job bị chặn chừng này (không tính lượt thử).
+    pub delay: Option<chrono::Duration>,
+}
+
+impl Gate {
+    /// Job của module `module` cho khách `tenant` có bị gói chặn không: module chưa bật cho khách,
+    /// hay khách chỉ đọc vì thuê bao. Module `always_enabled` không bao giờ bị chặn.
+    async fn blocks(
+        &self,
+        module: &str,
+        tenant: &crate::tenancy::TenantContext,
+    ) -> Result<bool, Error> {
+        if !self.entitlements.is_enforced() || self.entitlements.catalog().is_always_enabled(module)
+        {
+            return Ok(false);
+        }
+        let snapshot = self.entitlements.snapshot(tenant.id()).await?;
+        Ok(!snapshot.has_module(module)
+            || snapshot.access == crate::entitlement::TenantAccess::ReadOnly)
+    }
 }
 
 impl Worker {
@@ -88,7 +116,23 @@ impl Worker {
             last_slots: Mutex::new(HashMap::new()),
             last_cleanup: Mutex::new(None),
             turn: AtomicUsize::new(0),
+            gate: Gate::default(),
         }
+    }
+
+    /// Hoãn job của module mà gói của khách không có (bước 35). `Modules::worker` gọi.
+    pub(crate) fn with_entitlements(
+        mut self,
+        entitlements: crate::entitlement::EntitlementsHandle,
+    ) -> Self {
+        self.gate.entitlements = entitlements;
+        self
+    }
+
+    /// Hoãn job bị gói chặn `delay` (mặc định một giờ, `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS`).
+    pub fn blocked_delay(mut self, delay: Duration) -> Self {
+        self.gate.delay = chrono::Duration::from_std(delay).ok();
+        self
     }
 
     /// Một lượt: đưa job của lịch tới hạn vào hàng đợi, rồi chạy tối đa `concurrency`
@@ -244,9 +288,11 @@ impl Worker {
         let database = database.clone();
         let registry = self.databases.clone();
         let handlers = Arc::clone(&self.handlers);
+        let gate = self.gate.clone();
         let (table, worker) = (table_name(module), self.id.clone());
         async move {
-            let run = run_job(placement, &database, &registry, &handlers, &table, &worker, job);
+            let env = JobEnv { registry: &registry, handlers: &handlers, gate: &gate };
+            let run = run_job(placement, &database, &env, &table, &worker, job);
             if let Err(error) = run.await {
                 tracing::error!(error = %error, "cannot record a job result");
             }
@@ -447,15 +493,22 @@ fn log_task(result: Result<(), tokio::task::JoinError>) {
 /// Khách đang dời sang placement khác (`moving`): trả job về hàng đợi, không tính lần chạy — dữ liệu
 /// của khách đang được chép, job chạy ở đích sau khi dời xong. Khách đã ở placement khác: dòng job
 /// này là bản sao còn sót ở nguồn (dời với `keep_source`) — không chạy, đánh dấu hỏng hẳn.
+/// Thứ mọi job cần để chạy: sổ database (tìm khách), bộ chạy theo loại, điều kiện theo gói.
+struct JobEnv<'a> {
+    registry: &'a DatabaseRegistry,
+    handlers: &'a HashMap<&'static str, Arc<dyn JobHandler>>,
+    gate: &'a Gate,
+}
+
 async fn run_job(
     placement: PlacementId,
     database: &Database,
-    registry: &DatabaseRegistry,
-    handlers: &HashMap<&'static str, Arc<dyn JobHandler>>,
+    env: &JobEnv<'_>,
     table: &str,
     worker: &str,
     job: ClaimedJob,
 ) -> Result<(), Error> {
+    let JobEnv { registry, handlers, gate } = env;
     // Khách của job (`NO_TENANT`: job của cả database). Khách không còn: một lần lỗi như mọi lỗi.
     let tenant = if job.tenant == NO_TENANT {
         Ok(None)
@@ -468,6 +521,12 @@ async fn run_job(
         }
         if tenant.placement() != placement {
             return left_over(database, table, worker, &job, tenant.placement()).await;
+        }
+        let module = crate::job::module_of(&job.kind).unwrap_or_default();
+        if gate.blocks(module, tenant).await? {
+            metrics::counter!("entitlement_denials_total", "kind" => "job").increment(1);
+            let delay = gate.delay.unwrap_or(BLOCKED_DELAY);
+            return put_back_after(database, table, worker, &job, delay).await;
         }
     }
     let outcome = match (handlers.get(job.kind.as_str()), tenant) {
@@ -548,6 +607,9 @@ async fn run_job(
 /// Khách đang dời: chờ sau chừng này rồi mới nhận lại job của khách.
 const MOVING_DELAY: chrono::Duration = chrono::Duration::seconds(30);
 
+/// Job bị gói chặn: chờ sau chừng này (khi chương trình không đặt khác).
+const BLOCKED_DELAY: chrono::Duration = chrono::Duration::seconds(3600);
+
 /// Trả job vừa claim về hàng đợi (khách đang dời), không tính lần chạy này.
 async fn put_back(
     database: &Database,
@@ -555,17 +617,28 @@ async fn put_back(
     worker: &str,
     job: &ClaimedJob,
 ) -> Result<(), Error> {
+    put_back_after(database, table, worker, job, MOVING_DELAY).await
+}
+
+/// Trả job vừa claim về hàng đợi, chạy lại sau `delay`, không tính lần chạy này.
+async fn put_back_after(
+    database: &Database,
+    table: &str,
+    worker: &str,
+    job: &ClaimedJob,
+    delay: chrono::Duration,
+) -> Result<(), Error> {
     let mut update = Query::update();
     update
         .table(Alias::new(table))
         .value(Alias::new("claimed_by"), Option::<String>::None)
         .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
         .value(Alias::new("attempts"), Expr::col(Alias::new("attempts")).sub(1))
-        .value(Alias::new("run_at"), now() + MOVING_DELAY)
+        .value(Alias::new("run_at"), now() + delay)
         .and_where(Expr::col(Alias::new("id")).eq(job.id))
         .and_where(Expr::col(Alias::new("claimed_by")).eq(worker));
     database.write().execute(&update).await?;
-    tracing::debug!(job_id = %job.id, tenant_id = %job.tenant, "tenant is moving; job put back");
+    tracing::debug!(job_id = %job.id, tenant_id = %job.tenant, "job put back for later");
     Ok(())
 }
 

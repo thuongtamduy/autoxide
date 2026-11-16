@@ -52,6 +52,11 @@ impl Module for OrganizationsModule {
         "organizations"
     }
 
+    // Module nền: không gói nào tắt được (bước 35, D-323).
+    fn always_enabled(&self) -> bool {
+        true
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }
@@ -63,6 +68,10 @@ impl Module for OrganizationsModule {
 
     fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {
         settings::all()
+    }
+
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![service::UNITS_LIMIT]
     }
 
     fn permissions(&self) -> Vec<Permission> {
@@ -82,9 +91,11 @@ impl Module for OrganizationsModule {
             .config
             .ok_or_else(|| Error::internal("module `organizations` started before `configure`"))?;
         let units = context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok();
-        let service = Arc::new(
-            OrgService::new(context.outbox()?, config, context.org_settings()).with_units(units),
-        );
+        let mut service =
+            OrgService::new(context.outbox()?, config, context.org_settings()).with_units(units);
+        service.entitlements = context.entitlements();
+        context.usage_counter(&service::UNITS_LIMIT, Arc::new(service::UnitCounter))?;
+        let service = Arc::new(service);
         context.resource_type(profile::STORE, Arc::new(profile::StoreResolver))?;
         self.service = Some(service.clone());
         context.provide::<dyn api::OrgDirectory>(service)

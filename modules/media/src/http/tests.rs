@@ -113,7 +113,7 @@ async fn tai_len_tai_ve_va_header_an_toan() {
         assert_eq!(got.header(header::CONTENT_LENGTH), png.len().to_string());
         assert!(got.header(header::CONTENT_DISPOSITION).starts_with("inline; "));
         assert_eq!(got.header(header::X_CONTENT_TYPE_OPTIONS), "nosniff");
-        assert_eq!(got.header(header::CONTENT_SECURITY_POLICY), "default-src 'none'; sandbox");
+        assert_eq!(got.header(header::CONTENT_SECURITY_POLICY), autoxide_kernel::http::API_CSP);
         assert_eq!(got.header(header::ETAG), format!("\"{}\"", item["sha256"].as_str().unwrap()));
         assert_eq!(got.header(header::ACCEPT_RANGES), "bytes");
         assert_eq!(got.header(header::CACHE_CONTROL), "private, max-age=31536000, immutable");
@@ -133,7 +133,7 @@ async fn tai_len_tai_ve_va_header_an_toan() {
                 send(&app, "GET", &path, &[("authorization", reader.as_str())], Vec::new()).await;
             assert_eq!(got.body(), bytes);
             assert!(got.header(header::CONTENT_DISPOSITION).starts_with("attachment; "), "{name}");
-            assert_eq!(got.header(header::CONTENT_SECURITY_POLICY), "default-src 'none'; sandbox");
+            assert_eq!(got.header(header::CONTENT_SECURITY_POLICY), autoxide_kernel::http::API_CSP);
             assert_eq!(got.header(header::X_CONTENT_TYPE_OPTIONS), "nosniff");
         }
 

@@ -71,13 +71,13 @@ Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một ngư�
 Thiết kế: trụ 3. Bắt đầu SAU bước 34; mục tính tiền chờ `PaymentGateway` của bước 36, mục cấp phát
 chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh toán, hạn mức là dữ liệu, không phải code.
 
-- [ ] Module khai tính năng (`Module::features`) và hạn mức (`Module::limits`), mặc định rỗng
+- [x] Module khai tính năng (`Module::features`) và hạn mức (`Module::limits`), mặc định rỗng
       (D-038); gói = tập module + tính năng + hạn mức + giá theo kỳ; dùng thử, gói thêm, ghi đè
       riêng cho từng khách; API và tool MCP quản trị gói
-- [ ] Kernel cưỡng chế theo khách: module chưa bật thì route, tool MCP, job, event của nó bị chặn
+- [x] Kernel cưỡng chế theo khách: module chưa bật thì route, tool MCP, job, event của nó bị chặn
       (`module_not_enabled`); `has_feature`; hạn mức giữ chỗ / trả lại nguyên tử; số đo dùng ghi
       lại cho tính tiền; test đồng thời trên cả hai database
-- [ ] Vòng đời thuê bao: dùng thử → đang dùng → quá hạn (ân hạn) → tạm khoá (chỉ đọc) → huỷ (cho
+- [x] Vòng đời thuê bao: dùng thử → đang dùng → quá hạn (ân hạn) → tạm khoá (chỉ đọc) → huỷ (cho
       xuất dữ liệu) → xoá sau thời hạn lưu; thu hồi module giữ dữ liệu theo chính sách lưu; gia hạn
       và nhắc nợ bằng job
 - [ ] Tính tiền thuê bao SaaS: hoá đơn theo kỳ, đánh số tuần tự, thu qua `PaymentGateway` (bước 36)
@@ -86,7 +86,12 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
       liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng
 - [ ] Đối chiếu thiết kế 2: xuất toàn bộ dữ liệu một khách bằng job khi huỷ thuê bao; `suspend` thuê bao
       cho nhân sự nền tảng; hạn mức nút đếm mọi nút trừ gốc, hạn mức theo loại nút khai riêng; thông báo
-      của nền tảng tới quản trị mọi khách
+      của nền tảng tới quản trị mọi khách — đã làm (D-326, D-327): `suspend`, hạn mức nút trừ gốc, bộ lọc
+      `subscription_status` / `near_limit`; còn: xuất dữ liệu khách bằng job, thông báo nền tảng (chờ `notifications`, bước 37)
+- [ ] Xoá hẳn khách khi thuê bao `deleted` (D-327): kernel chưa có lệnh xoá khách — thêm lệnh xoá (giữ phần kế toán theo
+      bước 36), rồi `plans` gọi thay vì chỉ khoá hẳn
+- [ ] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): loại nút là dữ liệu của khách mà sổ hạn mức của kernel
+      khai tĩnh — cần hạn mức có tham số (vd khoá `organizations.units` + loại) hay khai sẵn các loại hay dùng (D-326)
 
 ## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)
 
@@ -95,7 +100,7 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
 Thiết kế: trụ 4. Bắt đầu SAU bước 34 (làm song song với 35 được; mục tính tiền của 35 dùng cổng
 thanh toán của bước này). Core không bao giờ tự giữ tiền.
 
-- [ ] Số thập phân `rust_decimal` cho tính toán (ghi `STACK.md`), quy tắc làm tròn theo từng chỗ
+- [x] Số thập phân `rust_decimal` cho tính toán (ghi `STACK.md`), quy tắc làm tròn theo từng chỗ
       dùng, chuyển qua lại với `Money` không mất đơn vị
 - [ ] Module `ledger`: tài khoản theo khách / nút / người bán, bút toán nợ = có, chỉ thêm, đảo
       bút toán để sửa, số dư suy từ bút toán, khoá dòng khi ghi đồng thời; test đồng thời trên cả
@@ -207,7 +212,7 @@ cả SQLite và Postgres.
       cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
       lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
       chung; file tải lên mà không xác nhận được dọn bằng job
-- [ ] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
+- [x] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
       `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
       HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
       có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
@@ -446,8 +451,8 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
 - [x] Rút số câu SQL của `GET /auth/me`, `auth.whoami`, `GET /auth/users` (D-302: 3 → 6 câu cho một `GET /auth/me`,
       chậm 35–46%; bước 34 thêm một câu kiểm role bắt buộc MFA, D-317): lấy `has_password`, `last_sign_in_at` từ chính
       dòng người dùng đã đọc, gộp cờ MFA, role bắt buộc MFA và email đang chờ đổi vào một câu; đo lại bằng `scripts/loadtest.sh`, mục tiêu trong ±20% của mốc trước bước 33 — xong trước bước 39 theo lời chủ dự án: 7 → 3 câu, +172% (D-319)
-- [ ] Login throttling trên Postgres khi bị dò dồn dập một email (D-302: 8500 → 232 request/s cho lượt bị chặn): bộ
-      đếm cập nhật một dòng bằng một câu thay vì nhiều câu `UPDATE` nối tiếp; trả 429 không cần khoá dòng khi đã bị khoá
+- [x] Login throttling trên Postgres khi bị dò dồn dập một email (D-302: 8500 → 232 request/s cho lượt bị chặn): bộ
+      đếm cập nhật một dòng bằng một câu thay vì nhiều câu `UPDATE` nối tiếp; trả 429 không cần khoá dòng khi đã bị khoá — xong trước bước 39 theo lời chủ dự án: lượt bị chặn vốn nhanh, số cũ là bài đo lẫn; đếm một câu (D-321)
 
 ## Giai đoạn D — Module nền dùng chung
 

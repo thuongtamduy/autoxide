@@ -117,6 +117,25 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Tính năng bật / tắt theo gói của module (`<module>.<tên>`, bước 35). Module tự hỏi bằng
+    /// [`EntitlementsHandle::require_feature`](crate::entitlement::EntitlementsHandle) trước việc
+    /// cần tính năng. Mặc định rỗng.
+    fn features(&self) -> Vec<crate::entitlement::Feature> {
+        Vec::new()
+    }
+
+    /// Hạn mức theo gói của module (`<module>.<tên>`, bước 35): module giữ chỗ / trả lại qua
+    /// [`EntitlementsHandle`](crate::entitlement::EntitlementsHandle). Mặc định rỗng.
+    fn limits(&self) -> Vec<crate::entitlement::Limit> {
+        Vec::new()
+    }
+
+    /// Module nền không bao giờ bị gói chặn (đăng nhập, file, audit…). Mặc định `false`: module bị
+    /// gói chi phối — chưa bật cho khách thì route, tool MCP, job, event của nó bị chặn.
+    fn always_enabled(&self) -> bool {
+        false
+    }
+
     /// Đọc cấu hình riêng của module và giữ lại trong chính nó. Gọi một lần lúc
     /// khởi động, trước mọi việc khác. Lỗi ghi vào `reader`, được báo chung một
     /// lượt với lỗi cấu hình của kernel và các module khác.
@@ -247,6 +266,9 @@ pub struct StartContext<'a> {
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
     org_settings: &'a crate::tenancy::OrgSettingCatalog,
+    entitlements: &'a crate::entitlement::EntitlementsHandle,
+    counters:
+        &'a mut std::collections::BTreeMap<&'static str, Arc<dyn crate::entitlement::UsageCounter>>,
 }
 
 impl StartContext<'_> {
@@ -260,6 +282,40 @@ impl StartContext<'_> {
     /// Cài đặt theo nút mà mọi module đã khai (`Module::org_settings`), cho module lưu giá trị.
     pub fn org_settings(&self) -> crate::tenancy::OrgSettingCatalog {
         self.org_settings.clone()
+    }
+
+    /// Quyền dùng theo khách (bước 35): hỏi module / tính năng có bật không, giữ chỗ hạn mức. Có từ
+    /// module khởi động đầu tiên; trước khi `plans` (hay module cung cấp khác) khởi động thì "không
+    /// giới hạn".
+    pub fn entitlements(&self) -> crate::entitlement::EntitlementsHandle {
+        self.entitlements.clone()
+    }
+
+    /// Đăng ký bộ đếm thật cho hạn mức `limit` của module này (job đối soát sửa số lệch).
+    pub fn usage_counter(
+        &mut self,
+        limit: &crate::entitlement::Limit,
+        counter: Arc<dyn crate::entitlement::UsageCounter>,
+    ) -> Result<(), Error> {
+        let owned = self
+            .entitlements
+            .catalog()
+            .limit(limit.key())
+            .is_some_and(|found| found.module == self.module);
+        if !owned {
+            return Err(Error::internal(format!(
+                "module `{}` registers a usage counter for `{}`, which it does not declare in Module::limits",
+                self.module,
+                limit.key()
+            )));
+        }
+        if self.counters.insert(limit.key(), counter).is_some() {
+            return Err(Error::internal(format!(
+                "usage counter for `{}` registered twice",
+                limit.key()
+            )));
+        }
+        Ok(())
     }
 
     /// Database của chương trình (database điều khiển: hai pool đọc / ghi). Cho chỗ thật sự của
@@ -390,6 +446,9 @@ struct Apis {
     // dạng `dyn Any` vì mỗi mục một kiểu khác nhau. Lấy ra thì ép kiểu ngược lại
     // có kiểm tra (`downcast_ref`) — sai kiểu trả `None` chứ không hỏng bộ nhớ.
     provided: HashMap<TypeId, (&'static str, Box<dyn Any + Send + Sync>)>,
+    /// `(module, module cung cấp)` mỗi lần một module `require` trait của module khác: sổ module
+    /// và `plans` biết module nào cần module nào (bước 35). `Mutex` vì `require` chỉ mượn `&self`.
+    required: std::sync::Mutex<BTreeSet<(&'static str, &'static str)>>,
 }
 
 impl Apis {
@@ -418,10 +477,29 @@ impl Apis {
             .cloned()
     }
 
+    /// Module đã công bố `T`, nếu có.
+    fn provider_of<T>(&self) -> Option<&'static str>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.provided.get(&TypeId::of::<T>()).map(|(module, _)| *module)
+    }
+
+    /// Các cặp `(module, module cung cấp)` đã ghi.
+    fn required(&self) -> BTreeSet<(&'static str, &'static str)> {
+        self.required.lock().map(|required| required.clone()).unwrap_or_default()
+    }
+
     fn require<T>(&self, module: &'static str) -> Result<Arc<T>, Error>
     where
         T: ?Sized + Send + Sync + 'static,
     {
+        if let Some(provider) = self.provider_of::<T>()
+            && provider != module
+            && let Ok(mut required) = self.required.lock()
+        {
+            required.insert((module, provider));
+        }
         self.get().ok_or_else(|| {
             Error::internal(format!(
                 "module `{module}` requires `{}`, which no earlier module provides; register \

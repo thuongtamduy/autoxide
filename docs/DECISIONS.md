@@ -7765,3 +7765,220 @@ Kết quả (`docs/BENCHMARKS.md` "Rút số câu SQL của đường đã đăn
 Đã cân nhắc: giữ dòng người dùng từ bước xác thực cho handler (bớt thêm một câu) — `Principal` là kiểu của kernel, gắn
 dòng người dùng của module `auth` vào là sai ranh giới; gộp cả token đổi email vào câu chung — phải đọc thẳng bảng của
 `OneTimeTokens`, lợi một câu không đáng phá lớp bọc.
+
+## D-320 · Header bảo mật chung cho mọi response (bước 40 P1) — 2026-11-16 — chủ dự án bảo làm trước
+
+Bối cảnh: mục "Header bảo mật chung" của bước 40, làm ngay theo đặc tả (P1 không phụ thuộc bước nào).
+
+Quyết định:
+
+1. **Một lớp `http/security_headers.rs`** đặt ngoài lớp log, trong lớp request id: mọi response đều có — 404 của
+   router, 429, preflight CORS, `/health/*`, `/metrics`, `/mcp`, `openapi.json`. Header chỉ đặt khi handler **chưa**
+   đặt (handler giữ quyền đặt chặt hơn).
+2. **Giá trị:** `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` (cấu hình được, kiểm thuộc tập
+   chuẩn), `X-Frame-Options: DENY`, CSP `API_CSP` = `default-src 'none'; frame-ancestors 'none'; base-uri 'none';
+   form-action 'none'; sandbox`. HSTS chỉ khi `AUTOXIDE_HTTP_HSTS_SECONDS > 0` (`includeSubDomains` tuỳ chọn). Không
+   đặt `Cross-Origin-Resource-Policy` (ảnh `media` được trang ở origin khác nhúng).
+3. **CSP của `/api/docs`** (`DOCS_CSP`), đã mở trong Chromium thật: script, style từ `cdn.jsdelivr.net`; font từ
+   `cdn.jsdelivr.net` **và `fonts.scalar.com`** (bản đầu thiếu nguồn này, Scalar 1.79 nạp font Inter từ đó và bị
+   chặn); `img-src 'self' data: https:`; `connect-src 'self'`. Lần đổi phiên bản Scalar sau mà console báo chặn thì
+   chỉ mở đúng nguồn bị chặn.
+4. `media` và `files` bỏ header tự đặt (`nosniff`, CSP `default-src 'none'; sandbox`), dựa vào lớp chung — CSP chung
+   chặt hơn và vẫn có `sandbox`.
+5. `autoxide doctor` thêm bước `hsts`: chỉ khi `AUTOXIDE_HTTP_PUBLIC_URL` là `https://`; HSTS = 0 → cảnh báo (gợi ý,
+   không lỗi).
+
+Đã cân nhắc: để reverse proxy đặt header — người cài tự làm hay quên, và response của chính máy chủ (chạy thẳng,
+không proxy) sẽ thiếu; vẫn tắt được bằng `AUTOXIDE_HTTP_SECURITY_HEADERS=false`. Thêm thư viện (`tower-helmet`…) —
+vài chục dòng tự viết là đủ.
+
+## D-321 · Bộ đếm login throttling: một câu "chèn hoặc cộng" trả số đếm; số 232 req/s của D-302 là bài đo lẫn — 2026-11-16 — chủ dự án bảo làm trước
+
+Bối cảnh: mục bước 39 "Login throttling trên Postgres khi bị dò dồn dập một email (D-302: 8500 → 232 request/s cho lượt
+bị chặn)". Đo lại trước khi sửa (bản debug, Postgres, 16 kết nối, cùng email, mật khẩu đúng): 5 giây đầu 223 req/s với
+713 lượt 200 + 390 lượt 429; 5 giây sau toàn 429, **4685 req/s**. Lượt bị chặn vốn chỉ một câu `SELECT` (không khoá
+dòng) nên đã nhanh; con số 232 là thời gian của các lượt **đăng nhập đúng** (băm Argon2) chạy trước khi khoá kích hoạt —
+trên Postgres nhiều lượt đồng thời lọt qua trước khi khoá hơn trên SQLite (một bên ghi), nên bài 6 giây bị lẫn.
+
+Quyết định:
+
+1. `Throttle::hit` / `record`: đếm bằng **một** câu `INSERT … ON CONFLICT (tenant_id, key) DO UPDATE SET count = CASE
+   WHEN cửa sổ còn THEN count + 1 ELSE 1 END, window_started_at = … RETURNING count` (SQLite từ 3.35 và Postgres đều
+   có), thay cho chuỗi `UPDATE` cộng → `UPDATE` mở cửa sổ mới → `INSERT … DO NOTHING` → `UPDATE` khoá → `SELECT` đọc
+   lại. Lượt được phép: 4–5 câu → 2 (đọc chặn, chèn-hoặc-cộng); lượt vượt mức thêm câu khoá. Mỗi lượt đồng thời nhận một
+   số đếm riêng, nên đúng `limit` lượt được phép (test đồng thời cũ xanh trên cả hai database).
+2. Lượt bị chặn giữ một câu `SELECT` không khoá dòng — vế "trả 429 không cần khoá dòng" của mục lộ trình đã đúng sẵn.
+
+Đo `Throttle::hit` trực tiếp (bản release, 16 luồng, 2400 lượt, giới hạn rất cao để mọi lượt được đếm; mỗi bên 2 lần):
+SQLite cùng khoá 2509–2544 → 4323–4617 lượt/s, khác khoá 2401–2526 → 4158–4164; Postgres khác khoá 3990–4533 →
+6787–6800; Postgres cùng khoá 2642–3090 → 2576–3300 (không đổi: các lượt xếp hàng trên khoá của cùng một dòng — giới
+hạn tự nhiên của "một bộ đếm cho một email", chấp nhận). Bài `POST /auth/login` của `scripts/loadtest.sh` đo Argon2 và
+thời điểm khoá kích hoạt, không đo bộ đếm: đọc kèm ghi chú này.
+
+## D-322 · `rust_decimal` cho tính toán tiền, thuế, tỉ giá (bước 36 mục 1) — 2026-11-16 — chủ dự án bảo làm trước
+
+Bối cảnh: mục 1 của bước 36 (D-188), làm trước theo lời chủ dự án; không phụ thuộc bước nào.
+
+Quyết định:
+
+1. **Thư viện `rust_decimal` 1.43** (đã có trong `Cargo.lock` qua `sea-orm-migration`), khai ở
+   `[workspace.dependencies]` chỉ với feature `std`; **không** bật `with-rust_decimal` của SeaORM — cột số thập phân lưu
+   dạng chữ, không dùng kiểu thập phân của database (SQLite không có; luật dữ liệu "tiền không dùng kiểu thập phân của
+   database" giữ nguyên). Ghi `STACK.md`.
+2. **`autoxide_kernel::decimal`**: `Decimal` (re-export), `Rounding { HalfUp, HalfEven, Down, Up, Floor, Ceiling }` —
+   mỗi chỗ đổi về `Money` nêu một quy tắc, không có mặc định ngầm; `parse` (chặt: `-?[0-9]+(\.[0-9]+)?`, tối đa 28 chữ
+   số, sai → `decimal.invalid` 422); `to_column` / `from_column` (chữ đã chuẩn hoá); `DecimalString` cho JSON (chuỗi,
+   số JSON bị từ chối, schema có `pattern`).
+3. **`Money::{to_decimal, from_decimal, apply_rate, convert}`**: đổi chính xác theo số chữ số lẻ của từng loại tiền
+   (VND 0, USD 2, KWD 3); nhân có kiểm tràn; ngoài khoảng `i64` → `money.overflow`. Không bao giờ đi qua `f64`.
+4. Bảng làm tròn theo chỗ dùng (thuế GTGT `HalfUp` theo nhóm thuế suất rồi `allocate`, chiết khấu `Down`…) là việc của
+   module / gói thuế ở các mục sau của bước 36 — kernel chỉ cho công cụ.
+
+Đã cân nhắc: tự viết số thập phân cố định trên `i128` — phải tự làm chia, làm tròn sáu kiểu, đọc / in chữ, dễ sai;
+`rust_decimal` đã có trong cây phụ thuộc, không thêm gì vào binary. `bigdecimal` — độ chính xác tuỳ ý không cần cho
+tiền, chậm hơn, chưa có trong cây.
+
+## D-323 · Quyền dùng theo khách ở kernel: tay cầm gắn muộn, `always_enabled`, sổ tính năng / hạn mức (bước 35 phần A) — 2026-11-16 — agent quyết
+
+Bối cảnh: phần đầu của bước 35 (đặc tả "Thứ tự làm" 1), chủ dự án bảo làm theo đề xuất A → E.
+
+Quyết định:
+
+1. **`autoxide_kernel::entitlement`**: `Feature` / `Limit` (`count`, `amount { unit }`, `metered { period: Month }`) là
+   hằng khai tĩnh, khoá `<module>.<tên>`; `TenantEntitlements` (đã gộp; `unrestricted`, `access` `Full` / `ReadOnly`,
+   module, tính năng, hạn mức `None` = không giới hạn, khoá vắng = 0); trait `Entitlements` (`snapshot`, `reserve`,
+   `confirm`, `release`, `record_usage`) — một module (`plans`) công bố bằng `provide`.
+2. **Tay cầm gắn muộn** `EntitlementsHandle` (`StartContext::entitlements()`): mọi module nhận từ lúc khởi động, kể cả
+   module đăng ký trước `plans`; kernel gắn `dyn Entitlements` sau khi MỌI module đã khởi động (như `DnsSlot`,
+   `OrgSlot`). Chưa có bên cung cấp → "không giới hạn" (mô hình một khách không đổi). **Khách nền tảng** luôn không
+   giới hạn — tay cầm không hỏi bên cung cấp cho khách đó (nhà vận hành không tự khoá mình).
+3. **`Module::{features, limits, always_enabled}`** có mặc định (D-038). `always_enabled = true`: `kernel`,
+   `antispam` (nội bộ), `mail`, `files`, `address`, `organizations`, `auth`, `audit`, `idempotency`, `webhooks`; `ai` và
+   mọi module nghiệp vụ bị gói chi phối. `plans` sẽ khai `true`.
+4. **Khác đặc tả, có lý do:** `Limit` không mang bộ đếm (để khai được bằng `const`); bộ đếm thật đăng ký trong `start`
+   bằng `StartContext::usage_counter(&LIMIT, Arc<dyn UsageCounter>)` (kiểm: hạn mức phải của chính module, không
+   đăng ký hai lần). `UsageCounter::count` nhận `&TenantContext` thay vì `TenantId` — đếm cần database của khách.
+   `Module::sample_data` để tới mục cấp phát (mục 5), chưa cần trước đó.
+5. **Sổ** `EntitlementCatalog` dựng lúc đăng ký (khai báo tĩnh, lỗi khai báo — sai tiền tố, trùng khoá — là lỗi khởi
+   động); phần `requires` (module nào `require` trait của module nào, ghi trong `Apis::require`) và bộ đếm điền sau
+   `start`. Sổ module (`GET /api/v1/kernel/modules`) thêm `features`, `limits`, `always_enabled`, `requires`.
+6. Mã lỗi chung của kernel: `module_not_enabled`, `feature_not_enabled`, `limit_exceeded`, `tenant_read_only` (403),
+   `quota_exhausted` (429 + `Retry-After`) — 402 chưa có nghĩa chuẩn (đặc tả "tự quyết" 2). Số đo
+   `entitlement_denials_total{kind}`, nhãn chỉ trong tập cố định (`module`, `feature`, `limit`, `quota`, `read_only`).
+
+## D-324 · Module `plans`: gói là dữ liệu, quyền dùng gộp có bộ nhớ đệm, hạn mức giữ chỗ nguyên tử (bước 35 phần B và lõi phần D) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Crate `modules/plans`**, mặt điều khiển (mọi bảng `plans_*` khai `control_plane_tables`, dữ liệu chỉ ở database
+   điều khiển); đăng ký ngay sau `webhooks`, trước module nghiệp vụ — bước 36 / 37 chèn `invoices`, `compliance`…
+   TRƯỚC nó (đặc tả "tự quyết" 1). `always_enabled`. Event ghi dưới khách nền tảng, chủ thể
+   `plans.subscription:<tenant_id>`, thân mang `tenant_id`.
+2. **Gói** (`base` / `addon`, `draft` / `active` / `retired`) kiểm module / tính năng / hạn mức với sổ của kernel (lạ →
+   422 `unknown`), gói chính thiếu module mà module khác cần → `plans.module_dependency_missing`. Không xoá gói, chỉ
+   `retire`. **Gói mặc định duy nhất**: khoá dòng cố định `plans_settings` (id 1) rồi bỏ cờ của gói khác, trong cùng
+   transaction (test đồng thời 6 request). Giá không sửa: thêm giá mới, tắt giá cũ.
+3. **Gộp quyền dùng** là hàm thuần (`merge.rs`): gói chính ∪ gói thêm, hạn mức cộng `× quantity`, `None` thắng, ghi đè
+   thay hẳn, ghi đè hết hạn bỏ qua. Không thuê bao → gói mặc định → không có thì không giới hạn. Thuê bao `suspended`,
+   `canceled`, `deleted` → `ReadOnly`. **Bộ nhớ đệm** trong tiến trình theo khách, `AUTOXIDE_PLANS_CACHE_SECONDS`
+   (30; 0–300); đổi ở máy chủ này thì xoá ngay mục của khách (đổi gói thì xoá hết).
+4. **Hạn mức**: `reserve` = một transaction ghi trên mặt điều khiển — thêm `plans_reservation` (`held`, hạn
+   `AUTOXIDE_PLANS_HOLD_MINUTES`, unique `(tenant_id, limit_key, reference)`), `INSERT … ON CONFLICT DO NOTHING` dòng
+   `plans_usage`, `rows::adjust` với trần = hạn mức. Gọi lại cùng `reference` + cùng lượng → `Ok`; khác lượng →
+   `reference_reused` (mã của kernel). `release` khoá dòng giữ chỗ rồi trừ, gọi lại vô hại. `record_usage`: sổ
+   `plans_usage_record` chỉ thêm, trùng `reference` bỏ qua, vượt quota kỳ → `quota_exhausted` (429, `Retry-After` tới
+   đầu tháng sau UTC). Khách không giới hạn thì `reserve` không ghi sổ (đối soát đếm lại khi khách vào gói).
+5. Nhà vận hành gán gói (`PUT /tenants/{id}/subscription`): lần đầu tạo thuê bao (dùng thử nếu gói có và chưa dùng),
+   sau đó đổi ngay; khách nền tảng → `plans.platform_exempt`. Endpoint vận hành kiểm `require_platform` rồi permission.
+6. Tool MCP nhận trường phẳng (client MCP không đọc `$ref`): `update_plan` chép lại các trường của gói;
+   `assign_subscription` nhận `addon_plan_ids` (mỗi gói thêm số lượng 1 — số lượng lớn hơn dùng REST).
+
+Đã cân nhắc: cache phân tán (Redis…) — thêm hạ tầng; độ trễ tối đa 30 giây là chấp nhận được cho bật / tắt module,
+còn hạn mức luôn kiểm trong transaction. Đặt `plans` sau mọi module — module nghiệp vụ không cần trait của `plans`
+(đi qua tay cầm của kernel), đặt sớm để bước sau chèn module nền trước nó.
+
+## D-325 · Kernel cưỡng chế quyền dùng ở bốn chỗ: route, tool MCP, job, event (bước 35 phần C) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Route REST**: `http::build` bọc router của mỗi module không `always_enabled` bằng lớp `http/entitlement.rs`
+   trước khi ghép dưới `/api/v1/<module>`. Lớp giải khách bằng cùng hàm của extractor `TenantContext` (kết quả cất
+   trong request, handler không giải lại, không xác thực thêm lần nào); không giải được khách (route công khai không
+   khách…) thì cho qua để handler tự trả lỗi. Gói không có module → 403 `module_not_enabled`; thuê bao `ReadOnly` →
+   `POST` / `PUT` / `PATCH` / `DELETE` → 403 `tenant_read_only` (dùng lại lỗi của trạng thái khách chỉ đọc, bước 33 —
+   một mã, một câu). `openapi::document_plan_gate` thêm câu vào response 403 sẵn có hay thêm 403 mới cho mọi
+   operation của module đó (chỉ thêm, không phá vỡ).
+2. **MCP**: `tools/list` ẩn tool của module gói không có; `tools/call` trả `module_not_enabled`; khách chỉ đọc (trạng
+   thái khách HAY thuê bao) chặn tool không `read_only`.
+3. **Job**: worker hỏi trước khi chạy job của khách; module không bật hay thuê bao chỉ đọc → trả job về hàng đợi sau
+   `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS` (3600; 60–86400), **không tính lượt thử** (không vào dead-letter). Gom tham số
+   của `run_job` vào `JobEnv`.
+4. **Event**: bên nhận thuộc module gói không có (hay khách chỉ đọc vì thuê bao) bị bỏ qua — coi như đã giao, không thử
+   lại; module `always_enabled` (audit, webhooks…) luôn nhận.
+5. Mọi chỗ bỏ qua khi chưa có bên cung cấp (`is_enforced`), với module `always_enabled`, và với khách nền tảng. Số đo
+   `entitlement_denials_total{kind}` với `kind` ∈ `module`, `read_only`, `job`, `event`, `feature`, `limit`, `quota`.
+6. Gọi trait của module khác qua `dyn Trait` kernel không chặn được: module cung cấp tự hỏi tay cầm khi cần (đặc tả).
+
+Đã cân nhắc: kiểm ở extractor `TenantContext` (một chỗ cho mọi handler) — extractor không biết route thuộc module nào;
+bọc theo module ở `http::build` biết đúng tên module mà không bắt module sửa gì.
+
+## D-326 · Nối hạn mức vào module thật; đếm request API theo khách; job hết hạn giữ và đối soát (bước 35 phần D) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Job của `plans`** (chỉ chạy ở database điều khiển): `plans.expire_holds` mỗi phút trả chỗ `held` quá hạn (lô 500,
+   chỉ trả chỗ còn `held` — không trả nhầm chỗ vừa xác nhận); `plans.reconcile_usage` hằng ngày đặt `used` = số đếm thật
+   (`UsageCounter` của module) + Σ chỗ `held` còn hạn, cho mọi khách có thuê bao, ghi số đo `plans_usage_reconciled_total`.
+2. **Hạn mức của module**, cùng một khuôn: giữ chỗ TRƯỚC transaction ghi của module, xác nhận khi commit, trả lại khi
+   lỗi hay khi bản ghi mất đi; mỗi hạn mức có bộ đếm thật.
+   - `organizations.units` (count): tạo nút, bỏ lưu trữ giữ chỗ (`organizations.unit:<id>`); lưu trữ trả lại; đếm mọi
+     nút không lưu trữ trừ gốc (A-3.12). Hạn mức theo loại nút (`organizations.units.<loại>`) **chưa làm**: loại nút là
+     dữ liệu của khách, sổ hạn mức của kernel khai tĩnh — ghi việc ở lộ trình.
+   - `auth.members` (count, người khác nhau giữ role): gán role, gán membership theo nút, nhận lời mời — người chưa giữ
+     role nào thì giữ chỗ (`auth.member:<user_id>`), mất role cuối thì trả lại. Tạo quản trị viên đầu (CLI của nhà vận
+     hành, cấp phát) không giữ chỗ — job đối soát đếm lại. Nhận lời mời của tài khoản mới: token đã tiêu trước khi biết
+     ID người dùng, hết chỗ thì tài khoản có mà không có role (quản trị viên giải phóng chỗ rồi mời lại).
+   - `files.storage_bytes` (amount bytes): cỡ chỉ biết sau khi ghi nội dung — ghi nội dung, giữ chỗ theo cỡ (vượt thì xoá
+     nội dung vừa ghi), lưu bản ghi, xác nhận; xoá file trả lại. Đếm: `CAST(COALESCE(SUM(size), 0) AS BIGINT)` (Postgres
+     `SUM` trả `numeric`).
+   - Tính năng `auth.api_keys` (tạo API key), `content.ai_suggestions` (kiểm SEO, dịch bằng AI); `notes.notes` là ví dụ
+     cho hướng dẫn viết module.
+3. **`kernel.api_requests`** (metered tháng, kernel khai): lớp HTTP bọc MỌI router của module (cả module luôn bật) đếm
+   request theo khách trong bộ nhớ; tool MCP cũng đếm. Tiến trình phục vụ API ghi gộp mỗi 60 giây
+   (`EntitlementsHandle::flush_usage`, `reference` = ID tiến trình + phút) và một lần khi dừng; tiến trình chết thì mất
+   tối đa 60 giây số đếm. Chỉ chặn khi gói đặt mức tối đa (đặc tả "tự quyết" 3): lần ghi gộp gặp `quota_exhausted` thì
+   khách bị chặn ở module không luôn bật (`429`, `Retry-After` tới đầu tháng) — đăng nhập, xem gói vẫn chạy; số đếm của
+   lần đó không ghi.
+4. Sửa lỗi có sẵn: sổ module (`GET /api/v1/kernel/modules/{name}`) trả 500 với module có bản nâng cấp dữ liệu (`auth`,
+   `webhooks`) vì bộ đọc trạng thái migration thiếu `upgrades`.
+
+## D-327 · Vòng đời thuê bao, thu tay kỳ thanh toán, khoá hẳn khách, bộ lọc danh sách khách (bước 35 phần E và F) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Bảng vòng đời** đúng đặc tả, chạy bằng job `plans.lifecycle` (mỗi 5 phút, lô 100, mỗi thuê bao một transaction:
+   khoá dòng, xét lại, rồi đổi). Hết kỳ: áp gói hạ đã hẹn; giá 0 → kỳ mới; giá > 0 → kỳ mới nếu kỳ `renewal` đã trả,
+   không thì `past_due` (`grace_ends_at`) và bảo đảm có kỳ `renewal` mở. Kỳ `initial` / `proration` chưa trả tới hạn
+   cũng đưa thuê bao đang dùng sang `past_due`. `past_due` quá ân hạn → `suspended` (chỉ đọc); quá `suspend_days` →
+   `canceled` (`delete_after` = `retention_days`); tới `delete_after` → `deleted`.
+2. **`deleted` khoá hẳn khách, giữ dữ liệu**: kernel chưa có lệnh xoá khách (bước 33 có tạo, tạm khoá, dời — chưa có
+   xoá) nên chưa xoá thật; ghi việc ở lộ trình. Phần kế toán phải giữ 10 năm khi xoá (bước 36).
+3. **Kỳ thanh toán** `plans_billing_period` (cột hoá đơn / cổng thanh toán để sẵn cho mục 4), `reference` =
+   `plans:<subscription>:<period_start>:<kind>` unique theo khách — lập lại không trùng. `plans.renewals` (mỗi giờ) lập
+   kỳ kế `renewal_lead_days` trước khi hết kỳ. Chưa có cổng thanh toán: nhà vận hành `mark-paid` (ghi
+   `provider_reference`) hay `void`; trả kỳ của thuê bao `past_due` / `suspended` → `active` (kỳ mới theo kỳ đã trả,
+   hay từ bây giờ nếu kỳ đó đã qua). Job và lần thu tiền cùng lúc: cả hai khoá dòng thuê bao — test đồng thời cho kết
+   quả `active` dù bên nào chạy trước.
+4. **Khách tự đổi gói**: so giá theo tháng; không thấp hơn → ngay, kỳ `proration` = (mới − cũ) × giây còn lại / giây của
+   kỳ, nhân trước chia sau bằng `i128`, làm tròn xuống (đặc tả "tự quyết" 5, 6); thấp hơn → hẹn `scheduled_*` tới hết
+   kỳ, không hoàn tiền. Huỷ cuối kỳ / huỷ ngay; tiếp tục bỏ hẹn huỷ, hay đăng ký lại trước `delete_after` (kỳ `initial`
+   phải trả).
+5. **Mail nhắc** (`plans.reminders`, mỗi giờ) qua `dyn Mailer` tới `billing_email` của thuê bao: trước hạn theo
+   `AUTOXIDE_PLANS_REMINDER_DAYS` (`7,1`, gửi một mốc gần nhất), khi quá hạn, mỗi 3 ngày trong ân hạn; mốc đã gửi ghi
+   vào cột `reminders` của kỳ — không gửi trùng. Mail viết tiếng Việt (bản dịch của mẫu); chuyển sang `dyn Notifier`
+   khi bước 37 có `notifications`.
+6. **F**: `POST /tenants/{id}/subscription/suspend` (lý do, audit qua event của kernel) đặt `kernel_tenants.status =
+   suspended` — khác chỉ đọc của thuê bao; bộ lọc `subscription_status`, `near_limit` (≥ 80% một hạn mức) của danh sách
+   khách hỏi `plans` qua hai hàm mới có mặc định của `Entitlements` (`tenants_with_status`, `tenants_near_limit`).
+7. Test: thời gian "trôi" bằng cách sửa mốc trong database rồi chạy worker; xoá job đã xong trước mỗi lượt để lịch xếp
+   lại trong cùng khung giờ (chỉ trong test).

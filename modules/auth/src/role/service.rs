@@ -10,7 +10,7 @@ use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, SqlErr,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, SqlErr,
 };
 use uuid::Uuid;
 
@@ -98,11 +98,107 @@ pub(crate) struct RoleService {
     outbox: Outbox,
     /// Bản dịch mô tả permission (D-264); mặc định rỗng (tiếng Anh).
     translations: autoxide_kernel::i18n::Translations,
+    /// Hạn mức số nhân sự theo gói (bước 35).
+    entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+}
+
+/// Hạn mức số nhân sự của một khách (bước 35): người khác nhau có ít nhất một role ở khách.
+pub(crate) const MEMBERS_LIMIT: autoxide_kernel::entitlement::Limit =
+    autoxide_kernel::entitlement::Limit::count(
+        "auth.members",
+        "People who hold at least one role in the tenant (staff accounts with access).",
+    );
+
+/// Mã giữ chỗ hạn mức của người dùng `user_id`.
+pub(crate) fn member_reference(user_id: Uuid) -> String {
+    format!("auth.member:{user_id}")
+}
+
+/// Người dùng `user_id` có giữ role nào ở khách `tenant` không.
+pub(crate) async fn has_membership(tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
+    let found = user_role::Entity::find()
+        .filter(user_role::Column::UserId.eq(user_id))
+        .filter(user_role::Column::TenantId.eq(tenant.id().as_uuid()))
+        .one(tenant.database().read())
+        .await?;
+    Ok(found.is_some())
+}
+
+/// Bộ đếm thật cho job đối soát của `plans`: số người khác nhau giữ role ở khách.
+pub(crate) struct MemberCounter;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::entitlement::UsageCounter for MemberCounter {
+    async fn count(&self, tenant: &TenantContext) -> Result<i64, Error> {
+        let users: BTreeSet<Uuid> = user_role::Entity::find()
+            .select_only()
+            .column(user_role::Column::UserId)
+            .filter(user_role::Column::TenantId.eq(tenant.id().as_uuid()))
+            .into_tuple::<Uuid>()
+            .all(tenant.database().read())
+            .await?
+            .into_iter()
+            .collect();
+        Ok(i64::try_from(users.len()).unwrap_or(i64::MAX))
+    }
 }
 
 impl RoleService {
     pub(crate) fn new(catalog: PermissionCatalog, outbox: Outbox) -> Self {
-        RoleService { catalog, outbox, translations: Default::default() }
+        RoleService {
+            catalog,
+            outbox,
+            translations: Default::default(),
+            entitlements: Default::default(),
+        }
+    }
+
+    /// Hạn mức số nhân sự theo gói (bước 35).
+    pub(crate) fn with_entitlements(
+        mut self,
+        entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+    ) -> Self {
+        self.entitlements = entitlements;
+        self
+    }
+
+    pub(crate) fn entitlements(&self) -> &autoxide_kernel::entitlement::EntitlementsHandle {
+        &self.entitlements
+    }
+
+    /// Bọc một lần đổi role của `user_id` bằng hạn mức số nhân sự: người chưa giữ role nào mà sắp
+    /// có → giữ chỗ TRƯỚC (ngoài transaction của module), lỗi thì trả lại; người sắp không còn role
+    /// nào → trả lại sau khi đổi xong.
+    async fn with_member_limit<T, F>(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        will_hold: bool,
+        change: F,
+    ) -> Result<T, Error>
+    where
+        F: std::future::Future<Output = Result<T, Error>>,
+    {
+        let held = has_membership(tenant, user_id).await?;
+        let reference = member_reference(user_id);
+        let joining = !held && will_hold;
+        if joining {
+            self.entitlements.reserve(tenant.id(), &MEMBERS_LIMIT, 1, &reference).await?;
+        }
+        let done = change.await;
+        match (&done, joining) {
+            (Ok(_), true) => {
+                self.entitlements.confirm(tenant.id(), &MEMBERS_LIMIT, &reference).await?
+            }
+            (Err(_), true) => {
+                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?
+            }
+            (Ok(_), false) if held && !will_hold => {
+                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?;
+            }
+            _ => {}
+        }
+        done
     }
 
     /// Dịch mô tả permission bằng `translations`.
@@ -336,6 +432,18 @@ impl RoleService {
         user_id: Uuid,
         role_ids: Vec<Uuid>,
     ) -> Result<Vec<Role>, Error> {
+        let will_hold = !role_ids.is_empty();
+        let change = self.write_user_roles(tenant, actor, user_id, role_ids);
+        self.with_member_limit(tenant, user_id, will_hold, change).await
+    }
+
+    async fn write_user_roles(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        user_id: Uuid,
+        role_ids: Vec<Uuid>,
+    ) -> Result<Vec<Role>, Error> {
         let role_ids: BTreeSet<Uuid> = role_ids.into_iter().collect();
         if role_ids.len() > MAX_ROLES_PER_USER {
             return Err(Error::validation(vec![
@@ -431,6 +539,18 @@ impl RoleService {
     /// phải làm việc ở từng nút và có mọi permission của role mình gán; role `admin` chỉ gán ở
     /// nút gốc.
     pub(crate) async fn set_memberships(
+        &self,
+        tenant: &TenantContext,
+        actor: &Principal,
+        user_id: Uuid,
+        memberships: Vec<(Uuid, Vec<Uuid>)>,
+    ) -> Result<Vec<Membership>, Error> {
+        let will_hold = memberships.iter().any(|(_, roles)| !roles.is_empty());
+        let change = self.write_memberships(tenant, actor, user_id, memberships);
+        self.with_member_limit(tenant, user_id, will_hold, change).await
+    }
+
+    async fn write_memberships(
         &self,
         tenant: &TenantContext,
         actor: &Principal,

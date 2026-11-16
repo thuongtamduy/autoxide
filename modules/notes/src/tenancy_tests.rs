@@ -202,7 +202,7 @@ async fn event_va_job_chay_dung_khach() {
 
         // Tài khoản bị xoá ở khách `own`: chỉ ghi chú của người đó ở `own` bị xoá, cùng ID người
         // dùng ở `shared` không bị đụng.
-        let service = NoteService::new(Outbox::standalone("notes"));
+        let service = NoteService::new(Outbox::standalone("notes"), Default::default());
         let deleted = Delivered::new(
             own.clone(),
             "auth",

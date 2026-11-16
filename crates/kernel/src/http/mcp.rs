@@ -49,6 +49,8 @@ carry `pagination` (follow `next_cursor` with the `cursor` argument). Failed cal
 struct McpServer {
     tools: Arc<Vec<Tool>>,
     translations: Arc<Translations>,
+    /// Quyền dùng theo khách (bước 35): tool của module gói không có bị ẩn và bị chặn.
+    entitlements: crate::entitlement::EntitlementsHandle,
 }
 
 /// Router của endpoint MCP; `None` khi chưa module nào xác thực (không biết ai gọi thì
@@ -58,9 +60,10 @@ pub(super) fn router(
     translations: Arc<Translations>,
     authenticator: Option<Arc<dyn Authenticator>>,
     origins: &CorsOrigins,
+    entitlements: crate::entitlement::EntitlementsHandle,
 ) -> Option<Router> {
     let authenticator = authenticator?;
-    let server = McpServer { tools: Arc::new(tools), translations };
+    let server = McpServer { tools: Arc::new(tools), translations, entitlements };
     let mut config = StreamableHttpServerConfig::default()
         .with_legacy_session_mode(false)
         .with_json_response(true)
@@ -185,6 +188,25 @@ fn describe(tool: &Tool) -> rmcp::model::Tool {
 }
 
 impl McpServer {
+    /// Module của tool (`<module>.<tên>`) có được dùng ở khách `tenant` không, và khách có chỉ
+    /// đọc vì thuê bao không (bước 35). `(true, false)` khi không có gói nào áp dụng.
+    async fn plan_allows(
+        &self,
+        tool: &Tool,
+        tenant: crate::tenancy::TenantId,
+    ) -> Result<(bool, bool), Error> {
+        let module = tool.name().split('.').next().unwrap_or_default();
+        if !self.entitlements.is_enforced() || self.entitlements.catalog().is_always_enabled(module)
+        {
+            return Ok((true, false));
+        }
+        let snapshot = self.entitlements.snapshot(tenant).await?;
+        Ok((
+            snapshot.has_module(module),
+            snapshot.access == crate::entitlement::TenantAccess::ReadOnly,
+        ))
+    }
+
     /// Lỗi của tool thành kết quả lỗi mà agent đọc được.
     fn failure(&self, tool: &str, error: &Error, language: Language) -> CallToolResult {
         if error.kind() == ErrorKind::Internal {
@@ -255,9 +277,15 @@ impl ServerHandler for McpServer {
         _request: Option<PaginatedRequestParams>,
         context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let (_, principal, _) = caller(&context)?;
-        let tools = self.tools.iter().filter(|tool| tool.allows(&principal)).map(describe);
-        Ok(ListToolsResult::with_all_items(tools.collect()))
+        let (tenant, principal, _) = caller(&context)?;
+        let mut listed = Vec::new();
+        for tool in self.tools.iter().filter(|tool| tool.allows(&principal)) {
+            // Tool của module gói không có: không liệt kê (lỗi tra quyền dùng: cũng không).
+            if matches!(self.plan_allows(tool, tenant.id()).await, Ok((true, _))) {
+                listed.push(describe(tool));
+            }
+        }
+        Ok(ListToolsResult::with_all_items(listed))
     }
 
     async fn call_tool(
@@ -290,8 +318,22 @@ impl ServerHandler for McpServer {
         }
         let arguments = request.arguments.map_or(Value::Null, Value::Object);
         metrics::counter!("mcp_tool_calls_total").increment(1);
-        // Khách chỉ đọc: tool đọc vẫn chạy, tool ghi nhận cùng lỗi như REST.
-        if tenant.read_only() && !tool.is_read_only() {
+        // Đếm cho hạn mức `kernel.api_requests` (REST và MCP), như lớp HTTP.
+        self.entitlements.count_request(tenant.id());
+        // Gói của khách không có module của tool: cùng lỗi như REST.
+        let (enabled, plan_read_only) = match self.plan_allows(tool, tenant.id()).await {
+            Ok(found) => found,
+            Err(error) => return Ok(self.failure(tool.name(), &error, language).into()),
+        };
+        if !enabled {
+            let module = tool.name().split('.').next().unwrap_or_default();
+            metrics::counter!("entitlement_denials_total", "kind" => "module").increment(1);
+            let error = crate::entitlement::module_not_enabled(module);
+            return Ok(self.failure(tool.name(), &error, language).into());
+        }
+        // Khách chỉ đọc (trạng thái khách hay thuê bao): tool đọc vẫn chạy, tool ghi nhận cùng lỗi
+        // như REST.
+        if (tenant.read_only() || plan_read_only) && !tool.is_read_only() {
             let error = crate::tenancy::errors::tenant_read_only();
             return Ok(self.failure(tool.name(), &error, language).into());
         }

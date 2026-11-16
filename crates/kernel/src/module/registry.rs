@@ -70,6 +70,8 @@ pub struct Modules {
     seeds: crate::tenancy::admin::Seeds,
     /// Cài đặt theo nút của mọi module (bước 34).
     org_settings: crate::tenancy::OrgSettingCatalog,
+    /// Quyền dùng theo khách (bước 35): sổ tính năng / hạn mức và tay cầm tới bên cung cấp.
+    entitlements: crate::entitlement::EntitlementsHandle,
     /// Bộ tra DNS cho tên miền riêng của khách: bản một module công bố (`dyn DnsTxtLookup`), không
     /// thì bộ tra của hệ điều hành; điền sau khi mọi module khởi động.
     dns: crate::tenancy::domains::DnsSlot,
@@ -162,6 +164,16 @@ impl Modules {
             declared_org_settings.extend(declared);
         }
         let org_settings = crate::tenancy::OrgSettingCatalog::new(declared_org_settings);
+        let declared = modules
+            .iter()
+            .map(|module| {
+                (module.name(), module.always_enabled(), module.features(), module.limits())
+            })
+            .collect();
+        let (entitlement_catalog, entitlement_problems) =
+            crate::entitlement::EntitlementCatalog::build(declared);
+        problems.extend(entitlement_problems);
+        let entitlements = crate::entitlement::EntitlementsHandle::new(entitlement_catalog);
         for module in &modules {
             for deprecation in module.deprecations() {
                 problems.extend(deprecation.problems(module.name()));
@@ -191,6 +203,7 @@ impl Modules {
                 keys,
                 seeds,
                 org_settings,
+                entitlements,
                 dns,
                 orgs,
                 moves,
@@ -237,6 +250,7 @@ impl Modules {
     ) -> Result<(), ModuleError> {
         let database = registry.control();
         let mut apis = Apis::default();
+        let mut counters = std::collections::BTreeMap::new();
         for module in &mut self.modules {
             let name = module.name();
             let mut context = StartContext {
@@ -253,6 +267,8 @@ impl Modules {
                 verification: &self.verification,
                 tenancy: registry,
                 org_settings: &self.org_settings,
+                entitlements: &self.entitlements,
+                counters: &mut counters,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -260,6 +276,8 @@ impl Modules {
         }
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
         self.orgs.fill(apis.get::<dyn crate::tenancy::OrgNodes>());
+        self.entitlements.fill(apis.get::<dyn crate::entitlement::Entitlements>());
+        self.entitlements.catalog().fill(apis.required(), counters);
         // Nơi lưu chung và bộ mở nơi lưu riêng của placement (module `files` công bố).
         registry.use_storage(
             apis.get::<dyn crate::storage::Storage>(),
@@ -268,7 +286,7 @@ impl Modules {
         self.apis = apis;
         self.tenancy = Some(registry.clone());
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
-        self.catalog.fill(&self.modules);
+        self.catalog.fill(&self.modules, self.entitlements.catalog());
         self.client_configs.fill(&self.modules);
         self.seeds.fill(
             self.modules
@@ -286,6 +304,11 @@ impl Modules {
     /// một module công bố sau đó bị bỏ qua.
     pub fn use_dns(&self, lookup: Arc<dyn crate::tenancy::DnsTxtLookup>) {
         self.dns.fill(Some(lookup));
+    }
+
+    /// Quyền dùng theo khách (bước 35): lớp cưỡng chế của HTTP, MCP, worker, bộ phát event dùng.
+    pub fn entitlements(&self) -> crate::entitlement::EntitlementsHandle {
+        self.entitlements.clone()
     }
 
     /// Sổ database đã dùng lúc khởi động; `None` trước [`start`](Self::start).
@@ -484,7 +507,8 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        Ok(Worker::new(databases, modules, handlers, schedules, concurrency))
+        Ok(Worker::new(databases, modules, handlers, schedules, concurrency)
+            .with_entitlements(self.entitlements.clone()))
     }
 
     /// Bộ phát event: đọc bảng event của mọi module phát event trên mọi database của sổ
@@ -514,7 +538,8 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        Ok(Dispatcher::new(databases, self.events.modules(), subscriptions, Arc::clone(&self.wake)))
+        Ok(Dispatcher::new(databases, self.events.modules(), subscriptions, Arc::clone(&self.wake))
+            .with_entitlements(self.entitlements.clone()))
     }
 
     /// Bước kiểm của từng module kèm tên module, theo thứ tự đăng ký (`autoxide doctor`). Gọi

@@ -4522,6 +4522,595 @@
       "permissions": [
         "organizations.units.write"
       ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: put a tenant on a plan (with the trial the first time), optionally replacing its add-ons.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "addon_plan_ids": {
+            "description": "Replace the add-ons with these active add-on plans, one of each; leave out to keep them.\nUse `PUT /api/v1/plans/tenants/{tenant_id}/subscription` for quantities above one.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "plan_id": {
+            "description": "An active base plan.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_id": {
+            "description": "An active recurring price of that plan.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_id": {
+            "description": "Id of the tenant.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "trial": {
+            "description": "Start with the plan's trial when the tenant never had one; default `true`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "tenant_id",
+          "plan_id"
+        ],
+        "type": "object"
+      },
+      "name": "plans.assign_subscription",
+      "output_schema": null,
+      "permissions": [
+        "plans.subscriptions.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move your tenant to another plan: a plan costing at least as much per month applies at once (the rest of the period is billed), a cheaper one when the period ends.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "billing_email": {
+            "description": "Where billing reminders go.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_id": {
+            "description": "An active base plan.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_id": {
+            "description": "An active recurring price of that plan.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your reference for this change, 1 to 200 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "name": "plans.change_subscription",
+      "output_schema": null,
+      "permissions": [
+        "plans.billing.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: create a plan from the modules, features and limits the installed modules declare (see `kernel.get_module`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A plan to create, or the whole new content of a plan.",
+        "properties": {
+          "code": {
+            "description": "Unique code, `[a-z][a-z0-9_-]{0,63}`.",
+            "example": "pro",
+            "type": "string"
+          },
+          "description": {
+            "description": "Up to 5000 characters.",
+            "type": "string"
+          },
+          "features": {
+            "description": "Features to turn on, by key (`features` of the modules).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "grace_days": {
+            "description": "0 to 3650; default 7.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "is_default": {
+            "description": "Make this the default plan (an active base plan); the previous default stops being one.",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "`base` (default) or `addon`.",
+            "type": "string"
+          },
+          "limits": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "description": "Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "modules": {
+            "description": "Modules to turn on, by name (`GET /api/v1/kernel/modules`). A base plan must also turn on\nthe modules they need (`requires`).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "description": "Name shown to customers, 1 to 200 characters.",
+            "example": "Pro",
+            "type": "string"
+          },
+          "placement": {
+            "description": "`shared` (default) or `dedicated`.",
+            "type": "string"
+          },
+          "renewal_lead_days": {
+            "description": "0 to 3650; default 7.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "requires_kyc": {
+            "type": "boolean"
+          },
+          "retention_days": {
+            "description": "0 to 3650; default 90.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "sample_data": {
+            "type": "boolean"
+          },
+          "status": {
+            "description": "`draft` (default) or `active`. Retire a plan with `POST /plans/{id}/retire`.",
+            "type": "string"
+          },
+          "suspend_days": {
+            "description": "0 to 3650; default 30.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "trial_days": {
+            "description": "0 to 3650; default 0.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "plans.create_plan",
+      "output_schema": null,
+      "permissions": [
+        "plans.plans.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "What your tenant may use now: modules, features, limits with their use, and whether the data is read-only. Check it before offering an action the plan may not include.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "plans.get_entitlements",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: get one plan.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Id of the plan.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "plans.get_plan",
+      "output_schema": null,
+      "permissions": [
+        "plans.plans.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: get a tenant's subscription and add-ons.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "tenant_id": {
+            "description": "Id of the tenant.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id"
+        ],
+        "type": "object"
+      },
+      "name": "plans.get_subscription",
+      "output_schema": null,
+      "permissions": [
+        "plans.subscriptions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: list every plan (drafts and retired ones too) with modules, features, limits and prices, newest first; follow `pagination.next_cursor`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of plans to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "plans.list_plans",
+      "output_schema": null,
+      "permissions": [
+        "plans.plans.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: a tenant's use of every limit (metered limits: this month).",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "tenant_id": {
+            "description": "Id of the tenant.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id"
+        ],
+        "type": "object"
+      },
+      "name": "plans.list_usage",
+      "output_schema": null,
+      "permissions": [
+        "plans.subscriptions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: stop selling a plan; tenants on it keep it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Id of the plan.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "plans.retire_plan",
+      "output_schema": null,
+      "permissions": [
+        "plans.plans.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: for one tenant, turn a module or feature on or off, or replace a limit, with a reason and an optional end.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "description": "Required with `module` / `feature`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "description": "When the override stops applying (RFC 3339).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "description": "Module name, feature key or limit key.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`module`, `feature` or `limit`.",
+            "type": "string"
+          },
+          "max_value": {
+            "description": "With `limit`: the new maximum; leave out for unlimited.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why, 1 to 500 characters.",
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "Id of the tenant.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "kind",
+          "key",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "name": "plans.set_override",
+      "output_schema": null,
+      "permissions": [
+        "plans.subscriptions.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: replace the whole content of a plan; tenants on it get the change within the cache time.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The whole new content of a plan, with its id.",
+        "properties": {
+          "code": {
+            "description": "Unique code, `[a-z][a-z0-9_-]{0,63}`.",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "features": {
+            "description": "Features to turn on.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "grace_days": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Id of the plan.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "`base` or `addon`.",
+            "type": "string"
+          },
+          "limits": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "description": "Limits by key; `null` is unlimited, a limit left out is 0.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "modules": {
+            "description": "Modules to turn on.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "description": "Name shown to customers, 1 to 200 characters.",
+            "type": "string"
+          },
+          "placement": {
+            "description": "`shared` or `dedicated`.",
+            "type": "string"
+          },
+          "renewal_lead_days": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requires_kyc": {
+            "type": "boolean"
+          },
+          "retention_days": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sample_data": {
+            "type": "boolean"
+          },
+          "status": {
+            "description": "`draft` or `active`.",
+            "type": "string"
+          },
+          "suspend_days": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "trial_days": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "status",
+          "grace_days",
+          "suspend_days",
+          "retention_days",
+          "renewal_lead_days",
+          "placement"
+        ],
+        "type": "object"
+      },
+      "name": "plans.update_plan",
+      "output_schema": null,
+      "permissions": [
+        "plans.plans.manage"
+      ]
     }
   ]
 }

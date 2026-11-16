@@ -56,6 +56,8 @@ pub struct Dispatcher {
     subscriptions: Vec<(&'static str, Subscription)>,
     wake: Arc<Notify>,
     last_cleanup: std::sync::Mutex<Option<std::time::Instant>>,
+    /// Quyền dùng theo khách (bước 35): bên nhận thuộc module gói của khách không có bị bỏ qua.
+    entitlements: crate::entitlement::EntitlementsHandle,
 }
 
 impl Dispatcher {
@@ -71,7 +73,34 @@ impl Dispatcher {
             subscriptions,
             wake,
             last_cleanup: std::sync::Mutex::new(None),
+            entitlements: crate::entitlement::EntitlementsHandle::default(),
         }
+    }
+
+    /// Bỏ qua bên nhận thuộc module mà gói của khách của event không có (bước 35).
+    pub(crate) fn with_entitlements(
+        mut self,
+        entitlements: crate::entitlement::EntitlementsHandle,
+    ) -> Self {
+        self.entitlements = entitlements;
+        self
+    }
+
+    /// Bên nhận thuộc module `subscriber` có được nhận event của khách `tenant` không: module
+    /// `always_enabled`, hay gói của khách có module và khách không chỉ đọc vì thuê bao.
+    async fn admits(
+        &self,
+        subscriber: &str,
+        tenant: &crate::tenancy::TenantContext,
+    ) -> Result<bool, Error> {
+        if !self.entitlements.is_enforced()
+            || self.entitlements.catalog().is_always_enabled(subscriber)
+        {
+            return Ok(true);
+        }
+        let snapshot = self.entitlements.snapshot(tenant.id()).await?;
+        Ok(snapshot.has_module(subscriber)
+            && snapshot.access == crate::entitlement::TenantAccess::Full)
     }
 
     /// Giao một lượt mọi event đang chờ; trả về số event đã xử lý (giao xong hoặc
@@ -212,6 +241,11 @@ impl Dispatcher {
         let all = async {
             for (subscriber, subscription) in &self.subscriptions {
                 if !subscription.matches(&event.name) {
+                    continue;
+                }
+                // Gói của khách không có module nhận: bỏ qua (coi như đã giao), không thử lại.
+                if !self.admits(subscriber, &event.tenant).await? {
+                    metrics::counter!("entitlement_denials_total", "kind" => "event").increment(1);
                     continue;
                 }
                 let handled = AssertUnwindSafe(subscription.handler.handle(event)).catch_unwind();

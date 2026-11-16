@@ -209,6 +209,10 @@ impl Module for KernelModule {
         ]
     }
 
+    fn limits(&self) -> Vec<crate::entitlement::Limit> {
+        vec![crate::entitlement::API_REQUESTS]
+    }
+
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
         vec![crate::tenancy::PUBLIC_URL]
     }
@@ -307,11 +311,14 @@ impl Module for KernelModule {
         ));
         self.registry = Some(context.tenancy().clone());
         self.settings = Some(settings.clone());
-        let admin = Arc::new(crate::tenancy::TenantAdmin::new(
-            context.tenancy().clone(),
-            self.seeds.clone(),
-            context.outbox()?,
-        ));
+        let admin = Arc::new(
+            crate::tenancy::TenantAdmin::new(
+                context.tenancy().clone(),
+                self.seeds.clone(),
+                context.outbox()?,
+            )
+            .with_entitlements(context.entitlements()),
+        );
         self.admin = Some(admin.clone());
         context.provide::<crate::tenancy::TenantAdmin>(admin)?;
         let platform_host =

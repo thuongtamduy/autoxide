@@ -337,6 +337,8 @@ pub struct TenantAdmin {
     registry: DatabaseRegistry,
     seeds: Seeds,
     outbox: Outbox,
+    /// Thuê bao, hạn mức (module `plans`, bước 35): bộ lọc `subscription_status`, `near_limit`.
+    entitlements: crate::entitlement::EntitlementsHandle,
 }
 
 impl std::fmt::Debug for TenantAdmin {
@@ -358,7 +360,16 @@ pub(super) fn is_slug(slug: &str) -> bool {
 
 impl TenantAdmin {
     pub(crate) fn new(registry: DatabaseRegistry, seeds: Seeds, outbox: Outbox) -> Self {
-        TenantAdmin { registry, seeds, outbox }
+        TenantAdmin { registry, seeds, outbox, entitlements: Default::default() }
+    }
+
+    /// Thuê bao và hạn mức cho bộ lọc của danh sách khách (bước 35).
+    pub(crate) fn with_entitlements(
+        mut self,
+        entitlements: crate::entitlement::EntitlementsHandle,
+    ) -> Self {
+        self.entitlements = entitlements;
+        self
     }
 
     fn control(&self) -> &crate::database::Database {
@@ -476,10 +487,17 @@ impl TenantAdmin {
                 .collect();
             select = select.filter(tenant::Column::PlacementId.is_in(ids));
         }
-        // Thuê bao và hạn mức là của module `plans` (bước 35): chưa có thì không khách nào có thuê
-        // bao hay gần hạn mức — trang rỗng (vẫn một câu truy vấn, điều kiện luôn sai).
-        if filter.subscription_status.is_some() || filter.near_limit == Some(true) {
-            select = select.filter(tenant::Column::Id.is_in(Vec::<Uuid>::new()));
+        // Thuê bao và hạn mức là của module `plans` (bước 35), hỏi qua tay cầm quyền dùng: chưa cài
+        // `plans` thì không khách nào có thuê bao hay gần hạn mức — trang rỗng.
+        if let Some(status) = &filter.subscription_status {
+            let ids = self.entitlements.tenants_with_status(status).await?;
+            select =
+                select.filter(tenant::Column::Id.is_in(ids.into_iter().map(|id| id.as_uuid())));
+        }
+        if filter.near_limit == Some(true) {
+            let ids = self.entitlements.tenants_near_limit().await?;
+            select =
+                select.filter(tenant::Column::Id.is_in(ids.into_iter().map(|id| id.as_uuid())));
         }
         let rows =
             fetch_page(select, tenant::Column::Id, |row| row.id, page, self.control().read())

@@ -11,6 +11,34 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `plans` (step 35): sell the software by plan without code changes. A plan is data — modules, features,
+  limits and prices — with add-ons and per-tenant overrides; tenants without a subscription get the default plan, and
+  with no default plan nothing changes. `GET /api/v1/plans/entitlements` tells a user interface what the tenant may
+  use; platform staff manage plans and subscriptions under `/api/v1/plans` (`plans.plans.*`,
+  `plans.subscriptions.*`) and over MCP. Modules declare features and limits (`Module::features`, `Module::limits`),
+  and reserve, confirm and release limits through the kernel's `EntitlementsHandle`; reservations are atomic on
+  both databases. The kernel enforces the plan: endpoints of a module the tenant's plan does not include answer
+  `403 module_not_enabled`, its MCP tools are hidden, its jobs wait (`AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS`, not counted
+  as attempts) and its event handlers are skipped; a suspended or canceled subscription makes the tenant read-only
+  (`403 tenant_read_only` on writes). Limits wired so far: `organizations.units` (units besides the root, archived ones
+  not counted), `auth.members` (people holding a role), `files.storage_bytes`, `kernel.api_requests` (requests per
+  month, recorded every minute; `429 quota_exhausted` only when the plan sets a maximum); features `auth.api_keys` and
+  `content.ai_suggestions`. Held reservations expire and usage is reconciled with the real counts daily.
+  Subscriptions have a lifecycle run by jobs — trial, active, past due (grace), suspended (read-only), canceled
+  (read-only, data kept), deleted — with billing periods paid by hand for now (`mark-paid`, `void`), reminder mails,
+  self-service change (upgrades at once with a prorated period, downgrades at period end), cancel and resume, and a
+  way for platform staff to suspend a tenant completely. The tenant list filters by `subscription_status` and
+  `near_limit`. Operator guide: `docs/PLANS.md`. The module catalog lists each module's features, limits, `always_enabled` and `requires`.
+- Decimal numbers for calculating with money (tax rates, exchange rates, quantities) in
+  `autoxide_kernel::decimal`: `Money::apply_rate`, `Money::convert`, `Money::to_decimal` / `from_decimal`, each with
+  an explicit `Rounding`; decimals are strings in JSON (`DecimalString`, error `decimal.invalid`) and text in the
+  database. Amounts are still stored as integers of minor units.
+- Security headers on every response, including errors, health checks and `/mcp`:
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy` (`AUTOXIDE_HTTP_REFERRER_POLICY`, default `no-referrer`),
+  `X-Frame-Options: DENY` and a strict `Content-Security-Policy` (the API reference page gets its own);
+  `Strict-Transport-Security` when `AUTOXIDE_HTTP_HSTS_SECONDS` is set. A header a handler sets itself is kept;
+  `AUTOXIDE_HTTP_SECURITY_HEADERS=false` turns them off. `autoxide doctor` reminds you of HSTS when the public URL
+  is `https://`. Downloads from `files` and `media` now carry the stricter common policy.
 - New module `address`: the official list of administrative units shared by every tenant
   (Vietnam after the 2025 merger: provinces and communes, no districts), imported from the
   official source with `autoxide task address.import path=<dir>` (a new list closes and opens
@@ -269,6 +297,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- Counting failed attempts (sign-in lockout and other throttles) takes one SQL statement instead of up to four:
+  60–75% more attempts per second, except many attempts on one email at once on PostgreSQL, which still queue on
+  that email's counter.
 - Faster signed-in requests: the user and their permissions are read in one SQL query instead of two on every
   request (access token and API key); `GET /api/v1/auth/me` and the MCP tool `auth.whoami` need three queries in
   all instead of seven, and `GET /api/v1/auth/users` one query per page for the account facts instead of two.
@@ -323,6 +354,8 @@ endpoints are marked deprecated with a sunset date first.
   both gates run the test binaries in parallel (`cargo xtask test-all` in the full gate).
 
 ### Fixed
+
+- `GET /api/v1/kernel/modules/{name}` answered 500 for modules with data upgrades (`auth`, `webhooks`).
 
 - Lists of one tenant ordered by id (audit entries, users, roles, media, content entries, terms, authors, redirects,
   comments, bans, reports, forms, newsletter lists, subscribers, campaigns, suppressions, webhook endpoints, menus)

@@ -451,6 +451,7 @@ impl<'a> TestAppBuilder<'a> {
             .deprecations(modules.deprecations())
             .body_limits(modules.body_limits())
             .tools(modules.tools().map_err(|e| fail("tools", e))?)
+            .entitlements(modules.entitlements())
             .translations(modules.translations().clone());
         if let Some(registry) = modules.tenancy() {
             extras = extras.tenancy(registry);

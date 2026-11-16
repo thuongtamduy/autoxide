@@ -35,6 +35,14 @@ export type AddPasskeyRequest = {
   name: string;
 };
 
+/** An add-on of a subscription. */
+export type AddonItem = {
+  /** An active plan of kind `addon`. */
+  plan_id: string;
+  /** 1 to 1000; the add-on's limits count this many times. */
+  quantity: number;
+};
+
 /** A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01). */
 export type Address = {
   /** Code of the commune, ward or special zone (5 digits for Vietnam). */
@@ -173,6 +181,21 @@ export type ApiKeyResponse = {
   prefix: string;
 };
 
+/** Put a tenant on a plan. */
+export type AssignRequest = {
+  /** Replace the add-ons with these; leave out to keep them. */
+  addons?: AddonItem[] | null;
+  /** An active base plan. */
+  plan_id: string;
+  /**
+   * An active recurring price of that plan; without it, periods last a month and nothing is
+   * charged.
+   */
+  price_id?: string | null;
+  /** Start with the plan's free trial when the tenant never had one; default `true`. */
+  trial?: boolean;
+};
+
 /** One change, as recorded in the audit log. */
 export type AuditEntryResponse = {
   /** What happened: the event name, `<module>.<what_happened>`. */
@@ -256,6 +279,32 @@ export type BanRequest = {
   until?: string | null;
   /** The user id, the email address, or the `ip_fingerprint` shown on a comment. */
   value: string;
+};
+
+/** A billing period of a subscription: what is charged for which time, and whether it is paid. */
+export type BillingPeriodResponse = {
+  amount: Money;
+  created_at: string;
+  due_at: string;
+  id: string;
+  invoice_number?: string | null;
+  /**
+   * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
+   * `metered`.
+   */
+  kind: string;
+  paid_at?: string | null;
+  period_end: string;
+  period_start: string;
+  plan_id: string;
+  price_id?: string | null;
+  /** The payment provider's reference (or the bank transfer's), when paid. */
+  provider_reference?: string | null;
+  /** Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`. */
+  reference: string;
+  /** `open`, `paid` or `void`. */
+  status: string;
+  tenant_id: string;
 };
 
 /**
@@ -366,6 +415,15 @@ export type CampaignResponse = {
 /** Where a campaign is. */
 export type CampaignStatus = "draft" | "scheduled" | "sending" | "paused" | "sent" | "cancelled";
 
+/** Cancel your tenant's subscription. */
+export type CancelRequest = {
+  /**
+   * `true` (default): cancel when the current period ends, and keep using it until then;
+   * `false`: cancel now (data becomes read-only and is kept for the plan's retention days).
+   */
+  at_period_end?: boolean;
+};
+
 /** A passkey ceremony in progress. */
 export type CeremonyResponse = {
   /** Send this back with the authenticator's answer, within 5 minutes. Works once. */
@@ -397,6 +455,23 @@ export type ChangePasswordRequest = {
   current_password: string;
   /** 12 to 128 characters. */
   new_password: string;
+};
+
+/** Move your tenant to another plan. */
+export type ChangeRequest = {
+  /** Replace the add-ons with these; leave out to keep them. */
+  addons?: AddonItem[] | null;
+  /** Where billing reminders go. */
+  billing_email?: string | null;
+  /** An active base plan. */
+  plan_id: string;
+  /** An active recurring price of that plan. */
+  price_id?: string | null;
+  /**
+   * Your reference for this change (1 to 200 characters), kept in the audit trail; sending the
+   * same change again changes nothing more.
+   */
+  reference: string;
 };
 
 /** Settings of the server an interface needs, by module: only values safe to show anyone. A module without such settings is absent. */
@@ -1005,6 +1080,9 @@ export type CreatedEndpointResponse = EndpointResponse & {
   secret: string;
 };
 
+/** ISO 4217 currency code in upper case, e.g. `USD`, `EUR`, `VND`. Only codes in circulation that have minor units are accepted. */
+export type Currency = string;
+
 /** The tenant of the caller. */
 export type CurrentTenant = {
   id: string;
@@ -1175,6 +1253,35 @@ export type Data_AuthorResponse = {
     /** The user account behind the profile, if any. */
     user_id?: string | null;
     website_url: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BillingPeriodResponse = {
+  /** A billing period of a subscription: what is charged for which time, and whether it is paid. */
+  data: {
+    amount: Money;
+    created_at: string;
+    due_at: string;
+    id: string;
+    invoice_number?: string | null;
+    /**
+     * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
+     * `metered`.
+     */
+    kind: string;
+    paid_at?: string | null;
+    period_end: string;
+    period_start: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** The payment provider's reference (or the bank transfer's), when paid. */
+    provider_reference?: string | null;
+    /** Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`. */
+    reference: string;
+    /** `open`, `paid` or `void`. */
+    status: string;
+    tenant_id: string;
   };
 };
 
@@ -1613,6 +1720,23 @@ export type Data_EndpointResponse = {
     last_delivery?: LastDelivery | null;
     updated_at: string;
     url: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_EntitlementsResponse = {
+  /** What the tenant may use now. User interfaces use it to hide what the plan does not include. */
+  data: {
+    /** `full`, or `read_only` while the subscription is suspended or canceled. */
+    access: string;
+    /** Features turned on. */
+    features: string[];
+    /** Every limit a module declares, with its use. */
+    limits: LimitUse[];
+    /** Modules turned on, including those always on. */
+    modules: string[];
+    /** `true` when nothing is limited (no plan applies to this tenant). */
+    unrestricted: boolean;
   };
 };
 
@@ -2125,16 +2249,25 @@ export type Data_MfaStatusResponse = {
 export type Data_ModuleInfo = {
   /** A module installed in this server, and everything it declares. */
   data: {
+    /**
+     * `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
+     * whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
+     */
+    always_enabled: boolean;
     /** Endpoints of the module that are deprecated. */
     deprecations: ModuleDeprecation[];
     /** Events the module emits. */
     events: ModuleEvent[];
+    /** Features of the module that a plan turns on or off (`<module>.<name>`). */
+    features: ModuleFeature[];
     /** `true` for the modules the server always installs (`kernel`, `antispam`). */
     internal: boolean;
     /** Kinds of background job the module runs. */
     jobs: string[];
     /** Languages, besides English, the module's error messages are translated to. */
     languages: string[];
+    /** Limits of the module that a plan sets (`<module>.<name>`). */
+    limits: ModuleLimit[];
     /** Database migrations of the module, in the order they apply. */
     migrations: ModuleMigration[];
     /**
@@ -2146,6 +2279,8 @@ export type Data_ModuleInfo = {
     permissions: ModulePermission[];
     /** Place in the start order, from 0. A module starts after the modules it depends on. */
     position: number;
+    /** Modules this module uses; a plan that turns this module on must turn them on too. */
+    requires: string[];
     /** Recurring jobs the module schedules. */
     schedules: ModuleSchedule[];
     /** Events the module listens to; `*` means every event. */
@@ -2227,6 +2362,27 @@ export type Data_NewsletterSettingsResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_OverrideResponse = {
+  /** An override for one tenant: turn a module or feature on or off, or replace a limit. */
+  data: {
+    created_at: string;
+    /** User who set it. */
+    created_by?: string | null;
+    /** With `module` / `feature`. */
+    enabled?: boolean | null;
+    /** The override no longer applies from this time. */
+    expires_at?: string | null;
+    id: string;
+    key: string;
+    /** `module`, `feature` or `limit`. */
+    kind: string;
+    /** With `limit`: the new maximum; `null` is unlimited. */
+    max_value?: number | null;
+    reason: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PasskeyResponse = {
   /** A passkey of the signed-in user. Holds no secret. */
   data: {
@@ -2258,6 +2414,86 @@ export type Data_PersonalDataResponse = {
   data: Record<string, unknown> & {
     /** Your profile, roles, sessions, API keys, passkeys and two-step sign-in status. */
     auth: Record<string, unknown>;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PlanResponse = {
+  /** A plan: the modules, features and limits a tenant gets, and its prices. */
+  data: {
+    code: string;
+    created_at: string;
+    description: string;
+    /** Features turned on. */
+    features: string[];
+    /** Days a tenant keeps full access after a period ends unpaid. */
+    grace_days: number;
+    id: string;
+    /**
+     * Tenants without a subscription get this plan. At most one plan is the default; with none,
+     * such tenants are not limited.
+     */
+    is_default: boolean;
+    /** `base` (a tenant has one) or `addon` (added on top, with a quantity). */
+    kind: string;
+    /** Limits by key; `null` means unlimited. A limit not listed is 0. */
+    limits: {
+      [key: string]: number | null;
+    };
+    /** Modules turned on (modules that are always on are not listed). */
+    modules: string[];
+    name: string;
+    /** Where a new tenant on this plan keeps its data: `shared` or `dedicated`. */
+    placement: string;
+    prices: PriceResponse[];
+    /** Days before a period ends that the next one is billed and a reminder sent. */
+    renewal_lead_days: number;
+    /** A new tenant on this plan must pass identity checks first. */
+    requires_kyc: boolean;
+    /** Days the data of a canceled subscription is kept before the tenant is deleted. */
+    retention_days: number;
+    /** A new tenant on this plan starts with sample data. */
+    sample_data: boolean;
+    /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
+    status: string;
+    /** Days a suspended (read-only) subscription waits before it is canceled. */
+    suspend_days: number;
+    /** Days of free trial for a tenant that never had one; 0 for none. */
+    trial_days: number;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PlanSubscription = {
+  /** The subscription of a tenant. */
+  data: {
+    addons: AddonItem[];
+    /** Cancels when the current period ends. */
+    cancel_at_period_end: boolean;
+    canceled_at?: string | null;
+    created_at: string;
+    current_period_end: string;
+    current_period_start: string;
+    delete_after?: string | null;
+    grace_ends_at?: string | null;
+    id: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** Plan the subscription moves to when the period ends (after a downgrade). */
+    scheduled_plan_id?: string | null;
+    scheduled_price_id?: string | null;
+    /**
+     * `trialing`, `active`, `past_due` (unpaid, in the grace period), `suspended` (read-only),
+     * `canceled` (read-only, data kept until `delete_after`) or `deleted`.
+     */
+    status: string;
+    suspended_at?: string | null;
+    tenant_id: string;
+    trial_ends_at?: string | null;
+    /** The tenant already had its free trial. */
+    trial_used: boolean;
+    updated_at: string;
   };
 };
 
@@ -3227,6 +3463,34 @@ export type Data_Vec_AdministrativeUnit = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_BillingPeriodResponse = {
+  data: {
+    amount: Money;
+    created_at: string;
+    due_at: string;
+    id: string;
+    invoice_number?: string | null;
+    /**
+     * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
+     * `metered`.
+     */
+    kind: string;
+    paid_at?: string | null;
+    period_end: string;
+    period_start: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** The payment provider's reference (or the bank transfer's), when paid. */
+    provider_reference?: string | null;
+    /** Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`. */
+    reference: string;
+    /** `open`, `paid` or `void`. */
+    status: string;
+    tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CommentCount = {
   data: {
     /** Shown comments (top-level and replies). */
@@ -3270,6 +3534,24 @@ export type Data_Vec_EventTypeResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_LimitUse = {
+  data: {
+    key: string;
+    /** `count`, `amount` or `metered`. */
+    kind: string;
+    /** The most the tenant may use; `null` is unlimited. */
+    max?: number | null;
+    /**
+     * `true` when more is in use than allowed (after moving to a smaller plan): nothing is
+     * removed, but nothing new can be added.
+     */
+    over_limit: boolean;
+    /** In use now (for `metered`: this month). */
+    used: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_MembershipResponse = {
   data: {
     /** The unit; the root unit has the id of the tenant. */
@@ -3295,16 +3577,25 @@ export type Data_Vec_MenuSummary = {
 /** Envelope of a single result. */
 export type Data_Vec_ModuleInfo = {
   data: {
+    /**
+     * `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
+     * whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
+     */
+    always_enabled: boolean;
     /** Endpoints of the module that are deprecated. */
     deprecations: ModuleDeprecation[];
     /** Events the module emits. */
     events: ModuleEvent[];
+    /** Features of the module that a plan turns on or off (`<module>.<name>`). */
+    features: ModuleFeature[];
     /** `true` for the modules the server always installs (`kernel`, `antispam`). */
     internal: boolean;
     /** Kinds of background job the module runs. */
     jobs: string[];
     /** Languages, besides English, the module's error messages are translated to. */
     languages: string[];
+    /** Limits of the module that a plan sets (`<module>.<name>`). */
+    limits: ModuleLimit[];
     /** Database migrations of the module, in the order they apply. */
     migrations: ModuleMigration[];
     /**
@@ -3316,6 +3607,8 @@ export type Data_Vec_ModuleInfo = {
     permissions: ModulePermission[];
     /** Place in the start order, from 0. A module starts after the modules it depends on. */
     position: number;
+    /** Modules this module uses; a plan that turns this module on must turn them on too. */
+    requires: string[];
     /** Recurring jobs the module schedules. */
     schedules: ModuleSchedule[];
     /** Events the module listens to; `*` means every event. */
@@ -3354,6 +3647,26 @@ export type Data_Vec_MyTenantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_OverrideResponse = {
+  data: {
+    created_at: string;
+    /** User who set it. */
+    created_by?: string | null;
+    /** With `module` / `feature`. */
+    enabled?: boolean | null;
+    /** The override no longer applies from this time. */
+    expires_at?: string | null;
+    id: string;
+    key: string;
+    /** `module`, `feature` or `limit`. */
+    kind: string;
+    /** With `limit`: the new maximum; `null` is unlimited. */
+    max_value?: number | null;
+    reason: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PermissionResponse = {
   data: {
     /** What the permission allows, in the language of `Accept-Language`. */
@@ -3387,6 +3700,52 @@ export type Data_Vec_Placement = {
     /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
     schema_state: string;
     storage?: PlacementStorage | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PlanResponse = {
+  data: {
+    code: string;
+    created_at: string;
+    description: string;
+    /** Features turned on. */
+    features: string[];
+    /** Days a tenant keeps full access after a period ends unpaid. */
+    grace_days: number;
+    id: string;
+    /**
+     * Tenants without a subscription get this plan. At most one plan is the default; with none,
+     * such tenants are not limited.
+     */
+    is_default: boolean;
+    /** `base` (a tenant has one) or `addon` (added on top, with a quantity). */
+    kind: string;
+    /** Limits by key; `null` means unlimited. A limit not listed is 0. */
+    limits: {
+      [key: string]: number | null;
+    };
+    /** Modules turned on (modules that are always on are not listed). */
+    modules: string[];
+    name: string;
+    /** Where a new tenant on this plan keeps its data: `shared` or `dedicated`. */
+    placement: string;
+    prices: PriceResponse[];
+    /** Days before a period ends that the next one is billed and a reminder sent. */
+    renewal_lead_days: number;
+    /** A new tenant on this plan must pass identity checks first. */
+    requires_kyc: boolean;
+    /** Days the data of a canceled subscription is kept before the tenant is deleted. */
+    retention_days: number;
+    /** A new tenant on this plan starts with sample data. */
+    sample_data: boolean;
+    /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
+    status: string;
+    /** Days a suspended (read-only) subscription waits before it is canceled. */
+    suspend_days: number;
+    /** Days of free trial for a tenant that never had one; 0 for none. */
+    trial_days: number;
+    updated_at: string;
   }[];
 };
 
@@ -3814,6 +4173,20 @@ export type EndpointResponse = {
   last_delivery?: LastDelivery | null;
   updated_at: string;
   url: string;
+};
+
+/** What the tenant may use now. User interfaces use it to hide what the plan does not include. */
+export type EntitlementsResponse = {
+  /** `full`, or `read_only` while the subscription is suspended or canceled. */
+  access: string;
+  /** Features turned on. */
+  features: string[];
+  /** Every limit a module declares, with its use. */
+  limits: LimitUse[];
+  /** Modules turned on, including those always on. */
+  modules: string[];
+  /** `true` when nothing is limited (no plan applies to this tenant). */
+  unrestricted: boolean;
 };
 
 /** The authors of an entry. */
@@ -4250,6 +4623,22 @@ export type LibrarySummaryResponse = {
   trashed_items: number;
 };
 
+/** Use of one limit. */
+export type LimitUse = {
+  key: string;
+  /** `count`, `amount` or `metered`. */
+  kind: string;
+  /** The most the tenant may use; `null` is unlimited. */
+  max?: number | null;
+  /**
+   * `true` when more is in use than allowed (after moving to a smaller plan): nothing is
+   * removed, but nothing new can be added.
+   */
+  over_limit: boolean;
+  /** In use now (for `metered`: this month). */
+  used: number;
+};
+
 /** One list choice. */
 export type ListChoice = {
   key: string;
@@ -4345,6 +4734,14 @@ export type ManagedApiKeyResponse = ApiKeyResponse & {
   user_id: string;
   /** Display name of that user; `null` when the account no longer exists. */
   user_name?: string | null;
+};
+
+/** Record a payment made outside the system (for example a bank transfer checked by hand). */
+export type MarkPaidRequest = {
+  /** When it was paid; default now. */
+  paid_at?: string | null;
+  /** The bank's or provider's reference of the payment, 1 to 200 characters. */
+  provider_reference: string;
 };
 
 /** How a result matched. */
@@ -4608,18 +5005,33 @@ export type ModuleEvent = {
   name: string;
 };
 
+/** A feature a plan can turn on or off. */
+export type ModuleFeature = {
+  description: string;
+  key: string;
+};
+
 /** A module installed in this server, and everything it declares. */
 export type ModuleInfo = {
+  /**
+   * `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
+   * whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
+   */
+  always_enabled: boolean;
   /** Endpoints of the module that are deprecated. */
   deprecations: ModuleDeprecation[];
   /** Events the module emits. */
   events: ModuleEvent[];
+  /** Features of the module that a plan turns on or off (`<module>.<name>`). */
+  features: ModuleFeature[];
   /** `true` for the modules the server always installs (`kernel`, `antispam`). */
   internal: boolean;
   /** Kinds of background job the module runs. */
   jobs: string[];
   /** Languages, besides English, the module's error messages are translated to. */
   languages: string[];
+  /** Limits of the module that a plan sets (`<module>.<name>`). */
+  limits: ModuleLimit[];
   /** Database migrations of the module, in the order they apply. */
   migrations: ModuleMigration[];
   /**
@@ -4631,12 +5043,29 @@ export type ModuleInfo = {
   permissions: ModulePermission[];
   /** Place in the start order, from 0. A module starts after the modules it depends on. */
   position: number;
+  /** Modules this module uses; a plan that turns this module on must turn them on too. */
+  requires: string[];
   /** Recurring jobs the module schedules. */
   schedules: ModuleSchedule[];
   /** Events the module listens to; `*` means every event. */
   subscriptions: string[];
   /** MCP tools the module offers at `/mcp`. */
   tools: ModuleTool[];
+};
+
+/** A limit a plan can set. */
+export type ModuleLimit = {
+  description: string;
+  key: string;
+  /**
+   * `count` (records that exist), `amount` (a quantity in use, see `unit`) or `metered`
+   * (use within a period, back to 0 at its start, see `period`).
+   */
+  kind: string;
+  /** Period of a `metered` limit: `month`. */
+  period?: string | null;
+  /** Unit of an `amount` limit, e.g. `bytes`. */
+  unit?: string | null;
 };
 
 /** A database migration of a module. */
@@ -4691,6 +5120,20 @@ export type ModuleToolDeprecation = {
   successor?: string | null;
   /** The tool goes away on this date, if one is set. */
   sunset?: string | null;
+};
+
+/**
+ * A sum of money: an integer number of the currency's minor units (cents for `USD`, dong for
+ * `VND`) plus the currency.
+ */
+export type Money = {
+  /**
+   * Amount in minor units of `currency`, as a base-10 integer string (JSON numbers above
+   * 2^53 lose precision in JavaScript). `"1999"` with `USD` is 19.99 US dollars; negative
+   * amounts start with `-`.
+   */
+  amount: string;
+  currency: Currency;
 };
 
 /** Where to move a page. */
@@ -4838,6 +5281,40 @@ export type NewsletterSettingsResponse = {
 export type NewsletterText = {
   en?: string | null;
   vi?: string | null;
+};
+
+/** An override to set; it replaces one of the same kind and key. */
+export type OverrideRequest = {
+  /** Required with `module` / `feature`. */
+  enabled?: boolean | null;
+  /** When the override stops applying. */
+  expires_at?: string | null;
+  /** Module name, feature key or limit key. */
+  key: string;
+  /** `module`, `feature` or `limit`. */
+  kind: string;
+  /** With `limit`: the new maximum; leave out or `null` for unlimited. */
+  max_value?: number | null;
+  /** Why, 1 to 500 characters (kept for the audit trail). */
+  reason: string;
+};
+
+/** An override for one tenant: turn a module or feature on or off, or replace a limit. */
+export type OverrideResponse = {
+  created_at: string;
+  /** User who set it. */
+  created_by?: string | null;
+  /** With `module` / `feature`. */
+  enabled?: boolean | null;
+  /** The override no longer applies from this time. */
+  expires_at?: string | null;
+  id: string;
+  key: string;
+  /** `module`, `feature` or `limit`. */
+  kind: string;
+  /** With `limit`: the new maximum; `null` is unlimited. */
+  max_value?: number | null;
+  reason: string;
 };
 
 /** One page of a list. */
@@ -5533,6 +6010,88 @@ export type Page_PasskeyResponse = {
     last_used_at?: string | null;
     /** Name the user gave it, e.g. the device. */
     name: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PlanResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    created_at: string;
+    description: string;
+    /** Features turned on. */
+    features: string[];
+    /** Days a tenant keeps full access after a period ends unpaid. */
+    grace_days: number;
+    id: string;
+    /**
+     * Tenants without a subscription get this plan. At most one plan is the default; with none,
+     * such tenants are not limited.
+     */
+    is_default: boolean;
+    /** `base` (a tenant has one) or `addon` (added on top, with a quantity). */
+    kind: string;
+    /** Limits by key; `null` means unlimited. A limit not listed is 0. */
+    limits: {
+      [key: string]: number | null;
+    };
+    /** Modules turned on (modules that are always on are not listed). */
+    modules: string[];
+    name: string;
+    /** Where a new tenant on this plan keeps its data: `shared` or `dedicated`. */
+    placement: string;
+    prices: PriceResponse[];
+    /** Days before a period ends that the next one is billed and a reminder sent. */
+    renewal_lead_days: number;
+    /** A new tenant on this plan must pass identity checks first. */
+    requires_kyc: boolean;
+    /** Days the data of a canceled subscription is kept before the tenant is deleted. */
+    retention_days: number;
+    /** A new tenant on this plan starts with sample data. */
+    sample_data: boolean;
+    /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
+    status: string;
+    /** Days a suspended (read-only) subscription waits before it is canceled. */
+    suspend_days: number;
+    /** Days of free trial for a tenant that never had one; 0 for none. */
+    trial_days: number;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PlanSubscription = {
+  /** The items of this page, in the requested order. */
+  data: {
+    addons: AddonItem[];
+    /** Cancels when the current period ends. */
+    cancel_at_period_end: boolean;
+    canceled_at?: string | null;
+    created_at: string;
+    current_period_end: string;
+    current_period_start: string;
+    delete_after?: string | null;
+    grace_ends_at?: string | null;
+    id: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** Plan the subscription moves to when the period ends (after a downgrade). */
+    scheduled_plan_id?: string | null;
+    scheduled_price_id?: string | null;
+    /**
+     * `trialing`, `active`, `past_due` (unpaid, in the grace period), `suspended` (read-only),
+     * `canceled` (read-only, data kept until `delete_after`) or `deleted`.
+     */
+    status: string;
+    suspended_at?: string | null;
+    tenant_id: string;
+    trial_ends_at?: string | null;
+    /** The tenant already had its free trial. */
+    trial_used: boolean;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -6245,6 +6804,121 @@ export type PlacementStorage = {
   region?: string | null;
 };
 
+/** A plan to create, or the whole new content of a plan. */
+export type PlanRequest = {
+  /** Unique code, `[a-z][a-z0-9_-]{0,63}`. */
+  code: string;
+  /** Up to 5000 characters. */
+  description?: string;
+  /** Features to turn on, by key (`features` of the modules). */
+  features?: string[];
+  /** 0 to 3650; default 7. */
+  grace_days?: number;
+  /** Make this the default plan (an active base plan); the previous default stops being one. */
+  is_default?: boolean;
+  /** `base` (default) or `addon`. */
+  kind?: string;
+  /** Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0. */
+  limits?: {
+    [key: string]: number | null;
+  };
+  /**
+   * Modules to turn on, by name (`GET /api/v1/kernel/modules`). A base plan must also turn on
+   * the modules they need (`requires`).
+   */
+  modules?: string[];
+  /** Name shown to customers, 1 to 200 characters. */
+  name: string;
+  /** `shared` (default) or `dedicated`. */
+  placement?: string;
+  /** 0 to 3650; default 7. */
+  renewal_lead_days?: number;
+  requires_kyc?: boolean;
+  /** 0 to 3650; default 90. */
+  retention_days?: number;
+  sample_data?: boolean;
+  /** `draft` (default) or `active`. Retire a plan with `POST /plans/{id}/retire`. */
+  status?: string;
+  /** 0 to 3650; default 30. */
+  suspend_days?: number;
+  /** 0 to 3650; default 0. */
+  trial_days?: number;
+};
+
+/** A plan: the modules, features and limits a tenant gets, and its prices. */
+export type PlanResponse = {
+  code: string;
+  created_at: string;
+  description: string;
+  /** Features turned on. */
+  features: string[];
+  /** Days a tenant keeps full access after a period ends unpaid. */
+  grace_days: number;
+  id: string;
+  /**
+   * Tenants without a subscription get this plan. At most one plan is the default; with none,
+   * such tenants are not limited.
+   */
+  is_default: boolean;
+  /** `base` (a tenant has one) or `addon` (added on top, with a quantity). */
+  kind: string;
+  /** Limits by key; `null` means unlimited. A limit not listed is 0. */
+  limits: {
+    [key: string]: number | null;
+  };
+  /** Modules turned on (modules that are always on are not listed). */
+  modules: string[];
+  name: string;
+  /** Where a new tenant on this plan keeps its data: `shared` or `dedicated`. */
+  placement: string;
+  prices: PriceResponse[];
+  /** Days before a period ends that the next one is billed and a reminder sent. */
+  renewal_lead_days: number;
+  /** A new tenant on this plan must pass identity checks first. */
+  requires_kyc: boolean;
+  /** Days the data of a canceled subscription is kept before the tenant is deleted. */
+  retention_days: number;
+  /** A new tenant on this plan starts with sample data. */
+  sample_data: boolean;
+  /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
+  status: string;
+  /** Days a suspended (read-only) subscription waits before it is canceled. */
+  suspend_days: number;
+  /** Days of free trial for a tenant that never had one; 0 for none. */
+  trial_days: number;
+  updated_at: string;
+};
+
+/** The subscription of a tenant. */
+export type PlanSubscription = {
+  addons: AddonItem[];
+  /** Cancels when the current period ends. */
+  cancel_at_period_end: boolean;
+  canceled_at?: string | null;
+  created_at: string;
+  current_period_end: string;
+  current_period_start: string;
+  delete_after?: string | null;
+  grace_ends_at?: string | null;
+  id: string;
+  plan_id: string;
+  price_id?: string | null;
+  /** Plan the subscription moves to when the period ends (after a downgrade). */
+  scheduled_plan_id?: string | null;
+  scheduled_price_id?: string | null;
+  /**
+   * `trialing`, `active`, `past_due` (unpaid, in the grace period), `suspended` (read-only),
+   * `canceled` (read-only, data kept until `delete_after`) or `deleted`.
+   */
+  status: string;
+  suspended_at?: string | null;
+  tenant_id: string;
+  trial_ends_at?: string | null;
+  /** The tenant already had its free trial. */
+  trial_used: boolean;
+  updated_at: string;
+};
+
 /** A comment just posted, for its author. */
 export type PostedComment = PublicComment & {
   /**
@@ -6339,6 +7013,49 @@ export type PreviewToken = {
   expires_at: string;
   /** Give it to `GET /api/v1/content/public/preview?token=…`. */
   token: string;
+};
+
+/** A new price of a plan. */
+export type PriceRequest = {
+  /** Amount per period (`recurring`) or per unit above `included` (`metered`); not negative. */
+  amount: Money;
+  /** With `metered`: use included each period; default 0. */
+  included?: number;
+  /** `month` or `year`. */
+  interval: string;
+  /** 1 to 12; default 1. */
+  interval_count?: number;
+  /** `recurring` or `metered`. */
+  kind: string;
+  /** With `metered`: the metered limit charged for, e.g. `kernel.api_requests`. */
+  limit_key?: string | null;
+  /** Tax category, when known. */
+  tax_category?: string | null;
+};
+
+/**
+ * A price of a plan. Prices never change: a new price is a new row, the old one is deactivated;
+ * subscriptions keep their price until they change plan.
+ */
+export type PriceResponse = {
+  /** `false`: no longer sold at this price. */
+  active: boolean;
+  /** Amount per period (`recurring`) or per unit above `included` (`metered`). */
+  amount: Money;
+  created_at: string;
+  id: string;
+  /** Use included each period before a metered price applies. */
+  included: number;
+  /** `month` or `year`. */
+  interval: string;
+  /** How many `interval`s a period lasts, 1 to 12. */
+  interval_count: number;
+  /** `recurring` (charged each period) or `metered` (charged for use of `limit_key`). */
+  kind: string;
+  /** The metered limit this price charges for. */
+  limit_key?: string | null;
+  /** Tax category of the price, when set. */
+  tax_category?: string | null;
 };
 
 /** An error, as RFC 9457 Problem Details. Branch on `code`; show `detail` to people. */
@@ -7534,6 +8251,12 @@ export type SuppressionResponse = {
   /** A note, or the SMTP code of a bounce. */
   note?: string | null;
   /** `hard_bounce`, `soft_bounce`, `complaint` or `manual`. */
+  reason: string;
+};
+
+/** Suspend a tenant completely. */
+export type SuspendRequest = {
+  /** Why, 1 to 500 characters (kept in the audit trail). */
   reason: string;
 };
 
@@ -9533,6 +10256,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_PublicComment;
+        403: Problem;
         404: Problem;
         default: Problem;
       };
@@ -9571,6 +10295,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_PublicComment;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -9584,6 +10309,7 @@ export interface paths {
       requestBody: ReportRequest;
       responses: {
         200: Data_CommentReported;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -9596,6 +10322,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; target_ids?: string }; };
       responses: {
         200: Data_Vec_CommentCount;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -9609,6 +10336,7 @@ export interface paths {
       responses: {
         200: Data_CommentSettings;
         400: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -9619,6 +10347,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { target_type: string; target_id: string }; };
       responses: {
         200: Data_CommentTarget;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -9631,6 +10360,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; target_id?: string; replies_limit?: number; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_ThreadComment;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -9644,6 +10374,7 @@ export interface paths {
       requestBody: UnsubscribeRequest;
       responses: {
         200: Data_CommentsUnsubscribed;
+        403: Problem;
         default: Problem;
       };
     };
@@ -9656,6 +10387,7 @@ export interface paths {
       responses: {
         200: Data_VerifiedResponse;
         400: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -10221,6 +10953,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; };
       responses: {
         200: Data_PublicAuthorPage;
+        403: Problem;
         404: Problem;
         default: Problem;
       };
@@ -10232,6 +10965,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale: string; limit?: number; site?: string }; };
       responses: {
         200: Data_Vec_PublicEntryResponse;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -10243,6 +10977,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale: string }; };
       responses: {
         200: Data_PublicMenu;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10255,6 +10990,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale: string; term_id?: string; author_id?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
       responses: {
         200: Page_PublicEntryResponse;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -10266,6 +11002,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { token: string }; };
       responses: {
         200: Data_PreviewEntryResponse;
+        403: Problem;
         404: Problem;
         503: Problem;
         default: Problem;
@@ -10278,6 +11015,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale: string; path: string; site?: string }; };
       responses: {
         200: Data_Resolution;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10290,6 +11028,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page"; limit?: number; site?: string }; };
       responses: {
         200: Page_SearchHit;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10302,6 +11041,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
       responses: {
         200: Page_SitemapItem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -10313,6 +11053,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_PublicTermCount;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -10324,6 +11065,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string }; };
       responses: {
         200: Data_PublicTermPage;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10663,6 +11405,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: "en" | "vi" }; };
       responses: {
         200: Data_PublicFormResponse;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -11425,6 +12168,7 @@ export interface paths {
         206: Blob;
         304: void;
         401: Problem;
+        403: Problem;
         404: Problem;
         416: Problem;
         422: Problem;
@@ -11512,6 +12256,7 @@ export interface paths {
       responses: {
         200: Data_PublicSiteMenu;
         304: void;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -11852,6 +12597,7 @@ export interface paths {
       responses: {
         200: Data_ConfirmResponse;
         400: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -11862,6 +12608,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale?: "en" | "vi" }; };
       responses: {
         200: Data_PublicListsResponse;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -11873,6 +12620,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { token?: string }; };
       responses: {
         200: Data_PreferencesResponse;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -11884,6 +12632,7 @@ export interface paths {
       requestBody: PreferencesBody;
       responses: {
         200: Data_PreferencesResponse;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -11898,6 +12647,7 @@ export interface paths {
       responses: {
         202: Data_SubscribeResponse;
         400: Problem;
+        403: Problem;
         422: Problem;
         429: Problem;
         503: Problem;
@@ -11912,6 +12662,7 @@ export interface paths {
       requestBody: string;
       responses: {
         200: Data_UnsubscribeResponse;
+        403: Problem;
         default: Problem;
       };
     };
@@ -12268,6 +13019,363 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/billing-periods": {
+    /** List your tenant's billing periods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/billing-periods/{id}": {
+    /** Get one of your tenant's billing periods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/billing-periods/{id}/mark-paid": {
+    /** Record that a billing period was paid. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MarkPaidRequest;
+      responses: {
+        200: Data_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/billing-periods/{id}/void": {
+    /** Void an unpaid billing period. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/catalog": {
+    /** List the plans on sale, with their prices. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PlanResponse;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/entitlements": {
+    /** Get what your tenant may use now. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_EntitlementsResponse;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/plans": {
+    /** List every plan, including drafts and retired plans. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_PlanResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a plan. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PlanRequest;
+      responses: {
+        201: Data_PlanResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/plans/{id}": {
+    /** Get a plan. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PlanResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace a plan. */
+    put: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PlanRequest;
+      responses: {
+        200: Data_PlanResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/plans/{id}/prices": {
+    /** Add a price to a plan. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PriceRequest;
+      responses: {
+        201: Data_PlanResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/plans/{id}/retire": {
+    /** Retire a plan. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PlanResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/prices/{id}/deactivate": {
+    /** Deactivate a price. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PlanResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/subscription": {
+    /** Get your tenant's subscription. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/subscription/cancel": {
+    /** Cancel your tenant's subscription. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CancelRequest;
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/subscription/change": {
+    /** Move your tenant to another plan. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ChangeRequest;
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/subscription/resume": {
+    /** Resume your tenant's subscription. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/subscriptions": {
+    /** List the subscriptions of every tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; plan_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/overrides": {
+    /** List a tenant's overrides. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_Vec_OverrideResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Set an override for a tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      requestBody: OverrideRequest;
+      responses: {
+        201: Data_OverrideResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/overrides/{id}": {
+    /** Remove an override of a tenant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string; id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/subscription": {
+    /** Get a tenant's subscription. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Put a tenant on a plan. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      requestBody: AssignRequest;
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/subscription/cancel": {
+    /** Cancel a tenant's subscription now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/subscription/suspend": {
+    /** Suspend a tenant completely. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      requestBody: SuspendRequest;
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/usage": {
+    /** Get a tenant's use of every limit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_Vec_LimitUse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/usage": {
+    /** Get your tenant's use of every limit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_LimitUse;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };

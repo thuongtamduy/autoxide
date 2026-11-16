@@ -86,7 +86,7 @@ where
             // Lỗi khai báo migration đã bị chặn lúc khởi động (`RequireApplied`); ở đây chỉ ghi log.
             match modules.placements(&registry) {
                 Ok(placements) => {
-                    let mut stopped = background_stopped;
+                    let mut stopped = background_stopped.clone();
                     background.spawn(placements.watch(PLACEMENT_CHECK_EVERY, async move {
                         let _ = stopped.wait_for(|stop| *stop).await;
                     }));
@@ -94,6 +94,29 @@ where
                 Err(error) => tracing::error!(error = %error, "cannot watch the placements"),
             }
         }
+    }
+
+    // Số request API theo khách (bước 35, hạn mức `kernel.api_requests`): tiến trình phục vụ API
+    // ghi gộp vào sổ lượng dùng mỗi phút, và một lần nữa khi dừng.
+    if role.serves_api() {
+        let entitlements = modules.entitlements();
+        let mut stopped = background_stopped.clone();
+        background.spawn(async move {
+            let node = uuid::Uuid::now_v7().to_string();
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                // Chỉ chép giá trị `bool` ra: guard của kênh `watch` không được giữ qua `.await`.
+                let stop = tokio::select! {
+                    _ = tick.tick() => false,
+                    changed = stopped.changed() => changed.is_err() || *stopped.borrow(),
+                };
+                entitlements.flush_usage(&node, chrono::Utc::now().timestamp() / 60).await;
+                if stop {
+                    break;
+                }
+            }
+        });
     }
 
     // Tín hiệu dừng tới thì chưa ngừng nhận kết nối ngay: bật cờ để `/health/ready` trả 503, vẫn

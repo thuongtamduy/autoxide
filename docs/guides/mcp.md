@@ -166,5 +166,16 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `organizations.move_unit` | `organizations.units.write` | writes |
 | `organizations.set_setting` | `organizations.settings.write` | writes |
 | `organizations.update_unit` | `organizations.units.write` | writes |
+| `plans.assign_subscription` | `plans.subscriptions.manage` | writes |
+| `plans.change_subscription` | `plans.billing.manage` | writes |
+| `plans.create_plan` | `plans.plans.manage` | writes |
+| `plans.get_entitlements` | — | read-only |
+| `plans.get_plan` | `plans.plans.read` | read-only |
+| `plans.get_subscription` | `plans.subscriptions.read` | read-only |
+| `plans.list_plans` | `plans.plans.read` | read-only |
+| `plans.list_usage` | `plans.subscriptions.read` | read-only |
+| `plans.retire_plan` | `plans.plans.manage` | writes |
+| `plans.set_override` | `plans.subscriptions.manage` | writes |
+| `plans.update_plan` | `plans.plans.manage` | writes |
 
 <!-- tools:end -->

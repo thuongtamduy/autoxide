@@ -160,6 +160,8 @@ pub(crate) struct Invitations {
     pub url: Option<String>,
     /// `AUTOXIDE_AUTH_INVITATION_DAYS`.
     pub days: i64,
+    /// Hạn mức số nhân sự theo gói (bước 35).
+    pub entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
 }
 
 fn now() -> DateTime<Utc> {
@@ -482,6 +484,44 @@ impl Invitations {
             None => existing.map(|user| user.id).ok_or_else(invalid)?,
         };
         let roles: BTreeSet<Uuid> = invitation.roles().into_iter().collect();
+        // Hạn mức số nhân sự (bước 35): người chưa giữ role nào ở khách chiếm thêm một chỗ — giữ chỗ
+        // ngoài transaction của module, lỗi thì trả lại (D-326).
+        let joining = !roles.is_empty() && !crate::role::has_membership(&tenant, user_id).await?;
+        let reference = crate::role::member_reference(user_id);
+        let tenant_id = tenant.id();
+        if joining {
+            self.entitlements
+                .reserve(tenant_id, &crate::role::MEMBERS_LIMIT, 1, &reference)
+                .await?;
+        }
+        let accepted =
+            self.accept_roles(tenant, user_id, &invitation, &roles, principal, user_agent).await;
+        if joining {
+            match &accepted {
+                Ok(done) => {
+                    let limit = &crate::role::MEMBERS_LIMIT;
+                    self.entitlements.confirm(done.tenant.id(), limit, &reference).await?;
+                }
+                Err(_) => {
+                    let limit = &crate::role::MEMBERS_LIMIT;
+                    self.entitlements.release(tenant_id, limit, &reference).await?;
+                }
+            }
+        }
+        accepted
+    }
+
+    /// Gán role của lời mời `invitation` cho `user_id` trong một transaction (đã tiêu token).
+    async fn accept_roles(
+        &self,
+        tenant: TenantContext,
+        user_id: Uuid,
+        invitation: &Invitation,
+        roles: &BTreeSet<Uuid>,
+        principal: Option<&Principal>,
+        user_agent: Option<&str>,
+    ) -> Result<Accepted, Error> {
+        let id = invitation.id;
         let transaction = tenant.database().begin_write().await?;
         if principal.is_none() {
             // Tài khoản mới: email nhận được mail mời là của người này.
@@ -489,7 +529,7 @@ impl Invitations {
                 .apply_verified_email(&tenant, &transaction, user_id, &invitation.email, now())
                 .await?;
         }
-        crate::role::add_roles(&transaction, &tenant, user_id, invitation.org_id, &roles).await?;
+        crate::role::add_roles(&transaction, &tenant, user_id, invitation.org_id, roles).await?;
         entity::Entity::update_many()
             .col_expr(entity::Column::Status, Expr::value("accepted"))
             .col_expr(entity::Column::AcceptedUserId, Expr::value(Some(user_id)))
@@ -622,6 +662,7 @@ mod tests {
             ),
             url: None,
             days: 7,
+            entitlements: Default::default(),
         }
     }
 

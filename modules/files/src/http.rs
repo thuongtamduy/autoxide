@@ -221,13 +221,12 @@ async fn download_file(
     };
     let file = download.file;
     let header_value = |text: &str| HeaderValue::from_str(text).map_err(Error::internal);
+    // `nosniff` và CSP có `sandbox` do lớp header bảo mật chung của kernel đặt (D-320): trình duyệt
+    // không đoán loại khác loại đã khai, file HTML tải lên không chạy được script.
     let headers = [
         (header::CONTENT_TYPE, header_value(&file.content_type)?),
         (header::CONTENT_LENGTH, HeaderValue::from(file.size)),
         (header::CONTENT_DISPOSITION, header_value(&content_disposition(&file.name))?),
-        // Trình duyệt không được đoán loại khác với loại đã khai (chặn file HTML giả
-        // dạng ảnh chạy script).
-        (header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff")),
         (header::ETAG, header_value(&file.etag())?),
         (header::CACHE_CONTROL, HeaderValue::from_static("private, no-cache")),
     ];
@@ -324,6 +323,7 @@ mod tests {
             assert_eq!(headers[header::CONTENT_TYPE], "text/plain");
             assert_eq!(headers[header::CONTENT_LENGTH], "5");
             assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
+            assert_eq!(headers[header::CONTENT_SECURITY_POLICY], autoxide_kernel::http::API_CSP);
             let disposition = headers[header::CONTENT_DISPOSITION].to_str().unwrap();
             assert!(disposition.ends_with("filename*=UTF-8''b%C3%A1o.txt"), "{disposition}");
 

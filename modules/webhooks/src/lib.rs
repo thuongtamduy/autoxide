@@ -60,6 +60,11 @@ impl Module for WebhooksModule {
         "webhooks"
     }
 
+    // Module nền: không gói nào tắt được (bước 35, D-323).
+    fn always_enabled(&self) -> bool {
+        true
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }

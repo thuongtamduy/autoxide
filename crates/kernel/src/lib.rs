@@ -23,8 +23,10 @@ pub use data::{
 };
 pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use ops::{doctor, logging, metrics, task, telemetry};
-pub use security::{access, antispam, idempotency, ip_hash, secret, throttle, tls, tokens};
-pub use values::{email, money, public_url};
+pub use security::{
+    access, antispam, entitlement, idempotency, ip_hash, secret, throttle, tls, tokens,
+};
+pub use values::{decimal, email, money, public_url};
 
 pub mod config;
 pub mod error;

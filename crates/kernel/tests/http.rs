@@ -776,6 +776,9 @@ async fn qua_gioi_han_thi_429_kem_retry_after() {
     assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(limited.headers()[header::RETRY_AFTER], "1");
     assert!(limited.headers().contains_key("x-request-id"));
+    // Header bảo mật có cả trên 429 (lớp đặt ngoài rate limiting, D-320).
+    assert_eq!(limited.headers()[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
+    assert_eq!(limited.headers()[header::CONTENT_SECURITY_POLICY], http::API_CSP);
     problem(limited, 429, "rate_limited").await;
     // Client khác vẫn được phục vụ; health check không bị đếm.
     let other = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 2])).await;
