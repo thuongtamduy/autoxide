@@ -60,6 +60,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Hồ sơ | Email đang chờ xác minh sau khi yêu cầu đổi (`pending_email`, hạn), và endpoint huỷ yêu cầu đổi | mới | Chỉ báo "đã gửi thư tới …" |
 | [x] | Phiên đăng nhập | Mỗi phiên trả cách đăng nhập (mật khẩu, mật khẩu + mã, passkey) và IP hay vị trí gần đúng (lưu theo luật dữ liệu cá nhân, có hạn) | mới | Chỉ hiện trình duyệt và hệ điều hành (giao diện đã chuyển `User-Agent` thật cho core) |
 | [x] | Đăng nhập và bảo mật | Passkey trả loại authenticator (AAGUID → tên như Touch ID, Windows Hello) | mới | Hiện tên người dùng tự đặt |
+| [ ] | Đăng nhập và bảo mật | Thêm passkey: options của `POST /auth/me/passkeys/registration` đòi ép `credProtect` (`extensions.enforceCredentialProtectionPolicy: true`, `credentialProtectionPolicy: userVerificationRequired`). Authenticator ảo của Chromium từ chối (`NotAllowedError`); bỏ phần mở rộng thì tạo được. Cần thử trên thiết bị thật (Windows Hello, iCloud Keychain, Android): thiết bị không hỗ trợ `credProtect` sẽ không thêm được passkey. Đề xuất: `enforceCredentialProtectionPolicy: false` (vẫn xin, không ép), hoặc ghi rõ lý do ép trong quyết định | mới (gặp khi chạy thử 16/11) | Hiện "đã huỷ" của trình duyệt; đăng nhập bằng passkey (W-042 của web) đã nối và chạy với core thật |
 | [x] | Mọi biểu mẫu có mật khẩu | `detail` của `auth.wrong_password` đang nhắc `POST /api/v1/auth/password-reset`: câu cho người gọi API, người dùng thường không hiểu. Viết câu cho người dùng; đưa hướng dẫn cho máy vào tài liệu OpenAPI | mới | Hiện nguyên câu của core |
 
 ## Tổ chức › Người dùng và role (`/org/access`)
@@ -69,7 +70,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Người dùng | `GET /auth/users` trả kèm role của từng người (hoặc `include=roles`) | mới | Gọi `GET /users/{id}/roles` cho từng dòng, mỗi trang 25 người |
 | [ ] | Người dùng | Lọc theo trạng thái (đang dùng / đã khoá) và theo role | trạng thái: xong (`status=active|disabled`); theo role: 34 (`GET /memberships?role_id=`) | Chỉ tìm theo email hoặc tên |
 | [x] | Chi tiết người dùng | `UserResponse` có `has_password`, `mfa_enabled`, lần đăng nhập cuối | mới | Luôn hiện "Đặt mật khẩu đầu tiên" và "Tắt xác thực hai bước"; đặt lần hai thì hiện lỗi `auth.password_already_set` |
-| [ ] | Role | Số người giữ mỗi role, "xem người giữ role" | 34 (`GET /memberships?role_id=`); số đếm: mới | Chưa có cột này |
+| [ ] | Role | Số người giữ mỗi role, "xem người giữ role" | 34 (`GET /memberships?role_id=`); số đếm: mới | Chưa có cột này. Nhân bản role đã có (16/11, `GET` rồi `POST /auth/roles`) |
 | [x] | Chi tiết role | Mô tả của permission theo `Accept-Language` | mới | Hiện mô tả tiếng Anh cả khi chọn tiếng Việt |
 | [ ] | Chi tiết role | Độ sâu theo nút (`grants: [{permission, scope}]`, lưới permission × độ sâu), membership theo nút | 34 | Chưa dựng; chỉ chọn permission ở phạm vi toàn khách |
 | [x] | `/verify-email`, `/reset-password` | Mã lỗi tách "hết hạn" và "đã dùng" (hiện chung `auth.invalid_*_token`) | mới | Hiện `detail` của core kèm cách xin link mới |
