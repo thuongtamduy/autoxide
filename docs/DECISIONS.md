@@ -7837,3 +7837,31 @@ Quyết định:
 Đã cân nhắc: tự viết số thập phân cố định trên `i128` — phải tự làm chia, làm tròn sáu kiểu, đọc / in chữ, dễ sai;
 `rust_decimal` đã có trong cây phụ thuộc, không thêm gì vào binary. `bigdecimal` — độ chính xác tuỳ ý không cần cho
 tiền, chậm hơn, chưa có trong cây.
+
+## D-323 · Quyền dùng theo khách ở kernel: tay cầm gắn muộn, `always_enabled`, sổ tính năng / hạn mức (bước 35 phần A) — 2026-11-16 — agent quyết
+
+Bối cảnh: phần đầu của bước 35 (đặc tả "Thứ tự làm" 1), chủ dự án bảo làm theo đề xuất A → E.
+
+Quyết định:
+
+1. **`autoxide_kernel::entitlement`**: `Feature` / `Limit` (`count`, `amount { unit }`, `metered { period: Month }`) là
+   hằng khai tĩnh, khoá `<module>.<tên>`; `TenantEntitlements` (đã gộp; `unrestricted`, `access` `Full` / `ReadOnly`,
+   module, tính năng, hạn mức `None` = không giới hạn, khoá vắng = 0); trait `Entitlements` (`snapshot`, `reserve`,
+   `confirm`, `release`, `record_usage`) — một module (`plans`) công bố bằng `provide`.
+2. **Tay cầm gắn muộn** `EntitlementsHandle` (`StartContext::entitlements()`): mọi module nhận từ lúc khởi động, kể cả
+   module đăng ký trước `plans`; kernel gắn `dyn Entitlements` sau khi MỌI module đã khởi động (như `DnsSlot`,
+   `OrgSlot`). Chưa có bên cung cấp → "không giới hạn" (mô hình một khách không đổi). **Khách nền tảng** luôn không
+   giới hạn — tay cầm không hỏi bên cung cấp cho khách đó (nhà vận hành không tự khoá mình).
+3. **`Module::{features, limits, always_enabled}`** có mặc định (D-038). `always_enabled = true`: `kernel`,
+   `antispam` (nội bộ), `mail`, `files`, `address`, `organizations`, `auth`, `audit`, `idempotency`, `webhooks`; `ai` và
+   mọi module nghiệp vụ bị gói chi phối. `plans` sẽ khai `true`.
+4. **Khác đặc tả, có lý do:** `Limit` không mang bộ đếm (để khai được bằng `const`); bộ đếm thật đăng ký trong `start`
+   bằng `StartContext::usage_counter(&LIMIT, Arc<dyn UsageCounter>)` (kiểm: hạn mức phải của chính module, không
+   đăng ký hai lần). `UsageCounter::count` nhận `&TenantContext` thay vì `TenantId` — đếm cần database của khách.
+   `Module::sample_data` để tới mục cấp phát (mục 5), chưa cần trước đó.
+5. **Sổ** `EntitlementCatalog` dựng lúc đăng ký (khai báo tĩnh, lỗi khai báo — sai tiền tố, trùng khoá — là lỗi khởi
+   động); phần `requires` (module nào `require` trait của module nào, ghi trong `Apis::require`) và bộ đếm điền sau
+   `start`. Sổ module (`GET /api/v1/kernel/modules`) thêm `features`, `limits`, `always_enabled`, `requires`.
+6. Mã lỗi chung của kernel: `module_not_enabled`, `feature_not_enabled`, `limit_exceeded`, `tenant_read_only` (403),
+   `quota_exhausted` (429 + `Retry-After`) — 402 chưa có nghĩa chuẩn (đặc tả "tự quyết" 2). Số đo
+   `entitlement_denials_total{kind}`, nhãn chỉ trong tập cố định (`module`, `feature`, `limit`, `quota`, `read_only`).

@@ -5755,6 +5755,10 @@
           "data": {
             "description": "A module installed in this server, and everything it declares.",
             "properties": {
+              "always_enabled": {
+                "description": "`true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant\nwhose plan does not include the module gets `403 module_not_enabled` from its endpoints.",
+                "type": "boolean"
+              },
               "deprecations": {
                 "description": "Endpoints of the module that are deprecated.",
                 "items": {
@@ -5766,6 +5770,13 @@
                 "description": "Events the module emits.",
                 "items": {
                   "$ref": "#/components/schemas/ModuleEvent"
+                },
+                "type": "array"
+              },
+              "features": {
+                "description": "Features of the module that a plan turns on or off (`<module>.<name>`).",
+                "items": {
+                  "$ref": "#/components/schemas/ModuleFeature"
                 },
                 "type": "array"
               },
@@ -5784,6 +5795,13 @@
                 "description": "Languages, besides English, the module's error messages are translated to.",
                 "items": {
                   "type": "string"
+                },
+                "type": "array"
+              },
+              "limits": {
+                "description": "Limits of the module that a plan sets (`<module>.<name>`).",
+                "items": {
+                  "$ref": "#/components/schemas/ModuleLimit"
                 },
                 "type": "array"
               },
@@ -5811,6 +5829,13 @@
                 "format": "int32",
                 "minimum": 0,
                 "type": "integer"
+              },
+              "requires": {
+                "description": "Modules this module uses; a plan that turns this module on must turn them on too.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
               "schedules": {
                 "description": "Recurring jobs the module schedules.",
@@ -5846,7 +5871,11 @@
               "tools",
               "deprecations",
               "languages",
-              "migrations"
+              "migrations",
+              "features",
+              "limits",
+              "always_enabled",
+              "requires"
             ],
             "type": "object"
           }
@@ -9118,6 +9147,10 @@
             "items": {
               "description": "A module installed in this server, and everything it declares.",
               "properties": {
+                "always_enabled": {
+                  "description": "`true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant\nwhose plan does not include the module gets `403 module_not_enabled` from its endpoints.",
+                  "type": "boolean"
+                },
                 "deprecations": {
                   "description": "Endpoints of the module that are deprecated.",
                   "items": {
@@ -9129,6 +9162,13 @@
                   "description": "Events the module emits.",
                   "items": {
                     "$ref": "#/components/schemas/ModuleEvent"
+                  },
+                  "type": "array"
+                },
+                "features": {
+                  "description": "Features of the module that a plan turns on or off (`<module>.<name>`).",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleFeature"
                   },
                   "type": "array"
                 },
@@ -9147,6 +9187,13 @@
                   "description": "Languages, besides English, the module's error messages are translated to.",
                   "items": {
                     "type": "string"
+                  },
+                  "type": "array"
+                },
+                "limits": {
+                  "description": "Limits of the module that a plan sets (`<module>.<name>`).",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleLimit"
                   },
                   "type": "array"
                 },
@@ -9174,6 +9221,13 @@
                   "format": "int32",
                   "minimum": 0,
                   "type": "integer"
+                },
+                "requires": {
+                  "description": "Modules this module uses; a plan that turns this module on must turn them on too.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
                 },
                 "schedules": {
                   "description": "Recurring jobs the module schedules.",
@@ -9209,7 +9263,11 @@
                 "tools",
                 "deprecations",
                 "languages",
-                "migrations"
+                "migrations",
+                "features",
+                "limits",
+                "always_enabled",
+                "requires"
               ],
               "type": "object"
             },
@@ -12917,9 +12975,30 @@
         ],
         "type": "object"
       },
+      "ModuleFeature": {
+        "description": "A feature a plan can turn on or off.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "key": {
+            "example": "content.ai_suggestions",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "description"
+        ],
+        "type": "object"
+      },
       "ModuleInfo": {
         "description": "A module installed in this server, and everything it declares.",
         "properties": {
+          "always_enabled": {
+            "description": "`true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant\nwhose plan does not include the module gets `403 module_not_enabled` from its endpoints.",
+            "type": "boolean"
+          },
           "deprecations": {
             "description": "Endpoints of the module that are deprecated.",
             "items": {
@@ -12931,6 +13010,13 @@
             "description": "Events the module emits.",
             "items": {
               "$ref": "#/components/schemas/ModuleEvent"
+            },
+            "type": "array"
+          },
+          "features": {
+            "description": "Features of the module that a plan turns on or off (`<module>.<name>`).",
+            "items": {
+              "$ref": "#/components/schemas/ModuleFeature"
             },
             "type": "array"
           },
@@ -12949,6 +13035,13 @@
             "description": "Languages, besides English, the module's error messages are translated to.",
             "items": {
               "type": "string"
+            },
+            "type": "array"
+          },
+          "limits": {
+            "description": "Limits of the module that a plan sets (`<module>.<name>`).",
+            "items": {
+              "$ref": "#/components/schemas/ModuleLimit"
             },
             "type": "array"
           },
@@ -12976,6 +13069,13 @@
             "format": "int32",
             "minimum": 0,
             "type": "integer"
+          },
+          "requires": {
+            "description": "Modules this module uses; a plan that turns this module on must turn them on too.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "schedules": {
             "description": "Recurring jobs the module schedules.",
@@ -13011,7 +13111,48 @@
           "tools",
           "deprecations",
           "languages",
-          "migrations"
+          "migrations",
+          "features",
+          "limits",
+          "always_enabled",
+          "requires"
+        ],
+        "type": "object"
+      },
+      "ModuleLimit": {
+        "description": "A limit a plan can set.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "key": {
+            "example": "files.storage_bytes",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`count` (records that exist), `amount` (a quantity in use, see `unit`) or `metered`\n(use within a period, back to 0 at its start, see `period`).",
+            "example": "amount",
+            "type": "string"
+          },
+          "period": {
+            "description": "Period of a `metered` limit: `month`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit": {
+            "description": "Unit of an `amount` limit, e.g. `bytes`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "kind"
         ],
         "type": "object"
       },

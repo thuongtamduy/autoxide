@@ -64,7 +64,11 @@ struct Entry {
 
 impl ModuleCatalog {
     /// Điền sổ từ các module đã khởi động. Gọi một lần; lần sau bị bỏ qua.
-    pub(crate) fn fill(&self, modules: &[Box<dyn Module>]) {
+    pub(crate) fn fill(
+        &self,
+        modules: &[Box<dyn Module>],
+        entitlements: &crate::entitlement::EntitlementCatalog,
+    ) {
         let entries = modules
             .iter()
             .enumerate()
@@ -76,7 +80,10 @@ impl ModuleCatalog {
                 // `Migrator::new` chỉ lỗi khi khai báo sai — điều `Modules::migrator` đã kiểm
                 // trước khi chương trình chạy tới đây. Lỗi thì chỉ mất phần trạng thái.
                 let migrator = Migrator::new(vec![ModuleMigrations::new(name, migrations)]).ok();
-                let info = ModuleInfo::describe(module.as_ref(), position, migration_names);
+                let mut info = ModuleInfo::describe(module.as_ref(), position, migration_names);
+                info.always_enabled = entitlements.is_always_enabled(name);
+                info.requires =
+                    entitlements.requires(name).into_iter().map(str::to_owned).collect();
                 Entry { info, migrator }
             })
             .collect();
@@ -147,6 +154,15 @@ pub(crate) struct ModuleInfo {
     languages: Vec<String>,
     /// Database migrations of the module, in the order they apply.
     migrations: Vec<ModuleMigration>,
+    /// Features of the module that a plan turns on or off (`<module>.<name>`).
+    features: Vec<ModuleFeature>,
+    /// Limits of the module that a plan sets (`<module>.<name>`).
+    limits: Vec<ModuleLimit>,
+    /// `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
+    /// whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
+    always_enabled: bool,
+    /// Modules this module uses; a plan that turns this module on must turn them on too.
+    requires: Vec<String>,
 }
 
 impl ModuleInfo {
@@ -242,8 +258,64 @@ impl ModuleInfo {
                 .into_iter()
                 .map(|name| ModuleMigration { name, applied: None })
                 .collect(),
+            features: module
+                .features()
+                .into_iter()
+                .map(|feature| ModuleFeature {
+                    key: feature.key().to_owned(),
+                    description: feature.description().to_owned(),
+                })
+                .collect(),
+            limits: module
+                .limits()
+                .into_iter()
+                .map(|limit| {
+                    let kind = limit.kind();
+                    ModuleLimit {
+                        key: limit.key().to_owned(),
+                        description: limit.description().to_owned(),
+                        kind: kind.as_str().to_owned(),
+                        unit: match kind {
+                            crate::entitlement::LimitKind::Amount { unit } => Some(unit.to_owned()),
+                            _ => None,
+                        },
+                        period: match kind {
+                            crate::entitlement::LimitKind::Metered { .. } => {
+                                Some("month".to_owned())
+                            }
+                            _ => None,
+                        },
+                    }
+                })
+                .collect(),
+            always_enabled: false,
+            requires: Vec::new(),
         }
     }
+}
+
+/// A feature a plan can turn on or off.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ModuleFeature {
+    #[schema(example = "content.ai_suggestions")]
+    key: String,
+    description: String,
+}
+
+/// A limit a plan can set.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ModuleLimit {
+    #[schema(example = "files.storage_bytes")]
+    key: String,
+    description: String,
+    /// `count` (records that exist), `amount` (a quantity in use, see `unit`) or `metered`
+    /// (use within a period, back to 0 at its start, see `period`).
+    #[schema(example = "amount")]
+    kind: String,
+    /// Unit of an `amount` limit, e.g. `bytes`.
+    unit: Option<String>,
+    /// Period of a `metered` limit: `month`.
+    period: Option<String>,
 }
 
 /// A permission a module declares.

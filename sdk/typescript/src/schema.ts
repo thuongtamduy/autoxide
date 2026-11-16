@@ -2125,16 +2125,25 @@ export type Data_MfaStatusResponse = {
 export type Data_ModuleInfo = {
   /** A module installed in this server, and everything it declares. */
   data: {
+    /**
+     * `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
+     * whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
+     */
+    always_enabled: boolean;
     /** Endpoints of the module that are deprecated. */
     deprecations: ModuleDeprecation[];
     /** Events the module emits. */
     events: ModuleEvent[];
+    /** Features of the module that a plan turns on or off (`<module>.<name>`). */
+    features: ModuleFeature[];
     /** `true` for the modules the server always installs (`kernel`, `antispam`). */
     internal: boolean;
     /** Kinds of background job the module runs. */
     jobs: string[];
     /** Languages, besides English, the module's error messages are translated to. */
     languages: string[];
+    /** Limits of the module that a plan sets (`<module>.<name>`). */
+    limits: ModuleLimit[];
     /** Database migrations of the module, in the order they apply. */
     migrations: ModuleMigration[];
     /**
@@ -2146,6 +2155,8 @@ export type Data_ModuleInfo = {
     permissions: ModulePermission[];
     /** Place in the start order, from 0. A module starts after the modules it depends on. */
     position: number;
+    /** Modules this module uses; a plan that turns this module on must turn them on too. */
+    requires: string[];
     /** Recurring jobs the module schedules. */
     schedules: ModuleSchedule[];
     /** Events the module listens to; `*` means every event. */
@@ -3295,16 +3306,25 @@ export type Data_Vec_MenuSummary = {
 /** Envelope of a single result. */
 export type Data_Vec_ModuleInfo = {
   data: {
+    /**
+     * `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
+     * whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
+     */
+    always_enabled: boolean;
     /** Endpoints of the module that are deprecated. */
     deprecations: ModuleDeprecation[];
     /** Events the module emits. */
     events: ModuleEvent[];
+    /** Features of the module that a plan turns on or off (`<module>.<name>`). */
+    features: ModuleFeature[];
     /** `true` for the modules the server always installs (`kernel`, `antispam`). */
     internal: boolean;
     /** Kinds of background job the module runs. */
     jobs: string[];
     /** Languages, besides English, the module's error messages are translated to. */
     languages: string[];
+    /** Limits of the module that a plan sets (`<module>.<name>`). */
+    limits: ModuleLimit[];
     /** Database migrations of the module, in the order they apply. */
     migrations: ModuleMigration[];
     /**
@@ -3316,6 +3336,8 @@ export type Data_Vec_ModuleInfo = {
     permissions: ModulePermission[];
     /** Place in the start order, from 0. A module starts after the modules it depends on. */
     position: number;
+    /** Modules this module uses; a plan that turns this module on must turn them on too. */
+    requires: string[];
     /** Recurring jobs the module schedules. */
     schedules: ModuleSchedule[];
     /** Events the module listens to; `*` means every event. */
@@ -4608,18 +4630,33 @@ export type ModuleEvent = {
   name: string;
 };
 
+/** A feature a plan can turn on or off. */
+export type ModuleFeature = {
+  description: string;
+  key: string;
+};
+
 /** A module installed in this server, and everything it declares. */
 export type ModuleInfo = {
+  /**
+   * `true` when no plan can turn the module off (sign-in, files, audit…). Otherwise a tenant
+   * whose plan does not include the module gets `403 module_not_enabled` from its endpoints.
+   */
+  always_enabled: boolean;
   /** Endpoints of the module that are deprecated. */
   deprecations: ModuleDeprecation[];
   /** Events the module emits. */
   events: ModuleEvent[];
+  /** Features of the module that a plan turns on or off (`<module>.<name>`). */
+  features: ModuleFeature[];
   /** `true` for the modules the server always installs (`kernel`, `antispam`). */
   internal: boolean;
   /** Kinds of background job the module runs. */
   jobs: string[];
   /** Languages, besides English, the module's error messages are translated to. */
   languages: string[];
+  /** Limits of the module that a plan sets (`<module>.<name>`). */
+  limits: ModuleLimit[];
   /** Database migrations of the module, in the order they apply. */
   migrations: ModuleMigration[];
   /**
@@ -4631,12 +4668,29 @@ export type ModuleInfo = {
   permissions: ModulePermission[];
   /** Place in the start order, from 0. A module starts after the modules it depends on. */
   position: number;
+  /** Modules this module uses; a plan that turns this module on must turn them on too. */
+  requires: string[];
   /** Recurring jobs the module schedules. */
   schedules: ModuleSchedule[];
   /** Events the module listens to; `*` means every event. */
   subscriptions: string[];
   /** MCP tools the module offers at `/mcp`. */
   tools: ModuleTool[];
+};
+
+/** A limit a plan can set. */
+export type ModuleLimit = {
+  description: string;
+  key: string;
+  /**
+   * `count` (records that exist), `amount` (a quantity in use, see `unit`) or `metered`
+   * (use within a period, back to 0 at its start, see `period`).
+   */
+  kind: string;
+  /** Period of a `metered` limit: `month`. */
+  period?: string | null;
+  /** Unit of an `amount` limit, e.g. `bytes`. */
+  unit?: string | null;
 };
 
 /** A database migration of a module. */

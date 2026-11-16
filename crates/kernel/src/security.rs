@@ -3,6 +3,7 @@
 
 pub mod access;
 pub mod antispam;
+pub mod entitlement;
 pub mod idempotency;
 pub mod ip_hash;
 mod seal;

@@ -49,6 +49,11 @@ impl Module for MailModule {
         "mail"
     }
 
+    // Module nền: không gói nào tắt được (bước 35, D-323).
+    fn always_enabled(&self) -> bool {
+        true
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         vec![
             autoxide_kernel::job::jobs_migration("m0001_create_jobs", "mail"),
