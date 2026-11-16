@@ -79,6 +79,9 @@ pub(crate) struct ReplaceRoleInput {
     #[serde(default)]
     #[schema(inline)]
     grants: Vec<crate::http::roles::RoleGrant>,
+    /// `true`: the role's permissions work only for accounts with two-step sign-in.
+    #[serde(default)]
+    requires_mfa: bool,
 }
 
 /// The complete list of roles a user should have.
@@ -159,6 +162,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
                 let state = replace.clone();
                 async move {
                     let role = RoleInput {
+                        requires_mfa: input.requires_mfa,
                         name: input.name,
                         description: input.description,
                         permissions: input.permissions,
@@ -338,7 +342,11 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
                 async move {
                     // Như REST: không tác động lên người có permission mà mình không có.
                     state.roles.require_covers(&tenant, &principal, input.id).await?;
-                    let changes = UserChanges { name: input.name, disabled: input.disabled };
+                    let changes = UserChanges {
+                        name: input.name,
+                        disabled: input.disabled,
+                        ..Default::default()
+                    };
                     let user = state
                         .users
                         .update(&tenant, Actor::from(&principal), input.id, changes, None)
@@ -369,6 +377,7 @@ mod tests {
             resets: services.resets.clone(),
             verifications: services.verifications.clone(),
             passkeys: services.passkeys.clone(),
+            reauth: services.reauth.clone(),
             personal_data: services.personal_data.clone(),
             self_registration: false,
             country_header: None,

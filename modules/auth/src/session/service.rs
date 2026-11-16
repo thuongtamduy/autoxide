@@ -245,6 +245,11 @@ impl SessionService {
     ///
     /// Trả kèm hash mật khẩu vừa kiểm: bên cấp quyền mới (API key) đưa nó vào
     /// [`lock_grant`] trong transaction ghi của mình.
+    /// Dịch vụ tài khoản phiên dùng chung.
+    pub(crate) fn users(&self) -> &Arc<UserService> {
+        &self.users
+    }
+
     pub(crate) async fn check_password(
         &self,
         tenant: &TenantContext,
@@ -273,25 +278,25 @@ impl SessionService {
     /// Bắt đầu bật TOTP cho người dùng `user_id`, kèm mật khẩu hiện tại (sai thì tính vào login
     /// throttling như [`check_password`](Self::check_password)): access token bị lộ không đủ để
     /// gắn ứng dụng authenticator của kẻ gian vào tài khoản rồi khoá chủ thật ở ngoài (D-156).
-    pub(crate) async fn start_totp(
+    pub(crate) async fn start_totp<'a>(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
-        current_password: &str,
+        confirm: impl Into<crate::reauth::Confirm<'a>>,
     ) -> Result<crate::mfa::TotpSetup, Error> {
-        let (user, _) = self.check_password(tenant, user_id, current_password).await?;
+        let (user, _) = confirm.into().check(self, tenant, user_id).await?;
         self.mfa.start_totp(tenant, user.id, &user.email).await
     }
 
     /// Người dùng `user_id` tự xoá tài khoản của mình, kèm mật khẩu hiện tại (sai thì
     /// tính vào login throttling như [`check_password`](Self::check_password)).
-    pub(crate) async fn delete_own_account(
+    pub(crate) async fn delete_own_account<'a>(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
-        current_password: &str,
+        confirm: impl Into<crate::reauth::Confirm<'a>>,
     ) -> Result<(), Error> {
-        self.check_password(tenant, user_id, current_password).await?;
+        confirm.into().check(self, tenant, user_id).await?;
         self.users.delete(tenant, Actor::user(user_id), user_id).await
     }
 
@@ -1207,7 +1212,8 @@ mod tests {
             assert!(!lock_grant(write, &tenant, user.id, Some(&verified)).await.unwrap());
             assert!(lock_grant(write, &tenant, user.id, None).await.unwrap());
 
-            let disable = crate::user::UserChanges { name: None, disabled: Some(true) };
+            let disable =
+                crate::user::UserChanges { name: None, disabled: Some(true), ..Default::default() };
             users.update(&tenant, Actor::system(), user.id, disable, None).await.unwrap();
             assert!(!lock_grant(write, &tenant, user.id, None).await.unwrap());
         })

@@ -25,6 +25,10 @@ pub struct Model {
     pub last_sign_in_at: Option<DateTimeUtc>,
     /// Email và tên viết thường, để tìm (`user::service::search_text`).
     pub search_text: String,
+    /// Ngôn ngữ ưa thích (mã BCP 47 máy chủ có bản dịch); `None`: theo request.
+    pub locale: Option<String>,
+    /// Múi giờ IANA ưa thích; `None`: chưa đặt.
+    pub time_zone: Option<String>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

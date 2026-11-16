@@ -31,7 +31,8 @@ impl Language {
         }
     }
 
-    fn from_tag(tag: &str) -> Option<Self> {
+    /// Ngôn ngữ có bản dịch ứng với mã `tag` (chỉ xét phần chính: `vi-VN` → `vi`).
+    pub fn from_tag(tag: &str) -> Option<Self> {
         // Chỉ xét phần ngôn ngữ chính: `vi-VN` → `vi`.
         let primary = tag.split(['-', '_']).next().unwrap_or_default();
         match primary.to_ascii_lowercase().as_str() {

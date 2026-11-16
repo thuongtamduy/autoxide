@@ -11,6 +11,15 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `auth`: `POST /api/v1/auth/me/reauth` gives a short-lived, single-use confirmation token (by
+  password, authenticator code, passkey or a mail) that sensitive changes accept as `reauth_token`
+  instead of `current_password` — creating an API key, changing the email, turning on two-step
+  sign-in, adding a passkey, deleting the account (new setting `AUTOXIDE_AUTH_REAUTH_MINUTES`).
+  `PATCH /api/v1/auth/me` changes your name, preferred language and time zone; `GET /api/v1/auth/me`
+  gives `locale`, `time_zone` and `mfa_required`. Roles take `requires_mfa` (also the built-in
+  `admin` role): their permissions apply only once the account has two-step sign-in. Mails sent
+  later use the preferred language.
+
 - Websites of organization units have their own addresses and languages: two units can both
   publish `/about` (the website shows the one of the nearest unit; slugs and addresses are unique
   per unit), and the new setting `organizations.languages` (list, first is the default) sets the

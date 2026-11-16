@@ -343,7 +343,7 @@ async fn update_user(
 ) -> Result<Tagged<UserResponse>, Error> {
     principal.require(&USERS_MANAGE)?;
     state.roles.require_covers(&tenant, &principal, id).await?;
-    let changes = UserChanges { name: input.name, disabled: input.disabled };
+    let changes = UserChanges { name: input.name, disabled: input.disabled, ..Default::default() };
     let user =
         state.users.update(&tenant, Actor::from(&principal), id, changes, if_match.expected()?);
     let user = user.await?;
@@ -667,6 +667,7 @@ mod tests {
             let bob =
                 Accounts::create(services.users.as_ref(), &services.tenant, bob).await.unwrap();
             let helpdesk = crate::role::RoleInput {
+                requires_mfa: false,
                 grants: Vec::new(),
                 name: "helpdesk".to_owned(),
                 description: String::new(),

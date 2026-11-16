@@ -195,7 +195,7 @@ pub(crate) struct CreateApiKeyRequest {
     expires_at: Option<DateTime<Utc>>,
     /// Your current password: a stolen access token alone must not create a key that
     /// outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
-    /// `passkey_credential`) instead — exactly one of the three.
+    /// `passkey_credential`) or a `reauth_token` instead — exactly one of them.
     #[serde(default)]
     current_password: String,
     /// A code from your authenticator app, instead of the password (two-step sign-in must be
@@ -210,6 +210,8 @@ pub(crate) struct CreateApiKeyRequest {
     /// `passkey_ceremony_id`.
     #[schema(value_type = Option<Object>)]
     passkey_credential: Option<serde_json::Value>,
+    /// A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password.
+    reauth_token: Option<String>,
 }
 
 impl From<CreateApiKeyRequest> for NewApiKey {
@@ -221,6 +223,7 @@ impl From<CreateApiKeyRequest> for NewApiKey {
             expires_at: input.expires_at,
             current_password: input.current_password,
             second_factor: match (input.totp_code, input.passkey_ceremony_id) {
+                _ if input.reauth_token.is_some() => input.reauth_token.map(Reauth::Token),
                 (Some(code), _) => Some(Reauth::Totp(code)),
                 (None, Some(ceremony_id)) => Some(Reauth::Passkey {
                     ceremony_id,

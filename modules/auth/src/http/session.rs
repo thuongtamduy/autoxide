@@ -30,7 +30,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(logout))
         // Khách chỉ đọc: người dùng vẫn đăng nhập để xem và xuất dữ liệu (A-3.11).
         .layer(autoxide_kernel::tenancy::allowed_while_read_only())
-        .routes(routes!(me))
+        .routes(routes!(me, update_me))
         .routes(routes!(change_password))
 }
 
@@ -147,6 +147,17 @@ pub(crate) struct MeResponse {
     /// The new address of an email change waiting to be confirmed; `null` when there is none.
     /// Cancel it with `DELETE /api/v1/auth/me/email`.
     pending_email: Option<PendingEmail>,
+    /// Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
+    /// request. Change it with `PATCH /api/v1/auth/me`.
+    #[schema(example = "vi")]
+    locale: Option<String>,
+    /// Preferred IANA time zone; `null`: not set.
+    #[schema(example = "Asia/Ho_Chi_Minh")]
+    time_zone: Option<String>,
+    /// `true` when a role of yours needs two-step sign-in and it is off: that role's permissions
+    /// are left out of `permissions` until you turn on an authenticator app
+    /// (`POST /api/v1/auth/me/mfa/totp`) or add a passkey.
+    mfa_required: bool,
 }
 
 /// An email change waiting for its confirmation link.
@@ -169,6 +180,8 @@ impl MeResponse {
         let facts =
             state.users.facts(tenant, &[user.id]).await?.remove(&user.id).unwrap_or_default();
         let pending = state.verifications.pending_change(tenant, &user).await?;
+        let preferences = state.users.preferences(tenant, user.id).await?.unwrap_or_default();
+        let mfa_required = crate::role::mfa_pending(tenant, user.id).await?;
         Ok(MeResponse {
             id: user.id,
             email: user.email,
@@ -179,6 +192,9 @@ impl MeResponse {
             permissions: principal.permissions(),
             has_password: facts.has_password,
             pending_email: pending.map(|(email, expires_at)| PendingEmail { email, expires_at }),
+            locale: preferences.locale,
+            time_zone: preferences.time_zone,
+            mfa_required,
         })
     }
 }
@@ -347,6 +363,70 @@ async fn me(
         .get(&tenant, principal.user_id())
         .await?
         .ok_or_else(crate::token::invalid_token)?;
+    Ok(Data { data: MeResponse::load(&state, &tenant, user, &principal).await? })
+}
+
+// Trường JSON có ba trạng thái: không gửi (`None`), `null` (`Some(None)`), có giá trị.
+fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+/// Your own changes: display name, preferred language and time zone.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UpdateMeRequest {
+    /// New display name, 1 to 100 characters (spaces around are removed).
+    #[schema(example = "Ada Lovelace")]
+    name: Option<String>,
+    /// Preferred language for mails sent later (`en` or `vi`); `null` clears it.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<String>, nullable, example = "vi")]
+    locale: Option<Option<String>>,
+    /// Preferred IANA time zone, e.g. `Asia/Ho_Chi_Minh`; `null` clears it.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<String>, nullable, example = "Asia/Ho_Chi_Minh")]
+    time_zone: Option<Option<String>>,
+}
+
+/// Change your display name, preferred language or time zone.
+///
+/// Any signed-in user, for their own account. Fields left out stay as they are; `null` clears
+/// the language or time zone. Mails sent later (password reset, invitations…) use the
+/// preferred language instead of the one of the request that caused them.
+#[utoipa::path(
+    patch,
+    path = "/me",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "update_me",
+    security(("bearer" = [])),
+    request_body = UpdateMeRequest,
+    responses(
+        (status = 200, description = "Your account after the change.", body = Data<MeResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "A value is invalid; `errors` names the fields (`name`, `locale`, `time_zone`).", body = Problem),
+    )
+)]
+async fn update_me(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    principal: Principal,
+    ValidJson(input): ValidJson<UpdateMeRequest>,
+) -> Result<Data<MeResponse>, Error> {
+    let changes = crate::user::UserChanges {
+        name: input.name,
+        locale: input.locale,
+        time_zone: input.time_zone,
+        ..Default::default()
+    };
+    let user_id = principal.user_id();
+    let user = state
+        .users
+        .update(&tenant, autoxide_kernel::event::Actor::from(&principal), user_id, changes, None)
+        .await?;
     Ok(Data { data: MeResponse::load(&state, &tenant, user, &principal).await? })
 }
 

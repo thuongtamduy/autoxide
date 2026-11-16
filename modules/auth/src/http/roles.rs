@@ -89,8 +89,11 @@ pub(crate) struct RoleResponse {
     name: String,
     description: String,
     /// `true` only for the built-in `admin` role: it grants every permission,
-    /// including permissions added later, and cannot be changed or deleted.
+    /// including permissions added later, and cannot be changed (except `requires_mfa`) or
+    /// deleted.
     all_permissions: bool,
+    /// `true`: the role's permissions work only for accounts with two-step sign-in.
+    requires_mfa: bool,
     /// Permissions the role grants, sorted by name. Empty when `all_permissions`.
     #[schema(example = json!(["auth.roles.read"]))]
     permissions: Vec<String>,
@@ -108,6 +111,7 @@ impl From<Role> for RoleResponse {
             name: role.name,
             description: role.description,
             all_permissions: role.all_permissions,
+            requires_mfa: role.requires_mfa,
             permissions: role.permissions,
             grants: role
                 .grants
@@ -139,11 +143,17 @@ pub(crate) struct RoleRequest {
     #[serde(default)]
     #[schema(inline)]
     grants: Vec<RoleGrant>,
+    /// When `true`, the role's permissions work only for accounts with two-step sign-in
+    /// (an authenticator app or a passkey); others see `mfa_required` in `GET /api/v1/auth/me`
+    /// until they turn it on. The only change the built-in `admin` role accepts.
+    #[serde(default)]
+    requires_mfa: bool,
 }
 
 impl From<RoleRequest> for RoleInput {
     fn from(request: RoleRequest) -> Self {
         RoleInput {
+            requires_mfa: request.requires_mfa,
             name: request.name,
             description: request.description,
             permissions: request.permissions,
@@ -500,6 +510,7 @@ mod tests {
                     &tenant,
                     Actor::system(),
                     crate::role::RoleInput {
+                        requires_mfa: false,
                         grants: Vec::new(),
                         name: "reader".to_owned(),
                         description: String::new(),

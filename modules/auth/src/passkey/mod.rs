@@ -2,7 +2,7 @@
 //! (D-077).
 
 pub(crate) mod authenticators;
-mod entity;
+pub(crate) mod entity;
 mod service;
 mod webauthn;
 

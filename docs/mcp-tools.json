@@ -139,7 +139,7 @@
         "description": "A key to create.",
         "properties": {
           "current_password": {
-            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and\n`passkey_credential`) instead — exactly one of the three.",
+            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and\n`passkey_credential`) or a `reauth_token` instead — exactly one of them.",
             "type": "string"
           },
           "expires_at": {
@@ -187,6 +187,13 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "reauth_token": {
+            "description": "A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "totp_code": {
             "description": "A code from your authenticator app, instead of the password (two-step sign-in must be\non). Wrong codes count towards the same limit as at sign-in.",
@@ -266,6 +273,10 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "requires_mfa": {
+            "description": "When `true`, the role's permissions work only for accounts with two-step sign-in\n(an authenticator app or a passkey); others see `mfa_required` in `GET /api/v1/auth/me`\nuntil they turn it on. The only change the built-in `admin` role accepts.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -666,6 +677,10 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "requires_mfa": {
+            "description": "`true`: the role's permissions work only for accounts with two-step sign-in.",
+            "type": "boolean"
           }
         },
         "required": [

@@ -7554,3 +7554,26 @@ Quyết định:
 
 Đã cân nhắc: cài đặt ngôn ngữ riêng của từng module (`content.locales` theo nút) — hai module phải đặt hai lần
 cho một website; giữ đường dẫn duy nhất cả khách — hai cửa hàng không cùng có `/about`, trái mô hình nhiều cửa hàng.
+
+## D-308 · Tài khoản: xác nhận lại danh tính, ưa thích, role bắt buộc MFA (bước 34 mục 9) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Token xác nhận lại** (`POST /api/v1/auth/me/reauth`): chứng minh bằng mật khẩu, mã TOTP, passkey hay mail (token
+   trong mail); nhận token ngắn hạn (`AUTOXIDE_AUTH_REAUTH_MINUTES`, mặc định 10, 1–60), dùng một lần, lưu ở
+   `auth_tokens` (mục đích `reauth`, chủ là người dùng). Lệnh nhạy cảm nhận đúng MỘT trong `current_password` /
+   `reauth_token`: tạo API key, đổi email, bật TOTP, thêm passkey, xoá tài khoản. Token không đổi được lấy token mới
+   (không kéo dài hạn mãi). Bước 54 (step-up) dùng chính token này. Thêm `password` vào các cách xác nhận (đặc tả chỉ
+   nêu passkey / totp / email_link) vì tài khoản có mật khẩu là đa số. Đổi mật khẩu vẫn cần mật khẩu hiện tại.
+2. **Ngôn ngữ, múi giờ ưa thích** ở `auth_user.locale` (ngôn ngữ có bản dịch: `en`, `vi`) và `auth_user.time_zone`
+   (IANA, kiểm bằng `chrono-tz`), đổi qua `PATCH /api/v1/auth/me` cùng tên hiển thị (event `auth.user_updated`). Job
+   gửi mail (đặt lại mật khẩu, báo đổi email) dùng ngôn ngữ ưa thích thay ngôn ngữ của request gốc — thay mục hoãn ở
+   D-062.
+3. **Role bắt buộc MFA** (`auth_role.requires_mfa`): khi tài khoản chưa có TOTP đã xác nhận hay passkey, permission
+   của role đó bị bỏ khỏi `Principal` (người dùng vẫn đăng nhập được để bật MFA); `GET /me` trả `mfa_required`. Đường
+   nóng giữ một câu: chỉ tra MFA khi người dùng có role như vậy. Role `admin` dựng sẵn nhận thay đổi duy nhất là
+   `requires_mfa`.
+4. `last_login_at` của đặc tả đã có sẵn là `last_sign_in_at` (bước 33 đợt 2) — không thêm cột trùng.
+
+Đã cân nhắc: chặn đăng nhập khi role bắt buộc MFA mà chưa bật — người dùng không vào được để bật; giữ token trong
+bộ nhớ — không chạy khi nhiều máy chủ.

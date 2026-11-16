@@ -25,6 +25,7 @@ mod m0025_passkey_aaguid;
 mod m0026_tenancy;
 mod m0027_widen_totp_secret;
 mod m0029_org_scopes;
+mod m0030_account;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -82,6 +83,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Quyền theo nút: độ sâu của permission, membership và API key gắn nút (bước 34, D-304).
         Box::new(m0029_org_scopes::Migration),
+        // Ngôn ngữ, múi giờ ưa thích; role bắt buộc MFA (bước 34 mục 9, D-308).
+        Box::new(m0030_account::Migration),
     ]
 }
 

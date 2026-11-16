@@ -25,6 +25,7 @@ mod passkey;
 mod password;
 mod permissions;
 mod privacy;
+mod reauth;
 mod recovery;
 mod reset;
 mod resource;
@@ -204,7 +205,17 @@ impl Module for AuthModule {
             passkeys: passkeys.clone(),
             mfa: mfa.clone(),
         }))?;
+        let reauth = Arc::new(reauth::Reauthentication {
+            sessions: sessions.clone(),
+            mfa: mfa.clone(),
+            passkeys: passkeys.clone(),
+            mailer: mailer.clone(),
+            translations: context.translations().clone(),
+            ttl: chrono::Duration::from_std(config.reauth_ttl)
+                .unwrap_or_else(|_| chrono::Duration::minutes(10)),
+        });
         self.state = Some(http::HttpState {
+            reauth,
             personal_data: context.personal_data_export(),
             sessions,
             users,
@@ -334,6 +345,7 @@ pub(crate) mod testing {
         pub resets: Arc<crate::reset::PasswordResets>,
         pub verifications: Arc<crate::verify::EmailVerifications>,
         pub passkeys: Arc<crate::passkey::PasskeyService>,
+        pub reauth: Arc<crate::reauth::Reauthentication>,
         pub mails: Arc<FakeMailer>,
         pub database: Database,
         /// Khách mặc định trên database của test.
@@ -448,7 +460,16 @@ pub(crate) mod testing {
                 }),
             )
             .unwrap();
+        let reauth = Arc::new(crate::reauth::Reauthentication {
+            sessions: sessions.clone(),
+            mfa: mfa.clone(),
+            passkeys: passkeys.clone(),
+            mailer: mails.clone(),
+            translations: translations.clone(),
+            ttl: chrono::Duration::minutes(10),
+        });
         Services {
+            reauth,
             personal_data,
             passkeys,
             users,

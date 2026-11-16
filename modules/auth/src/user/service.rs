@@ -49,12 +49,23 @@ pub(crate) struct NewUser {
     pub password: Option<String>,
 }
 
+/// Ngôn ngữ và múi giờ ưa thích (D-308).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Preferences {
+    pub locale: Option<String>,
+    pub time_zone: Option<String>,
+}
+
 /// Thay đổi cho một người dùng; trường `None` giữ nguyên.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct UserChanges {
     pub name: Option<String>,
     /// `true`: khoá; `false`: mở khoá.
     pub disabled: Option<bool>,
+    /// Ngôn ngữ ưa thích: `Some(None)` bỏ đặt (D-308).
+    pub locale: Option<Option<String>>,
+    /// Múi giờ IANA ưa thích: `Some(None)` bỏ đặt.
+    pub time_zone: Option<Option<String>>,
 }
 
 /// Lọc danh sách người dùng theo trạng thái.
@@ -229,6 +240,8 @@ impl UserService {
             created_at: Set(now),
             updated_at: Set(now),
             last_sign_in_at: Set(None),
+            locale: Set(None),
+            time_zone: Set(None),
         }
         .insert(&transaction)
         .await
@@ -261,9 +274,37 @@ impl UserService {
         changes: UserChanges,
         expected: Option<DateTime<Utc>>,
     ) -> Result<User, Error> {
-        let name = changes.name.map(|name| name.trim().to_owned());
-        if let Some(problem) = name.as_deref().and_then(check_name) {
-            return Err(Error::validation(vec![problem]));
+        let name = changes.name.as_ref().map(|name| name.trim().to_owned());
+        let mut problems: Vec<FieldError> =
+            name.as_deref().and_then(check_name).into_iter().collect();
+        let locale = match &changes.locale {
+            Some(Some(raw)) => match check_locale(raw) {
+                Ok(locale) => Some(Some(locale)),
+                Err(problem) => {
+                    problems.push(problem);
+                    None
+                }
+            },
+            Some(None) => Some(None),
+            None => None,
+        };
+        let time_zone = match &changes.time_zone {
+            Some(Some(raw)) => match raw.trim().parse::<chrono_tz::Tz>() {
+                Ok(zone) => Some(Some(zone.name().to_owned())),
+                Err(_) => {
+                    problems.push(FieldError::new(
+                        "time_zone",
+                        "invalid",
+                        "must be an IANA time zone name, e.g. `Asia/Ho_Chi_Minh` or `UTC`",
+                    ));
+                    None
+                }
+            },
+            Some(None) => Some(None),
+            None => None,
+        };
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
         }
         let transaction = tenant.database().begin_write().await?;
         let before = Entity::find_by_id(id)
@@ -291,6 +332,12 @@ impl UserService {
             update =
                 update.col_expr(Column::SearchText, Expr::value(search_text(&before.email, &name)));
             update = update.col_expr(Column::Name, Expr::value(name));
+        }
+        if let Some(locale) = locale {
+            update = update.col_expr(Column::Locale, Expr::value(locale));
+        }
+        if let Some(time_zone) = time_zone {
+            update = update.col_expr(Column::TimeZone, Expr::value(time_zone));
         }
         match changes.disabled {
             // Đã khoá rồi thì giữ nguyên thời điểm khoá cũ.
@@ -469,6 +516,31 @@ impl UserService {
     /// Dữ kiện tài khoản của những người `ids` cho trang quản trị (có mật khẩu chưa, đã bật đăng
     /// nhập hai bước chưa, lần đăng nhập cuối) — hai câu truy vấn cho cả trang, không theo từng
     /// người (đề bài giao diện B1).
+    /// Ngôn ngữ và múi giờ ưa thích của người dùng `id` (D-308); `None` khi không có tài khoản.
+    pub(crate) async fn preferences(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Option<Preferences>, Error> {
+        let row = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
+        Ok(row.map(|row| Preferences { locale: row.locale, time_zone: row.time_zone }))
+    }
+
+    /// Ngôn ngữ cho mail gửi chậm tới người dùng `id`: ngôn ngữ ưa thích nếu đã đặt, không thì
+    /// `fallback` (ngôn ngữ của request gốc) (D-308).
+    pub(crate) async fn mail_language(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        fallback: autoxide_kernel::i18n::Language,
+    ) -> Result<autoxide_kernel::i18n::Language, Error> {
+        let preferred = self.preferences(tenant, id).await?.and_then(|found| found.locale);
+        Ok(preferred
+            .as_deref()
+            .and_then(autoxide_kernel::i18n::Language::from_tag)
+            .unwrap_or(fallback))
+    }
+
     pub(crate) async fn facts(
         &self,
         tenant: &TenantContext,
@@ -673,7 +745,21 @@ impl Users for UserService {
 
 /// Ảnh chụp những gì audit cần biết về một người dùng (không có hash mật khẩu).
 fn snapshot(row: &entity::Model) -> serde_json::Value {
-    json!({"email": row.email, "name": row.name, "disabled_at": row.disabled_at})
+    json!({
+        "email": row.email,
+        "name": row.name,
+        "disabled_at": row.disabled_at,
+        "locale": row.locale,
+        "time_zone": row.time_zone,
+    })
+}
+
+/// Ngôn ngữ ưa thích: mã BCP 47 mà máy chủ có bản dịch (`en`, `vi`), dạng chuẩn.
+fn check_locale(raw: &str) -> Result<String, FieldError> {
+    autoxide_kernel::i18n::canonical_locale(raw.trim())
+        .and_then(|locale| autoxide_kernel::i18n::Language::from_tag(&locale))
+        .map(|language| language.tag().to_owned())
+        .ok_or_else(|| FieldError::new("locale", "invalid", "must be `en` or `vi`"))
 }
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên.
@@ -1221,7 +1307,7 @@ mod update_tests {
     }
 
     fn disable(disabled: bool) -> UserChanges {
-        UserChanges { name: None, disabled: Some(disabled) }
+        UserChanges { name: None, disabled: Some(disabled), ..Default::default() }
     }
 
     #[tokio::test]
@@ -1248,7 +1334,11 @@ mod update_tests {
                     &tenant,
                     Actor::system(),
                     ada.id,
-                    UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None },
+                    UserChanges {
+                        name: Some("  Ada L. ".to_owned()),
+                        disabled: None,
+                        ..Default::default()
+                    },
                     None,
                 )
                 .await
@@ -1289,7 +1379,8 @@ mod update_tests {
                 .await
                 .unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");
-            let empty = UserChanges { name: Some(" ".to_owned()), disabled: None };
+            let empty =
+                UserChanges { name: Some(" ".to_owned()), disabled: None, ..Default::default() };
             assert_eq!(
                 users
                     .update(&tenant, Actor::system(), ada.id, empty, None)

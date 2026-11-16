@@ -118,6 +118,7 @@ impl EmailVerifications {
         job: &EmailChangedJob,
     ) -> Result<(), Error> {
         let language = if job.language == Language::Vi.tag() { Language::Vi } else { Language::En };
+        let language = self.users.mail_language(tenant, job.user_id, language).await?;
         let ttl = chrono::Duration::days(REPORT_DAYS);
         let subject = job.user_id.to_string();
         let transaction = tenant.database().begin_write().await?;

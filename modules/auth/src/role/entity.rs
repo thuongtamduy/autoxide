@@ -15,6 +15,8 @@ pub(crate) mod role {
         pub name: String,
         pub description: String,
         pub all_permissions: bool,
+        /// Quyền của role chỉ có hiệu lực khi tài khoản đã bật MFA (TOTP hay passkey, D-308).
+        pub requires_mfa: bool,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
     }

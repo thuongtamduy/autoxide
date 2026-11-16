@@ -39,6 +39,8 @@ pub(crate) struct Role {
     pub description: String,
     /// Có mọi permission (role `admin`); khi đó `permissions` rỗng.
     pub all_permissions: bool,
+    /// Quyền của role chỉ có hiệu lực khi tài khoản đã bật MFA (D-308).
+    pub requires_mfa: bool,
     /// Theo thứ tự tên, mọi độ sâu.
     pub permissions: Vec<String>,
     /// Permission kèm độ sâu (bước 34), theo thứ tự tên.
@@ -56,6 +58,8 @@ pub(crate) struct RoleInput {
     pub permissions: Vec<String>,
     /// Permission kèm độ sâu (bước 34); một permission chỉ được nêu một lần trong cả hai danh sách.
     pub grants: Vec<(String, Scope)>,
+    /// Xem [`Role::requires_mfa`].
+    pub requires_mfa: bool,
 }
 
 /// Bộ lọc danh sách membership.
@@ -157,6 +161,7 @@ impl RoleService {
         actor: Actor,
         input: RoleInput,
     ) -> Result<Role, Error> {
+        let requires_mfa = input.requires_mfa;
         let (name, description, permissions) = self.check(input)?;
         let now = now();
         let id = Uuid::now_v7();
@@ -167,6 +172,7 @@ impl RoleService {
             name: Set(name.clone()),
             description: Set(description.clone()),
             all_permissions: Set(false),
+            requires_mfa: Set(requires_mfa),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -174,7 +180,9 @@ impl RoleService {
         .await
         .map_err(|error| name_taken_or(error, &name))?;
         insert_permissions(&transaction, tenant, id, &permissions).await?;
-        let after = Some(role_json(&name, &description, &permissions));
+        let mut after = role_json(&name, &description, &permissions);
+        after["requires_mfa"] = json!(requires_mfa);
+        let after = Some(after);
         let event = events::RoleCreated { before: None, after };
         self.outbox.record(&transaction, tenant, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
@@ -191,6 +199,7 @@ impl RoleService {
         input: RoleInput,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Role, Error> {
+        let requires_mfa = input.requires_mfa;
         let (name, description, permissions) = self.check(input)?;
         let transaction = tenant.database().begin_write().await?;
         let current = role::Entity::find_by_id(id)
@@ -198,11 +207,18 @@ impl RoleService {
             .one(&transaction)
             .await?
             .ok_or_else(|| role_not_found(id))?;
-        if current.all_permissions {
+        // Role `admin` dựng sẵn: chỉ đổi được `requires_mfa` (tên, mô tả giữ nguyên, không
+        // permission nào) — bảo vệ tài khoản quyền cao nhất là chỗ cần MFA nhất (D-308).
+        let only_mfa = current.all_permissions
+            && name == current.name
+            && description == current.description
+            && permissions.is_empty();
+        if current.all_permissions && !only_mfa {
             return Err(builtin_role());
         }
         let before = role_snapshot(&transaction, tenant, &current).await?;
         let mut update = role::Entity::update_many()
+            .col_expr(role::Column::RequiresMfa, Expr::value(requires_mfa))
             .col_expr(role::Column::Name, Expr::value(name.clone()))
             .col_expr(role::Column::Description, Expr::value(description.clone()))
             .col_expr(role::Column::UpdatedAt, Expr::value(now()))
@@ -224,7 +240,8 @@ impl RoleService {
             .exec(&transaction)
             .await?;
         insert_permissions(&transaction, tenant, id, &permissions).await?;
-        let after = role_json(&name, &description, &permissions);
+        let mut after = role_json(&name, &description, &permissions);
+        after["requires_mfa"] = json!(requires_mfa);
         let event = events::RoleUpdated { before: Some(before), after: Some(after) };
         self.outbox.record(&transaction, tenant, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
@@ -639,6 +656,7 @@ impl RoleService {
         let mut select = Query::select();
         select
             .column((role::Entity, role::Column::AllPermissions))
+            .column((role::Entity, role::Column::RequiresMfa))
             .column((user_role::Entity, user_role::Column::OrgId))
             .column((role_permission::Entity, role_permission::Column::Permission))
             .column((role_permission::Entity, role_permission::Column::Scope))
@@ -659,9 +677,21 @@ impl RoleService {
                     .eq(tenant.id().as_uuid()),
             );
         let rows = tenant.database().read().query_all(&select).await?;
+        // Role bắt buộc MFA (D-308): chỉ khi có role như vậy mới tra MFA của tài khoản — đường
+        // nóng của mọi người khác giữ một câu.
+        let mut has_mfa = None;
+        for row in &rows {
+            if row.try_get::<bool>("", "requires_mfa")? {
+                has_mfa = Some(has_second_factor(tenant, user_id).await?);
+                break;
+            }
+        }
         let root = root_of(tenant.id());
         let mut grants = Vec::with_capacity(rows.len());
         for row in rows {
+            if row.try_get::<bool>("", "requires_mfa")? && has_mfa == Some(false) {
+                continue;
+            }
             // Role `admin` chỉ gán được ở nút gốc (`set_memberships` chặn chỗ khác).
             if row.try_get::<bool>("", "all_permissions")? {
                 return Ok(Principal::with_all_permissions(user_id).in_tenant(tenant.id()));
@@ -851,6 +881,7 @@ impl autoxide_kernel::tenancy::TenantSeed for AdminRoleSeed {
             name: Set("admin".to_owned()),
             description: Set(ADMIN_DESCRIPTION.to_owned()),
             all_permissions: Set(true),
+            requires_mfa: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -882,7 +913,9 @@ async fn role_snapshot<C: ConnectionTrait>(
 ) -> Result<serde_json::Value, Error> {
     let mut permissions = permissions_of(connection, tenant, [row.id]).await?;
     let granted = permissions.remove(&row.id).unwrap_or_default();
-    Ok(role_json(&row.name, &row.description, &granted))
+    let mut snapshot = role_json(&row.name, &row.description, &granted);
+    snapshot["requires_mfa"] = json!(row.requires_mfa);
+    Ok(snapshot)
 }
 
 /// Role cho audit: tên, mô tả, permission (tên) và độ sâu của từng permission.
@@ -1089,6 +1122,7 @@ fn to_role(row: role::Model, grants: Vec<(String, Scope)>) -> Role {
         name: row.name,
         description: row.description,
         all_permissions: row.all_permissions,
+        requires_mfa: row.requires_mfa,
         permissions: grants.iter().map(|(permission, _)| permission.clone()).collect(),
         grants,
         created_at: row.created_at,
@@ -1122,6 +1156,52 @@ fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
 
+/// Tài khoản `user_id` đã bật MFA: TOTP đã xác nhận, hay có ít nhất một passkey.
+pub(crate) async fn has_second_factor(
+    tenant: &TenantContext,
+    user_id: Uuid,
+) -> Result<bool, Error> {
+    let read = tenant.database().read();
+    let totp = crate::mfa::entity::totp::Entity::find()
+        .filter(crate::mfa::entity::totp::Column::UserId.eq(user_id))
+        .filter(crate::mfa::entity::totp::Column::ConfirmedAt.is_not_null())
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    if totp.is_some() {
+        return Ok(true);
+    }
+    let passkey = crate::passkey::entity::passkey::Entity::find()
+        .filter(crate::passkey::entity::passkey::Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    Ok(passkey.is_some())
+}
+
+/// Tài khoản `user_id` có role bắt buộc MFA mà chưa bật MFA: quyền của các role đó đang bị giữ.
+pub(crate) async fn mfa_pending(tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
+    let read = tenant.database().read();
+    let held: Vec<Uuid> = user_role::Entity::find()
+        .filter(user_role::Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .all(read)
+        .await?
+        .into_iter()
+        .map(|row| row.role_id)
+        .collect();
+    if held.is_empty() {
+        return Ok(false);
+    }
+    let flagged = role::Entity::find()
+        .filter(role::Column::Id.is_in(held))
+        .filter(role::Column::RequiresMfa.eq(true))
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    Ok(flagged.is_some() && !has_second_factor(tenant, user_id).await?)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -1139,6 +1219,7 @@ mod tests {
 
     fn input(name: &str, permissions: &[&str]) -> RoleInput {
         RoleInput {
+            requires_mfa: false,
             grants: Vec::new(),
             name: name.to_owned(),
             description: String::new(),

@@ -118,6 +118,7 @@ impl PasswordResets {
         if !user.is_active() {
             return Ok(());
         }
+        let language = self.users.mail_language(tenant, user.id, language).await?;
         let now = now();
         let subject = user.id.to_string();
         let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
@@ -303,7 +304,7 @@ mod tests {
             // Tài khoản bị khoá: không gửi.
             let ada =
                 services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
-            let disable = UserChanges { name: None, disabled: Some(true) };
+            let disable = UserChanges { name: None, disabled: Some(true), ..Default::default() };
             services.users.update(&tenant, Actor::system(), ada.id, disable, None).await.unwrap();
             time_passes(&services, 2).await;
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;

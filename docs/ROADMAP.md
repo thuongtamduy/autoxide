@@ -100,7 +100,7 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 - [ ] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho nhiều khách /
       nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút. Nâng cấp: tài khoản, role và
       API key có sẵn thành nhân sự của khách mặc định, giữ quyền cũ
-- [ ] Tài khoản: xác nhận lại danh tính `POST /auth/me/reauth` thay `current_password`; ngôn ngữ, múi giờ ưa
+- [x] Tài khoản: xác nhận lại danh tính `POST /auth/me/reauth` thay `current_password`; ngôn ngữ, múi giờ ưa
       thích và tự đổi tên hiển thị qua `PATCH /auth/me`; bắt buộc MFA theo role; `last_login_at`
 - [ ] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào ngữ cảnh
       khách con bằng cùng API; audit ghi ở cả hai phía

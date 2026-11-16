@@ -68,6 +68,14 @@ curl -sS "$API/api/v1/auth/logout" --json '{"refresh_token":"'"$REFRESH"'"}'
 
 `GET /api/v1/auth/me/sessions` lists the devices signed in to your account: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `password_change`) and, when the server's reverse proxy tells it (`AUTOXIDE_AUTH_COUNTRY_HEADER`, e.g. `CF-IPCountry`), the approximate `country`. The IP address is never kept. End a session you do not know with `DELETE /api/v1/auth/me/sessions/{id}`.
 
+## Your account
+
+`PATCH /api/v1/auth/me` changes your display name (`name`), preferred language (`locale`: `en` or `vi`) and time zone (`time_zone`, IANA, e.g. `Asia/Ho_Chi_Minh`); `null` clears the language or time zone. Mails sent later (password reset, email change notice) use your preferred language.
+
+Sensitive changes — creating an API key, changing your email, turning on two-step sign-in, adding a passkey, deleting your account — need proof that it is you. Send your `current_password`, or first get a short-lived confirmation token with `POST /api/v1/auth/me/reauth` (`{"method": "password" | "totp" | "passkey" | "email_link", …}`) and send it as `reauth_token`. Each token works once, for `AUTOXIDE_AUTH_REAUTH_MINUTES` (10 by default). Accounts without a password use `passkey`, `totp` or `email_link`.
+
+A role can require two-step sign-in (`requires_mfa`, also on the built-in `admin` role). Until the account turns on an authenticator app or adds a passkey, that role's permissions are left out and `GET /api/v1/auth/me` answers `mfa_required: true`.
+
 ## With the SDK
 
 Give the client a function for the token, so each request reads the current one:

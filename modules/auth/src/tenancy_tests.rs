@@ -31,6 +31,7 @@ fn new_user(email: &str, password: &str) -> NewUser {
 
 fn role(name: &str) -> RoleInput {
     RoleInput {
+        requires_mfa: false,
         name: name.to_owned(),
         description: String::new(),
         permissions: Vec::new(),

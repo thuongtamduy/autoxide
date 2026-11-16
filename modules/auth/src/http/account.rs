@@ -28,8 +28,12 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct DeleteAccountRequest {
     /// Your current password.
-    #[validate(length(min = 1, max = 1024))]
+    #[serde(default)]
+    #[validate(length(max = 1024))]
     current_password: String,
+    /// A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+    /// (accounts without a password use this). Exactly one of the two.
+    reauth_token: Option<String>,
 }
 
 /// Everything the server keeps about you: one entry per module that keeps personal
@@ -112,10 +116,8 @@ async fn delete_own_account(
     ValidJson(input): ValidJson<DeleteAccountRequest>,
 ) -> Result<StatusCode, Error> {
     super::require_session(&principal)?;
-    state
-        .sessions
-        .delete_own_account(&tenant, principal.user_id(), &input.current_password)
-        .await?;
+    let confirm = super::confirm(&input.current_password, input.reauth_token.as_deref())?;
+    state.sessions.delete_own_account(&tenant, principal.user_id(), confirm).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -243,7 +245,8 @@ mod web_requests {
             };
             let pk =
                 Accounts::create(services.users.as_ref(), &tenant, passkey_only).await.unwrap();
-            let changes = crate::user::UserChanges { name: None, disabled: Some(true) };
+            let changes =
+                crate::user::UserChanges { name: None, disabled: Some(true), ..Default::default() };
             services.users.update(&tenant, Actor::system(), pk.id, changes, None).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
 

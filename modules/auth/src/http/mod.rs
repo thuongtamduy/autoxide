@@ -7,6 +7,7 @@ mod email;
 pub(crate) mod memberships;
 mod mfa;
 mod passkeys;
+mod reauth;
 mod reset;
 pub(crate) mod roles;
 pub(crate) mod session;
@@ -36,6 +37,8 @@ pub(crate) struct HttpState {
     pub resets: Arc<PasswordResets>,
     pub verifications: Arc<EmailVerifications>,
     pub passkeys: Arc<crate::passkey::PasskeyService>,
+    /// Xác nhận lại danh tính (`POST /me/reauth`, D-308).
+    pub reauth: Arc<crate::reauth::Reauthentication>,
     /// Dữ liệu cá nhân của mọi module, cho `GET /me/export`.
     pub personal_data: autoxide_kernel::privacy::PersonalDataExport,
     /// Cho người lạ tự đăng ký (`POST /register`).
@@ -58,6 +61,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(passkeys::routes())
         .merge(passkeys::login_routes())
         .merge(sessions::routes())
+        .merge(reauth::routes())
         .with_state(Arc::new(state))
         // Response của `auth` hay chứa secret chỉ trả một lần (token, API key mới, secret TOTP,
         // mã khôi phục): không ai được lưu lại — proxy, trình duyệt, lớp idempotency (RFC 6749
@@ -255,4 +259,14 @@ pub(crate) mod test_support {
         assert_eq!(status, StatusCode::OK, "{login}");
         format!("Bearer {}", login["data"]["access_token"].as_str().unwrap())
     }
+}
+
+/// Xác nhận chủ tài khoản từ thân request: đúng một trong `current_password` / `reauth_token`
+/// (D-308); sai thì 422 cho ô `current_password`.
+pub(crate) fn confirm<'a>(
+    current_password: &'a str,
+    reauth_token: Option<&'a str>,
+) -> Result<crate::reauth::Confirm<'a>, autoxide_kernel::error::Error> {
+    crate::reauth::Confirm::from_request(current_password, reauth_token)
+        .map_err(|problem| autoxide_kernel::error::Error::validation(vec![problem]))
 }

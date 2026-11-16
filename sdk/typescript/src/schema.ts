@@ -315,9 +315,15 @@ export type CeremonyResponse = {
 
 /** A new email address for the signed-in account. */
 export type ChangeEmailRequest = {
-  current_password: string;
+  /** Your current password. */
+  current_password?: string;
   /** The new address. Case and surrounding spaces do not matter. */
   new_email: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
 };
 
 /** The current password and the new one. */
@@ -666,7 +672,7 @@ export type CreateApiKeyRequest = {
   /**
    * Your current password: a stolen access token alone must not create a key that
    * outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
-   * `passkey_credential`) instead — exactly one of the three.
+   * `passkey_credential`) or a `reauth_token` instead — exactly one of them.
    */
   current_password?: string;
   /**
@@ -697,6 +703,8 @@ export type CreateApiKeyRequest = {
    * `GET /api/v1/auth/me`). Give a key only what its job needs.
    */
   permissions: string[];
+  /** A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password. */
+  reauth_token?: string | null;
   /**
    * A code from your authenticator app, instead of the password (two-step sign-in must be
    * on). Wrong codes count towards the same limit as at sign-in.
@@ -1787,11 +1795,24 @@ export type Data_MeResponse = {
      */
     has_password: boolean;
     id: string;
+    /**
+     * Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
+     * request. Change it with `PATCH /api/v1/auth/me`.
+     */
+    locale?: string | null;
+    /**
+     * `true` when a role of yours needs two-step sign-in and it is off: that role's permissions
+     * are left out of `permissions` until you turn on an authenticator app
+     * (`POST /api/v1/auth/me/mfa/totp`) or add a passkey.
+     */
+    mfa_required: boolean;
     /** Display name. */
     name: string;
     pending_email?: PendingEmail | null;
     /** Permissions granted by the user's roles, sorted by name. */
     permissions: string[];
+    /** Preferred IANA time zone; `null`: not set. */
+    time_zone?: string | null;
   };
 };
 
@@ -2259,6 +2280,21 @@ export type Data_PublicTermPage = {
 };
 
 /** Envelope of a single result. */
+export type Data_ReauthResponse = {
+  /** A confirmation token. */
+  data: {
+    /** When the token stops working (`AUTOXIDE_AUTH_REAUTH_MINUTES`). */
+    expires_at: string;
+    /**
+     * Send it as `reauth_token` with the sensitive change (creating an API key, changing your
+     * email, turning on two-step sign-in, adding a passkey, deleting your account). Used once.
+     * `null` with `email_link`: the token is in the mail.
+     */
+    reauth_token?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RecoveryCodesResponse = {
   /** One-time recovery codes. Shown only once. */
   data: {
@@ -2336,7 +2372,8 @@ export type Data_RoleResponse = {
   data: {
     /**
      * `true` only for the built-in `admin` role: it grants every permission,
-     * including permissions added later, and cannot be changed or deleted.
+     * including permissions added later, and cannot be changed (except `requires_mfa`) or
+     * deleted.
      */
     all_permissions: boolean;
     created_at: string;
@@ -2350,6 +2387,8 @@ export type Data_RoleResponse = {
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
     permissions: string[];
+    /** `true`: the role's permissions work only for accounts with two-step sign-in. */
+    requires_mfa: boolean;
     updated_at: string;
   };
 };
@@ -3081,7 +3120,8 @@ export type Data_Vec_RoleResponse = {
   data: {
     /**
      * `true` only for the built-in `admin` role: it grants every permission,
-     * including permissions added later, and cannot be changed or deleted.
+     * including permissions added later, and cannot be changed (except `requires_mfa`) or
+     * deleted.
      */
     all_permissions: boolean;
     created_at: string;
@@ -3095,6 +3135,8 @@ export type Data_Vec_RoleResponse = {
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
     permissions: string[];
+    /** `true`: the role's permissions work only for accounts with two-step sign-in. */
+    requires_mfa: boolean;
     updated_at: string;
   }[];
 };
@@ -3226,7 +3268,12 @@ export type Data_VerifiedResponse = {
 /** Confirms deleting your own account. */
 export type DeleteAccountRequest = {
   /** Your current password. */
-  current_password: string;
+  current_password?: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
 };
 
 /** Proof of authorship. */
@@ -3820,11 +3867,24 @@ export type MeResponse = {
    */
   has_password: boolean;
   id: string;
+  /**
+   * Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
+   * request. Change it with `PATCH /api/v1/auth/me`.
+   */
+  locale?: string | null;
+  /**
+   * `true` when a role of yours needs two-step sign-in and it is off: that role's permissions
+   * are left out of `permissions` until you turn on an authenticator app
+   * (`POST /api/v1/auth/me/mfa/totp`) or add a passkey.
+   */
+  mfa_required: boolean;
   /** Display name. */
   name: string;
   pending_email?: PendingEmail | null;
   /** Permissions granted by the user's roles, sorted by name. */
   permissions: string[];
+  /** Preferred IANA time zone; `null`: not set. */
+  time_zone?: string | null;
 };
 
 /** A translation of an item's text alternative. */
@@ -5052,7 +5112,8 @@ export type Page_RoleResponse = {
   data: {
     /**
      * `true` only for the built-in `admin` role: it grants every permission,
-     * including permissions added later, and cannot be changed or deleted.
+     * including permissions added later, and cannot be changed (except `requires_mfa`) or
+     * deleted.
      */
     all_permissions: boolean;
     created_at: string;
@@ -5066,6 +5127,8 @@ export type Page_RoleResponse = {
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
     permissions: string[];
+    /** `true`: the role's permissions work only for accounts with two-step sign-in. */
+    requires_mfa: boolean;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -6088,6 +6151,32 @@ export type PutMenuRequest = {
   items: MenuItemInput[];
 };
 
+/** Proof that you are the account owner, for one sensitive change. */
+export type ReauthRequest = {
+  /** How you prove it is you. */
+  method: "password" | "totp" | "passkey" | "email_link";
+  /** With `passkey`. */
+  passkey_ceremony_id?: string | null;
+  /** With `passkey`: the browser's `AuthenticationResponseJSON`. */
+  passkey_credential?: Record<string, unknown> | null;
+  /** With `password`. */
+  password?: string | null;
+  /** With `totp`. */
+  totp_code?: string | null;
+};
+
+/** A confirmation token. */
+export type ReauthResponse = {
+  /** When the token stops working (`AUTOXIDE_AUTH_REAUTH_MINUTES`). */
+  expires_at: string;
+  /**
+   * Send it as `reauth_token` with the sensitive change (creating an API key, changing your
+   * email, turning on two-step sign-in, adding a passkey, deleting your account). Used once.
+   * `null` with `email_link`: the token is in the mail.
+   */
+  reauth_token?: string | null;
+};
+
 /** One-time recovery codes. Shown only once. */
 export type RecoveryCodesResponse = {
   /**
@@ -6243,13 +6332,20 @@ export type RoleRequest = {
    * Duplicates are ignored.
    */
   permissions?: string[];
+  /**
+   * When `true`, the role's permissions work only for accounts with two-step sign-in
+   * (an authenticator app or a passkey); others see `mfa_required` in `GET /api/v1/auth/me`
+   * until they turn it on. The only change the built-in `admin` role accepts.
+   */
+  requires_mfa?: boolean;
 };
 
 /** A role: a named set of permissions given to users. */
 export type RoleResponse = {
   /**
    * `true` only for the built-in `admin` role: it grants every permission,
-   * including permissions added later, and cannot be changed or deleted.
+   * including permissions added later, and cannot be changed (except `requires_mfa`) or
+   * deleted.
    */
   all_permissions: boolean;
   created_at: string;
@@ -6263,6 +6359,8 @@ export type RoleResponse = {
   name: string;
   /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
   permissions: string[];
+  /** `true`: the role's permissions work only for accounts with two-step sign-in. */
+  requires_mfa: boolean;
   updated_at: string;
 };
 
@@ -6517,13 +6615,23 @@ export type SitemapItem = {
 /** Proof that you are the account owner. */
 export type StartPasskeyRegistrationRequest = {
   /** Your current password: a stolen access token alone must not add a passkey. */
-  current_password: string;
+  current_password?: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
 };
 
 /** Confirms starting two-step sign-in. */
 export type StartTotpRequest = {
   /** Your current password. */
-  current_password: string;
+  current_password?: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
 };
 
 /** Where an entry is in its life. */
@@ -7248,6 +7356,16 @@ export type UpdateListRequest = {
   public?: boolean | null;
 };
 
+/** Your own changes: display name, preferred language and time zone. */
+export type UpdateMeRequest = {
+  /** Preferred language for mails sent later (`en` or `vi`); `null` clears it. */
+  locale?: string | null;
+  /** New display name, 1 to 100 characters (spaces around are removed). */
+  name?: string | null;
+  /** Preferred IANA time zone, e.g. `Asia/Ho_Chi_Minh`; `null` clears it. */
+  time_zone?: string | null;
+};
+
 /** A new status for a submission. */
 export type UpdateSubmissionRequest = {
   /** `read`, `archived`, `spam`, or `new` (e.g. not spam after all). */
@@ -7627,6 +7745,17 @@ export interface paths {
         default: Problem;
       };
     };
+    /** Change your display name, preferred language or time zone. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: UpdateMeRequest;
+      responses: {
+        200: Data_MeResponse;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
     /** Delete your own account and everything it owns. */
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
@@ -7837,6 +7966,23 @@ export interface paths {
       requestBody: ChangePasswordRequest;
       responses: {
         200: Data_TokenResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/me/reauth": {
+    /** Confirm it is you, for a sensitive change. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ReauthRequest;
+      responses: {
+        200: Data_ReauthResponse;
+        202: Data_ReauthResponse;
         400: Problem;
         401: Problem;
         403: Problem;

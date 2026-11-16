@@ -68,6 +68,14 @@ curl -sS "$API/api/v1/auth/logout" --json '{"refresh_token":"'"$REFRESH"'"}'
 
 `GET /api/v1/auth/me/sessions` liệt kê các thiết bị đang đăng nhập tài khoản: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `password_change`) và, khi reverse proxy của máy chủ cho biết (`AUTOXIDE_AUTH_COUNTRY_HEADER`, vd `CF-IPCountry`), quốc gia gần đúng `country`. Địa chỉ IP không bao giờ được lưu. Phiên lạ thì kết thúc bằng `DELETE /api/v1/auth/me/sessions/{id}`.
 
+## Tài khoản của bạn
+
+`PATCH /api/v1/auth/me` đổi tên hiển thị (`name`), ngôn ngữ ưa thích (`locale`: `en` hay `vi`) và múi giờ (`time_zone`, theo IANA, vd `Asia/Ho_Chi_Minh`); `null` bỏ đặt ngôn ngữ hay múi giờ. Mail gửi sau (đặt lại mật khẩu, báo đổi email) dùng ngôn ngữ ưa thích của bạn.
+
+Thay đổi quan trọng — tạo API key, đổi email, bật xác thực hai bước, thêm passkey, xoá tài khoản — cần chứng minh đó là bạn. Gửi `current_password`, hoặc trước đó lấy token xác nhận ngắn hạn bằng `POST /api/v1/auth/me/reauth` (`{"method": "password" | "totp" | "passkey" | "email_link", …}`) rồi gửi nó trong `reauth_token`. Mỗi token dùng một lần, trong `AUTOXIDE_AUTH_REAUTH_MINUTES` (mặc định 10 phút). Tài khoản không có mật khẩu dùng `passkey`, `totp` hay `email_link`.
+
+Một role có thể bắt buộc xác thực hai bước (`requires_mfa`, cả với role `admin` dựng sẵn). Khi tài khoản chưa bật ứng dụng xác thực hay thêm passkey, permission của role đó bị bỏ ra và `GET /api/v1/auth/me` trả `mfa_required: true`.
+
 ## Với SDK
 
 Đưa client một hàm trả token, để mỗi request đọc token hiện tại:

@@ -100,6 +100,8 @@ pub(crate) enum Reauth {
     Totp(String),
     /// Câu trả lời của passkey cho nghi thức `ceremony_id` (từ `POST /login/passkey/options`).
     Passkey { ceremony_id: Uuid, credential: serde_json::Value },
+    /// Token xác nhận lại từ `POST /me/reauth` (D-308).
+    Token(String),
 }
 
 pub(crate) struct ApiKeyService {
@@ -200,6 +202,10 @@ impl ApiKeyService {
             }
             Some(Reauth::Passkey { ceremony_id, credential }) => {
                 self.passkeys.reauthenticate(tenant, user_id, *ceremony_id, credential).await?;
+                None
+            }
+            Some(Reauth::Token(token)) => {
+                crate::reauth::consume(tenant, user_id, token).await?;
                 None
             }
         };
@@ -680,6 +686,7 @@ mod tests {
                 &tenant,
                 Actor::system(),
                 RoleInput {
+                    requires_mfa: false,
                     grants: Vec::new(),
                     name: "reader".to_owned(),
                     description: String::new(),
@@ -807,7 +814,7 @@ mod tests {
                 services.api_keys.authenticate(&tenant, &created.secret).await.unwrap();
             assert!(!after_role.allows("auth.users.read"));
 
-            let disable = UserChanges { name: None, disabled: Some(true) };
+            let disable = UserChanges { name: None, disabled: Some(true), ..Default::default() };
             services
                 .users
                 .update(&tenant, Actor::system(), ada.user_id(), disable, None)

@@ -43,6 +43,13 @@ pub(crate) const LOGIN_LOCK_MINUTES: Setting = Setting::new(
 )
 .with_default("15");
 
+pub(crate) const REAUTH_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_AUTH_REAUTH_MINUTES",
+    "How long a confirmation token from `POST /api/v1/auth/me/reauth` stays usable (1 to 60 \
+     minutes). It is used once, for one sensitive change.",
+)
+.with_default("10");
+
 pub(crate) const SELF_REGISTRATION: Setting = Setting::new(
     "AUTOXIDE_AUTH_SELF_REGISTRATION",
     "Let anyone create an account with `POST /api/v1/auth/register` (`true` or `false`). New \
@@ -137,6 +144,8 @@ pub(crate) struct AuthConfig {
     pub country_header: Option<axum::http::HeaderName>,
     /// `None`: passkey tắt.
     pub passkey: Option<PasskeyConfig>,
+    /// Hạn của token xác nhận lại (D-308).
+    pub reauth_ttl: Duration,
 }
 
 /// Cấu hình passkey (WebAuthn).
@@ -166,6 +175,7 @@ impl AuthConfig {
         let max_failures =
             reader.get_with(&LOGIN_MAX_FAILURES, |raw| parse_in_range(raw, 1u32, 100));
         let lock = reader.get_with(&LOGIN_LOCK_MINUTES, |raw| parse_in_range(raw, 1u64, 1440));
+        let reauth = reader.get_with(&REAUTH_MINUTES, |raw| parse_in_range(raw, 1u64, 60));
         let self_registration = reader.get_with(&SELF_REGISTRATION, |raw| match raw {
             "true" => Ok(true),
             "false" => Ok(false),
@@ -234,6 +244,7 @@ impl AuthConfig {
             email_change_report_url: email_change_report_url?,
             country_header: country_header?,
             passkey: passkey_config(reader, rp_id?, origins?)?,
+            reauth_ttl: Duration::from_secs(reauth? * 60),
         })
     }
 }
