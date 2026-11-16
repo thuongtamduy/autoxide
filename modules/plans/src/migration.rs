@@ -24,6 +24,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0007_tenancy_jobs",
             vec![autoxide_kernel::job::tenant_table("plans")],
         ),
+        Box::new(CreateBillingPeriods),
     ]
 }
 
@@ -332,5 +333,70 @@ impl MigrationTrait for CreateUsage {
             manager.drop_table(Table::drop().table(table).to_owned()).await?;
         }
         Ok(())
+    }
+}
+
+/// Kỳ thanh toán của thuê bao (bước 35 phần E; cột hoá đơn / cổng thanh toán dùng ở mục 4).
+struct CreateBillingPeriods;
+
+impl MigrationName for CreateBillingPeriods {
+    fn name(&self) -> &str {
+        "m0008_create_billing_periods"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateBillingPeriods {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("plans_billing_period")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("subscription_id"))
+                    // `initial`, `renewal`, `proration`, `metered`.
+                    .col(schema::string_len("kind", 16))
+                    .col(schema::uuid("plan_id"))
+                    .col(schema::uuid_null("price_id"))
+                    .col(schema::timestamp_with_time_zone("period_start"))
+                    .col(schema::timestamp_with_time_zone("period_end"))
+                    .col(schema::big_integer("amount_minor"))
+                    .col(schema::string_len("amount_currency", 3))
+                    .col(schema::string_len("reference", 200))
+                    .col(schema::uuid_null("invoice_id"))
+                    .col(schema::string_len_null("invoice_number", 64))
+                    // `open`, `paid`, `void`.
+                    .col(schema::string_len("status", 16))
+                    .col(schema::timestamp_with_time_zone("due_at"))
+                    .col(schema::timestamp_with_time_zone_null("paid_at"))
+                    .col(schema::string_len_null("provider_reference", 200))
+                    // Mốc nhắc đã gửi (JSON), để không gửi trùng.
+                    .col(schema::text("reminders"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "plans_billing_period",
+            "plans_billing_period_reference_unique",
+            &["tenant_id", "reference"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "plans_billing_period",
+            "plans_billing_period_due_idx",
+            &["status", "due_at"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager.drop_table(Table::drop().table("plans_billing_period").to_owned()).await
     }
 }

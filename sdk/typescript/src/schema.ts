@@ -281,6 +281,32 @@ export type BanRequest = {
   value: string;
 };
 
+/** A billing period of a subscription: what is charged for which time, and whether it is paid. */
+export type BillingPeriodResponse = {
+  amount: Money;
+  created_at: string;
+  due_at: string;
+  id: string;
+  invoice_number?: string | null;
+  /**
+   * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
+   * `metered`.
+   */
+  kind: string;
+  paid_at?: string | null;
+  period_end: string;
+  period_start: string;
+  plan_id: string;
+  price_id?: string | null;
+  /** The payment provider's reference (or the bank transfer's), when paid. */
+  provider_reference?: string | null;
+  /** Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`. */
+  reference: string;
+  /** `open`, `paid` or `void`. */
+  status: string;
+  tenant_id: string;
+};
+
 /**
  * A mark of a `text` node: `bold`, `italic`, `underline`, `strike`, `code`, or `link`
  * (`attrs.href`: `http://`, `https://`, `mailto:` or a path starting with `/`).
@@ -389,6 +415,15 @@ export type CampaignResponse = {
 /** Where a campaign is. */
 export type CampaignStatus = "draft" | "scheduled" | "sending" | "paused" | "sent" | "cancelled";
 
+/** Cancel your tenant's subscription. */
+export type CancelRequest = {
+  /**
+   * `true` (default): cancel when the current period ends, and keep using it until then;
+   * `false`: cancel now (data becomes read-only and is kept for the plan's retention days).
+   */
+  at_period_end?: boolean;
+};
+
 /** A passkey ceremony in progress. */
 export type CeremonyResponse = {
   /** Send this back with the authenticator's answer, within 5 minutes. Works once. */
@@ -420,6 +455,23 @@ export type ChangePasswordRequest = {
   current_password: string;
   /** 12 to 128 characters. */
   new_password: string;
+};
+
+/** Move your tenant to another plan. */
+export type ChangeRequest = {
+  /** Replace the add-ons with these; leave out to keep them. */
+  addons?: AddonItem[] | null;
+  /** Where billing reminders go. */
+  billing_email?: string | null;
+  /** An active base plan. */
+  plan_id: string;
+  /** An active recurring price of that plan. */
+  price_id?: string | null;
+  /**
+   * Your reference for this change (1 to 200 characters), kept in the audit trail; sending the
+   * same change again changes nothing more.
+   */
+  reference: string;
 };
 
 /** Settings of the server an interface needs, by module: only values safe to show anyone. A module without such settings is absent. */
@@ -1201,6 +1253,35 @@ export type Data_AuthorResponse = {
     /** The user account behind the profile, if any. */
     user_id?: string | null;
     website_url: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BillingPeriodResponse = {
+  /** A billing period of a subscription: what is charged for which time, and whether it is paid. */
+  data: {
+    amount: Money;
+    created_at: string;
+    due_at: string;
+    id: string;
+    invoice_number?: string | null;
+    /**
+     * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
+     * `metered`.
+     */
+    kind: string;
+    paid_at?: string | null;
+    period_end: string;
+    period_start: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** The payment provider's reference (or the bank transfer's), when paid. */
+    provider_reference?: string | null;
+    /** Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`. */
+    reference: string;
+    /** `open`, `paid` or `void`. */
+    status: string;
+    tenant_id: string;
   };
 };
 
@@ -3382,6 +3463,34 @@ export type Data_Vec_AdministrativeUnit = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_BillingPeriodResponse = {
+  data: {
+    amount: Money;
+    created_at: string;
+    due_at: string;
+    id: string;
+    invoice_number?: string | null;
+    /**
+     * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
+     * `metered`.
+     */
+    kind: string;
+    paid_at?: string | null;
+    period_end: string;
+    period_start: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** The payment provider's reference (or the bank transfer's), when paid. */
+    provider_reference?: string | null;
+    /** Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`. */
+    reference: string;
+    /** `open`, `paid` or `void`. */
+    status: string;
+    tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CommentCount = {
   data: {
     /** Shown comments (top-level and replies). */
@@ -4625,6 +4734,14 @@ export type ManagedApiKeyResponse = ApiKeyResponse & {
   user_id: string;
   /** Display name of that user; `null` when the account no longer exists. */
   user_name?: string | null;
+};
+
+/** Record a payment made outside the system (for example a bank transfer checked by hand). */
+export type MarkPaidRequest = {
+  /** When it was paid; default now. */
+  paid_at?: string | null;
+  /** The bank's or provider's reference of the payment, 1 to 200 characters. */
+  provider_reference: string;
 };
 
 /** How a result matched. */
@@ -8134,6 +8251,12 @@ export type SuppressionResponse = {
   /** A note, or the SMTP code of a bounce. */
   note?: string | null;
   /** `hard_bounce`, `soft_bounce`, `complaint` or `manual`. */
+  reason: string;
+};
+
+/** Suspend a tenant completely. */
+export type SuspendRequest = {
+  /** Why, 1 to 500 characters (kept in the audit trail). */
   reason: string;
 };
 
@@ -12900,6 +13023,60 @@ export interface paths {
       };
     };
   };
+  "/api/v1/plans/billing-periods": {
+    /** List your tenant's billing periods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/billing-periods/{id}": {
+    /** Get one of your tenant's billing periods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/billing-periods/{id}/mark-paid": {
+    /** Record that a billing period was paid. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MarkPaidRequest;
+      responses: {
+        200: Data_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/billing-periods/{id}/void": {
+    /** Void an unpaid billing period. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/plans/catalog": {
     /** List the plans on sale, with their prices. */
     get: {
@@ -13028,6 +13205,51 @@ export interface paths {
       };
     };
   };
+  "/api/v1/plans/subscription/cancel": {
+    /** Cancel your tenant's subscription. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CancelRequest;
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/subscription/change": {
+    /** Move your tenant to another plan. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ChangeRequest;
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/subscription/resume": {
+    /** Resume your tenant's subscription. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/plans/subscriptions": {
     /** List the subscriptions of every tenant. */
     get: {
@@ -13100,6 +13322,35 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/subscription/cancel": {
+    /** Cancel a tenant's subscription now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/subscription/suspend": {
+    /** Suspend a tenant completely. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      requestBody: SuspendRequest;
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };

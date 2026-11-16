@@ -51,6 +51,7 @@ pub(crate) fn routes(service: Arc<PlansService>) -> OpenApiRouter {
         .routes(routes!(list_overrides, set_override))
         .routes(routes!(remove_override))
         .routes(routes!(tenant_usage))
+        .merge(crate::http_lifecycle::routes())
         .with_state(service)
 }
 
@@ -359,9 +360,9 @@ pub(crate) struct EntitlementsResponse {
 #[serde(deny_unknown_fields)]
 pub(crate) struct AddonItem {
     /// An active plan of kind `addon`.
-    plan_id: Uuid,
+    pub(crate) plan_id: Uuid,
     /// 1 to 1000; the add-on's limits count this many times.
-    quantity: i32,
+    pub(crate) quantity: i32,
 }
 
 /// The subscription of a tenant.

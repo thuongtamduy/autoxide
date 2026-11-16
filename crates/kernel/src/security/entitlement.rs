@@ -195,6 +195,17 @@ pub trait Entitlements: Send + Sync {
         quantity: i64,
         reference: &str,
     ) -> Result<(), Error>;
+
+    /// Khách có thuê bao ở trạng thái `status` (bộ lọc của danh sách khách). Mặc định: không ai.
+    async fn tenants_with_status(&self, status: &str) -> Result<Vec<TenantId>, Error> {
+        let _ = status;
+        Ok(Vec::new())
+    }
+
+    /// Khách đã dùng từ 80% một hạn mức trở lên (bộ lọc `near_limit`). Mặc định: không ai.
+    async fn tenants_near_limit(&self) -> Result<Vec<TenantId>, Error> {
+        Ok(Vec::new())
+    }
 }
 
 /// Tay cầm kernel đưa cho MỌI module lúc `start`. Trỏ tới `dyn Entitlements` khi có module công
@@ -337,6 +348,22 @@ impl EntitlementsHandle {
         } else {
             metrics::counter!("entitlement_denials_total", "kind" => "feature").increment(1);
             Err(feature_not_enabled(feature.key()))
+        }
+    }
+
+    /// Xem [`Entitlements::tenants_with_status`]; không có bên cung cấp: không ai.
+    pub async fn tenants_with_status(&self, status: &str) -> Result<Vec<TenantId>, Error> {
+        match self.provider.get() {
+            Some(provider) => provider.tenants_with_status(status).await,
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// Xem [`Entitlements::tenants_near_limit`]; không có bên cung cấp: không ai.
+    pub async fn tenants_near_limit(&self) -> Result<Vec<TenantId>, Error> {
+        match self.provider.get() {
+            Some(provider) => provider.tenants_near_limit().await,
+            None => Ok(Vec::new()),
         }
     }
 

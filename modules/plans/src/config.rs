@@ -19,19 +19,36 @@ pub(crate) const HOLD_MINUTES: Setting = Setting::new(
 )
 .with_default("15");
 
-#[derive(Debug, Clone, Copy)]
+pub(crate) const REMINDER_DAYS: Setting = Setting::new(
+    "AUTOXIDE_PLANS_REMINDER_DAYS",
+    "Days before a billing period is due that a reminder is mailed to the subscription's billing \
+     email, separated by commas (each 1 to 60). A reminder is also sent when the period is overdue \
+     and every 3 days of the grace period.",
+)
+.with_default("7,1");
+
+#[derive(Debug, Clone)]
 pub(crate) struct PlansConfig {
     pub cache: Duration,
     pub hold: chrono::Duration,
+    pub reminder_days: Vec<u32>,
 }
 
 impl PlansConfig {
     pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Self, Invalid> {
         let cache = reader.get_with(&CACHE_SECONDS, |raw| parse_in_range(raw, 0u64, 300));
         let hold = reader.get_with(&HOLD_MINUTES, |raw| parse_in_range(raw, 1i64, 1440));
+        let reminder_days = reader.get_with(&REMINDER_DAYS, |raw| {
+            let mut days = Vec::new();
+            for part in raw.split(',').map(str::trim).filter(|part| !part.is_empty()) {
+                days.push(parse_in_range(part, 1u32, 60)?);
+            }
+            Ok(days)
+        });
         Ok(PlansConfig {
             cache: Duration::from_secs(cache?),
             hold: chrono::Duration::minutes(hold?),
+            reminder_days: reminder_days?,
         })
     }
 }

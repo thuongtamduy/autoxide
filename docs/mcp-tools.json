@@ -4592,6 +4592,55 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Move your tenant to another plan: a plan costing at least as much per month applies at once (the rest of the period is billed), a cheaper one when the period ends.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "billing_email": {
+            "description": "Where billing reminders go.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_id": {
+            "description": "An active base plan.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_id": {
+            "description": "An active recurring price of that plan.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your reference for this change, 1 to 200 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "name": "plans.change_subscription",
+      "output_schema": null,
+      "permissions": [
+        "plans.billing.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Platform staff: create a plan from the modules, features and limits the installed modules declare (see `kernel.get_module`).",
       "input_schema": {
         "additionalProperties": false,

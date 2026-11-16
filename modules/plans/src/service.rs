@@ -119,6 +119,13 @@ pub(crate) struct PlansService {
     pub cache: Cache,
     /// Hạn của một chỗ giữ chưa xác nhận.
     pub hold: chrono::Duration,
+    /// Sổ khách của kernel: khoá hẳn khách (`suspend`, xoá sau thời hạn lưu).
+    pub tenants: Option<Arc<autoxide_kernel::tenancy::TenantAdmin>>,
+    /// Gửi mail nhắc thanh toán (module `mail`); `None` thì không nhắc.
+    pub mailer: Option<Arc<dyn autoxide_kernel::mail::Mailer>>,
+    pub translations: autoxide_kernel::i18n::Translations,
+    /// `AUTOXIDE_PLANS_REMINDER_DAYS`: nhắc trước hạn chừng này ngày.
+    pub reminder_days: Vec<u32>,
 }
 
 /// Bộ nhớ đệm quyền dùng theo khách trong tiến trình (`AUTOXIDE_PLANS_CACHE_SECONDS`): quyền dùng

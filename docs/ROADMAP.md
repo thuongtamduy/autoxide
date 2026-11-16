@@ -77,7 +77,7 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
 - [x] Kernel cưỡng chế theo khách: module chưa bật thì route, tool MCP, job, event của nó bị chặn
       (`module_not_enabled`); `has_feature`; hạn mức giữ chỗ / trả lại nguyên tử; số đo dùng ghi
       lại cho tính tiền; test đồng thời trên cả hai database
-- [ ] Vòng đời thuê bao: dùng thử → đang dùng → quá hạn (ân hạn) → tạm khoá (chỉ đọc) → huỷ (cho
+- [x] Vòng đời thuê bao: dùng thử → đang dùng → quá hạn (ân hạn) → tạm khoá (chỉ đọc) → huỷ (cho
       xuất dữ liệu) → xoá sau thời hạn lưu; thu hồi module giữ dữ liệu theo chính sách lưu; gia hạn
       và nhắc nợ bằng job
 - [ ] Tính tiền thuê bao SaaS: hoá đơn theo kỳ, đánh số tuần tự, thu qua `PaymentGateway` (bước 36)
@@ -86,7 +86,10 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
       liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng
 - [ ] Đối chiếu thiết kế 2: xuất toàn bộ dữ liệu một khách bằng job khi huỷ thuê bao; `suspend` thuê bao
       cho nhân sự nền tảng; hạn mức nút đếm mọi nút trừ gốc, hạn mức theo loại nút khai riêng; thông báo
-      của nền tảng tới quản trị mọi khách
+      của nền tảng tới quản trị mọi khách — đã làm (D-326, D-327): `suspend`, hạn mức nút trừ gốc, bộ lọc
+      `subscription_status` / `near_limit`; còn: xuất dữ liệu khách bằng job, thông báo nền tảng (chờ `notifications`, bước 37)
+- [ ] Xoá hẳn khách khi thuê bao `deleted` (D-327): kernel chưa có lệnh xoá khách — thêm lệnh xoá (giữ phần kế toán theo
+      bước 36), rồi `plans` gọi thay vì chỉ khoá hẳn
 - [ ] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): loại nút là dữ liệu của khách mà sổ hạn mức của kernel
       khai tĩnh — cần hạn mức có tham số (vd khoá `organizations.units` + loại) hay khai sẵn các loại hay dùng (D-326)
 

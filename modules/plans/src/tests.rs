@@ -3,6 +3,7 @@
 //! hạn mức giữ chỗ / trả lại đồng thời, lượng dùng theo kỳ, không rò rỉ giữa khách.
 
 mod enforcement;
+mod lifecycle;
 
 use std::sync::Arc;
 

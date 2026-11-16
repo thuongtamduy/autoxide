@@ -7951,3 +7951,34 @@ Quyết định:
    lần đó không ghi.
 4. Sửa lỗi có sẵn: sổ module (`GET /api/v1/kernel/modules/{name}`) trả 500 với module có bản nâng cấp dữ liệu (`auth`,
    `webhooks`) vì bộ đọc trạng thái migration thiếu `upgrades`.
+
+## D-327 · Vòng đời thuê bao, thu tay kỳ thanh toán, khoá hẳn khách, bộ lọc danh sách khách (bước 35 phần E và F) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Bảng vòng đời** đúng đặc tả, chạy bằng job `plans.lifecycle` (mỗi 5 phút, lô 100, mỗi thuê bao một transaction:
+   khoá dòng, xét lại, rồi đổi). Hết kỳ: áp gói hạ đã hẹn; giá 0 → kỳ mới; giá > 0 → kỳ mới nếu kỳ `renewal` đã trả,
+   không thì `past_due` (`grace_ends_at`) và bảo đảm có kỳ `renewal` mở. Kỳ `initial` / `proration` chưa trả tới hạn
+   cũng đưa thuê bao đang dùng sang `past_due`. `past_due` quá ân hạn → `suspended` (chỉ đọc); quá `suspend_days` →
+   `canceled` (`delete_after` = `retention_days`); tới `delete_after` → `deleted`.
+2. **`deleted` khoá hẳn khách, giữ dữ liệu**: kernel chưa có lệnh xoá khách (bước 33 có tạo, tạm khoá, dời — chưa có
+   xoá) nên chưa xoá thật; ghi việc ở lộ trình. Phần kế toán phải giữ 10 năm khi xoá (bước 36).
+3. **Kỳ thanh toán** `plans_billing_period` (cột hoá đơn / cổng thanh toán để sẵn cho mục 4), `reference` =
+   `plans:<subscription>:<period_start>:<kind>` unique theo khách — lập lại không trùng. `plans.renewals` (mỗi giờ) lập
+   kỳ kế `renewal_lead_days` trước khi hết kỳ. Chưa có cổng thanh toán: nhà vận hành `mark-paid` (ghi
+   `provider_reference`) hay `void`; trả kỳ của thuê bao `past_due` / `suspended` → `active` (kỳ mới theo kỳ đã trả,
+   hay từ bây giờ nếu kỳ đó đã qua). Job và lần thu tiền cùng lúc: cả hai khoá dòng thuê bao — test đồng thời cho kết
+   quả `active` dù bên nào chạy trước.
+4. **Khách tự đổi gói**: so giá theo tháng; không thấp hơn → ngay, kỳ `proration` = (mới − cũ) × giây còn lại / giây của
+   kỳ, nhân trước chia sau bằng `i128`, làm tròn xuống (đặc tả "tự quyết" 5, 6); thấp hơn → hẹn `scheduled_*` tới hết
+   kỳ, không hoàn tiền. Huỷ cuối kỳ / huỷ ngay; tiếp tục bỏ hẹn huỷ, hay đăng ký lại trước `delete_after` (kỳ `initial`
+   phải trả).
+5. **Mail nhắc** (`plans.reminders`, mỗi giờ) qua `dyn Mailer` tới `billing_email` của thuê bao: trước hạn theo
+   `AUTOXIDE_PLANS_REMINDER_DAYS` (`7,1`, gửi một mốc gần nhất), khi quá hạn, mỗi 3 ngày trong ân hạn; mốc đã gửi ghi
+   vào cột `reminders` của kỳ — không gửi trùng. Mail viết tiếng Việt (bản dịch của mẫu); chuyển sang `dyn Notifier`
+   khi bước 37 có `notifications`.
+6. **F**: `POST /tenants/{id}/subscription/suspend` (lý do, audit qua event của kernel) đặt `kernel_tenants.status =
+   suspended` — khác chỉ đọc của thuê bao; bộ lọc `subscription_status`, `near_limit` (≥ 80% một hạn mức) của danh sách
+   khách hỏi `plans` qua hai hàm mới có mặc định của `Entitlements` (`tenants_with_status`, `tenants_near_limit`).
+7. Test: thời gian "trôi" bằng cách sửa mốc trong database rồi chạy worker; xoá job đã xong trước mỗi lượt để lịch xếp
+   lại trong cùng khung giờ (chỉ trong test).

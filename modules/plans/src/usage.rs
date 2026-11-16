@@ -16,7 +16,8 @@ use autoxide_kernel::tenancy::TenantId;
 use chrono::{DateTime, Datelike, Months, NaiveDate, TimeZone, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set, SqlErr,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
+    SqlErr,
 };
 use uuid::Uuid;
 
@@ -359,6 +360,39 @@ impl PlansService {
             }
         }
         Ok(fixed)
+    }
+
+    /// Khách có thuê bao ở trạng thái `status`.
+    pub(crate) async fn tenants_with_status(&self, status: &str) -> Result<Vec<TenantId>, Error> {
+        let ids: Vec<Uuid> = crate::entity::subscription::Entity::find()
+            .select_only()
+            .column(crate::entity::subscription::Column::TenantId)
+            .filter(crate::entity::subscription::Column::Status.eq(status))
+            .into_tuple()
+            .all(self.databases.control().read())
+            .await?;
+        Ok(ids.into_iter().map(TenantId::from_uuid).collect())
+    }
+
+    /// Khách đã dùng từ 80% một hạn mức (đếm hay lượng) trở lên.
+    pub(crate) async fn tenants_near_limit(&self) -> Result<Vec<TenantId>, Error> {
+        let rows = usage::Entity::find()
+            .filter(usage::Column::PeriodStart.eq(NO_PERIOD))
+            .filter(usage::Column::Used.gt(0))
+            .all(self.databases.control().read())
+            .await?;
+        let mut found = Vec::new();
+        for row in rows {
+            let tenant = TenantId::from_uuid(row.tenant_id);
+            if found.contains(&tenant) {
+                continue;
+            }
+            let max = self.snapshot(tenant).await?.limit(&row.limit_key);
+            if max.is_some_and(|max| i128::from(row.used) * 10 >= i128::from(max) * 8) {
+                found.push(tenant);
+            }
+        }
+        Ok(found)
     }
 
     /// Lượng đang dùng của hạn mức `key` ở kỳ `period`.

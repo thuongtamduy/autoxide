@@ -33,5 +33,8 @@ events! {
     SUBSCRIPTION_PLAN_CHANGED, SubscriptionPlanChanged, "plans.subscription_plan_changed", "A tenant moved to another plan or price, or changed its add-ons (`tenant_id`, `before`, `after`).";
     OVERRIDE_SET, OverrideSet, "plans.override_set", "An override was set for a tenant (`tenant_id`, `override`).";
     OVERRIDE_REMOVED, OverrideRemoved, "plans.override_removed", "An override of a tenant was removed (`tenant_id`, `override`).";
+    BILLING_PERIOD_OPENED, BillingPeriodOpened, "plans.billing_period_opened", "A billing period was opened (`tenant_id`, `kind`, `reference`, `amount`, `currency`, `due_at`).";
+    BILLING_PERIOD_PAID, BillingPeriodPaid, "plans.billing_period_paid", "A billing period was paid (`tenant_id`, `reference`, `amount`, `currency`).";
+    BILLING_PERIOD_VOIDED, BillingPeriodVoided, "plans.billing_period_voided", "A billing period was voided (`tenant_id`, `reference`).";
     ENTITLEMENTS_CHANGED, EntitlementsChanged, "plans.entitlements_changed", "What a tenant may use changed because of its subscription, add-ons or overrides (`tenant_id`). Read `GET /api/v1/plans/entitlements` again.";
 }

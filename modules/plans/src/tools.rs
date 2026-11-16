@@ -147,9 +147,57 @@ pub(crate) struct OverrideInput {
     expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ChangeInput {
+    /// An active base plan.
+    plan_id: Uuid,
+    /// An active recurring price of that plan.
+    price_id: Option<Uuid>,
+    /// Where billing reminders go.
+    billing_email: Option<String>,
+    /// Your reference for this change, 1 to 200 characters.
+    reference: String,
+}
+
 pub(crate) fn all(service: &Arc<PlansService>) -> Vec<Tool> {
     let mut tools = plan_tools(service);
     tools.extend(tenant_tools(service));
+    let change = service.clone();
+    tools.push(
+        Tool::new(
+            "change_subscription",
+            "Move your tenant to another plan: a plan costing at least as much per month applies \
+             at once (the rest of the period is billed), a cheaper one when the period ends.",
+            move |tenant: TenantContext, principal: Principal, input: ChangeInput| {
+                let service = change.clone();
+                async move {
+                    if input.reference.trim().is_empty() || input.reference.len() > 200 {
+                        return Err(Error::validation(vec![
+                            autoxide_kernel::error::FieldError::new(
+                                "reference",
+                                "length",
+                                "must be 1 to 200 characters long",
+                            ),
+                        ]));
+                    }
+                    let change = crate::lifecycle::ChangeInput {
+                        plan_id: input.plan_id,
+                        price_id: input.price_id,
+                        addons: None,
+                        billing_email: input.billing_email,
+                    };
+                    service.change(Actor::from(&principal), tenant.id(), change).await?;
+                    let row = service
+                        .subscription(tenant.id())
+                        .await?
+                        .ok_or_else(subscription_not_found)?;
+                    Ok::<_, Error>(SubscriptionResponse::from(row))
+                }
+            },
+        )
+        .requires(crate::permissions::BILLING_MANAGE),
+    );
     tools
 }
 

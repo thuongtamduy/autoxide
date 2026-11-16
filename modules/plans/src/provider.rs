@@ -44,4 +44,12 @@ impl Entitlements for Provider {
     ) -> Result<(), Error> {
         self.0.record_usage(tenant, limit, quantity, reference).await
     }
+
+    async fn tenants_with_status(&self, status: &str) -> Result<Vec<TenantId>, Error> {
+        self.0.tenants_with_status(status).await
+    }
+
+    async fn tenants_near_limit(&self) -> Result<Vec<TenantId>, Error> {
+        self.0.tenants_near_limit().await
+    }
 }

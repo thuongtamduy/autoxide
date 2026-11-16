@@ -23,7 +23,12 @@ endpoints are marked deprecated with a sunset date first.
   (`403 tenant_read_only` on writes). Limits wired so far: `organizations.units` (units besides the root, archived ones
   not counted), `auth.members` (people holding a role), `files.storage_bytes`, `kernel.api_requests` (requests per
   month, recorded every minute; `429 quota_exhausted` only when the plan sets a maximum); features `auth.api_keys` and
-  `content.ai_suggestions`. Held reservations expire and usage is reconciled with the real counts daily. The module catalog lists each module's features, limits, `always_enabled` and `requires`.
+  `content.ai_suggestions`. Held reservations expire and usage is reconciled with the real counts daily.
+  Subscriptions have a lifecycle run by jobs — trial, active, past due (grace), suspended (read-only), canceled
+  (read-only, data kept), deleted — with billing periods paid by hand for now (`mark-paid`, `void`), reminder mails,
+  self-service change (upgrades at once with a prorated period, downgrades at period end), cancel and resume, and a
+  way for platform staff to suspend a tenant completely. The tenant list filters by `subscription_status` and
+  `near_limit`. Operator guide: `docs/PLANS.md`. The module catalog lists each module's features, limits, `always_enabled` and `requires`.
 - Decimal numbers for calculating with money (tax rates, exchange rates, quantities) in
   `autoxide_kernel::decimal`: `Money::apply_rate`, `Money::convert`, `Money::to_decimal` / `from_decimal`, each with
   an explicit `Rounding`; decimals are strings in JSON (`DecimalString`, error `decimal.invalid`) and text in the

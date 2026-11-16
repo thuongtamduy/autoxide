@@ -263,3 +263,36 @@ pub(crate) mod usage_record {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+pub(crate) mod billing_period {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "plans_billing_period")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub subscription_id: Uuid,
+        pub kind: String,
+        pub plan_id: Uuid,
+        pub price_id: Option<Uuid>,
+        pub period_start: DateTimeUtc,
+        pub period_end: DateTimeUtc,
+        pub amount_minor: i64,
+        pub amount_currency: String,
+        pub reference: String,
+        pub invoice_id: Option<Uuid>,
+        pub invoice_number: Option<String>,
+        pub status: String,
+        pub due_at: DateTimeUtc,
+        pub paid_at: Option<DateTimeUtc>,
+        pub provider_reference: Option<String>,
+        pub reminders: String,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

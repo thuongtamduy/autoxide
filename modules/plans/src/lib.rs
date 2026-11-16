@@ -10,7 +10,9 @@ mod config;
 mod entity;
 mod events;
 mod http;
+mod http_lifecycle;
 mod jobs;
+mod lifecycle;
 mod merge;
 mod migration;
 mod permissions;
@@ -74,6 +76,7 @@ impl Module for PlansModule {
             "plans_usage",
             "plans_reservation",
             "plans_usage_record",
+            "plans_billing_period",
         ]
     }
 
@@ -97,6 +100,7 @@ impl Module for PlansModule {
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         let config = self
             .config
+            .clone()
             .ok_or_else(|| Error::internal("module `plans` started before `configure`"))?;
         let service = Arc::new(PlansService {
             databases: context.tenancy(),
@@ -104,6 +108,10 @@ impl Module for PlansModule {
             entitlements: context.entitlements(),
             cache: Cache::new(config.cache),
             hold: config.hold,
+            tenants: context.require::<autoxide_kernel::tenancy::TenantAdmin>().ok(),
+            mailer: context.require::<dyn autoxide_kernel::mail::Mailer>().ok(),
+            translations: context.translations().clone(),
+            reminder_days: config.reminder_days.clone(),
         });
         self.service = Some(service.clone());
         context.provide::<dyn autoxide_kernel::entitlement::Entitlements>(Arc::new(

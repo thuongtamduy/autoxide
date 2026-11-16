@@ -311,11 +311,14 @@ impl Module for KernelModule {
         ));
         self.registry = Some(context.tenancy().clone());
         self.settings = Some(settings.clone());
-        let admin = Arc::new(crate::tenancy::TenantAdmin::new(
-            context.tenancy().clone(),
-            self.seeds.clone(),
-            context.outbox()?,
-        ));
+        let admin = Arc::new(
+            crate::tenancy::TenantAdmin::new(
+                context.tenancy().clone(),
+                self.seeds.clone(),
+                context.outbox()?,
+            )
+            .with_entitlements(context.entitlements()),
+        );
         self.admin = Some(admin.clone());
         context.provide::<crate::tenancy::TenantAdmin>(admin)?;
         let platform_host =
