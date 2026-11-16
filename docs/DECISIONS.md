@@ -7791,3 +7791,26 @@ Quyết định:
 Đã cân nhắc: để reverse proxy đặt header — người cài tự làm hay quên, và response của chính máy chủ (chạy thẳng,
 không proxy) sẽ thiếu; vẫn tắt được bằng `AUTOXIDE_HTTP_SECURITY_HEADERS=false`. Thêm thư viện (`tower-helmet`…) —
 vài chục dòng tự viết là đủ.
+
+## D-321 · Bộ đếm login throttling: một câu "chèn hoặc cộng" trả số đếm; số 232 req/s của D-302 là bài đo lẫn — 2026-11-16 — chủ dự án bảo làm trước
+
+Bối cảnh: mục bước 39 "Login throttling trên Postgres khi bị dò dồn dập một email (D-302: 8500 → 232 request/s cho lượt
+bị chặn)". Đo lại trước khi sửa (bản debug, Postgres, 16 kết nối, cùng email, mật khẩu đúng): 5 giây đầu 223 req/s với
+713 lượt 200 + 390 lượt 429; 5 giây sau toàn 429, **4685 req/s**. Lượt bị chặn vốn chỉ một câu `SELECT` (không khoá
+dòng) nên đã nhanh; con số 232 là thời gian của các lượt **đăng nhập đúng** (băm Argon2) chạy trước khi khoá kích hoạt —
+trên Postgres nhiều lượt đồng thời lọt qua trước khi khoá hơn trên SQLite (một bên ghi), nên bài 6 giây bị lẫn.
+
+Quyết định:
+
+1. `Throttle::hit` / `record`: đếm bằng **một** câu `INSERT … ON CONFLICT (tenant_id, key) DO UPDATE SET count = CASE
+   WHEN cửa sổ còn THEN count + 1 ELSE 1 END, window_started_at = … RETURNING count` (SQLite từ 3.35 và Postgres đều
+   có), thay cho chuỗi `UPDATE` cộng → `UPDATE` mở cửa sổ mới → `INSERT … DO NOTHING` → `UPDATE` khoá → `SELECT` đọc
+   lại. Lượt được phép: 4–5 câu → 2 (đọc chặn, chèn-hoặc-cộng); lượt vượt mức thêm câu khoá. Mỗi lượt đồng thời nhận một
+   số đếm riêng, nên đúng `limit` lượt được phép (test đồng thời cũ xanh trên cả hai database).
+2. Lượt bị chặn giữ một câu `SELECT` không khoá dòng — vế "trả 429 không cần khoá dòng" của mục lộ trình đã đúng sẵn.
+
+Đo `Throttle::hit` trực tiếp (bản release, 16 luồng, 2400 lượt, giới hạn rất cao để mọi lượt được đếm; mỗi bên 2 lần):
+SQLite cùng khoá 2509–2544 → 4323–4617 lượt/s, khác khoá 2401–2526 → 4158–4164; Postgres khác khoá 3990–4533 →
+6787–6800; Postgres cùng khoá 2642–3090 → 2576–3300 (không đổi: các lượt xếp hàng trên khoá của cùng một dòng — giới
+hạn tự nhiên của "một bộ đếm cho một email", chấp nhận). Bài `POST /auth/login` của `scripts/loadtest.sh` đo Argon2 và
+thời điểm khoá kích hoạt, không đo bộ đếm: đọc kèm ghi chú này.

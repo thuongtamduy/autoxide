@@ -9,9 +9,9 @@
 //! - Mỗi khoá có một cửa sổ đếm dài `window`. Vượt `limit` lần trong cửa sổ thì khoá bị chặn
 //!   trong `lock` (mặc định bằng `window`), rồi đếm lại từ đầu.
 //! - Khoá đếm được băm SHA-256 trước khi lưu: email hay IP không nằm nguyên văn trong bảng.
-//! - Mỗi bước là MỘT câu `UPDATE` có điều kiện — database tự xếp hàng các request đồng thời,
-//!   không request nào ghi đè số đếm của request khác. [`Throttle::hit`] đếm TRƯỚC rồi mới
-//!   kiểm, nên N request bắn cùng lúc không vượt được `limit`.
+//! - Mỗi lần đếm là MỘT câu "chèn hoặc cộng" trả về số đếm (D-321) — database tự xếp hàng các
+//!   request đồng thời, không request nào ghi đè số đếm của request khác. [`Throttle::hit`] đếm
+//!   TRƯỚC rồi mới kiểm, nên N request bắn cùng lúc không vượt được `limit`.
 //! - Theo khách (bước 33): mỗi hàm nhận khách; số đếm nằm ở database của khách, khoá chính
 //!   `(tenant_id, key)` — một khách bị dồn không làm khoá người dùng của khách khác.
 
@@ -98,79 +98,77 @@ impl Throttle {
             None => None,
         };
         Ok(match until {
-            Some(until) if until > now => {
-                let wait = Ord::max((until - now).num_milliseconds(), 0);
-                Outcome::Limited {
-                    retry_after: Ord::max(
-                        <u64 as TryFrom<i64>>::try_from((wait + 999) / 1000).unwrap_or(1),
-                        1,
-                    ),
-                }
-            }
+            Some(until) if until > now => Outcome::Limited { retry_after: seconds_up(until - now) },
             _ => Outcome::Allowed,
         })
     }
 
     /// Đếm một lần cho `key` rồi xét: bị chặn (từ trước hoặc vì lần này vượt giới hạn) thì
     /// [`Outcome::Limited`]. Lần đang bị chặn thì không đếm thêm.
+    ///
+    /// Hai câu cho lượt được phép (D-321): đọc xem có đang bị chặn không (không khoá dòng — lượt bị
+    /// chặn dừng ở đây), rồi một câu "chèn hoặc cộng" trả về số đếm của CHÍNH lượt này. Mỗi lượt đồng
+    /// thời nhận một số đếm khác nhau, nên đúng `limit` lượt được phép.
     pub async fn hit(&self, tenant: &TenantContext, key: &str) -> Result<Outcome, Error> {
         let before = self.check(tenant, key).await?;
         if !before.is_allowed() {
             return Ok(before);
         }
-        self.record(tenant, key).await?;
-        self.check(tenant, key).await
+        let hashed = sha256(key);
+        let now = now();
+        if self.count(tenant, &hashed, now).await? > i64::from(self.limit) {
+            self.lock_if_exceeded(tenant, &hashed, now).await?;
+            return Ok(Outcome::Limited { retry_after: seconds_up(self.lock) });
+        }
+        Ok(Outcome::Allowed)
     }
 
     /// Đếm một lần cho `key`, không xét (vd ghi một lần đăng nhập sai).
     pub async fn record(&self, tenant: &TenantContext, key: &str) -> Result<(), Error> {
         let hashed = sha256(key);
         let now = now();
-        let window_start = now - self.window;
-        let table = Alias::new(&self.table);
-        let connection = tenant.database().write();
-        let id = tenant.id().as_uuid();
-        // Vòng lặp chỉ chạy lại một lần, khi hai request cùng chèn dòng đầu tiên.
-        for _ in 0..2 {
-            // 1. Đang trong cửa sổ đếm: cộng một.
-            let counted = Query::update()
-                .table(table.clone())
-                .value(Alias::new("count"), Expr::col(Alias::new("count")).add(1))
-                .and_where(Expr::col(Alias::new("tenant_id")).eq(id))
-                .and_where(Expr::col(Alias::new("key")).eq(hashed.as_str()))
-                .and_where(Expr::col(Alias::new("window_started_at")).gt(window_start))
-                .to_owned();
-            if connection.execute(&counted).await?.rows_affected() > 0 {
-                return self.lock_if_exceeded(tenant, &hashed, now).await;
-            }
-            // 2. Cửa sổ cũ đã hết: bắt đầu cửa sổ mới với một lần.
-            let restarted = Query::update()
-                .table(table.clone())
-                .value(Alias::new("count"), 1)
-                .value(Alias::new("window_started_at"), now)
-                .and_where(Expr::col(Alias::new("tenant_id")).eq(id))
-                .and_where(Expr::col(Alias::new("key")).eq(hashed.as_str()))
-                .and_where(Expr::col(Alias::new("window_started_at")).lte(window_start))
-                .to_owned();
-            if connection.execute(&restarted).await?.rows_affected() > 0 {
-                return self.lock_if_exceeded(tenant, &hashed, now).await;
-            }
-            // 3. Chưa có dòng: chèn. Request khác vừa chèn trước thì quay lại bước 1.
-            let inserted = Query::insert()
-                .into_table(table.clone())
-                .columns(["tenant_id", "key", "count", "window_started_at"].map(Alias::new))
-                .values_panic([id.into(), hashed.as_str().into(), 1.into(), now.into()])
-                .on_conflict(
-                    OnConflict::columns([Alias::new("tenant_id"), Alias::new("key")])
-                        .do_nothing()
-                        .to_owned(),
-                )
-                .to_owned();
-            if connection.execute(&inserted).await?.rows_affected() > 0 {
-                return self.lock_if_exceeded(tenant, &hashed, now).await;
-            }
+        if self.count(tenant, &hashed, now).await? > i64::from(self.limit) {
+            self.lock_if_exceeded(tenant, &hashed, now).await?;
         }
         Ok(())
+    }
+
+    /// Cộng một vào số đếm của khoá đã băm `hashed` bằng MỘT câu và trả số đếm sau khi cộng: chưa
+    /// có dòng thì chèn với 1; cửa sổ cũ đã hết thì bắt đầu cửa sổ mới với 1. `INSERT … ON CONFLICT
+    /// DO UPDATE … RETURNING` chạy trên cả SQLite (từ 3.35) và Postgres; database tự xếp hàng các
+    /// lượt cùng lúc trên dòng đó.
+    async fn count(
+        &self,
+        tenant: &TenantContext,
+        hashed: &str,
+        now: DateTime<Utc>,
+    ) -> Result<i64, Error> {
+        let table = Alias::new(&self.table);
+        // Cột của dòng đang có, ghi kèm tên bảng cho rõ (không lẫn với `excluded`).
+        let column = |name: &str| Expr::col((table.clone(), Alias::new(name)));
+        let fresh = column("window_started_at").gt(now - self.window);
+        let upsert = Query::insert()
+            .into_table(table.clone())
+            .columns(["tenant_id", "key", "count", "window_started_at"].map(Alias::new))
+            .values_panic([tenant.id().as_uuid().into(), hashed.into(), 1.into(), now.into()])
+            .on_conflict(
+                OnConflict::columns([Alias::new("tenant_id"), Alias::new("key")])
+                    .value(
+                        Alias::new("count"),
+                        Expr::case(fresh.clone(), column("count").add(1)).finally(1),
+                    )
+                    .value(
+                        Alias::new("window_started_at"),
+                        Expr::case(fresh, column("window_started_at")).finally(now),
+                    )
+                    .to_owned(),
+            )
+            .returning_col(Alias::new("count"))
+            .to_owned();
+        let row = tenant.database().write().query_one(&upsert).await?.ok_or_else(|| {
+            Error::internal(format!("counting in `{}` returned no row", self.table))
+        })?;
+        Ok(i64::from(row.try_get::<i32>("", "count")?))
     }
 
     /// Trả lại một lần đã đếm (vd lần thử hoá ra không sai): người dùng thật không bị tính oan.
@@ -239,6 +237,12 @@ impl Throttle {
         }
         Ok(())
     }
+}
+
+/// Số giây (làm tròn lên, ít nhất 1) của `duration`.
+fn seconds_up(duration: chrono::Duration) -> u64 {
+    let millis = Ord::max(duration.num_milliseconds(), 0);
+    Ord::max(<u64 as TryFrom<i64>>::try_from((millis + 999) / 1000).unwrap_or(1), 1)
 }
 
 fn now() -> DateTime<Utc> {

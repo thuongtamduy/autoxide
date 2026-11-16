@@ -275,6 +275,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- Counting failed attempts (sign-in lockout and other throttles) takes one SQL statement instead of up to four:
+  60–75% more attempts per second, except many attempts on one email at once on PostgreSQL, which still queue on
+  that email's counter.
 - Faster signed-in requests: the user and their permissions are read in one SQL query instead of two on every
   request (access token and API key); `GET /api/v1/auth/me` and the MCP tool `auth.whoami` need three queries in
   all instead of seven, and `GET /api/v1/auth/users` one query per page for the account facts instead of two.
