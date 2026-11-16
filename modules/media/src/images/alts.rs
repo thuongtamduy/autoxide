@@ -65,13 +65,14 @@ pub(crate) async fn alts_in<C: ConnectionTrait>(
         .collect())
 }
 
-/// Ngôn ngữ không nằm trong `AUTOXIDE_MEDIA_ALT_LOCALES`.
+/// Ngôn ngữ không nằm trong ngôn ngữ dịch `alt` của khách (`media.alt_locales`, thiếu thì
+/// `AUTOXIDE_MEDIA_ALT_LOCALES`).
 fn unsupported_locale(locales: &[String]) -> Error {
     Error::new(
         ErrorKind::Validation,
         "media.unsupported_locale",
-        "Text alternatives can be translated only into the languages this server lists in \
-         AUTOXIDE_MEDIA_ALT_LOCALES: {locales}.",
+        "Text alternatives can be translated only into these languages: {locales} (the tenant's \
+         `media.alt_locales` setting, otherwise the server's AUTOXIDE_MEDIA_ALT_LOCALES).",
     )
     .with_param("locales", locales.join(", "))
 }
@@ -84,14 +85,15 @@ fn with_alts(mut snapshot: Value, alts: &BTreeMap<String, String>) -> Value {
 }
 
 impl MediaService {
-    /// Ngôn ngữ `raw` đúng cách viết đã khai (không phân biệt hoa thường), hay lỗi.
-    pub(crate) fn alt_locale(&self, raw: &str) -> Result<String, Error> {
-        self.config
-            .alt_locales
-            .iter()
-            .find(|known| known.eq_ignore_ascii_case(raw.trim()))
-            .cloned()
-            .ok_or_else(|| unsupported_locale(&self.config.alt_locales))
+    /// Ngôn ngữ `raw` đúng cách viết khách `tenant` đã khai (không phân biệt hoa thường), hay lỗi.
+    pub(crate) async fn alt_locale(
+        &self,
+        tenant: &TenantContext,
+        raw: &str,
+    ) -> Result<String, Error> {
+        let locales = self.alt_locales(tenant).await?;
+        let found = locales.iter().find(|known| known.eq_ignore_ascii_case(raw.trim())).cloned();
+        found.ok_or_else(|| unsupported_locale(&locales))
     }
 
     /// Đặt (`Some`) hay xoá (`None`) `alt` bằng ngôn ngữ `locale` của item `id`. Cần
@@ -107,7 +109,7 @@ impl MediaService {
         expected: Option<DateTime<Utc>>,
     ) -> Result<Item, Error> {
         principal.require(&MEDIA_WRITE)?;
-        let locale = self.alt_locale(locale)?;
+        let locale = self.alt_locale(tenant, locale).await?;
         let alt = alt.map(str::trim);
         if alt.is_some_and(|alt| alt.chars().count() > ALT_MAX_LENGTH) {
             return Err(Error::validation(vec![

@@ -48,6 +48,11 @@ enum Action {
     Suspend { tenant: String },
     /// Resume a suspended tenant.
     Resume { tenant: String },
+    /// Make a tenant read-only: its data can still be read and exported and its users can sign
+    /// in, but every change answers 403 until `writable`.
+    ReadOnly { tenant: String },
+    /// Let a read-only tenant change its data again.
+    Writable { tenant: String },
     /// Prepare again a tenant whose creation stopped half-way (safe to run again).
     Provision { tenant: String },
     /// Move a tenant's data to another placement (database). The tenant answers 503 during the
@@ -193,6 +198,8 @@ async fn execute(
         Action::Show { tenant } => Ok(line(&admin.get(&tenant).await?)),
         Action::Suspend { tenant } => set_status(admin, &tenant, "suspended").await,
         Action::Resume { tenant } => set_status(admin, &tenant, "active").await,
+        Action::ReadOnly { tenant } => set_read_only(admin, &tenant, true).await,
+        Action::Writable { tenant } => set_read_only(admin, &tenant, false).await,
         Action::Provision { tenant } => Ok(line(&admin.provision(Actor::system(), &tenant).await?)),
     }
 }
@@ -203,7 +210,17 @@ async fn set_status(
     status: &str,
 ) -> Result<String, autoxide_kernel::error::Error> {
     let found = admin.get(tenant).await?;
-    let changes = TenantChanges { name: None, status: Some(status.to_owned()) };
+    let changes = TenantChanges { status: Some(status.to_owned()), ..TenantChanges::default() };
+    Ok(line(&admin.update(Actor::system(), found.id, changes, None).await?))
+}
+
+async fn set_read_only(
+    admin: &TenantAdmin,
+    tenant: &str,
+    read_only: bool,
+) -> Result<String, autoxide_kernel::error::Error> {
+    let found = admin.get(tenant).await?;
+    let changes = TenantChanges { read_only: Some(read_only), ..TenantChanges::default() };
     Ok(line(&admin.update(Actor::system(), found.id, changes, None).await?))
 }
 
@@ -280,8 +297,13 @@ fn describe_move(tenant: &str, moved: &TenantMove) -> String {
 /// Một dòng mô tả khách.
 fn line(tenant: &Tenant) -> String {
     format!(
-        "{}  {}  {}  placement={}  \"{}\"",
-        tenant.id, tenant.slug, tenant.status, tenant.placement, tenant.name
+        "{}  {}  {}{}  placement={}  \"{}\"",
+        tenant.id,
+        tenant.slug,
+        tenant.status,
+        if tenant.read_only { " (read-only)" } else { "" },
+        tenant.placement,
+        tenant.name
     )
 }
 

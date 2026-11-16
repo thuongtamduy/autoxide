@@ -264,3 +264,23 @@ website) and no tool to delete a comment for good (use REST).
 
 The anti-spam layer (`AUTOXIDE_ANTISPAM_*`) is shared by every module. All are described in
 [`.env.example`](../.env.example).
+
+### Per tenant
+
+With several tenants, the settings above are the default of every tenant. A tenant can replace
+some of them with its own (its administrator with `PUT /api/v1/kernel/settings/{name}`,
+permission `kernel.settings.manage`; platform staff with
+`PUT /api/v1/kernel/tenants/{id}/settings/{name}`):
+
+| Tenant setting               | Replaces                               | Value                                   |
+| ---------------------------- | -------------------------------------- | --------------------------------------- |
+| `comments.banned_words`      | `AUTOXIDE_COMMENTS_BANNED_WORDS`       | comma-separated words; `-` for none     |
+| `comments.suspect_words`     | `AUTOXIDE_COMMENTS_SUSPECT_WORDS`      | comma-separated words; `-` for none     |
+| `comments.max_links`         | `AUTOXIDE_COMMENTS_MAX_LINKS`          | `0` to `100`                            |
+| `comments.guest_moderation`  | `AUTOXIDE_COMMENTS_GUEST_MODERATION`   | `pre`, `first_time` or `post`           |
+| `comments.user_moderation`   | `AUTOXIDE_COMMENTS_USER_MODERATION`    | `pre`, `first_time` or `post`           |
+
+A wrong value is refused when it is set (`422`, the problem in `errors`). Overrides per target
+kind (`AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`) still win over a tenant's moderation mode.
+`DELETE` the setting to go back to the server's value. `GET /api/v1/comments/public/settings`
+answers with the tenant's own `max_links`.

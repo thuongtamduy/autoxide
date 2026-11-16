@@ -29,6 +29,11 @@ pub(crate) use views::{CommentDetail, TargetResponse};
 
 pub(crate) fn routes(service: Arc<CommentsService>) -> OpenApiRouter {
     OpenApiRouter::new()
+        // Link trong thư vẫn dùng được khi khách chỉ đọc (xác nhận địa chỉ đã bắt đầu trước đó; rút
+        // lại đồng ý luôn phải làm được).
+        .routes(routes!(public::verify_email))
+        .routes(routes!(public::unsubscribe))
+        .layer(autoxide_kernel::tenancy::allowed_while_read_only())
         .routes(routes!(public::get_settings))
         .routes(routes!(public::list_thread))
         .routes(routes!(public::create_comment))
@@ -38,8 +43,6 @@ pub(crate) fn routes(service: Arc<CommentsService>) -> OpenApiRouter {
         .routes(routes!(public::report_comment))
         .routes(routes!(public::count_comments))
         .routes(routes!(public::get_public_target))
-        .routes(routes!(public::verify_email))
-        .routes(routes!(public::unsubscribe))
         .routes(routes!(public::get_profile, public::set_profile))
         .routes(routes!(admin::list_comments))
         .routes(routes!(admin::get_comment, admin::update_comment, admin::delete_comment))

@@ -326,11 +326,17 @@ export type ChangePasswordRequest = {
 export type ClientConfigResponse = {
   /** Content settings an interface needs. */
   content: {
-    /** Language of a new entry when none is given. */
+    /**
+     * Language of a new entry when none is given: the tenant's `content.default_locale`,
+     * otherwise the server's `AUTOXIDE_CONTENT_DEFAULT_LOCALE`.
+     */
     default_locale: string;
     /** Hosts whose videos and posts may be embedded in an entry (`AUTOXIDE_CONTENT_EMBED_HOSTS`). */
     embed_hosts: string[];
-    /** Languages entries may be written in (`AUTOXIDE_CONTENT_LOCALES`), the default first. */
+    /**
+     * Languages entries may be written in: the tenant's `content.locales` setting, otherwise
+     * the server's `AUTOXIDE_CONTENT_LOCALES`.
+     */
     locales: string[];
     /** Largest entry body accepted, in bytes. */
     max_body_bytes: number;
@@ -368,8 +374,8 @@ export type ClientConfigResponse = {
      */
     allowed_types: string[];
     /**
-     * Languages of `alt` translations (`AUTOXIDE_MEDIA_ALT_LOCALES`): show one alt field per
-     * language.
+     * Languages of `alt` translations: the tenant's `media.alt_locales` setting, otherwise the
+     * server's `AUTOXIDE_MEDIA_ALT_LOCALES`. Show one alt field per language.
      */
     alt_locales: string[];
     /** Widths of the smaller copies made of images, in pixels. */
@@ -886,6 +892,8 @@ export type CurrentTenant = {
   name: string;
   /** Whether this is the platform tenant (the operator's own). */
   platform: boolean;
+  /** Read-only: data can be read but every change is refused with `403 tenant_read_only`. */
+  read_only?: boolean;
   slug: string;
   status: string;
 };
@@ -1344,6 +1352,8 @@ export type Data_CurrentTenant = {
     name: string;
     /** Whether this is the platform tenant (the operator's own). */
     platform: boolean;
+    /** Read-only: data can be read but every change is refused with `403 tenant_read_only`. */
+    read_only?: boolean;
     slug: string;
     status: string;
   };
@@ -2482,15 +2492,24 @@ export type Data_Tenant = {
   /** A customer (tenant) of the platform. */
   data: {
     created_at: string;
+    expanded?: TenantExpanded | null;
     id: string;
     name: string;
     /** Parent tenant, when the tenant belongs to a chain. */
     parent_id?: string | null;
     /** Name of the placement (database) that keeps its data. */
     placement: string;
+    /**
+     * Read-only: its data can be read (and its users can sign in and export), but every change
+     * is refused with `403 tenant_read_only`. Independent of `status`.
+     */
+    read_only?: boolean;
     /** Short name: lower-case letters, digits and `-`; unique on the platform. */
     slug: string;
-    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    /**
+     * `provisioning`, `active`, `suspended` (every request is refused with
+     * `403 tenant_suspended`), `maintenance` or `moving`.
+     */
     status: string;
     updated_at: string;
   };
@@ -2513,6 +2532,11 @@ export type Data_TenantDomain = {
     id: string;
     /** Last time the DNS record was looked up. */
     last_checked_at?: string | null;
+    /**
+     * Node of the tenant's organization tree the domain belongs to (e.g. one store's own
+     * site); `null`: the tenant as a whole. Set it with `PATCH /domains/{id}`.
+     */
+    org_id?: string | null;
     /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
     record: TenantDomainRecord;
     /**
@@ -2593,9 +2617,17 @@ export type Data_TenantSettingState = {
   /** A setting the installed modules take per tenant, and its state in the current tenant. */
   data: {
     description: string;
+    /**
+     * Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
+     * partner service (mail server, AI provider, payment gateway…). `null`: no group.
+     */
+    group?: string | null;
     /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
     is_set: boolean;
-    /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+    /**
+     * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
+     * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
+     */
     name: string;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
     secret: boolean;
@@ -2964,9 +2996,17 @@ export type Data_Vec_ScheduleResponse = {
 export type Data_Vec_TenantSettingState = {
   data: {
     description: string;
+    /**
+     * Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
+     * partner service (mail server, AI provider, payment gateway…). `null`: no group.
+     */
+    group?: string | null;
     /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
     is_set: boolean;
-    /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+    /**
+     * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
+     * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
+     */
     name: string;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
     secret: boolean;
@@ -4995,15 +5035,24 @@ export type Page_Tenant = {
   /** The items of this page, in the requested order. */
   data: {
     created_at: string;
+    expanded?: TenantExpanded | null;
     id: string;
     name: string;
     /** Parent tenant, when the tenant belongs to a chain. */
     parent_id?: string | null;
     /** Name of the placement (database) that keeps its data. */
     placement: string;
+    /**
+     * Read-only: its data can be read (and its users can sign in and export), but every change
+     * is refused with `403 tenant_read_only`. Independent of `status`.
+     */
+    read_only?: boolean;
     /** Short name: lower-case letters, digits and `-`; unique on the platform. */
     slug: string;
-    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    /**
+     * `provisioning`, `active`, `suspended` (every request is refused with
+     * `403 tenant_suspended`), `maintenance` or `moving`.
+     */
     status: string;
     updated_at: string;
   }[];
@@ -5027,6 +5076,11 @@ export type Page_TenantDomain = {
     id: string;
     /** Last time the DNS record was looked up. */
     last_checked_at?: string | null;
+    /**
+     * Node of the tenant's organization tree the domain belongs to (e.g. one store's own
+     * site); `null`: the tenant as a whole. Set it with `PATCH /domains/{id}`.
+     */
+    org_id?: string | null;
     /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
     record: TenantDomainRecord;
     /**
@@ -6338,15 +6392,24 @@ export type Taxonomy = "category" | "tag";
 /** A customer (tenant) of the platform. */
 export type Tenant = {
   created_at: string;
+  expanded?: TenantExpanded | null;
   id: string;
   name: string;
   /** Parent tenant, when the tenant belongs to a chain. */
   parent_id?: string | null;
   /** Name of the placement (database) that keeps its data. */
   placement: string;
+  /**
+   * Read-only: its data can be read (and its users can sign in and export), but every change
+   * is refused with `403 tenant_read_only`. Independent of `status`.
+   */
+  read_only?: boolean;
   /** Short name: lower-case letters, digits and `-`; unique on the platform. */
   slug: string;
-  /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+  /**
+   * `provisioning`, `active`, `suspended` (every request is refused with
+   * `403 tenant_suspended`), `maintenance` or `moving`.
+   */
   status: string;
   updated_at: string;
 };
@@ -6354,7 +6417,13 @@ export type Tenant = {
 /** Changes to a tenant; omitted fields stay as they are. */
 export type TenantChanges = {
   name?: string | null;
-  /** `active` or `suspended`. */
+  /**
+   * `true`: the tenant can only read (its users still sign in and export their data), every
+   * change is refused with `403 tenant_read_only`; `false`: writable again. Independent of
+   * `status`. The platform tenant cannot be made read-only.
+   */
+  read_only?: boolean | null;
+  /** `active` or `suspended`. A suspended tenant refuses every request, reads included. */
   status?: string | null;
 };
 
@@ -6373,6 +6442,11 @@ export type TenantDomain = {
   id: string;
   /** Last time the DNS record was looked up. */
   last_checked_at?: string | null;
+  /**
+   * Node of the tenant's organization tree the domain belongs to (e.g. one store's own
+   * site); `null`: the tenant as a whole. Set it with `PATCH /domains/{id}`.
+   */
+  org_id?: string | null;
   /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
   record: TenantDomainRecord;
   /**
@@ -6386,6 +6460,15 @@ export type TenantDomain = {
   verified_at?: string | null;
 };
 
+/** Where a domain belongs in the tenant's organization tree. */
+export type TenantDomainChanges = {
+  /**
+   * Id of a node of the tenant's organization tree (e.g. one store, for its own site), or
+   * `null` for the tenant as a whole. Required: send `null` explicitly to detach.
+   */
+  org_id: string | null;
+};
+
 /** The DNS record that proves the tenant owns the domain. */
 export type TenantDomainRecord = {
   /** Full name of the record. */
@@ -6394,6 +6477,21 @@ export type TenantDomainRecord = {
   type: string;
   /** Exact value of the record. */
   value: string;
+};
+
+/** Related records of a tenant, asked for with `expand`. */
+export type TenantExpanded = {
+  placement?: Placement | null;
+  /**
+   * The tenant's subscription (`expand=subscription`). Always `null` for now: subscriptions
+   * come with the plans module (step 35); without it no tenant has one.
+   */
+  subscription?: Record<string, unknown> | null;
+  /**
+   * The tenant's use of its plan's limits (`expand=usage`). Always `null` for now, like
+   * `subscription`.
+   */
+  usage?: Record<string, unknown> | null;
 };
 
 /** A move of a tenant to another placement. */
@@ -6477,9 +6575,17 @@ export type TenantMoveRequest = {
 /** A setting the installed modules take per tenant, and its state in the current tenant. */
 export type TenantSettingState = {
   description: string;
+  /**
+   * Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
+   * partner service (mail server, AI provider, payment gateway…). `null`: no group.
+   */
+  group?: string | null;
   /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
   is_set: boolean;
-  /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+  /**
+   * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
+   * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
+   */
   name: string;
   /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
   secret: boolean;
@@ -7860,6 +7966,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_CommentSettings;
+        400: Problem;
         default: Problem;
       };
     };
@@ -9070,7 +9177,9 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_ClientConfigResponse;
+        403: Problem;
         500: Problem;
+        503: Problem;
         default: Problem;
       };
     };
@@ -9115,6 +9224,20 @@ export interface paths {
     };
   };
   "/api/v1/kernel/domains/{id}": {
+    /** Attach a domain to a node of the organization tree. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TenantDomainChanges;
+      responses: {
+        200: Data_TenantDomain;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
     /** Remove a domain from this tenant. */
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
@@ -9180,7 +9303,7 @@ export interface paths {
   "/api/v1/kernel/settings": {
     /** List this tenant's settings. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { group?: string }; };
       responses: {
         200: Data_Vec_TenantSettingState;
         401: Problem;
@@ -9228,7 +9351,7 @@ export interface paths {
   "/api/v1/kernel/tenants": {
     /** List the tenants of the platform. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; parent_id?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; parent_id?: string; read_only?: boolean; placement_kind?: string; schema_state?: string; subscription_status?: string; near_limit?: boolean; expand?: string }; };
       responses: {
         200: Page_Tenant;
         401: Problem;
@@ -9306,6 +9429,48 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/settings": {
+    /** List a tenant's settings (platform staff). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { group?: string }; };
+      responses: {
+        200: Data_Vec_TenantSettingState;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/settings/{name}": {
+    /** Set a setting of a tenant (platform staff). */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; name: string }; };
+      requestBody: TenantSettingValue;
+      responses: {
+        200: Data_TenantSettingState;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a setting of a tenant (platform staff). */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; name: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

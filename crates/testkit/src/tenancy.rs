@@ -7,7 +7,55 @@
 //!   sinh trong ứng dụng, duy nhất toàn cục — vd khoá chính `id`);
 //! - mọi index thường bắt đầu bằng `tenant_id`, trừ index quét cả database có tên `…_sweep_idx`.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::{
+    SettingValue, TenantContext, TenantId, TenantSetting, TenantSettings,
+};
+
 use crate::schema::{SchemaSnapshot, TableSnapshot};
+
+/// Cấu hình theo khách giữ trong bộ nhớ, cho test dựng service của module bằng tay (không qua
+/// `TestApp`). Không kiểm giá trị như kernel: test đặt gì module đọc nấy. Test cần kernel thật
+/// (bộ kiểm, REST) thì dùng `TestApp` và `app.api::<dyn TenantSettings>()`.
+#[derive(Debug, Default)]
+pub struct FakeTenantSettings(Mutex<HashMap<(TenantId, String), String>>);
+
+impl FakeTenantSettings {
+    /// Khách `tenant` đặt `name` = `value`.
+    pub fn set(&self, tenant: TenantId, name: &str, value: &str) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert((tenant, name.to_owned()), value.to_owned());
+    }
+
+    /// Khách `tenant` bỏ `name` (về cấu hình chung).
+    pub fn remove(&self, tenant: TenantId, name: &str) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&(tenant, name.to_owned()));
+    }
+}
+
+#[async_trait::async_trait]
+impl TenantSettings for FakeTenantSettings {
+    async fn get(
+        &self,
+        tenant: &TenantContext,
+        setting: &TenantSetting,
+    ) -> Result<Option<SettingValue>, Error> {
+        let values = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Như kernel: tên hiện tại trước, không có thì tên cũ của cấu hình đã đổi tên.
+        let value = std::iter::once(setting.name())
+            .chain(setting.former_name())
+            .find_map(|name| values.get(&(tenant.id(), name.to_owned())));
+        Ok(value.map(SettingValue::new))
+    }
+}
 
 /// Các vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ. `control_plane`: bảng mặt điều khiển đã khai.
 pub fn schema_tenancy_violations(snapshot: &SchemaSnapshot, control_plane: &[&str]) -> Vec<String> {

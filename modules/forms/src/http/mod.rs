@@ -25,11 +25,13 @@ pub(crate) use inbox::SubmissionResponse;
 
 pub(crate) fn routes(service: Arc<FormsService>) -> OpenApiRouter {
     OpenApiRouter::new()
+        // Khách chỉ đọc vẫn xuất được dữ liệu của mình (đối chiếu thiết kế 2, A-3.11).
+        .routes(routes!(exports::create_export))
+        .layer(autoxide_kernel::tenancy::allowed_while_read_only())
         .routes(routes!(admin::list_forms, admin::create_form))
         .routes(routes!(admin::get_form, admin::update_form, admin::delete_form))
         .routes(routes!(inbox::list_submissions))
         .routes(routes!(inbox::export_submissions))
-        .routes(routes!(exports::create_export))
         .routes(routes!(exports::get_export))
         .routes(routes!(exports::download_export))
         .routes(routes!(inbox::get_submission, inbox::update_submission, inbox::delete_submission))

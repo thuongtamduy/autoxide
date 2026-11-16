@@ -215,7 +215,12 @@ impl ContentService {
             }
         }
         let mut problems = Vec::new();
-        let locale = self.check_locale(input.locale.as_deref(), "locale", &mut problems);
+        let locale = self.check_locale(
+            &self.languages(tenant).await?,
+            input.locale.as_deref(),
+            "locale",
+            &mut problems,
+        );
         if input.fields.title.as_deref().is_none_or(|title| title.trim().is_empty()) {
             problems.push(
                 FieldError::new("title", "required", "must be 1 to {title_max} characters")
@@ -767,7 +772,12 @@ impl ContentService {
             .ok_or_else(|| entry_not_found(source_id))?;
         permissions::require_write(principal, &source)?;
         let mut problems = Vec::new();
-        let target = self.check_locale(Some(locale), "locale", &mut problems);
+        let target = self.check_locale(
+            &self.languages(tenant).await?,
+            Some(locale),
+            "locale",
+            &mut problems,
+        );
         if problems.is_empty() && target == source.locale {
             problems.push(FieldError::new(
                 "locale",

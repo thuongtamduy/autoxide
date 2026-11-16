@@ -44,7 +44,8 @@ use crate::error::Error;
 
 pub use admin::{
     CurrentTenant, NewTenant, PLACEMENTS_READ, Placement, PlacementStorage, TENANTS_MANAGE,
-    TENANTS_READ, Tenant, TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
+    TENANTS_READ, Tenant, TenantAdmin, TenantChanges, TenantExpanded, TenantFilter, TenantSeed,
+    require_platform,
 };
 pub use config::{TenancyConfig, WorkerPlacements};
 pub use domains::{
@@ -61,15 +62,19 @@ pub use registry::{
 };
 pub use request::{TENANT_HEADER, TenantHint};
 pub use scope::{ScopeExt, TenantScoped};
-pub use settings::{PUBLIC_URL, SETTINGS_MANAGE, SettingValue, TenantSetting, TenantSettings};
+pub use settings::{
+    CONNECTION_GROUP, PUBLIC_URL, SETTINGS_MANAGE, SettingCheck, SettingValue, TenantSetting,
+    TenantSettings, parsed_setting,
+};
 
 pub(crate) use config::read_setting;
 
 /// Chỗ module `kernel` nhận thứ của mọi module khi chúng đã khởi động (`Modules::start_in` điền):
-/// bộ gieo dữ liệu cho khách mới, bộ tra DNS, thứ việc dời khách cần.
+/// bộ gieo dữ liệu cho khách mới, bộ tra DNS, cây tổ chức, thứ việc dời khách cần.
 pub(crate) struct Slots {
     pub(crate) seeds: admin::Seeds,
     pub(crate) dns: domains::DnsSlot,
+    pub(crate) orgs: domains::OrgSlot,
     pub(crate) moves: moves::MoveSetup,
 }
 
@@ -102,7 +107,8 @@ impl From<TenantId> for Uuid {
     }
 }
 
-/// ID của một nút trong cây tổ chức của khách. Khai sẵn cho bước 34; chưa dùng.
+/// ID của một nút trong cây tổ chức của khách (bước 34). Tên miền gắn được với một nút (đối chiếu
+/// thiết kế đợt 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OrgId(Uuid);
@@ -115,6 +121,26 @@ impl OrgId {
     pub const fn as_uuid(&self) -> Uuid {
         self.0
     }
+}
+
+impl fmt::Display for OrgId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// Cây tổ chức của khách, nhìn từ kernel: chỉ hỏi "nút này có thuộc khách không". Module giữ cây
+/// tổ chức (bước 34) công bố `context.provide::<dyn OrgNodes>(…)` trong `Module::start`; chưa
+/// module nào công bố thì kernel coi như khách không có nút nào (vd tên miền chỉ gắn được `null`).
+///
+/// Tên khác `OrgDirectory` của module `organizations` (bước 34, hợp đồng đầy đủ của cây tổ chức
+/// cho module khác): đây là phần hẹp kernel cần, kernel không phụ thuộc module nào.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait OrgNodes: Send + Sync {
+    /// `org` là một nút (còn dùng được) trong cây tổ chức của khách `tenant`.
+    async fn has_node(&self, tenant: &TenantContext, org: OrgId) -> Result<bool, Error>;
 }
 
 /// ID của một placement (vị trí dữ liệu: một database).
@@ -250,6 +276,8 @@ struct Inner {
     schema_ready: bool,
     /// Nơi lưu file riêng của placement (`autoxide placement storage`); `None`: nơi lưu chung.
     storage: Option<Arc<dyn crate::storage::Storage>>,
+    /// Chỉ đọc (`kernel_tenants.read_only`): lệnh ghi bị chặn ở chỗ giải khách của request.
+    read_only: bool,
 }
 
 impl TenantContext {
@@ -271,6 +299,7 @@ impl TenantContext {
             database,
             schema_ready: true,
             storage: None,
+            read_only: false,
         }))
     }
 
@@ -305,6 +334,19 @@ impl TenantContext {
     /// Placement của khách đã áp dụng đủ migration.
     pub fn schema_ready(&self) -> bool {
         self.0.schema_ready
+    }
+
+    /// Cùng khách, đánh dấu chỉ đọc (sổ database dựng từ `kernel_tenants.read_only`; test dựng).
+    #[must_use]
+    pub fn with_read_only(self, read_only: bool) -> Self {
+        let inner = Arc::unwrap_or_clone(self.0);
+        TenantContext(Arc::new(Inner { read_only, ..inner }))
+    }
+
+    /// Khách chỉ đọc: đọc được, lệnh ghi qua REST / MCP bị chặn (`tenant_read_only`). Job và event
+    /// của khách vẫn chạy (việc đã nhận trước đó, dọn dẹp theo luật).
+    pub fn read_only(&self) -> bool {
+        self.0.read_only
     }
 
     /// Khách mặc định trên `database` — chế độ `single`, và đường chuyển tiếp cho code chưa nhận
@@ -383,6 +425,7 @@ impl fmt::Debug for TenantContext {
             .field("id", &self.0.id)
             .field("slug", &self.0.slug)
             .field("status", &self.0.status)
+            .field("read_only", &self.0.read_only)
             .field("placement", &self.0.placement)
             .finish_non_exhaustive()
     }
@@ -410,6 +453,14 @@ pub mod errors {
         Error::forbidden(
             "tenant_suspended",
             "This tenant is suspended. Contact the service provider.",
+        )
+    }
+
+    pub fn tenant_read_only() -> Error {
+        Error::forbidden(
+            "tenant_read_only",
+            "This tenant is read-only for now: its data can be read and exported, but not \
+             changed. Contact the service provider.",
         )
     }
 
@@ -510,6 +561,14 @@ pub mod errors {
         Error::not_found(
             "tenant_domain_not_found",
             "This domain is not one of the current tenant's domains.",
+        )
+    }
+
+    pub fn tenant_domain_revoked() -> Error {
+        Error::conflict(
+            "tenant_domain_revoked",
+            "This domain was removed from the tenant and cannot be changed. Add it again with \
+             `POST /api/v1/kernel/domains`.",
         )
     }
 
@@ -668,6 +727,37 @@ pub fn ensure_serving(tenant: &TenantContext) -> Result<(), Error> {
             Err(errors::tenant_maintenance(30))
         }
     }
+}
+
+/// Đánh dấu route vẫn ghi được khi khách chỉ đọc: đăng nhập, làm mới / kết thúc phiên, đặt lại mật
+/// khẩu, link trong thư (xác nhận, huỷ đăng ký — rút lại đồng ý luôn phải làm được), xuất dữ liệu.
+/// Gắn bằng [`allowed_while_read_only`] trên router con chứa đúng các route đó.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AllowedWhileReadOnly;
+
+/// Lớp gắn [`AllowedWhileReadOnly`] cho các route đã thêm vào router trước nó:
+/// `OpenApiRouter::new().routes(routes!(login)).layer(allowed_while_read_only())`.
+pub fn allowed_while_read_only() -> axum::Extension<AllowedWhileReadOnly> {
+    axum::Extension(AllowedWhileReadOnly)
+}
+
+/// Kiểm request (`method`, `extensions`) có được làm với `tenant`: khách chỉ đọc chỉ nhận `GET`,
+/// `HEAD`, `OPTIONS`, và route đánh dấu [`AllowedWhileReadOnly`]; còn lại `tenant_read_only`.
+/// Kernel gọi ở chỗ giải khách của request (extractor `TenantContext`, `OptionalTenant`); tool
+/// MCP kiểm theo cờ `read_only` của tool.
+pub fn ensure_writable(
+    tenant: &TenantContext,
+    method: &axum::http::Method,
+    extensions: &axum::http::Extensions,
+) -> Result<(), Error> {
+    use axum::http::Method;
+    if !tenant.read_only()
+        || [Method::GET, Method::HEAD, Method::OPTIONS].contains(method)
+        || extensions.get::<AllowedWhileReadOnly>().is_some()
+    {
+        return Ok(());
+    }
+    Err(errors::tenant_read_only())
 }
 
 #[cfg(test)]

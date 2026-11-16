@@ -3,7 +3,10 @@
 //! giá trị không phải secret mà giao diện cần để khỏi đoán mặc định của core (ngôn ngữ, giới hạn
 //! tải lên, địa chỉ công khai…).
 //!
-//! Giá trị đọc một lần lúc khởi động (cấu hình không đổi khi chương trình đang chạy). Lược đồ
+//! Giá trị đọc một lần lúc khởi động (cấu hình không đổi khi chương trình đang chạy). Module nhận
+//! cấu hình theo khách (vd ngôn ngữ của `content`, đối chiếu thiết kế 2 A-b7) gắn thêm
+//! [`TenantClientSection`]: request xác định được khách thì các trường khách đã đặt thay giá trị
+//! chung. Lược đồ
 //! OpenAPI của câu trả lời ghép từ lược đồ của từng phần (`T: ToSchema` của module), nên tài liệu
 //! mô tả đủ từng trường mà kernel không cần biết module nào.
 
@@ -22,11 +25,25 @@ use crate::error::Error;
 use crate::module::Module;
 use crate::response::{Data, Problem};
 
+/// Giá trị theo khách của một phần cấu hình cho giao diện.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait TenantClientSection: Send + Sync {
+    /// Các trường (mức đầu của phần) mà khách `tenant` đặt khác cấu hình chung, cùng tên và kiểu
+    /// như trong phần; trường vắng giữ giá trị chung.
+    async fn overrides(
+        &self,
+        tenant: &crate::tenancy::TenantContext,
+    ) -> Result<serde_json::Map<String, Value>, Error>;
+}
+
 /// Phần cấu hình cho giao diện của một module: giá trị và lược đồ OpenAPI của nó.
 #[derive(Clone)]
 pub struct ClientSection {
     value: Value,
     schema: RefOr<Schema>,
+    tenant: Option<Arc<dyn TenantClientSection>>,
 }
 
 // `RefOr<Schema>` của utoipa không cài `Debug`: chỉ in giá trị.
@@ -44,7 +61,28 @@ impl ClientSection {
         let value = serde_json::to_value(value).map_err(|error| {
             Error::internal(format!("client config does not serialize: {error}"))
         })?;
-        Ok(ClientSection { value, schema: T::schema() })
+        Ok(ClientSection { value, schema: T::schema(), tenant: None })
+    }
+
+    /// Cùng phần, các trường khách đặt riêng lấy từ `tenant` (request xác định được khách).
+    #[must_use]
+    pub fn per_tenant(mut self, tenant: Arc<dyn TenantClientSection>) -> Self {
+        self.tenant = Some(tenant);
+        self
+    }
+
+    /// Giá trị của phần cho khách `tenant` (`None`: giá trị chung).
+    async fn value_for(
+        &self,
+        tenant: Option<&crate::tenancy::TenantContext>,
+    ) -> Result<Value, Error> {
+        let mut value = self.value.clone();
+        if let (Some(overlay), Some(tenant), Some(object)) =
+            (&self.tenant, tenant, value.as_object_mut())
+        {
+            object.extend(overlay.overrides(tenant).await?);
+        }
+        Ok(value)
     }
 }
 
@@ -101,23 +139,31 @@ pub(crate) fn routes(configs: ClientConfigs) -> OpenApiRouter {
 ///
 /// No sign-in needed. Values the server's operator set (or the defaults), by module: languages,
 /// path prefixes, upload limits, the public address… — so an interface does not guess the
-/// server's defaults. They change only when the server restarts with new settings.
+/// server's defaults. When the request names a tenant (its domain, the `Autoxide-Tenant` header
+/// or a credential), values that tenant set for itself replace the server's (e.g. the languages
+/// of `content` and of `media` alt texts, see `GET /api/v1/kernel/settings`).
 #[utoipa::path(
     get,
     path = "/client-config",
     extensions(("x-public" = json!(true))),
     operation_id = "get_client_config",
+    security((), ("bearer" = [])),
     responses(
         (status = 200, description = "The settings, by module.", body = Data<ClientConfigResponse>),
+        (status = 403, description = "The tenant of the request is suspended; code `tenant_suspended`.", body = Problem),
         (status = 500, description = "Unexpected server error.", body = Problem),
+        (status = 503, description = "The tenant of the request is under maintenance; code `tenant_maintenance`.", body = Problem),
     )
 )]
 async fn get_client_config(
     axum::extract::State(configs): axum::extract::State<Arc<ClientConfigs>>,
-) -> Data<ClientConfigResponse> {
-    let sections =
-        configs.sections().iter().map(|(name, section)| (*name, section.value.clone())).collect();
-    Data { data: ClientConfigResponse(sections) }
+    crate::tenancy::OptionalTenant(tenant): crate::tenancy::OptionalTenant,
+) -> Result<Data<ClientConfigResponse>, Error> {
+    let mut sections = BTreeMap::new();
+    for (name, section) in configs.sections() {
+        sections.insert(*name, section.value_for(tenant.as_ref()).await?);
+    }
+    Ok(Data { data: ClientConfigResponse(sections) })
 }
 
 /// Kernel's own section.

@@ -76,8 +76,11 @@ thì nhận `428` (mã `precondition_required`); ai đó vừa sửa trước th
 - `PUT /api/v1/media/{id}/alts/{locale}` với `{"alt": "…"}` — alt bằng một ngôn ngữ (vd `vi` trên
   website hai ngôn ngữ); `DELETE /api/v1/media/{id}/alts/{locale}` gỡ nó. `alt` của item vẫn là bản
   mặc định cho mọi ngôn ngữ chưa có bản dịch; item trả mọi bản dịch trong `alts`. Ngôn ngữ được
-  phép: `AUTOXIDE_MEDIA_ALT_LOCALES` (mặc định `en,vi`); ngôn ngữ khác bị từ chối với
-  `media.unsupported_locale`. Xoá hẳn item thì xoá luôn bản dịch.
+  phép: `AUTOXIDE_MEDIA_ALT_LOCALES` (mặc định `en,vi`), hoặc cấu hình `media.alt_locales` riêng
+  của khách khi khách đã đặt (quản trị của khách gọi `PUT /api/v1/kernel/settings/media.alt_locales`,
+  nhân sự nền tảng gọi `PUT /api/v1/kernel/tenants/{id}/settings/media.alt_locales`; `alt_locales`
+  trong `GET /api/v1/kernel/client-config` cho thấy danh sách của khách); ngôn ngữ khác bị từ chối
+  với `media.unsupported_locale`. Xoá hẳn item thì xoá luôn bản dịch.
 
 ## Phục vụ nội dung
 

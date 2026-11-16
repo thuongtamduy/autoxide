@@ -1075,3 +1075,71 @@ async fn hai_khach_khong_thay_media_cua_nhau() {
     .await
     .unwrap();
 }
+
+/// Cấu hình theo khách (đối chiếu thiết kế 2, A-b7): `media.alt_locales` của khách `b` thay
+/// `AUTOXIDE_MEDIA_ALT_LOCALES` cho riêng `b` (dịch `alt`, cấu hình cho giao diện); khách `a`
+/// chưa đặt dùng biến môi trường; giá trị sai bị từ chối lúc đặt.
+#[tokio::test]
+async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
+    TestDatabase::run(async |test| {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let all = ["media.read", "media.write", "media.purge"];
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant("b")
+            .user("platform", 9, &["kernel.tenants.manage"])
+            .user_in("a", "admin-a", 1, &all)
+            .user_in("b", "admin-b", 2, &all)
+            .provide::<dyn Storage>(storage)
+            .provide::<dyn TextModel>(text)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let path = "/api/v1/kernel/tenants/b/settings/media.alt_locales";
+        let refused =
+            app.put(path).token("platform").json(json!({"value": "fr, français"})).send().await;
+        assert_eq!(refused.unwrap().status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let set = app.put(path).token("platform").json(json!({"value": "vi,fr"})).send().await;
+        assert_eq!(set.unwrap().status(), StatusCode::OK);
+
+        for (token, french) in
+            [("admin-a", StatusCode::UNPROCESSABLE_ENTITY), ("admin-b", StatusCode::OK)]
+        {
+            let answer = app
+                .post("/api/v1/media?name=photo.png")
+                .token(token)
+                .header("content-type", "image/png")
+                .bytes(samples::png(2, 2))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), StatusCode::CREATED, "{}", answer.json());
+            let item = answer.json()["data"]["id"].as_str().unwrap().to_owned();
+            let answer = app
+                .put(&format!("/api/v1/media/{item}/alts/fr"))
+                .token(token)
+                .header("if-match", "*")
+                .json(json!({"alt": "Une photo"}))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), french, "{token}: {}", answer.json());
+            if french != StatusCode::OK {
+                assert_eq!(answer.json()["code"], "media.unsupported_locale");
+            }
+        }
+        for (slug, locales) in [("a", json!(["en", "vi"])), ("b", json!(["vi", "fr"]))] {
+            let config = app
+                .get("/api/v1/kernel/client-config")
+                .header("autoxide-tenant", slug)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(config.json()["data"]["media"]["alt_locales"], locales, "tenant {slug}");
+        }
+    })
+    .await
+    .unwrap();
+}

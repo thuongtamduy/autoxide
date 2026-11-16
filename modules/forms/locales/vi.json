@@ -20,6 +20,7 @@
   "field:must be a number": "phải là một số",
   "field:must be a phone number: 6 to 15 digits, optionally with `+`, spaces, `-`, `(`, `)` or `.`": "phải là số điện thoại: 6 đến 15 chữ số, được có `+`, khoảng trắng, `-`, `(`, `)` hay `.`",
   "field:must be a string": "phải là chuỗi",
+  "field:must be a whole number from {min} to {max}": "phải là số nguyên từ {min} đến {max}",
   "field:must be an `https://` or `http://` address": "phải là địa chỉ `https://` hay `http://`",
   "field:must be an array of option values": "phải là mảng các giá trị lựa chọn",
   "field:must be an email address": "phải là địa chỉ email",

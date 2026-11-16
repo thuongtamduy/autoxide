@@ -120,14 +120,15 @@ impl ResourceResolver for TermResolver {
         for text in texts {
             by_term.entry(text.term_id).or_default().push(text);
         }
-        let wanted = locale.unwrap_or(&config.default_locale);
+        let default = self.0.languages(tenant).await?.default;
+        let wanted = locale.unwrap_or(&default);
         Ok(by_term
             .into_iter()
             .filter_map(|(id, texts)| {
                 let chosen = texts
                     .iter()
                     .find(|text| text.locale == wanted)
-                    .or_else(|| texts.iter().find(|text| text.locale == config.default_locale))
+                    .or_else(|| texts.iter().find(|text| text.locale == default))
                     .or_else(|| texts.first())?;
                 let path =
                     format!("/{}/{}/{}", config.post_path_prefix, chosen.taxonomy, chosen.slug);

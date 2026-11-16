@@ -38,6 +38,7 @@ impl ContentService {
         rows: Vec<Published>,
     ) -> Result<Vec<PublicView>, Error> {
         let ids: Vec<Uuid> = rows.iter().map(|row| row.entry_id).collect();
+        let default_locale = self.languages(tenant).await?.default;
         let mut authors =
             crate::taxonomy::authors::authors_of(tenant.database().read(), tenant, &ids).await?;
         // Ảnh đại diện của tác giả cũng tra qua `media`: ảnh riêng tư thì không lộ cả ID.
@@ -55,7 +56,7 @@ impl ContentService {
             ids.extend(images.iter().copied());
         }
         if !avatars.is_empty() {
-            wanted.entry(self.config.default_locale.clone()).or_default().extend(avatars);
+            wanted.entry(default_locale.clone()).or_default().extend(avatars);
         }
         let mut media: HashMap<(String, Uuid), MediaRef> = HashMap::new();
         let mut public: HashSet<Uuid> = HashSet::new();
@@ -89,7 +90,7 @@ impl ContentService {
             tenant.database().read(),
             tenant,
             &ids,
-            &self.config.default_locale,
+            &default_locale,
             &rows,
         )
         .await?;

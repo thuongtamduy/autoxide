@@ -135,8 +135,8 @@ impl ContentService {
             .await?
             .into_iter()
             .collect();
-        let missing: Vec<&str> = self
-            .config
+        let languages = self.languages(tenant).await?;
+        let missing: Vec<&str> = languages
             .locales
             .iter()
             .map(String::as_str)

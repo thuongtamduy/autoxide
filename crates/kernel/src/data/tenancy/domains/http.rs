@@ -19,7 +19,7 @@ use crate::event::Actor;
 use crate::mcp::{PageInput, Tool};
 use crate::pagination::{Page, PageQuery, PageRequest};
 use crate::response::{Created, Data, Problem};
-use crate::tenancy::TenantContext;
+use crate::tenancy::{OrgId, TenantContext};
 
 /// A domain to add to the tenant.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -30,6 +30,19 @@ pub(crate) struct NewDomain {
     /// `localhost` or the platform's own domain.
     #[schema(example = "shop.example")]
     domain: String,
+}
+
+/// Where a domain belongs in the tenant's organization tree.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = TenantDomainChanges)]
+pub(crate) struct DomainChanges {
+    /// Id of a node of the tenant's organization tree (e.g. one store, for its own site), or
+    /// `null` for the tenant as a whole. Required: send `null` explicitly to detach.
+    // `deserialize_with`: serde coi trường `Option` vắng mặt là `null`; ép phải gửi.
+    #[serde(deserialize_with = "Option::deserialize")]
+    #[schema(required = true)]
+    org_id: Option<Uuid>,
 }
 
 /// Which domain to ask about.
@@ -138,6 +151,41 @@ async fn verify_domain(
     Ok(Data { data: service.verify(Actor::from(&principal), &tenant, id).await? })
 }
 
+/// Attach a domain to a node of the organization tree.
+///
+/// Requires `kernel.domains.manage`. Sets which node of the tenant's organization tree the domain
+/// belongs to (`org_id`), e.g. a store that has its own site; `null` attaches it to the tenant as
+/// a whole. The node must belong to the current tenant. The domain's status and its 7-day
+/// verification deadline do not change. Sending the current value changes nothing.
+#[utoipa::path(
+    patch,
+    path = "/domains/{id}",
+    extensions(("x-permissions" = json!(["kernel.domains.manage"]))),
+    operation_id = "update_tenant_domain",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the domain.")),
+    request_body = DomainChanges,
+    responses(
+        (status = 200, description = "The domain after the change.", body = Data<TenantDomain>),
+        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.domains.manage`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "The tenant has no such domain; code `tenant_domain_not_found`.", body = Problem),
+        (status = 409, description = "The domain was removed; code `tenant_domain_revoked`.", body = Problem),
+        (status = 422, description = "`org_id` is missing or not a node of this tenant (no installed module keeps an organization tree: only `null` is accepted); see `errors`.", body = Problem),
+    )
+)]
+async fn update_domain(
+    State(service): State<Arc<TenantDomains>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    crate::http::ValidJson(input): crate::http::ValidJson<DomainChanges>,
+) -> Result<Data<TenantDomain>, Error> {
+    principal.require(&DOMAINS_MANAGE)?;
+    let org = input.org_id.map(OrgId::from_uuid);
+    Ok(Data { data: service.assign_org(Actor::from(&principal), &tenant, id, org).await? })
+}
+
 /// Remove a domain from this tenant.
 ///
 /// Requires `kernel.domains.manage`. The domain becomes `revoked`: requests to it no longer reach
@@ -205,7 +253,7 @@ pub(crate) fn routes(service: Arc<TenantDomains>) -> OpenApiRouter {
         .routes(routes!(list_domains, add_domain))
         .routes(routes!(domain_allowed))
         .routes(routes!(verify_domain))
-        .routes(routes!(remove_domain))
+        .routes(routes!(update_domain, remove_domain))
         .with_state(service)
 }
 
@@ -218,9 +266,22 @@ pub(crate) struct DomainRef {
     id: Uuid,
 }
 
+// Đầu vào của tool `update_domain`.
+/// Which domain, and the node of the organization tree it belongs to.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DomainOrg {
+    /// Id of the domain, from `kernel.list_domains` or `kernel.add_domain`.
+    id: Uuid,
+    /// Id of a node of the tenant's organization tree, or `null` for the tenant as a whole.
+    #[serde(deserialize_with = "Option::deserialize")]
+    #[schema(required = true)]
+    org_id: Option<Uuid>,
+}
+
 /// Tool MCP — gọi đúng các hàm REST dùng. Không có tool xoá tên miền (việc phá huỷ, làm qua REST).
 pub(crate) fn tools(service: Arc<TenantDomains>) -> Vec<Tool> {
-    let (list, add, verify) = (service.clone(), service.clone(), service);
+    let (list, add, verify, update) = (service.clone(), service.clone(), service.clone(), service);
     vec![
         Tool::new(
             "list_domains",
@@ -251,6 +312,20 @@ pub(crate) fn tools(service: Arc<TenantDomains>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: DomainRef| {
                 let verify = verify.clone();
                 async move { verify.verify(Actor::from(&principal), &tenant, input.id).await }
+            },
+        )
+        .requires(DOMAINS_MANAGE),
+        Tool::new(
+            "update_domain",
+            "Attach one of the current tenant's domains to a node of its organization tree \
+             (`org_id`, e.g. a store with its own site), or to the tenant as a whole \
+             (`org_id: null`). Status and verification are not affected.",
+            move |tenant: TenantContext, principal: Principal, input: DomainOrg| {
+                let update = update.clone();
+                async move {
+                    let org = input.org_id.map(OrgId::from_uuid);
+                    update.assign_org(Actor::from(&principal), &tenant, input.id, org).await
+                }
             },
         )
         .requires(DOMAINS_MANAGE),

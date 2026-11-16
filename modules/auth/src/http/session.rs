@@ -28,6 +28,8 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(login_mfa))
         .routes(routes!(refresh))
         .routes(routes!(logout))
+        // Khách chỉ đọc: người dùng vẫn đăng nhập để xem và xuất dữ liệu (A-3.11).
+        .layer(autoxide_kernel::tenancy::allowed_while_read_only())
         .routes(routes!(me))
         .routes(routes!(change_password))
 }

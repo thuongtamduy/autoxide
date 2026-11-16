@@ -278,7 +278,12 @@ impl ContentService {
     ) -> Result<TermWithTexts, Error> {
         principal.require(&CONTENT_MANAGE)?;
         let mut problems = Vec::new();
-        let locale = self.check_locale(input.locale.as_deref(), "locale", &mut problems);
+        let locale = self.check_locale(
+            &self.languages(tenant).await?,
+            input.locale.as_deref(),
+            "locale",
+            &mut problems,
+        );
         if input.name.as_deref().is_none_or(|name| name.trim().is_empty()) {
             problems.push(
                 FieldError::new("name", "required", "must be 1 to {name_max} characters")
@@ -372,7 +377,12 @@ impl ContentService {
             }
             None => None,
             Some(raw) => {
-                let locale = self.check_locale(Some(raw), "locale", &mut problems);
+                let locale = self.check_locale(
+                    &self.languages(tenant).await?,
+                    Some(raw),
+                    "locale",
+                    &mut problems,
+                );
                 let existing = before.texts.iter().find(|text| text.locale == locale).cloned();
                 if existing.is_none()
                     && input.name.as_deref().is_none_or(|name| name.trim().is_empty())
@@ -635,7 +645,8 @@ impl ContentService {
         page: &PageRequest,
     ) -> Result<Page<(TermRef, u64)>, Error> {
         let mut problems = Vec::new();
-        let locale = self.check_locale(Some(locale), "locale", &mut problems);
+        let languages = self.languages(tenant).await?;
+        let locale = self.check_locale(&languages, Some(locale), "locale", &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -685,7 +696,7 @@ impl ContentService {
         let Page { data, pagination } = found;
         let mut shown = Vec::with_capacity(data.len());
         for term in data {
-            let named = pick(&texts, term.id, &locale, &self.config.default_locale)
+            let named = pick(&texts, term.id, &locale, &languages.default)
                 .ok_or_else(|| Error::internal("a term without names"))?;
             let count = counts.get(&term.id).copied().unwrap_or(0);
             shown.push((named, u64::try_from(count).unwrap_or(0)));
@@ -702,12 +713,13 @@ impl ContentService {
         slug: &str,
     ) -> Result<(TermWithTexts, TermRef), Error> {
         let mut problems = Vec::new();
-        let locale = self.check_locale(Some(locale), "locale", &mut problems);
+        let languages = self.languages(tenant).await?;
+        let locale = self.check_locale(&languages, Some(locale), "locale", &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
         let mut found = None;
-        for language in [locale.as_str(), self.config.default_locale.as_str()] {
+        for language in [locale.as_str(), languages.default.as_str()] {
             found = term_translation::Entity::find()
                 .scoped(tenant)
                 .filter(term_translation::Column::Taxonomy.eq(taxonomy.as_str()))
@@ -724,7 +736,7 @@ impl ContentService {
                 .with_param("slug", slug)
         })?;
         let full = self.term_with_texts(tenant, text.term_id).await?;
-        let shown = pick(&full.texts, text.term_id, &locale, &self.config.default_locale)
+        let shown = pick(&full.texts, text.term_id, &locale, &languages.default)
             .ok_or_else(|| Error::internal("a term without names"))?;
         Ok((full, shown))
     }

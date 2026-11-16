@@ -1,8 +1,9 @@
 //! `Mailer` của module: đưa mail vào job queue; job gửi qua [`Transport`].
 //!
 //! Theo khách (bước 33): mail xếp hàng trên database của khách gửi nó; job gửi qua máy chủ SMTP và
-//! địa chỉ người gửi của khách đó khi khách đã đặt (`mail.smtp_url`, `mail.from` — D-274), không thì
-//! qua cấu hình chung của máy chủ.
+//! địa chỉ người gửi của khách đó khi khách đã đặt (`mail.connection.smtp.url`,
+//! `mail.connection.smtp.from` — D-274; tên theo quy ước kết nối đối tác, tên cũ `mail.smtp_url` /
+//! `mail.from` vẫn được nhận), không thì qua cấu hình chung của máy chủ.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -11,7 +12,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Event, Outbox};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use autoxide_kernel::mail::{DELIVERY_FAILED, Mail, Mailer};
-use autoxide_kernel::tenancy::{TenantContext, TenantSetting, TenantSettings};
+use autoxide_kernel::tenancy::{CONNECTION_GROUP, TenantContext, TenantSetting, TenantSettings};
 use lettre::Message;
 use lettre::message::header::{HeaderName, HeaderValue};
 use lettre::message::{Mailbox, MultiPart, SinglePart};
@@ -57,18 +58,23 @@ impl Event for DeliveryFailed {
 
 /// Máy chủ SMTP riêng của khách (URL có mật khẩu: lưu mã hoá, không bao giờ trả ra).
 pub(crate) const TENANT_SMTP_URL: TenantSetting = TenantSetting::new(
-    "mail.smtp_url",
+    "mail.connection.smtp.url",
     "SMTP server this tenant's mail goes through, like `smtps://user:password@smtp.example.com`; \
      unset: the server's own (`AUTOXIDE_MAIL_SMTP_URL`).",
 )
-.secret();
+.secret()
+.group(CONNECTION_GROUP)
+.formerly("mail.smtp_url");
 
-/// Người gửi riêng của khách.
+/// Người gửi riêng của khách. Cùng nhóm kết nối: địa chỉ gửi đi kèm tài khoản SMTP (tên miền của
+/// nó phải được máy chủ SMTP cho gửi).
 pub(crate) const TENANT_FROM: TenantSetting = TenantSetting::new(
-    "mail.from",
+    "mail.connection.smtp.from",
     "Sender of this tenant's mail, like `Shop <no-reply@shop.example>`; unset: the server's own \
      (`AUTOXIDE_MAIL_FROM`). Its domain must be allowed to send through the SMTP server.",
-);
+)
+.group(CONNECTION_GROUP)
+.formerly("mail.from");
 
 pub(crate) struct MailService {
     queue: JobQueue,
@@ -150,7 +156,10 @@ impl Sender {
     ) -> Result<(Arc<Transport>, Mailbox), Error> {
         let from = match self.settings.get(tenant, &TENANT_FROM).await? {
             Some(value) => value.as_str().parse::<Mailbox>().map_err(|error| {
-                Error::internal(format!("tenant setting `mail.from` is not a mailbox: {error}"))
+                Error::internal(format!(
+                    "tenant setting `{}` is not a mailbox: {error}",
+                    TENANT_FROM.name()
+                ))
             })?,
             None => self.from.clone(),
         };

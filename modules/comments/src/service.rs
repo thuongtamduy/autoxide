@@ -20,7 +20,9 @@ use autoxide_kernel::i18n::Translations;
 use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::resource::ResourceDirectory;
 use autoxide_kernel::secret::SecretKey;
-use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{
+    DatabaseRegistry, ScopeExt, TenantContext, TenantSettings, parsed_setting,
+};
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
@@ -30,7 +32,7 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::config::CommentsConfig;
+use crate::config::{self, CommentsConfig, Rules};
 use crate::entity::{comment, profile, target};
 
 /// Tên module (bảng, khoá đếm, nonce, token).
@@ -48,6 +50,8 @@ pub(crate) struct CommentsService {
     pub(crate) verification: PostingVerification,
     pub(crate) tokens: OneTimeTokens,
     pub(crate) config: CommentsConfig,
+    /// Cấu hình theo khách (từ cấm, chế độ duyệt…) của kernel.
+    pub(crate) settings: Arc<dyn TenantSettings>,
 }
 
 /// Thứ service cần từ kernel và module khác.
@@ -60,6 +64,7 @@ pub(crate) struct Parts {
     pub translations: Translations,
     pub resources: ResourceDirectory,
     pub verification: PostingVerification,
+    pub settings: Arc<dyn TenantSettings>,
 }
 
 impl CommentsService {
@@ -75,7 +80,46 @@ impl CommentsService {
             verification: parts.verification,
             tokens: OneTimeTokens::new(MODULE),
             config,
+            settings: parts.settings,
         }
+    }
+
+    /// Luật kiểm duyệt của khách `tenant`: cấu hình khách đặt (`comments.banned_words`…), thiếu
+    /// thì biến môi trường. Đọc qua cache của kernel, không thêm truy vấn mỗi request.
+    pub(crate) async fn rules(&self, tenant: &TenantContext) -> Result<Rules, Error> {
+        let settings = self.settings.as_ref();
+        let mut rules = Rules::of(&self.config);
+        if let Some(words) =
+            parsed_setting(settings, tenant, &config::TENANT_BANNED_WORDS, config::tenant_words)
+                .await?
+        {
+            rules.banned_words = words;
+        }
+        if let Some(words) =
+            parsed_setting(settings, tenant, &config::TENANT_SUSPECT_WORDS, config::tenant_words)
+                .await?
+        {
+            rules.suspect_words = words;
+        }
+        if let Some(links) =
+            parsed_setting(settings, tenant, &config::TENANT_MAX_LINKS, config::tenant_max_links)
+                .await?
+        {
+            rules.max_links = links;
+        }
+        if let Some(mode) =
+            parsed_setting(settings, tenant, &config::TENANT_GUEST_MODERATION, config::tenant_mode)
+                .await?
+        {
+            rules.guest_mode = mode;
+        }
+        if let Some(mode) =
+            parsed_setting(settings, tenant, &config::TENANT_USER_MODERATION, config::tenant_mode)
+                .await?
+        {
+            rules.user_mode = mode;
+        }
+        Ok(rules)
     }
 }
 

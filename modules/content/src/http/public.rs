@@ -384,7 +384,12 @@ pub(crate) async fn list_posts(
     Query(paging): Query<PageQuery>,
 ) -> Result<Response, Error> {
     let mut problems = Vec::new();
-    let locale = service.check_locale(Some(&query.locale), "locale", &mut problems);
+    let locale = service.check_locale(
+        &service.languages(&tenant).await?,
+        Some(&query.locale),
+        "locale",
+        &mut problems,
+    );
     // Câu tìm dài vô hạn thành một câu `LIKE` đắt trên mọi bài, cho bất kỳ ai gọi.
     let max = crate::ai::semantic::QUERY_MAX;
     if query.q.as_deref().is_some_and(|q| q.trim().chars().count() > max) {
@@ -704,10 +709,11 @@ pub(crate) async fn sitemap(
     Query(paging): Query<PageQuery>,
 ) -> Result<Response, Error> {
     let mut problems = Vec::new();
+    let languages = service.languages(&tenant).await?;
     let locale = query
         .locale
         .as_deref()
-        .map(|locale| service.check_locale(Some(locale), "locale", &mut problems));
+        .map(|locale| service.check_locale(&languages, Some(locale), "locale", &mut problems));
     let page = page_request(paging, problems)?;
     let found = service.sitemap(&tenant, locale.as_deref(), &page).await?;
     let mut translations = service.translations_of(&tenant, &found.data).await?;
@@ -762,7 +768,12 @@ pub(crate) async fn feed(
     Query(query): Query<FeedQuery>,
 ) -> Result<Response, Error> {
     let mut problems = Vec::new();
-    let locale = service.check_locale(Some(&query.locale), "locale", &mut problems);
+    let locale = service.check_locale(
+        &service.languages(&tenant).await?,
+        Some(&query.locale),
+        "locale",
+        &mut problems,
+    );
     let limit = query.limit.unwrap_or(20);
     if !(1..=100).contains(&limit) {
         problems.push(autoxide_kernel::error::FieldError::new(

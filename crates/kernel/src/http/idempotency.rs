@@ -117,6 +117,11 @@ async fn run(
     };
     // Khách người gọi đang làm việc (kể cả nhân sự nền tảng vào khách khác bằng header).
     let tenant = databases.tenant(principal.tenant_id()).await?;
+    // Khách tạm khoá / chỉ đọc: lệnh ghi bị từ chối vì một trạng thái sẽ qua (A-3.11) —
+    // không lưu câu trả lời đó, để gửi lại cùng key sau khi khách mở lại thì lệnh được làm thật.
+    if tenant.read_only() || crate::tenancy::ensure_serving(&tenant).is_err() {
+        return Ok(next.run(request).await);
+    }
     // Người gọi trong khách: cùng tài khoản (cùng `user_id`) ở hai khách là hai phạm vi. Khách mặc
     // định giữ phạm vi như trước bước 33: nâng cấp không làm mất key đang còn hiệu lực.
     let api_key = principal.api_key_id().map(|id| id.as_bytes().to_vec()).unwrap_or_default();

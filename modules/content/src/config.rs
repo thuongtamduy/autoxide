@@ -2,6 +2,8 @@
 //! được ngay, trừ secret ký link xem trước (không có thì tính năng xem trước tắt).
 
 use autoxide_kernel::config::{ConfigReader, Invalid, Setting, parse_in_range};
+use autoxide_kernel::error::FieldError;
+use autoxide_kernel::tenancy::TenantSetting;
 
 pub(crate) const LOCALES: Setting = Setting::new(
     "AUTOXIDE_CONTENT_LOCALES",
@@ -185,6 +187,85 @@ impl ContentConfig {
     }
 }
 
+// --- Ngôn ngữ theo khách (đối chiếu thiết kế 2, A-b7) ----------------------------------------
+
+pub(crate) const TENANT_LOCALES: TenantSetting = TenantSetting::new(
+    "content.locales",
+    "Languages this tenant's content may be written in, comma-separated BCP 47 codes (e.g. \
+     `en,vi`), instead of the server's AUTOXIDE_CONTENT_LOCALES. Entries already written in a \
+     language left out stay as they are.",
+)
+.checked(|raw| tenant_locales(raw).map(|_| ()));
+
+pub(crate) const TENANT_DEFAULT_LOCALE: TenantSetting = TenantSetting::new(
+    "content.default_locale",
+    "Language used when a request names none, instead of the server's \
+     AUTOXIDE_CONTENT_DEFAULT_LOCALE. When it is not one of the tenant's languages, the server's \
+     default is used if it is one of them, otherwise the first of them.",
+)
+.checked(|raw| tenant_default_locale(raw).map(|_| ()));
+
+/// Danh sách ngôn ngữ (`content.locales`): ít nhất một mã, bỏ trùng, giữ thứ tự.
+pub(crate) fn tenant_locales(raw: &str) -> Result<Vec<String>, FieldError> {
+    let mut locales = Vec::new();
+    for item in raw.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+        let Some(locale) = canonical_locale(item) else {
+            return Err(FieldError::new(
+                "value",
+                "invalid",
+                "must be comma-separated language codes like `en` or `pt-BR`",
+            ));
+        };
+        if !locales.contains(&locale) {
+            locales.push(locale);
+        }
+    }
+    if locales.is_empty() {
+        return Err(FieldError::new(
+            "value",
+            "invalid",
+            "must be comma-separated language codes like `en` or `pt-BR`",
+        ));
+    }
+    Ok(locales)
+}
+
+/// Ngôn ngữ mặc định (`content.default_locale`).
+pub(crate) fn tenant_default_locale(raw: &str) -> Result<String, FieldError> {
+    canonical_locale(raw.trim()).ok_or_else(|| {
+        FieldError::new("value", "invalid", "must be a language code like `en` or `pt-BR`")
+    })
+}
+
+/// Ngôn ngữ đang áp cho một khách.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Languages {
+    /// Ngôn ngữ được viết, theo thứ tự đã khai.
+    pub locales: Vec<String>,
+    /// Luôn nằm trong `locales`.
+    pub default: String,
+}
+
+impl Languages {
+    /// Ghép cấu hình của khách (`None`: chưa đặt) với của máy chủ. Ngôn ngữ mặc định của khách chỉ
+    /// dùng khi nằm trong danh sách; không thì mặc định của máy chủ nếu nằm trong danh sách; không
+    /// nữa thì ngôn ngữ đầu tiên.
+    pub(crate) fn resolve(
+        config: &ContentConfig,
+        locales: Option<Vec<String>>,
+        default: Option<String>,
+    ) -> Self {
+        let locales = locales.unwrap_or_else(|| config.locales.clone());
+        let default = [default, Some(config.default_locale.clone())]
+            .into_iter()
+            .flatten()
+            .find(|locale| locales.contains(locale))
+            .or_else(|| locales.first().cloned())
+            .unwrap_or_else(|| config.default_locale.clone());
+        Languages { locales, default }
+    }
+}
+
 /// Mã ngôn ngữ BCP 47 dạng chuẩn: phần đầu chữ thường (2–3 chữ cái), phần vùng 2 chữ hoa
 /// hoặc 3 số, phần chữ viết 4 chữ cái viết hoa chữ đầu (`zh-Hant-TW`). `None` nếu sai dạng.
 pub(crate) fn canonical_locale(raw: &str) -> Option<String> {
@@ -218,6 +299,28 @@ pub(crate) fn canonical_locale(raw: &str) -> Option<String> {
 mod tests {
     use super::*;
     use autoxide_kernel::config::ConfigSource;
+
+    #[test]
+    fn ngon_ngu_theo_khach_ghep_voi_may_chu() {
+        let config = read(&[]).unwrap();
+        let both = |locales: Option<&str>, default: Option<&str>| {
+            let locales = locales.map(|raw| tenant_locales(raw).unwrap());
+            let default = default.map(|raw| tenant_default_locale(raw).unwrap());
+            let languages = Languages::resolve(&config, locales, default);
+            (languages.locales.join(","), languages.default)
+        };
+        assert_eq!(both(None, None), ("en,vi".to_owned(), "en".to_owned()));
+        assert_eq!(both(Some("vi, FR,vi"), None), ("vi,fr".to_owned(), "vi".to_owned()));
+        assert_eq!(both(Some("vi,en"), Some("vi")), ("vi,en".to_owned(), "vi".to_owned()));
+        assert_eq!(both(None, Some("vi")), ("en,vi".to_owned(), "vi".to_owned()));
+        // Mặc định của khách không nằm trong danh sách: mặc định của máy chủ, rồi ngôn ngữ đầu.
+        assert_eq!(both(None, Some("fr")), ("en,vi".to_owned(), "en".to_owned()));
+        assert_eq!(both(Some("fr,de"), Some("ja")), ("fr,de".to_owned(), "fr".to_owned()));
+        for bad in ["", " , ", "english", "en,xx-yyyyyy"] {
+            assert_eq!(tenant_locales(bad).unwrap_err().field, "value", "{bad}");
+        }
+        assert!(tenant_default_locale("english").is_err());
+    }
 
     fn read(pairs: &[(&str, &str)]) -> Result<ContentConfig, String> {
         let source = ConfigSource::from_pairs(pairs.iter().copied());

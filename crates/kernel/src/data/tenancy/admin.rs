@@ -11,6 +11,7 @@
 //!   đang "vào" khách khác bằng header làm việc này từ trong khách đó.
 //! - Chế độ `single`: chỉ có khách mặc định; tạo khách là lỗi `tenant_single_mode`.
 
+use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
 use axum::extract::{Path, Query, State};
@@ -24,8 +25,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{
-    DEFAULT_TENANT, DatabaseRegistry, MAIN_PLACEMENT, PlacementId, TenancyMode, TenantContext,
-    TenantId, TenantStatus, errors,
+    DEFAULT_TENANT, DatabaseRegistry, MAIN_PLACEMENT, PlacementId, PlacementKind, SchemaState,
+    TenancyMode, TenantContext, TenantId, TenantStatus, errors,
 };
 use crate::access::{Permission, Principal, Risk};
 use crate::error::{Error, FieldError};
@@ -108,6 +109,8 @@ pub(super) mod tenant {
         pub placement_id: Uuid,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
+        /// Chỉ đọc: đọc được, mọi lệnh ghi bị chặn (`tenant_read_only`); độc lập với `status`.
+        pub read_only: bool,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -146,9 +149,14 @@ pub struct Tenant {
     #[schema(example = "acme")]
     pub slug: String,
     pub name: String,
-    /// `provisioning`, `active`, `suspended`, `maintenance` or `moving`.
+    /// `provisioning`, `active`, `suspended` (every request is refused with
+    /// `403 tenant_suspended`), `maintenance` or `moving`.
     #[schema(example = "active")]
     pub status: String,
+    /// Read-only: its data can be read (and its users can sign in and export), but every change
+    /// is refused with `403 tenant_read_only`. Independent of `status`.
+    #[serde(default)]
+    pub read_only: bool,
     /// Parent tenant, when the tenant belongs to a chain.
     pub parent_id: Option<Uuid>,
     /// Name of the placement (database) that keeps its data.
@@ -156,6 +164,24 @@ pub struct Tenant {
     pub placement: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Related records asked for with `expand` in `GET /api/v1/kernel/tenants`; absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expanded: Option<TenantExpanded>,
+}
+
+/// Related records of a tenant, asked for with `expand`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TenantExpanded {
+    /// The placement that keeps the tenant's data (`expand=placement`); `null` when not asked for.
+    pub placement: Option<Placement>,
+    /// The tenant's subscription (`expand=subscription`). Always `null` for now: subscriptions
+    /// come with the plans module (step 35); without it no tenant has one.
+    #[schema(value_type = Option<Object>)]
+    pub subscription: Option<serde_json::Value>,
+    /// The tenant's use of its plan's limits (`expand=usage`). Always `null` for now, like
+    /// `subscription`.
+    #[schema(value_type = Option<Object>)]
+    pub usage: Option<serde_json::Value>,
 }
 
 /// The tenant of the caller.
@@ -165,6 +191,9 @@ pub struct CurrentTenant {
     pub slug: String,
     pub name: String,
     pub status: String,
+    /// Read-only: data can be read but every change is refused with `403 tenant_read_only`.
+    #[serde(default)]
+    pub read_only: bool,
     /// `single` (one tenant) or `multi` (many tenants on one installation).
     #[schema(example = "single")]
     pub mode: String,
@@ -233,20 +262,53 @@ pub struct NewTenant {
 #[serde(deny_unknown_fields)]
 pub struct TenantChanges {
     pub name: Option<String>,
-    /// `active` or `suspended`.
+    /// `active` or `suspended`. A suspended tenant refuses every request, reads included.
     #[schema(example = "suspended")]
     pub status: Option<String>,
+    /// `true`: the tenant can only read (its users still sign in and export their data), every
+    /// change is refused with `403 tenant_read_only`; `false`: writable again. Independent of
+    /// `status`. The platform tenant cannot be made read-only.
+    pub read_only: Option<bool>,
 }
 
-/// Which tenants to list.
+/// Which tenants to list, and what to add to each.
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct TenantFilter {
-    /// Only tenants in this state.
+    /// Only tenants in this state: `provisioning`, `active`, `suspended`, `maintenance` or
+    /// `moving`.
     pub status: Option<String>,
     /// Only children of this tenant.
     pub parent_id: Option<Uuid>,
+    /// Only read-only tenants (`true`) or writable ones (`false`).
+    pub read_only: Option<bool>,
+    /// Only tenants whose placement is of this kind: `shared` or `dedicated`.
+    #[param(example = "dedicated")]
+    pub placement_kind: Option<String>,
+    /// Only tenants whose placement is in this state: `ready`, `behind` (migrations pending) or
+    /// `migrating`.
+    #[param(example = "behind")]
+    pub schema_state: Option<String>,
+    /// Only tenants whose subscription is in this state: `trialing`, `active`, `past_due`,
+    /// `suspended`, `canceled` or `deleted`. Subscriptions come with the plans module (step 35);
+    /// without it no tenant has one, so the page is empty.
+    #[param(example = "past_due")]
+    pub subscription_status: Option<String>,
+    /// `true`: only tenants close to a limit of their plan. Limits come with the plans module
+    /// (step 35); without it no tenant has limits, so the page is empty. `false` filters nothing.
+    pub near_limit: Option<bool>,
+    /// Related records to add to each tenant under `expanded`, comma-separated: `placement`,
+    /// `subscription`, `usage`. Fetched for the whole page at once.
+    #[param(example = "placement,subscription")]
+    pub expand: Option<String>,
 }
+
+/// Trạng thái thuê bao bộ lọc nhận (đặc tả 35).
+const SUBSCRIPTION_STATES: [&str; 6] =
+    ["trialing", "active", "past_due", "suspended", "canceled", "deleted"];
+
+/// Thứ `expand` nhận.
+const EXPANSIONS: [&str; 3] = ["placement", "subscription", "usage"];
 
 #[derive(Debug, Serialize)]
 struct TenantChanged {
@@ -319,6 +381,7 @@ impl TenantAdmin {
             slug: tenant.slug().to_owned(),
             name: tenant.name().to_owned(),
             status: tenant.status().as_str().to_owned(),
+            read_only: tenant.read_only(),
             mode: match self.registry.mode() {
                 TenancyMode::Single => "single",
                 TenancyMode::Multi => "multi",
@@ -328,31 +391,123 @@ impl TenantAdmin {
         }
     }
 
-    /// Một trang khách, mới nhất trước (trừ khi `order=asc`).
+    /// Một trang khách, mới nhất trước (trừ khi `order=asc`). Hai câu truy vấn cho cả trang (bảng
+    /// placement nhỏ, rồi trang khách đã lọc), không gọi riêng từng dòng.
     pub async fn list(
         &self,
         filter: &TenantFilter,
         page: &PageRequest,
     ) -> Result<Page<Tenant>, Error> {
+        let mut problems = Vec::new();
         let mut select = tenant::Entity::find();
         if let Some(status) = &filter.status {
             if TenantStatus::parse(status).is_none() {
-                return Err(Error::validation(vec![FieldError::new(
+                problems.push(FieldError::new(
                     "status",
                     "invalid",
                     "must be one of provisioning, active, suspended, maintenance, moving",
-                )]));
+                ));
             }
             select = select.filter(tenant::Column::Status.eq(status.as_str()));
         }
         if let Some(parent) = filter.parent_id {
             select = select.filter(tenant::Column::ParentId.eq(parent));
         }
+        if let Some(read_only) = filter.read_only {
+            select = select.filter(tenant::Column::ReadOnly.eq(read_only));
+        }
+        if filter.placement_kind.as_deref().is_some_and(|kind| PlacementKind::parse(kind).is_none())
+        {
+            problems.push(FieldError::new(
+                "placement_kind",
+                "invalid",
+                "must be `shared` or `dedicated`",
+            ));
+        }
+        if filter.schema_state.as_deref().is_some_and(|state| SchemaState::parse(state).is_none()) {
+            problems.push(FieldError::new(
+                "schema_state",
+                "invalid",
+                "must be one of ready, behind, migrating",
+            ));
+        }
+        if filter
+            .subscription_status
+            .as_deref()
+            .is_some_and(|state| !SUBSCRIPTION_STATES.contains(&state))
+        {
+            problems.push(FieldError::new(
+                "subscription_status",
+                "invalid",
+                "must be one of trialing, active, past_due, suspended, canceled, deleted",
+            ));
+        }
+        let mut expand = Vec::new();
+        for item in filter.expand.as_deref().unwrap_or_default().split(',').map(str::trim) {
+            if item.is_empty() || expand.contains(&item) {
+                continue;
+            }
+            if EXPANSIONS.contains(&item) {
+                expand.push(item);
+            } else {
+                problems.push(FieldError::new(
+                    "expand",
+                    "invalid",
+                    "can only list placement, subscription and usage",
+                ));
+                break;
+            }
+        }
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
+        }
+        let placements = self.placement_names().await?;
+        if filter.placement_kind.is_some() || filter.schema_state.is_some() {
+            let ids: Vec<Uuid> = placements
+                .iter()
+                .filter(|placement| {
+                    filter.placement_kind.as_deref().is_none_or(|kind| placement.kind == kind)
+                        && filter
+                            .schema_state
+                            .as_deref()
+                            .is_none_or(|state| placement.schema_state == state)
+                })
+                .map(|placement| placement.id)
+                .collect();
+            select = select.filter(tenant::Column::PlacementId.is_in(ids));
+        }
+        // Thuê bao và hạn mức là của module `plans` (bước 35): chưa có thì không khách nào có thuê
+        // bao hay gần hạn mức — trang rỗng (vẫn một câu truy vấn, điều kiện luôn sai).
+        if filter.subscription_status.is_some() || filter.near_limit == Some(true) {
+            select = select.filter(tenant::Column::Id.is_in(Vec::<Uuid>::new()));
+        }
         let rows =
             fetch_page(select, tenant::Column::Id, |row| row.id, page, self.control().read())
                 .await?;
-        let placements = self.placement_names().await?;
-        Ok(rows.map(|row| describe(row, &placements)))
+        // Placement của trang, mô tả một lần mỗi cái (đọc nơi lưu riêng cần mở bản mã hoá).
+        let mut described: HashMap<Uuid, Placement> = HashMap::new();
+        if expand.contains(&"placement") {
+            for row in &rows.data {
+                if described.contains_key(&row.placement_id) {
+                    continue;
+                }
+                if let Some(placement) =
+                    placements.iter().find(|placement| placement.id == row.placement_id)
+                {
+                    let placement = describe_placement(&self.registry, placement.clone()).await;
+                    described.insert(row.placement_id, placement);
+                }
+            }
+        }
+        Ok(rows.map(|row| {
+            let placement = described.get(&row.placement_id).cloned();
+            let mut tenant = describe(row, &placements);
+            if !expand.is_empty() {
+                tenant.expanded =
+                    Some(TenantExpanded { placement, subscription: None, usage: None });
+            }
+            tenant
+        }))
     }
 
     async fn find(&self, id: Uuid) -> Result<tenant::Model, Error> {
@@ -436,6 +591,7 @@ impl TenantAdmin {
             placement_id: Set(placement),
             created_at: Set(now),
             updated_at: Set(now),
+            read_only: Set(false),
         };
         // Hai yêu cầu cùng slug cùng lúc: khoá unique của bảng chặn bên sau.
         row.insert(self.control().write()).await.map_err(|error| {
@@ -487,7 +643,7 @@ impl TenantAdmin {
         Ok(tenant)
     }
 
-    /// Đổi tên hay trạng thái (`active` / `suspended`) của khách `id`.
+    /// Đổi tên, trạng thái (`active` / `suspended`) hay cờ chỉ đọc của khách `id`.
     pub async fn update(
         &self,
         actor: Actor,
@@ -524,6 +680,14 @@ impl TenantAdmin {
                 "the platform tenant cannot be suspended",
             ));
         }
+        // Khách nền tảng chỉ đọc thì không ai gỡ được qua API (nhân sự nền tảng sống ở đó).
+        if id == DEFAULT_TENANT.as_uuid() && changes.read_only == Some(true) {
+            problems.push(FieldError::new(
+                "read_only",
+                "invalid",
+                "the platform tenant cannot be made read-only",
+            ));
+        }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -534,6 +698,9 @@ impl TenantAdmin {
         }
         if let Some(Some(status)) = status {
             active.status = Set(status.as_str().to_owned());
+        }
+        if let Some(read_only) = changes.read_only {
+            active.read_only = Set(read_only);
         }
         active.updated_at = Set(now());
         // Đúng phiên bản đã đọc (ghi trong điều kiện `UPDATE`): hai người sửa cùng lúc không đè nhau.
@@ -555,7 +722,12 @@ impl TenantAdmin {
         self.outbox
             .record(context.database().write(), &context, actor, Some(subject(id)), &event)
             .await?;
-        tracing::info!(tenant_id = %id, status = %after.status, "tenant updated");
+        tracing::info!(
+            tenant_id = %id,
+            status = %after.status,
+            read_only = after.read_only,
+            "tenant updated"
+        );
         Ok(after)
     }
 
@@ -647,10 +819,12 @@ fn describe(row: tenant::Model, placements: &[placement::Model]) -> Tenant {
         slug: row.slug,
         name: row.name,
         status: row.status,
+        read_only: row.read_only,
         parent_id: row.parent_id,
         placement,
         created_at: row.created_at,
         updated_at: row.updated_at,
+        expanded: None,
     }
 }
 
@@ -891,4 +1065,44 @@ pub(crate) fn tools(admin: Arc<TenantAdmin>) -> Vec<Tool> {
         .requires(TENANTS_READ)
         .read_only(),
     ]
+}
+
+// --- Migration ------------------------------------------------------------------------------
+
+/// Cột `read_only` của `kernel_tenants`: khách chỉ đọc (đọc được, ghi bị chặn), độc lập với
+/// `status` (tạm khoá chặn cả đọc) — đối chiếu thiết kế 2, A-3.11.
+pub(crate) struct AddReadOnly;
+
+impl crate::migration::prelude::MigrationName for AddReadOnly {
+    fn name(&self) -> &str {
+        "m0013_tenant_read_only"
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::migration::prelude::MigrationTrait for AddReadOnly {
+    async fn up(
+        &self,
+        manager: &crate::migration::prelude::SchemaManager,
+    ) -> Result<(), crate::migration::prelude::DbErr> {
+        use crate::migration::prelude::*;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("kernel_tenants")
+                    .add_column(schema::boolean("read_only").default(false))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(
+        &self,
+        manager: &crate::migration::prelude::SchemaManager,
+    ) -> Result<(), crate::migration::prelude::DbErr> {
+        use crate::migration::prelude::*;
+        manager
+            .alter_table(Table::alter().table("kernel_tenants").drop_column("read_only").to_owned())
+            .await
+    }
 }

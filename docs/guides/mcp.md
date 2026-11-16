@@ -128,6 +128,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
+| `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
 | `media.get` | `media.read` | read-only |
 | `media.list` | `media.read` | read-only |

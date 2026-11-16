@@ -35,8 +35,14 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(delete_passkey))
         .routes(routes!(list_user_passkeys, remove_user_passkeys))
         .routes(routes!(remove_user_passkey))
+}
+
+/// Đăng nhập bằng passkey: vẫn được khi khách chỉ đọc (A-3.11).
+pub(super) fn login_routes() -> OpenApiRouter<Arc<HttpState>> {
+    OpenApiRouter::new()
         .routes(routes!(start_login))
         .routes(routes!(login))
+        .layer(autoxide_kernel::tenancy::allowed_while_read_only())
 }
 
 /// A passkey ceremony in progress.

@@ -414,7 +414,12 @@ impl ContentService {
                     .with_param("limit_max", LIMIT_MAX),
             );
         }
-        let locale = self.check_locale(query.locale.as_deref(), "locale", &mut problems);
+        let locale = self.check_locale(
+            &self.languages(tenant).await?,
+            query.locale.as_deref(),
+            "locale",
+            &mut problems,
+        );
         if !problems.is_empty() {
             return Err(invalid(problems));
         }

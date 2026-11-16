@@ -158,7 +158,8 @@ Retention times are settings, not rules written in the code. Whether a contact f
 consent, how long submissions may be kept, and how fast data requests must be answered depend
 on the law that applies to you (for example Vietnam's Personal Data Protection Law of 2025 and
 Decree 356/2025): **check the original texts for your case** and set
-`AUTOXIDE_FORMS_RETENTION_DAYS` (or each form's `retention_days`) accordingly.
+`AUTOXIDE_FORMS_RETENTION_DAYS` (or the tenant's `forms.retention_days`, or each form's
+`retention_days`) accordingly.
 
 ## AI agents (MCP)
 
@@ -194,3 +195,10 @@ use REST) and no tool to send a form.
 A form may set its own `ip_limit_per_hour`, `email_limit_per_hour` and `retention_days`. The
 anti-spam layer itself (`AUTOXIDE_ANTISPAM_*`) is shared by every module. All are described in
 [`.env.example`](../.env.example).
+
+With several tenants, a tenant can replace `AUTOXIDE_FORMS_RETENTION_DAYS` with its own
+`forms.retention_days` (`0` to `36500`; its administrator with
+`PUT /api/v1/kernel/settings/forms.retention_days`, permission `kernel.settings.manage`; platform
+staff with `PUT /api/v1/kernel/tenants/{id}/settings/forms.retention_days`). The order is: the
+form's `retention_days`, then the tenant's setting, then the server's. A wrong value is refused when
+it is set; `DELETE` the setting to go back to the server's value.

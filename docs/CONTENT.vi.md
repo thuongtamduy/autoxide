@@ -123,6 +123,16 @@ Website chỉ ghép tên miền và, nếu dùng, tiền tố ngôn ngữ (`/vi/
 Ngôn ngữ đặt bằng `AUTOXIDE_CONTENT_LOCALES` (mặc định `en,vi`, mã BCP 47) và
 `AUTOXIDE_CONTENT_DEFAULT_LOCALE` (mặc định `en`).
 
+Khi có nhiều khách hàng (tenant), hai biến này là mặc định của mọi khách: mỗi khách có thể đặt
+`content.locales` và `content.default_locale` của mình (quản trị của khách gọi
+`PUT /api/v1/kernel/settings/{name}`, permission `kernel.settings.manage`; nhân sự nền tảng gọi
+`PUT /api/v1/kernel/tenants/{id}/settings/{name}`). Ngôn ngữ của khách áp cho mọi thứ của khách đó:
+mục, term, menu, chuyển hướng nhận ngôn ngữ nào, `locale` của route công khai, và phần `content` của
+`GET /api/v1/kernel/client-config` cho request nêu khách. Ngôn ngữ mặc định của khách không nằm
+trong danh sách ngôn ngữ của khách thì dùng mặc định của máy chủ nếu nó nằm trong danh sách, không
+thì ngôn ngữ đầu tiên. Mục đã viết bằng ngôn ngữ mà khách bỏ đi vẫn giữ nguyên. Mã sai bị từ chối
+ngay lúc đặt; gọi `DELETE` cấu hình đó để về giá trị của máy chủ.
+
 - Mỗi bản dịch là một mục riêng, có slug, trạng thái và lịch sử riêng, nối với nhau bằng
   `translation_group_id`. Tạo bằng `POST …/entries/{id}/translations`
   (`{"locale": "vi", "title": …}`). Trang con chỉ dịch được khi trang cha đã có bản dịch.

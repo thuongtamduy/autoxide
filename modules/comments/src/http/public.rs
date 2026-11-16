@@ -62,19 +62,25 @@ pub(crate) struct CommentSettings {
 
 /// Get the comment settings (public).
 ///
-/// No sign-in needed. Limits and switches a website needs to show the comment box.
+/// No sign-in needed. Limits and switches a website needs to show the comment box, for the
+/// tenant of the request (its own `comments.max_links` when it set one).
 #[utoipa::path(
     get,
     path = "/public/settings",
     extensions(("x-public" = json!(true))),
     operation_id = "get_comment_settings",
     security((), ("bearer" = [])),
-    responses((status = 200, description = "The settings.", body = Data<CommentSettings>))
+    responses(
+        (status = 200, description = "The settings.", body = Data<CommentSettings>),
+        (status = 400, description = "No tenant could be told for the request; code `tenant_required`.", body = Problem),
+    )
 )]
 pub(crate) async fn get_settings(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
 ) -> Result<Data<CommentSettings>, Error> {
     let config = &service.config;
+    let rules = service.rules(&tenant).await?;
     Ok(Data {
         data: CommentSettings {
             enabled: config.enabled,
@@ -83,7 +89,7 @@ pub(crate) async fn get_settings(
             signed_in_only_types: config.signed_in_only.clone(),
             verified_only_types: config.verified_only.clone(),
             max_length: config.max_length,
-            max_links: config.max_links,
+            max_links: rules.max_links,
             edit_minutes: config.edit_minutes,
             markdown: config.markdown,
             reply_mails: config.reply_mails(),

@@ -76,9 +76,12 @@ in between, `412` (code `precondition_failed`) — read it again and retry.
 - `PUT /api/v1/media/{id}/alts/{locale}` with `{"alt": "…"}` — the alt text in one language
   (e.g. `vi` on a bilingual site); `DELETE /api/v1/media/{id}/alts/{locale}` removes it. The
   item's own `alt` stays the default for every language without a translation; the item answers
-  all translations in `alts`. Languages allowed: `AUTOXIDE_MEDIA_ALT_LOCALES` (default `en,vi`);
-  others are refused with `media.unsupported_locale`. Deleting an item for good deletes its
-  translations.
+  all translations in `alts`. Languages allowed: `AUTOXIDE_MEDIA_ALT_LOCALES` (default `en,vi`),
+  or the tenant's own `media.alt_locales` setting when it set one (its administrator with
+  `PUT /api/v1/kernel/settings/media.alt_locales`, platform staff with
+  `PUT /api/v1/kernel/tenants/{id}/settings/media.alt_locales`; `media.alt_locales` in
+  `GET /api/v1/kernel/client-config` shows the tenant's list); others are refused with
+  `media.unsupported_locale`. Deleting an item for good deletes its translations.
 
 ## Serve the content
 

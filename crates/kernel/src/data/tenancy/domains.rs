@@ -15,8 +15,11 @@
 //!   tra qua trait [`DnsTxtLookup`] (bản thật dùng `hickory-resolver`, `dns.rs`; test dùng bản giả).
 //! - `updated_at` là lúc trạng thái đổi lần cuối: tên miền `pending` hỏng sau 7 ngày tính từ đó.
 //! - Event `kernel.domain_added` / `kernel.domain_verified` / `kernel.domain_revoked` /
-//!   `kernel.domain_failed` ghi vào outbox của `kernel` trong database của khách (như event của
-//!   `TenantAdmin`).
+//!   `kernel.domain_failed` / `kernel.domain_updated` ghi vào outbox của `kernel` trong database
+//!   của khách (như event của `TenantAdmin`).
+//! - Tên miền gắn được với một nút trong cây tổ chức của khách (`org_id`, đối chiếu thiết kế đợt
+//!   2): nút phải thuộc khách, hỏi qua trait [`OrgNodes`] (module cây tổ chức của bước 34 công
+//!   bố); chưa ai công bố thì chỉ gỡ được (`null`). Gắn / gỡ không đổi trạng thái hay hạn 7 ngày.
 //! - Job `kernel.verify_domains` (mỗi 10 phút) tra lại tên miền `pending`, và tên miền `verified`
 //!   đã quá một ngày từ lần kiểm trước.
 //! - Xác minh / thu hồi xong thì bỏ tên miền khỏi cache của sổ database ngay; máy chủ khác thấy sau
@@ -39,12 +42,14 @@ use uuid::Uuid;
 
 use super::errors::{
     self, tenant_domain_dns_failed, tenant_domain_invalid, tenant_domain_not_found,
-    tenant_domain_taken,
+    tenant_domain_revoked, tenant_domain_taken,
 };
-use super::{DatabaseRegistry, TenancyMode, TenantContext, TenantId, TenantStatus};
+use super::{
+    DatabaseRegistry, OrgId, OrgNodes, TenancyMode, TenantContext, TenantId, TenantStatus,
+};
 use crate::access::Permission;
 use crate::database::Database;
-use crate::error::{Error, ErrorKind};
+use crate::error::{Error, ErrorKind, FieldError};
 use crate::event::{Actor, Event, EventInfo, Outbox};
 use crate::job::{JobContext, JobHandler, Schedule};
 use crate::migration::prelude::{
@@ -74,6 +79,12 @@ pub(crate) const DOMAIN_FAILED: EventInfo = EventInfo::new(
     "kernel.domain_failed",
     "A domain of the tenant became `failed`: not verified within 7 days, or its DNS record was \
      missing at 3 daily checks in a row; requests to it no longer reach the tenant.",
+);
+
+pub(crate) const DOMAIN_UPDATED: EventInfo = EventInfo::new(
+    "kernel.domain_updated",
+    "A domain of the tenant was attached to another node of the tenant's organization tree, or \
+     detached from it.",
 );
 
 /// Loại job (cũng là tên lịch) tra lại tên miền đang chờ.
@@ -122,6 +133,23 @@ impl DnsSlot {
 
     fn get(&self) -> Arc<dyn DnsTxtLookup> {
         self.0.get_or_init(|| Arc::new(dns::SystemDns::default())).clone()
+    }
+}
+
+/// Cây tổ chức một module công bố (bước 34), hoặc không có. Điền một lần sau khi mọi module khởi
+/// động (`Modules::start_in`). Clone rẻ.
+#[derive(Clone, Default)]
+pub(crate) struct OrgSlot(Arc<OnceLock<Arc<dyn OrgNodes>>>);
+
+impl OrgSlot {
+    pub(crate) fn fill(&self, nodes: Option<Arc<dyn OrgNodes>>) {
+        if let Some(nodes) = nodes {
+            let _ = self.0.set(nodes);
+        }
+    }
+
+    fn get(&self) -> Option<Arc<dyn OrgNodes>> {
+        self.0.get().cloned()
     }
 }
 
@@ -226,6 +254,9 @@ pub struct TenantDomain {
     pub status: String,
     /// The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`.
     pub record: DomainRecord,
+    /// Node of the tenant's organization tree the domain belongs to (e.g. one store's own
+    /// site); `null`: the tenant as a whole. Set it with `PATCH /domains/{id}`.
+    pub org_id: Option<Uuid>,
     pub verified_at: Option<DateTime<Utc>>,
     /// Last time the DNS record was looked up.
     pub last_checked_at: Option<DateTime<Utc>>,
@@ -280,6 +311,22 @@ impl Event for DomainFailed {
     const NAME: &'static str = "kernel.domain_failed";
 }
 
+/// Payload of `kernel.domain_updated`.
+#[derive(Debug, Serialize)]
+struct DomainUpdated {
+    id: Uuid,
+    domain: String,
+    status: String,
+    /// Node the domain belongs to now; `null`: the tenant as a whole.
+    org_id: Option<Uuid>,
+    /// Node it belonged to before.
+    previous_org_id: Option<Uuid>,
+}
+
+impl Event for DomainUpdated {
+    const NAME: &'static str = "kernel.domain_updated";
+}
+
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
@@ -292,6 +339,7 @@ fn describe(row: Model) -> TenantDomain {
             value: format!("{CHALLENGE_VALUE_PREFIX}{}", row.verification_token),
         },
         id: row.id,
+        org_id: row.org_id,
         domain: row.domain,
         status: row.status,
         verified_at: row.verified_at,
@@ -317,6 +365,7 @@ pub struct TenantDomains {
     registry: DatabaseRegistry,
     outbox: Outbox,
     dns: DnsSlot,
+    orgs: OrgSlot,
     /// Tên máy của `AUTOXIDE_HTTP_PUBLIC_URL`: khách không được nhận.
     platform_host: Option<String>,
 }
@@ -332,9 +381,10 @@ impl TenantDomains {
         registry: DatabaseRegistry,
         outbox: Outbox,
         dns: DnsSlot,
+        orgs: OrgSlot,
         platform_host: Option<String>,
     ) -> Self {
-        TenantDomains { registry, outbox, dns, platform_host }
+        TenantDomains { registry, outbox, dns, orgs, platform_host }
     }
 
     /// Bản cài chạy chế độ nhiều khách (chỉ khi đó tên miền riêng có tác dụng).
@@ -505,6 +555,77 @@ impl TenantDomains {
             tracing::info!(tenant_id = %tenant.id(), domain = %row.domain, "tenant domain revoked");
         }
         Ok(())
+    }
+
+    /// Gắn tên miền `id` của khách `tenant` với nút `org` của cây tổ chức của khách (`None`: gỡ,
+    /// tên miền thuộc cả khách). Nút phải thuộc khách — hỏi [`OrgNodes`]; chưa module nào công
+    /// bố cây tổ chức thì chỉ nhận `None`. Tên miền đã thu hồi: `tenant_domain_revoked`. Gắn lại
+    /// đúng nút đang gắn không đổi gì, không ghi event. Không đổi trạng thái hay `updated_at` (hạn 7
+    /// ngày của tên miền `pending` tính từ đó). Hai lệnh gắn cùng lúc: lệnh ghi sau thắng.
+    pub async fn assign_org(
+        &self,
+        actor: Actor,
+        tenant: &TenantContext,
+        id: Uuid,
+        org: Option<OrgId>,
+    ) -> Result<TenantDomain, Error> {
+        let row = self.find_owned(tenant, id).await?;
+        if row.status == REVOKED {
+            return Err(tenant_domain_revoked());
+        }
+        let org_id = org.map(|org| org.as_uuid());
+        if row.org_id == org_id {
+            return Ok(describe(row));
+        }
+        if let Some(org) = org {
+            // Hỏi cây tổ chức NGOÀI mọi lệnh ghi: module khác có thể đọc database của nó.
+            let problem = match self.orgs.get() {
+                Some(nodes) if nodes.has_node(tenant, org).await? => None,
+                Some(_) => Some(FieldError::new(
+                    "org_id",
+                    "not_found",
+                    "is not a node of this tenant's organization tree; send `null` to attach the \
+                     domain to the tenant as a whole",
+                )),
+                None => Some(FieldError::new(
+                    "org_id",
+                    "unsupported",
+                    "cannot name a node: no installed module keeps an organization tree; send \
+                     `null`",
+                )),
+            };
+            if let Some(problem) = problem {
+                return Err(Error::validation(vec![problem]));
+            }
+        }
+        let updated = Entity::update_many()
+            .col_expr(Column::OrgId, Expr::value(org_id))
+            .filter(Column::Id.eq(row.id))
+            .filter(Column::TenantId.eq(tenant.id().as_uuid()))
+            .filter(Column::Status.ne(REVOKED))
+            .exec(self.control().write())
+            .await?;
+        if updated.rows_affected == 0 {
+            // Vừa bị thu hồi (hay nhận lại bởi khách khác) giữa lúc đọc và lúc ghi.
+            return Err(tenant_domain_revoked());
+        }
+        // Cache của sổ database chỉ giữ tên miền → khách: gắn nút không đổi gì ở đó.
+        let after = self.find(row.id).await?;
+        let event = DomainUpdated {
+            id: after.id,
+            domain: after.domain.clone(),
+            status: after.status.clone(),
+            org_id: after.org_id,
+            previous_org_id: row.org_id,
+        };
+        self.record(tenant, actor, &after, &event).await?;
+        tracing::info!(
+            tenant_id = %tenant.id(),
+            domain = %after.domain,
+            org_id = ?after.org_id,
+            "tenant domain attached to an organization node"
+        );
+        Ok(describe(after))
     }
 
     /// Tên miền `raw` đã xác minh và khách của nó đang hoạt động — cho câu hỏi `ask` của Caddy

@@ -7199,3 +7199,70 @@ Chủ dự án bảo "merge luôn" để team giao diện dùng ngay các sửa 
 bước 33, trong lúc `./gate.sh` đầy đủ còn đang chạy. Ngoại lệ một lần cho luật "chỉ merge khi gate đầy đủ xanh"
 (CLAUDE.md): mọi commit đã qua `./gate.sh --quick`; gate đầy đủ lần trước (sau phần B) xanh; test Postgres của kernel và
 app đã chạy cho C1, C2. Gate đầy đủ vẫn chạy tiếp; đỏ thì sửa ngay trên nhánh làm việc và merge bản sửa. Không phát hành.
+
+## D-296 · Đối chiếu thiết kế 2 của bước 33: cấu hình nghiệp vụ theo khách, lọc danh sách khách, tách tạm khoá khỏi chỉ đọc — 2026-11-16 — agent quyết
+
+1. **Cấu hình theo khách (A-b7).** `comments.banned_words`, `comments.suspect_words` (`-` = không từ nào),
+   `comments.max_links`, `comments.guest_moderation`, `comments.user_moderation`; `forms.retention_days`;
+   `content.locales`, `content.default_locale`; `media.alt_locales`. Biến môi trường là mặc định của mọi khách.
+   `TenantSetting::checked` kiểm giá trị lúc đặt (422, lỗi ô `value`); module đọc bằng `parsed_setting` — giá trị đã lưu
+   mà nay sai thì `warn` và dùng giá trị chung. Kernel cache cấu hình theo khách (một truy vấn mỗi khách, TTL
+   `AUTOXIDE_TENANCY_CACHE_SECONDS`, xoá khi đặt / bỏ trên máy chủ này). Ưu tiên: chế độ duyệt theo loại đích của máy chủ
+   > chế độ của khách; `retention_days` của form > khách > máy chủ; ngôn ngữ mặc định của khách không thuộc danh sách thì
+   dùng mặc định của máy chủ nếu thuộc, không thì ngôn ngữ đầu. Nhân sự nền tảng:
+   `GET/PUT/DELETE /kernel/tenants/{id}/settings[/{name}]` (`kernel.tenants.read` / `kernel.tenants.manage`; khách
+   `moving` → `tenant_moving`). `GET /kernel/client-config` nhận khách tuỳ chọn, module gắn `TenantClientSection` để thay
+   trường theo khách. `GET /comments/public/settings` cần khách của request (chế độ `multi` không nêu khách → 400).
+2. **Danh sách khách (A-c7).** Lọc `read_only`, `placement_kind`, `schema_state`, `subscription_status`, `near_limit`;
+   `expand=placement,subscription,usage` → trường `expanded`. Hai truy vấn mỗi trang. Chưa có module `plans` (bước 35)
+   thì `subscription_status` / `near_limit=true` trả trang rỗng và `subscription` / `usage` là `null` — đúng sự thật,
+   hợp đồng không đổi khi bước 35 thêm dữ liệu. Tool MCP `list_tenants` chưa nhận các lọc mới.
+3. **Tạm khoá ≠ chỉ đọc (A-3.11).** Cột `kernel_tenants.read_only` (migration `m0013_tenant_read_only`), độc lập
+   `status`; đặt qua `PATCH /kernel/tenants/{id}` hay `autoxide tenant read-only|writable`; khách nền tảng không chỉ đọc
+   được. Cưỡng chế một chỗ ở `tenancy::request::tenant()`: `ensure_serving` (403 `tenant_suspended`) rồi
+   `ensure_writable` (lệnh ghi — không phải GET/HEAD/OPTIONS — trên route không gắn `AllowedWhileReadOnly` → **403
+   `tenant_read_only`**). Lệch mục bổ sung của đặc tả 33 (ghi 402 `plans.subscription_past_due`): theo đặc tả 35, vì
+   kernel không phát mã `plans.`. MCP kiểm theo cờ `read_only` của tool. Vẫn ghi được khi chỉ đọc: đăng nhập, refresh,
+   logout, đặt lại mật khẩu, link trong thư (xác nhận, huỷ đăng ký — rút lại đồng ý luôn phải làm được; Luật Bảo vệ dữ
+   liệu cá nhân 91/2025/QH15, cần đối chiếu văn bản gốc), tạo bản xuất của `forms`. Idempotency không lưu câu trả lời
+   khi khách chỉ đọc hay không phục vụ. Job và event vẫn chạy; bước 35 thêm hoãn job / bỏ event theo `always_enabled`
+   và cộng chỉ đọc do thuê bao vào `ensure_writable` (cờ của nhà vận hành giữ riêng).
+
+Chưa làm: test ở `auth` khẳng định đăng nhập chạy khi khách chỉ đọc (cơ chế miễn đã có test ở kernel bằng route giả);
+lọc mới cho tool `list_tenants`; `kernel.public_url` theo khách trong client-config.
+
+## D-297 · Đối chiếu đợt 2 của bước 33: gắn tên miền với nút; nhóm `connection` và đổi tên setting bằng tên cũ — 2026-11-16 — agent quyết
+
+1. **Gắn tên miền với nút.** `PATCH /api/v1/kernel/domains/{id}` với `{"org_id": <uuid> | null}` (`kernel.domains.manage`;
+   thiếu `org_id` → 422, muốn gỡ phải gửi `null`), tool `kernel.update_domain`, event `kernel.domain_updated`
+   (`org_id`, `previous_org_id`). Kernel hỏi "nút có thuộc khách không" qua trait hẹp `tenancy::OrgNodes::has_node`, lấy
+   muộn sau khi mọi module khởi động; module `organizations` (bước 34) công bố nó cạnh `OrgDirectory` của mình. Không
+   đặt tên `OrgDirectory` trong kernel: đặc tả 34 đã dùng tên đó cho trait của module. Chưa ai công bố thì chỉ nhận
+   `null` (422 ô `org_id`, mã `unsupported`); nút lạ hay của khách khác: 422 `not_found`. Tên miền đã thu hồi → 409
+   `tenant_domain_revoked` — lệch đặc tả (ghi `kernel.domain_revoked`): mã lỗi kernel không mang tiền tố, cùng họ
+   `tenant_domain_*` của D-291, và tên kia đã là event. Gắn nút không đổi trạng thái hay hạn xác minh; gắn lại đúng giá
+   trị đang có thì không ghi event. Hai lệnh gắn cùng lúc: lệnh ghi sau thắng.
+2. **Nhóm setting.** `TenantSetting::group(…)`; nhóm `connection` (`CONNECTION_GROUP`) là kết nối tới đối tác. Tên setting
+   được nhiều đoạn nối bằng `.`; nhóm `connection` buộc tên `<module>.connection.<loại>.<trường>` và ngược lại tên dạng
+   đó buộc khai nhóm (kiểm lúc khởi động). `GET /kernel/settings?group=`, bản của nhân sự nền tảng và tool
+   `kernel.list_settings` lọc theo nhóm (nhóm lạ: danh sách rỗng); response có `group`.
+3. **Đổi tên** (thay tên ở D-274, D-275): `mail.smtp_url` → `mail.connection.smtp.url`, `mail.from` →
+   `mail.connection.smtp.from`, `ai.api_key` → `ai.connection.text.api_key`, `ai.model` → `ai.connection.text.model`.
+   `from` / `model` vào nhóm vì đi kèm tài khoản đối tác; loại `text` vì khoá của khách chỉ áp cho sinh chữ (embedding
+   sau này là `ai.connection.embedding.…`).
+4. **Tên cũ là alias, không upgrade dữ liệu.** `TenantSetting::formerly(<tên cũ>)`: đọc dòng tên mới trước rồi tới dòng
+   tên cũ; `PUT` / `DELETE` nhận cả hai tên, response và event mang tên mới; `PUT` ghi tên mới và xoá dòng tên cũ trong
+   cùng transaction. Lý do: tên setting nằm trong AAD của Sealer nên đổi tên dòng secret phải mã hoá lại; bảng thuộc
+   kernel, module không được đụng; upgrade phải chạy trên mọi placement. Alias mở secret bằng đúng tên đã lưu và không
+   phá client đang dùng tên cũ. Chấp nhận: dòng tên cũ nằm lại tới lần đặt kế; quay về binary cũ thì giá trị đã ghi dưới
+   tên mới không được đọc. Alias chưa có ngày hết hạn — bỏ tên cũ cần một quyết định riêng.
+
+Chưa làm: `POST /kernel/settings/{name}/test` (thuộc bước 51); bản giả `OrgNodes` trong testkit (bước 34 có bản thật).
+
+## D-298 · Merge D-296 và D-297 vào `main` trước gate đầy đủ (lần hai) — 2026-11-16 — chủ dự án quyết
+
+Chủ dự án bảo đẩy lên `main` ngay để mở phiên làm việc mới trên máy sạch (máy của phiên này gần hết đĩa, chỉ chạy được
+một subagent mỗi lúc). Ngoại lệ lần hai cho luật "chỉ merge khi gate đầy đủ xanh" (CLAUDE.md), như D-295: hai phần việc
+được merge (D-296, D-297) đã qua `./gate.sh --quick`, và test của các crate bị sửa đã chạy trên Postgres; gate đầy đủ
+gần nhất xanh ở `11bbef0`. Bước 33 chưa đóng: phiên kế tiếp chạy `./gate.sh` đầy đủ trên `main` mới trước khi làm tiếp
+(đo đường nóng, hướng dẫn viết module, changelog); đỏ thì sửa trước mọi việc khác. Không phát hành.

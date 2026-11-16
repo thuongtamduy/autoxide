@@ -93,7 +93,19 @@ impl Module for MediaModule {
     fn client_config(
         &self,
     ) -> Result<Option<autoxide_kernel::module::ClientSection>, autoxide_kernel::error::Error> {
-        self.config.as_ref().map_or(Ok(None), client_config::section)
+        let Some(config) = &self.config else { return Ok(None) };
+        let section = client_config::section(config)?;
+        // Ngôn ngữ dịch `alt` là cấu hình theo khách: request xác định được khách thì lấy của khách.
+        Ok(match &self.service {
+            Some(service) => section.map(|section| {
+                section.per_tenant(Arc::new(client_config::TenantAltLocales(service.clone())))
+            }),
+            None => section,
+        })
+    }
+
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::TENANT_ALT_LOCALES]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -114,7 +126,8 @@ impl Module for MediaModule {
         let ai = context.require::<dyn autoxide_kernel::ai::TextModel>()?;
         let service = Arc::new(
             MediaService::new(storage, context.outbox()?, context.jobs(), ai, config)
-                .with_resources(context.resources()),
+                .with_resources(context.resources())
+                .with_settings(context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?),
         );
         self.service = Some(service.clone());
         self.databases = Some(context.tenancy());
