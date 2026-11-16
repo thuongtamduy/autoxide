@@ -7896,3 +7896,28 @@ Quyết định:
 Đã cân nhắc: cache phân tán (Redis…) — thêm hạ tầng; độ trễ tối đa 30 giây là chấp nhận được cho bật / tắt module,
 còn hạn mức luôn kiểm trong transaction. Đặt `plans` sau mọi module — module nghiệp vụ không cần trait của `plans`
 (đi qua tay cầm của kernel), đặt sớm để bước sau chèn module nền trước nó.
+
+## D-325 · Kernel cưỡng chế quyền dùng ở bốn chỗ: route, tool MCP, job, event (bước 35 phần C) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Route REST**: `http::build` bọc router của mỗi module không `always_enabled` bằng lớp `http/entitlement.rs`
+   trước khi ghép dưới `/api/v1/<module>`. Lớp giải khách bằng cùng hàm của extractor `TenantContext` (kết quả cất
+   trong request, handler không giải lại, không xác thực thêm lần nào); không giải được khách (route công khai không
+   khách…) thì cho qua để handler tự trả lỗi. Gói không có module → 403 `module_not_enabled`; thuê bao `ReadOnly` →
+   `POST` / `PUT` / `PATCH` / `DELETE` → 403 `tenant_read_only` (dùng lại lỗi của trạng thái khách chỉ đọc, bước 33 —
+   một mã, một câu). `openapi::document_plan_gate` thêm câu vào response 403 sẵn có hay thêm 403 mới cho mọi
+   operation của module đó (chỉ thêm, không phá vỡ).
+2. **MCP**: `tools/list` ẩn tool của module gói không có; `tools/call` trả `module_not_enabled`; khách chỉ đọc (trạng
+   thái khách HAY thuê bao) chặn tool không `read_only`.
+3. **Job**: worker hỏi trước khi chạy job của khách; module không bật hay thuê bao chỉ đọc → trả job về hàng đợi sau
+   `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS` (3600; 60–86400), **không tính lượt thử** (không vào dead-letter). Gom tham số
+   của `run_job` vào `JobEnv`.
+4. **Event**: bên nhận thuộc module gói không có (hay khách chỉ đọc vì thuê bao) bị bỏ qua — coi như đã giao, không thử
+   lại; module `always_enabled` (audit, webhooks…) luôn nhận.
+5. Mọi chỗ bỏ qua khi chưa có bên cung cấp (`is_enforced`), với module `always_enabled`, và với khách nền tảng. Số đo
+   `entitlement_denials_total{kind}` với `kind` ∈ `module`, `read_only`, `job`, `event`, `feature`, `limit`, `quota`.
+6. Gọi trait của module khác qua `dyn Trait` kernel không chặn được: module cung cấp tự hỏi tay cầm khi cần (đặc tả).
+
+Đã cân nhắc: kiểm ở extractor `TenantContext` (một chỗ cho mọi handler) — extractor không biết route thuộc module nào;
+bọc theo module ở `http::build` biết đúng tên module mà không bắt module sửa gì.

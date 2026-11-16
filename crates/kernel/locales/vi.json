@@ -139,7 +139,7 @@
   "tenant_placement_taken": "Đã có vị trí dữ liệu tên `{placement}`.",
   "tenant_platform_only": "Chỉ quản trị của nền tảng mới làm được việc này.",
   "tenant_purge_current": "Vị trí dữ liệu `{placement}` đang giữ dữ liệu thật của khách; chỉ xoá được bản sao để lại ở vị trí khác (bởi `--keep-source`).",
-  "tenant_read_only": "Thuê bao đang tạm khoá hoặc đã huỷ: chỉ xem được dữ liệu. Thanh toán để mở lại.",
+  "tenant_read_only": "Khách hàng này đang ở chế độ chỉ đọc: xem và xuất được dữ liệu nhưng không thay đổi được. Liên hệ nhà cung cấp dịch vụ.",
   "tenant_required": "Không xác định được khách hàng của yêu cầu. Gửi tới tên miền của khách, kèm header `Autoxide-Tenant: <slug>`, hoặc đăng nhập.",
   "tenant_setting_unknown": "Không module nào nhận cấu hình `{name}`. Xem danh sách bằng `GET /api/v1/kernel/settings`.",
   "tenant_single_mode": "Bản cài đang chạy chế độ một khách hàng; đặt AUTOXIDE_TENANCY_MODE=multi để thêm khách.",

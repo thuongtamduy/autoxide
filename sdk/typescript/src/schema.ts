@@ -10133,6 +10133,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_PublicComment;
+        403: Problem;
         404: Problem;
         default: Problem;
       };
@@ -10171,6 +10172,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_PublicComment;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10184,6 +10186,7 @@ export interface paths {
       requestBody: ReportRequest;
       responses: {
         200: Data_CommentReported;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10196,6 +10199,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; target_ids?: string }; };
       responses: {
         200: Data_Vec_CommentCount;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10209,6 +10213,7 @@ export interface paths {
       responses: {
         200: Data_CommentSettings;
         400: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -10219,6 +10224,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { target_type: string; target_id: string }; };
       responses: {
         200: Data_CommentTarget;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10231,6 +10237,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; target_id?: string; replies_limit?: number; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_ThreadComment;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10244,6 +10251,7 @@ export interface paths {
       requestBody: UnsubscribeRequest;
       responses: {
         200: Data_CommentsUnsubscribed;
+        403: Problem;
         default: Problem;
       };
     };
@@ -10256,6 +10264,7 @@ export interface paths {
       responses: {
         200: Data_VerifiedResponse;
         400: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -10821,6 +10830,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; };
       responses: {
         200: Data_PublicAuthorPage;
+        403: Problem;
         404: Problem;
         default: Problem;
       };
@@ -10832,6 +10842,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale: string; limit?: number; site?: string }; };
       responses: {
         200: Data_Vec_PublicEntryResponse;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -10843,6 +10854,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale: string }; };
       responses: {
         200: Data_PublicMenu;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10855,6 +10867,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale: string; term_id?: string; author_id?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
       responses: {
         200: Page_PublicEntryResponse;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -10866,6 +10879,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { token: string }; };
       responses: {
         200: Data_PreviewEntryResponse;
+        403: Problem;
         404: Problem;
         503: Problem;
         default: Problem;
@@ -10878,6 +10892,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale: string; path: string; site?: string }; };
       responses: {
         200: Data_Resolution;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10890,6 +10905,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page"; limit?: number; site?: string }; };
       responses: {
         200: Page_SearchHit;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -10902,6 +10918,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
       responses: {
         200: Page_SitemapItem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -10913,6 +10930,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_PublicTermCount;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -10924,6 +10942,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string }; };
       responses: {
         200: Data_PublicTermPage;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -11263,6 +11282,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: "en" | "vi" }; };
       responses: {
         200: Data_PublicFormResponse;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -12025,6 +12045,7 @@ export interface paths {
         206: Blob;
         304: void;
         401: Problem;
+        403: Problem;
         404: Problem;
         416: Problem;
         422: Problem;
@@ -12112,6 +12133,7 @@ export interface paths {
       responses: {
         200: Data_PublicSiteMenu;
         304: void;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -12452,6 +12474,7 @@ export interface paths {
       responses: {
         200: Data_ConfirmResponse;
         400: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -12462,6 +12485,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale?: "en" | "vi" }; };
       responses: {
         200: Data_PublicListsResponse;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -12473,6 +12497,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { token?: string }; };
       responses: {
         200: Data_PreferencesResponse;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -12484,6 +12509,7 @@ export interface paths {
       requestBody: PreferencesBody;
       responses: {
         200: Data_PreferencesResponse;
+        403: Problem;
         404: Problem;
         422: Problem;
         default: Problem;
@@ -12498,6 +12524,7 @@ export interface paths {
       responses: {
         202: Data_SubscribeResponse;
         400: Problem;
+        403: Problem;
         422: Problem;
         429: Problem;
         503: Problem;
@@ -12512,6 +12539,7 @@ export interface paths {
       requestBody: string;
       responses: {
         200: Data_UnsubscribeResponse;
+        403: Problem;
         default: Problem;
       };
     };

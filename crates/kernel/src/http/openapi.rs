@@ -120,6 +120,41 @@ pub(super) fn label_module(module: &str, openapi: &mut OpenApi) {
     }
 }
 
+/// Ghi vào mọi operation của một module bị gói chi phối (bước 35) rằng nó có thể trả 403 vì gói:
+/// thêm câu vào response 403 sẵn có, hay thêm response 403 mới.
+pub(super) fn document_plan_gate(openapi: &mut OpenApi) {
+    for item in openapi.paths.paths.values_mut() {
+        for (method, operation) in operations_mut(item) {
+            let writes = matches!(method, "post" | "put" | "patch" | "delete");
+            let sentence = if writes {
+                "The tenant's plan does not include this module (`module_not_enabled`), or the \
+                 subscription is suspended or canceled and data can only be read \
+                 (`tenant_read_only`)."
+            } else {
+                "The tenant's plan does not include this module (`module_not_enabled`)."
+            };
+            match operation.responses.responses.get_mut("403") {
+                Some(RefOr::T(response)) => {
+                    response.description = format!("{} {sentence}", response.description);
+                }
+                Some(RefOr::Ref(_)) => {}
+                None => {
+                    let response = ResponseBuilder::new()
+                        .description(sentence)
+                        .content(
+                            PROBLEM_CONTENT_TYPE,
+                            ContentBuilder::new()
+                                .schema(Some(RefOr::Ref(Ref::from_schema_name(Problem::name()))))
+                                .build(),
+                        )
+                        .build();
+                    operation.responses.responses.insert("403".to_owned(), RefOr::T(response));
+                }
+            }
+        }
+    }
+}
+
 /// Hoàn thiện tài liệu chung sau khi đã ghép mọi module.
 /// Hoàn tất tài liệu: schema `Problem`, cách xác thực, response lỗi mặc định, và các
 /// header chung khai trên từng operation (để SDK sinh tự động có sẵn tham số).

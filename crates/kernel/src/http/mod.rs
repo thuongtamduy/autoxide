@@ -32,6 +32,7 @@ mod client;
 mod conditional;
 mod deprecation;
 mod disposition;
+mod entitlement;
 mod extract;
 mod health;
 mod idempotency;
@@ -128,12 +129,21 @@ pub struct Extras {
     /// [`TenantContext`](crate::tenancy::TenantContext) dùng nó. `None`: handler cần khách trả
     /// lỗi 500 nói rõ thiếu gì.
     pub tenancy: Option<crate::tenancy::DatabaseRegistry>,
+    /// Quyền dùng theo khách (bước 35): route và tool MCP của module mà gói của khách không có bị
+    /// chặn. Mặc định: không có bên cung cấp, không chặn gì.
+    pub entitlements: crate::entitlement::EntitlementsHandle,
 }
 
 impl Extras {
     /// Sets the database registry (tenancy).
     pub fn tenancy(mut self, registry: crate::tenancy::DatabaseRegistry) -> Self {
         self.tenancy = Some(registry);
+        self
+    }
+
+    /// Sets what each tenant may use (step 35).
+    pub fn entitlements(mut self, entitlements: crate::entitlement::EntitlementsHandle) -> Self {
+        self.entitlements = entitlements;
         self
     }
 
@@ -187,6 +197,14 @@ pub fn build(
     let mut api = OpenApiRouter::new();
     for (name, mut routes) in modules {
         openapi::label_module(name, routes.get_openapi_mut());
+        // Module bị gói chi phối: chặn route khi gói của khách không có nó (bước 35).
+        if !extras.entitlements.catalog().is_always_enabled(name) && name != crate::user_flags::ME {
+            openapi::document_plan_gate(routes.get_openapi_mut());
+            let handle = extras.entitlements.clone();
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                entitlement::gate(handle.clone(), name, request, next)
+            }));
+        }
         api = api.nest(&format!("/{name}"), routes);
     }
     let (router, mut openapi) = OpenApiRouter::with_openapi(openapi::base_document())
@@ -217,9 +235,13 @@ pub fn build(
         .clone()
         .map(|inner| rate_limit::ApiKeyLimited::wrap(inner, config.api_key_rate_limit));
     let translations = Arc::new(extras.translations);
-    if let Some(mcp) =
-        mcp::router(extras.tools, translations.clone(), limited.clone(), &config.cors_origins)
-    {
+    if let Some(mcp) = mcp::router(
+        extras.tools,
+        translations.clone(),
+        limited.clone(),
+        &config.cors_origins,
+        extras.entitlements.clone(),
+    ) {
         router = router.merge(mcp);
     }
 

@@ -29,6 +29,7 @@
   "text:A plan was created (`plan`).": "Một gói vừa được tạo (`plan`).",
   "text:A tenant got its first subscription (`tenant_id`, `subscription`).": "Khách hàng có thuê bao đầu tiên (`tenant_id`, `subscription`).",
   "text:A tenant moved to another plan or price, or changed its add-ons (`tenant_id`, `before`, `after`).": "Khách hàng đổi gói, đổi giá hay đổi gói thêm (`tenant_id`, `before`, `after`).",
+  "text:An item was added.": "Một mục vừa được thêm.",
   "text:An override of a tenant was removed (`tenant_id`, `override`).": "Một ghi đè của khách hàng đã bị gỡ (`tenant_id`, `override`).",
   "text:An override was set for a tenant (`tenant_id`, `override`).": "Một ghi đè vừa được đặt cho khách hàng (`tenant_id`, `override`).",
   "text:Change, cancel or resume the subscription of your tenant.": "Đổi, huỷ hay tiếp tục thuê bao của khách hàng của bạn.",

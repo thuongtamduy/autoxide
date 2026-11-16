@@ -18,6 +18,14 @@ pub const JOB_CONCURRENCY: Setting = Setting::new(
 )
 .with_default("4");
 
+pub const JOB_BLOCKED_DELAY_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS",
+    "When a job belongs to a module the tenant's plan no longer includes, or the tenant is \
+     read-only, wait this long before looking at it again (60 to 86400 seconds). Such a wait does \
+     not count as a failed attempt.",
+)
+.with_default("3600");
+
 /// Tiến trình `serve` làm việc gì.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -47,6 +55,8 @@ impl ProcessRole {
 pub struct ProcessConfig {
     pub role: ProcessRole,
     pub job_concurrency: u64,
+    /// Hoãn job bị gói chặn chừng này giây (bước 35).
+    pub job_blocked_delay: u64,
 }
 
 impl ProcessConfig {
@@ -59,7 +69,13 @@ impl ProcessConfig {
         });
         let job_concurrency =
             reader.get_with(&JOB_CONCURRENCY, |raw| parse_in_range(raw, 1u64, 256));
-        Ok(ProcessConfig { role: role?, job_concurrency: job_concurrency? })
+        let job_blocked_delay =
+            reader.get_with(&JOB_BLOCKED_DELAY_SECONDS, |raw| parse_in_range(raw, 60u64, 86_400));
+        Ok(ProcessConfig {
+            role: role?,
+            job_concurrency: job_concurrency?,
+            job_blocked_delay: job_blocked_delay?,
+        })
     }
 }
 
@@ -79,7 +95,10 @@ mod tests {
     fn mac_dinh_lam_ca_hai_viec() {
         let config = read(&[]).unwrap();
 
-        assert_eq!(config, ProcessConfig { role: ProcessRole::All, job_concurrency: 4 });
+        assert_eq!(
+            config,
+            ProcessConfig { role: ProcessRole::All, job_concurrency: 4, job_blocked_delay: 3600 }
+        );
         assert!(config.role.serves_api() && config.role.runs_background_work());
         let api = read(&[("AUTOXIDE_PROCESS_ROLE", "api")]).unwrap().role;
         assert!(api.serves_api() && !api.runs_background_work());

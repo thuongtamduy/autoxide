@@ -25798,7 +25798,7 @@
                 }
               }
             },
-            "description": "Missing permission `ai.view`; code `permission_denied`."
+            "description": "Missing permission `ai.view`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "default": {
             "content": {
@@ -34718,7 +34718,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.read`; code `permission_denied`."
+            "description": "Missing permission `comments.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -34856,7 +34856,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.manage`; code `permission_denied`."
+            "description": "Missing permission `comments.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -34969,7 +34969,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.manage`; code `permission_denied`."
+            "description": "Missing permission `comments.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -35069,7 +35069,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.manage`; code `permission_denied`."
+            "description": "Missing permission `comments.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -35176,7 +35176,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.export`; code `permission_denied`."
+            "description": "Missing permission `comments.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -35268,7 +35268,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.export`; code `permission_denied`."
+            "description": "Missing permission `comments.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -35352,7 +35352,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.post`; code `permission_denied`."
+            "description": "Missing permission `comments.post`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "default": {
             "content": {
@@ -35447,7 +35447,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.post`; code `permission_denied`."
+            "description": "Missing permission `comments.post`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -35572,7 +35572,7 @@
                 }
               }
             },
-            "description": "Comments are off (`comments.disabled`), guests may not comment here (`comments.guests_not_allowed`), the author is banned (`comments.banned`), or a signed-in caller lacks `comments.post` (`permission_denied`)."
+            "description": "Comments are off (`comments.disabled`), guests may not comment here (`comments.guests_not_allowed`), the author is banned (`comments.banned`), or a signed-in caller lacks `comments.post` (`permission_denied`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -35697,6 +35697,16 @@
             },
             "description": "The comment."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -35799,7 +35809,7 @@
                 }
               }
             },
-            "description": "Not the author (`comments.not_author`), or banned (`comments.banned`)."
+            "description": "Not the author (`comments.not_author`), or banned (`comments.banned`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -35935,7 +35945,7 @@
                 }
               }
             },
-            "description": "Not the author; code `comments.not_author`."
+            "description": "Not the author; code `comments.not_author`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "412": {
             "content": {
@@ -36046,6 +36056,16 @@
             },
             "description": "One page of replies."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -36152,6 +36172,16 @@
             },
             "description": "Received."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -36244,6 +36274,16 @@
             },
             "description": "The counts."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -36327,6 +36367,16 @@
             },
             "description": "No tenant could be told for the request; code `tenant_required`."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -36397,6 +36447,16 @@
               }
             },
             "description": "The state."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -36548,6 +36608,16 @@
             },
             "description": "One page of top-level comments."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -36644,6 +36714,16 @@
             },
             "description": "Done."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -36729,6 +36809,16 @@
               }
             },
             "description": "The link is invalid, expired or used; code `comments.link_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "default": {
             "content": {
@@ -36869,7 +36959,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.read`; code `permission_denied`."
+            "description": "Missing permission `comments.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -36979,7 +37069,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.read`; code `permission_denied`."
+            "description": "Missing permission `comments.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -37132,7 +37222,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.manage`; code `permission_denied`."
+            "description": "Missing permission `comments.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -37259,7 +37349,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.moderate`; code `permission_denied`."
+            "description": "Missing permission `comments.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -37359,7 +37449,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.read`; code `permission_denied`."
+            "description": "Missing permission `comments.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -37491,7 +37581,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.moderate`; code `permission_denied`."
+            "description": "Missing permission `comments.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -37661,7 +37751,7 @@
                 }
               }
             },
-            "description": "Missing permission `comments.read`; code `permission_denied`."
+            "description": "Missing permission `comments.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -37800,7 +37890,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -37913,7 +38003,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -38023,7 +38113,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -38123,7 +38213,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -38247,7 +38337,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -38574,7 +38664,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -38687,7 +38777,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the parent page is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the parent page is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -38807,7 +38897,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.delete`; code `permission_denied`."
+            "description": "Missing permission `content.delete`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -38937,7 +39027,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -39069,7 +39159,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -39226,7 +39316,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.publish`; code `permission_denied`."
+            "description": "Missing permission `content.publish`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -39373,7 +39463,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -39512,7 +39602,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the page or the new parent is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the page or the new parent is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -39661,7 +39751,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -39807,7 +39897,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), an editor archived it and you only have `content.publish_own` (code `content.archived`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`)."
+            "description": "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), an editor archived it and you only have `content.publish_own` (code `content.archived`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -39972,7 +40062,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -40115,7 +40205,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -40266,7 +40356,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -40370,7 +40460,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -40496,7 +40586,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -40631,7 +40721,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "default": {
             "content": {
@@ -40753,7 +40843,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.publish`; code `permission_denied`."
+            "description": "Missing permission `content.publish`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -40887,7 +40977,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -40994,7 +41084,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -41142,7 +41232,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -41280,7 +41370,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry (or its translation) is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry (or its translation) is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -41441,7 +41531,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -41566,7 +41656,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry — or the translation of its parent page — is not yours and you only have `content.write_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry — or the translation of its parent page — is not yours and you only have `content.write_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -41703,7 +41793,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.publish` or `content.publish_own` (code `permission_denied`), or the entry is not yours and you only have `content.publish_own` (code `content.not_owner`)."
+            "description": "Missing permission `content.publish` or `content.publish_own` (code `permission_denied`), or the entry is not yours and you only have `content.publish_own` (code `content.not_owner`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -41819,7 +41909,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "default": {
             "content": {
@@ -41921,7 +42011,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -42063,7 +42153,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "412": {
             "content": {
@@ -42159,6 +42249,16 @@
             },
             "description": "The author."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -42253,6 +42353,16 @@
             },
             "description": "The newest posts, newest first."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -42334,6 +42444,16 @@
               }
             },
             "description": "The menu."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -42494,6 +42614,16 @@
             },
             "description": "One page of published posts."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -42565,6 +42695,16 @@
               }
             },
             "description": "The draft."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -42676,6 +42816,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -42805,6 +42955,16 @@
             },
             "description": "The best results shown on the website, best first."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -42933,6 +43093,16 @@
             },
             "description": "One page of addresses."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -43051,6 +43221,16 @@
             },
             "description": "One page of terms with their post counts."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -43140,6 +43320,16 @@
               }
             },
             "description": "The term."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -43286,7 +43476,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -43399,7 +43589,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -43509,7 +43699,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -43609,7 +43799,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -43733,7 +43923,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -43903,7 +44093,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -44010,7 +44200,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.publish`; code `permission_denied`."
+            "description": "Missing permission `content.publish`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -44149,7 +44339,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -44292,7 +44482,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -44405,7 +44595,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -44515,7 +44705,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -44625,7 +44815,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read`; code `permission_denied`."
+            "description": "Missing permission `content.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -44749,7 +44939,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.manage`; code `permission_denied`."
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -44883,7 +45073,7 @@
                 }
               }
             },
-            "description": "Missing permission `content.read` (or `content.write` / `content.write_own`); code `permission_denied`."
+            "description": "Missing permission `content.read` (or `content.write` / `content.write_own`); code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -45602,7 +45792,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.read`; code `permission_denied`."
+            "description": "Missing permission `forms.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -45715,7 +45905,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.manage` (or `forms.read`, needed to set `notify_emails`); code `permission_denied`."
+            "description": "Missing permission `forms.manage` (or `forms.read`, needed to set `notify_emails`); code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -45833,7 +46023,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.export`; code `permission_denied`."
+            "description": "Missing permission `forms.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -45925,7 +46115,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.export`; code `permission_denied`."
+            "description": "Missing permission `forms.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -46019,7 +46209,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.export`; code `permission_denied`."
+            "description": "Missing permission `forms.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -46140,7 +46330,7 @@
                 }
               }
             },
-            "description": "The link is wrong or has expired; code `forms.export_link_invalid`. Get a new one from `GET /api/v1/forms/exports/{export_id}`."
+            "description": "The link is wrong or has expired; code `forms.export_link_invalid`. Get a new one from `GET /api/v1/forms/exports/{export_id}`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -46229,6 +46419,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -46361,7 +46561,7 @@
                 }
               }
             },
-            "description": "The page's `Origin` is not allowed for this form; code `forms.origin_not_allowed`."
+            "description": "The page's `Origin` is not allowed for this form; code `forms.origin_not_allowed`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -46510,7 +46710,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.review`; code `permission_denied`."
+            "description": "Missing permission `forms.review`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -46610,7 +46810,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.read`; code `permission_denied`."
+            "description": "Missing permission `forms.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -46742,7 +46942,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.review`; code `permission_denied`."
+            "description": "Missing permission `forms.review`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -46881,7 +47081,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.manage`; code `permission_denied`."
+            "description": "Missing permission `forms.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -47001,7 +47201,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.read`; code `permission_denied`."
+            "description": "Missing permission `forms.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -47133,7 +47333,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.manage` (or `forms.read`, needed to change `notify_emails`); code `permission_denied`."
+            "description": "Missing permission `forms.manage` (or `forms.read`, needed to change `notify_emails`); code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -47329,7 +47529,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.read`; code `permission_denied`."
+            "description": "Missing permission `forms.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -47467,7 +47667,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.export`; code `permission_denied`."
+            "description": "Missing permission `forms.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -47603,7 +47803,7 @@
                 }
               }
             },
-            "description": "Missing permission `forms.export`; code `permission_denied`."
+            "description": "Missing permission `forms.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -50777,7 +50977,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.read`; code `permission_denied`."
+            "description": "Missing permission `media.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -50946,7 +51146,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "413": {
             "content": {
@@ -51110,7 +51310,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.read`; code `permission_denied`."
+            "description": "Missing permission `media.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -51223,7 +51423,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -51333,7 +51533,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -51443,7 +51643,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.read`; code `permission_denied`."
+            "description": "Missing permission `media.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -51575,7 +51775,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -51699,7 +51899,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.read`; code `permission_denied`."
+            "description": "Missing permission `media.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "default": {
             "content": {
@@ -51832,7 +52032,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.read`; code `permission_denied`."
+            "description": "Missing permission `media.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -51932,7 +52132,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -52032,7 +52232,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.read`; code `permission_denied`."
+            "description": "Missing permission `media.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -52164,7 +52364,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -52311,7 +52511,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -52421,7 +52621,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.read`; code `permission_denied`."
+            "description": "Missing permission `media.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -52553,7 +52753,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -52710,7 +52910,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write` (code `permission_denied`), or the image is private and may not be sent (code `media.ai_private_not_allowed`)."
+            "description": "Missing permission `media.write` (code `permission_denied`), or the image is private and may not be sent (code `media.ai_private_not_allowed`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -52883,7 +53083,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -53064,7 +53264,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -53299,6 +53499,16 @@
             },
             "description": "A token was sent but is not valid; see `GET /api/v1/auth/me` for the codes."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -53415,6 +53625,16 @@
           },
           "304": {
             "description": "Not modified: the `ETag` in `If-None-Match` is current."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "description": "No media item has this id that you may load."
@@ -53557,7 +53777,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -53717,7 +53937,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.purge`; code `permission_denied`."
+            "description": "Missing permission `media.purge`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -53834,7 +54054,7 @@
                 }
               }
             },
-            "description": "Missing permission `media.write`; code `permission_denied`."
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -53974,7 +54194,7 @@
                 }
               }
             },
-            "description": "Missing permission `menus.read`; code `permission_denied`."
+            "description": "Missing permission `menus.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -54093,7 +54313,7 @@
                 }
               }
             },
-            "description": "Missing permission `menus.manage`; code `permission_denied`."
+            "description": "Missing permission `menus.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -54215,6 +54435,16 @@
           "304": {
             "description": "The menu has not changed since the `ETag` sent in `If-None-Match`."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -54322,7 +54552,7 @@
                 }
               }
             },
-            "description": "Missing permission `menus.manage`; code `permission_denied`."
+            "description": "Missing permission `menus.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -54422,7 +54652,7 @@
                 }
               }
             },
-            "description": "Missing permission `menus.read`; code `permission_denied`."
+            "description": "Missing permission `menus.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -54554,7 +54784,7 @@
                 }
               }
             },
-            "description": "Missing permission `menus.manage`; code `permission_denied`."
+            "description": "Missing permission `menus.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -54691,7 +54921,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -54837,7 +55067,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -54950,7 +55180,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -55059,7 +55289,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -55189,7 +55419,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -55321,7 +55551,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -55485,7 +55715,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.send`; code `permission_denied`."
+            "description": "Missing permission `newsletter.send`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -55629,7 +55859,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.send`; code `permission_denied`."
+            "description": "Missing permission `newsletter.send`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -55743,7 +55973,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -55877,7 +56107,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.send`; code `permission_denied`."
+            "description": "Missing permission `newsletter.send`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -56041,7 +56271,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.send`; code `permission_denied`."
+            "description": "Missing permission `newsletter.send`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -56215,7 +56445,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.send`; code `permission_denied`."
+            "description": "Missing permission `newsletter.send`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -56365,7 +56595,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.send`; code `permission_denied`."
+            "description": "Missing permission `newsletter.send`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -56492,7 +56722,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.export`; code `permission_denied`."
+            "description": "Missing permission `newsletter.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -56584,7 +56814,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.export`; code `permission_denied`."
+            "description": "Missing permission `newsletter.export`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -56704,7 +56934,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -56817,7 +57047,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage` (or `newsletter.send`, needed for `new_posts: send`); code `permission_denied`."
+            "description": "Missing permission `newsletter.manage` (or `newsletter.send`, needed for `new_posts: send`); code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "409": {
             "content": {
@@ -56937,7 +57167,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -57067,7 +57297,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -57199,7 +57429,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage` (or `newsletter.send`, needed for `new_posts: send`); code `permission_denied`."
+            "description": "Missing permission `newsletter.manage` (or `newsletter.send`, needed for `new_posts: send`); code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -57339,6 +57569,16 @@
             },
             "description": "The link is invalid, expired or used; code `newsletter.confirmation_invalid`."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -57405,6 +57645,16 @@
               }
             },
             "description": "The public lists."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -57477,6 +57727,16 @@
               }
             },
             "description": "The preferences."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -57580,6 +57840,16 @@
               }
             },
             "description": "The preferences after the change."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -57686,6 +57956,16 @@
               }
             },
             "description": "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -57803,6 +58083,16 @@
             },
             "description": "Unsubscribed."
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -57874,7 +58164,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "default": {
             "content": {
@@ -58027,7 +58317,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -58134,7 +58424,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -58234,7 +58524,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -58334,7 +58624,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -58466,7 +58756,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {
@@ -58625,7 +58915,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+            "description": "Missing permission `newsletter.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -58738,7 +59028,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -58838,7 +59128,7 @@
                 }
               }
             },
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`."
+            "description": "Missing permission `newsletter.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "404": {
             "content": {

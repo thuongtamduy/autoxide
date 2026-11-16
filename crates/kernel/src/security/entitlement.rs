@@ -17,7 +17,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, OnceLock};
 
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::tenancy::{DEFAULT_TENANT, TenantContext, TenantId};
 
 /// Một tính năng bật / tắt theo gói, khoá `<module>.<tên>` (vd `content.ai_suggestions`).
@@ -516,15 +516,6 @@ pub fn reference_reused(reference: &str, limit: &str) -> Error {
     )
     .with_param("reference", reference.to_owned())
     .with_param("limit", limit.to_owned())
-}
-
-/// `tenant_read_only` (403): thuê bao tạm khoá hay đã huỷ, chỉ xem được.
-pub fn tenant_read_only() -> Error {
-    Error::new(
-        ErrorKind::Forbidden,
-        "tenant_read_only",
-        "The subscription is suspended or canceled: the data can only be read. Pay to open it again.",
-    )
 }
 
 #[cfg(test)]

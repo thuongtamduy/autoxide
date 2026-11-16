@@ -507,7 +507,8 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        Ok(Worker::new(databases, modules, handlers, schedules, concurrency))
+        Ok(Worker::new(databases, modules, handlers, schedules, concurrency)
+            .with_entitlements(self.entitlements.clone()))
     }
 
     /// Bộ phát event: đọc bảng event của mọi module phát event trên mọi database của sổ
@@ -537,7 +538,8 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        Ok(Dispatcher::new(databases, self.events.modules(), subscriptions, Arc::clone(&self.wake)))
+        Ok(Dispatcher::new(databases, self.events.modules(), subscriptions, Arc::clone(&self.wake))
+            .with_entitlements(self.entitlements.clone()))
     }
 
     /// Bước kiểm của từng module kèm tên module, theo thứ tự đăng ký (`autoxide doctor`). Gọi

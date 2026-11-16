@@ -2,6 +2,8 @@
 //! chọn (cả SQLite và Postgres): gói là dữ liệu, gói mặc định duy nhất, gán gói, ghi đè, quyền dùng,
 //! hạn mức giữ chỗ / trả lại đồng thời, lượng dùng theo kỳ, không rò rỉ giữa khách.
 
+mod enforcement;
+
 use std::sync::Arc;
 
 use autoxide_kernel::entitlement::{EntitlementsHandle, Feature, Limit, Period};
