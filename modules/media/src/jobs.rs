@@ -6,11 +6,13 @@
 //!   tuổi đọc từ `version_id` (UUIDv7 mang thời điểm tạo) — để không xoá upload đang dở.
 //!   Không bao giờ đọc hay xoá khoá ngoài `media/` (của từng khách).
 //!
-//! Theo khách (bước 33): job theo lịch chạy một lần cho mỗi database. Dọn thùng rác tìm các khách
-//! có item quá hạn trên database đó (index quét `media_item_trashed_sweep_idx`) rồi xoá theo từng
-//! khách — mỗi lần xoá ghi event của đúng khách. Dọn mồ côi đọc khoá ở nơi lưu chung: nội dung của
-//! khách mặc định ở `media/…`, của khách khác ở `tenants/<khách>/media/…` (D-259); mỗi khoá được
-//! đối chiếu với **database của chính khách đó** (tra qua sổ database). Khoá của khách không còn
+//! Theo khách (bước 33): dọn thùng rác chạy một lần cho mỗi database — tìm các khách có item quá
+//! hạn trên database đó (index quét `media_item_trashed_sweep_idx`) rồi xoá theo từng khách, mỗi
+//! lần xoá ghi event của đúng khách. Dọn mồ côi chạy một lần cho cả bản cài (database điều khiển),
+//! quét mọi nơi lưu (nơi lưu chung và nơi lưu riêng của từng placement,
+//! [`DatabaseRegistry::file_stores`]): nội dung của khách mặc định ở `media/…`, của khách khác ở
+//! `tenants/<khách>/media/…` (D-259); mỗi khoá được đối chiếu với **database của chính khách đó**
+//! (tra qua sổ database), chỉ với khách đang lưu file ở nơi đang quét. Khoá của khách không còn
 //! trong sổ thì để nguyên.
 
 use std::collections::{BTreeMap, HashMap};
@@ -21,7 +23,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{
-    DEFAULT_TENANT, DatabaseRegistry, ScopeExt, TenantContext, TenantId,
+    DEFAULT_TENANT, DatabaseRegistry, FileStore, ScopeExt, TenantContext, TenantId,
 };
 use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
@@ -136,12 +138,29 @@ impl MediaService {
         databases: &DatabaseRegistry,
         now: DateTime<Utc>,
     ) -> Result<u64, Error> {
+        let mut removed = 0;
+        for store in databases.file_stores(self.storage.clone()).await? {
+            removed += self.clean_store(databases, &store, now).await?;
+        }
+        if removed > 0 {
+            tracing::info!(keys = removed, "orphaned media content removed");
+        }
+        Ok(removed)
+    }
+
+    /// Như [`clean_orphans`](Self::clean_orphans), ở một nơi lưu.
+    async fn clean_store(
+        &self,
+        databases: &DatabaseRegistry,
+        store: &FileStore,
+        now: DateTime<Utc>,
+    ) -> Result<u64, Error> {
+        let storage = &store.storage;
         let cutoff = now - chrono::Duration::hours(ORPHAN_GRACE_HOURS);
-        // Khoá thật ở nơi lưu chung (không qua tiền tố khách): của khách mặc định và của mọi khách
-        // khác.
-        let mut keys = self.storage.keys_with_prefix(KEY_PREFIX).await?;
+        // Khoá thật ở nơi lưu (không qua tiền tố khách): của khách mặc định và của mọi khách khác.
+        let mut keys = storage.keys_with_prefix(KEY_PREFIX).await?;
         keys.extend(
-            self.storage
+            storage
                 .keys_with_prefix("tenants/")
                 .await?
                 .into_iter()
@@ -166,6 +185,9 @@ impl MediaService {
                 // Khách không còn trong sổ (hay chưa mở được database của nó): không đoán.
                 continue;
             };
+            if !store.serves(&tenant) {
+                continue;
+            }
             for chunk in candidates.chunks(BATCH) {
                 let ids: Vec<Uuid> = chunk.iter().map(|(_, item, _)| *item).collect();
                 // Kết nối ghi: dòng vừa lưu chưa tới read replica thì vẫn thấy.
@@ -184,13 +206,10 @@ impl MediaService {
                     if current.get(item) == Some(version) {
                         continue;
                     }
-                    self.storage.delete(key).await?;
+                    storage.delete(key).await?;
                     removed += 1;
                 }
             }
-        }
-        if removed > 0 {
-            tracing::info!(keys = removed, "orphaned media content removed");
         }
         Ok(removed)
     }

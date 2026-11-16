@@ -5,15 +5,20 @@
 //! - Bảng `kernel_tenant_domains` thuộc mặt điều khiển (chỉ database điều khiển có dữ liệu); một tên
 //!   miền thuộc đúng một khách trên cả nền tảng (unique index).
 //! - Trạng thái: `pending` (chờ bản ghi TXT) → `verified`; `pending` quá 7 ngày → `failed`; xoá →
-//!   `revoked`. `failed` xác minh lại được (`POST /domains/{id}/verify`). Tên miền `failed` /
+//!   `revoked`. Tên miền `verified` được kiểm lại mỗi ngày: 3 lần liên tiếp không thấy bản ghi đúng
+//!   (`check_failures`) → `failed`, request tới nó không còn vào khách; một lần thấy thì đếm lại từ 0.
+//!   DNS không trả lời (lỗi, quá giờ) không tính là "không thấy" — sự cố của DNS không lấy mất tên
+//!   miền của khách. `failed` xác minh lại được (`POST /domains/{id}/verify`). Tên miền `failed` /
 //!   `revoked` của khách khác thì khách mới nhận lại được — người chưa chứng minh sở hữu không giữ
 //!   chỗ mãi (chỉ `pending` và `verified` chặn khách khác).
 //! - Bản ghi phải đặt: TXT `_autoxide-challenge.<domain>` = `autoxide-verify=<verification_token>`;
 //!   tra qua trait [`DnsTxtLookup`] (bản thật dùng `hickory-resolver`, `dns.rs`; test dùng bản giả).
 //! - `updated_at` là lúc trạng thái đổi lần cuối: tên miền `pending` hỏng sau 7 ngày tính từ đó.
-//! - Event `kernel.domain_added` / `kernel.domain_verified` / `kernel.domain_revoked` ghi vào
-//!   outbox của `kernel` trong database của khách (như event của `TenantAdmin`).
-//! - Job `kernel.verify_domains` (mỗi 10 phút) tra lại tên miền `pending`.
+//! - Event `kernel.domain_added` / `kernel.domain_verified` / `kernel.domain_revoked` /
+//!   `kernel.domain_failed` ghi vào outbox của `kernel` trong database của khách (như event của
+//!   `TenantAdmin`).
+//! - Job `kernel.verify_domains` (mỗi 10 phút) tra lại tên miền `pending`, và tên miền `verified`
+//!   đã quá một ngày từ lần kiểm trước.
 //! - Xác minh / thu hồi xong thì bỏ tên miền khỏi cache của sổ database ngay; máy chủ khác thấy sau
 //!   tối đa `AUTOXIDE_TENANCY_CACHE_SECONDS`.
 
@@ -42,6 +47,9 @@ use crate::database::Database;
 use crate::error::{Error, ErrorKind};
 use crate::event::{Actor, Event, EventInfo, Outbox};
 use crate::job::{JobContext, JobHandler, Schedule};
+use crate::migration::prelude::{
+    DbErr, MigrationName, MigrationTrait, SchemaManager, Table, schema,
+};
 use crate::pagination::{Page, PageRequest, fetch_page};
 
 pub(crate) use http::{routes, tools};
@@ -62,6 +70,11 @@ pub(crate) const DOMAIN_VERIFIED: EventInfo = EventInfo::new(
 );
 pub(crate) const DOMAIN_REVOKED: EventInfo =
     EventInfo::new("kernel.domain_revoked", "A domain was removed from the tenant.");
+pub(crate) const DOMAIN_FAILED: EventInfo = EventInfo::new(
+    "kernel.domain_failed",
+    "A domain of the tenant became `failed`: not verified within 7 days, or its DNS record was \
+     missing at 3 daily checks in a row; requests to it no longer reach the tenant.",
+);
 
 /// Loại job (cũng là tên lịch) tra lại tên miền đang chờ.
 pub(crate) const VERIFY_DOMAINS: &str = "kernel.verify_domains";
@@ -79,6 +92,10 @@ const LOOKUP_TIMEOUT: Duration = Duration::from_secs(10);
 const SWEEP_BATCH: u64 = 200;
 /// Độ dài tối đa của `check_error` (cột `varchar(200)`).
 const CHECK_ERROR_MAX: usize = 200;
+/// Tên miền `verified` được kiểm lại sau chừng này giờ từ lần kiểm trước.
+const RECHECK_HOURS: i64 = 24;
+/// Số lần kiểm lại liên tiếp không thấy bản ghi thì tên miền `verified` thành `failed`.
+const MAX_CHECK_FAILURES: i32 = 3;
 
 /// Tra bản ghi TXT của một tên. Kernel dùng bộ tra DNS của hệ điều hành; module (hay testkit) công
 /// bố `dyn DnsTxtLookup` để thay (`context.provide::<dyn DnsTxtLookup>(…)`).
@@ -163,6 +180,8 @@ mod entity {
         pub verified_at: Option<DateTimeUtc>,
         pub last_checked_at: Option<DateTimeUtc>,
         pub check_error: Option<String>,
+        /// Số lần kiểm lại liên tiếp không thấy bản ghi (tên miền `verified`).
+        pub check_failures: i32,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
     }
@@ -201,7 +220,8 @@ pub struct TenantDomain {
     #[schema(example = "shop.example")]
     pub domain: String,
     /// `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
-    /// days: fix the record and verify again).
+    /// days, or a verified domain whose record was missing at 3 daily checks in a row: fix the
+    /// record and verify again).
     #[schema(example = "pending")]
     pub status: String,
     /// The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`.
@@ -211,12 +231,16 @@ pub struct TenantDomain {
     pub last_checked_at: Option<DateTime<Utc>>,
     /// Why the last lookup did not verify the domain.
     pub check_error: Option<String>,
+    /// Daily checks in a row of the verified domain that did not find the DNS record; at 3 the
+    /// domain becomes `failed`. Keep the record in place: one successful check resets it to 0.
+    pub failed_checks: u32,
     pub created_at: DateTime<Utc>,
     /// When the status last changed; a `pending` domain fails 7 days after it.
     pub updated_at: DateTime<Utc>,
 }
 
-/// Payload of `kernel.domain_added`, `kernel.domain_verified` and `kernel.domain_revoked`.
+/// Payload of `kernel.domain_added`, `kernel.domain_verified`, `kernel.domain_revoked` and
+/// `kernel.domain_failed`.
 #[derive(Debug, Serialize)]
 struct DomainChanged {
     id: Uuid,
@@ -248,6 +272,14 @@ impl Event for DomainRevoked {
     const NAME: &'static str = "kernel.domain_revoked";
 }
 
+#[derive(Debug, Serialize)]
+#[serde(transparent)]
+struct DomainFailed(DomainChanged);
+
+impl Event for DomainFailed {
+    const NAME: &'static str = "kernel.domain_failed";
+}
+
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
@@ -265,6 +297,7 @@ fn describe(row: Model) -> TenantDomain {
         verified_at: row.verified_at,
         last_checked_at: row.last_checked_at,
         check_error: row.check_error,
+        failed_checks: u32::try_from(row.check_failures).unwrap_or(0),
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -273,8 +306,10 @@ fn describe(row: Model) -> TenantDomain {
 /// Kết quả một lần tra bản ghi TXT.
 enum Probe {
     Found,
-    /// Chưa thấy bản ghi đúng: lý do (tiếng Anh, cho người quản trị).
+    /// DNS trả lời nhưng không có bản ghi đúng: lý do (tiếng Anh, cho người quản trị).
     Missing(String),
+    /// Không hỏi được DNS (lỗi, quá giờ): không biết bản ghi còn hay không.
+    Unreachable(String),
 }
 
 /// Dịch vụ tên miền riêng của khách. Module `kernel` công bố (`context.require::<TenantDomains>()`).
@@ -362,6 +397,7 @@ impl TenantDomains {
                     verified_at: Set(None),
                     last_checked_at: Set(None),
                     check_error: Set(None),
+                    check_failures: Set(0),
                     created_at: Set(now),
                     updated_at: Set(now),
                 };
@@ -397,6 +433,7 @@ impl TenantDomains {
                     .col_expr(Column::VerifiedAt, Expr::value(Option::<DateTime<Utc>>::None))
                     .col_expr(Column::LastCheckedAt, Expr::value(Option::<DateTime<Utc>>::None))
                     .col_expr(Column::CheckError, Expr::value(Option::<String>::None))
+                    .col_expr(Column::CheckFailures, Expr::value(0))
                     .col_expr(Column::CreatedAt, Expr::value(now))
                     .col_expr(Column::UpdatedAt, Expr::value(now))
                     .filter(Column::Id.eq(row.id))
@@ -419,7 +456,8 @@ impl TenantDomains {
     }
 
     /// Tra bản ghi TXT của tên miền `id` của khách `tenant` ngay, trả trạng thái mới. Tên miền
-    /// `failed` xác minh lại được; tên miền đã xác minh trả về như cũ.
+    /// `failed` xác minh lại được; tên miền đã xác minh trả về như cũ — trừ khi lần kiểm lại hằng
+    /// ngày gần nhất không thấy bản ghi: khi đó kiểm lại ngay (sửa bản ghi xong thì đếm lại từ 0).
     pub async fn verify(
         &self,
         actor: Actor,
@@ -428,7 +466,11 @@ impl TenantDomains {
     ) -> Result<TenantDomain, Error> {
         let row = self.owned(tenant, id).await?;
         if row.status == VERIFIED {
-            return Ok(describe(row));
+            if row.check_failures == 0 {
+                return Ok(describe(row));
+            }
+            let database = self.control().clone();
+            return self.recheck(&database, row).await.map(describe);
         }
         let row = self.check(actor, row).await?;
         Ok(describe(row))
@@ -508,16 +550,123 @@ impl TenantDomains {
         let reason = format!(
             "Not verified within {PENDING_DAYS} days. Set the TXT record, then verify again."
         );
-        Entity::update_many()
+        let updated = Entity::update_many()
             .col_expr(Column::Status, Expr::value(FAILED))
-            .col_expr(Column::CheckError, Expr::value(reason))
+            .col_expr(Column::CheckError, Expr::value(reason.clone()))
             .col_expr(Column::UpdatedAt, Expr::value(now))
             .filter(Column::Id.eq(row.id))
             .filter(Column::Status.eq(PENDING))
             .exec(database.write())
             .await?;
-        tracing::info!(domain = %row.domain, "tenant domain not verified in time; marked failed");
+        if updated.rows_affected > 0 {
+            let after = Model {
+                status: FAILED.to_owned(),
+                check_error: Some(reason),
+                updated_at: now,
+                ..row
+            };
+            self.record_failed(&after).await?;
+            tracing::info!(domain = %after.domain, "tenant domain not verified in time; marked failed");
+        }
         Ok(())
+    }
+
+    /// Kiểm lại các tên miền `verified` trên `database` đã quá [`RECHECK_HOURS`] giờ từ lần kiểm
+    /// trước (job `kernel.verify_domains`): thấy bản ghi → đếm lại từ 0; không thấy lần thứ
+    /// [`MAX_CHECK_FAILURES`] liên tiếp → `failed`. Trả số tên miền đã xét.
+    pub async fn recheck_verified(&self, database: &Database) -> Result<usize, Error> {
+        let due = Utc::now() - chrono::Duration::hours(RECHECK_HOURS);
+        let rows = Entity::find()
+            .filter(Column::Status.eq(VERIFIED))
+            .filter(
+                sea_orm::Condition::any()
+                    .add(Column::LastCheckedAt.is_null())
+                    .add(Column::LastCheckedAt.lt(due)),
+            )
+            .order_by_asc(Column::LastCheckedAt)
+            .order_by_asc(Column::Id)
+            .limit(SWEEP_BATCH)
+            .all(database.read())
+            .await?;
+        let count = rows.len();
+        for row in rows {
+            self.recheck(database, row).await?;
+        }
+        Ok(count)
+    }
+
+    /// Tra DNS cho tên miền `verified` `row` rồi ghi kết quả; trả dòng sau khi ghi. Mọi lệnh ghi
+    /// chỉ ghi khi số lần trượt chưa bị bên khác đổi: hai lượt kiểm cùng lúc chỉ đếm một lần, chỉ
+    /// một bên ghi event.
+    async fn recheck(&self, database: &Database, row: Model) -> Result<Model, Error> {
+        // Tra DNS NGOÀI mọi transaction: gọi mạng có thể chậm.
+        let probe = self.probe(&row.domain, &row.verification_token).await;
+        let now = now();
+        let unchanged = |update: sea_orm::UpdateMany<Entity>| {
+            update
+                .filter(Column::Id.eq(row.id))
+                .filter(Column::Status.eq(VERIFIED))
+                .filter(Column::CheckFailures.eq(row.check_failures))
+        };
+        match probe {
+            Probe::Found => {
+                unchanged(Entity::update_many())
+                    .col_expr(Column::CheckFailures, Expr::value(0))
+                    .col_expr(Column::LastCheckedAt, Expr::value(now))
+                    .col_expr(Column::CheckError, Expr::value(Option::<String>::None))
+                    .exec(database.write())
+                    .await?;
+            }
+            Probe::Unreachable(reason) => {
+                // Không biết bản ghi còn hay không: không tính là trượt, kiểm lại sau một ngày.
+                let reason: String = reason.chars().take(CHECK_ERROR_MAX).collect();
+                unchanged(Entity::update_many())
+                    .col_expr(Column::LastCheckedAt, Expr::value(now))
+                    .col_expr(Column::CheckError, Expr::value(reason))
+                    .exec(database.write())
+                    .await?;
+            }
+            Probe::Missing(reason) => {
+                let failures = row.check_failures.saturating_add(1);
+                let reason: String = reason.chars().take(CHECK_ERROR_MAX).collect();
+                let mut update = unchanged(Entity::update_many())
+                    .col_expr(Column::CheckFailures, Expr::value(failures))
+                    .col_expr(Column::LastCheckedAt, Expr::value(now))
+                    .col_expr(Column::CheckError, Expr::value(reason));
+                let failed = failures >= MAX_CHECK_FAILURES;
+                if failed {
+                    update = update
+                        .col_expr(Column::Status, Expr::value(FAILED))
+                        .col_expr(Column::UpdatedAt, Expr::value(now));
+                }
+                let updated = update.exec(database.write()).await?;
+                if failed && updated.rows_affected > 0 {
+                    self.registry.invalidate_domain(&row.domain);
+                    let after = self.find_in(database, row.id).await?;
+                    self.record_failed(&after).await?;
+                    tracing::warn!(
+                        tenant_id = %after.tenant_id,
+                        domain = %after.domain,
+                        failures,
+                        "tenant domain lost its DNS record; marked failed"
+                    );
+                    return Ok(after);
+                }
+            }
+        }
+        self.find_in(database, row.id).await
+    }
+
+    /// Ghi `kernel.domain_failed` cho tên miền vừa thành `failed` (khách không còn thì bỏ qua).
+    async fn record_failed(&self, row: &Model) -> Result<(), Error> {
+        match self.registry.tenant(TenantId::from_uuid(row.tenant_id)).await {
+            Ok(tenant) => {
+                let event = DomainFailed(changed(row));
+                self.record(&tenant, Actor::system(), row, &event).await
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error),
+        }
     }
 
     /// Tra DNS cho `row` (trên database điều khiển) và ghi kết quả.
@@ -544,6 +693,7 @@ impl TenantDomains {
                     .col_expr(Column::VerifiedAt, Expr::value(now))
                     .col_expr(Column::LastCheckedAt, Expr::value(now))
                     .col_expr(Column::CheckError, Expr::value(Option::<String>::None))
+                    .col_expr(Column::CheckFailures, Expr::value(0))
                     .col_expr(Column::UpdatedAt, Expr::value(now))
                     .filter(Column::Id.eq(row.id))
                     .filter(Column::Status.is_in([PENDING, FAILED]))
@@ -564,7 +714,7 @@ impl TenantDomains {
                 }
                 Ok(after)
             }
-            Probe::Missing(reason) => {
+            Probe::Missing(reason) | Probe::Unreachable(reason) => {
                 let reason: String = reason.chars().take(CHECK_ERROR_MAX).collect();
                 let mut update = Entity::update_many()
                     .col_expr(Column::LastCheckedAt, Expr::value(now))
@@ -600,9 +750,9 @@ impl TenantDomains {
             )),
             Ok(Err(error)) => {
                 tracing::warn!(domain, error = %error.message(), "DNS lookup failed");
-                Probe::Missing(format!("DNS lookup failed: {}", error.message()))
+                Probe::Unreachable(format!("DNS lookup failed: {}", error.message()))
             }
-            Err(_) => Probe::Missing(format!(
+            Err(_) => Probe::Unreachable(format!(
                 "DNS lookup timed out after {} seconds.",
                 LOOKUP_TIMEOUT.as_secs()
             )),
@@ -670,7 +820,46 @@ impl JobHandler for VerifyDomains {
         if checked > 0 {
             tracing::info!(checked, "pending tenant domains checked");
         }
+        let rechecked = self.0.recheck_verified(&job.database).await?;
+        if rechecked > 0 {
+            tracing::info!(rechecked, "verified tenant domains checked again");
+        }
         Ok(())
+    }
+}
+
+/// Cột `check_failures` của `kernel_tenant_domains`: số lần kiểm lại hằng ngày liên tiếp không thấy
+/// bản ghi TXT của tên miền đã xác minh.
+pub(crate) struct AddCheckFailures;
+
+impl MigrationName for AddCheckFailures {
+    fn name(&self) -> &str {
+        "m0012_domain_check_failures"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddCheckFailures {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("kernel_tenant_domains")
+                    .add_column(schema::integer("check_failures").default(0))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("kernel_tenant_domains")
+                    .drop_column("check_failures")
+                    .to_owned(),
+            )
+            .await
     }
 }
 

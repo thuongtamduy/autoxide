@@ -130,6 +130,8 @@ impl Module for KernelModule {
             ),
             // Lượt dời khách giữa các placement (mặt điều khiển).
             Box::new(crate::tenancy::moves::CreateTenantMoves),
+            // Số lần kiểm lại hằng ngày liên tiếp không thấy bản ghi TXT của tên miền đã xác minh.
+            Box::new(crate::tenancy::domains::AddCheckFailures),
         ]
     }
 
@@ -189,6 +191,7 @@ impl Module for KernelModule {
             crate::tenancy::domains::DOMAIN_ADDED,
             crate::tenancy::domains::DOMAIN_VERIFIED,
             crate::tenancy::domains::DOMAIN_REVOKED,
+            crate::tenancy::domains::DOMAIN_FAILED,
             crate::tenancy::moves::TENANT_MOVED,
         ]
     }

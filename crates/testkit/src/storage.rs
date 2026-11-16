@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::storage::{ByteStream, Storage, StoredFile};
+use autoxide_kernel::storage::{ByteStream, Storage, StorageLocation, StorageOpener, StoredFile};
 use bytes::Bytes;
 use futures_util::{StreamExt as _, TryStreamExt as _};
 
@@ -72,6 +72,51 @@ impl Storage for MemoryStorage {
 
     async fn keys(&self) -> Result<Vec<String>, Error> {
         Ok(self.lock().keys().cloned().collect())
+    }
+}
+
+/// Bộ mở nơi lưu riêng của placement cho test (bước 33): mỗi chỗ (`dir` của nơi lưu cục bộ, `bucket`
+/// của S3) một [`MemoryStorage`], tạo lần đầu được mở. Đưa vào app bằng
+/// `.provide::<dyn StorageOpener>(opener)`; test xem nội dung bằng [`MemoryStorageOpener::store`].
+#[derive(Clone, Default)]
+pub struct MemoryStorageOpener {
+    stores: std::sync::Arc<Mutex<std::collections::HashMap<String, std::sync::Arc<MemoryStorage>>>>,
+}
+
+impl std::fmt::Debug for MemoryStorageOpener {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MemoryStorageOpener").finish_non_exhaustive()
+    }
+}
+
+impl MemoryStorageOpener {
+    /// Bộ mở chưa có nơi lưu nào.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Nơi lưu ở chỗ `place` (tạo nếu chưa có).
+    pub fn store(&self, place: &str) -> std::sync::Arc<MemoryStorage> {
+        let mut stores = self.stores.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        stores.entry(place.to_owned()).or_default().clone()
+    }
+
+    /// Cho chỗ `place` trỏ tới `store` có sẵn (vd nơi lưu chung của app): hai cấu hình khác nhau mà
+    /// cùng một chỗ.
+    pub fn alias(&self, place: &str, store: std::sync::Arc<MemoryStorage>) {
+        let mut stores = self.stores.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        stores.insert(place.to_owned(), store);
+    }
+}
+
+impl StorageOpener for MemoryStorageOpener {
+    fn open(&self, location: &StorageLocation) -> Result<std::sync::Arc<dyn Storage>, Error> {
+        let place = match location {
+            StorageLocation::Local { dir } => dir.clone(),
+            StorageLocation::S3(s3) => s3.bucket.clone(),
+        };
+        let store: std::sync::Arc<dyn Storage> = self.store(&place);
+        Ok(store)
     }
 }
 

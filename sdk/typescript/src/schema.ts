@@ -2500,6 +2500,11 @@ export type Data_TenantDomain = {
     created_at: string;
     /** Lower case, without port or trailing dot; international names in punycode. */
     domain: string;
+    /**
+     * Daily checks in a row of the verified domain that did not find the DNS record; at 3 the
+     * domain becomes `failed`. Keep the record in place: one successful check resets it to 0.
+     */
+    failed_checks: number;
     id: string;
     /** Last time the DNS record was looked up. */
     last_checked_at?: string | null;
@@ -2507,7 +2512,8 @@ export type Data_TenantDomain = {
     record: TenantDomainRecord;
     /**
      * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
-     * days: fix the record and verify again).
+     * days, or a verified domain whose record was missing at 3 daily checks in a row: fix the
+     * record and verify again).
      */
     status: string;
     /** When the status last changed; a `pending` domain fails 7 days after it. */
@@ -2548,6 +2554,11 @@ export type Data_TenantMovePlan = {
   data: {
     /** What must be fixed first; empty when the move can run. */
     blocking: TenantMoveBlocker[];
+    /**
+     * Files of the tenant that would be copied to the file storage of `to`; `0` when both
+     * placements keep files in the same storage (nothing to copy).
+     */
+    files: number;
     /** Placement that keeps the tenant's data now. */
     from: string;
     keep_source: boolean;
@@ -2850,6 +2861,7 @@ export type Data_Vec_Placement = {
     name: string;
     /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
     schema_state: string;
+    storage?: PlacementStorage | null;
   }[];
 };
 
@@ -4988,6 +5000,11 @@ export type Page_TenantDomain = {
     created_at: string;
     /** Lower case, without port or trailing dot; international names in punycode. */
     domain: string;
+    /**
+     * Daily checks in a row of the verified domain that did not find the DNS record; at 3 the
+     * domain becomes `failed`. Keep the record in place: one successful check resets it to 0.
+     */
+    failed_checks: number;
     id: string;
     /** Last time the DNS record was looked up. */
     last_checked_at?: string | null;
@@ -4995,7 +5012,8 @@ export type Page_TenantDomain = {
     record: TenantDomainRecord;
     /**
      * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
-     * days: fix the record and verify again).
+     * days, or a verified domain whose record was missing at 3 daily checks in a row: fix the
+     * record and verify again).
      */
     status: string;
     /** When the status last changed; a `pending` domain fails 7 days after it. */
@@ -5188,6 +5206,28 @@ export type Placement = {
   name: string;
   /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
   schema_state: string;
+  storage?: PlacementStorage | null;
+};
+
+/** Where a placement keeps its tenants' files. Access keys are never shown. */
+export type PlacementStorage = {
+  /** Bucket (`s3`). */
+  bucket?: string | null;
+  /** Whether an access key is stored (`s3`); its value is never shown. */
+  credentials: boolean;
+  /** Directory on the server (`local`). */
+  dir?: string | null;
+  /** Address of the S3-compatible service (`s3`); `null` for Amazon S3. */
+  endpoint?: string | null;
+  /**
+   * `local` (a directory on the server), `s3` (an S3 or S3-compatible bucket), or
+   * `unreadable` (the stored settings cannot be decrypted with the configured secret key).
+   */
+  kind: string;
+  /** Folder inside the bucket (`s3`). */
+  prefix?: string | null;
+  /** Region of the bucket (`s3`). */
+  region?: string | null;
 };
 
 /** A comment just posted, for its author. */
@@ -6300,6 +6340,11 @@ export type TenantDomain = {
   created_at: string;
   /** Lower case, without port or trailing dot; international names in punycode. */
   domain: string;
+  /**
+   * Daily checks in a row of the verified domain that did not find the DNS record; at 3 the
+   * domain becomes `failed`. Keep the record in place: one successful check resets it to 0.
+   */
+  failed_checks: number;
   id: string;
   /** Last time the DNS record was looked up. */
   last_checked_at?: string | null;
@@ -6307,7 +6352,8 @@ export type TenantDomain = {
   record: TenantDomainRecord;
   /**
    * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
-   * days: fix the record and verify again).
+   * days, or a verified domain whose record was missing at 3 daily checks in a row: fix the
+   * record and verify again).
    */
   status: string;
   /** When the status last changed; a `pending` domain fails 7 days after it. */
@@ -6359,6 +6405,11 @@ export type TenantMoveBlocker = {
 export type TenantMovePlan = {
   /** What must be fixed first; empty when the move can run. */
   blocking: TenantMoveBlocker[];
+  /**
+   * Files of the tenant that would be copied to the file storage of `to`; `0` when both
+   * placements keep files in the same storage (nothing to copy).
+   */
+  files: number;
   /** Placement that keeps the tenant's data now. */
   from: string;
   keep_source: boolean;

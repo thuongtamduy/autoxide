@@ -111,6 +111,8 @@ impl Module for FilesModule {
         let service = Arc::new(FileService::new(storage.clone(), outbox, config.limits));
         self.service = Some(service.clone());
         context.personal_data(service)?;
+        // Nơi lưu riêng của placement (bước 33) mở bằng cùng cài đặt.
+        context.provide::<dyn autoxide_kernel::storage::StorageOpener>(Arc::new(store::Opener))?;
         context.provide::<dyn Storage>(storage)
     }
 
@@ -151,7 +153,9 @@ impl Module for FilesModule {
 
     fn schedules(&self) -> Vec<Schedule> {
         let day = std::time::Duration::from_secs(24 * 3600);
-        vec![Schedule::new(cleanup::CLEAN_ORPHANS, cleanup::CLEAN_ORPHANS, day)]
+        // Một lần mỗi ngày cho cả bản cài (database điều khiển): job quét mọi nơi lưu file và đối
+        // chiếu từng khoá với database của đúng khách — chạy trên mọi database chỉ lặp lại việc đó.
+        vec![Schedule::new(cleanup::CLEAN_ORPHANS, cleanup::CLEAN_ORPHANS, day).on_control_only()]
     }
 }
 

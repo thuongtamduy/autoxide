@@ -238,6 +238,11 @@ impl Modules {
             })?;
         }
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
+        // Nơi lưu chung và bộ mở nơi lưu riêng của placement (module `files` công bố).
+        registry.use_storage(
+            apis.get::<dyn crate::storage::Storage>(),
+            apis.get::<dyn crate::storage::StorageOpener>(),
+        );
         self.apis = apis;
         self.tenancy = Some(registry.clone());
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.

@@ -1044,6 +1044,33 @@ async fn hai_khach_khong_thay_media_cua_nhau() {
         let violations =
             autoxide_testkit::leak_check(&app, "admin-b", marker, &seeded).await.unwrap();
         assert_eq!(violations, Vec::<String>::new());
+
+        // Con trỏ pagination của khách A (theo ID và theo cột: tên, kích thước, ngày) dùng ở khách
+        // B chỉ cho thấy dữ liệu của B (D-259 mục 5). A cần hai dòng mỗi danh sách để có con trỏ.
+        let second = app
+            .post(&format!("/api/v1/media?name={marker}-2.png&tags={marker}-2"))
+            .token("admin-a")
+            .header("content-type", "image/png")
+            .bytes(samples::png(3, 3))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(second.status(), StatusCode::CREATED, "{}", second.json());
+        let folder = app
+            .post("/api/v1/media/folders")
+            .token("admin-a")
+            .json(json!({"name": format!("{marker}-2")}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(folder.status(), StatusCode::CREATED, "{}", folder.json());
+        let (violations, tried) =
+            autoxide_testkit::cursor_leak_check(&app, "admin-a", "admin-b", marker, &seeded)
+                .await
+                .unwrap();
+        assert_eq!(violations, Vec::<String>::new());
+        // Item: mặc định + 3 cách sắp; thư mục: mặc định + 2; nhãn: mặc định + 2.
+        assert!(tried >= 9, "{tried}");
     })
     .await
     .unwrap();

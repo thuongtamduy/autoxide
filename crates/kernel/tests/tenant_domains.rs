@@ -372,6 +372,116 @@ async fn job_xac_minh_va_het_han() {
     .unwrap();
 }
 
+/// Lùi `last_checked_at` của `domain` về 25 giờ trước: lần kiểm lại hằng ngày tới hạn.
+async fn backdate_check(app: &TestApp, domain: &str) {
+    use sea_orm::sea_query::ExprTrait as _;
+    let old = chrono::Utc::now() - chrono::Duration::hours(25);
+    let update = Query::update()
+        .table(Alias::new("kernel_tenant_domains"))
+        .value(Alias::new("last_checked_at"), old)
+        .and_where(Expr::col(Alias::new("domain")).eq(domain))
+        .to_owned();
+    assert_eq!(app.database().write().execute(&update).await.unwrap().rows_affected(), 1);
+}
+
+/// Tên miền `domain` của khách `a`, qua REST.
+async fn domain_of(app: &TestApp, domain: &str) -> Value {
+    let list = app.get("/api/v1/kernel/domains").token("admin-a").send().await.unwrap();
+    let rows = list.json()["data"].as_array().unwrap().clone();
+    rows.into_iter().find(|row| row["domain"] == domain).unwrap()
+}
+
+/// D-291 mục 8: tên miền `verified` được kiểm lại mỗi ngày; 3 lần liên tiếp không thấy bản ghi →
+/// `failed` (event, không còn được phép); thấy lại thì đếm từ 0; DNS không trả lời không tính.
+#[tokio::test]
+async fn kiem_lai_hang_ngay_ten_mien_da_xac_minh() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let service = app.api::<TenantDomains>().unwrap();
+        let (_, added) = add(&app, "admin-a", "daily.test").await;
+        let id = added["data"]["id"].as_str().unwrap().to_owned();
+        let record = added["data"]["record"].clone();
+        let (name, value) = (record["name"].as_str().unwrap(), record["value"].as_str().unwrap());
+        app.dns().set_txt(name, &[value]);
+        let (_, verified) = verify(&app, "admin-a", &id).await;
+        assert_eq!(
+            (verified["data"]["status"].as_str(), verified["data"]["failed_checks"].as_u64()),
+            (Some("verified"), Some(0))
+        );
+        // Vừa kiểm: chưa tới hạn.
+        assert_eq!(service.recheck_verified(app.database()).await.unwrap(), 0);
+
+        // Bản ghi còn: vẫn `verified`, không trượt.
+        backdate_check(&app, "daily.test").await;
+        assert_eq!(service.recheck_verified(app.database()).await.unwrap(), 1);
+        assert_eq!(domain_of(&app, "daily.test").await["failed_checks"], 0);
+
+        // Mất bản ghi: trượt lần 1, vẫn được phép.
+        app.dns().remove(name);
+        backdate_check(&app, "daily.test").await;
+        service.recheck_verified(app.database()).await.unwrap();
+        let row = domain_of(&app, "daily.test").await;
+        assert_eq!(
+            (row["status"].as_str(), row["failed_checks"].as_u64()),
+            (Some("verified"), Some(1))
+        );
+        assert!(row["check_error"].as_str().unwrap().contains("No TXT record"), "{row}");
+        assert_eq!(allowed(&app, "daily.test").await, StatusCode::OK);
+
+        // DNS không trả lời: không tính.
+        app.dns().fail(true);
+        backdate_check(&app, "daily.test").await;
+        service.recheck_verified(app.database()).await.unwrap();
+        let row = domain_of(&app, "daily.test").await;
+        assert_eq!(row["failed_checks"], 1);
+        assert!(row["check_error"].as_str().unwrap().contains("DNS lookup failed"), "{row}");
+        app.dns().fail(false);
+
+        // Trượt lần 2, rồi bản ghi trở lại: đếm lại từ 0.
+        backdate_check(&app, "daily.test").await;
+        service.recheck_verified(app.database()).await.unwrap();
+        assert_eq!(domain_of(&app, "daily.test").await["failed_checks"], 2);
+        app.dns().set_txt(name, &[value]);
+        backdate_check(&app, "daily.test").await;
+        service.recheck_verified(app.database()).await.unwrap();
+        let row = domain_of(&app, "daily.test").await;
+        assert_eq!((row["failed_checks"].as_u64(), &row["check_error"]), (Some(0), &Value::Null));
+
+        // Ba lần liên tiếp (lần cuối do job của kernel chạy): `failed`, không còn vào khách.
+        app.dns().remove(name);
+        for _ in 0..2 {
+            backdate_check(&app, "daily.test").await;
+            service.recheck_verified(app.database()).await.unwrap();
+        }
+        assert_eq!(allowed(&app, "daily.test").await, StatusCode::OK);
+        backdate_check(&app, "daily.test").await;
+        let worker = app.modules().worker(1).unwrap();
+        assert!(worker.run_once().await.unwrap() >= 1);
+        let row = domain_of(&app, "daily.test").await;
+        assert_eq!(
+            (row["status"].as_str(), row["failed_checks"].as_u64()),
+            (Some("failed"), Some(3))
+        );
+        assert_eq!(allowed(&app, "daily.test").await, StatusCode::NOT_FOUND);
+        let a = app.tenant("a").await.unwrap();
+        assert_eq!(
+            events(&a).await,
+            ["kernel.domain_added", "kernel.domain_verified", "kernel.domain_failed"]
+        );
+
+        // Đặt lại bản ghi rồi xác minh: `verified`, đếm từ 0.
+        app.dns().set_txt(name, &[value]);
+        let (_, again) = verify(&app, "admin-a", &id).await;
+        assert_eq!(
+            (again["data"]["status"].as_str(), again["data"]["failed_checks"].as_u64()),
+            (Some("verified"), Some(0))
+        );
+        assert_eq!(allowed(&app, "daily.test").await, StatusCode::OK);
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn tool_mcp_dung_chung_service() {
     TestDatabase::run(async |test| {

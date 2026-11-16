@@ -113,7 +113,8 @@ pub(crate) async fn run_backup(settings: Settings, directory: PathBuf) -> Result
 }
 
 /// Chế độ `multi`: backup chỉ chép database chính (sổ khách và khách trên placement chung) và mọi
-/// file; database riêng của placement khác KHÔNG được chép (bước 39 làm đủ). Trả lời cảnh báo để in
+/// file ở nơi lưu chung; database riêng của placement khác và nơi lưu file riêng của placement KHÔNG
+/// được chép (bước 39 làm đủ). Trả lời cảnh báo để in
 /// (rỗng khi không có placement nào khác), và ghi log.
 async fn skipped_placements(
     registry: Option<&autoxide_kernel::tenancy::DatabaseRegistry>,
@@ -137,7 +138,7 @@ async fn skipped_placements(
     Ok(format!(
         "WARNING: only the main database was copied. The databases of these placements were NOT: \
          {}. Back each of them up with your database's own tools until `autoxide backup` covers \
-         them.\n",
+         them; the same goes for a placement's own file storage (`autoxide placement storage`).\n",
         others.join(", ")
     ))
 }

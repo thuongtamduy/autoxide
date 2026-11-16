@@ -269,6 +269,7 @@ fn content_disposition(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use autoxide_kernel::storage::Storage as _;
     use autoxide_testkit::{TestApp, TestDatabase, TestRequest};
     use serde_json::Value;
 
@@ -430,6 +431,91 @@ mod tests {
             assert_eq!(removed, 1);
             assert!(shared.get(&key).await.unwrap().is_some());
             assert!(shared.get(&orphan).await.unwrap().is_none());
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Bước 33: placement có nơi lưu riêng (`autoxide placement storage`): file của khách trên đó
+    /// nằm ở nơi lưu riêng, không ở nơi lưu chung; đọc lại được. Job dọn mồ côi quét cả nơi lưu riêng
+    /// và ở mỗi nơi chỉ xét khách đang lưu file ở đó (bản sao còn sót ở nơi lưu chung để nguyên).
+    #[tokio::test]
+    async fn placement_co_noi_luu_rieng() {
+        TestDatabase::run(async |test| {
+            let root = std::env::temp_dir().join(format!("autoxide-files-{}", Uuid::now_v7()));
+            let (dir, own_dir) = (root.join("shared"), root.join("own"));
+            let app = TestApp::builder(test)
+                .setting("AUTOXIDE_FILES_DIR", dir.to_str().unwrap())
+                .tenant("a")
+                .tenant_dedicated("b")
+                .user_in("a", "ada", 0xada, &["files.upload", "files.manage"])
+                .user_in("b", "bob", 0xb0b, &["files.upload", "files.manage"])
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let placements = app.modules().placements(app.registry()).unwrap();
+            let location = autoxide_kernel::storage::StorageLocation::Local {
+                dir: own_dir.to_str().unwrap().to_owned(),
+            };
+            // `b` đã nằm trên placement `b` (chưa có file nào): đổi nơi lưu cần `force`.
+            let error = placements.set_storage("b", Some(location.clone()), false).await;
+            assert_eq!(error.unwrap_err().code(), "tenant_placement_storage_in_use");
+            placements.set_storage("b", Some(location), true).await.unwrap();
+
+            let upload = |token: &'static str, text: &'static str| {
+                app.post("/api/v1/files?name=x.txt")
+                    .token(token)
+                    .header(header::CONTENT_TYPE.as_str(), "text/plain")
+                    .body(Body::from(text))
+            };
+            let (status, _, body) = send(upload("bob", "of b")).await;
+            assert_eq!(status, StatusCode::CREATED, "{}", String::from_utf8_lossy(&body));
+            let id = json(&body)["data"]["id"].as_str().unwrap().to_owned();
+            let (status, _, body) = send(upload("ada", "of a")).await;
+            assert_eq!(status, StatusCode::CREATED);
+            let a_id = json(&body)["data"]["id"].as_str().unwrap().to_owned();
+
+            let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
+            let shared = app.api::<dyn autoxide_kernel::storage::Storage>().unwrap();
+            let own = crate::store::ObjectStorage::open(&crate::config::Backend::Local {
+                dir: own_dir.clone(),
+            })
+            .unwrap();
+            let key = format!("tenants/{}/files/{id}", b.id());
+            assert!(own.get(&key).await.unwrap().is_some(), "in the placement's own storage");
+            assert!(shared.get(&key).await.unwrap().is_none());
+            assert!(
+                shared.get(&format!("tenants/{}/files/{a_id}", a.id())).await.unwrap().is_some()
+            );
+            let (status, _, body) =
+                send(app.get(&format!("/api/v1/files/{id}/content")).token("bob")).await;
+            assert_eq!((status, body.as_slice()), (StatusCode::OK, b"of b".as_slice()));
+
+            // Mồ côi ở nơi lưu riêng (của `b`) và ở nơi lưu chung (của `a`): bị xoá. Khoá của `b` ở
+            // nơi lưu chung (`b` không lưu ở đó): để nguyên.
+            let put = async |storage: &dyn autoxide_kernel::storage::Storage, key: String| {
+                let stream =
+                    futures_util::stream::iter([Ok(bytes::Bytes::from_static(b"x"))]).boxed();
+                storage.put(&key, stream).await.unwrap()
+            };
+            let orphan_own = format!("tenants/{}/files/{}", b.id(), Uuid::now_v7());
+            let orphan_shared = format!("tenants/{}/files/{}", a.id(), Uuid::now_v7());
+            let stray = format!("tenants/{}/files/{}", b.id(), Uuid::now_v7());
+            put(&own, orphan_own.clone()).await;
+            put(&*shared, orphan_shared.clone()).await;
+            put(&*shared, stray.clone()).await;
+            let service = FileService::new(
+                shared.clone(),
+                autoxide_kernel::event::Outbox::standalone("files"),
+                crate::config::Limits { max_bytes: 64, allowed_types: None },
+            );
+            let later = chrono::Utc::now() + chrono::Duration::hours(25);
+            assert_eq!(service.clean_orphans(app.registry(), later).await.unwrap(), 2);
+            assert!(own.get(&orphan_own).await.unwrap().is_none());
+            assert!(own.get(&key).await.unwrap().is_some());
+            assert!(shared.get(&orphan_shared).await.unwrap().is_none());
+            assert!(shared.get(&stray).await.unwrap().is_some());
         })
         .await
         .unwrap();

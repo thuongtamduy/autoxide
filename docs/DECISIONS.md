@@ -7153,3 +7153,29 @@ bản backup. Chế độ `single` không đổi gì.
   `autoxide tenant move <khách> --to <placement>` (đồng bộ, không giới hạn; phải chạy với cùng cấu hình như máy chủ vì
   thời gian chờ đọc từ cấu hình).
 - File không chép: nơi lưu dùng chung (khoá dưới `tenants/<id>/`); bucket theo placement là dòng lộ trình riêng.
+
+## D-293 · Nơi lưu file riêng theo placement; con trỏ pagination; kiểm lại tên miền hằng ngày (bước 33, đóng "Thứ ngoài bảng" và D-291 mục 8) — 2026-11-16 — agent quyết
+
+1. Placement (trừ `main`) có thể có nơi lưu file riêng: thư mục hay bucket S3, cùng thông số với `files`; lưu mã hoá
+   trong `kernel_placements.storage_sealed` (mục đích `kernel.placement_storage`, gắn ID placement). Chỉ đặt bằng CLI
+   `autoxide placement storage`; API chỉ trả phần không bí mật (`kind`, `bucket`, `prefix`, `region`, `endpoint`,
+   `dir`, `credentials: bool`). Cho mọi placement trừ `main`, không chỉ `dedicated`: khoá vẫn có tiền tố
+   `tenants/<id>/` nên dùng chung không lẫn. Placement đang có khách thì không đổi được, trừ khi `--force` (khi nơi lưu
+   mới đã có đúng các file đó). Không thử kết nối lúc đặt (lỗi hiện ở lần đọc / ghi đầu tiên).
+2. Kernel định nghĩa `StorageLocation` và trait `StorageOpener` (module `files` công bố bộ mở); sổ database gắn nơi lưu
+   riêng vào `TenantContext`, nên module vẫn chỉ gọi `TenantStorage::new(nơi_lưu_chung, khách)`. Client cache theo
+   placement, dựng lại khi giá trị đã lưu đổi. Không mở được thì chỉ thao tác file báo lỗi, khách vẫn phục vụ.
+3. Dời khách (D-292): hai placement khác nơi lưu thì chép file trước khi chép dòng (xoá file thừa ở đích, so số file);
+   xoá ở nguồn ở bước dọn, trừ `keep_source`; `abort` / `purge` xoá phần tương ứng. Trước mọi lần chép hay xoá, ghi thử
+   một file đánh dấu để phát hiện hai cấu hình cùng một chỗ — khi đó không chép, không xoá. Kế hoạch có thêm `files`.
+4. Job dọn mồ côi của `files` và `media` chạy một lần mỗi ngày trên database điều khiển (`on_control_only`), quét mọi
+   nơi lưu, ở mỗi nơi chỉ xét khách lưu file ở đó — thay phần "quét N lần" của D-277 và D-280.
+5. Con trỏ pagination: giữ D-259 mục 5, không gắn khách, không đổi định dạng. Con trỏ chỉ là vị trí trong truy vấn đã
+   lọc theo khách; gắn khách phải đổi 52 chỗ gọi `fetch_page*` mà không thêm an toàn. Bằng chứng là bài
+   `autoxide_testkit::cursor_leak_check` (con trỏ theo ID và theo cột), chạy ở `notes` và `media`.
+6. Tên miền `verified` được kiểm lại mỗi 24 giờ trong job `kernel.verify_domains` (migration
+   `m0012_domain_check_failures`, cột `check_failures`, API `failed_checks`): 3 lần liên tiếp không thấy bản ghi thì
+   `failed`, event `kernel.domain_failed` (cũng ghi khi `pending` quá 7 ngày), xoá cache. DNS lỗi hay quá giờ không tính
+   là trượt (sự cố DNS không lấy mất tên miền của khách); một lần thấy bản ghi thì đếm lại từ 0.
+
+Chưa làm: `autoxide doctor` kiểm nơi lưu riêng của từng placement; `autoxide backup` chép nơi lưu riêng (bước 39).

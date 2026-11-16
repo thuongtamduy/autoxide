@@ -43,8 +43,8 @@ use crate::database::Database;
 use crate::error::Error;
 
 pub use admin::{
-    CurrentTenant, NewTenant, PLACEMENTS_READ, Placement, TENANTS_MANAGE, TENANTS_READ, Tenant,
-    TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
+    CurrentTenant, NewTenant, PLACEMENTS_READ, Placement, PlacementStorage, TENANTS_MANAGE,
+    TENANTS_READ, Tenant, TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
 };
 pub use config::{TenancyConfig, WorkerPlacements};
 pub use domains::{
@@ -56,7 +56,9 @@ pub use moves::{
     TENANTS_MOVE, TenantMove, TenantMoveBlocker, TenantMovePlan, TenantMoves, TenantTableRows,
 };
 pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
-pub use registry::{DatabaseRegistry, PLACEMENT_READ_URL, PLACEMENT_URL};
+pub use registry::{
+    DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
+};
 pub use request::{TENANT_HEADER, TenantHint};
 pub use scope::{ScopeExt, TenantScoped};
 pub use settings::{PUBLIC_URL, SETTINGS_MANAGE, SettingValue, TenantSetting, TenantSettings};
@@ -246,6 +248,8 @@ struct Inner {
     /// Placement đã áp dụng đủ migration (`schema_state = ready`); chưa thì khách nhận
     /// `tenant_maintenance`.
     schema_ready: bool,
+    /// Nơi lưu file riêng của placement (`autoxide placement storage`); `None`: nơi lưu chung.
+    storage: Option<Arc<dyn crate::storage::Storage>>,
 }
 
 impl TenantContext {
@@ -266,7 +270,28 @@ impl TenantContext {
             placement,
             database,
             schema_ready: true,
+            storage: None,
         }))
+    }
+
+    /// Cùng khách, file lưu ở `storage` (nơi lưu riêng của placement của nó) thay cho nơi lưu chung.
+    /// Sổ database dựng; test dựng để thử placement có nơi lưu riêng.
+    #[must_use]
+    pub fn with_storage(self, storage: Arc<dyn crate::storage::Storage>) -> Self {
+        let inner = Arc::unwrap_or_clone(self.0);
+        TenantContext(Arc::new(Inner { storage: Some(storage), ..inner }))
+    }
+
+    /// Nơi lưu file riêng của placement của khách; `None`: khách dùng nơi lưu chung.
+    /// [`TenantStorage::new`](crate::storage::TenantStorage::new) tự chọn.
+    pub fn own_storage(&self) -> Option<&Arc<dyn crate::storage::Storage>> {
+        self.0.storage.as_ref()
+    }
+
+    /// Placement có nơi lưu riêng mà khách dùng; `None`: khách dùng nơi lưu chung. Job dọn file
+    /// mồ côi so với [`FileStore::placement`] để chỉ xét khách của nơi lưu đang quét.
+    pub fn storage_placement(&self) -> Option<PlacementId> {
+        self.0.storage.as_ref().map(|_| self.0.placement)
     }
 
     /// Cùng khách, đánh dấu placement chưa áp dụng đủ migration (sổ database dựng khi
@@ -452,6 +477,17 @@ pub mod errors {
             .with_param("placement", placement)
     }
 
+    pub fn tenant_placement_storage_in_use(placement: &str, tenants: u64) -> Error {
+        Error::conflict(
+            "tenant_placement_storage_in_use",
+            "{tenants} tenant(s) keep their data on the placement `{placement}`; changing its file \
+             storage would hide their files. Move them to another placement first, or pass \
+             `--force` when the new storage already holds the same files (e.g. a new access key).",
+        )
+        .with_param("placement", placement)
+        .with_param("tenants", tenants)
+    }
+
     pub fn tenant_domain_invalid(domain: &str) -> Error {
         // Giá trị do client gửi: chỉ nhắc lại phần đầu.
         let shown: String = domain.chars().take(100).collect();
@@ -563,6 +599,15 @@ pub mod errors {
         Error::unavailable(
             "tenant_move_unreachable",
             "Cannot reach the database of the placement `{placement}`: {error}",
+        )
+        .with_param("placement", placement)
+        .with_param("error", error)
+    }
+
+    pub fn tenant_move_storage_unavailable(placement: &str, error: &str) -> Error {
+        Error::unavailable(
+            "tenant_move_storage_unavailable",
+            "Cannot reach the file storage of the placement `{placement}`: {error}",
         )
         .with_param("placement", placement)
         .with_param("error", error)

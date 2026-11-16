@@ -6,6 +6,11 @@
 //! `tenants/<khách>/files/<id>` (D-259). Mỗi khoá được đối chiếu với **database của chính khách đó**
 //! (tra qua sổ database): một khoá không bao giờ bị coi là mồ côi chỉ vì job đang chạy trên database
 //! khác. Khoá của khách không còn trong sổ thì để nguyên.
+//!
+//! Job quét mọi nơi lưu: nơi lưu chung và nơi lưu riêng của từng placement
+//! ([`DatabaseRegistry::file_stores`]); ở mỗi nơi chỉ xét khách đang lưu file ở đó (bản sao còn sót
+//! sau khi dời khách không phải việc của job này — `autoxide tenant purge-copy`). Chạy một lần mỗi
+//! ngày trên database điều khiển.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -16,7 +21,7 @@ use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
-use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantId};
+use autoxide_kernel::tenancy::{DatabaseRegistry, FileStore, ScopeExt, TenantId};
 
 use crate::entity::{Column, Entity};
 use crate::service::FileService;
@@ -58,10 +63,28 @@ impl FileService {
         databases: &DatabaseRegistry,
         now: DateTime<Utc>,
     ) -> Result<u64, Error> {
+        let mut removed = 0;
+        for store in databases.file_stores(self.storage().clone()).await? {
+            removed += self.clean_store(databases, &store, now).await?;
+        }
+        if removed > 0 {
+            tracing::info!(keys = removed, "orphaned file content removed");
+        }
+        Ok(removed)
+    }
+
+    /// Như [`clean_orphans`](Self::clean_orphans), ở một nơi lưu.
+    async fn clean_store(
+        &self,
+        databases: &DatabaseRegistry,
+        store: &FileStore,
+        now: DateTime<Utc>,
+    ) -> Result<u64, Error> {
+        let storage = &store.storage;
         let cutoff = now - chrono::Duration::hours(GRACE_HOURS);
-        let mut keys = self.storage().keys_with_prefix(PREFIX).await?;
+        let mut keys = storage.keys_with_prefix(PREFIX).await?;
         keys.extend(
-            self.storage()
+            storage
                 .keys_with_prefix("tenants/")
                 .await?
                 .into_iter()
@@ -85,6 +108,9 @@ impl FileService {
                 // Khách không còn trong sổ (hay chưa mở được database của nó): không đoán.
                 continue;
             };
+            if !store.serves(&tenant) {
+                continue;
+            }
             for chunk in candidates.chunks(BATCH) {
                 let ids: Vec<Uuid> = chunk.iter().map(|(_, id)| *id).collect();
                 // Kết nối ghi: dòng vừa lưu chưa tới read replica thì vẫn thấy.
@@ -102,13 +128,10 @@ impl FileService {
                     if known.contains(id) {
                         continue;
                     }
-                    self.storage().delete(key).await?;
+                    storage.delete(key).await?;
                     removed += 1;
                 }
             }
-        }
-        if removed > 0 {
-            tracing::info!(keys = removed, "orphaned file content removed");
         }
         Ok(removed)
     }

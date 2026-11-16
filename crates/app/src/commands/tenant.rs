@@ -236,6 +236,12 @@ fn describe_plan(plan: &TenantMovePlan) -> String {
         plan.tables.len(),
         plan.settle_seconds
     ));
+    if plan.files > 0 {
+        lines.push(format!(
+            "{} files would be copied to the file storage of `{}`.",
+            plan.files, plan.to
+        ));
+    }
     if let Some(id) = plan.resumes {
         lines.push(format!("Running it resumes the stopped move {id}."));
     }

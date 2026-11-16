@@ -6923,6 +6923,12 @@
                 "example": "shop.example",
                 "type": "string"
               },
+              "failed_checks": {
+                "description": "Daily checks in a row of the verified domain that did not find the DNS record; at 3 the\ndomain becomes `failed`. Keep the record in place: one successful check resets it to 0.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
               "id": {
                 "format": "uuid",
                 "type": "string"
@@ -6940,7 +6946,7 @@
                 "description": "The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`."
               },
               "status": {
-                "description": "`pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7\ndays: fix the record and verify again).",
+                "description": "`pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7\ndays, or a verified domain whose record was missing at 3 daily checks in a row: fix the\nrecord and verify again).",
                 "example": "pending",
                 "type": "string"
               },
@@ -6962,6 +6968,7 @@
               "domain",
               "status",
               "record",
+              "failed_checks",
               "created_at",
               "updated_at"
             ],
@@ -7072,6 +7079,12 @@
                 },
                 "type": "array"
               },
+              "files": {
+                "description": "Files of the tenant that would be copied to the file storage of `to`; `0` when both\nplacements keep files in the same storage (nothing to copy).",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
               "from": {
                 "description": "Placement that keeps the tenant's data now.",
                 "example": "main",
@@ -7136,6 +7149,7 @@
               "blocking",
               "tables",
               "rows",
+              "files",
               "settle_seconds"
             ],
             "type": "object"
@@ -7914,6 +7928,17 @@
                 "schema_state": {
                   "description": "`ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`.",
                   "type": "string"
+                },
+                "storage": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PlacementStorage",
+                      "description": "The placement's own file storage; `null` when its tenants' files are kept in the\nplatform's storage (the `files` module settings). Set with `autoxide placement storage`."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -14191,6 +14216,12 @@
                   "example": "shop.example",
                   "type": "string"
                 },
+                "failed_checks": {
+                  "description": "Daily checks in a row of the verified domain that did not find the DNS record; at 3 the\ndomain becomes `failed`. Keep the record in place: one successful check resets it to 0.",
+                  "format": "int32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
                 "id": {
                   "format": "uuid",
                   "type": "string"
@@ -14208,7 +14239,7 @@
                   "description": "The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`."
                 },
                 "status": {
-                  "description": "`pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7\ndays: fix the record and verify again).",
+                  "description": "`pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7\ndays, or a verified domain whose record was missing at 3 daily checks in a row: fix the\nrecord and verify again).",
                   "example": "pending",
                   "type": "string"
                 },
@@ -14230,6 +14261,7 @@
                 "domain",
                 "status",
                 "record",
+                "failed_checks",
                 "created_at",
                 "updated_at"
               ],
@@ -14731,6 +14763,17 @@
           "schema_state": {
             "description": "`ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`.",
             "type": "string"
+          },
+          "storage": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PlacementStorage",
+                "description": "The placement's own file storage; `null` when its tenants' files are kept in the\nplatform's storage (the `files` module settings). Set with `autoxide placement storage`."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -14740,6 +14783,61 @@
           "backend",
           "schema_state",
           "created_at"
+        ],
+        "type": "object"
+      },
+      "PlacementStorage": {
+        "description": "Where a placement keeps its tenants' files. Access keys are never shown.",
+        "properties": {
+          "bucket": {
+            "description": "Bucket (`s3`).",
+            "example": "acme-files",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "credentials": {
+            "description": "Whether an access key is stored (`s3`); its value is never shown.",
+            "type": "boolean"
+          },
+          "dir": {
+            "description": "Directory on the server (`local`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endpoint": {
+            "description": "Address of the S3-compatible service (`s3`); `null` for Amazon S3.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`local` (a directory on the server), `s3` (an S3 or S3-compatible bucket), or\n`unreadable` (the stored settings cannot be decrypted with the configured secret key).",
+            "example": "s3",
+            "type": "string"
+          },
+          "prefix": {
+            "description": "Folder inside the bucket (`s3`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "region": {
+            "description": "Region of the bucket (`s3`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "credentials"
         ],
         "type": "object"
       },
@@ -17958,6 +18056,12 @@
             "example": "shop.example",
             "type": "string"
           },
+          "failed_checks": {
+            "description": "Daily checks in a row of the verified domain that did not find the DNS record; at 3 the\ndomain becomes `failed`. Keep the record in place: one successful check resets it to 0.",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -17975,7 +18079,7 @@
             "description": "The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`."
           },
           "status": {
-            "description": "`pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7\ndays: fix the record and verify again).",
+            "description": "`pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7\ndays, or a verified domain whose record was missing at 3 daily checks in a row: fix the\nrecord and verify again).",
             "example": "pending",
             "type": "string"
           },
@@ -17997,6 +18101,7 @@
           "domain",
           "status",
           "record",
+          "failed_checks",
           "created_at",
           "updated_at"
         ],
@@ -18133,6 +18238,12 @@
             },
             "type": "array"
           },
+          "files": {
+            "description": "Files of the tenant that would be copied to the file storage of `to`; `0` when both\nplacements keep files in the same storage (nothing to copy).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
           "from": {
             "description": "Placement that keeps the tenant's data now.",
             "example": "main",
@@ -18197,6 +18308,7 @@
           "blocking",
           "tables",
           "rows",
+          "files",
           "settle_seconds"
         ],
         "type": "object"

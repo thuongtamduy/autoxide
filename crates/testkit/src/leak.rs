@@ -14,6 +14,9 @@
 //!
 //! Tham số `{tên}` trong đường dẫn được thay lần lượt bằng mọi ID của A khai cùng tên (không có
 //! thì bằng mọi ID của A); tham số tool có tên trong `ids`, hay tên kết thúc `id`, cũng vậy.
+//!
+//! [`cursor_leak_check`]: con trỏ pagination lấy ở khách A gửi bằng người của khách B không bao giờ
+//! cho thấy dữ liệu của A (mọi truy vấn đã lọc theo khách; con trỏ chỉ là vị trí).
 
 use serde_json::{Map, Value};
 
@@ -82,6 +85,85 @@ pub async fn leak_check(
     }
     let _ = client.cancel().await;
     Ok(violations)
+}
+
+/// Con trỏ pagination của khách A dùng ở khách B (bước 33, D-259 mục 5): với mọi `GET` trả trang
+/// (`pagination.next_cursor`), lấy trang đầu `limit=1` bằng `owner` (người của A) — mỗi giá trị của
+/// tham số `sort` nếu endpoint có, để thử cả con trỏ theo cột — rồi gửi con trỏ đó bằng `other`
+/// (người của B). Vi phạm là câu trả lời thành công chứa dấu hiệu của A (`marker` hay một ID trong
+/// `ids`). Trả (vi phạm, số con trỏ đã thử): bên gọi kiểm số đó > 0 để biết bài thật sự chạy (A
+/// phải có ít nhất hai dòng trong danh sách để có con trỏ).
+pub async fn cursor_leak_check(
+    app: &TestApp,
+    owner: &str,
+    other: &str,
+    marker: &str,
+    ids: &[(&str, String)],
+) -> Result<(Vec<String>, usize), TestAppError> {
+    let leaked =
+        |body: &str| body.contains(marker) || ids.iter().any(|(_, id)| body.contains(id.as_str()));
+    let contract = serde_json::to_value(app.openapi())
+        .map_err(|e| TestAppError::new(format!("openapi: {e}")))?;
+    let mut violations = Vec::new();
+    let mut tried = 0;
+    let paths = contract["paths"].as_object().cloned().unwrap_or_default();
+    for (path, item) in paths {
+        let Some(get) = item.get("get") else { continue };
+        // Phần query chung của hai lượt: không gì, hay `sort=<giá trị>`.
+        let mut sorts = vec![String::new()];
+        sorts.extend(sort_values(&contract, get).iter().map(|sort| format!("&sort={sort}")));
+        for uri in substitutions(&path, ids) {
+            for sort in &sorts {
+                let first = app
+                    .get(&format!("{uri}?limit=1{sort}"))
+                    .token(owner)
+                    .unchecked()
+                    .send()
+                    .await?;
+                if !first.status().is_success() {
+                    continue;
+                }
+                let Some(cursor) =
+                    first.json()["pagination"]["next_cursor"].as_str().map(str::to_owned)
+                else {
+                    continue;
+                };
+                tried += 1;
+                let next = format!("{uri}?limit=200{sort}&cursor={cursor}");
+                let answer = app.get(&next).token(other).unchecked().send().await?;
+                if answer.status().is_success() && leaked(&answer.text()) {
+                    violations.push(format!(
+                        "GET {next} → {}: a cursor of the other tenant shows its data",
+                        answer.status()
+                    ));
+                }
+            }
+        }
+    }
+    Ok((violations, tried))
+}
+
+/// Giá trị của tham số query `sort` của thao tác `operation` (enum, kể cả qua `$ref`).
+fn sort_values(contract: &Value, operation: &Value) -> Vec<String> {
+    let Some(parameters) = operation["parameters"].as_array() else { return Vec::new() };
+    let Some(sort) = parameters.iter().find(|parameter| parameter["name"] == "sort") else {
+        return Vec::new();
+    };
+    let mut schema = &sort["schema"];
+    // `oneOf: [null, {$ref}]` (tham số tuỳ chọn) hay `$ref` thẳng.
+    if let Some(choices) = schema["oneOf"].as_array()
+        && let Some(found) = choices.iter().find(|choice| choice.get("$ref").is_some())
+    {
+        schema = found;
+    }
+    if let Some(reference) = schema["$ref"].as_str() {
+        let name = reference.rsplit('/').next().unwrap_or_default();
+        schema = &contract["components"]["schemas"][name];
+    }
+    schema["enum"]
+        .as_array()
+        .map(|values| values.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .unwrap_or_default()
 }
 
 /// Mọi cách thay `{tham số}` của `path` bằng ID của khách A.

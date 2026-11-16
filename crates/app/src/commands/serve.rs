@@ -207,12 +207,13 @@ mod tests {
 
             assert_eq!(
                 error,
-                "12 migrations have not been applied to the database: kernel/m0001_create_secrets, \
+                "13 migrations have not been applied to the database: kernel/m0001_create_secrets, \
                  kernel/m0002_create_user_flags, kernel/m0003_create_tenancy, \
                  kernel/m0004_tenancy_user_flags, kernel/m0005_create_tenant_settings, \
                  kernel/m0006_create_events, kernel/m0007_add_event_actor, \
                  kernel/m0008_tenancy_events, kernel/m0009_create_jobs, kernel/m0010_tenancy_jobs, \
-                 kernel/m0011_create_tenant_moves, notes/m0001_create_note; run `autoxide migrate \
+                 kernel/m0011_create_tenant_moves, kernel/m0012_domain_check_failures, \
+                 notes/m0001_create_note; run `autoxide migrate \
                  up` first"
             );
         })

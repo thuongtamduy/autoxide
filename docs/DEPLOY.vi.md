@@ -292,8 +292,9 @@ sudo -u autoxide autoxide backup "backups/$(date +%F)"
 `autoxide restore <thư mục backup>` ở đó trước khi khởi động service.
 
 Với `AUTOXIDE_TENANCY_MODE=multi`, bản backup có database chính (sổ khách và mọi khách trên đó) và
-mọi file, nhưng không có database của các placement khác; lệnh in cảnh báo nêu tên chúng. Backup các
-database đó bằng công cụ của chính database. Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
+mọi file ở nơi lưu file chung, nhưng không có database của các placement khác, cũng không có nơi lưu
+file riêng của placement; lệnh in cảnh báo nêu tên chúng. Backup những thứ đó bằng công cụ của chính
+database (và của nơi lưu). Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
 backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.
 
 ## Chuyển từ SQLite sang PostgreSQL
@@ -360,6 +361,10 @@ miền của nền tảng.
    `pending` kèm lý do trong `check_error`. Tên miền đang chờ cũng được tra lại mỗi 10 phút; quá 7
    ngày chưa xác minh được thì thành `failed` (sửa bản ghi rồi xác minh lại).
    `DELETE /api/v1/kernel/domains/{id}` gỡ một tên miền.
+4. Giữ nguyên bản ghi TXT. Tên miền đã xác minh được kiểm lại mỗi ngày một lần: 3 lần liên tiếp không
+   thấy bản ghi thì tên miền thành `failed` (event `kernel.domain_failed`) và request tới nó không
+   còn vào khách. `failed_checks` đếm số lần trượt; một lần kiểm thấy bản ghi (hay `POST …/verify`
+   sau khi sửa) đưa nó về 0. Máy chủ DNS không trả lời thì không tính là trượt.
 
 Tên miền của chính nền tảng (tên máy trong `AUTOXIDE_HTTP_PUBLIC_URL`), địa chỉ IP và `localhost`
 bị từ chối. Mỗi lúc một tên miền chỉ thuộc một khách: khách khác chỉ nhận được sau khi nó bị gỡ hay
@@ -432,11 +437,14 @@ Khi chạy nhiều khách hàng, dữ liệu của mỗi khách nằm ở một 
    request đang chạy đã xong (`AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`), và tới khi job và event của
    khách đang được chạy đã xong. Rồi lệnh chép mọi dòng của khách, kể cả job đang chờ và event chưa
    giao, trong một transaction; so số dòng của từng bảng; chuyển khách sang placement mới (khách
-   chạy lại từ đó); và xoá bản cũ. SQLite và PostgreSQL trộn được theo cả hai chiều. File không được
-   chép: chúng ở nguyên chỗ cũ (ổ đĩa hay S3, mọi placement dùng chung, dưới `tenants/<id>/`).
+   chạy lại từ đó); và xoá bản cũ. SQLite và PostgreSQL trộn được theo cả hai chiều. File (dưới
+   `tenants/<id>/`) ở nguyên chỗ cũ khi hai placement dùng cùng nơi lưu file; khi đích có nơi lưu
+   riêng (xem dưới), file được chép sang đó trước khi chép dòng và bị xoá ở nơi lưu cũ ở cuối. Chạy
+   thử cho biết số file sẽ chép.
 
 `--keep-source` giữ bản cũ làm bản dự phòng thay vì xoá (job đang chờ và event của bản cũ bị xoá,
-để không gì chạy hai lần). Không gì dùng bản đó; xoá nó khi đã yên tâm:
+để không gì chạy hai lần; file của bản cũ cũng được giữ). Không gì dùng bản đó; xoá nó khi đã yên
+tâm:
 
 ```bash
 autoxide tenant purge-copy acme --placement main
@@ -447,6 +455,27 @@ với `{"to": "acme-db"}`: đó là chạy thử. Thêm `"dry_run": false` để
 theo dõi ở `Location` của câu trả lời (`GET /api/v1/kernel/tenants/{id}/moves/{move_id}`); tool MCP
 là `kernel.move_tenant`. Một job chạy được khoảng bốn phút: khách lớn (chạy thử cho biết số dòng)
 thì dời bằng lệnh, lệnh không giới hạn thời gian.
+
+**Nơi lưu file riêng của placement.** Mặc định file của mọi khách nằm ở nơi lưu theo cấu hình của
+module `files` (`AUTOXIDE_FILES_DIR` hay `AUTOXIDE_FILES_S3_BUCKET`), dưới `tenants/<id>/`. Cho một
+placement — thường là placement `dedicated` — bucket hay thư mục riêng, để file của khách đó cũng
+nằm riêng:
+
+```bash
+printf '%s' "$SECRET_ACCESS_KEY" | autoxide placement storage acme-db \
+  --s3-bucket acme-files --s3-region eu-west-1 \
+  --s3-endpoint https://<account>.r2.cloudflarestorage.com \
+  --s3-access-key-id "$ACCESS_KEY_ID" --s3-secret-access-key -
+# hoặc một thư mục trên máy chủ:
+autoxide placement storage acme-db --dir /var/lib/autoxide/files-acme
+```
+
+Cấu hình được lưu mã hoá bằng `AUTOXIDE_SECRET_KEY`; `autoxide placement list` và
+`GET /api/v1/kernel/placements` cho thấy bucket hay thư mục, không bao giờ cho thấy khoá. Bucket
+phải có sẵn; khoá sai lộ ra ở lần tải lên đầu tiên. Đặt nơi lưu khi placement chưa có khách, rồi dời
+khách sang: việc dời chép file của họ. Đổi về sau bị từ chối (file của họ đang ở nơi lưu cũ), trừ khi
+thêm `--force` khi nơi lưu mới đã có đúng các file đó — ví dụ khoá truy cập mới cho cùng bucket.
+`--clear` đưa file tải lên mới về nơi lưu chung (cùng luật). Mọi máy chủ phải chạy module `files`.
 
 **Khi việc dời dừng giữa chừng** (tiến trình chết, không kết nối được database, số dòng không
 khớp), không mất gì. Trước bước chuyển, khách vẫn trả `503` ở placement cũ; sau bước chuyển, khách

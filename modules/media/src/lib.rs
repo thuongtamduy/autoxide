@@ -154,7 +154,8 @@ impl Module for MediaModule {
         let day = Duration::from_secs(24 * 3600);
         vec![
             Schedule::new(PURGE_TRASH, PURGE_TRASH, day),
-            Schedule::new(CLEAN_ORPHANS, CLEAN_ORPHANS, day),
+            // Một lần cho cả bản cài: job quét mọi nơi lưu, đối chiếu với database của đúng khách.
+            Schedule::new(CLEAN_ORPHANS, CLEAN_ORPHANS, day).on_control_only(),
         ]
     }
 

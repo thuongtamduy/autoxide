@@ -24,9 +24,13 @@
 //!   (bước 2 xoá dòng của khách ở đích rồi chép lại). Huỷ được trước bước 3 ([`TenantMoves::abort`]).
 //! - Không bao giờ có hai bản "đang sống": `placement_id` chỉ đổi sau khi số dòng khớp, nguồn chỉ bị
 //!   xoá sau khi đã đổi.
-//! - Không chép: bảng mặt điều khiển (`kernel_tenants`, `kernel_placements`, tên miền…); file lưu
-//!   trữ (khoá `tenants/<id>/…` ở nơi lưu chung, không đổi khi dời; bucket riêng theo placement là
-//!   mục khác của lộ trình).
+//! - Không chép: bảng mặt điều khiển (`kernel_tenants`, `kernel_placements`, tên miền…).
+//! - File lưu trữ (khoá `tenants/<id>/…`): hai placement cùng nơi lưu (cùng nơi lưu chung, hay nơi
+//!   lưu riêng chỉ cùng một chỗ) thì không chép gì. Khác nơi lưu: bước 2 chép mọi file của khách sang
+//!   nơi lưu của đích (xoá file thừa của khách ở đó trước, so số file sau), bước 4 xoá file ở nguồn
+//!   (trừ `keep_source`; `purge` xoá sau). Trước khi chép hay xoá, ghi thử một file đánh dấu ở đích
+//!   rồi tìm ở nguồn: hai cấu hình khác nhau mà cùng một chỗ (vd nơi lưu riêng trỏ đúng thư mục của
+//!   nơi lưu chung) thì coi là cùng nơi lưu — không bao giờ xoá file đang dùng.
 
 mod http;
 
@@ -53,6 +57,7 @@ use crate::i18n::{Language, Translations};
 use crate::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use crate::migration::Migrator;
 use crate::migration::prelude::*;
+use crate::storage::Storage;
 use crate::transfer::{CopiedTable, TableKind, TenantTables, TransferError, same_database};
 
 pub(crate) use http::{routes, tools};
@@ -224,6 +229,9 @@ pub struct TenantMovePlan {
     pub tables: Vec<TenantTableRows>,
     /// Sum of `tables[].rows`.
     pub rows: u64,
+    /// Files of the tenant that would be copied to the file storage of `to`; `0` when both
+    /// placements keep files in the same storage (nothing to copy).
+    pub files: u64,
     /// Seconds the tenant answers `503 tenant_maintenance` before copying starts (other servers
     /// see the move and requests in progress finish); copying takes longer for many rows.
     pub settle_seconds: u64,
@@ -310,6 +318,7 @@ struct Checked {
     blockers: Vec<Error>,
     resume: Option<Model>,
     tables: Vec<TenantTableRows>,
+    files: u64,
 }
 
 /// Dời khách giữa các placement. Module `kernel` công bố (`context.require::<TenantMoves>()`).
@@ -474,7 +483,74 @@ impl TenantMoves {
                 blockers.extend(target_db.err());
             }
         }
-        Ok(Checked { tenant: row, from: source, to: target, blockers, resume, tables })
+        let mut files = 0;
+        match self.file_stores(&source, &target).await {
+            Ok(Some((from_store, _))) => {
+                match from_store.keys_with_prefix(&tenant_prefix(row.id)).await {
+                    Ok(keys) => files = keys.len() as u64,
+                    Err(error) => blockers.push(errors::tenant_move_storage_unavailable(
+                        &source.name,
+                        &error.to_string(),
+                    )),
+                }
+            }
+            Ok(None) => {}
+            Err(error) => blockers.push(error),
+        }
+        Ok(Checked { tenant: row, from: source, to: target, blockers, resume, tables, files })
+    }
+
+    /// Nơi lưu file của placement `placement`: nơi lưu riêng của nó, hay nơi lưu chung. Kèm cấu hình
+    /// nơi lưu riêng (`None`: nơi lưu chung) để so hai placement.
+    async fn file_store(
+        &self,
+        placement: &placement::Model,
+    ) -> Result<(Option<crate::storage::StorageLocation>, Arc<dyn Storage>), Error> {
+        let unavailable = |error: Error| {
+            errors::tenant_move_storage_unavailable(&placement.name, &error.to_string())
+        };
+        let id = PlacementId::from_uuid(placement.id);
+        match (&placement.storage_sealed, id == MAIN_PLACEMENT) {
+            (Some(sealed), false) => {
+                let location =
+                    self.registry.storage_location(id, sealed).await.map_err(unavailable)?;
+                let store = self.registry.placement_storage(id).await.map_err(unavailable)?;
+                let store = store.ok_or_else(|| {
+                    unavailable(Error::internal("the placement no longer has its own storage"))
+                })?;
+                Ok((Some(location), store))
+            }
+            _ => {
+                let store = self.registry.shared_storage().ok_or_else(|| {
+                    unavailable(Error::internal("no module provides the file storage"))
+                })?;
+                Ok((None, store))
+            }
+        }
+    }
+
+    /// Nơi lưu file của `from` và của `to` khi hai placement dùng hai nơi lưu khác nhau; `None`: cùng
+    /// nơi lưu (cùng nơi lưu chung, hay nơi lưu riêng chỉ cùng một chỗ) — không có file nào phải
+    /// chép hay xoá.
+    async fn file_stores(
+        &self,
+        from: &placement::Model,
+        to: &placement::Model,
+    ) -> Result<Option<(Arc<dyn Storage>, Arc<dyn Storage>)>, Error> {
+        let own = |placement: &placement::Model| {
+            placement.storage_sealed.is_some() && placement.id != MAIN_PLACEMENT.as_uuid()
+        };
+        if !own(from) && !own(to) {
+            return Ok(None);
+        }
+        let (from_location, from_store) = self.file_store(from).await?;
+        let (to_location, to_store) = self.file_store(to).await?;
+        if let (Some(a), Some(b)) = (&from_location, &to_location)
+            && a.same_place(b)
+        {
+            return Ok(None);
+        }
+        Ok(Some((from_store, to_store)))
     }
 
     /// Lý do hai database chưa chép được cho nhau: cùng một database, hay thiếu migration.
@@ -530,6 +606,7 @@ impl TenantMoves {
             resumes: checked.resume.map(|moving| moving.id),
             rows: checked.tables.iter().map(|table| table.rows).sum(),
             tables: checked.tables,
+            files: checked.files,
             settle_seconds: self.settle.as_secs(),
         })
     }
@@ -827,6 +904,17 @@ impl TenantMoves {
         }
         let tables = self.tables(&source, &target).await?;
         wait_claims(&source, &tables, tenant).await?;
+        // File trước dòng: chép file hỏng thì đích chưa có gì đổi; chạy lại chép lại từ đầu.
+        let files = match self.file_stores(&from, &to).await? {
+            Some((from_store, to_store)) => {
+                copy_files(&*from_store, &*to_store, &tenant_prefix(moving.tenant_id))
+                    .await
+                    .map_err(|error| {
+                        errors::tenant_move_storage_unavailable(&to.name, &error.to_string())
+                    })?
+            }
+            None => 0,
+        };
         let context = TenantContext::new(
             tenant,
             row.slug.clone(),
@@ -850,7 +938,7 @@ impl TenantMoves {
         verify(&tables, &source, &target, tenant).await?;
         self.set_state(self.control().write(), moving, runner, &to.name, COPIED, Some(&copied))
             .await?;
-        tracing::info!(move_id = %moving.id, tenant_id = %tenant, rows = event.rows, "tenant rows copied");
+        tracing::info!(move_id = %moving.id, tenant_id = %tenant, rows = event.rows, files, "tenant rows and files copied");
         self.find(moving.id).await
     }
 
@@ -916,8 +1004,16 @@ impl TenantMoves {
             .await
             .map_err(transfer)?;
         transaction.commit().await?;
+        let mut files = 0;
+        if !keep && let Some((from_store, to_store)) = self.file_stores(&from, &to).await? {
+            files = delete_files(&*from_store, &*to_store, &tenant_prefix(moving.tenant_id))
+                .await
+                .map_err(|error| {
+                    errors::tenant_move_storage_unavailable(&from.name, &error.to_string())
+                })?;
+        }
         self.set_state(self.control().write(), moving, runner, &to.name, DONE, None).await?;
-        tracing::info!(move_id = %moving.id, tenant_id = %tenant, deleted, keep_source = keep, "tenant move done");
+        tracing::info!(move_id = %moving.id, tenant_id = %tenant, deleted, files, keep_source = keep, "tenant move done");
         self.find(moving.id).await
     }
 
@@ -950,6 +1046,10 @@ impl TenantMoves {
             let transaction = target.begin_write().await?;
             tables.delete(&transaction, tenant_id, |_| true).await.map_err(transfer)?;
             transaction.commit().await?;
+            // File đã chép sang nơi lưu của đích (nếu khác nơi lưu của nguồn).
+            if let Some((from_store, to_store)) = self.file_stores(&from, &to).await? {
+                delete_files(&*to_store, &*from_store, &tenant_prefix(moving.tenant_id)).await?;
+            }
             Ok::<_, Error>(())
         }
         .await;
@@ -1015,7 +1115,14 @@ impl TenantMoves {
         let transaction = database.begin_write().await?;
         tables.delete(&transaction, tenant_id, |_| true).await.map_err(transfer)?;
         transaction.commit().await?;
-        tracing::info!(tenant_id = %row.id, placement, "copy of the tenant's data deleted");
+        let mut files = 0;
+        if let Some((copy_store, live_store)) = self.file_stores(copy, current).await? {
+            files =
+                delete_files(&*copy_store, &*live_store, &tenant_prefix(row.id)).await.map_err(
+                    |error| errors::tenant_move_storage_unavailable(placement, &error.to_string()),
+                )?;
+        }
+        tracing::info!(tenant_id = %row.id, placement, files, "copy of the tenant's data deleted");
         Ok(counts.into_iter().map(TenantTableRows::from).filter(|table| table.rows > 0).collect())
     }
 
@@ -1055,6 +1162,70 @@ impl TenantMoves {
             finished_at: moving.finished_at,
         })
     }
+}
+
+/// Tiền tố khoá file của khách `tenant` (không phải khách mặc định — khách đó không dời được).
+fn tenant_prefix(tenant: Uuid) -> String {
+    format!("tenants/{tenant}/")
+}
+
+/// `a` và `b` thật ra là cùng một nơi lưu: ghi một file đánh dấu (dưới `prefix`) vào `b` rồi tìm nó
+/// ở `a`. Cấu hình khác nhau vẫn có thể trỏ cùng một chỗ (vd thư mục của nơi lưu chung) — khi đó
+/// chép hay xoá "nguồn" là xoá file đang dùng.
+async fn same_store(a: &dyn Storage, b: &dyn Storage, prefix: &str) -> Result<bool, Error> {
+    let marker = format!("{prefix}move-check-{}", Uuid::now_v7());
+    let content = futures_util::stream::iter([Ok(bytes::Bytes::from_static(b"autoxide"))]);
+    b.put(&marker, Box::pin(content)).await?;
+    let found = a.get(&marker).await;
+    b.delete(&marker).await?;
+    Ok(found?.is_some())
+}
+
+/// Chép mọi file dưới `prefix` từ `source` sang `target` (đè file cùng khoá, xoá file thừa dưới
+/// `prefix` ở `target`), rồi so số file. Trả số file đã chép; `0` khi hai bên là cùng một nơi lưu.
+async fn copy_files(
+    source: &dyn Storage,
+    target: &dyn Storage,
+    prefix: &str,
+) -> Result<u64, Error> {
+    if same_store(source, target, prefix).await? {
+        return Ok(0);
+    }
+    let keys = source.keys_with_prefix(prefix).await?;
+    let wanted: std::collections::HashSet<&str> = keys.iter().map(String::as_str).collect();
+    for stale in target.keys_with_prefix(prefix).await? {
+        if !wanted.contains(stale.as_str()) {
+            target.delete(&stale).await?;
+        }
+    }
+    for key in &keys {
+        // File biến mất giữa lúc liệt kê và lúc đọc (khách `moving` không ghi gì; chỉ job dọn có
+        // thể xoá): bỏ qua, phép so bên dưới bắt lệch.
+        let Some(file) = source.get(key).await? else { continue };
+        target.put(key, file.content).await?;
+    }
+    let copied = target.keys_with_prefix(prefix).await?.len();
+    if copied != keys.len() {
+        return Err(errors::tenant_move_count_mismatch("files", keys.len() as u64, copied as u64));
+    }
+    Ok(keys.len() as u64)
+}
+
+/// Xoá mọi file dưới `prefix` ở `doomed` — trừ khi `doomed` thật ra là cùng nơi lưu với `kept`.
+/// Trả số file đã xoá.
+async fn delete_files(
+    doomed: &dyn Storage,
+    kept: &dyn Storage,
+    prefix: &str,
+) -> Result<u64, Error> {
+    if same_store(doomed, kept, prefix).await? {
+        return Ok(0);
+    }
+    let keys = doomed.keys_with_prefix(prefix).await?;
+    for key in &keys {
+        doomed.delete(key).await?;
+    }
+    Ok(keys.len() as u64)
 }
 
 /// So số dòng của khách ở hai database, từng bảng; đích có thêm đúng một event

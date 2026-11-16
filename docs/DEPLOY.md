@@ -294,8 +294,9 @@ To restore on a new machine, prepare the directory (steps 1–2), then run
 `autoxide restore <backup directory>` there before starting the service.
 
 With `AUTOXIDE_TENANCY_MODE=multi`, the backup holds the main database (the tenant register and
-every tenant on it) and all files, but not the databases of other placements; the command prints
-a warning naming them. Back those databases up with the database's own tools. Keep
+every tenant on it) and all files of the shared file storage, but not the databases of other
+placements nor a placement's own file storage; the command prints a warning naming them. Back
+those up with the database's (and the storage's) own tools. Keep
 `AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in
 a backup cannot be read.
 
@@ -363,6 +364,11 @@ platform's.
    `verified`, or still `pending` with the reason in `check_error`. Pending domains are also
    checked every 10 minutes; one not verified within 7 days becomes `failed` (fix the record,
    then verify it again). `DELETE /api/v1/kernel/domains/{id}` removes a domain.
+4. Keep the TXT record. A verified domain is checked again once a day: when the record is missing
+   at 3 checks in a row, the domain becomes `failed` (event `kernel.domain_failed`) and requests
+   to it no longer reach the tenant. `failed_checks` counts the misses; one check that finds the
+   record (or `POST …/verify` after fixing it) resets it to 0. A DNS server that does not answer
+   does not count as a miss.
 
 The platform's own domain (the host of `AUTOXIDE_HTTP_PUBLIC_URL`), IP addresses and `localhost`
 are refused. A domain belongs to one tenant at a time: another tenant can claim it only after it
@@ -438,11 +444,14 @@ Move a tenant to give a growing customer a database of its own, or to bring it b
    being run have finished. Then it copies every row of the tenant, queued jobs and undelivered
    events included, in one transaction; compares the row counts of every table; switches the
    tenant to the new placement (it works again from there); and deletes the old copy. SQLite and
-   PostgreSQL can be mixed in either direction. Files are not copied: they stay where they are
-   (local disk or S3, shared by every placement, under `tenants/<id>/`).
+   PostgreSQL can be mixed in either direction. Files (under `tenants/<id>/`) stay where they are
+   when both placements use the same file storage; when the target has its own storage (below),
+   they are copied there before the rows and deleted from the old storage at the end. The dry run
+   shows how many files would be copied.
 
 `--keep-source` keeps the old copy as a backup instead of deleting it (its queued jobs and events
-are deleted, so nothing runs twice). Nothing uses it; delete it once you are satisfied:
+are deleted, so nothing runs twice; its files stay too). Nothing uses it; delete it once you are
+satisfied:
 
 ```bash
 autoxide tenant purge-copy acme --placement main
@@ -454,6 +463,28 @@ Over the API, platform staff with `kernel.tenants.move` call
 answer (`GET /api/v1/kernel/tenants/{id}/moves/{move_id}`); the MCP tool is `kernel.move_tenant`.
 A job may run for about four minutes: move large tenants (the dry run shows the row count) with
 the command, which has no time limit.
+
+**A placement's own file storage.** By default every tenant's files are kept in the storage of
+the `files` module settings (`AUTOXIDE_FILES_DIR` or `AUTOXIDE_FILES_S3_BUCKET`), under
+`tenants/<id>/`. Give a placement — typically a `dedicated` one — its own bucket or directory, so
+a customer's files live apart too:
+
+```bash
+printf '%s' "$SECRET_ACCESS_KEY" | autoxide placement storage acme-db \
+  --s3-bucket acme-files --s3-region eu-west-1 \
+  --s3-endpoint https://<account>.r2.cloudflarestorage.com \
+  --s3-access-key-id "$ACCESS_KEY_ID" --s3-secret-access-key -
+# or a directory on the server:
+autoxide placement storage acme-db --dir /var/lib/autoxide/files-acme
+```
+
+The settings are stored encrypted with `AUTOXIDE_SECRET_KEY`; `autoxide placement list` and
+`GET /api/v1/kernel/placements` show the bucket or directory, never the keys. The bucket must
+exist; a wrong key shows up at the first upload. Set the storage while the placement has no
+tenants, then move tenants onto it: the move copies their files. Changing it later is refused
+(their files are in the old storage), except with `--force` when the new storage already holds
+the same files — for example a new access key for the same bucket. `--clear` sends the files of
+new uploads back to the shared storage (same rule). Every server must run the `files` module.
 
 **When a move stops half-way** (the process dies, a database cannot be reached, row counts
 differ), nothing is lost. Before the switch the tenant keeps answering `503` on its old placement;

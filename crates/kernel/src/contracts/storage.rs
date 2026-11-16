@@ -10,6 +10,7 @@ use std::pin::Pin;
 
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt as _};
+use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
@@ -112,14 +113,21 @@ pub fn slice(content: ByteStream, range: Range<u64>) -> ByteStream {
 /// (khách mặc định không có tiền tố — file cũ không phải dời; khách khác `tenants/<id>/`) và từ chối
 /// khoá có `..`, bắt đầu bằng `/` hay có đoạn rỗng: một khách không với tới file của khách khác.
 /// Liệt kê chỉ trả file của khách, khoá đã bỏ tiền tố.
+///
+/// Khách trên placement có nơi lưu riêng ([`StorageLocation`], `autoxide placement storage`) dùng
+/// nơi lưu đó thay cho nơi lưu chung (sổ database gắn nó vào ngữ cảnh khách,
+/// [`TenantContext::own_storage`](crate::tenancy::TenantContext::own_storage)) — module vẫn chỉ gọi
+/// `TenantStorage::new(nơi_lưu_chung, khách)`.
 pub struct TenantStorage {
     inner: std::sync::Arc<dyn Storage>,
     prefix: String,
 }
 
 impl TenantStorage {
-    /// Nơi lưu của khách `tenant` trên `inner`.
+    /// Nơi lưu của khách `tenant`: nơi lưu riêng của placement của nó nếu có, không thì `inner`
+    /// (nơi lưu chung).
     pub fn new(inner: std::sync::Arc<dyn Storage>, tenant: &crate::tenancy::TenantContext) -> Self {
+        let inner = tenant.own_storage().cloned().unwrap_or(inner);
         TenantStorage { inner, prefix: tenant.storage_prefix() }
     }
 
@@ -179,10 +187,227 @@ impl Storage for TenantStorage {
     }
 }
 
+/// Nơi lưu file riêng của một placement (bước 33): một thư mục trên máy chủ hay một bucket S3 (hay
+/// dịch vụ tương thích S3). Lưu mã hoá trong `kernel_placements.storage_sealed` (mục đích
+/// [`PLACEMENT_STORAGE`](crate::tenancy::PLACEMENT_STORAGE)); không API nào trả lại khoá bí mật.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum StorageLocation {
+    /// Thư mục trên ổ đĩa của máy chủ (tạo khi ghi file đầu tiên).
+    Local { dir: String },
+    /// Bucket S3.
+    S3(S3Location),
+}
+
+/// Bucket S3 của một placement — cùng các thông số với `AUTOXIDE_FILES_S3_*` / `AWS_*` của module
+/// `files`.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct S3Location {
+    pub bucket: String,
+    /// Thư mục trong bucket; `None`: gốc bucket.
+    pub prefix: Option<String>,
+    pub region: String,
+    /// Địa chỉ dịch vụ tương thích S3; `None`: Amazon S3.
+    pub endpoint: Option<String>,
+    pub access_key_id: Option<String>,
+    pub secret_access_key: Option<String>,
+}
+
+// `Debug` tự viết: không bao giờ in khoá bí mật (log, thông báo lỗi).
+impl std::fmt::Debug for S3Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("S3Location")
+            .field("bucket", &self.bucket)
+            .field("prefix", &self.prefix)
+            .field("region", &self.region)
+            .field("endpoint", &self.endpoint)
+            .field("access_key_id", &self.access_key_id.as_ref().map(|_| "***"))
+            .field("secret_access_key", &self.secret_access_key.as_ref().map(|_| "***"))
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for StorageLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StorageLocation::Local { dir } => f.debug_struct("Local").field("dir", dir).finish(),
+            StorageLocation::S3(s3) => s3.fmt(f),
+        }
+    }
+}
+
+impl StorageLocation {
+    /// Chuẩn hoá (bỏ khoảng trắng, `/` ở hai đầu tiền tố, `/` cuối địa chỉ) rồi kiểm; mọi trường sai
+    /// báo cùng lúc (lỗi `validation`, tên trường như cờ của `autoxide placement storage`).
+    pub fn checked(self) -> Result<Self, Error> {
+        use crate::error::FieldError;
+        let mut problems = Vec::new();
+        let location = match self {
+            StorageLocation::Local { dir } => {
+                let dir = dir.trim().to_owned();
+                if dir.is_empty() {
+                    problems.push(FieldError::new("dir", "required", "must not be empty"));
+                }
+                StorageLocation::Local { dir }
+            }
+            StorageLocation::S3(s3) => {
+                let text = |value: Option<String>| {
+                    value.map(|value| value.trim().to_owned()).filter(|value| !value.is_empty())
+                };
+                let bucket = s3.bucket.trim().to_owned();
+                let bucket_ok = (3..=63).contains(&bucket.len())
+                    && bucket.bytes().all(|b| {
+                        b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'.'
+                    });
+                if !bucket_ok {
+                    problems.push(FieldError::new(
+                        "s3_bucket",
+                        "invalid",
+                        "must be 3 to 63 lower-case letters, digits, `-` and `.`",
+                    ));
+                }
+                let prefix = text(s3.prefix).map(|prefix| prefix.trim_matches('/').to_owned());
+                if prefix.as_deref().is_some_and(|prefix| {
+                    !prefix.chars().all(|c| c.is_ascii_alphanumeric() || "-_./".contains(c))
+                }) {
+                    problems.push(FieldError::new(
+                        "s3_prefix",
+                        "invalid",
+                        "may contain only letters, digits, `-`, `_`, `.` and `/`",
+                    ));
+                }
+                let region = s3.region.trim().to_owned();
+                if region.is_empty() {
+                    problems.push(FieldError::new("s3_region", "required", "must not be empty"));
+                }
+                let endpoint = text(s3.endpoint).map(|url| url.trim_end_matches('/').to_owned());
+                if endpoint
+                    .as_deref()
+                    .is_some_and(|url| !url.starts_with("https://") && !url.starts_with("http://"))
+                {
+                    problems.push(FieldError::new(
+                        "s3_endpoint",
+                        "invalid",
+                        "must be an `https://` (or `http://`) URL",
+                    ));
+                }
+                let access_key_id = text(s3.access_key_id);
+                let secret_access_key = s3.secret_access_key.filter(|value| !value.is_empty());
+                if access_key_id.is_some() != secret_access_key.is_some() {
+                    problems.push(FieldError::new(
+                        "s3_secret_access_key",
+                        "required",
+                        "give both the access key and its secret, or neither",
+                    ));
+                }
+                StorageLocation::S3(S3Location {
+                    bucket,
+                    prefix: prefix.filter(|prefix| !prefix.is_empty()),
+                    region,
+                    endpoint,
+                    access_key_id,
+                    secret_access_key,
+                })
+            }
+        };
+        if problems.is_empty() { Ok(location) } else { Err(Error::validation(problems)) }
+    }
+
+    /// Hai nơi lưu chỉ cùng một chỗ (cùng thư mục; cùng địa chỉ, bucket và thư mục trong bucket —
+    /// khoá truy cập khác nhau vẫn là cùng chỗ).
+    pub fn same_place(&self, other: &StorageLocation) -> bool {
+        match (self, other) {
+            (StorageLocation::Local { dir: a }, StorageLocation::Local { dir: b }) => {
+                a.trim_end_matches('/') == b.trim_end_matches('/')
+            }
+            (StorageLocation::S3(a), StorageLocation::S3(b)) => {
+                (&a.endpoint, &a.bucket, &a.prefix) == (&b.endpoint, &b.bucket, &b.prefix)
+            }
+            _ => false,
+        }
+    }
+}
+
+/// Mở nơi lưu theo [`StorageLocation`] — module cài nơi lưu thật (`files`) công bố
+/// (`context.provide::<dyn StorageOpener>(…)`); sổ database dùng để mở nơi lưu riêng của placement.
+pub trait StorageOpener: Send + Sync {
+    /// Nơi lưu ở `location`. Không gọi mạng (dựng client là đủ): lỗi cấu hình hiện ra ở lần đọc / ghi
+    /// đầu tiên.
+    fn open(&self, location: &StorageLocation) -> Result<std::sync::Arc<dyn Storage>, Error>;
+}
+
+/// Nơi lưu không mở được (cấu hình hỏng, không module nào mở nơi lưu): mọi thao tác trả lỗi nêu
+/// lý do. Khách trên placement đó vẫn phục vụ được phần không chạm file.
+pub(crate) struct UnavailableStorage(pub(crate) String);
+
+impl UnavailableStorage {
+    fn error(&self) -> Error {
+        Error::internal(format!("file storage unavailable: {}", self.0))
+    }
+}
+
+#[async_trait::async_trait]
+impl Storage for UnavailableStorage {
+    async fn put(&self, _key: &str, _content: ByteStream) -> Result<u64, Error> {
+        Err(self.error())
+    }
+
+    async fn get(&self, _key: &str) -> Result<Option<StoredFile>, Error> {
+        Err(self.error())
+    }
+
+    async fn delete(&self, _key: &str) -> Result<(), Error> {
+        Err(self.error())
+    }
+
+    async fn keys(&self) -> Result<Vec<String>, Error> {
+        Err(self.error())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use futures_util::TryStreamExt as _;
+
+    #[test]
+    fn noi_luu_rieng_duoc_chuan_hoa_va_kiem() {
+        let s3 = |bucket: &str, key: Option<&str>, secret: Option<&str>| {
+            StorageLocation::S3(S3Location {
+                bucket: bucket.to_owned(),
+                prefix: Some("/tenants-eu/".to_owned()),
+                region: "us-east-1".to_owned(),
+                endpoint: Some("http://127.0.0.1:9000/".to_owned()),
+                access_key_id: key.map(str::to_owned),
+                secret_access_key: secret.map(str::to_owned),
+            })
+        };
+        let StorageLocation::S3(ok) =
+            s3(" files ", Some("id"), Some("TOPSECRET-1")).checked().unwrap()
+        else {
+            panic!("expected S3")
+        };
+        assert_eq!(ok.bucket, "files");
+        assert_eq!(ok.prefix.as_deref(), Some("tenants-eu"));
+        assert_eq!(ok.endpoint.as_deref(), Some("http://127.0.0.1:9000"));
+        assert!(!format!("{ok:?}").contains("TOPSECRET"), "{ok:?}");
+
+        let error = s3("A", Some("id"), None).checked().unwrap_err();
+        let fields: Vec<&str> = error.fields().iter().map(|e| e.field.as_str()).collect();
+        assert_eq!(fields, ["s3_bucket", "s3_secret_access_key"]);
+        assert!(StorageLocation::Local { dir: " ".to_owned() }.checked().is_err());
+
+        let a = s3("files", Some("one"), Some("x")).checked().unwrap();
+        let b = s3("files", Some("two"), Some("y")).checked().unwrap();
+        assert!(a.same_place(&b));
+        assert!(!a.same_place(&s3("other", None, None).checked().unwrap()));
+        let dir = StorageLocation::Local { dir: "/data/eu/".to_owned() };
+        assert!(dir.same_place(&StorageLocation::Local { dir: "/data/eu".to_owned() }));
+        assert!(!dir.same_place(&a));
+        let json = serde_json::to_string(&dir).unwrap();
+        assert_eq!(json, r#"{"kind":"local","dir":"/data/eu/"}"#);
+        assert_eq!(serde_json::from_str::<StorageLocation>(&json).unwrap(), dir);
+    }
 
     #[tokio::test]
     async fn cat_doan_qua_nhieu_khuc() {

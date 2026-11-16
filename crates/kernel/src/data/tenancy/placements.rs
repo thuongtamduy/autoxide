@@ -16,17 +16,20 @@ use std::sync::Arc;
 
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+};
 use uuid::Uuid;
 
 use super::admin::placement;
 use super::{
-    DatabaseRegistry, MAIN_PLACEMENT, NO_TENANT, PLACEMENT_READ_URL, PLACEMENT_URL, PlacementId,
-    PlacementKind, errors,
+    DatabaseRegistry, MAIN_PLACEMENT, NO_TENANT, PLACEMENT_READ_URL, PLACEMENT_STORAGE,
+    PLACEMENT_URL, PlacementId, PlacementKind, errors,
 };
 use crate::config::{DatabaseBackend, DatabaseUrl};
 use crate::error::{Error, FieldError};
 use crate::migration::{MigrationState, Migrator};
+use crate::storage::StorageLocation;
 
 /// Trạng thái schema của một placement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -140,7 +143,74 @@ impl Placements {
             .order_by_asc(placement::Column::Name)
             .all(self.registry.control().read())
             .await?;
-        Ok(rows.into_iter().map(super::admin::describe_placement).collect())
+        let mut all = Vec::with_capacity(rows.len());
+        for row in rows {
+            all.push(super::admin::describe_placement(&self.registry, row).await);
+        }
+        Ok(all)
+    }
+
+    /// Đặt (`Some`) hay bỏ (`None`, file của khách về nơi lưu chung) nơi lưu file riêng của
+    /// placement `name`. Lưu mã hoá (mục đích [`PLACEMENT_STORAGE`]); không bao giờ trả lại khoá bí
+    /// mật. Placement đang có khách thì từ chối (`tenant_placement_storage_in_use`: file của họ nằm
+    /// ở nơi lưu cũ) trừ khi `force` — khi nơi lưu mới đã có đúng các file đó (vd đổi khoá truy cập).
+    /// Không thử kết nối: lỗi cấu hình hiện ra ở lần đọc / ghi file đầu tiên (`autoxide doctor`).
+    pub async fn set_storage(
+        &self,
+        name: &str,
+        location: Option<StorageLocation>,
+        force: bool,
+    ) -> Result<super::Placement, Error> {
+        let location = location.map(StorageLocation::checked).transpose()?;
+        let row = placement::Entity::find()
+            .filter(placement::Column::Name.eq(name))
+            .one(self.registry.control().read())
+            .await?
+            .ok_or_else(|| errors::tenant_placement_not_found(name))?;
+        if row.id == MAIN_PLACEMENT.as_uuid() {
+            return Err(Error::validation(vec![FieldError::new(
+                "placement",
+                "main",
+                "the placement `main` keeps its files where the `files` module settings say",
+            )]));
+        }
+        let id = PlacementId::from_uuid(row.id);
+        if !force {
+            let tenants = super::admin::tenant::Entity::find()
+                .filter(super::admin::tenant::Column::PlacementId.eq(row.id))
+                .count(self.registry.control().read())
+                .await?;
+            if tenants > 0 {
+                return Err(errors::tenant_placement_storage_in_use(name, tenants));
+            }
+        }
+        let sealed = match &location {
+            Some(location) => {
+                let json =
+                    zeroize::Zeroizing::new(serde_json::to_vec(location).map_err(Error::internal)?);
+                let sealer = self.registry.sealer().await?;
+                Some(sealer.seal(NO_TENANT, PLACEMENT_STORAGE, &id.to_string(), &json)?)
+            }
+            None => None,
+        };
+        placement::Entity::update_many()
+            .col_expr(placement::Column::StorageSealed, Expr::value(sealed))
+            .col_expr(placement::Column::UpdatedAt, Expr::value(now()))
+            .filter(placement::Column::Id.eq(row.id))
+            .exec(self.registry.control().write())
+            .await?;
+        self.registry.invalidate_placement(id);
+        let kind = match &location {
+            Some(StorageLocation::Local { .. }) => "local",
+            Some(StorageLocation::S3(_)) => "s3",
+            None => "shared",
+        };
+        tracing::info!(placement = %name, storage = kind, "placement file storage changed");
+        let row = placement::Entity::find_by_id(row.id)
+            .one(self.registry.control().write())
+            .await?
+            .ok_or_else(|| errors::tenant_placement_not_found(name))?;
+        Ok(super::admin::describe_placement(&self.registry, row).await)
     }
 
     /// Thêm placement: kiểm tên, thử kết nối, lưu URL mã hoá, rồi kiểm migration (database đã
