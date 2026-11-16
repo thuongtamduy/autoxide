@@ -8,6 +8,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    /// Khách của event (bước 33): mỗi khách một chuỗi băm.
+    pub tenant_id: Uuid,
     pub module: String,
     pub action: String,
     pub actor_user_id: Option<Uuid>,
@@ -27,8 +29,14 @@ pub struct Model {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-/// Bảng `audit_chain`: một dòng (`name` = [`HEAD`](crate::chain::HEAD)) giữ số thứ tự và mã băm
-/// của dòng cuối trong chuỗi.
+impl autoxide_kernel::tenancy::TenantScoped for Entity {
+    fn tenant_column() -> Self::Column {
+        Column::TenantId
+    }
+}
+
+/// Bảng `audit_chain`: mỗi khách một dòng (`name` = [`HEAD`](crate::chain::HEAD)) giữ số thứ tự
+/// và mã băm của dòng cuối trong chuỗi của khách.
 pub(crate) mod head {
     use sea_orm::entity::prelude::*;
 
@@ -37,10 +45,18 @@ pub(crate) mod head {
     #[sea_orm(table_name = "audit_chain")]
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
+        pub tenant_id: Uuid,
+        #[sea_orm(primary_key, auto_increment = false)]
         pub name: String,
         pub sequence: i64,
         pub hash: String,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }

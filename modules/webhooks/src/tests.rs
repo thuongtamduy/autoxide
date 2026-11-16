@@ -81,6 +81,8 @@ impl Receiver {
 
 struct Setup {
     database: Database,
+    /// Khách mặc định trên database của test.
+    tenant: autoxide_kernel::tenancy::TenantContext,
     service: Arc<WebhookService>,
     fanout: Fanout,
     sender: Sender,
@@ -92,6 +94,14 @@ async fn setup(test: &TestDatabase, allow_http: bool) -> Setup {
     let config = Config::read(&mut reader);
     let (config, _) = reader.finish(config).unwrap();
     let database = Database::connect(&config.database).await.unwrap();
+    // Bảng của kernel (`kernel_secrets`: khoá gốc mã hoá secret ký).
+    autoxide_kernel::module::Modules::new(Vec::new())
+        .unwrap()
+        .migrator()
+        .unwrap()
+        .up(&database)
+        .await
+        .unwrap();
     Migrator::new(vec![ModuleMigrations::new("webhooks", crate::migration::all())])
         .unwrap()
         .up(&database)
@@ -102,23 +112,25 @@ async fn setup(test: &TestDatabase, allow_http: bool) -> Setup {
         ("webhooks", crate::events::all()),
     ])
     .unwrap();
+    let secrets = autoxide_kernel::secret::SecretKey::new(database.clone(), None);
     let service = Arc::new(WebhookService::new(
-        database.clone(),
+        secrets.clone(),
         Outbox::standalone("webhooks"),
         catalog,
         allow_http,
         // Máy nhận trong test chạy trên 127.0.0.1.
         allow_http,
     ));
-    let fanout = Fanout { database: database.clone(), jobs: JobQueue::new("webhooks") };
+    let fanout = Fanout { jobs: JobQueue::new("webhooks") };
     let client = Sender::client(std::time::Duration::from_secs(5), allow_http).unwrap();
-    let sender = Sender { database: database.clone(), client, allow_private_networks: allow_http };
-    Setup { database, service, fanout, sender }
+    let sender = Sender { secrets, client, allow_private_networks: allow_http };
+    let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+    Setup { database, tenant, service, fanout, sender }
 }
 
 fn event(database: &Database, name: &str) -> Delivered {
     Delivered::new(
-        autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+        autoxide_kernel::tenancy::TenantContext::default_on(database.clone()),
         "demo",
         name.to_owned(),
         json!({"after": {"size": 3}}),
@@ -133,7 +145,7 @@ async fn deliveries(database: &Database) -> Vec<delivery::Model> {
 
 fn job(database: &Database, delivery_id: Uuid, attempt: i32) -> JobContext {
     JobContext::for_tenant(
-        autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+        autoxide_kernel::tenancy::TenantContext::default_on(database.clone()),
         crate::delivery::SEND_KIND,
         json!({"delivery_id": delivery_id}),
         attempt,
@@ -152,7 +164,7 @@ async fn gui_co_chu_ky_thu_lai_khi_loi_va_khong_gui_trung() {
             description: "test".to_owned(),
             events: vec![DEMO_EVENT.to_owned()],
         };
-        let created = setup.service.create(Actor::system(), input).await.unwrap();
+        let created = setup.service.create(&setup.tenant, Actor::system(), input).await.unwrap();
 
         // Event không ai đăng ký: không gửi. Event được giao hai lần: chỉ một lần gửi.
         setup.fanout.handle(&event(&setup.database, "webhooks.endpoint_created")).await.unwrap();
@@ -216,7 +228,7 @@ async fn giao_dong_thoi_khong_gui_trung() {
             description: String::new(),
             events: vec![DEMO_EVENT.to_owned()],
         };
-        setup.service.create(Actor::system(), input).await.unwrap();
+        setup.service.create(&setup.tenant, Actor::system(), input).await.unwrap();
         let fanout = Arc::new(setup.fanout);
         let happened = event(&setup.database, DEMO_EVENT);
         let handles: Vec<_> = (0..6)
@@ -247,7 +259,8 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
         receiver.answers.lock().unwrap().push(StatusCode::BAD_GATEWAY);
         let url = receiver.start().await;
         let input = NewEndpoint { url, description: String::new(), events: vec!["*".to_owned()] };
-        let endpoint = setup.service.create(Actor::system(), input).await.unwrap().endpoint;
+        let endpoint =
+            setup.service.create(&setup.tenant, Actor::system(), input).await.unwrap().endpoint;
 
         setup.fanout.handle(&event(&setup.database, DEMO_EVENT)).await.unwrap();
         setup.fanout.handle(&event(&setup.database, DEMO_EVENT)).await.unwrap();
@@ -270,7 +283,7 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
 
         // Endpoint bị tắt: lần gửi còn chờ thất bại, không gửi đi.
         let off = EndpointChanges { disabled: Some(true), ..Default::default() };
-        setup.service.update(Actor::system(), endpoint.id, off, None).await.unwrap();
+        setup.service.update(&setup.tenant, Actor::system(), endpoint.id, off, None).await.unwrap();
         setup.sender.run(&job(&setup.database, rows[1].id, 1)).await.unwrap();
         let skipped = delivery::Entity::find_by_id(rows[1].id).one(setup.database.read()).await;
         assert_eq!(skipped.unwrap().unwrap().status, "failed");
@@ -294,7 +307,8 @@ async fn khong_gui_vao_mang_rieng() {
             description: String::new(),
             events: vec!["*".to_owned()],
         };
-        let endpoint = setup.service.create(Actor::system(), input).await.unwrap().endpoint;
+        let endpoint =
+            setup.service.create(&setup.tenant, Actor::system(), input).await.unwrap().endpoint;
         let backend = setup.database.write().get_database_backend();
         let sql = format!(
             "UPDATE webhooks_endpoint SET url = 'https://127.0.0.1:9/hook' WHERE id = '{}'",
@@ -332,10 +346,17 @@ async fn kiem_dia_chi_va_ten_event() {
             description: String::new(),
             events: vec![event.to_owned()],
         };
-        let insecure =
-            setup.service.create(Actor::system(), new("http://example.com/h", DEMO_EVENT));
+        let insecure = setup.service.create(
+            &setup.tenant,
+            Actor::system(),
+            new("http://example.com/h", DEMO_EVENT),
+        );
         assert_eq!(insecure.await.unwrap_err().fields()[0].field, "url");
-        let unknown = setup.service.create(Actor::system(), new("https://example.com/h", "x.y"));
+        let unknown = setup.service.create(
+            &setup.tenant,
+            Actor::system(),
+            new("https://example.com/h", "x.y"),
+        );
         assert_eq!(unknown.await.unwrap_err().fields()[0].field, "events[0]");
         // Mọi lỗi cùng một lần.
         let all_wrong = NewEndpoint {
@@ -343,7 +364,8 @@ async fn kiem_dia_chi_va_ten_event() {
             description: "x".repeat(201),
             events: vec!["x.y".to_owned()],
         };
-        let error = setup.service.create(Actor::system(), all_wrong).await.unwrap_err();
+        let error =
+            setup.service.create(&setup.tenant, Actor::system(), all_wrong).await.unwrap_err();
         let fields: Vec<&str> = error.fields().iter().map(|field| field.field.as_str()).collect();
         assert_eq!(fields, ["url", "description", "events[0]"]);
         // Mạng riêng hay máy này: từ chối ngay (SSRF, D-149) — kể cả IP viết kiểu khác.
@@ -356,14 +378,21 @@ async fn kiem_dia_chi_va_ten_event() {
             "https://2130706433/h",
             "https://[::ffff:192.168.1.1]/h",
         ] {
-            let refused = setup.service.create(Actor::system(), new(private, DEMO_EVENT)).await;
+            let refused = setup
+                .service
+                .create(&setup.tenant, Actor::system(), new(private, DEMO_EVENT))
+                .await;
             let error = refused.unwrap_err();
             assert_eq!(error.fields()[0].field, "url", "{private}");
             assert!(error.fields()[0].message.contains("private"), "{private}");
         }
         for bad in ["not a url", "https://user:pass@example.com/h", "ftp://example.com"] {
             assert!(
-                setup.service.create(Actor::system(), new(bad, DEMO_EVENT)).await.is_err(),
+                setup
+                    .service
+                    .create(&setup.tenant, Actor::system(), new(bad, DEMO_EVENT))
+                    .await
+                    .is_err(),
                 "{bad}"
             );
         }
@@ -373,15 +402,20 @@ async fn kiem_dia_chi_va_ten_event() {
             events: vec![],
         };
         assert_eq!(
-            setup.service.create(Actor::system(), none).await.unwrap_err().code(),
+            setup.service.create(&setup.tenant, Actor::system(), none).await.unwrap_err().code(),
             "validation_failed"
         );
-        let ok =
-            setup.service.create(Actor::system(), new("https://example.com/h", DEMO_EVENT)).await;
+        let ok = setup
+            .service
+            .create(&setup.tenant, Actor::system(), new("https://example.com/h", DEMO_EVENT))
+            .await;
         let created = ok.unwrap();
         assert!(created.secret.starts_with("whsec_"));
-        let rotated =
-            setup.service.rotate_secret(Actor::system(), created.endpoint.id).await.unwrap();
+        let rotated = setup
+            .service
+            .rotate_secret(&setup.tenant, Actor::system(), created.endpoint.id)
+            .await
+            .unwrap();
         assert_ne!(rotated, created.secret);
     })
     .await
@@ -490,8 +524,9 @@ async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
         let busy = post("https://example.com/busy").await;
         let quiet = post("https://example.com/quiet").await;
         let now = chrono::Utc::now();
-        for (minutes, status, code) in [(10, "failed", Some(500)), (1, "delivered", Some(204))] {
+        for (minutes, status, code) in [(10, "failed", Some(500)), (1, "succeeded", Some(204))] {
             let row = delivery::Model {
+                tenant_id: app.default_tenant().id().as_uuid(),
                 id: Uuid::now_v7(),
                 endpoint_id: busy,
                 event_id: Uuid::now_v7(),
@@ -520,11 +555,11 @@ async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
 
         let list = app.get("/api/v1/webhooks?order=asc").token("admin").send().await.unwrap();
         let rows = list.json()["data"].clone();
-        assert_eq!(rows[0]["last_delivery"]["status"], "delivered");
+        assert_eq!(rows[0]["last_delivery"]["status"], "succeeded");
         assert_eq!(rows[0]["last_delivery"]["response_status"], 204);
         assert!(rows[1]["last_delivery"].is_null(), "{rows}");
         let one = app.get(&format!("/api/v1/webhooks/{busy}")).token("admin").send().await.unwrap();
-        assert_eq!(one.json()["data"]["last_delivery"]["status"], "delivered");
+        assert_eq!(one.json()["data"]["last_delivery"]["status"], "succeeded");
 
         let active = app.get("/api/v1/webhooks?status=active").token("admin").send().await.unwrap();
         let ids: Vec<_> =
@@ -532,6 +567,53 @@ async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
         assert_eq!(ids, [json!(busy)]);
         let off = app.get("/api/v1/webhooks?status=disabled").token("admin").send().await.unwrap();
         assert_eq!(off.json()["data"][0]["id"], json!(quiet));
+    })
+    .await
+    .unwrap();
+}
+
+/// Bước 33 (D-278): event của khách `a` chỉ tạo lần gửi tới endpoint của `a` (khách `b` có
+/// endpoint nghe cùng event mà không nhận gì); secret ký lưu đã mã hoá; người của `b` không đọc
+/// được endpoint của `a`.
+#[tokio::test]
+async fn event_khach_a_khong_gui_toi_endpoint_khach_b() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant_dedicated("b")
+            .user_in("a", "admin-a", 1, &["webhooks.manage"])
+            .user_in("b", "admin-b", 2, &["webhooks.manage"])
+            .module(Demo)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let marker = "marker-hook-a";
+        let mut ids = Vec::new();
+        for (who, description) in [("admin-a", marker), ("admin-b", "b")] {
+            let body = json!({"url": "https://example.com/hook", "description": description, "events": [DEMO_EVENT]});
+            let answer = app.post("/api/v1/webhooks").token(who).json(body).send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::CREATED, "{}", answer.json());
+            ids.push(answer.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
+        let stored = crate::entity::endpoint::Entity::find().all(a.database().read()).await.unwrap();
+        let mine: Vec<_> = stored.iter().filter(|row| row.tenant_id == a.id().as_uuid()).collect();
+        assert_eq!(mine.len(), 1);
+        assert!(mine[0].secret.starts_with("sealed:v1:"), "the signing secret is stored encrypted");
+
+        let event = Delivered::new(a.clone(), "demo", DEMO_EVENT.to_owned(), json!({"after": {}}));
+        let fanout = Fanout { jobs: JobQueue::new("webhooks") };
+        fanout.handle(&event).await.unwrap();
+        let in_a = delivery::Entity::find().all(a.database().read()).await.unwrap();
+        let in_a: Vec<_> = in_a.into_iter().filter(|row| row.tenant_id == a.id().as_uuid()).collect();
+        assert_eq!(in_a.len(), 1);
+        assert_eq!(in_a[0].endpoint_id.to_string(), ids[0]);
+        assert!(delivery::Entity::find().all(b.database().read()).await.unwrap().is_empty());
+
+        let seeded = [("id", ids[0].clone())];
+        let violations = autoxide_testkit::leak_check(&app, "admin-b", marker, &seeded).await.unwrap();
+        assert_eq!(violations, Vec::<String>::new());
     })
     .await
     .unwrap();

@@ -134,7 +134,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "list_lists",
             "List the newsletter lists, newest first, with how many people are unconfirmed, \
              confirmed and unsubscribed. Follow `pagination.next_cursor` for more.",
-            move |_tenant: TenantContext, principal: Principal, input: ListListsInput| {
+            move |tenant: TenantContext, principal: Principal, input: ListListsInput| {
                 let service = lists.clone();
                 async move {
                     let paging = PageQuery::new(
@@ -143,9 +143,9 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                         None,
                     );
                     let page = page_request(paging, Vec::new())?;
-                    let found = service.list_lists(&principal, &page).await?;
+                    let found = service.list_lists(&tenant, &principal, &page).await?;
                     let ids: Vec<Uuid> = found.data.iter().map(|list| list.row.id).collect();
-                    let mut counts = service.subscription_counts(&ids).await?;
+                    let mut counts = service.subscription_counts(&tenant, &ids).await?;
                     Ok::<Page<ListResponse>, Error>(found.map(|list| {
                         let count = counts.remove(&list.row.id).unwrap_or_default();
                         ListResponse::new(list, count)
@@ -160,7 +160,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "Find subscribers by part of their email address, list or subscription status, \
              newest first, with their subscriptions. Follow `pagination.next_cursor` with the \
              same filters for more.",
-            move |_tenant: TenantContext, principal: Principal, input: FindSubscribersInput| {
+            move |tenant: TenantContext, principal: Principal, input: FindSubscribersInput| {
                 let service = find.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -181,7 +181,8 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                         None,
                     );
                     let page = page_request(paging, problems)?;
-                    let found = service.list_subscribers(&principal, &filter, &page).await?;
+                    let found =
+                        service.list_subscribers(&tenant, &principal, &filter, &page).await?;
                     Ok::<Page<SubscriberResponse>, Error>(found.map(Into::into))
                 }
             },
@@ -193,7 +194,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "Write a draft campaign for a list. Nothing is sent: a person (or an agent with \
              `newsletter.send`) sends or schedules it after review. Returns the campaign with \
              its `version`.",
-            move |_tenant: TenantContext, principal: Principal, input: CreateCampaignInput| {
+            move |tenant: TenantContext, principal: Principal, input: CreateCampaignInput| {
                 let service = create.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -212,7 +213,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                         advertising: input.advertising,
                     };
                     Ok::<Versioned, Error>(versioned(
-                        service.create_campaign(&principal, input).await?,
+                        service.create_campaign(&tenant, &principal, input).await?,
                     ))
                 }
             },
@@ -222,11 +223,11 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "get_campaign",
             "Get a campaign: content, status and progress (`progress.total`, `pending`, \
              `sent`, `failed`, `skipped`), and the `version` needed to send or schedule it.",
-            move |_tenant: TenantContext, principal: Principal, input: CampaignId| {
+            move |tenant: TenantContext, principal: Principal, input: CampaignId| {
                 let service = get.clone();
                 async move {
                     Ok::<Versioned, Error>(versioned(
-                        service.get_campaign(&principal, input.id).await?,
+                        service.get_campaign(&tenant, &principal, input.id).await?,
                     ))
                 }
             },
@@ -238,12 +239,13 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "Send a draft or scheduled campaign now to every confirmed subscriber of its list. \
              Mails go out in batches; follow the progress with `get_campaign`. Pass the \
              `version` you read.",
-            move |_tenant: TenantContext, principal: Principal, input: SendInput| {
+            move |tenant: TenantContext, principal: Principal, input: SendInput| {
                 let service = send.clone();
                 async move {
                     let expected = IfMatch::from_value(&input.version).expected()?;
-                    let found =
-                        service.change_state(&principal, input.id, Action::Send, expected).await?;
+                    let found = service
+                        .change_state(&tenant, &principal, input.id, Action::Send, expected)
+                        .await?;
                     Ok::<Versioned, Error>(versioned(found))
                 }
             },
@@ -253,7 +255,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "schedule_campaign",
             "Schedule a draft or scheduled campaign to start sending at `at`. Pass the \
              `version` you read.",
-            move |_tenant: TenantContext, principal: Principal, input: ScheduleInput| {
+            move |tenant: TenantContext, principal: Principal, input: ScheduleInput| {
                 let service = schedule.clone();
                 async move {
                     if input.version.trim().is_empty() {
@@ -265,7 +267,13 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                     }
                     let expected = IfMatch::from_value(&input.version).expected()?;
                     let found = service
-                        .change_state(&principal, input.id, Action::Schedule(input.at), expected)
+                        .change_state(
+                            &tenant,
+                            &principal,
+                            input.id,
+                            Action::Schedule(input.at),
+                            expected,
+                        )
                         .await?;
                     Ok(versioned(found))
                 }

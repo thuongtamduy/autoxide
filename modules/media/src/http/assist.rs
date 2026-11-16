@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -78,11 +79,13 @@ impl From<AltSuggestion> for AltSuggestionResponse {
 )]
 pub(crate) async fn suggest_alt(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<AltRequest>,
 ) -> Result<Data<AltSuggestionResponse>, Error> {
-    let suggestion =
-        service.suggest_alt(&principal, id, &input.locale, input.context.as_deref()).await?;
+    let suggestion = service
+        .suggest_alt(&tenant, &principal, id, &input.locale, input.context.as_deref())
+        .await?;
     Ok(Data { data: suggestion.into() })
 }

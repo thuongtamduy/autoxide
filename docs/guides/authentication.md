@@ -6,6 +6,8 @@ Vietnamese: [`authentication.vi.md`](authentication.vi.md). Examples use `curl` 
 
 Send the email and password. The answer holds a short-lived **access token** (send it with every request) and a **refresh token** (to get the next pair). An account with two-step sign-in answers `202` with a `challenge_id` instead; finish with `POST /api/v1/auth/login/mfa` and the code.
 
+On a server that hosts several tenants, sign in on the tenant's domain or with the `Autoxide-Tenant` header. The tokens you get name their tenant, so the requests that follow — with the access token, `/refresh`, `/logout`, `/login/mfa`, and the links in password-reset and verification mails — need neither the header nor the domain. Sending a token together with a header (or domain) of another tenant is refused.
+
 <!-- example: sign-in -->
 ```bash
 curl -sS "$API/api/v1/auth/login" \

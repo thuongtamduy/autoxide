@@ -103,7 +103,8 @@ async fn run(
         request.headers().get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
     let principal = match &settings.authenticator {
         Some(authenticator) => {
-            let hint = crate::tenancy::TenantHint::from_headers(request.headers());
+            let hint =
+                crate::tenancy::TenantHint::of_request(request.headers(), request.extensions());
             authenticator.authenticate(authorization, &hint).await.ok()
         }
         None => None,

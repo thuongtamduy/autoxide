@@ -7,7 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
@@ -192,12 +192,13 @@ impl NewsletterService {
     /// Một trang người đăng ký, mới trước (mặc định). Cần `newsletter.read`.
     pub(crate) async fn list_subscribers(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         filter: &SubscriberFilter,
         page: &PageRequest,
     ) -> Result<Page<Subscriber>, Error> {
         principal.require(&NEWSLETTER_READ)?;
-        let mut select = subscriber::Entity::find();
+        let mut select = subscriber::Entity::find().scoped(tenant);
         if let Some(email) =
             filter.email.as_deref().map(str::trim).filter(|email| !email.is_empty())
         {
@@ -211,7 +212,10 @@ impl NewsletterService {
         }
         if filter.list_id.is_some() || filter.status.is_some() {
             let mut inner = Query::select();
-            inner.column(subscription::Column::SubscriberId).from(subscription::Entity);
+            inner
+                .column(subscription::Column::SubscriberId)
+                .from(subscription::Entity)
+                .and_where(subscription::Column::TenantId.eq(tenant.id().as_uuid()));
             if let Some(list_id) = filter.list_id {
                 inner.and_where(subscription::Column::ListId.eq(list_id));
             }
@@ -220,36 +224,51 @@ impl NewsletterService {
             }
             select = select.filter(subscriber::Column::Id.in_subquery(inner.to_owned()));
         }
-        let found =
-            fetch_page(select, subscriber::Column::Id, |row| row.id, page, self.database.read())
-                .await?;
+        let found = fetch_page(
+            select,
+            subscriber::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await?;
         let Page { data, pagination } = found;
-        let data = self.describe(self.database.read(), data).await?;
+        let data = self.describe(tenant.database().read(), tenant, data).await?;
         Ok(Page { data, pagination })
     }
 
     /// Người đăng ký `id`. Cần `newsletter.read`.
     pub(crate) async fn get_subscriber(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<Subscriber, Error> {
         principal.require(&NEWSLETTER_READ)?;
-        self.find_subscriber(id).await
+        self.find_subscriber(tenant, id).await
     }
 
-    pub(crate) async fn find_subscriber(&self, id: Uuid) -> Result<Subscriber, Error> {
+    pub(crate) async fn find_subscriber(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Subscriber, Error> {
         let row = subscriber::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(subscriber_not_found)?;
-        self.describe(self.database.read(), vec![row]).await?.pop().ok_or_else(subscriber_not_found)
+        self.describe(tenant.database().read(), tenant, vec![row])
+            .await?
+            .pop()
+            .ok_or_else(subscriber_not_found)
     }
 
     /// Đọc kèm đăng ký, `key` danh sách và lý do bị chặn cho `rows` (giữ thứ tự).
     pub(crate) async fn describe<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         rows: Vec<subscriber::Model>,
     ) -> Result<Vec<Subscriber>, Error> {
         if rows.is_empty() {
@@ -257,17 +276,20 @@ impl NewsletterService {
         }
         let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
         let memberships = subscription::Entity::find()
+            .scoped(tenant)
             .filter(subscription::Column::SubscriberId.is_in(ids))
             .all(connection)
             .await?;
         let lists = self
             .lists_by_id(
                 connection,
+                tenant,
                 memberships.iter().map(|row| row.list_id).collect::<HashSet<_>>(),
             )
             .await?;
         let emails: Vec<String> = rows.iter().map(|row| row.email.clone()).collect();
         let suppressed: HashMap<String, String> = suppression::Entity::find()
+            .scoped(tenant)
             .filter(suppression::Column::Email.is_in(emails))
             .all(connection)
             .await?
@@ -303,6 +325,7 @@ impl NewsletterService {
     /// `newsletter.manage`.
     pub(crate) async fn import_subscribers(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: ImportInput,
     ) -> Result<ImportReport, Error> {
@@ -333,7 +356,9 @@ impl NewsletterService {
         if input.list_ids.is_empty() {
             problems.push(FieldError::new("list_ids", "required", "needs at least one list"));
         }
-        let lists = self.lists_by_id(self.database.read(), input.list_ids.iter().copied()).await?;
+        let lists = self
+            .lists_by_id(tenant.database().read(), tenant, input.list_ids.iter().copied())
+            .await?;
         for (index, id) in input.list_ids.iter().enumerate() {
             if !lists.contains_key(id) {
                 problems.push(FieldError::new(
@@ -372,9 +397,9 @@ impl NewsletterService {
         let mut report = ImportReport::default();
         for chunk in people.chunks(IMPORT_CHUNK) {
             let mut part = ImportReport::default();
-            let transaction = self.database.begin_write().await?;
+            let transaction = tenant.database().begin_write().await?;
             for person in chunk {
-                let (row, created) = upsert_subscriber(&transaction, person, now).await?;
+                let (row, created) = upsert_subscriber(&transaction, tenant, person, now).await?;
                 if created {
                     part.created += 1;
                 } else {
@@ -390,13 +415,19 @@ impl NewsletterService {
                     }
                     if active.is_changed() {
                         active.updated_at = Set(now);
-                        active.update(&transaction).await?;
+                        subscriber::Entity::update(active)
+                            .validate()?
+                            .scoped(tenant)
+                            .exec(&transaction)
+                            .await?;
                     }
                 }
                 for list_id in &list_ids {
-                    let existing = subscription::Entity::find_by_id((row.id, *list_id))
-                        .one(&transaction)
-                        .await?;
+                    let existing =
+                        subscription::Entity::find_by_id((tenant.id().as_uuid(), row.id, *list_id))
+                            .scoped(tenant)
+                            .one(&transaction)
+                            .await?;
                     match existing.as_ref().map(|row| SubscriptionStatus::stored(&row.status)) {
                         Some(SubscriptionStatus::Confirmed) => part.unchanged += 1,
                         Some(SubscriptionStatus::Unsubscribed) => part.kept_unsubscribed += 1,
@@ -408,6 +439,7 @@ impl NewsletterService {
                             };
                             set_subscription(
                                 &transaction,
+                                tenant,
                                 existing,
                                 (row.id, *list_id),
                                 wanted,
@@ -429,15 +461,7 @@ impl NewsletterService {
                     "kept_unsubscribed": part.kept_unsubscribed,
                 })),
             });
-            self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    Actor::from(principal),
-                    None,
-                    &event,
-                )
-                .await?;
+            self.outbox.record(&transaction, tenant, Actor::from(principal), None, &event).await?;
             transaction.commit().await?;
             report.created += part.created;
             report.subscribed += part.subscribed;
@@ -455,13 +479,14 @@ impl NewsletterService {
     /// Sửa người đăng ký `id`. Cần `newsletter.manage`.
     pub(crate) async fn update_subscriber(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         change: SubscriberChange,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Subscriber, Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
-        let before = self.find_subscriber(id).await?;
+        let before = self.find_subscriber(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -475,7 +500,11 @@ impl NewsletterService {
             check_attributes(attributes, "attributes", &mut problems)?;
         }
         let lists = self
-            .lists_by_id(self.database.read(), change.unsubscribe_list_ids.iter().copied())
+            .lists_by_id(
+                tenant.database().read(),
+                tenant,
+                change.unsubscribe_list_ids.iter().copied(),
+            )
             .await?;
         for (index, list_id) in change.unsubscribe_list_ids.iter().enumerate() {
             if !lists.contains_key(list_id) {
@@ -510,9 +539,10 @@ impl NewsletterService {
             row.attributes = Set(to_json(attributes)?);
         }
         row.updated_at = Set(now);
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let update = subscriber::Entity::update(row)
             .validate()?
+            .scoped(tenant)
             .filter(subscriber::Column::UpdatedAt.eq(expected.unwrap_or(before.row.updated_at)));
         let after = match update.exec(&transaction).await {
             Ok(after) => after,
@@ -523,35 +553,31 @@ impl NewsletterService {
         };
         let actor = Actor::from(principal);
         for list in lists.values() {
-            self.unsubscribe_in(&transaction, actor, id, list, now).await?;
+            self.unsubscribe_in(&transaction, tenant, actor, id, list, now).await?;
         }
         let event = events::SubscriberUpdated(Change {
             before: Some(summary(&before.row)),
             after: Some(summary(&after)),
         });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::subscriber_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::subscriber_subject(id), &event)
             .await?;
         transaction.commit().await?;
-        self.find_subscriber(id).await
+        self.find_subscriber(tenant, id).await
     }
 
     /// Huỷ đăng ký `subscriber_id` ở `list` (chưa huỷ thì thôi), kèm event. Trả `true` nếu có đổi.
     pub(crate) async fn unsubscribe_in<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         actor: Actor,
         subscriber_id: Uuid,
         list: &List,
         now: DateTime<Utc>,
     ) -> Result<bool, Error> {
         let updated = subscription::Entity::update_many()
+            .scoped(tenant)
             .col_expr(
                 subscription::Column::Status,
                 sea_orm::sea_query::Expr::value(SubscriptionStatus::Unsubscribed.as_str()),
@@ -579,13 +605,7 @@ impl NewsletterService {
             })),
         });
         self.outbox
-            .record(
-                connection,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::subscriber_subject(subscriber_id),
-                &event,
-            )
+            .record(connection, tenant, actor, events::subscriber_subject(subscriber_id), &event)
             .await?;
         Ok(true)
     }
@@ -593,16 +613,18 @@ impl NewsletterService {
     /// Xoá hẳn người đăng ký `id` (đăng ký, lượt gửi, token). Cần `newsletter.manage`.
     pub(crate) async fn delete_subscriber(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = subscriber::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(subscriber_not_found)?;
-        self.erase(&transaction, Actor::from(principal), &row).await?;
+        self.erase(&transaction, tenant, Actor::from(principal), &row).await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -610,19 +632,22 @@ impl NewsletterService {
     /// Mọi thứ module giữ về `email` (yêu cầu xuất của chủ dữ liệu). Cần `newsletter.export`.
     pub(crate) async fn email_data(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         email: &str,
     ) -> Result<EmailData, Error> {
         principal.require(&NEWSLETTER_EXPORT)?;
         let email = required_email(email)?;
-        let read = self.database.read();
+        let read = tenant.database().read();
         let row = subscriber::Entity::find()
+            .scoped(tenant)
             .filter(subscriber::Column::Email.eq(email.as_str()))
             .one(read)
             .await?;
         let deliveries = match &row {
             Some(row) => {
                 let mut rows = delivery::Entity::find()
+                    .scoped(tenant)
                     .filter(delivery::Column::SubscriberId.eq(row.id))
                     .all(read)
                     .await?;
@@ -632,10 +657,11 @@ impl NewsletterService {
             None => Vec::new(),
         };
         let subscriber = match row {
-            Some(row) => self.describe(read, vec![row]).await?.pop(),
+            Some(row) => self.describe(read, tenant, vec![row]).await?.pop(),
             None => None,
         };
         let suppression = suppression::Entity::find()
+            .scoped(tenant)
             .filter(suppression::Column::Email.eq(email.as_str()))
             .one(read)
             .await?;
@@ -647,20 +673,22 @@ impl NewsletterService {
     /// `newsletter.export`. Trả `true` nếu có người đăng ký bị xoá.
     pub(crate) async fn erase_email(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         email: &str,
     ) -> Result<bool, Error> {
         principal.require(&NEWSLETTER_EXPORT)?;
         let email = required_email(email)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = subscriber::Entity::find()
+            .scoped(tenant)
             .filter(subscriber::Column::Email.eq(email.as_str()))
             .one(&transaction)
             .await?;
         let Some(row) = row else {
             return Ok(false);
         };
-        self.erase(&transaction, Actor::from(principal), &row).await?;
+        self.erase(&transaction, tenant, Actor::from(principal), &row).await?;
         transaction.commit().await?;
         tracing::info!(subscriber_id = %row.id, "newsletter data of an email address erased");
         Ok(true)
@@ -670,21 +698,22 @@ impl NewsletterService {
     async fn erase<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         actor: Actor,
         row: &subscriber::Model,
     ) -> Result<(), Error> {
         let subscriptions = subscription::Entity::delete_many()
+            .scoped(tenant)
             .filter(subscription::Column::SubscriberId.eq(row.id))
             .exec(connection)
             .await?;
         let deliveries = delivery::Entity::delete_many()
+            .scoped(tenant)
             .filter(delivery::Column::SubscriberId.eq(row.id))
             .exec(connection)
             .await?;
-        self.tokens
-            .forget(connection, &TenantContext::legacy_default(&self.database), &row.id.to_string())
-            .await?;
-        subscriber::Entity::delete_by_id(row.id).exec(connection).await?;
+        self.tokens.forget(connection, tenant, &row.id.to_string()).await?;
+        subscriber::Entity::delete_by_id(row.id).scoped(tenant).exec(connection).await?;
         let event = events::SubscriberErased(Change {
             before: Some(json!({
                 "id": row.id,
@@ -694,13 +723,7 @@ impl NewsletterService {
             after: None,
         });
         self.outbox
-            .record(
-                connection,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::subscriber_subject(row.id),
-                &event,
-            )
+            .record(connection, tenant, actor, events::subscriber_subject(row.id), &event)
             .await?;
         Ok(())
     }
@@ -710,12 +733,14 @@ impl NewsletterService {
 /// lại. Trả dòng và `true` nếu vừa tạo.
 pub(crate) async fn upsert_subscriber<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     person: &ImportPerson,
     now: DateTime<Utc>,
 ) -> Result<(subscriber::Model, bool), Error> {
     let attributes = person.attributes.clone().unwrap_or_default();
     let fresh = subscriber::ActiveModel {
         id: Set(Uuid::now_v7()),
+        tenant_id: Set(tenant.id().as_uuid()),
         email: Set(person.email.clone()),
         name: Set(person.name.clone()),
         locale: Set(person.locale.unwrap_or_default().as_str().to_owned()),
@@ -727,10 +752,15 @@ pub(crate) async fn upsert_subscriber<C: ConnectionTrait>(
         updated_at: Set(now),
     };
     let inserted = subscriber::Entity::insert(fresh)
-        .on_conflict(OnConflict::column(subscriber::Column::Email).do_nothing().to_owned())
+        .on_conflict(
+            OnConflict::columns([subscriber::Column::TenantId, subscriber::Column::Email])
+                .do_nothing()
+                .to_owned(),
+        )
         .exec_without_returning(connection)
         .await?;
     let row = subscriber::Entity::find()
+        .scoped(tenant)
         .filter(subscriber::Column::Email.eq(person.email.as_str()))
         .one(connection)
         .await?
@@ -751,6 +781,7 @@ pub(crate) struct Wanted {
 /// `None`; đụng dòng vừa được chèn song song thì cập nhật dòng đó), không thì cập nhật.
 pub(crate) async fn set_subscription<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     existing: Option<subscription::Model>,
     (subscriber_id, list_id): (Uuid, Uuid),
     wanted: Wanted,
@@ -762,6 +793,7 @@ pub(crate) async fn set_subscription<C: ConnectionTrait>(
         Some(row) => row,
         None => {
             let fresh = subscription::ActiveModel {
+                tenant_id: Set(tenant.id().as_uuid()),
                 subscriber_id: Set(subscriber_id),
                 list_id: Set(list_id),
                 status: Set(status.as_str().to_owned()),
@@ -775,6 +807,7 @@ pub(crate) async fn set_subscription<C: ConnectionTrait>(
             let inserted = subscription::Entity::insert(fresh)
                 .on_conflict(
                     OnConflict::columns([
+                        subscription::Column::TenantId,
                         subscription::Column::SubscriberId,
                         subscription::Column::ListId,
                     ])
@@ -783,10 +816,12 @@ pub(crate) async fn set_subscription<C: ConnectionTrait>(
                 )
                 .exec_without_returning(connection)
                 .await?;
-            let row = subscription::Entity::find_by_id((subscriber_id, list_id))
-                .one(connection)
-                .await?
-                .ok_or_else(subscriber_not_found)?;
+            let row =
+                subscription::Entity::find_by_id((tenant.id().as_uuid(), subscriber_id, list_id))
+                    .scoped(tenant)
+                    .one(connection)
+                    .await?
+                    .ok_or_else(subscriber_not_found)?;
             if inserted > 0 {
                 return Ok(row);
             }
@@ -806,7 +841,7 @@ pub(crate) async fn set_subscription<C: ConnectionTrait>(
     }
     row.unsubscribed_at = Set(None);
     row.updated_at = Set(now);
-    Ok(row.update(connection).await?)
+    Ok(subscription::Entity::update(row).validate()?.scoped(tenant).exec(connection).await?)
 }
 
 /// Thuộc tính: JSON object, tối đa 16 KiB.

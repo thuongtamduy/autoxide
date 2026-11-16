@@ -18,6 +18,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::http::{Disposition, content_disposition};
 use autoxide_kernel::response::Problem;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged, if_none_match};
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
@@ -104,12 +105,13 @@ impl VersionQuery {
 )]
 pub(crate) async fn get_content(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     Path(id): Path<Uuid>,
     Query(query): Query<VersionQuery>,
     headers: HeaderMap,
 ) -> Result<Response, Error> {
-    serve(&service, principal, id, &query, &headers, true).await
+    serve(&service, &tenant, principal, id, &query, &headers, true).await
 }
 
 /// Check the content of a media item without downloading it.
@@ -131,12 +133,13 @@ pub(crate) async fn get_content(
 )]
 pub(crate) async fn head_content(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     Path(id): Path<Uuid>,
     Query(query): Query<VersionQuery>,
     headers: HeaderMap,
 ) -> Result<Response, Error> {
-    serve(&service, principal, id, &query, &headers, false).await
+    serve(&service, &tenant, principal, id, &query, &headers, false).await
 }
 
 /// Replace the content of a media item, keeping its id.
@@ -172,6 +175,7 @@ pub(crate) async fn head_content(
 )]
 pub(crate) async fn replace_content(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -180,13 +184,16 @@ pub(crate) async fn replace_content(
 ) -> Result<Tagged<MediaItemResponse>, Error> {
     let expected = if_match.required()?;
     let content = body_stream(body, service.config.limits.max_bytes);
-    let item = service.replace(&principal, id, content_type(&headers)?, content, expected).await?;
-    super::tagged(&service, item).await
+    let item = service
+        .replace(&tenant, &principal, id, content_type(&headers)?, content, expected)
+        .await?;
+    super::tagged(&service, &tenant, item).await
 }
 
 /// Trả nội dung (hay chỉ header, khi `with_body` là `false`).
 async fn serve(
     service: &MediaService,
+    tenant: &TenantContext,
     principal: Option<Principal>,
     id: Uuid,
     query: &VersionQuery,
@@ -194,17 +201,17 @@ async fn serve(
     with_body: bool,
 ) -> Result<Response, Error> {
     let webp = query.webp()?;
-    let item = service.viewable(principal.as_ref(), id).await?;
+    let item = service.viewable(tenant, principal.as_ref(), id).await?;
     // Ảnh thu nhỏ xin bằng `w`, nếu đã làm xong; không thì bản gốc. Xin bản WebP mà chưa có thì
     // gửi bản JPEG / PNG cùng cỡ: địa chỉ trong `<source type="image/webp">` vẫn ra ảnh.
     let mut copy = match query.w {
-        Some(width) if webp => service.variant(&item, width, true).await?,
-        Some(width) => service.variant(&item, width, false).await?,
+        Some(width) if webp => service.variant(tenant, &item, width, true).await?,
+        Some(width) => service.variant(tenant, &item, width, false).await?,
         None => None,
     };
     let fallback = webp && copy.is_none();
     if let (true, Some(width)) = (fallback, query.w) {
-        copy = service.variant(&item, width, false).await?;
+        copy = service.variant(tenant, &item, width, false).await?;
     }
     // Bản xin chưa làm xong (sẽ có): bản đang gửi là tạm, không được cache lâu dưới địa chỉ này.
     let pending = query.w.is_some_and(|width| {
@@ -279,8 +286,8 @@ async fn serve(
         return Ok((status, headers).into_response());
     }
     let stored = match &copy {
-        Some(copy) => service.read_key(&copy.storage_key(), range).await?,
-        None => service.read(&item, range).await?,
+        Some(copy) => service.read_key(tenant, &copy.storage_key(), range).await?,
+        None => service.read(tenant, &item, range).await?,
     };
     Ok((status, headers, Body::from_stream(stored.content)).into_response())
 }

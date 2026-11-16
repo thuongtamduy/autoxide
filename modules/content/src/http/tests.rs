@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{Embedder, TextModel};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_media::api::Media;
 use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
 use autoxide_testkit::{TestApp, TestDatabase, TestResponse, tool};
@@ -293,6 +294,28 @@ async fn etag_resolve_theo_ca_cau_tra_loi() {
         .await;
         assert_eq!(linked.status(), StatusCode::OK, "{}", linked.json());
 
+        // Danh sách thẻ công khai: thẻ có bài đã đăng, kèm số bài; thẻ chưa có bài thì không hiện.
+        let unused = json!({"taxonomy": "tag", "locale": "en", "name": "Unused"});
+        let unused = send(&app, "POST", "/terms", Some("admin"), &[], Some(unused)).await;
+        assert_eq!(unused.status(), StatusCode::CREATED, "{}", unused.json());
+        let terms = send(&app, "GET", "/public/terms?locale=en", None, &[], None).await;
+        assert_eq!(terms.status(), StatusCode::OK, "{}", terms.json());
+        let listed = terms.json()["data"].clone();
+        assert_eq!(listed.as_array().unwrap().len(), 1, "{listed}");
+        assert_eq!(
+            (listed[0]["id"].as_str(), listed[0]["posts"].as_u64()),
+            (Some(tag_id.as_str()), Some(1))
+        );
+        assert_eq!(
+            (listed[0]["name"].as_str(), listed[0]["taxonomy"].as_str()),
+            (Some("Food"), Some("tag"))
+        );
+        let categories =
+            send(&app, "GET", "/public/terms?locale=en&taxonomy=category", None, &[], None).await;
+        assert_eq!(categories.json()["data"], json!([]));
+        let bad = send(&app, "GET", "/public/terms?locale=fr", None, &[], None).await;
+        assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
         let again = send(&app, "GET", path, None, &[("if-none-match", &first_etag)], None).await;
         assert_eq!(again.status(), StatusCode::OK, "the tag changed the answer");
         assert_ne!(again.header(header::ETAG), first_etag);
@@ -312,14 +335,16 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
     use autoxide_kernel::event::{Delivered, EventHandler};
 
     TestDatabase::run(async |test| {
-        let (content, _, _) = crate::testing::service(test, crate::testing::config(&[])).await;
+        let (content, _, database) =
+            crate::testing::service(test, crate::testing::config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
         let ada = crate::testing::editor();
         let mut input = crate::tests::post("Reviewed");
         input.fields.ai_generated = Some(true);
-        let entry = content.create(&ada, input).await.unwrap();
-        content.publish(&ada, entry.id, None, None, true).await.unwrap();
+        let entry = content.create(&tenant, &ada, input).await.unwrap();
+        content.publish(&tenant, &ada, entry.id, None, None, true).await.unwrap();
         let deleted = Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(&content.database),
+            tenant.clone(),
             "auth",
             autoxide_kernel::privacy::USER_DELETED.to_owned(),
             json!({"before": {"id": ada.user_id()}}),
@@ -327,7 +352,7 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
         content.handle(&deleted).await.unwrap();
         content.handle(&deleted).await.unwrap();
         let (resolution, _) =
-            super::public::resolution(&content, "en", "/blog/reviewed").await.unwrap();
+            super::public::resolution(&content, &tenant, "en", "/blog/reviewed").await.unwrap();
         let shown = serde_json::to_value(resolution).unwrap();
         assert_eq!(
             (shown["entry"]["ai_generated"].as_bool(), shown["entry"]["ai_reviewed"].as_bool()),

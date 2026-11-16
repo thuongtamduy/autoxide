@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use chrono::{DateTime, Utc};
@@ -138,9 +139,10 @@ pub(crate) struct MenuSummary {
 )]
 pub(crate) async fn list_menus(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<Vec<MenuSummary>>, Error> {
-    let menus = service.list_menus(&principal).await?;
+    let menus = service.list_menus(&tenant, &principal).await?;
     let data = menus
         .into_iter()
         .map(|menu| MenuSummary {
@@ -172,11 +174,13 @@ pub(crate) async fn list_menus(
 )]
 pub(crate) async fn get_menu(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(key): Path<String>,
     Query(query): Query<MenuQuery>,
 ) -> Result<Tagged<MenuResponse>, Error> {
-    let (menu, nodes) = service.get_menu(&principal, &key, query.locale.as_deref()).await?;
+    let (menu, nodes) =
+        service.get_menu(&tenant, &principal, &key, query.locale.as_deref()).await?;
     Ok(Tagged { version: menu.updated_at, data: menu_response(menu, nodes) })
 }
 
@@ -203,6 +207,7 @@ pub(crate) async fn get_menu(
 )]
 pub(crate) async fn put_menu(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(key): Path<String>,
     Query(query): Query<MenuQuery>,
@@ -211,7 +216,8 @@ pub(crate) async fn put_menu(
 ) -> Result<Tagged<MenuResponse>, Error> {
     let expected = if_match.required()?;
     let items = input.items.into_iter().map(ItemInput::from).collect();
-    let (menu, nodes) =
-        service.put_menu(&principal, &key, query.locale.as_deref(), items, expected).await?;
+    let (menu, nodes) = service
+        .put_menu(&tenant, &principal, &key, query.locale.as_deref(), items, expected)
+        .await?;
     Ok(Tagged { version: menu.updated_at, data: menu_response(menu, nodes) })
 }

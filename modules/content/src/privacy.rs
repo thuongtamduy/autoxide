@@ -10,7 +10,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::{Value, json};
@@ -21,14 +21,16 @@ use crate::service::ContentService;
 
 #[async_trait::async_trait]
 impl PersonalData for ContentService {
-    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let read = self.database.read();
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+        let read = tenant.database().read();
         let authors = author::Entity::find()
+            .scoped(tenant)
             .filter(author::Column::UserId.eq(user_id))
             .order_by_asc(author::Column::Id)
             .all(read)
             .await?;
         let entries = entry::Entity::find()
+            .scoped(tenant)
             .filter(entry::Column::CreatedBy.eq(user_id))
             .order_by_asc(entry::Column::Id)
             .all(read)
@@ -60,51 +62,61 @@ impl EventHandler for ContentService {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
+        // Tài khoản thuộc khách của event (bước 33): chỉ gỡ dữ liệu của khách đó.
+        let tenant = &event.tenant;
         // Huỷ lịch trước khi bỏ `created_by`: sau đó không còn biết lịch nào của người này.
-        let canceled = self.cancel_schedules_of(user_id).await?;
+        let canceled = self.cancel_schedules_of(tenant, user_id).await?;
         // Yêu cầu dịch đang chờ của người này: huỷ (job chạy tới sẽ thấy đã xong và thôi).
-        let translations = self.cancel_translations_of(user_id).await?;
+        let translations = self.cancel_translations_of(tenant, user_id).await?;
         let profiles = author::Entity::find()
+            .scoped(tenant)
             .filter(author::Column::UserId.eq(user_id))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         for profile in &profiles {
-            self.remove_author(profile.id, Actor::system()).await?;
+            self.remove_author(tenant, profile.id, Actor::system()).await?;
         }
         // Mỗi lệnh tự đủ (không cần chung transaction): chạy lại giữa chừng vẫn ra cùng kết quả.
-        let write = self.database.write();
+        let write = tenant.database().write();
         let none = || Expr::value(Option::<Uuid>::None);
         entry::Entity::update_many()
+            .scoped(tenant)
             .col_expr(entry::Column::CreatedBy, none())
             .filter(entry::Column::CreatedBy.eq(user_id))
             .exec(write)
             .await?;
         entry::Entity::update_many()
+            .scoped(tenant)
             .col_expr(entry::Column::ReviewRequestedBy, none())
             .filter(entry::Column::ReviewRequestedBy.eq(user_id))
             .exec(write)
             .await?;
         published::Entity::update_many()
+            .scoped(tenant)
             .col_expr(published::Column::AiReviewedBy, none())
             .filter(published::Column::AiReviewedBy.eq(user_id))
             .exec(write)
             .await?;
         revision::Entity::update_many()
+            .scoped(tenant)
             .col_expr(revision::Column::CreatedBy, none())
             .filter(revision::Column::CreatedBy.eq(user_id))
             .exec(write)
             .await?;
         schedule::Entity::update_many()
+            .scoped(tenant)
             .col_expr(schedule::Column::CreatedBy, none())
             .filter(schedule::Column::CreatedBy.eq(user_id))
             .exec(write)
             .await?;
         redirect::Entity::update_many()
+            .scoped(tenant)
             .col_expr(redirect::Column::CreatedBy, none())
             .filter(redirect::Column::CreatedBy.eq(user_id))
             .exec(write)
             .await?;
         crate::entity::translation_request::Entity::update_many()
+            .scoped(tenant)
             .col_expr(crate::entity::translation_request::Column::CreatedBy, none())
             .filter(crate::entity::translation_request::Column::CreatedBy.eq(user_id))
             .exec(write)

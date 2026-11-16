@@ -172,6 +172,12 @@ No sign-in needed. Only published versions are ever returned — drafts never.
 
 (All under `/api/v1/content`.)
 
+**Several sites on one server.** On a server with several tenants, each tenant is its own site:
+the public endpoints answer for the tenant of the request — its own domain, or the
+`Autoxide-Tenant` header (its short name). Two tenants may use the same slugs, addresses,
+author and term slugs, menus and redirects; one never sees the other's entries. An `ETag` from
+one tenant never matches in another.
+
 **Rendering an address.** For each request, the website calls `resolve` with the language
 and the path, and acts on `type`:
 
@@ -226,6 +232,10 @@ Editors can show a draft to someone without an account:
    the draft. The answer is `Cache-Control: no-store`; it always shows the latest draft, and
    holds only its content — not who created it or asked for a review. An invalid or expired
    token is `404` (`content.preview_token_invalid`). Changing the secret revokes every token.
+
+On a server with several tenants, a token only opens the draft of the tenant it was made in: it
+names its tenant, so the preview page works on the main domain without a tenant header, and the
+same token sent to another tenant (by domain or header) is `404` as an invalid token.
 
 ## AI agents
 

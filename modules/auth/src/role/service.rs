@@ -4,7 +4,6 @@
 use std::collections::{BTreeSet, HashMap};
 
 use autoxide_kernel::access::{PermissionCatalog, Principal};
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
@@ -19,7 +18,7 @@ use super::entity::{role, role_permission, user_role};
 use crate::events;
 use crate::user::entity as user;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use serde_json::json;
 
 const NAME_MAX_LENGTH: usize = 64;
@@ -52,7 +51,6 @@ pub(crate) struct RoleInput {
 }
 
 pub(crate) struct RoleService {
-    database: Database,
     catalog: PermissionCatalog,
     outbox: Outbox,
     /// Bản dịch mô tả permission (D-264); mặc định rỗng (tiếng Anh).
@@ -60,8 +58,8 @@ pub(crate) struct RoleService {
 }
 
 impl RoleService {
-    pub(crate) fn new(database: Database, catalog: PermissionCatalog, outbox: Outbox) -> Self {
-        RoleService { database, catalog, outbox, translations: Default::default() }
+    pub(crate) fn new(catalog: PermissionCatalog, outbox: Outbox) -> Self {
+        RoleService { catalog, outbox, translations: Default::default() }
     }
 
     /// Dịch mô tả permission bằng `translations`.
@@ -88,35 +86,46 @@ impl RoleService {
     }
 
     /// Một trang role, mới tạo trước (mặc định).
-    pub(crate) async fn list(&self, page: &PageRequest) -> Result<Page<Role>, Error> {
-        let connection = self.database.read();
-        let page =
-            fetch_page(role::Entity::find(), role::Column::Id, |row| row.id, page, connection)
-                .await?;
-        let mut permissions = permissions_of(connection, page.data.iter().map(|r| r.id)).await?;
+    pub(crate) async fn list(
+        &self,
+        tenant: &TenantContext,
+        page: &PageRequest,
+    ) -> Result<Page<Role>, Error> {
+        let connection = tenant.database().read();
+        let select = role::Entity::find().scoped(tenant);
+        let page = fetch_page(select, role::Column::Id, |row| row.id, page, connection).await?;
+        let mut permissions =
+            permissions_of(connection, tenant, page.data.iter().map(|r| r.id)).await?;
         Ok(page.map(|row| {
             let granted = permissions.remove(&row.id).unwrap_or_default();
             to_role(row, granted)
         }))
     }
 
-    pub(crate) async fn get(&self, id: Uuid) -> Result<Role, Error> {
-        let connection = self.database.read();
+    pub(crate) async fn get(&self, tenant: &TenantContext, id: Uuid) -> Result<Role, Error> {
+        let connection = tenant.database().read();
         let row = role::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(connection)
             .await?
             .ok_or_else(|| role_not_found(id))?;
-        let mut permissions = permissions_of(connection, [id]).await?;
+        let mut permissions = permissions_of(connection, tenant, [id]).await?;
         Ok(to_role(row, permissions.remove(&id).unwrap_or_default()))
     }
 
-    pub(crate) async fn create(&self, actor: Actor, input: RoleInput) -> Result<Role, Error> {
+    pub(crate) async fn create(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        input: RoleInput,
+    ) -> Result<Role, Error> {
         let (name, description, permissions) = self.check(input)?;
         let now = now();
         let id = Uuid::now_v7();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         role::ActiveModel {
             id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             name: Set(name.clone()),
             description: Set(description.clone()),
             all_permissions: Set(false),
@@ -126,47 +135,42 @@ impl RoleService {
         .insert(&transaction)
         .await
         .map_err(|error| name_taken_or(error, &name))?;
-        insert_permissions(&transaction, id, &permissions).await?;
+        insert_permissions(&transaction, tenant, id, &permissions).await?;
         let after =
             Some(json!({"name": name, "description": description, "permissions": permissions}));
         let event = events::RoleCreated { before: None, after };
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                role_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role created");
-        self.get(id).await
+        self.get(tenant, id).await
     }
 
     /// Thay toàn bộ tên, mô tả và permission của role `id`.
     pub(crate) async fn update(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         id: Uuid,
         input: RoleInput,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Role, Error> {
         let (name, description, permissions) = self.check(input)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let current = role::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| role_not_found(id))?;
         if current.all_permissions {
             return Err(builtin_role());
         }
-        let before = role_snapshot(&transaction, &current).await?;
+        let before = role_snapshot(&transaction, tenant, &current).await?;
         let mut update = role::Entity::update_many()
             .col_expr(role::Column::Name, Expr::value(name.clone()))
             .col_expr(role::Column::Description, Expr::value(description.clone()))
             .col_expr(role::Column::UpdatedAt, Expr::value(now()))
-            .filter(role::Column::Id.eq(id));
+            .filter(role::Column::Id.eq(id))
+            .scoped(tenant);
         if let Some(expected) = expected {
             // Kiểm phiên bản ngay trong câu `UPDATE` (D-084).
             update = update.filter(role::Column::UpdatedAt.eq(expected));
@@ -179,47 +183,38 @@ impl RoleService {
         }
         role_permission::Entity::delete_many()
             .filter(role_permission::Column::RoleId.eq(id))
+            .scoped(tenant)
             .exec(&transaction)
             .await?;
-        insert_permissions(&transaction, id, &permissions).await?;
+        insert_permissions(&transaction, tenant, id, &permissions).await?;
         let after = json!({"name": name, "description": description, "permissions": permissions});
         let event = events::RoleUpdated { before: Some(before), after: Some(after) };
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                role_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role changed");
-        self.get(id).await
+        self.get(tenant, id).await
     }
 
     /// Xoá role `id`; người dùng đang có role này mất nó.
-    pub(crate) async fn delete(&self, actor: Actor, id: Uuid) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
+    pub(crate) async fn delete(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        let transaction = tenant.database().begin_write().await?;
         let current = role::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| role_not_found(id))?;
         if current.all_permissions {
             return Err(builtin_role());
         }
-        let before = role_snapshot(&transaction, &current).await?;
-        role::Entity::delete_by_id(id).exec(&transaction).await?;
+        let before = role_snapshot(&transaction, tenant, &current).await?;
+        role::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         let event = events::RoleDeleted { before: Some(before), after: None };
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                role_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role deleted");
         Ok(())
@@ -229,6 +224,7 @@ impl RoleService {
     /// (`GET /auth/users?include=roles`, đề bài giao diện B1).
     pub(crate) async fn names_of_users(
         &self,
+        tenant: &TenantContext,
         user_ids: &[Uuid],
     ) -> Result<HashMap<Uuid, Vec<(Uuid, String)>>, Error> {
         let mut by_user: HashMap<Uuid, Vec<(Uuid, String)>> = HashMap::new();
@@ -249,9 +245,13 @@ impl RoleService {
                 Expr::col((user_role::Entity, user_role::Column::UserId))
                     .is_in(user_ids.iter().copied()),
             )
+            .and_where(
+                Expr::col((user_role::Entity, user_role::Column::TenantId))
+                    .eq(tenant.id().as_uuid()),
+            )
             .order_by((role::Entity, role::Column::Name), sea_orm::sea_query::Order::Asc)
             .to_owned();
-        for row in self.database.read().query_all(&select).await? {
+        for row in tenant.database().read().query_all(&select).await? {
             let user_id: Uuid = row.try_get("", "user_id")?;
             let role_id: Uuid = row.try_get("", "id")?;
             let name: String = row.try_get("", "name")?;
@@ -261,17 +261,22 @@ impl RoleService {
     }
 
     /// Các role của người dùng `user_id`, theo thứ tự tên.
-    pub(crate) async fn user_roles(&self, user_id: Uuid) -> Result<Vec<Role>, Error> {
-        let connection = self.database.read();
-        if user::Entity::find_by_id(user_id).one(connection).await?.is_none() {
+    pub(crate) async fn user_roles(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<Vec<Role>, Error> {
+        let connection = tenant.database().read();
+        if user::Entity::find_by_id(user_id).scoped(tenant).one(connection).await?.is_none() {
             return Err(crate::user::user_not_found(user_id));
         }
-        roles_of_user(connection, user_id).await
+        roles_of_user(connection, tenant, user_id).await
     }
 
     /// Thay toàn bộ role của người dùng `user_id` bằng `role_ids`.
     pub(crate) async fn set_user_roles(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         user_id: Uuid,
         role_ids: Vec<Uuid>,
@@ -287,13 +292,14 @@ impl RoleService {
                 .with_param("max_roles_per_user", MAX_ROLES_PER_USER),
             ]));
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Cập nhật dòng người dùng trước: khoá dòng đó tới hết transaction, nên hai
         // request gán role cho cùng một người chạy lần lượt (Postgres); SQLite vốn
         // chỉ một bên ghi. Đồng thời biết người dùng có tồn tại không.
         let touched = user::Entity::update_many()
             .col_expr(user::Column::UpdatedAt, Expr::value(now()))
             .filter(user::Column::Id.eq(user_id))
+            .scoped(tenant)
             .exec(&transaction)
             .await?;
         if touched.rows_affected == 0 {
@@ -301,6 +307,7 @@ impl RoleService {
         }
         let found = role::Entity::find()
             .filter(role::Column::Id.is_in(role_ids.iter().copied()))
+            .scoped(tenant)
             .count(&transaction)
             .await?;
         if found != role_ids.len() as u64 {
@@ -310,16 +317,18 @@ impl RoleService {
                 "every entry must be the id of an existing role",
             )]));
         }
-        let admins_before = count_active_admins(&transaction).await?;
-        let before = role_names(&roles_of_user(&transaction, user_id).await?);
+        let admins_before = count_active_admins(&transaction, tenant).await?;
+        let before = role_names(&roles_of_user(&transaction, tenant, user_id).await?);
         user_role::Entity::delete_many()
             .filter(user_role::Column::UserId.eq(user_id))
+            .scoped(tenant)
             .exec(&transaction)
             .await?;
         let now = now();
         for role_id in &role_ids {
             user_role::ActiveModel {
                 id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
                 user_id: Set(user_id),
                 role_id: Set(*role_id),
                 created_at: Set(now),
@@ -329,21 +338,15 @@ impl RoleService {
         }
         // Chỉ chặn khi thay đổi này lấy đi admin cuối cùng. Lúc mới cài chưa có admin
         // nào thì việc gán role vẫn được phép.
-        if admins_before > 0 && count_active_admins(&transaction).await? == 0 {
+        if admins_before > 0 && count_active_admins(&transaction, tenant).await? == 0 {
             transaction.rollback().await?;
             return Err(last_admin());
         }
-        let after = roles_of_user(&transaction, user_id).await?;
+        let after = roles_of_user(&transaction, tenant, user_id).await?;
         let event =
             events::UserRolesChanged { before: Some(before), after: Some(role_names(&after)) };
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::user_subject(user_id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::user_subject(user_id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, roles = role_ids.len(), "user roles changed");
@@ -351,8 +354,12 @@ impl RoleService {
     }
 
     /// Bên gọi là người dùng `user_id`: permission của họ là hợp các permission của
-    /// mọi role của họ. Hai câu truy vấn, không phụ thuộc số role.
-    pub(crate) async fn principal(&self, user_id: Uuid) -> Result<Principal, Error> {
+    /// mọi role của họ. Hai câu truy vấn, không phụ thuộc số role. Bên gọi thuộc khách `tenant`.
+    pub(crate) async fn principal(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<Principal, Error> {
         use sea_orm::sea_query::ExprTrait as _;
         // MỘT câu cho mọi request đã đăng nhập (đường nóng): mỗi dòng là một role của
         // người dùng kèm một permission của role đó (NULL nếu role không có permission
@@ -372,18 +379,22 @@ impl RoleService {
                 Expr::col((role_permission::Entity, role_permission::Column::RoleId))
                     .equals((role::Entity, role::Column::Id)),
             )
-            .and_where(Expr::col((user_role::Entity, user_role::Column::UserId)).eq(user_id));
-        let rows = self.database.read().query_all(&select).await?;
+            .and_where(Expr::col((user_role::Entity, user_role::Column::UserId)).eq(user_id))
+            .and_where(
+                Expr::col((user_role::Entity, user_role::Column::TenantId))
+                    .eq(tenant.id().as_uuid()),
+            );
+        let rows = tenant.database().read().query_all(&select).await?;
         let mut permissions = Vec::with_capacity(rows.len());
         for row in rows {
             if row.try_get::<bool>("", "all_permissions")? {
-                return Ok(Principal::with_all_permissions(user_id));
+                return Ok(Principal::with_all_permissions(user_id).in_tenant(tenant.id()));
             }
             if let Some(permission) = row.try_get::<Option<String>>("", "permission")? {
                 permissions.push(permission);
             }
         }
-        Ok(Principal::new(user_id, permissions))
+        Ok(Principal::new(user_id, permissions).in_tenant(tenant.id()))
     }
 
     /// `Ok` nếu `actor` có mọi permission người dùng `target` có. Dùng trước khi một
@@ -392,10 +403,11 @@ impl RoleService {
     /// hơn mình, rồi chiếm nó (D-079).
     pub(crate) async fn require_covers(
         &self,
+        tenant: &TenantContext,
         actor: &Principal,
         target: Uuid,
     ) -> Result<(), Error> {
-        let target = self.principal(target).await?;
+        let target = self.principal(tenant, target).await?;
         let covered = if target.has_all_permissions() {
             actor.has_all_permissions()
         } else {
@@ -468,17 +480,23 @@ impl RoleService {
 /// transaction của bên gọi.
 pub(crate) async fn grant_admin<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_id: Uuid,
 ) -> Result<(), Error> {
     let admin = role::Entity::find()
         .filter(role::Column::AllPermissions.eq(true))
+        .scoped(tenant)
         .one(connection)
         .await?
         .ok_or_else(|| {
-            Error::internal("the built-in `admin` role is missing; run the migrations")
+            Error::internal(
+                "the built-in `admin` role of this tenant is missing; run the migrations, or \
+                 provision the tenant again",
+            )
         })?;
     user_role::ActiveModel {
         id: Set(Uuid::now_v7()),
+        tenant_id: Set(tenant.id().as_uuid()),
         user_id: Set(user_id),
         role_id: Set(admin.id),
         created_at: Set(now()),
@@ -486,6 +504,52 @@ pub(crate) async fn grant_admin<C: ConnectionTrait>(
     .insert(connection)
     .await?;
     Ok(())
+}
+
+/// Mô tả của role `admin` dựng sẵn (như migration m0003 gieo cho khách mặc định).
+const ADMIN_DESCRIPTION: &str =
+    "Every permission, including permissions added later. Built in: cannot be changed or deleted.";
+
+/// Gieo role `admin` (mọi permission) cho khách mới (bước 33, `Module::seed_tenant`). Chạy lại
+/// được: khách đã có role toàn quyền thì thôi; hai lần gieo cùng lúc thì index unique
+/// `(tenant_id, name)` giữ một dòng. Khách mặc định có sẵn role này từ migration (m0003, m0026).
+pub(crate) struct AdminRoleSeed;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::TenantSeed for AdminRoleSeed {
+    async fn seed(&self, tenant: &TenantContext) -> Result<(), Error> {
+        let write = tenant.database().write();
+        let existing = role::Entity::find()
+            .filter(role::Column::AllPermissions.eq(true))
+            .scoped(tenant)
+            .one(write)
+            .await?;
+        if existing.is_some() {
+            return Ok(());
+        }
+        let now = now();
+        let row = role::ActiveModel {
+            id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
+            name: Set("admin".to_owned()),
+            description: Set(ADMIN_DESCRIPTION.to_owned()),
+            all_permissions: Set(true),
+            created_at: Set(now),
+            updated_at: Set(now),
+        };
+        role::Entity::insert(row)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns([
+                    role::Column::TenantId,
+                    role::Column::Name,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec_without_returning(write)
+            .await?;
+        Ok(())
+    }
 }
 
 /// Chủ thể (subject) của event về role `id`.
@@ -496,9 +560,10 @@ fn role_subject(id: Uuid) -> Option<String> {
 /// Ảnh chụp một role cho audit: tên, mô tả, permission.
 async fn role_snapshot<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     row: &role::Model,
 ) -> Result<serde_json::Value, Error> {
-    let mut permissions = permissions_of(connection, [row.id]).await?;
+    let mut permissions = permissions_of(connection, tenant, [row.id]).await?;
     let granted = permissions.remove(&row.id).unwrap_or_default();
     Ok(json!({"name": row.name, "description": row.description, "permissions": granted}))
 }
@@ -518,12 +583,14 @@ fn is_role_name(name: &str) -> bool {
 
 async fn insert_permissions(
     transaction: &DatabaseTransaction,
+    tenant: &TenantContext,
     role_id: Uuid,
     permissions: &[String],
 ) -> Result<(), Error> {
     for permission in permissions {
         role_permission::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             role_id: Set(role_id),
             permission: Set(permission.clone()),
         }
@@ -536,10 +603,12 @@ async fn insert_permissions(
 /// Permission của từng role trong `role_ids`, một câu truy vấn cho cả danh sách.
 async fn permissions_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     role_ids: impl IntoIterator<Item = Uuid>,
 ) -> Result<HashMap<Uuid, Vec<String>>, Error> {
     let rows = role_permission::Entity::find()
         .filter(role_permission::Column::RoleId.is_in(role_ids))
+        .scoped(tenant)
         .order_by_asc(role_permission::Column::Permission)
         .all(connection)
         .await?;
@@ -552,6 +621,7 @@ async fn permissions_of<C: ConnectionTrait>(
 
 async fn roles_of_user<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_id: Uuid,
 ) -> Result<Vec<Role>, Error> {
     let rows = role::Entity::find()
@@ -560,14 +630,16 @@ async fn roles_of_user<C: ConnectionTrait>(
                 Query::select()
                     .column(user_role::Column::RoleId)
                     .from(user_role::Entity)
+                    .and_where(user_role::Column::TenantId.eq(tenant.id().as_uuid()))
                     .and_where(user_role::Column::UserId.eq(user_id))
                     .to_owned(),
             ),
         )
+        .scoped(tenant)
         .order_by_asc(role::Column::Name)
         .all(connection)
         .await?;
-    let mut permissions = permissions_of(connection, rows.iter().map(|row| row.id)).await?;
+    let mut permissions = permissions_of(connection, tenant, rows.iter().map(|row| row.id)).await?;
     Ok(rows
         .into_iter()
         .map(|row| {
@@ -578,7 +650,10 @@ async fn roles_of_user<C: ConnectionTrait>(
 }
 
 /// Số người dùng CÒN HOẠT ĐỘNG (chưa bị khoá) đang có một role mang mọi permission.
-pub(crate) async fn count_active_admins<C: ConnectionTrait>(connection: &C) -> Result<u64, Error> {
+pub(crate) async fn count_active_admins<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+) -> Result<u64, Error> {
     // Khoá các role toàn quyền (câu `UPDATE` không đổi gì vẫn giữ khoá dòng tới hết
     // transaction): mọi thay đổi có thể làm mất admin nối đuôi nhau. Thiếu khoá này, trên
     // Postgres hai admin cuối cùng xoá nhau cùng lúc thì mỗi bên vẫn đếm thấy người kia còn
@@ -586,22 +661,26 @@ pub(crate) async fn count_active_admins<C: ConnectionTrait>(connection: &C) -> R
     role::Entity::update_many()
         .col_expr(role::Column::AllPermissions, Expr::col(role::Column::AllPermissions))
         .filter(role::Column::AllPermissions.eq(true))
+        .scoped(tenant)
         .exec(connection)
         .await?;
-    count_active_admins_unlocked(connection).await
+    count_active_admins_unlocked(connection, tenant).await
 }
 
 /// Như [`count_active_admins`] nhưng không khoá: chỉ đọc, dùng được trên kết nối đọc (vd lệnh
 /// `autoxide doctor`). Không dùng để quyết một thay đổi về quyền — đếm này có thể cũ ngay sau đó.
 pub(crate) async fn count_active_admins_unlocked<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
 ) -> Result<u64, Error> {
+    let id = tenant.id().as_uuid();
     let count = user_role::Entity::find()
         .filter(
             user_role::Column::RoleId.in_subquery(
                 Query::select()
                     .column(role::Column::Id)
                     .from(role::Entity)
+                    .and_where(role::Column::TenantId.eq(id))
                     .and_where(role::Column::AllPermissions.eq(true))
                     .to_owned(),
             ),
@@ -611,10 +690,12 @@ pub(crate) async fn count_active_admins_unlocked<C: ConnectionTrait>(
                 Query::select()
                     .column(user::Column::Id)
                     .from(user::Entity)
+                    .and_where(user::Column::TenantId.eq(id))
                     .and_where(user::Column::DisabledAt.is_null())
                     .to_owned(),
             ),
         )
+        .scoped(tenant)
         .count(connection)
         .await?;
     Ok(count)
@@ -691,29 +772,31 @@ mod tests {
     }
 
     async fn user(services: &Services, email: &str) -> Uuid {
+        let tenant = services.tenant.clone();
         let input = NewUser { email: email.to_owned(), name: "U".to_owned(), password: None };
-        services.users.create(Actor::system(), input).await.unwrap().id
+        services.users.create(&tenant, Actor::system(), input).await.unwrap().id
     }
 
-    async fn admin_role(roles: &RoleService) -> Role {
-        let page = roles.list(&PageRequest::first(200, Order::Asc)).await.unwrap();
+    async fn admin_role(roles: &RoleService, tenant: &TenantContext) -> Role {
+        let page = roles.list(tenant, &PageRequest::first(200, Order::Asc)).await.unwrap();
         page.data.into_iter().find(|role| role.all_permissions).unwrap()
     }
 
     #[tokio::test]
     async fn role_admin_dung_san_va_khong_sua_xoa_duoc() {
         TestDatabase::run(async |test| {
-            let roles = crate::testing::services(test).await.roles;
+            let services = crate::testing::services(test).await;
+            let (roles, tenant) = (services.roles.clone(), services.tenant.clone());
 
-            let admin = admin_role(&roles).await;
+            let admin = admin_role(&roles, &tenant).await;
 
             assert_eq!(admin.name, "admin");
             assert!(admin.permissions.is_empty());
             let changed = roles
-                .update(Actor::system(), admin.id, input("boss", &[]), None)
+                .update(&tenant, Actor::system(), admin.id, input("boss", &[]), None)
                 .await
                 .unwrap_err();
-            let deleted = roles.delete(Actor::system(), admin.id).await.unwrap_err();
+            let deleted = roles.delete(&tenant, Actor::system(), admin.id).await.unwrap_err();
             assert_eq!(changed.code(), "auth.role_builtin");
             assert_eq!(deleted.code(), "auth.role_builtin");
         })
@@ -724,10 +807,12 @@ mod tests {
     #[tokio::test]
     async fn tao_sua_xoa_role() {
         TestDatabase::run(async |test| {
-            let roles = crate::testing::services(test).await.roles;
+            let services = crate::testing::services(test).await;
+            let (roles, tenant) = (services.roles.clone(), services.tenant.clone());
 
             let created = roles
                 .create(
+                    &tenant,
                     Actor::system(),
                     input(" editor ", &["notes.write", "auth.roles.read", "notes.write"]),
                 )
@@ -738,17 +823,26 @@ mod tests {
             assert!(!created.all_permissions);
 
             let changed = roles
-                .update(Actor::system(), created.id, input("writer", &["notes.write"]), None)
+                .update(
+                    &tenant,
+                    Actor::system(),
+                    created.id,
+                    input("writer", &["notes.write"]),
+                    None,
+                )
                 .await
                 .unwrap();
             assert_eq!(changed.name, "writer");
             assert_eq!(changed.permissions, ["notes.write"]);
-            assert_eq!(roles.get(created.id).await.unwrap(), changed);
+            assert_eq!(roles.get(&tenant, created.id).await.unwrap(), changed);
 
-            roles.delete(Actor::system(), created.id).await.unwrap();
-            assert_eq!(roles.get(created.id).await.unwrap_err().code(), "auth.role_not_found");
+            roles.delete(&tenant, Actor::system(), created.id).await.unwrap();
             assert_eq!(
-                roles.delete(Actor::system(), created.id).await.unwrap_err().code(),
+                roles.get(&tenant, created.id).await.unwrap_err().code(),
+                "auth.role_not_found"
+            );
+            assert_eq!(
+                roles.delete(&tenant, Actor::system(), created.id).await.unwrap_err().code(),
                 "auth.role_not_found"
             );
         })
@@ -759,21 +853,24 @@ mod tests {
     #[tokio::test]
     async fn du_lieu_sai_va_ten_trung() {
         TestDatabase::run(async |test| {
-            let roles = crate::testing::services(test).await.roles;
+            let services = crate::testing::services(test).await;
+            let (roles, tenant) = (services.roles.clone(), services.tenant.clone());
 
             let invalid = roles
-                .create(Actor::system(), input("Bad Name", &["notes.write", "nope.read"]))
+                .create(&tenant, Actor::system(), input("Bad Name", &["notes.write", "nope.read"]))
                 .await
                 .unwrap_err();
             let fields: Vec<(&str, &str)> =
                 invalid.fields().iter().map(|f| (f.field.as_str(), f.code.as_str())).collect();
             assert_eq!(fields, [("name", "pattern"), ("permissions[1]", "unknown")]);
 
-            roles.create(Actor::system(), input("editor", &[])).await.unwrap();
-            let taken = roles.create(Actor::system(), input("editor", &[])).await.unwrap_err();
+            roles.create(&tenant, Actor::system(), input("editor", &[])).await.unwrap();
+            let taken =
+                roles.create(&tenant, Actor::system(), input("editor", &[])).await.unwrap_err();
             assert_eq!(taken.kind(), ErrorKind::Conflict);
             assert_eq!(taken.code(), "auth.role_name_taken");
-            let admin = roles.create(Actor::system(), input("admin", &[])).await.unwrap_err();
+            let admin =
+                roles.create(&tenant, Actor::system(), input("admin", &[])).await.unwrap_err();
             assert_eq!(admin.code(), "auth.role_name_taken");
         })
         .await
@@ -784,33 +881,44 @@ mod tests {
     async fn quyen_cua_nguoi_dung_la_hop_cac_role() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let roles = &services.roles;
-            let reader =
-                roles.create(Actor::system(), input("reader", &["auth.roles.read"])).await.unwrap();
-            let writer =
-                roles.create(Actor::system(), input("writer", &["notes.write"])).await.unwrap();
+            let reader = roles
+                .create(&tenant, Actor::system(), input("reader", &["auth.roles.read"]))
+                .await
+                .unwrap();
+            let writer = roles
+                .create(&tenant, Actor::system(), input("writer", &["notes.write"]))
+                .await
+                .unwrap();
             let ada = user(&services, "ada@example.com").await;
 
-            assert_eq!(roles.principal(ada).await.unwrap().permissions(), Vec::<String>::new());
+            assert_eq!(
+                roles.principal(&tenant, ada).await.unwrap().permissions(),
+                Vec::<String>::new()
+            );
             let assigned = roles
-                .set_user_roles(Actor::system(), ada, vec![writer.id, reader.id])
+                .set_user_roles(&tenant, Actor::system(), ada, vec![writer.id, reader.id])
                 .await
                 .unwrap();
 
             let names: Vec<&str> = assigned.iter().map(|role| role.name.as_str()).collect();
             assert_eq!(names, ["reader", "writer"]);
-            let principal = roles.principal(ada).await.unwrap();
+            let principal = roles.principal(&tenant, ada).await.unwrap();
             assert_eq!(principal.permissions(), ["auth.roles.read", "notes.write"]);
             assert!(principal.has(&NOTES_WRITE));
-            assert_eq!(roles.user_roles(ada).await.unwrap(), assigned);
+            assert_eq!(roles.user_roles(&tenant, ada).await.unwrap(), assigned);
 
             // Sửa role: người có role nhận permission mới ngay.
-            roles.update(Actor::system(), writer.id, input("writer", &[]), None).await.unwrap();
-            assert!(!roles.principal(ada).await.unwrap().has(&NOTES_WRITE));
+            roles
+                .update(&tenant, Actor::system(), writer.id, input("writer", &[]), None)
+                .await
+                .unwrap();
+            assert!(!roles.principal(&tenant, ada).await.unwrap().has(&NOTES_WRITE));
 
-            let admin = admin_role(roles).await;
-            roles.set_user_roles(Actor::system(), ada, vec![admin.id]).await.unwrap();
-            assert!(roles.principal(ada).await.unwrap().has_all_permissions());
+            let admin = admin_role(roles, &tenant).await;
+            roles.set_user_roles(&tenant, Actor::system(), ada, vec![admin.id]).await.unwrap();
+            assert!(roles.principal(&tenant, ada).await.unwrap().has_all_permissions());
         })
         .await
         .unwrap();
@@ -820,13 +928,18 @@ mod tests {
     async fn gan_role_cho_nguoi_hay_role_khong_ton_tai() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let ada = user(&services, "ada@example.com").await;
 
-            let no_user =
-                services.roles.set_user_roles(Actor::system(), Uuid::now_v7(), vec![]).await;
-            let no_role =
-                services.roles.set_user_roles(Actor::system(), ada, vec![Uuid::now_v7()]).await;
-            let read_no_user = services.roles.user_roles(Uuid::now_v7()).await;
+            let no_user = services
+                .roles
+                .set_user_roles(&tenant, Actor::system(), Uuid::now_v7(), vec![])
+                .await;
+            let no_role = services
+                .roles
+                .set_user_roles(&tenant, Actor::system(), ada, vec![Uuid::now_v7()])
+                .await;
+            let read_no_user = services.roles.user_roles(&tenant, Uuid::now_v7()).await;
 
             assert_eq!(no_user.unwrap_err().code(), "auth.user_not_found");
             assert_eq!(no_role.unwrap_err().fields()[0].code, "unknown");
@@ -840,20 +953,22 @@ mod tests {
     async fn khong_bo_duoc_admin_cuoi_cung() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let roles = &services.roles;
-            let admin = admin_role(roles).await;
+            let admin = admin_role(roles, &tenant).await;
             let ada = user(&services, "ada@example.com").await;
             let bob = user(&services, "bob@example.com").await;
-            roles.set_user_roles(Actor::system(), ada, vec![admin.id]).await.unwrap();
+            roles.set_user_roles(&tenant, Actor::system(), ada, vec![admin.id]).await.unwrap();
 
-            let error = roles.set_user_roles(Actor::system(), ada, vec![]).await.unwrap_err();
+            let error =
+                roles.set_user_roles(&tenant, Actor::system(), ada, vec![]).await.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::Conflict);
             assert_eq!(error.code(), "auth.last_admin");
-            assert!(roles.principal(ada).await.unwrap().has_all_permissions());
+            assert!(roles.principal(&tenant, ada).await.unwrap().has_all_permissions());
 
             // Có admin khác thì bỏ được.
-            roles.set_user_roles(Actor::system(), bob, vec![admin.id]).await.unwrap();
-            roles.set_user_roles(Actor::system(), ada, vec![]).await.unwrap();
+            roles.set_user_roles(&tenant, Actor::system(), bob, vec![admin.id]).await.unwrap();
+            roles.set_user_roles(&tenant, Actor::system(), ada, vec![]).await.unwrap();
         })
         .await
         .unwrap();
@@ -866,17 +981,18 @@ mod tests {
     async fn gan_role_dong_thoi_khong_tron_lan() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let roles = services.roles.clone();
             let ada = user(&services, "ada@example.com").await;
             let mut sets = Vec::new();
             for index in 0..4 {
                 let first = roles
-                    .create(Actor::system(), input(&format!("a{index}"), &[]))
+                    .create(&tenant, Actor::system(), input(&format!("a{index}"), &[]))
                     .await
                     .unwrap()
                     .id;
                 let second = roles
-                    .create(Actor::system(), input(&format!("b{index}"), &[]))
+                    .create(&tenant, Actor::system(), input(&format!("b{index}"), &[]))
                     .await
                     .unwrap()
                     .id;
@@ -888,17 +1004,23 @@ mod tests {
                 .map(|set| {
                     let roles: Arc<RoleService> = roles.clone();
                     let ids: Vec<Uuid> = set.iter().copied().collect();
-                    tokio::spawn(
-                        async move { roles.set_user_roles(Actor::system(), ada, ids).await },
-                    )
+                    let tenant = tenant.clone();
+                    tokio::spawn(async move {
+                        roles.set_user_roles(&tenant, Actor::system(), ada, ids).await
+                    })
                 })
                 .collect();
             for attempt in attempts {
                 attempt.await.unwrap().unwrap();
             }
 
-            let last: BTreeSet<Uuid> =
-                roles.user_roles(ada).await.unwrap().into_iter().map(|role| role.id).collect();
+            let last: BTreeSet<Uuid> = roles
+                .user_roles(&tenant, ada)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|role| role.id)
+                .collect();
             assert!(sets.contains(&last), "{last:?}");
         })
         .await

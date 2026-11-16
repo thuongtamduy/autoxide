@@ -29,7 +29,8 @@ after that, administrators manage accounts through `/api/v1/auth/users`. People 
 create their own accounts only when `AUTOXIDE_AUTH_SELF_REGISTRATION=true`.
 Programs and AI agents use API keys (`/api/v1/auth/api-keys`): a key acts as the
 user who created it, limited to the permissions listed on it, and is sent like an
-access token (`Authorization: Bearer axk_…`). Creating a key, like adding a passkey, asks
+access token (`Authorization: Bearer axk1_…`; the key names its tenant, so no other header
+is needed). Creating a key, like adding a passkey, asks
 for the user's current password, and resetting a password removes every key and passkey
 of that account. Users can turn on two-step sign-in
 with an authenticator app (TOTP) and get one-time recovery codes

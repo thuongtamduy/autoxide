@@ -10,6 +10,10 @@
 //!   (brute force) bằng tích vô hướng; điểm của mục = đoạn khớp nhất. Gộp với tìm theo chữ không
 //!   dấu sẵn có (D-104) bằng Reciprocal Rank Fusion (`k = 60`).
 //! - Embedding tắt (hay lỗi, hay hết ngân sách tìm công khai): chỉ tìm theo chữ — vẫn có kết quả.
+//! - Theo khách (bước 33): vector trong bộ nhớ giữ theo (khách, `scope`, `locale`), câu tìm theo
+//!   (khách, mô hình, câu), ngân sách tìm công khai đếm riêng mỗi khách — khách này không bao giờ
+//!   thấy vector, câu tìm hay hạn mức của khách kia. Job lập index bù chạy một lần mỗi database,
+//!   xếp job lập index cho từng khách có mục trên database đó.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
@@ -17,9 +21,10 @@ use std::time::{Duration, Instant};
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{EmbedKind, vector};
+use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
@@ -85,14 +90,36 @@ struct Loaded {
     chunks: Vec<(Uuid, i32, Vec<f32>)>,
 }
 
-/// Bộ nhớ của tìm theo ý nghĩa trong một tiến trình.
+/// Khoá của vector trong bộ nhớ: (khách, bản nào, ngôn ngữ).
+type IndexKey = (TenantId, Scope, String);
+/// Khoá của vector câu tìm: (khách, "mô hình + câu đã bỏ dấu").
+type QueryKey = (TenantId, String);
+
+/// Bộ nhớ của tìm theo ý nghĩa trong một tiến trình. Mọi khoá bắt đầu bằng khách (bước 33).
 #[derive(Default)]
 pub(crate) struct SearchCache {
     // `Mutex` của thư viện chuẩn: giữ khoá rất ngắn, không có `await` bên trong.
-    indexes: Mutex<HashMap<(Scope, String), Arc<Loaded>>>,
-    queries: Mutex<HashMap<String, Arc<Vec<f32>>>>,
-    /// Ngân sách tìm công khai theo ý nghĩa: (đầu phút, số lần đã dùng trong phút đó).
-    public_budget: Mutex<Option<(Instant, u32)>>,
+    indexes: Mutex<HashMap<IndexKey, Arc<Loaded>>>,
+    /// Vector câu tìm theo (khách, "mô hình + câu"): khách có thể dùng mô hình riêng (khoá AI
+    /// theo khách), và câu tìm của khách này không được lộ qua thời gian trả lời ở khách kia.
+    queries: Mutex<HashMap<QueryKey, Arc<Vec<f32>>>>,
+    /// Ngân sách tìm công khai theo ý nghĩa của từng khách: (đầu phút, số lần đã dùng trong
+    /// phút đó). Khách này tiêu hết không làm khách kia mất tìm theo ý nghĩa.
+    public_budget: Mutex<HashMap<TenantId, (Instant, u32)>>,
+}
+
+impl SearchCache {
+    /// Số `version` của vector (khách, `scope`, `locale`) đang giữ trong bộ nhớ (cho test).
+    #[cfg(test)]
+    pub(crate) fn cached_version(
+        &self,
+        tenant: TenantId,
+        scope: Scope,
+        locale: &str,
+    ) -> Option<i64> {
+        let cache = self.indexes.lock().ok()?;
+        cache.get(&(tenant, scope, locale.to_owned())).map(|loaded| loaded.version)
+    }
 }
 
 impl std::fmt::Debug for SearchCache {
@@ -138,40 +165,55 @@ impl ContentService {
     /// Embedding tắt thì không làm gì.
     pub(crate) async fn enqueue_index<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         connection: &C,
         entry_id: Uuid,
     ) -> Result<(), Error> {
         if self.embedder.enabled() {
             self.jobs
-                .enqueue(
-                    connection,
-                    &TenantContext::legacy_default(&self.database),
-                    &IndexJob { entry_id },
-                    EnqueueOptions::default(),
-                )
+                .enqueue(connection, tenant, &IndexJob { entry_id }, EnqueueOptions::default())
                 .await?;
         }
         Ok(())
     }
 
     /// Lập lại index (bản nháp và bản công khai) của mục `entry_id`.
-    pub(crate) async fn index_entry(&self, entry_id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn index_entry(
+        &self,
+        tenant: &TenantContext,
+        entry_id: Uuid,
+    ) -> Result<(), Error> {
         if !self.embedder.enabled() {
             return Ok(());
         }
-        let read = self.database.read();
-        let draft = entry::Entity::find_by_id(entry_id).one(read).await?.map(|row| {
-            (row.locale.clone(), chunks(&row.title, &row.excerpt, &row.plain_text), row.updated_at)
-        });
-        let public = published::Entity::find_by_id(entry_id).one(read).await?.map(|row| {
-            (row.locale.clone(), chunks(&row.title, &row.excerpt, &row.plain_text), row.updated_at)
-        });
-        self.index_scope(entry_id, Scope::Draft, draft).await?;
-        self.index_scope(entry_id, Scope::Published, public).await
+        let read = tenant.database().read();
+        let draft =
+            entry::Entity::find_by_id(entry_id).scoped(tenant).one(read).await?.map(|row| {
+                (
+                    row.locale.clone(),
+                    chunks(&row.title, &row.excerpt, &row.plain_text),
+                    row.updated_at,
+                )
+            });
+        let public = published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::EntryId.eq(entry_id))
+            .one(read)
+            .await?
+            .map(|row| {
+                (
+                    row.locale.clone(),
+                    chunks(&row.title, &row.excerpt, &row.plain_text),
+                    row.updated_at,
+                )
+            });
+        self.index_scope(tenant, entry_id, Scope::Draft, draft).await?;
+        self.index_scope(tenant, entry_id, Scope::Published, public).await
     }
 
     async fn index_scope(
         &self,
+        tenant: &TenantContext,
         entry_id: Uuid,
         scope: Scope,
         source: Option<(String, Vec<String>, chrono::DateTime<chrono::Utc>)>,
@@ -180,21 +222,22 @@ impl ContentService {
         let read_stamp = source.as_ref().map(|(_, _, stamp)| *stamp);
         let dimensions = i32::try_from(self.embedder.dimensions()).unwrap_or(0);
         let existing = embedding::Entity::find()
+            .scoped(tenant)
             .filter(embedding::Column::EntryId.eq(entry_id))
             .filter(embedding::Column::Scope.eq(scope.as_str()))
             .order_by_asc(embedding::Column::ChunkIndex)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let Some((locale, texts, _)) = source else {
             if let Some(first) = existing.first() {
-                ensure_state(self.database.write(), scope, &first.locale).await?;
-                let transaction = self.database.begin_write().await?;
-                if stamp(&transaction, entry_id, scope).await?.is_some() {
+                ensure_state(tenant.database().write(), tenant, scope, &first.locale).await?;
+                let transaction = tenant.database().begin_write().await?;
+                if stamp(&transaction, tenant, entry_id, scope).await?.is_some() {
                     // Mục vừa có lại (vd đăng lại) sau lúc đọc: để job mới hơn lo.
                     return Ok(());
                 }
-                delete_rows(&transaction, entry_id, scope).await?;
-                bump(&transaction, scope, &first.locale).await?;
+                delete_rows(&transaction, tenant, entry_id, scope).await?;
+                bump(&transaction, tenant, scope, &first.locale).await?;
                 transaction.commit().await?;
             }
             return Ok(());
@@ -220,28 +263,21 @@ impl ContentService {
             .map(|(text, _)| text.clone())
             .collect();
         // Gọi embedding NGOÀI transaction (luật: không gọi mạng trong transaction ghi).
-        let mut fresh = self
-            .embedder
-            .embed(
-                &TenantContext::legacy_default(&self.database),
-                "content.index",
-                &missing,
-                EmbedKind::Document,
-            )
-            .await?;
+        let mut fresh =
+            self.embedder.embed(tenant, "content.index", &missing, EmbedKind::Document).await?;
         for vector in &mut fresh {
             vector::normalize(vector);
         }
         let mut fresh = fresh.into_iter();
         let now = now();
-        ensure_state(self.database.write(), scope, &locale).await?;
-        let transaction = self.database.begin_write().await?;
+        ensure_state(tenant.database().write(), tenant, scope, &locale).await?;
+        let transaction = tenant.database().begin_write().await?;
         // Mục đổi trong lúc tính embedding (job khác sẽ chạy với chữ mới): không ghi đè bằng
         // vector của chữ cũ.
-        if stamp(&transaction, entry_id, scope).await? != read_stamp {
+        if stamp(&transaction, tenant, entry_id, scope).await? != read_stamp {
             return Ok(());
         }
-        delete_rows(&transaction, entry_id, scope).await?;
+        delete_rows(&transaction, tenant, entry_id, scope).await?;
         for (index, hash) in hashes.iter().enumerate() {
             let bytes = match known.get(hash.as_str()) {
                 Some(bytes) => bytes.clone(),
@@ -249,6 +285,7 @@ impl ContentService {
             };
             embedding::ActiveModel {
                 id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
                 entry_id: Set(entry_id),
                 scope: Set(scope.as_str().to_owned()),
                 locale: Set(locale.clone()),
@@ -262,21 +299,45 @@ impl ContentService {
             .insert(&transaction)
             .await?;
         }
-        bump(&transaction, scope, &locale).await?;
+        bump(&transaction, tenant, scope, &locale).await?;
         transaction.commit().await?;
         Ok(())
     }
 
-    /// Xếp job lập index cho các mục chưa có index với mô hình hiện tại (tối đa
-    /// [`CATCH_UP_BATCH`] mỗi lần). Trả số mục đã xếp.
-    pub(crate) async fn catch_up_embeddings(&self) -> Result<usize, Error> {
+    /// Xếp job lập index cho các mục trên `database` chưa có index với mô hình hiện tại, theo
+    /// từng khách có mục ở đó (tối đa [`CATCH_UP_BATCH`] mỗi khách mỗi lần). Trả số mục đã xếp.
+    pub(crate) async fn catch_up_embeddings(&self, database: &Database) -> Result<usize, Error> {
         if !self.embedder.enabled() {
             return Ok(0);
         }
-        let read = self.database.read();
+        // Khách có mục trên database này (quét cả database qua index có `tenant_id` đứng đầu).
+        let tenants: Vec<Uuid> = entry::Entity::find()
+            .select_only()
+            .column(entry::Column::TenantId)
+            .distinct()
+            .into_tuple::<Uuid>()
+            .all(database.read())
+            .await?;
+        let mut queued = 0;
+        for id in tenants {
+            match self.databases.tenant(TenantId::from_uuid(id)).await {
+                Ok(tenant) => queued += self.catch_up_tenant(&tenant).await?,
+                // Khách đã bị xoá khỏi sổ: dữ liệu còn lại do việc xoá khách lo, không đoán ở đây.
+                Err(error) => {
+                    tracing::warn!(tenant_id = %id, error = %error, "content search catch-up skipped a tenant");
+                }
+            }
+        }
+        Ok(queued)
+    }
+
+    /// Phần của khách `tenant` trong [`catch_up_embeddings`](Self::catch_up_embeddings).
+    async fn catch_up_tenant(&self, tenant: &TenantContext) -> Result<usize, Error> {
+        let read = tenant.database().read();
         let model = self.embedder.model_id().to_owned();
         let dimensions = i32::try_from(self.embedder.dimensions()).unwrap_or(0);
         let indexed: BTreeSet<Uuid> = embedding::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(embedding::Column::EntryId)
             .filter(embedding::Column::Scope.eq(Scope::Draft.as_str()))
@@ -289,6 +350,7 @@ impl ContentService {
             .into_iter()
             .collect();
         let all: Vec<Uuid> = entry::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(entry::Column::Id)
             .into_tuple()
@@ -299,7 +361,7 @@ impl ContentService {
         if missing.is_empty() {
             return Ok(0);
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Mỗi mục tối đa một job lập bù mỗi ngày: nhà cung cấp hỏng hay hết hạn mức thì không
         // xếp chồng job mỗi giờ.
         let day = chrono::Utc::now().format("%Y-%m-%d");
@@ -307,12 +369,7 @@ impl ContentService {
             let options =
                 EnqueueOptions::default().unique_key(format!("content.index:{entry_id}:{day}"));
             self.jobs
-                .enqueue(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    &IndexJob { entry_id: *entry_id },
-                    options,
-                )
+                .enqueue(&transaction, tenant, &IndexJob { entry_id: *entry_id }, options)
                 .await?;
         }
         transaction.commit().await?;
@@ -324,6 +381,7 @@ impl ContentService {
     /// đăng nhập, tắt mặc định).
     pub(crate) async fn search(
         &self,
+        tenant: &TenantContext,
         principal: Option<&Principal>,
         query: &SearchQuery,
         public: bool,
@@ -361,9 +419,10 @@ impl ContentService {
             return Err(invalid(problems));
         }
         let scope = if public { Scope::Published } else { Scope::Draft };
-        let by_text = self.text_candidates(scope, q, &locale, query.kind).await?;
-        let by_meaning = if self.embedder.enabled() && (!public || self.spend_public_budget()) {
-            match self.meaning_candidates(scope, q, &locale).await {
+        let by_text = self.text_candidates(tenant, scope, q, &locale, query.kind).await?;
+        let by_meaning = if self.embedder.enabled() && (!public || self.spend_public_budget(tenant))
+        {
+            match self.meaning_candidates(tenant, scope, q, &locale).await {
                 Ok(found) => found,
                 Err(error) => {
                     // Lỗi embedding (hết hạn mức, nhà cung cấp bận): vẫn trả kết quả theo chữ.
@@ -391,7 +450,7 @@ impl ContentService {
             slot.2 = true;
         }
         let ids: Vec<Uuid> = fused.keys().copied().collect();
-        let mut hits = self.describe_hits(scope, &ids, query.kind, &fused).await?;
+        let mut hits = self.describe_hits(tenant, scope, &ids, query.kind, &fused).await?;
         hits.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.entry_id.cmp(&b.entry_id)));
         hits.truncate(limit as usize);
         Ok(hits)
@@ -400,16 +459,18 @@ impl ContentService {
     /// Mục khớp chữ (không dấu, D-104), mới nhất trước.
     async fn text_candidates(
         &self,
+        tenant: &TenantContext,
         scope: Scope,
         q: &str,
         locale: &str,
         kind: Option<Kind>,
     ) -> Result<Vec<Uuid>, Error> {
-        let read = self.database.read();
+        let read = tenant.database().read();
         let limit = CANDIDATES as u64;
         Ok(match scope {
             Scope::Draft => {
                 let mut select = entry::Entity::find()
+                    .scoped(tenant)
                     .select_only()
                     .column(entry::Column::Id)
                     .filter(entry::Column::Locale.eq(locale))
@@ -426,6 +487,7 @@ impl ContentService {
             }
             Scope::Published => {
                 let mut select = published::Entity::find()
+                    .scoped(tenant)
                     .select_only()
                     .column(published::Column::EntryId)
                     .filter(published::Column::Locale.eq(locale))
@@ -446,12 +508,13 @@ impl ContentService {
     /// Mục gần câu tìm nhất theo ý nghĩa: (ID, độ giống, đoạn khớp nhất), giống nhất trước.
     async fn meaning_candidates(
         &self,
+        tenant: &TenantContext,
         scope: Scope,
         q: &str,
         locale: &str,
     ) -> Result<Vec<(Uuid, f32, i32)>, Error> {
-        let query = self.query_vector(q).await?;
-        let loaded = self.loaded(scope, locale).await?;
+        let query = self.query_vector(tenant, q).await?;
+        let loaded = self.loaded(tenant, scope, locale).await?;
         let mut best: HashMap<Uuid, (f32, i32)> = HashMap::new();
         for (entry_id, chunk, vector) in &loaded.chunks {
             let similarity = vector::dot(&query, vector);
@@ -468,8 +531,11 @@ impl ContentService {
     }
 
     /// Vector (đã chuẩn hoá) của câu tìm, giữ lại để lần sau khỏi gọi nhà cung cấp.
-    async fn query_vector(&self, q: &str) -> Result<Arc<Vec<f32>>, Error> {
-        let key = format!("{}\n{}", self.embedder.model_id(), autoxide_kernel::search::fold(q));
+    async fn query_vector(&self, tenant: &TenantContext, q: &str) -> Result<Arc<Vec<f32>>, Error> {
+        let key = (
+            tenant.id(),
+            format!("{}\n{}", self.embedder.model_id(), autoxide_kernel::search::fold(q)),
+        );
         if let Some(found) =
             self.search_cache.queries.lock().ok().and_then(|cache| cache.get(&key).cloned())
         {
@@ -477,12 +543,7 @@ impl ContentService {
         }
         let mut vectors = self
             .embedder
-            .embed(
-                &TenantContext::legacy_default(&self.database),
-                "content.search",
-                &[q.to_owned()],
-                EmbedKind::Query,
-            )
+            .embed(tenant, "content.search", &[q.to_owned()], EmbedKind::Query)
             .await?;
         let mut vector = vectors.pop().unwrap_or_default();
         vector::normalize(&mut vector);
@@ -497,16 +558,22 @@ impl ContentService {
     }
 
     /// Vector của (`scope`, `locale`) trong bộ nhớ; nạp lại khi `version` trong database đổi.
-    async fn loaded(&self, scope: Scope, locale: &str) -> Result<Arc<Loaded>, Error> {
-        let read = self.database.read();
+    async fn loaded(
+        &self,
+        tenant: &TenantContext,
+        scope: Scope,
+        locale: &str,
+    ) -> Result<Arc<Loaded>, Error> {
+        let read = tenant.database().read();
         let version = embedding_state::Entity::find()
+            .scoped(tenant)
             .filter(embedding_state::Column::Scope.eq(scope.as_str()))
             .filter(embedding_state::Column::Locale.eq(locale))
             .one(read)
             .await?
             .map_or(0, |row| row.version);
         let model = self.embedder.model_id().to_owned();
-        let key = (scope, locale.to_owned());
+        let key = (tenant.id(), scope, locale.to_owned());
         let cached =
             self.search_cache.indexes.lock().ok().and_then(|cache| cache.get(&key).cloned());
         if let Some(cached) =
@@ -516,6 +583,7 @@ impl ContentService {
         }
         let dimensions = i32::try_from(self.embedder.dimensions()).unwrap_or(0);
         let rows = embedding::Entity::find()
+            .scoped(tenant)
             .filter(embedding::Column::Scope.eq(scope.as_str()))
             .filter(embedding::Column::Locale.eq(locale))
             .filter(embedding::Column::Model.eq(model.as_str()))
@@ -535,27 +603,25 @@ impl ContentService {
         Ok(loaded)
     }
 
-    /// Một lần tìm công khai theo ý nghĩa trong ngân sách mỗi phút không (đếm trong tiến trình).
-    fn spend_public_budget(&self) -> bool {
-        let Ok(mut budget) = self.search_cache.public_budget.lock() else { return false };
+    /// Một lần tìm công khai theo ý nghĩa trong ngân sách mỗi phút của khách `tenant` không
+    /// (đếm trong tiến trình).
+    fn spend_public_budget(&self, tenant: &TenantContext) -> bool {
+        let Ok(mut budgets) = self.search_cache.public_budget.lock() else { return false };
         let now = Instant::now();
-        let (start, used) = match *budget {
-            Some((start, used)) if now.duration_since(start) < Duration::from_secs(60) => {
-                (start, used)
-            }
-            _ => (now, 0),
-        };
+        // Bỏ phút đã qua của mọi khách: bảng không lớn dần theo số khách từng tìm.
+        budgets.retain(|_, (start, _)| now.duration_since(*start) < Duration::from_secs(60));
+        let (start, used) = budgets.get(&tenant.id()).copied().unwrap_or((now, 0));
         if used >= self.config.public_search_per_minute {
-            *budget = Some((start, used));
             return false;
         }
-        *budget = Some((start, used + 1));
+        budgets.insert(tenant.id(), (start, used + 1));
         true
     }
 
     /// Chi tiết của các mục tìm được (bỏ mục không còn, hay khác `kind`).
     async fn describe_hits(
         &self,
+        tenant: &TenantContext,
         scope: Scope,
         ids: &[Uuid],
         kind: Option<Kind>,
@@ -564,11 +630,12 @@ impl ContentService {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
-        let read = self.database.read();
+        let read = tenant.database().read();
         // (ID, loại, ngôn ngữ, tiêu đề, tóm tắt, chữ thuần, trạng thái, đường dẫn)
         type Row = (Uuid, String, String, String, String, String, Option<String>, Option<String>);
         let rows: Vec<Row> = match scope {
             Scope::Draft => entry::Entity::find()
+                .scoped(tenant)
                 .filter(entry::Column::Id.is_in(ids.to_vec()))
                 .all(read)
                 .await?
@@ -587,6 +654,7 @@ impl ContentService {
                 })
                 .collect(),
             Scope::Published => published::Entity::find()
+                .scoped(tenant)
                 .filter(published::Column::EntryId.is_in(ids.to_vec()))
                 .all(read)
                 .await?
@@ -684,10 +752,12 @@ fn hash(text: &str) -> String {
 
 async fn delete_rows<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     entry_id: Uuid,
     scope: Scope,
 ) -> Result<(), Error> {
     embedding::Entity::delete_many()
+        .scoped(tenant)
         .filter(embedding::Column::EntryId.eq(entry_id))
         .filter(embedding::Column::Scope.eq(scope.as_str()))
         .exec(connection)
@@ -699,10 +769,12 @@ async fn delete_rows<C: ConnectionTrait>(
 /// một lỗi trùng khoá trong transaction làm hỏng cả transaction đó.
 async fn ensure_state<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     scope: Scope,
     locale: &str,
 ) -> Result<(), Error> {
     let exists = embedding_state::Entity::find()
+        .scoped(tenant)
         .filter(embedding_state::Column::Scope.eq(scope.as_str()))
         .filter(embedding_state::Column::Locale.eq(locale))
         .one(connection)
@@ -713,6 +785,7 @@ async fn ensure_state<C: ConnectionTrait>(
     }
     let row = embedding_state::ActiveModel {
         id: Set(Uuid::now_v7()),
+        tenant_id: Set(tenant.id().as_uuid()),
         scope: Set(scope.as_str().to_owned()),
         locale: Set(locale.to_owned()),
         version: Set(0),
@@ -727,8 +800,14 @@ async fn ensure_state<C: ConnectionTrait>(
 
 /// Tăng `version` của (`scope`, `locale`) để mọi tiến trình nạp lại vector. Một câu `UPDATE`
 /// (`version = version + 1`); dòng đã có nhờ [`ensure_state`].
-async fn bump<C: ConnectionTrait>(connection: &C, scope: Scope, locale: &str) -> Result<(), Error> {
+async fn bump<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    scope: Scope,
+    locale: &str,
+) -> Result<(), Error> {
     embedding_state::Entity::update_many()
+        .scoped(tenant)
         .col_expr(
             embedding_state::Column::Version,
             Expr::col(embedding_state::Column::Version).add(1),
@@ -743,16 +822,22 @@ async fn bump<C: ConnectionTrait>(connection: &C, scope: Scope, locale: &str) ->
 /// Dấu thời gian hiện tại của bản (`scope`) của mục, đọc trong `connection`; `None`: không có.
 async fn stamp<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     entry_id: Uuid,
     scope: Scope,
 ) -> Result<Option<chrono::DateTime<chrono::Utc>>, Error> {
     Ok(match scope {
-        Scope::Draft => {
-            entry::Entity::find_by_id(entry_id).one(connection).await?.map(|row| row.updated_at)
-        }
-        Scope::Published => {
-            published::Entity::find_by_id(entry_id).one(connection).await?.map(|row| row.updated_at)
-        }
+        Scope::Draft => entry::Entity::find_by_id(entry_id)
+            .scoped(tenant)
+            .one(connection)
+            .await?
+            .map(|row| row.updated_at),
+        Scope::Published => published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::EntryId.eq(entry_id))
+            .one(connection)
+            .await?
+            .map(|row| row.updated_at),
     })
 }
 
@@ -762,19 +847,23 @@ pub(crate) struct Indexer(pub Arc<ContentService>);
 #[async_trait::async_trait]
 impl JobHandler for Indexer {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("a content index job must belong to a tenant"))?;
         let input: IndexJob = serde_json::from_value(job.payload.clone())
             .map_err(|error| Error::internal(format!("content index job payload: {error}")))?;
-        self.0.index_entry(input.entry_id).await
+        self.0.index_entry(tenant, input.entry_id).await
     }
 }
 
-/// Bộ chạy job lập index còn thiếu.
+/// Bộ chạy job lập index còn thiếu (theo lịch: một lần cho mỗi database).
 pub(crate) struct CatchUp(pub Arc<ContentService>);
 
 #[async_trait::async_trait]
 impl JobHandler for CatchUp {
-    async fn run(&self, _: &JobContext) -> Result<(), Error> {
-        self.0.catch_up_embeddings().await.map(|_| ())
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.0.catch_up_embeddings(&job.database).await.map(|_| ())
     }
 }
 

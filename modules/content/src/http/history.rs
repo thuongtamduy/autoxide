@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use chrono::{DateTime, Utc};
@@ -120,12 +121,16 @@ pub(crate) struct ScheduleRequest {
 )]
 pub(crate) async fn list_revisions(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<RevisionResponse>, Error> {
     let page = page_request(paging, Vec::new())?;
-    Ok(service.list_revisions(&principal, id, &page).await?.map(|row| revision(row, false)))
+    Ok(service
+        .list_revisions(&tenant, &principal, id, &page)
+        .await?
+        .map(|row| revision(row, false)))
 }
 
 /// Get one revision of an entry, with its fields.
@@ -147,10 +152,13 @@ pub(crate) async fn list_revisions(
 )]
 pub(crate) async fn get_revision(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path((id, revision_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Data<RevisionResponse>, Error> {
-    Ok(Data { data: revision(service.get_revision(&principal, id, revision_id).await?, true) })
+    Ok(Data {
+        data: revision(service.get_revision(&tenant, &principal, id, revision_id).await?, true),
+    })
 }
 
 /// Copy a revision back into the draft.
@@ -178,12 +186,18 @@ pub(crate) async fn get_revision(
 )]
 pub(crate) async fn restore_revision(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path((id, revision_id)): Path<(Uuid, Uuid)>,
     if_match: IfMatch,
 ) -> Result<Tagged<EntryResponse>, Error> {
     let expected = if_match.required()?;
-    tagged(&service, service.restore(&principal, id, revision_id, expected).await?).await
+    tagged(
+        &service,
+        &tenant,
+        service.restore(&tenant, &principal, id, revision_id, expected).await?,
+    )
+    .await
 }
 
 /// Which schedules to list.
@@ -216,6 +230,7 @@ pub(crate) struct SchedulesQuery {
 )]
 pub(crate) async fn list_all_schedules(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<SchedulesQuery>,
     Query(paging): Query<PageQuery>,
@@ -232,7 +247,7 @@ pub(crate) async fn list_all_schedules(
         ));
     }
     let page = page_request(paging, problems)?;
-    let page = service.list_all_schedules(&principal, status, &page).await?;
+    let page = service.list_all_schedules(&tenant, &principal, status, &page).await?;
     Ok(page.map(ScheduleResponse::from))
 }
 
@@ -254,10 +269,11 @@ pub(crate) async fn list_all_schedules(
 )]
 pub(crate) async fn list_schedules(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<Vec<ScheduleResponse>>, Error> {
-    let rows = service.list_schedules(&principal, id).await?;
+    let rows = service.list_schedules(&tenant, &principal, id).await?;
     Ok(Data { data: rows.into_iter().map(ScheduleResponse::from).collect() })
 }
 
@@ -288,6 +304,7 @@ pub(crate) async fn list_schedules(
 )]
 pub(crate) async fn create_schedule(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -296,12 +313,15 @@ pub(crate) async fn create_schedule(
     let expected = if_match.required()?;
     let row = service
         .create_schedule_reviewed(
+            &tenant,
             &principal,
             id,
-            input.action,
-            input.run_at,
+            crate::publishing::schedules::SchedulePlan {
+                action: input.action,
+                run_at: input.run_at,
+                ai_reviewed: input.ai_reviewed,
+            },
             expected,
-            input.ai_reviewed,
         )
         .await?;
     Ok(Created::new(format!("/content/entries/{id}/schedules"), row.into()))
@@ -327,8 +347,9 @@ pub(crate) async fn create_schedule(
 )]
 pub(crate) async fn cancel_schedule(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<ScheduleResponse>, Error> {
-    Ok(Data { data: service.cancel_schedule(&principal, id).await?.into() })
+    Ok(Data { data: service.cancel_schedule(&tenant, &principal, id).await?.into() })
 }

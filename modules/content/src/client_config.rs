@@ -17,8 +17,9 @@ struct ContentClientConfig {
     /// Language of a new entry when none is given.
     #[schema(example = "en")]
     default_locale: String,
-    /// Path prefix of posts on the website (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), e.g. `/blog/`.
-    #[schema(example = "/blog/")]
+    /// First segment of the address of every post (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), without
+    /// slashes: `blog` gives posts at `/blog/<slug>`.
+    #[schema(example = "blog")]
     post_path_prefix: String,
     /// Hosts whose videos and posts may be embedded in an entry (`AUTOXIDE_CONTENT_EMBED_HOSTS`).
     #[schema(example = json!(["www.youtube.com", "player.vimeo.com"]))]

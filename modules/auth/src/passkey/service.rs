@@ -8,11 +8,10 @@
 
 use std::sync::Arc;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -43,7 +42,6 @@ pub(crate) struct Ceremony {
 }
 
 pub(crate) struct PasskeyService {
-    database: Database,
     users: Arc<UserService>,
     sessions: Arc<SessionService>,
     outbox: Outbox,
@@ -53,7 +51,6 @@ pub(crate) struct PasskeyService {
 
 impl PasskeyService {
     pub(crate) fn new(
-        database: Database,
         users: Arc<UserService>,
         sessions: Arc<SessionService>,
         outbox: Outbox,
@@ -62,7 +59,7 @@ impl PasskeyService {
         let engine = config.map(Engine::new).transpose().map_err(|Rejected(reason)| {
             Error::internal(format!("passkey configuration: {reason}"))
         })?;
-        Ok(PasskeyService { database, users, sessions, outbox, engine })
+        Ok(PasskeyService { users, sessions, outbox, engine })
     }
 
     fn engine(&self) -> Result<&Engine, Error> {
@@ -80,16 +77,21 @@ impl PasskeyService {
     /// tài khoản (D-079).
     pub(crate) async fn start_registration(
         &self,
+        tenant: &TenantContext,
         user_id: Uuid,
         current_password: &str,
     ) -> Result<Ceremony, Error> {
         let engine = self.engine()?;
-        self.sessions.check_password(user_id, current_password).await?;
-        let user =
-            self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
+        self.sessions.check_password(tenant, user_id, current_password).await?;
+        let user = self
+            .users
+            .get(tenant, user_id)
+            .await?
+            .ok_or_else(|| crate::user::user_not_found(user_id))?;
         let existing = passkey::Entity::find()
             .filter(passkey::Column::UserId.eq(user_id))
-            .all(self.database.read())
+            .scoped(tenant)
+            .all(tenant.database().read())
             .await?;
         if existing.len() as u64 >= MAX_PASSKEYS {
             return Err(Error::conflict(
@@ -107,12 +109,13 @@ impl PasskeyService {
         let started = engine.start_registration(&handle, &user.email, &user.name, &ids).map_err(
             |Rejected(reason)| Error::internal(format!("passkey registration: {reason}")),
         )?;
-        self.save_ceremony(Some(user_id), started.state, started.options).await
+        self.save_ceremony(tenant, Some(user_id), started.state, started.options).await
     }
 
     /// Hoàn tất đăng ký: kiểm câu trả lời `credential` rồi lưu passkey tên `name`.
     pub(crate) async fn finish_registration(
         &self,
+        tenant: &TenantContext,
         user_id: Uuid,
         ceremony_id: Uuid,
         name: &str,
@@ -123,7 +126,7 @@ impl PasskeyService {
         // Đọc nghi thức, kiểm câu trả lời, rồi dùng nghi thức và lưu passkey trong CÙNG một
         // transaction: đổi / đặt lại mật khẩu xoá nghi thức đang dở trong transaction của nó,
         // nên passkey mở bằng mật khẩu cũ không lọt vào sau khi mật khẩu đã đổi.
-        let state = self.read_ceremony(ceremony_id, Some(user_id)).await?;
+        let state = self.read_ceremony(tenant, ceremony_id, Some(user_id)).await?;
         let registered =
             engine.finish_registration(&state, credential).map_err(|Rejected(reason)| {
                 Error::bad_request(
@@ -132,13 +135,14 @@ impl PasskeyService {
                 )
                 .with_param("reason", reason)
             })?;
-        let transaction = self.database.begin_write().await?;
-        if !take_ceremony_in(&transaction, ceremony_id).await? {
+        let transaction = tenant.database().begin_write().await?;
+        if !take_ceremony_in(&transaction, tenant, ceremony_id).await? {
             transaction.rollback().await?;
             return Err(invalid_ceremony());
         }
         let row = passkey::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(user_id),
             credential_id: Set(registered.credential_id),
             user_handle: Set(registered.user_handle),
@@ -162,7 +166,7 @@ impl PasskeyService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::user(user_id),
                 events::user_subject(user_id),
                 &event,
@@ -176,42 +180,48 @@ impl PasskeyService {
     /// Passkey của người dùng `user_id`, mới thêm trước (mặc định).
     pub(crate) async fn list(
         &self,
+        tenant: &TenantContext,
         user_id: Uuid,
         page: &PageRequest,
     ) -> Result<Page<super::Passkey>, Error> {
-        let select = passkey::Entity::find().filter(passkey::Column::UserId.eq(user_id));
-        fetch_page(select, passkey::Column::Id, |row| row.id, page, self.database.read()).await
+        let select =
+            passkey::Entity::find().filter(passkey::Column::UserId.eq(user_id)).scoped(tenant);
+        fetch_page(select, passkey::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// Xoá passkey `id` của người dùng `user_id` (chính người đó gỡ).
-    pub(crate) async fn delete(&self, user_id: Uuid, id: Uuid) -> Result<(), Error> {
-        self.remove(Actor::user(user_id), user_id, id, false).await
+    pub(crate) async fn delete(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        self.remove(tenant, Actor::user(user_id), user_id, id, false).await
     }
 
     /// Quản trị viên (`actor`) gỡ passkey `id` của người dùng `user_id`; event ghi
     /// `by_administrator`. Bên gọi đã kiểm permission và `require_covers`.
     pub(crate) async fn remove_for(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         user_id: Uuid,
         id: Uuid,
     ) -> Result<(), Error> {
-        self.remove(actor, user_id, id, true).await
+        self.remove(tenant, actor, user_id, id, true).await
     }
 
     /// Quản trị viên (hay người vận hành qua CLI) gỡ mọi passkey của `user_id`. Trả số passkey
     /// đã gỡ.
-    pub(crate) async fn remove_all_for(&self, actor: Actor, user_id: Uuid) -> Result<u64, Error> {
-        let transaction = self.database.begin_write().await?;
-        let removed = remove_all_in(
-            &transaction,
-            &TenantContext::legacy_default(&self.database),
-            &self.outbox,
-            actor,
-            user_id,
-            true,
-        )
-        .await?;
+    pub(crate) async fn remove_all_for(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        user_id: Uuid,
+    ) -> Result<u64, Error> {
+        let transaction = tenant.database().begin_write().await?;
+        let removed =
+            remove_all_in(&transaction, tenant, &self.outbox, actor, user_id, true).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, removed, "passkeys removed by an administrator");
         Ok(removed)
@@ -219,43 +229,39 @@ impl PasskeyService {
 
     async fn remove(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         user_id: Uuid,
         id: Uuid,
         by_admin: bool,
     ) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = passkey::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .filter(|row| row.user_id == user_id)
             .ok_or_else(|| passkey_not_found(id))?;
-        let deleted = passkey::Entity::delete_by_id(id).exec(&transaction).await?;
+        let deleted = passkey::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             transaction.rollback().await?;
             return Err(passkey_not_found(id));
         }
         let event = removed_event(&row.name, by_admin);
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::user_subject(user_id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::user_subject(user_id), &event)
             .await?;
         transaction.commit().await?;
         Ok(())
     }
 
     /// Bắt đầu đăng nhập bằng passkey (chưa biết là ai).
-    pub(crate) async fn start_login(&self) -> Result<Ceremony, Error> {
+    pub(crate) async fn start_login(&self, tenant: &TenantContext) -> Result<Ceremony, Error> {
         let started = self
             .engine()?
             .start_login()
             .map_err(|Rejected(reason)| Error::internal(format!("passkey sign-in: {reason}")))?;
-        self.save_ceremony(None, started.state, started.options).await
+        self.save_ceremony(tenant, None, started.state, started.options).await
     }
 
     /// Hoàn tất đăng nhập: kiểm câu trả lời `credential`, cấp cặp token như đăng nhập
@@ -263,12 +269,13 @@ impl PasskeyService {
     /// mã TOTP.
     pub(crate) async fn finish_login(
         &self,
+        tenant: &TenantContext,
         ceremony_id: Uuid,
         credential: &Value,
         user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
-        let stored = self.verify_assertion(ceremony_id, credential).await?;
-        self.sessions.login_with_passkey(stored.user_id, stored.id, user_agent).await
+        let stored = self.verify_assertion(tenant, ceremony_id, credential).await?;
+        self.sessions.login_with_passkey(tenant, stored.user_id, stored.id, user_agent).await
     }
 
     /// Xác nhận lại người đang đăng nhập `user_id` bằng passkey (D-272), thay cho mật khẩu ở thao
@@ -276,11 +283,12 @@ impl PasskeyService {
     /// nhập; passkey phải là của chính `user_id`. Trả ID của passkey đã dùng.
     pub(crate) async fn reauthenticate(
         &self,
+        tenant: &TenantContext,
         user_id: Uuid,
         ceremony_id: Uuid,
         credential: &Value,
     ) -> Result<Uuid, Error> {
-        let stored = self.verify_assertion(ceremony_id, credential).await?;
+        let stored = self.verify_assertion(tenant, ceremony_id, credential).await?;
         if stored.user_id != user_id {
             tracing::info!(passkey_id = %stored.id, "passkey of another account used to confirm");
             return Err(sign_in_failed());
@@ -292,6 +300,7 @@ impl PasskeyService {
     /// đếm và lần dùng cuối; trả passkey đã ký.
     async fn verify_assertion(
         &self,
+        tenant: &TenantContext,
         ceremony_id: Uuid,
         credential: &Value,
     ) -> Result<passkey::Model, Error> {
@@ -303,10 +312,11 @@ impl PasskeyService {
                     .with_param("reason", reason),
             ])
         })?;
-        let state = self.take_ceremony(ceremony_id, None).await?;
+        let state = self.take_ceremony(tenant, ceremony_id, None).await?;
         let stored = passkey::Entity::find()
             .filter(passkey::Column::CredentialId.eq(assertion.credential_id()))
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?;
         let Some(stored) = stored else {
             tracing::info!("passkey sign-in with an unknown credential");
@@ -328,16 +338,18 @@ impl PasskeyService {
         };
         let mut update = passkey::Entity::update_many()
             .col_expr(passkey::Column::LastUsedAt, Expr::value(Some(now())))
-            .filter(passkey::Column::Id.eq(stored.id));
+            .filter(passkey::Column::Id.eq(stored.id))
+            .scoped(tenant);
         if let Some(dynamic) = dynamic {
             update = update.col_expr(passkey::Column::DynamicState, Expr::value(dynamic));
         }
-        update.exec(self.database.write()).await?;
+        update.exec(tenant.database().write()).await?;
         Ok(stored)
     }
 
     async fn save_ceremony(
         &self,
+        tenant: &TenantContext,
         user_id: Option<Uuid>,
         state: Vec<u8>,
         options: Value,
@@ -345,19 +357,26 @@ impl PasskeyService {
         let id = Uuid::now_v7();
         ceremony::ActiveModel {
             id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(user_id),
             state: Set(state),
             expires_at: Set(now() + chrono::Duration::minutes(CEREMONY_MINUTES)),
         }
-        .insert(self.database.write())
+        .insert(tenant.database().write())
         .await?;
         Ok(Ceremony { id, options })
     }
 
     /// Trạng thái của nghi thức `id` (của `user_id`, nếu là đăng ký), còn hạn; chưa dùng nó.
-    async fn read_ceremony(&self, id: Uuid, user_id: Option<Uuid>) -> Result<Vec<u8>, Error> {
+    async fn read_ceremony(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        user_id: Option<Uuid>,
+    ) -> Result<Vec<u8>, Error> {
         let row = ceremony::Entity::find_by_id(id)
-            .one(self.database.write())
+            .scoped(tenant)
+            .one(tenant.database().write())
             .await?
             .filter(|row| row.user_id == user_id && row.expires_at > now())
             .ok_or_else(invalid_ceremony)?;
@@ -366,9 +385,14 @@ impl PasskeyService {
 
     /// Lấy và xoá nghi thức `id` (của `user_id`, nếu là đăng ký). Xoá có điều kiện: nhiều
     /// request cùng dùng một nghi thức thì đúng một bên được.
-    async fn take_ceremony(&self, id: Uuid, user_id: Option<Uuid>) -> Result<Vec<u8>, Error> {
-        let state = self.read_ceremony(id, user_id).await?;
-        if !take_ceremony_in(self.database.write(), id).await? {
+    async fn take_ceremony(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        user_id: Option<Uuid>,
+    ) -> Result<Vec<u8>, Error> {
+        let state = self.read_ceremony(tenant, id, user_id).await?;
+        if !take_ceremony_in(tenant.database().write(), tenant, id).await? {
             return Err(invalid_ceremony());
         }
         Ok(state)
@@ -376,9 +400,14 @@ impl PasskeyService {
 }
 
 /// Xoá nghi thức `id` trong `connection`; `false` nếu request khác đã dùng (hay đã bị xoá).
-async fn take_ceremony_in<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<bool, Error> {
+async fn take_ceremony_in<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<bool, Error> {
     let deleted = ceremony::Entity::delete_many()
         .filter(ceremony::Column::Id.eq(id))
+        .scoped(tenant)
         .exec(connection)
         .await?;
     Ok(deleted.rows_affected == 1)
@@ -432,10 +461,13 @@ pub(crate) async fn remove_all_in<C: ConnectionTrait>(
     user_id: Uuid,
     by_admin: bool,
 ) -> Result<u64, Error> {
-    let rows =
-        passkey::Entity::find().filter(passkey::Column::UserId.eq(user_id)).all(connection).await?;
+    let rows = passkey::Entity::find()
+        .filter(passkey::Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .all(connection)
+        .await?;
     for row in &rows {
-        passkey::Entity::delete_by_id(row.id).exec(connection).await?;
+        passkey::Entity::delete_by_id(row.id).scoped(tenant).exec(connection).await?;
         let event = removed_event(&row.name, by_admin);
         outbox.record(connection, tenant, actor, events::user_subject(user_id), &event).await?;
     }
@@ -455,10 +487,12 @@ fn removed_event(name: &str, by_admin: bool) -> events::PasskeyRemoved {
 /// nghi thức mở bằng mật khẩu cũ hết dùng được.
 pub(crate) async fn drop_ceremonies_in<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_id: Uuid,
 ) -> Result<(), Error> {
     ceremony::Entity::delete_many()
         .filter(ceremony::Column::UserId.eq(user_id))
+        .scoped(tenant)
         .exec(connection)
         .await?;
     Ok(())
@@ -468,6 +502,7 @@ pub(crate) async fn drop_ceremonies_in<C: ConnectionTrait>(
 /// mật khẩu xoá passkey trong transaction của nó, nên passkey vừa bị xoá không mở được phiên.
 pub(crate) async fn still_registered_in<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     id: Uuid,
     user_id: Uuid,
 ) -> Result<bool, Error> {
@@ -475,6 +510,7 @@ pub(crate) async fn still_registered_in<C: ConnectionTrait>(
         .col_expr(passkey::Column::LastUsedAt, Expr::value(Some(now())))
         .filter(passkey::Column::Id.eq(id))
         .filter(passkey::Column::UserId.eq(user_id))
+        .scoped(tenant)
         .exec(connection)
         .await?;
     Ok(touched.rows_affected == 1)

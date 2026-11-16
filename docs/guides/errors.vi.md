@@ -50,7 +50,7 @@ Lỗi ném ra `AutoxideError`:
 ```ts
 import { AutoxideError, createClient } from "@autoxide/sdk";
 
-const api = createClient({ baseUrl: "https://api.example.com", token: "axk_…" /* read it from your secret store */, language: "vi" });
+const api = createClient({ baseUrl: "https://api.example.com", token: "axk1_…" /* read it from your secret store */, language: "vi" });
 
 try {
   await api.post("/api/v1/content/entries", { body: { kind: "post", title: "" } });

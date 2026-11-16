@@ -1,8 +1,16 @@
 //! Access token: JWT (RFC 7519) ký bằng HMAC-SHA256 (`HS256`).
 //!
-//! Token mang ID người dùng (`sub`), thời điểm cấp (`iat`) và hết hạn (`exp`), bên
-//! cấp (`iss`). Máy chủ kiểm chữ ký bằng khoá bí mật, không cần hỏi database —
-//! nên token phải sống ngắn: nó không thu hồi được trước khi hết hạn.
+//! Token mang ID người dùng (`sub`), khách của người dùng (`tid`, bước 33), thời điểm cấp
+//! (`iat`) và hết hạn (`exp`), bên cấp (`iss`). Máy chủ kiểm chữ ký bằng khoá bí mật, không cần
+//! hỏi database — nên token phải sống ngắn: nó không thu hồi được trước khi hết hạn.
+//!
+//! **Khoá ký theo khách (bước 33, D-285):** khách mặc định ký bằng đúng khoá cấu hình
+//! (`AUTOXIDE_AUTH_TOKEN_SECRET`) như trước — token cấp trước khi nâng cấp vẫn dùng được; khách
+//! khác ký bằng khoá dẫn xuất `HMAC-SHA256(khoá cấu hình, "auth.access_token\0tenant\0<id>")`,
+//! cùng cách nhãn với `SecretKey::derive_for` của kernel. Khoá cấu hình không lấy từ `SecretKey`
+//! nên dẫn xuất ở đây. Đổi `tid` của token sang khách khác mà giữ chữ ký thì chữ ký không khớp
+//! khoá của khách kia: token bị từ chối. Token không có `tid` (cấp trước bước 33) thuộc khách
+//! mặc định.
 //!
 //! Tự viết thay vì dùng thư viện `jsonwebtoken`: ta chỉ cần đúng một thuật toán,
 //! còn thư viện kéo theo RSA và đường cong elliptic có lỗ hổng chưa vá (D-045).
@@ -23,9 +31,15 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::{
+    DEFAULT_TENANT, DatabaseRegistry, TenantContext, TenantId, resolve_link_token,
+};
 
 /// Giá trị `iss` của mọi token Autoxide cấp.
 const ISSUER: &str = "autoxide";
+
+/// Mục đích của khoá ký access token, trong nhãn dẫn xuất khoá của khách (xem đầu file).
+const PURPOSE: &str = "auth.access_token";
 
 /// Phần header của mọi token, đã mã hoá sẵn: `{"alg":"HS256","typ":"JWT"}`.
 const HEADER: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
@@ -36,6 +50,9 @@ type HmacSha256 = Hmac<Sha256>;
 struct Claims {
     iss: String,
     sub: Uuid,
+    /// Khách của người dùng. Token cấp trước bước 33 không có: khách mặc định.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tid: Option<Uuid>,
     iat: i64,
     exp: i64,
 }
@@ -69,19 +86,37 @@ impl AccessTokens {
         self.ttl
     }
 
-    /// Cấp token cho người dùng `user`, tính từ `now`.
-    pub(crate) fn issue(&self, user: Uuid, now: DateTime<Utc>) -> Result<String, Error> {
+    /// Cấp token cho người dùng `user` của khách `tenant`, tính từ `now`.
+    pub(crate) fn issue(
+        &self,
+        tenant: TenantId,
+        user: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<String, Error> {
         let iat = now.timestamp();
         let ttl = i64::try_from(self.ttl.as_secs()).map_err(Error::internal)?;
-        let claims = Claims { iss: ISSUER.to_owned(), sub: user, iat, exp: iat + ttl };
+        let claims = Claims {
+            iss: ISSUER.to_owned(),
+            sub: user,
+            tid: Some(tenant.as_uuid()),
+            iat,
+            exp: iat + ttl,
+        };
         let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).map_err(Error::internal)?);
         let signing_input = format!("{HEADER}.{payload}");
-        let signature = URL_SAFE_NO_PAD.encode(self.mac(&signing_input)?.finalize().into_bytes());
+        let signature =
+            URL_SAFE_NO_PAD.encode(self.mac(tenant, &signing_input)?.finalize().into_bytes());
         Ok(format!("{signing_input}.{signature}"))
     }
 
-    /// Kiểm `token` tại thời điểm `now`; hợp lệ thì trả ID người dùng.
-    pub(crate) fn verify(&self, token: &str, now: DateTime<Utc>) -> Result<Uuid, Error> {
+    /// Kiểm `token` tại thời điểm `now`; hợp lệ thì trả (khách, ID người dùng). Khách đọc từ
+    /// claim `tid` TRƯỚC khi kiểm chữ ký — để chọn khoá — rồi chữ ký phải khớp khoá của đúng khách
+    /// đó: `tid` giả không qua được.
+    pub(crate) fn verify(
+        &self,
+        token: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(TenantId, Uuid), Error> {
         // Đúng ba phần `header.payload.signature`; chữ ký phủ `header.payload`.
         let (signing_input, signature) = token.rsplit_once('.').ok_or_else(invalid_token)?;
         let (header, payload) = signing_input.split_once('.').ok_or_else(invalid_token)?;
@@ -94,11 +129,13 @@ impl AccessTokens {
             return Err(invalid_token());
         }
         let signature = URL_SAFE_NO_PAD.decode(signature).map_err(|_| invalid_token())?;
+        // Nội dung chưa được tin: chỉ đọc `tid` để chọn khoá kiểm chữ ký.
+        let claims: Claims = decode_json(payload)?;
+        let tenant = claims.tid.map_or(DEFAULT_TENANT, TenantId::from_uuid);
         // `verify_slice` so sánh trong thời gian không đổi: không lộ dần chữ ký đúng
         // qua thời gian trả lời.
-        self.mac(signing_input)?.verify_slice(&signature).map_err(|_| invalid_token())?;
+        self.mac(tenant, signing_input)?.verify_slice(&signature).map_err(|_| invalid_token())?;
 
-        let claims: Claims = decode_json(payload)?;
         if claims.iss != ISSUER {
             return Err(invalid_token());
         }
@@ -108,15 +145,27 @@ impl AccessTokens {
                 "Your session has expired. Sign in again.",
             ));
         }
-        Ok(claims.sub)
+        Ok((tenant, claims.sub))
     }
 
-    fn mac(&self, signing_input: &str) -> Result<HmacSha256, Error> {
-        let mut mac = <HmacSha256 as KeyInit>::new_from_slice(&self.key)
-            .map_err(|error| Error::internal(format!("hmac: {error}")))?;
+    /// HMAC đã nạp `signing_input`, với khoá ký của khách `tenant` (xem đầu file).
+    fn mac(&self, tenant: TenantId, signing_input: &str) -> Result<HmacSha256, Error> {
+        let mut mac = if tenant == DEFAULT_TENANT {
+            hmac(&self.key)?
+        } else {
+            // Byte 0 ngăn cách: không ghép (mục đích, khách) khác nhau thành cùng một nhãn.
+            let mut derive = hmac(&self.key)?;
+            derive.update(format!("{PURPOSE}\0tenant\0{tenant}").as_bytes());
+            hmac(&derive.finalize().into_bytes())?
+        };
         mac.update(signing_input.as_bytes());
         Ok(mac)
     }
+}
+
+fn hmac(key: &[u8]) -> Result<HmacSha256, Error> {
+    <HmacSha256 as KeyInit>::new_from_slice(key)
+        .map_err(|error| Error::internal(format!("hmac: {error}")))
 }
 
 fn decode_json<T: serde::de::DeserializeOwned>(part: &str) -> Result<T, Error> {
@@ -133,6 +182,27 @@ pub(crate) fn invalid_token() -> Error {
 /// không đoán thử được như mật khẩu.
 pub(crate) fn hash_refresh_token(token: &str) -> String {
     sha256(token)
+}
+
+/// Khách và phần thô của token một lần mà client gửi lại (refresh token, `mfa_token`, token
+/// trong mail): token cấp ra mang khách bằng `autoxide_kernel::tenancy::link_token` (khách mặc
+/// định giữ dạng cũ, khách khác `t<ID khách>.<phần thô>`), nên tra được ở database của đúng khách
+/// TRƯỚC khi tra bản băm của phần thô — kể cả khi request tới tên miền chính không header
+/// (`request` là `None`). `None`: token sai dạng, khách không có / không phục vụ được, hay khách
+/// của request (header, tên miền) khác khách ghi trong token — bên gọi trả lỗi "token sai" như
+/// thường.
+pub(crate) async fn resolve<'t>(
+    databases: &DatabaseRegistry,
+    request: Option<&TenantContext>,
+    token: &'t str,
+) -> Result<Option<(TenantContext, &'t str)>, Error> {
+    let Some((tenant, raw)) = resolve_link_token(databases, request, token).await? else {
+        return Ok(None);
+    };
+    if request.is_some_and(|request| request.id() != tenant.id()) {
+        return Ok(None);
+    }
+    Ok(Some((tenant, raw)))
 }
 
 #[cfg(test)]
@@ -155,18 +225,61 @@ mod tests {
         );
     }
 
+    /// Ký `claims` (JSON) bằng `key` như bản trước bước 33 (khoá cấu hình, không theo khách).
+    fn sign_with(key: &[u8], claims: &str) -> String {
+        let payload = URL_SAFE_NO_PAD.encode(claims.as_bytes());
+        let signing_input = format!("{HEADER}.{payload}");
+        let mut mac = hmac(key).unwrap();
+        mac.update(signing_input.as_bytes());
+        format!("{signing_input}.{}", URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes()))
+    }
+
     #[test]
     fn cap_roi_kiem_lai_duoc() {
         let user = Uuid::now_v7();
-        let token = tokens().issue(user, now()).unwrap();
+        let token = tokens().issue(DEFAULT_TENANT, user, now()).unwrap();
 
         assert_eq!(token.split('.').count(), 3);
-        assert_eq!(tokens().verify(&token, now()).unwrap(), user);
+        assert_eq!(tokens().verify(&token, now()).unwrap(), (DEFAULT_TENANT, user));
+        let (_, payload) = token.split_once('.').unwrap();
+        let claims: Claims = decode_json(payload.split_once('.').unwrap().0).unwrap();
+        assert_eq!(claims.tid, Some(DEFAULT_TENANT.as_uuid()));
+    }
+
+    /// Khách khác ký bằng khoá riêng; đổi `tid` mà giữ chữ ký thì bị từ chối; token cũ không có
+    /// `tid` (ký bằng khoá cấu hình) thuộc khách mặc định và vẫn dùng được.
+    #[test]
+    fn khoa_theo_khach_va_token_cu() {
+        let other = TenantId::from_uuid(Uuid::now_v7());
+        let user = Uuid::now_v7();
+        let token = tokens().issue(other, user, now()).unwrap();
+        assert_eq!(tokens().verify(&token, now()).unwrap(), (other, user));
+        // Khoá của khách khác khác khoá cấu hình: cùng nội dung, khác chữ ký.
+        let in_default = tokens().issue(DEFAULT_TENANT, user, now()).unwrap();
+        assert_ne!(token.rsplit_once('.').unwrap().1, in_default.rsplit_once('.').unwrap().1);
+
+        // `tid` đổi sang khách mặc định (hay khách khác), chữ ký giữ nguyên.
+        let signature = token.rsplit_once('.').unwrap().1;
+        for tid in [DEFAULT_TENANT, TenantId::from_uuid(Uuid::now_v7())] {
+            let claims = format!(
+                r#"{{"iss":"autoxide","sub":"{user}","tid":"{tid}","iat":0,"exp":9999999999}}"#
+            );
+            let forged =
+                format!("{HEADER}.{}.{signature}", URL_SAFE_NO_PAD.encode(claims.as_bytes()));
+            assert_eq!(tokens().verify(&forged, now()).unwrap_err().code(), "auth.invalid_token");
+        }
+
+        // Token cấp trước bước 33: không `tid`, ký bằng khoá cấu hình.
+        let legacy = sign_with(
+            b"0123456789abcdef0123456789abcdef",
+            &format!(r#"{{"iss":"autoxide","sub":"{user}","iat":0,"exp":9999999999}}"#),
+        );
+        assert_eq!(tokens().verify(&legacy, now()).unwrap(), (DEFAULT_TENANT, user));
     }
 
     #[test]
     fn het_han_thi_bao_rieng() {
-        let token = tokens().issue(Uuid::now_v7(), now()).unwrap();
+        let token = tokens().issue(DEFAULT_TENANT, Uuid::now_v7(), now()).unwrap();
 
         let still_valid = tokens().verify(&token, now() + chrono::Duration::seconds(899));
         let expired = tokens().verify(&token, now() + chrono::Duration::seconds(900));
@@ -177,7 +290,7 @@ mod tests {
 
     #[test]
     fn sai_khoa_sua_noi_dung_hay_hong_deu_bi_tu_choi() {
-        let token = tokens().issue(Uuid::now_v7(), now()).unwrap();
+        let token = tokens().issue(DEFAULT_TENANT, Uuid::now_v7(), now()).unwrap();
         let other_key = AccessTokens::new(
             b"another-key-another-key-another!!".to_vec(),
             Duration::from_secs(900),
@@ -194,7 +307,7 @@ mod tests {
         let unsigned = format!("{none_header}.{payload}.");
 
         for bad in [
-            other_key.issue(Uuid::now_v7(), now()).unwrap(),
+            other_key.issue(DEFAULT_TENANT, Uuid::now_v7(), now()).unwrap(),
             forged,
             unsigned,
             format!("{token}.extra"),

@@ -7,7 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Order, Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -125,6 +125,7 @@ impl FormsService {
     /// Form chưa có bài nào thì vắng trong kết quả.
     pub(crate) async fn submission_counts(
         &self,
+        tenant: &TenantContext,
         form_ids: &[Uuid],
     ) -> Result<HashMap<Uuid, SubmissionCounts>, Error> {
         if form_ids.is_empty() {
@@ -138,8 +139,9 @@ impl FormsService {
             .filter(submission::Column::FormId.is_in(form_ids.iter().copied()))
             .group_by(submission::Column::FormId)
             .group_by(submission::Column::Status)
+            .scoped(tenant)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let mut counts: HashMap<Uuid, SubmissionCounts> = HashMap::new();
         for (form_id, status, count) in rows {
@@ -158,14 +160,17 @@ impl FormsService {
     /// Một trang bài gửi của form `form_id`, mới trước (mặc định). Cần `forms.read`.
     pub(crate) async fn list_submissions(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         form_id: Uuid,
         filter: &InboxFilter,
         page: &PageRequest,
     ) -> Result<Page<Submission>, Error> {
         principal.require(&FORMS_READ)?;
-        self.find_form(form_id).await?;
-        let mut select = submission::Entity::find().filter(submission::Column::FormId.eq(form_id));
+        self.find_form(tenant, form_id).await?;
+        let mut select = submission::Entity::find()
+            .scoped(tenant)
+            .filter(submission::Column::FormId.eq(form_id));
         select = match filter.status {
             Some(status) => select.filter(submission::Column::Status.eq(status.as_str())),
             None => select.filter(submission::Column::Status.ne(SubmissionStatus::Spam.as_str())),
@@ -174,28 +179,39 @@ impl FormsService {
             select = select
                 .filter(autoxide_kernel::search::contains(submission::Column::SearchKey, search));
         }
-        let Page { data, pagination } =
-            fetch_page(select, submission::Column::Id, |row| row.id, page, self.database.read())
-                .await?;
-        Ok(Page { data: self.describe(data).await?, pagination })
+        let Page { data, pagination } = fetch_page(
+            select,
+            submission::Column::Id,
+            |row| row.id,
+            page,
+            tenant.database().read(),
+        )
+        .await?;
+        Ok(Page { data: self.describe(tenant, data).await?, pagination })
     }
 
     /// Bài gửi `id`. Cần `forms.read`.
     pub(crate) async fn get_submission(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<Submission, Error> {
         principal.require(&FORMS_READ)?;
-        self.find_submission(id).await
+        self.find_submission(tenant, id).await
     }
 
-    pub(crate) async fn find_submission(&self, id: Uuid) -> Result<Submission, Error> {
+    pub(crate) async fn find_submission(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Submission, Error> {
         let row = submission::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| submission_not_found(id))?;
-        self.describe(vec![row])
+        self.describe(tenant, vec![row])
             .await?
             .into_iter()
             .next()
@@ -206,13 +222,14 @@ impl FormsService {
     /// `forms.submission_received` (thông báo cho quản trị viên như bài mới).
     pub(crate) async fn set_submission_status(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         status: SubmissionStatus,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Submission, Error> {
         principal.require(&FORMS_REVIEW)?;
-        let before = self.find_submission(id).await?;
+        let before = self.find_submission(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -226,9 +243,10 @@ impl FormsService {
             row.spam_reason = Set(None);
         }
         row.updated_at = Set(now);
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let update = submission::Entity::update(row)
             .validate()?
+            .scoped(tenant)
             .filter(submission::Column::UpdatedAt.eq(expected.unwrap_or(before.row.updated_at)));
         let after = match update.exec(&transaction).await {
             Ok(after) => after,
@@ -246,7 +264,7 @@ impl FormsService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 actor,
                 subject.clone(),
                 &events::SubmissionStatusChanged(change),
@@ -255,13 +273,7 @@ impl FormsService {
         if before.status() == SubmissionStatus::Spam {
             let received = Change { before: None, after: Some(summary(&after, &before.form_key)) };
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::SubmissionReceived(received),
-                )
+                .record(&transaction, tenant, actor, subject, &events::SubmissionReceived(received))
                 .await?;
         }
         transaction.commit().await?;
@@ -271,13 +283,15 @@ impl FormsService {
     /// Xoá bài gửi `id`. Cần `forms.review`.
     pub(crate) async fn delete_submission(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
         principal.require(&FORMS_REVIEW)?;
-        let before = self.find_submission(id).await?;
-        let transaction = self.database.begin_write().await?;
-        let deleted = submission::Entity::delete_by_id(id).exec(&transaction).await?;
+        let before = self.find_submission(tenant, id).await?;
+        let transaction = tenant.database().begin_write().await?;
+        let deleted =
+            submission::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             return Err(submission_not_found(id));
         }
@@ -285,7 +299,7 @@ impl FormsService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::submission_subject(id),
                 &events::SubmissionDeleted(change),
@@ -299,27 +313,29 @@ impl FormsService {
     /// [`rows_of_email`]). Cần `forms.export`.
     pub(crate) async fn submissions_of_email(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         email: &str,
     ) -> Result<Vec<Submission>, Error> {
         principal.require(&FORMS_EXPORT)?;
         let email = checked_email(email)?;
-        let mut rows = rows_of_email(self.database.read(), &email).await?;
+        let mut rows = rows_of_email(tenant.database().read(), tenant, &email).await?;
         rows.sort_by_key(|row| row.id);
-        self.describe(rows).await
+        self.describe(tenant, rows).await
     }
 
     /// Xoá hẳn mọi bài gửi của email `email` (yêu cầu xoá của chủ dữ liệu; xem
     /// [`rows_of_email`]). Cần `forms.export`. Event không mang email. Trả số bài đã xoá.
     pub(crate) async fn erase_email(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         email: &str,
     ) -> Result<u64, Error> {
         principal.require(&FORMS_EXPORT)?;
         let email = checked_email(email)?;
-        let transaction = self.database.begin_write().await?;
-        let rows = rows_of_email(&transaction, &email).await?;
+        let transaction = tenant.database().begin_write().await?;
+        let rows = rows_of_email(&transaction, tenant, &email).await?;
         if rows.is_empty() {
             return Ok(0);
         }
@@ -327,6 +343,7 @@ impl FormsService {
         let form_ids: Vec<Uuid> =
             rows.iter().map(|row| row.form_id).collect::<HashSet<_>>().into_iter().collect();
         let deleted = submission::Entity::delete_many()
+            .scoped(tenant)
             .filter(submission::Column::Id.is_in(ids.clone()))
             .exec(&transaction)
             .await?;
@@ -337,7 +354,7 @@ impl FormsService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 None,
                 &events::SubmissionsErased(change),
@@ -347,8 +364,8 @@ impl FormsService {
         tracing::info!(count = deleted.rows_affected, "submissions of an email address erased");
         // File xuất của các form đó có thể còn chứa bài vừa xoá: xoá hết (sau transaction — nơi
         // lưu có thể ở xa). Xoá file lỗi thì dòng còn lại, job dọn hằng ngày thử lại.
-        let exports = self.exports_of(form_ids).await?;
-        self.purge_exports(exports).await?;
+        let exports = self.exports_of(tenant, form_ids).await?;
+        self.purge_exports(tenant, exports).await?;
         Ok(deleted.rows_affected)
     }
 
@@ -357,18 +374,20 @@ impl FormsService {
     /// (`submissions/exports.rs`): cùng nội dung, từng byte.
     pub(crate) async fn export_csv(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         form_id: Uuid,
         status: Option<SubmissionStatus>,
     ) -> Result<(String, String), Error> {
         principal.require(&FORMS_EXPORT)?;
-        let form = self.find_form(form_id).await?;
-        let columns = self.export_columns(&form).await?;
+        let form = self.find_form(tenant, form_id).await?;
+        let columns = self.export_columns(tenant, &form).await?;
         let mut text = String::from(csv::BOM);
         text.push_str(&csv::line(&columns.header));
         let mut cursor = None;
         loop {
-            let (rows, next) = self.export_page(form_id, status, &columns.keys, cursor).await?;
+            let (rows, next) =
+                self.export_page(tenant, form_id, status, &columns.keys, cursor).await?;
             for row in &rows {
                 text.push_str(&csv::line(row));
             }
@@ -382,9 +401,13 @@ impl FormsService {
 
     /// Cột của bản xuất: cột cố định, rồi trường của phiên bản hiện hành, rồi trường chỉ có ở
     /// phiên bản cũ.
-    pub(crate) async fn export_columns(&self, form: &Form) -> Result<ExportColumns, Error> {
+    pub(crate) async fn export_columns(
+        &self,
+        tenant: &TenantContext,
+        form: &Form,
+    ) -> Result<ExportColumns, Error> {
         let form_id = form.row.id;
-        let versions = self.versions(&[form_id]).await?;
+        let versions = self.versions(tenant, &[form_id]).await?;
         let mut keys: Vec<String> = form.fields.iter().map(|field| field.key.clone()).collect();
         let mut older: Vec<(&i32, &Vec<Field>)> = versions
             .iter()
@@ -419,6 +442,7 @@ impl FormsService {
     /// trang sau (`None`: hết).
     pub(crate) async fn export_page(
         &self,
+        tenant: &TenantContext,
         form_id: Uuid,
         status: Option<SubmissionStatus>,
         keys: &[String],
@@ -428,14 +452,21 @@ impl FormsService {
         if let Some(after) = after {
             page = page.after(after);
         }
-        let mut select = submission::Entity::find().filter(submission::Column::FormId.eq(form_id));
+        let mut select = submission::Entity::find()
+            .scoped(tenant)
+            .filter(submission::Column::FormId.eq(form_id));
         select = match status {
             Some(status) => select.filter(submission::Column::Status.eq(status.as_str())),
             None => select.filter(submission::Column::Status.ne(SubmissionStatus::Spam.as_str())),
         };
-        let found =
-            fetch_page(select, submission::Column::Id, |row| row.id, &page, self.database.read())
-                .await?;
+        let found = fetch_page(
+            select,
+            submission::Column::Id,
+            |row| row.id,
+            &page,
+            tenant.database().read(),
+        )
+        .await?;
         let mut rows = Vec::with_capacity(found.data.len());
         for row in &found.data {
             let data: Map<String, Value> = from_json(&row.data)?;
@@ -461,18 +492,20 @@ impl FormsService {
     /// Đọc `rows` ra kèm `key` của form và trường của đúng phiên bản.
     pub(crate) async fn describe(
         &self,
+        tenant: &TenantContext,
         rows: Vec<submission::Model>,
     ) -> Result<Vec<Submission>, Error> {
         let form_ids: Vec<Uuid> =
             rows.iter().map(|row| row.form_id).collect::<HashSet<_>>().into_iter().collect();
         let keys: HashMap<Uuid, String> = form::Entity::find()
+            .scoped(tenant)
             .filter(form::Column::Id.is_in(form_ids.clone()))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?
             .into_iter()
             .map(|row| (row.id, row.key))
             .collect();
-        let versions = self.versions(&form_ids).await?;
+        let versions = self.versions(tenant, &form_ids).await?;
         rows.into_iter()
             .map(|row| {
                 let fields =
@@ -489,13 +522,18 @@ impl FormsService {
     }
 
     /// Ảnh chụp trường của mọi phiên bản các form `form_ids`, theo (form, phiên bản).
-    async fn versions(&self, form_ids: &[Uuid]) -> Result<HashMap<(Uuid, i32), Vec<Field>>, Error> {
+    async fn versions(
+        &self,
+        tenant: &TenantContext,
+        form_ids: &[Uuid],
+    ) -> Result<HashMap<(Uuid, i32), Vec<Field>>, Error> {
         if form_ids.is_empty() {
             return Ok(HashMap::new());
         }
         form_version::Entity::find()
+            .scoped(tenant)
             .filter(form_version::Column::FormId.is_in(form_ids.to_vec()))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?
             .into_iter()
             .map(|row| Ok(((row.form_id, row.version), from_json(&row.fields)?)))
@@ -503,25 +541,36 @@ impl FormsService {
     }
 
     /// Bỏ `created_by` khỏi form của một người dùng đã bị xoá.
-    pub(crate) async fn forget_creator(&self, user_id: Uuid) -> Result<u64, Error> {
+    pub(crate) async fn forget_creator(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<u64, Error> {
         let updated = form::Entity::update_many()
             .col_expr(form::Column::CreatedBy, Expr::value(Option::<Uuid>::None))
+            .scoped(tenant)
             .filter(form::Column::CreatedBy.eq(user_id))
-            .exec(self.database.write())
+            .exec(tenant.database().write())
             .await?;
         export::Entity::update_many()
             .col_expr(export::Column::RequestedBy, Expr::value(Option::<Uuid>::None))
+            .scoped(tenant)
             .filter(export::Column::RequestedBy.eq(user_id))
-            .exec(self.database.write())
+            .exec(tenant.database().write())
             .await?;
         Ok(updated.rows_affected)
     }
 
     /// Form do người dùng `user_id` tạo (cho bản xuất dữ liệu cá nhân).
-    pub(crate) async fn forms_created_by(&self, user_id: Uuid) -> Result<Vec<Form>, Error> {
+    pub(crate) async fn forms_created_by(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<Vec<Form>, Error> {
         form::Entity::find()
+            .scoped(tenant)
             .filter(form::Column::CreatedBy.eq(user_id))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?
             .into_iter()
             .map(Form::parse)
@@ -538,9 +587,11 @@ impl FormsService {
 /// index — chấp nhận được cho yêu cầu hiếm của chủ dữ liệu.
 async fn rows_of_email<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     email: &str,
 ) -> Result<Vec<submission::Model>, Error> {
     let rows = submission::Entity::find()
+        .scoped(tenant)
         .filter(
             Condition::any()
                 .add(submission::Column::Email.eq(email))

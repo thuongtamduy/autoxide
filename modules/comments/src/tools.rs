@@ -140,7 +140,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "List comments for moderation, newest first: by default those waiting for approval \
              (`pending`), with their text, author, email, hold reason and report count. Follow \
              `pagination.next_cursor` with the same filters for more.",
-            move |_tenant: TenantContext, principal: Principal, input: QueueInput| {
+            move |tenant: TenantContext, principal: Principal, input: QueueInput| {
                 let service = queue.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -159,7 +159,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
                         ),
                         problems,
                     )?;
-                    let found = service.queue(&principal, &filter, &page).await?;
+                    let found = service.queue(&tenant, &principal, &filter, &page).await?;
                     Ok::<Page<CommentDetail>, Error>(found.map(CommentDetail::from))
                 }
             },
@@ -170,10 +170,12 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "get",
             "Get a comment in any status with its moderation details and its `version`, needed \
              to approve, reject or mark it as spam.",
-            move |_tenant: TenantContext, principal: Principal, input: CommentId| {
+            move |tenant: TenantContext, principal: Principal, input: CommentId| {
                 let service = get.clone();
                 async move {
-                    Ok::<Versioned, Error>(versioned(service.get(&principal, input.id).await?))
+                    Ok::<Versioned, Error>(versioned(
+                        service.get(&tenant, &principal, input.id).await?,
+                    ))
                 }
             },
         )
@@ -184,7 +186,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "Approve (`published`), reject (`rejected`), mark as spam (`spam`) or hold again \
              (`pending`) a comment. Approving shows it and mails people following the comment \
              it answers. Pass the `version` you read.",
-            move |_tenant: TenantContext, principal: Principal, input: ModerateInput| {
+            move |tenant: TenantContext, principal: Principal, input: ModerateInput| {
                 let service = moderate.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -194,7 +196,8 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
                         return Err(Error::validation(problems));
                     };
                     let expected = IfMatch::from_value(&input.version).expected()?;
-                    let found = service.set_status(&principal, input.id, status, expected).await?;
+                    let found =
+                        service.set_status(&tenant, &principal, input.id, status, expected).await?;
                     Ok(versioned(found))
                 }
             },
@@ -204,13 +207,20 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "set_target_state",
             "Open or close the comments of a target (`open` / `closed`); closed targets take no \
              new comments, existing ones stay shown.",
-            move |_tenant: TenantContext, principal: Principal, input: TargetInput| {
+            move |tenant: TenantContext, principal: Principal, input: TargetInput| {
                 let service = target.clone();
                 async move {
                     let change =
                         TargetChange { state: Some(input.state), ..TargetChange::default() };
                     let found = service
-                        .set_target(&principal, &input.target_type, &input.target_id, change, None)
+                        .set_target(
+                            &tenant,
+                            &principal,
+                            &input.target_type,
+                            &input.target_id,
+                            change,
+                            None,
+                        )
                         .await?;
                     Ok::<TargetResponse, Error>(TargetResponse::new(found, true))
                 }
@@ -222,7 +232,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "List shown questions (top-level comments, e.g. on a product) that have no shown \
              answer yet, newest first, with their text, author and badges. Answer one with \
              `comments.answer`. Follow `pagination.next_cursor` with the same filters for more.",
-            move |_tenant: TenantContext, principal: Principal, input: UnansweredInput| {
+            move |tenant: TenantContext, principal: Principal, input: UnansweredInput| {
                 let service = unanswered.clone();
                 async move {
                     let filter = QueueFilter {
@@ -240,7 +250,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
                         ),
                         Vec::new(),
                     )?;
-                    let found = service.queue(&principal, &filter, &page).await?;
+                    let found = service.queue(&tenant, &principal, &filter, &page).await?;
                     Ok::<Page<CommentDetail>, Error>(found.map(CommentDetail::from))
                 }
             },
@@ -253,10 +263,10 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
              on the website: the answer carries your badges on the target (e.g. `seller`), \
              follows the same moderation and may wait for approval. Needs a display name \
              (`PUT /api/v1/comments/profile`) and, on some kinds, a verified account.",
-            move |_tenant: TenantContext, principal: Principal, input: AnswerInput| {
+            move |tenant: TenantContext, principal: Principal, input: AnswerInput| {
                 let service = answer.clone();
                 async move {
-                    let question = service.public_comment(input.id).await?;
+                    let question = service.public_comment(&tenant, input.id).await?;
                     let new = NewComment {
                         target_type: question.row.target_type,
                         target_id: question.row.target_id,
@@ -265,8 +275,9 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
                         locale: input.locale,
                         ..NewComment::default()
                     };
-                    let posted =
-                        service.post(Some(&principal), &ClientInfo::default(), new).await?;
+                    let posted = service
+                        .post(&tenant, Some(&principal), &ClientInfo::default(), new)
+                        .await?;
                     Ok::<CommentDetail, Error>(posted.comment.into())
                 }
             },

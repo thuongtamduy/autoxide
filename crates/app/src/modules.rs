@@ -52,8 +52,7 @@ mod tests {
     use autoxide_kernel::database::Database;
     use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::{
-        PENDING_TENANCY, TestDatabase, schema_ownership_violations, schema_snapshot,
-        schema_tenancy_violations,
+        TestDatabase, schema_ownership_violations, schema_snapshot, schema_tenancy_violations,
     };
 
     /// Chạy mọi migration của chương trình trên một database trống rồi hỏi chính
@@ -76,7 +75,7 @@ mod tests {
             // Bảng cấp khách hàng có `tenant_id`, khoá và index bắt đầu bằng nó (bước 33).
             let snapshot = schema_snapshot(db.write()).await.unwrap();
             let control_plane = settings.modules.control_plane_tables();
-            let violations = schema_tenancy_violations(&snapshot, &control_plane, PENDING_TENANCY);
+            let violations = schema_tenancy_violations(&snapshot, &control_plane);
             assert_eq!(violations, Vec::<String>::new());
 
             // Migration nào cũng phải gỡ được: xuống hết rồi lên lại.
@@ -113,7 +112,8 @@ mod tests {
                 password: None,
                 admin: true,
             };
-            let ada = accounts.create(&TenantContext::legacy_default(&db), account).await.unwrap();
+            let ada =
+                accounts.create(&TenantContext::default_on(db.clone()), account).await.unwrap();
             assert_eq!(dispatcher.run_once().await.unwrap(), 1);
             assert_eq!(dispatcher.run_once().await.unwrap(), 0);
 
@@ -198,14 +198,14 @@ mod tests {
             };
             let root = accounts
                 .create(
-                    &TenantContext::legacy_default(&runtime.database),
+                    &TenantContext::default_on(runtime.database.clone()),
                     account("root@example.com", true),
                 )
                 .await
                 .unwrap();
             let bob = accounts
                 .create(
-                    &TenantContext::legacy_default(&runtime.database),
+                    &TenantContext::default_on(runtime.database.clone()),
                     account("bob@example.com", false),
                 )
                 .await

@@ -127,7 +127,7 @@ async fn record(setup: &Setup, title: &str) {
         .outbox
         .record(
             &transaction,
-            &autoxide_kernel::tenancy::TenantContext::legacy_default(&setup.database),
+            &autoxide_kernel::tenancy::TenantContext::default_on(setup.database.clone()),
             actor,
             Some(format!("notes.note:{title}")),
             &event,
@@ -151,7 +151,7 @@ async fn event_chi_ton_tai_khi_transaction_commit_roi_duoc_giao_mot_lan() {
             .outbox
             .record(
                 &transaction,
-                &autoxide_kernel::tenancy::TenantContext::legacy_default(&setup.database),
+                &autoxide_kernel::tenancy::TenantContext::default_on(setup.database.clone()),
                 Actor::system(),
                 None,
                 &event,
@@ -191,7 +191,7 @@ async fn nguoi_la_khac_he_thong() {
                 .outbox
                 .record(
                     &transaction,
-                    &autoxide_kernel::tenancy::TenantContext::legacy_default(&setup.database),
+                    &autoxide_kernel::tenancy::TenantContext::default_on(setup.database.clone()),
                     actor,
                     None,
                     &event,
@@ -326,7 +326,7 @@ async fn khai_sai_thi_bao_ro() {
 
         let error = setup.modules.dispatcher().err().unwrap().to_string();
         assert!(error.contains("subscribes to event `notes.nothing`"), "{error}");
-        let tenant = autoxide_kernel::tenancy::TenantContext::legacy_default(&setup.database);
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(setup.database.clone());
 
         // Ghi event của module khác qua outbox của `notes` là lỗi của người viết code.
         #[derive(Serialize)]

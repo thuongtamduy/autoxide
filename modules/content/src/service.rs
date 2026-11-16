@@ -8,17 +8,20 @@
 use std::sync::Arc;
 
 use autoxide_kernel::ai::{Embedder, TextModel};
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::job::JobQueue;
+use autoxide_kernel::tenancy::DatabaseRegistry;
 use autoxide_media::api::Media;
 use chrono::{DateTime, SubsecRound, Utc};
 
 use crate::config::ContentConfig;
 
+// Không giữ `Database`: mọi hàm chạm dữ liệu nhận `&TenantContext` và dùng database của khách
+// (bước 33).
 pub(crate) struct ContentService {
-    pub(crate) database: Database,
+    /// Sổ database: job định kỳ tra ngữ cảnh từng khách; link xem trước tìm khách ghi trong token.
+    pub(crate) databases: DatabaseRegistry,
     pub(crate) outbox: Outbox,
     pub(crate) jobs: JobQueue,
     pub(crate) media: Arc<dyn Media>,
@@ -42,7 +45,7 @@ pub(crate) struct Dependencies {
 
 impl ContentService {
     pub(crate) fn new(
-        database: Database,
+        databases: DatabaseRegistry,
         outbox: Outbox,
         jobs: JobQueue,
         dependencies: Dependencies,
@@ -51,7 +54,7 @@ impl ContentService {
         let Dependencies { media, ai, embedder } = dependencies;
         let search_cache = crate::ai::semantic::SearchCache::default();
         ContentService {
-            database,
+            databases,
             outbox,
             jobs,
             media,

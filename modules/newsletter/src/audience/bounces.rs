@@ -13,7 +13,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -83,24 +83,27 @@ impl NewsletterService {
     /// Một trang danh sách chặn, mới trước (mặc định). Cần `newsletter.read`.
     pub(crate) async fn list_suppressions(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         filter: &SuppressionFilter,
         page: &PageRequest,
     ) -> Result<Page<suppression::Model>, Error> {
         principal.require(&NEWSLETTER_READ)?;
-        let mut select = suppression::Entity::find();
+        let mut select = suppression::Entity::find().scoped(tenant);
         if let Some(email) =
             filter.email.as_deref().map(str::trim).filter(|email| !email.is_empty())
         {
             select =
                 select.filter(autoxide_kernel::search::contains(suppression::Column::Email, email));
         }
-        fetch_page(select, suppression::Column::Id, |row| row.id, page, self.database.read()).await
+        fetch_page(select, suppression::Column::Id, |row| row.id, page, tenant.database().read())
+            .await
     }
 
     /// Chặn `email` bằng tay. Đã có thì trả dòng cũ. Cần `newsletter.manage`.
     pub(crate) async fn add_suppression(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         email: &str,
         note: Option<&str>,
@@ -112,9 +115,16 @@ impl NewsletterService {
         let Some(email) = email.filter(|_| problems.is_empty()) else {
             return Err(Error::validation(problems));
         };
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = self
-            .suppress(&transaction, Actor::from(principal), &email, SuppressionReason::Manual, note)
+            .suppress(
+                &transaction,
+                tenant,
+                Actor::from(principal),
+                &email,
+                SuppressionReason::Manual,
+                note,
+            )
             .await?;
         transaction.commit().await?;
         Ok(row)
@@ -123,17 +133,20 @@ impl NewsletterService {
     /// Bỏ chặn dòng `id`; đếm soft bounce của địa chỉ về 0. Cần `newsletter.manage`.
     pub(crate) async fn remove_suppression(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = suppression::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| suppression_not_found(id))?;
-        suppression::Entity::delete_by_id(id).exec(&transaction).await?;
+        suppression::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         subscriber::Entity::update_many()
+            .scoped(tenant)
             .col_expr(subscriber::Column::SoftBounces, Expr::value(0))
             .filter(subscriber::Column::Email.eq(row.email.as_str()))
             .exec(&transaction)
@@ -145,7 +158,7 @@ impl NewsletterService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::suppression_subject(id),
                 &event,
@@ -159,6 +172,7 @@ impl NewsletterService {
     /// `newsletter.manage`.
     pub(crate) async fn report_bounce(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         email: &str,
         kind: BounceKind,
@@ -171,23 +185,25 @@ impl NewsletterService {
         let Some(email) = email.filter(|_| problems.is_empty()) else {
             return Err(Error::validation(problems));
         };
-        self.bounce(Actor::from(principal), &email, kind, note).await
+        self.bounce(tenant, Actor::from(principal), &email, kind, note).await
     }
 
     /// Ghi một bounce: hard / khiếu nại thì chặn; soft thì đếm, tới ngưỡng thì chặn.
     pub(crate) async fn bounce(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         email: &str,
         kind: BounceKind,
         note: Option<String>,
     ) -> Result<BounceOutcome, Error> {
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let reason = match kind {
             BounceKind::Hard => Some(SuppressionReason::HardBounce),
             BounceKind::Complaint => Some(SuppressionReason::Complaint),
             BounceKind::Soft => {
                 subscriber::Entity::update_many()
+                    .scoped(tenant)
                     .col_expr(
                         subscriber::Column::SoftBounces,
                         Expr::col(subscriber::Column::SoftBounces).add(1),
@@ -196,6 +212,7 @@ impl NewsletterService {
                     .exec(&transaction)
                     .await?;
                 let count = subscriber::Entity::find()
+                    .scoped(tenant)
                     .filter(subscriber::Column::Email.eq(email))
                     .one(&transaction)
                     .await?
@@ -205,9 +222,10 @@ impl NewsletterService {
             }
         };
         if let Some(reason) = reason {
-            self.suppress(&transaction, actor, email, reason, note).await?;
+            self.suppress(&transaction, tenant, actor, email, reason, note).await?;
         }
         let suppressed = suppression::Entity::find()
+            .scoped(tenant)
             .filter(suppression::Column::Email.eq(email))
             .one(&transaction)
             .await?
@@ -220,6 +238,7 @@ impl NewsletterService {
     async fn suppress<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         actor: Actor,
         email: &str,
         reason: SuppressionReason,
@@ -227,16 +246,22 @@ impl NewsletterService {
     ) -> Result<suppression::Model, Error> {
         let fresh = suppression::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             email: Set(email.to_owned()),
             reason: Set(reason.as_str().to_owned()),
             note: Set(note),
             created_at: Set(now()),
         };
         let inserted = suppression::Entity::insert(fresh)
-            .on_conflict(OnConflict::column(suppression::Column::Email).do_nothing().to_owned())
+            .on_conflict(
+                OnConflict::columns([suppression::Column::TenantId, suppression::Column::Email])
+                    .do_nothing()
+                    .to_owned(),
+            )
             .exec_without_returning(connection)
             .await?;
         let row = suppression::Entity::find()
+            .scoped(tenant)
             .filter(suppression::Column::Email.eq(email))
             .one(connection)
             .await?
@@ -247,13 +272,7 @@ impl NewsletterService {
                 after: Some(json!({"id": row.id, "reason": row.reason})),
             });
             self.outbox
-                .record(
-                    connection,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    events::suppression_subject(row.id),
-                    &event,
-                )
+                .record(connection, tenant, actor, events::suppression_subject(row.id), &event)
                 .await?;
             tracing::info!(suppression_id = %row.id, reason = reason.as_str(), "address suppressed");
         }
@@ -273,6 +292,8 @@ impl EventHandler for DeliveryFailures {
             return Ok(());
         }
         let service = &self.0;
+        // Mail bị từ chối thuộc khách của event (module `mail` ghi event theo khách gửi mail).
+        let tenant = &event.tenant;
         let to = event.payload.get("to").and_then(|to| to.as_str()).unwrap_or_default();
         // `Ada <ada@example.com>` → `ada@example.com`.
         let address = match (to.rfind('<'), to.rfind('>')) {
@@ -289,20 +310,22 @@ impl EventHandler for DeliveryFailures {
             .and_then(|id| id.parse::<Uuid>().ok());
         if let Some(id) = delivery_id {
             delivery::Entity::update_many()
+                .scoped(tenant)
                 .col_expr(delivery::Column::Status, Expr::value(DeliveryStatus::Failed.as_str()))
                 .col_expr(delivery::Column::Error, Expr::value(Some("hard_bounce")))
                 .filter(delivery::Column::Id.eq(id))
-                .exec(service.database.write())
+                .exec(tenant.database().write())
                 .await?;
         }
         let known = subscriber::Entity::find()
+            .scoped(tenant)
             .filter(subscriber::Column::Email.eq(email.as_str()))
-            .one(service.database.read())
+            .one(tenant.database().read())
             .await?
             .is_some();
         if (delivery_id.is_some() || known) && autoxide_kernel::email::is_valid(&email) {
             let note = code.map(|code| format!("smtp {code}"));
-            service.bounce(Actor::system(), &email, BounceKind::Hard, note).await?;
+            service.bounce(tenant, Actor::system(), &email, BounceKind::Hard, note).await?;
         }
         Ok(())
     }

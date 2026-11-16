@@ -8,6 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -183,6 +184,7 @@ pub(crate) struct TestRequest {
 )]
 pub(crate) async fn list_campaigns(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<CampaignsQuery>,
     Query(paging): Query<PageQuery>,
@@ -198,7 +200,7 @@ pub(crate) async fn list_campaigns(
         list_id: uuid_param(query.list_id.as_deref(), "list_id", &mut problems),
     };
     let page = page_request(paging, problems)?;
-    Ok(service.list_campaigns(&principal, &filter, &page).await?.map(Into::into))
+    Ok(service.list_campaigns(&tenant, &principal, &filter, &page).await?.map(Into::into))
 }
 
 /// Create a draft campaign.
@@ -222,6 +224,7 @@ pub(crate) async fn list_campaigns(
 )]
 pub(crate) async fn create_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateCampaignRequest>,
 ) -> Result<Created<CampaignResponse>, Error> {
@@ -234,7 +237,7 @@ pub(crate) async fn create_campaign(
         locale: input.locale,
         advertising: input.advertising,
     };
-    let campaign = service.create_campaign(&principal, input).await?;
+    let campaign = service.create_campaign(&tenant, &principal, input).await?;
     Ok(Created::new(format!("/newsletter/campaigns/{}", campaign.row.id), campaign.into()))
 }
 
@@ -257,10 +260,11 @@ pub(crate) async fn create_campaign(
 )]
 pub(crate) async fn get_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<CampaignResponse>, Error> {
-    let campaign = service.get_campaign(&principal, id).await?;
+    let campaign = service.get_campaign(&tenant, &principal, id).await?;
     Ok(Tagged { version: campaign.row.updated_at, data: campaign.into() })
 }
 
@@ -298,10 +302,11 @@ pub(crate) struct CampaignPreviewResponse {
 )]
 pub(crate) async fn preview_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<CampaignPreviewResponse>, Error> {
-    let preview = service.preview(&principal, id).await?;
+    let preview = service.preview(&tenant, &principal, id).await?;
     Ok(Data {
         data: CampaignPreviewResponse {
             subject: preview.subject,
@@ -339,13 +344,14 @@ pub(crate) async fn preview_campaign(
 )]
 pub(crate) async fn update_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<UpdateCampaignRequest>,
 ) -> Result<Tagged<CampaignResponse>, Error> {
     let expected = if_match.required()?;
-    let campaign = service.update_campaign(&principal, id, input.into(), expected).await?;
+    let campaign = service.update_campaign(&tenant, &principal, id, input.into(), expected).await?;
     Ok(Tagged { version: campaign.row.updated_at, data: campaign.into() })
 }
 
@@ -372,12 +378,13 @@ pub(crate) async fn update_campaign(
 )]
 pub(crate) async fn delete_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<StatusCode, Error> {
     let expected = if_match.required()?;
-    service.delete_campaign(&principal, id, expected).await?;
+    service.delete_campaign(&tenant, &principal, id, expected).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -409,12 +416,13 @@ pub(crate) async fn delete_campaign(
 )]
 pub(crate) async fn send_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<Tagged<CampaignResponse>, Error> {
     let expected = if_match.required()?;
-    let campaign = service.change_state(&principal, id, Action::Send, expected).await?;
+    let campaign = service.change_state(&tenant, &principal, id, Action::Send, expected).await?;
     Ok(Tagged { version: campaign.row.updated_at, data: campaign.into() })
 }
 
@@ -445,6 +453,7 @@ pub(crate) async fn send_campaign(
 )]
 pub(crate) async fn schedule_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -452,7 +461,7 @@ pub(crate) async fn schedule_campaign(
 ) -> Result<Tagged<CampaignResponse>, Error> {
     let expected = if_match.required()?;
     let campaign =
-        service.change_state(&principal, id, Action::Schedule(input.at), expected).await?;
+        service.change_state(&tenant, &principal, id, Action::Schedule(input.at), expected).await?;
     Ok(Tagged { version: campaign.row.updated_at, data: campaign.into() })
 }
 
@@ -478,12 +487,13 @@ pub(crate) async fn schedule_campaign(
 )]
 pub(crate) async fn pause_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<Tagged<CampaignResponse>, Error> {
     let expected = if_match.expected()?;
-    let campaign = service.change_state(&principal, id, Action::Pause, expected).await?;
+    let campaign = service.change_state(&tenant, &principal, id, Action::Pause, expected).await?;
     Ok(Tagged { version: campaign.row.updated_at, data: campaign.into() })
 }
 
@@ -510,12 +520,13 @@ pub(crate) async fn pause_campaign(
 )]
 pub(crate) async fn resume_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<Tagged<CampaignResponse>, Error> {
     let expected = if_match.expected()?;
-    let campaign = service.change_state(&principal, id, Action::Resume, expected).await?;
+    let campaign = service.change_state(&tenant, &principal, id, Action::Resume, expected).await?;
     Ok(Tagged { version: campaign.row.updated_at, data: campaign.into() })
 }
 
@@ -541,12 +552,13 @@ pub(crate) async fn resume_campaign(
 )]
 pub(crate) async fn cancel_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<Tagged<CampaignResponse>, Error> {
     let expected = if_match.expected()?;
-    let campaign = service.change_state(&principal, id, Action::Cancel, expected).await?;
+    let campaign = service.change_state(&tenant, &principal, id, Action::Cancel, expected).await?;
     Ok(Tagged { version: campaign.row.updated_at, data: campaign.into() })
 }
 
@@ -573,10 +585,11 @@ pub(crate) async fn cancel_campaign(
 )]
 pub(crate) async fn test_campaign(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<TestRequest>,
 ) -> Result<StatusCode, Error> {
-    service.send_test(&principal, id, &input.email).await?;
+    service.send_test(&tenant, &principal, id, &input.email).await?;
     Ok(StatusCode::ACCEPTED)
 }

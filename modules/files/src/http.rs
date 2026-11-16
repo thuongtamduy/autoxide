@@ -8,6 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::storage::ByteStream;
+use autoxide_kernel::tenancy::TenantContext;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -92,10 +93,11 @@ pub(crate) struct UploadQuery {
 )]
 async fn list_files(
     State(service): State<Arc<FileService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<FileResponse>, Error> {
-    let page = service.list(&principal, &PageRequest::try_from(query)?).await?;
+    let page = service.list(&tenant, &principal, &PageRequest::try_from(query)?).await?;
     Ok(page.map(FileResponse::from))
 }
 
@@ -129,6 +131,7 @@ async fn list_files(
 )]
 async fn upload_file(
     State(service): State<Arc<FileService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<UploadQuery>,
     headers: HeaderMap,
@@ -155,7 +158,7 @@ async fn upload_file(
             }
         })
         .boxed();
-    let file = service.upload(&principal, &query.name, content_type, content).await?;
+    let file = service.upload(&tenant, &principal, &query.name, content_type, content).await?;
     Ok(Created::new(format!("/files/{}", file.id), file.into()))
 }
 
@@ -178,10 +181,11 @@ async fn upload_file(
 )]
 async fn get_file(
     State(service): State<Arc<FileService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<FileResponse>, Error> {
-    Ok(Data { data: service.get(&principal, id).await?.into() })
+    Ok(Data { data: service.get(&tenant, &principal, id).await?.into() })
 }
 
 /// Download the content of a file.
@@ -205,12 +209,13 @@ async fn get_file(
 )]
 async fn download_file(
     State(service): State<Arc<FileService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     request_headers: HeaderMap,
 ) -> Result<Response, Error> {
     let unchanged = |etag: &str| autoxide_kernel::version::if_none_match(&request_headers, etag);
-    let Some(download) = service.download(&principal, id, unchanged).await? else {
+    let Some(download) = service.download(&tenant, &principal, id, unchanged).await? else {
         // Client đã có đúng bản này: lớp `not_modified` của kernel cũng trả 304 như vầy.
         return Ok(StatusCode::NOT_MODIFIED.into_response());
     };
@@ -248,10 +253,11 @@ async fn download_file(
 )]
 async fn delete_file(
     State(service): State<Arc<FileService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete(&principal, id).await?;
+    service.delete(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -263,6 +269,7 @@ fn content_disposition(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use autoxide_kernel::storage::Storage as _;
     use autoxide_testkit::{TestApp, TestDatabase, TestRequest};
     use serde_json::Value;
 
@@ -367,5 +374,150 @@ mod tests {
             "attachment; filename=\"b_o c_o _Q1_.pdf\"; \
              filename*=UTF-8''b%C3%A1o%20c%C3%A1o%20%22Q1%22.pdf"
         );
+    }
+
+    /// Bước 33: file của khách nằm dưới tiền tố của khách ở nơi lưu (`tenants/<id>/files/…`);
+    /// người của khách khác không thấy; job dọn mồ côi (chạy trên mọi database) không xoá nhầm nội
+    /// dung còn dòng ở database của đúng khách.
+    #[tokio::test]
+    async fn khoa_file_co_tien_to_khach_va_khong_ro_ri() {
+        TestDatabase::run(async |test| {
+            let dir = std::env::temp_dir().join(format!("autoxide-files-{}", Uuid::now_v7()));
+            let app = TestApp::builder(test)
+                .setting("AUTOXIDE_FILES_DIR", dir.to_str().unwrap())
+                .tenant("a")
+                .tenant_dedicated("b")
+                .user_in("a", "ada", 0xada, &["files.upload", "files.manage"])
+                .user_in("b", "bob", 0xb0b, &["files.upload", "files.manage"])
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let marker = "MARKER-files-a";
+            let request = app
+                .post(&format!("/api/v1/files?name={marker}.txt"))
+                .token("ada")
+                .header(header::CONTENT_TYPE.as_str(), "text/plain")
+                .body(Body::from("secret of a"));
+            let (status, _, body) = send(request).await;
+            assert_eq!(status, StatusCode::CREATED, "{}", String::from_utf8_lossy(&body));
+            let id = json(&body)["data"]["id"].as_str().unwrap().to_owned();
+
+            let a = app.tenant("a").await.unwrap();
+            let shared = app.api::<dyn autoxide_kernel::storage::Storage>().unwrap();
+            let key = format!("tenants/{}/files/{id}", a.id().as_uuid());
+            assert!(shared.get(&key).await.unwrap().is_some(), "content under the tenant's prefix");
+            assert!(shared.get(&format!("files/{id}")).await.unwrap().is_none());
+
+            let seeded = [("id", id.clone())];
+            let violations =
+                autoxide_testkit::leak_check(&app, "bob", marker, &seeded).await.unwrap();
+            assert_eq!(violations, Vec::<String>::new());
+            let (status, _, _) =
+                send(app.get(&format!("/api/v1/files/{id}/content")).token("bob")).await;
+            assert_eq!(status, StatusCode::NOT_FOUND);
+
+            // Một ngày sau: job dọn (ở mọi database) giữ nội dung còn dòng, xoá nội dung mồ côi.
+            let orphan = format!("tenants/{}/files/{}", a.id().as_uuid(), Uuid::now_v7());
+            let stream = futures_util::stream::iter([Ok(bytes::Bytes::from_static(b"x"))]).boxed();
+            shared.put(&orphan, stream).await.unwrap();
+            let service = FileService::new(
+                shared.clone(),
+                autoxide_kernel::event::Outbox::standalone("files"),
+                crate::config::Limits { max_bytes: 64, allowed_types: None },
+            );
+            let later = chrono::Utc::now() + chrono::Duration::hours(25);
+            let removed = service.clean_orphans(app.registry(), later).await.unwrap();
+            assert_eq!(removed, 1);
+            assert!(shared.get(&key).await.unwrap().is_some());
+            assert!(shared.get(&orphan).await.unwrap().is_none());
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Bước 33: placement có nơi lưu riêng (`autoxide placement storage`): file của khách trên đó
+    /// nằm ở nơi lưu riêng, không ở nơi lưu chung; đọc lại được. Job dọn mồ côi quét cả nơi lưu riêng
+    /// và ở mỗi nơi chỉ xét khách đang lưu file ở đó (bản sao còn sót ở nơi lưu chung để nguyên).
+    #[tokio::test]
+    async fn placement_co_noi_luu_rieng() {
+        TestDatabase::run(async |test| {
+            let root = std::env::temp_dir().join(format!("autoxide-files-{}", Uuid::now_v7()));
+            let (dir, own_dir) = (root.join("shared"), root.join("own"));
+            let app = TestApp::builder(test)
+                .setting("AUTOXIDE_FILES_DIR", dir.to_str().unwrap())
+                .tenant("a")
+                .tenant_dedicated("b")
+                .user_in("a", "ada", 0xada, &["files.upload", "files.manage"])
+                .user_in("b", "bob", 0xb0b, &["files.upload", "files.manage"])
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let placements = app.modules().placements(app.registry()).unwrap();
+            let location = autoxide_kernel::storage::StorageLocation::Local {
+                dir: own_dir.to_str().unwrap().to_owned(),
+            };
+            // `b` đã nằm trên placement `b` (chưa có file nào): đổi nơi lưu cần `force`.
+            let error = placements.set_storage("b", Some(location.clone()), false).await;
+            assert_eq!(error.unwrap_err().code(), "tenant_placement_storage_in_use");
+            placements.set_storage("b", Some(location), true).await.unwrap();
+
+            let upload = |token: &'static str, text: &'static str| {
+                app.post("/api/v1/files?name=x.txt")
+                    .token(token)
+                    .header(header::CONTENT_TYPE.as_str(), "text/plain")
+                    .body(Body::from(text))
+            };
+            let (status, _, body) = send(upload("bob", "of b")).await;
+            assert_eq!(status, StatusCode::CREATED, "{}", String::from_utf8_lossy(&body));
+            let id = json(&body)["data"]["id"].as_str().unwrap().to_owned();
+            let (status, _, body) = send(upload("ada", "of a")).await;
+            assert_eq!(status, StatusCode::CREATED);
+            let a_id = json(&body)["data"]["id"].as_str().unwrap().to_owned();
+
+            let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
+            let shared = app.api::<dyn autoxide_kernel::storage::Storage>().unwrap();
+            let own = crate::store::ObjectStorage::open(&crate::config::Backend::Local {
+                dir: own_dir.clone(),
+            })
+            .unwrap();
+            let key = format!("tenants/{}/files/{id}", b.id());
+            assert!(own.get(&key).await.unwrap().is_some(), "in the placement's own storage");
+            assert!(shared.get(&key).await.unwrap().is_none());
+            assert!(
+                shared.get(&format!("tenants/{}/files/{a_id}", a.id())).await.unwrap().is_some()
+            );
+            let (status, _, body) =
+                send(app.get(&format!("/api/v1/files/{id}/content")).token("bob")).await;
+            assert_eq!((status, body.as_slice()), (StatusCode::OK, b"of b".as_slice()));
+
+            // Mồ côi ở nơi lưu riêng (của `b`) và ở nơi lưu chung (của `a`): bị xoá. Khoá của `b` ở
+            // nơi lưu chung (`b` không lưu ở đó): để nguyên.
+            let put = async |storage: &dyn autoxide_kernel::storage::Storage, key: String| {
+                let stream =
+                    futures_util::stream::iter([Ok(bytes::Bytes::from_static(b"x"))]).boxed();
+                storage.put(&key, stream).await.unwrap()
+            };
+            let orphan_own = format!("tenants/{}/files/{}", b.id(), Uuid::now_v7());
+            let orphan_shared = format!("tenants/{}/files/{}", a.id(), Uuid::now_v7());
+            let stray = format!("tenants/{}/files/{}", b.id(), Uuid::now_v7());
+            put(&own, orphan_own.clone()).await;
+            put(&*shared, orphan_shared.clone()).await;
+            put(&*shared, stray.clone()).await;
+            let service = FileService::new(
+                shared.clone(),
+                autoxide_kernel::event::Outbox::standalone("files"),
+                crate::config::Limits { max_bytes: 64, allowed_types: None },
+            );
+            let later = chrono::Utc::now() + chrono::Duration::hours(25);
+            assert_eq!(service.clean_orphans(app.registry(), later).await.unwrap(), 2);
+            assert!(own.get(&orphan_own).await.unwrap().is_none());
+            assert!(own.get(&key).await.unwrap().is_some());
+            assert!(shared.get(&orphan_shared).await.unwrap().is_none());
+            assert!(shared.get(&stray).await.unwrap().is_some());
+        })
+        .await
+        .unwrap();
     }
 }

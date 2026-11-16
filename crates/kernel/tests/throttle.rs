@@ -52,7 +52,7 @@ async fn sql(database: &Database, text: &str) -> i64 {
 async fn vuot_gioi_han_thi_chan_roi_xoa_thi_quen() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let throttle = Throttle::new("demo", 3, Duration::from_secs(900)).unwrap();
         for _ in 0..3 {
             assert_eq!(throttle.hit(&tenant, "ip:a").await.unwrap(), Outcome::Allowed);
@@ -83,7 +83,7 @@ async fn vuot_gioi_han_thi_chan_roi_xoa_thi_quen() {
 async fn het_cua_so_thi_dem_lai_va_don_dep() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let throttle = Throttle::new("demo", 2, Duration::from_secs(60))
             .unwrap()
             .with_lock(Duration::from_secs(600))
@@ -119,7 +119,7 @@ async fn het_cua_so_thi_dem_lai_va_don_dep() {
 async fn dem_dong_thoi_du_tung_lan() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let throttle = Arc::new(Throttle::new("demo", 100, Duration::from_secs(900)).unwrap());
         let tasks: Vec<_> = (0..8)
             .map(|_| {
@@ -141,7 +141,7 @@ async fn dem_dong_thoi_du_tung_lan() {
 async fn ban_dong_thoi_khong_vuot_gioi_han() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let throttle = Arc::new(Throttle::new("demo", 5, Duration::from_secs(900)).unwrap());
         let tasks: Vec<_> = (0..40)
             .map(|_| {
@@ -167,7 +167,7 @@ async fn ban_dong_thoi_khong_vuot_gioi_han() {
 async fn moi_khach_dem_rieng() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let ours = TenantContext::legacy_default(&database);
+        let ours = TenantContext::default_on(database.clone());
         let theirs = TenantContext::new(
             TenantId::from_uuid(uuid::Uuid::now_v7()),
             "other",

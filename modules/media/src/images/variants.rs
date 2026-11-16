@@ -10,8 +10,8 @@
 //! - Ảnh quá [`MAX_PIXELS`] pixel không được giải mã (chặn "bom giải nén"); ảnh hỏng thì
 //!   bỏ qua, ghi log, không thử lại mãi.
 //! - Giải mã / đổi cỡ chạy trên thread riêng (`spawn_blocking`), không chặn thread async.
-//! - Khoá ở nơi lưu `media/<id>/<version_id>_w<width>`; gắn với một phiên bản nội dung —
-//!   thay nội dung thì bản cũ bị xoá và job làm lại cho phiên bản mới.
+//! - Khoá ở nơi lưu `media/<id>/<version_id>_w<width>` (trong nơi lưu của khách); gắn với một
+//!   phiên bản nội dung — thay nội dung thì bản cũ bị xoá và job làm lại cho phiên bản mới.
 //! - AVIF và SVG không có ảnh thu nhỏ (không có bộ giải mã AVIF thuần Rust; SVG đã co giãn
 //!   được).
 
@@ -21,8 +21,8 @@ use std::sync::Arc;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::rows;
-use autoxide_kernel::storage::StoredFile;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::storage::{Storage as _, StoredFile};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use bytes::Bytes;
 use futures_util::TryStreamExt as _;
 use image::codecs::jpeg::JpegEncoder;
@@ -116,7 +116,12 @@ impl JobHandler for Generator {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let input: MakeVariants = serde_json::from_value(job.payload.clone())
             .map_err(|error| Error::internal(format!("media variants job payload: {error}")))?;
-        self.0.make_variants(input.item_id, input.version_id).await.map(|_| ())
+        // Job xếp trong transaction của khách: worker trả ngữ cảnh khách đó.
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("media variants job has no tenant"))?;
+        self.0.make_variants(tenant, input.item_id, input.version_id).await.map(|_| ())
     }
 }
 
@@ -126,20 +131,14 @@ impl MediaService {
     pub(crate) async fn enqueue_variants<C: ConnectionTrait>(
         &self,
         transaction: &C,
+        tenant: &TenantContext,
         item: &Item,
     ) -> Result<(), Error> {
         if wanted_widths(&self.config.image_widths, item).is_empty() {
             return Ok(());
         }
         let job = MakeVariants { item_id: item.id, version_id: item.version_id };
-        self.jobs
-            .enqueue(
-                transaction,
-                &TenantContext::legacy_default(&self.database),
-                &job,
-                EnqueueOptions::default(),
-            )
-            .await?;
+        self.jobs.enqueue(transaction, tenant, &job, EnqueueOptions::default()).await?;
         Ok(())
     }
 
@@ -148,17 +147,19 @@ impl MediaService {
     /// Item đã đổi nội dung hay không còn thì không làm gì (job của phiên bản mới lo).
     pub(crate) async fn make_variants(
         &self,
+        tenant: &TenantContext,
         item_id: Uuid,
         version_id: Uuid,
     ) -> Result<usize, Error> {
-        let Some(item) = item::Entity::find_by_id(item_id).one(self.database.write()).await? else {
+        let found = item::Entity::find_by_id(item_id).scoped(tenant).one(tenant.database().write());
+        let Some(item) = found.await? else {
             return Ok(0);
         };
         let widths = wanted_widths(&self.config.image_widths, &item);
         if item.version_id != version_id || widths.is_empty() {
             return Ok(0);
         }
-        let original = read_all(self.read(&item, None).await?).await?;
+        let original = read_all(self.read(tenant, &item, None).await?).await?;
         // Giải mã và đổi cỡ tốn CPU: chạy trên thread riêng của tokio cho việc chặn.
         let rendered = tokio::task::spawn_blocking(move || render(&original, &widths))
             .await
@@ -172,19 +173,20 @@ impl MediaService {
             }
         };
 
+        let store = self.store(tenant);
         let mut written = Vec::new();
         for copy in &rendered {
             let width = i32::try_from(copy.width).map_err(Error::internal)?;
             let key = storage_key(item_id, version_id, width, copy.content_type);
             let body = futures_util::stream::iter([Ok(Bytes::from(copy.bytes.clone()))]);
-            self.storage.put(&key, Box::pin(body)).await?;
+            store.put(&key, Box::pin(body)).await?;
             written.push(key);
         }
-        let saved = self.save_variants(item_id, version_id, &rendered).await;
+        let saved = self.save_variants(tenant, item_id, version_id, &rendered).await;
         if !matches!(saved, Ok(true)) {
             // Nội dung vừa đổi (hay lỗi): ảnh vừa làm không còn ai dùng.
             for key in &written {
-                if let Err(error) = self.storage.delete(key).await {
+                if let Err(error) = store.delete(key).await {
                     tracing::warn!(key, error = %error, "cannot remove an unused smaller copy");
                 }
             }
@@ -199,20 +201,23 @@ impl MediaService {
     /// Lưu dòng của các ảnh thu nhỏ nếu item còn ở phiên bản `version_id`. `false`: đã đổi.
     async fn save_variants(
         &self,
+        tenant: &TenantContext,
         item_id: Uuid,
         version_id: Uuid,
         rendered: &[Rendered],
     ) -> Result<bool, Error> {
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Khoá dòng item (`rows::lock_one`) để lệnh thay nội dung chạy cùng lúc phải chờ.
-        let current =
-            item::Entity::find_by_id(item_id).filter(item::Column::VersionId.eq(version_id));
+        let current = item::Entity::find_by_id(item_id)
+            .scoped(tenant)
+            .filter(item::Column::VersionId.eq(version_id));
         if rows::lock_one(&transaction, current).await?.is_none() {
             transaction.rollback().await?;
             return Ok(false);
         }
         // Làm lại (job chạy lần hai): thay các dòng cũ của cùng phiên bản.
         variant::Entity::delete_many()
+            .scoped(tenant)
             .filter(variant::Column::ItemId.eq(item_id))
             .filter(variant::Column::VersionId.eq(version_id))
             .exec(&transaction)
@@ -221,6 +226,7 @@ impl MediaService {
         for copy in rendered {
             variant::Entity::insert(variant::ActiveModel {
                 id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
                 item_id: Set(item_id),
                 version_id: Set(version_id),
                 width: Set(i32::try_from(copy.width).map_err(Error::internal)?),
@@ -240,6 +246,7 @@ impl MediaService {
     /// `webp`, không thì bản JPEG / PNG.
     pub(crate) async fn variant(
         &self,
+        tenant: &TenantContext,
         item: &Item,
         width: u32,
         webp: bool,
@@ -253,11 +260,12 @@ impl MediaService {
             variant::Column::ContentType.ne(WEBP)
         };
         Ok(variant::Entity::find()
+            .scoped(tenant)
             .filter(variant::Column::ItemId.eq(item.id))
             .filter(variant::Column::VersionId.eq(item.version_id))
             .filter(variant::Column::Width.eq(width))
             .filter(format)
-            .one(self.database.read())
+            .one(tenant.database().read())
             .await?)
     }
 }
@@ -266,6 +274,7 @@ impl MediaService {
 /// (cả bản JPEG / PNG lẫn bản WebP; [`pair`] ghép chúng theo cỡ). Một câu query.
 pub(crate) async fn variants_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     items: &[Item],
 ) -> Result<std::collections::HashMap<Uuid, Vec<Variant>>, Error> {
     let mut found: std::collections::HashMap<Uuid, Vec<Variant>> = std::collections::HashMap::new();
@@ -273,6 +282,7 @@ pub(crate) async fn variants_of<C: ConnectionTrait>(
         return Ok(found);
     }
     let rows = variant::Entity::find()
+        .scoped(tenant)
         .filter(variant::Column::ItemId.is_in(items.iter().map(|item| item.id).collect::<Vec<_>>()))
         .order_by_asc(variant::Column::Width)
         .all(connection)
@@ -455,6 +465,7 @@ mod tests {
     fn chon_co_can_lam() {
         let mut item = Item {
             id: Uuid::nil(),
+            tenant_id: Uuid::nil(),
             folder_id: Uuid::nil(),
             name: "a".into(),
             name_key: "a".into(),

@@ -9,8 +9,11 @@ pub(crate) mod endpoint {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
+        /// Khách sở hữu endpoint (bước 33).
+        pub tenant_id: Uuid,
         pub url: String,
         pub description: String,
+        /// Secret ký, đã mã hoá (`sealed:v1:…`, D-278); chỉ mở lúc ký.
         pub secret: String,
         /// JSON: danh sách tên event.
         pub events: String,
@@ -20,6 +23,12 @@ pub(crate) mod endpoint {
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }
 
 pub(crate) mod delivery {
@@ -31,6 +40,8 @@ pub(crate) mod delivery {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
+        /// Khách của endpoint (bước 33).
+        pub tenant_id: Uuid,
         pub endpoint_id: Uuid,
         pub event_id: Uuid,
         pub event_name: String,
@@ -45,4 +56,10 @@ pub(crate) mod delivery {
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }

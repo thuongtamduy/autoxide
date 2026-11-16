@@ -12,6 +12,8 @@
 //! - Mỗi mail báo có token huỷ riêng (32 byte ngẫu nhiên, chỉ lưu bản băm, mục đích
 //!   `unsubscribe`, sống 365 ngày) — như D-130 của `newsletter`.
 //! - Event được giao lại (D-054): mail mang `dedupe_key` = trả lời + dòng theo dõi.
+//! - Token trong link (xác minh, huỷ) mang khách của nó khi khách không phải khách mặc định
+//!   (`autoxide_kernel::tenancy::link_token`, D-281): bấm link ở tên miền chính vẫn tới đúng khách.
 //! - Giới hạn số mail xác minh tới một địa chỉ mỗi ngày bằng `Throttle` (`posting.rs`).
 
 use std::sync::Arc;
@@ -21,10 +23,10 @@ use autoxide_kernel::event::{Delivered, Event, EventHandler};
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::resource::Resource;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext, link_token, resolve_link_token};
 use autoxide_kernel::tokens::Issued;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use uuid::Uuid;
 
 use crate::entity::{comment, subscription};
@@ -83,7 +85,7 @@ impl EventHandler for ReplyNotifier {
         let id =
             event.payload.get("after").and_then(|after| after.get("id")).and_then(|id| id.as_str());
         match id.and_then(|id| id.parse::<Uuid>().ok()) {
-            Some(id) => self.0.notify_reply(id).await.map(|_| ()),
+            Some(id) => self.0.notify_reply(&event.tenant, id).await.map(|_| ()),
             None => Ok(()),
         }
     }
@@ -91,17 +93,15 @@ impl EventHandler for ReplyNotifier {
 
 impl CommentsService {
     /// Đích của bình luận trong sổ đối tượng (tiêu đề, đường dẫn), khi loại có bộ tra.
-    async fn resource_of(&self, row: &comment::Model) -> Result<Option<Resource>, Error> {
+    async fn resource_of(
+        &self,
+        tenant: &TenantContext,
+        row: &comment::Model,
+    ) -> Result<Option<Resource>, Error> {
         if !self.resources.knows(&row.target_type) {
             return Ok(None);
         }
-        self.resources
-            .resolve(
-                &TenantContext::legacy_default(&self.database),
-                &row.target_type,
-                &row.target_id,
-            )
-            .await
+        self.resources.resolve(tenant, &row.target_type, &row.target_id).await
     }
 
     /// Đường dẫn đầy đủ tới trang của đích, khi biết địa chỉ website và đường dẫn.
@@ -114,6 +114,7 @@ impl CommentsService {
     /// Xếp mail xác minh `email` (token `issued`) cho bình luận `row`.
     pub(crate) async fn send_verification(
         &self,
+        tenant: &TenantContext,
         row: &comment::Model,
         email: &str,
         issued: &Issued,
@@ -123,36 +124,39 @@ impl CommentsService {
             return Ok(());
         };
         let language = language(row.locale.as_deref());
-        let link = url.replace("{token}", &issued.token);
+        // Link mang khách của token (`autoxide_kernel::tenancy::link_token`).
+        let link = url.replace("{token}", &link_token(tenant, &issued.token));
         let target = target_name(resource, language);
         let hours = VERIFY_HOURS.to_string();
         let params =
             [("target", target.as_str()), ("link", link.as_str()), ("hours", hours.as_str())];
         let mut mail = VERIFY_MAIL.mail(email, &self.translations, language, &params);
         mail.dedupe_key = Some(format!("comments.verify:{}", issued.id));
-        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
+        self.mailer.send(tenant, mail).await
     }
 
     /// Xác minh email bằng token trong mail: bình luận được đánh dấu email đã xác minh và email đó
-    /// theo dõi trả lời của nó.
-    pub(crate) async fn verify(&self, token: &str) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
-        let Some(consumed) = self
-            .tokens
-            .consume(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                VERIFY,
-                token.trim(),
-            )
-            .await?
+    /// theo dõi trả lời của nó. Khách lấy từ token khi token mang khách; không thì `request`
+    /// (khách của request, `None`: khách mặc định) — xem
+    /// `autoxide_kernel::tenancy::resolve_link_token`.
+    pub(crate) async fn verify(
+        &self,
+        request: Option<&TenantContext>,
+        token: &str,
+    ) -> Result<(), Error> {
+        let Some((resolved, raw)) = resolve_link_token(&self.databases, request, token).await?
         else {
+            return Err(link_invalid());
+        };
+        let tenant = &resolved;
+        let transaction = tenant.database().begin_write().await?;
+        let Some(consumed) = self.tokens.consume(&transaction, tenant, VERIFY, raw).await? else {
             transaction.rollback().await?;
             return Err(link_invalid());
         };
         let id: Uuid = consumed.subject.parse().map_err(Error::internal)?;
         let email = consumed.data.unwrap_or_default();
-        let found = comment::Entity::find_by_id(id).one(&transaction).await?;
+        let found = comment::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?;
         let Some(found) = found.filter(|row| row.author_email.as_deref() == Some(email.as_str()))
         else {
             // Bình luận đã bị xoá hay email đã bị xoá: token hết tác dụng.
@@ -161,18 +165,23 @@ impl CommentsService {
         };
         let mut row = found.into_active_model();
         row.email_verified = Set(true);
-        row.update(&transaction).await?;
+        comment::Entity::update(row).validate()?.scoped(tenant).exec(&transaction).await?;
         let follow = subscription::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             comment_id: Set(id),
             email: Set(email),
             created_at: Set(now()),
         };
         subscription::Entity::insert(follow)
             .on_conflict(
-                OnConflict::columns([subscription::Column::CommentId, subscription::Column::Email])
-                    .do_nothing()
-                    .to_owned(),
+                OnConflict::columns([
+                    subscription::Column::TenantId,
+                    subscription::Column::CommentId,
+                    subscription::Column::Email,
+                ])
+                .do_nothing()
+                .to_owned(),
             )
             .exec_without_returning(&transaction)
             .await?;
@@ -182,32 +191,40 @@ impl CommentsService {
     }
 
     /// Huỷ theo dõi bằng token trong mail báo; `all`: mọi bình luận theo dõi bằng cùng email.
-    /// Token lạ / đã dùng không phải lỗi (không lộ gì). Trả số dòng theo dõi đã xoá.
-    pub(crate) async fn unsubscribe(&self, token: &str, all: bool) -> Result<u64, Error> {
-        let transaction = self.database.begin_write().await?;
-        let Some(consumed) = self
-            .tokens
-            .consume(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                UNSUBSCRIBE,
-                token.trim(),
-            )
-            .await?
+    /// Token lạ / đã dùng không phải lỗi (không lộ gì). Trả số dòng theo dõi đã xoá. Khách như
+    /// [`Self::verify`].
+    pub(crate) async fn unsubscribe(
+        &self,
+        request: Option<&TenantContext>,
+        token: &str,
+        all: bool,
+    ) -> Result<u64, Error> {
+        let Some((resolved, raw)) = resolve_link_token(&self.databases, request, token).await?
+        else {
+            return Ok(0);
+        };
+        let tenant = &resolved;
+        let transaction = tenant.database().begin_write().await?;
+        let Some(consumed) = self.tokens.consume(&transaction, tenant, UNSUBSCRIBE, raw).await?
         else {
             transaction.rollback().await?;
             return Ok(0);
         };
         let id: Uuid = consumed.subject.parse().map_err(Error::internal)?;
-        let Some(found) = subscription::Entity::find_by_id(id).one(&transaction).await? else {
+        let Some(found) =
+            subscription::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
+        else {
             transaction.commit().await?;
             return Ok(0);
         };
         let delete = if all {
             subscription::Entity::delete_many()
+                .scoped(tenant)
                 .filter(subscription::Column::Email.eq(found.email.as_str()))
         } else {
-            subscription::Entity::delete_many().filter(subscription::Column::Id.eq(id))
+            subscription::Entity::delete_many()
+                .scoped(tenant)
+                .filter(subscription::Column::Id.eq(id))
         };
         let deleted = delete.exec(&transaction).await?.rows_affected;
         transaction.commit().await?;
@@ -216,11 +233,15 @@ impl CommentsService {
 
     /// Mail báo trả lời `id` (đã hiện) tới mọi email theo dõi bình luận được trả lời, trừ chính
     /// người trả lời. Trả số mail đã xếp hàng.
-    pub(crate) async fn notify_reply(&self, id: Uuid) -> Result<usize, Error> {
+    pub(crate) async fn notify_reply(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<usize, Error> {
         let Some(unsubscribe_url) = self.config.unsubscribe_url.as_deref() else {
             return Ok(0);
         };
-        let reply = match self.find(id).await {
+        let reply = match self.find(tenant, id).await {
             Ok(found) => found,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(0),
             Err(error) => return Err(error),
@@ -232,15 +253,19 @@ impl CommentsService {
             return Ok(0);
         }
         let followers = subscription::Entity::find()
+            .scoped(tenant)
             .filter(subscription::Column::CommentId.eq(followed_id))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         if followers.is_empty() {
             return Ok(0);
         }
-        let followed = comment::Entity::find_by_id(followed_id).one(self.database.read()).await?;
+        let followed = comment::Entity::find_by_id(followed_id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
         let language = language(followed.as_ref().and_then(|row| row.locale.as_deref()));
-        let resource = self.resource_of(&reply).await?;
+        let resource = self.resource_of(tenant, &reply).await?;
         let target = target_name(resource.as_ref(), language);
         let page =
             self.page_link(resource.as_ref()).map(|link| format!("\n{link}\n")).unwrap_or_default();
@@ -252,15 +277,16 @@ impl CommentsService {
             let issued = self
                 .tokens
                 .issue(
-                    self.database.write(),
-                    &TenantContext::legacy_default(&self.database),
+                    tenant.database().write(),
+                    tenant,
                     UNSUBSCRIBE,
                     &follower.id.to_string(),
                     None,
                     chrono::Duration::days(UNSUBSCRIBE_DAYS),
                 )
                 .await?;
-            let unsubscribe = unsubscribe_url.replace("{token}", &issued.token);
+            let unsubscribe =
+                unsubscribe_url.replace("{token}", &link_token(tenant, &issued.token));
             let params = [
                 ("target", target.as_str()),
                 ("page", page.as_str()),
@@ -268,7 +294,7 @@ impl CommentsService {
             ];
             let mut mail = REPLY_MAIL.mail(&follower.email, &self.translations, language, &params);
             mail.dedupe_key = Some(format!("comments.reply:{id}:{}", follower.id));
-            self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await?;
+            self.mailer.send(tenant, mail).await?;
             sent += 1;
         }
         Ok(sent)

@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -121,13 +122,20 @@ pub(crate) struct RedirectsQuery {
 )]
 pub(crate) async fn list_redirects(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<RedirectsQuery>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<RedirectResponse>, Error> {
     let page = page_request(paging, Vec::new())?;
     let found = service
-        .list_redirects(&principal, query.locale.as_deref(), query.source.as_deref(), &page)
+        .list_redirects(
+            &tenant,
+            &principal,
+            query.locale.as_deref(),
+            query.source.as_deref(),
+            &page,
+        )
         .await?;
     Ok(found.map(RedirectResponse::from))
 }
@@ -154,10 +162,11 @@ pub(crate) async fn list_redirects(
 )]
 pub(crate) async fn create_redirect(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<RedirectRequest>,
 ) -> Result<Created<RedirectResponse>, Error> {
-    let row = service.create_redirect(&principal, input.into()).await?;
+    let row = service.create_redirect(&tenant, &principal, input.into()).await?;
     Ok(Created::new(format!("/content/redirects/{}", row.id), row.into()))
 }
 
@@ -180,10 +189,11 @@ pub(crate) async fn create_redirect(
 )]
 pub(crate) async fn get_redirect(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<RedirectResponse>, Error> {
-    let row = service.get_redirect(&principal, id).await?;
+    let row = service.get_redirect(&tenant, &principal, id).await?;
     Ok(Tagged { version: row.updated_at, data: row.into() })
 }
 
@@ -212,13 +222,14 @@ pub(crate) async fn get_redirect(
 )]
 pub(crate) async fn update_redirect(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<RedirectRequest>,
 ) -> Result<Tagged<RedirectResponse>, Error> {
     let expected = if_match.required()?;
-    let row = service.update_redirect(&principal, id, input.into(), expected).await?;
+    let row = service.update_redirect(&tenant, &principal, id, input.into(), expected).await?;
     Ok(Tagged { version: row.updated_at, data: row.into() })
 }
 
@@ -241,9 +252,10 @@ pub(crate) async fn update_redirect(
 )]
 pub(crate) async fn delete_redirect(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete_redirect(&principal, id).await?;
+    service.delete_redirect(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

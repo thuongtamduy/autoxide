@@ -28,6 +28,8 @@ mod reset;
 mod resource;
 mod role;
 mod session;
+#[cfg(test)]
+mod tenancy_tests;
 mod token;
 mod tools;
 mod user;
@@ -81,6 +83,15 @@ impl Module for AuthModule {
         migration::all()
     }
 
+    fn upgrades(&self) -> Vec<Box<dyn autoxide_kernel::migration::DataUpgrade>> {
+        migration::upgrades()
+    }
+
+    /// Khách mới có role `admin` (mọi permission) như khách mặc định (bước 33).
+    fn seed_tenant(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::TenantSeed>> {
+        Some(Arc::new(role::AdminRoleSeed))
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(AuthConfig::read(reader)?);
         Ok(())
@@ -91,11 +102,12 @@ impl Module for AuthModule {
             .config
             .clone()
             .ok_or_else(|| Error::internal("module `auth` started before it was configured"))?;
-        let database = context.database().clone();
+        // Service không giữ database: mỗi hàm nhận khách của request (bước 33).
+        let databases = context.tenancy();
         let outbox = context.outbox()?;
-        self.cleanup = Some(Arc::new(cleanup::Cleanup::new(database.clone())));
-        self.administrator = Some(Arc::new(doctor::Administrator { database: database.clone() }));
-        let users = Arc::new(UserService::new(database.clone(), Passwords::new(), outbox.clone()));
+        self.cleanup = Some(Arc::new(cleanup::Cleanup));
+        self.administrator = Some(Arc::new(doctor::Administrator { databases: databases.clone() }));
+        let users = Arc::new(UserService::new(Passwords::new(), outbox.clone()));
         let secret = match config.token_secret {
             Some(secret) => secret,
             None => {
@@ -108,34 +120,32 @@ impl Module for AuthModule {
             }
         };
         let access_tokens = AccessTokens::new(secret, config.access_token_ttl);
-        let throttle =
-            LoginThrottle::new(database.clone(), config.login_max_failures, config.login_lock)?;
+        let throttle = LoginThrottle::new(config.login_max_failures, config.login_lock)?;
         let mailer = context.require::<dyn Mailer>()?;
+        let secrets = context.require::<autoxide_kernel::secret::SecretKey>()?;
 
         let mfa = Arc::new(MfaService::new(
-            database.clone(),
+            secrets.as_ref().clone(),
             config.totp_issuer.clone(),
-            LoginThrottle::new(database.clone(), config.login_max_failures, config.login_lock)?,
+            LoginThrottle::new(config.login_max_failures, config.login_lock)?,
             outbox.clone(),
         ));
         let sessions = Arc::new(SessionService::new(
-            database.clone(),
             users.clone(),
             access_tokens,
             config.refresh_token_ttl,
             throttle,
             mfa.clone(),
             outbox.clone(),
+            databases.clone(),
         )?);
         let passkeys = Arc::new(passkey::PasskeyService::new(
-            database.clone(),
             users.clone(),
             sessions.clone(),
             outbox.clone(),
             config.passkey.as_ref(),
         )?);
         let verifications = Arc::new(verify::EmailVerifications {
-            database: database.clone(),
             users: users.clone(),
             sessions: sessions.clone(),
             mailer: mailer.clone(),
@@ -144,13 +154,13 @@ impl Module for AuthModule {
             jobs: context.jobs(),
             url: config.email_verification_url.clone(),
             report_url: config.email_change_report_url.clone(),
+            databases: databases.clone(),
         });
         let roles = Arc::new(
-            RoleService::new(database.clone(), context.permissions().clone(), outbox.clone())
+            RoleService::new(context.permissions().clone(), outbox.clone())
                 .with_translations(context.translations().clone()),
         );
         let api_keys = Arc::new(ApiKeyService::new(
-            database.clone(),
             users.clone(),
             roles.clone(),
             sessions.clone(),
@@ -159,24 +169,25 @@ impl Module for AuthModule {
             passkeys.clone(),
         ));
         let resets = Arc::new(reset::PasswordResets {
-            database: database.clone(),
             jobs: context.jobs(),
             users: users.clone(),
             mailer: mailer.clone(),
             translations: context.translations().clone(),
             outbox: outbox.clone(),
             url: config.password_reset_url.clone(),
+            databases: databases.clone(),
         });
         let authenticator = RequestAuthenticator {
             sessions: sessions.clone(),
             roles: roles.clone(),
             api_keys: api_keys.clone(),
+            databases,
         };
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
         // Tên hiển thị của người dùng cho module khác (vd tên người làm trong audit log).
-        context.resource_type(resource::USER, Arc::new(resource::UserResolver(users.clone())))?;
+        context.resource_type(resource::USER, Arc::new(resource::UserResolver))?;
         context.provide::<dyn api::Accounts>(users.clone())?;
         context.provide::<dyn api::AccountRecovery>(Arc::new(recovery::OperatorRecovery {
             users: users.clone(),
@@ -279,6 +290,7 @@ pub(crate) mod testing {
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
 
     /// Kết nối tới database trống của test và áp dụng mọi migration của module.
@@ -288,6 +300,14 @@ pub(crate) mod testing {
         let config = Config::read(&mut reader);
         let (config, _) = reader.finish(config).unwrap();
         let database = Database::connect(&config.database).await.unwrap();
+        // Bảng của kernel (`kernel_secrets`: khoá gốc mã hoá secret TOTP).
+        autoxide_kernel::module::Modules::new(Vec::new())
+            .unwrap()
+            .migrator()
+            .unwrap()
+            .up(&database)
+            .await
+            .unwrap();
         Migrator::new(vec![ModuleMigrations::new("auth", super::migration::all())])
             .unwrap()
             .up(&database)
@@ -314,14 +334,17 @@ pub(crate) mod testing {
         pub passkeys: Arc<crate::passkey::PasskeyService>,
         pub mails: Arc<FakeMailer>,
         pub database: Database,
+        /// Khách mặc định trên database của test.
+        pub tenant: TenantContext,
         pub personal_data: autoxide_kernel::privacy::PersonalDataExport,
     }
 
     pub async fn services(test: &TestDatabase) -> Services {
         let database = database(test).await;
+        // Một khách (khách mặc định) trên database của test: token mang khách tra qua sổ này.
+        let registry = autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone());
         let outbox = autoxide_kernel::event::Outbox::standalone("auth");
         let users = Arc::new(crate::user::UserService::new(
-            database.clone(),
             crate::password::Passwords::new(),
             outbox.clone(),
         ));
@@ -330,30 +353,21 @@ pub(crate) mod testing {
             std::time::Duration::from_secs(900),
         );
         let mfa = Arc::new(crate::mfa::MfaService::new(
-            database.clone(),
+            autoxide_kernel::secret::SecretKey::new(database.clone(), None),
             "Autoxide".to_owned(),
-            crate::session::LoginThrottle::new(
-                database.clone(),
-                5,
-                std::time::Duration::from_secs(15 * 60),
-            )
-            .unwrap(),
+            crate::session::LoginThrottle::new(5, std::time::Duration::from_secs(15 * 60)).unwrap(),
             outbox.clone(),
         ));
         let sessions = Arc::new(
             crate::session::SessionService::new(
-                database.clone(),
                 users.clone(),
                 tokens,
                 std::time::Duration::from_secs(30 * 24 * 60 * 60),
-                crate::session::LoginThrottle::new(
-                    database.clone(),
-                    5,
-                    std::time::Duration::from_secs(15 * 60),
-                )
-                .unwrap(),
+                crate::session::LoginThrottle::new(5, std::time::Duration::from_secs(15 * 60))
+                    .unwrap(),
                 mfa.clone(),
                 outbox.clone(),
+                registry.clone(),
             )
             .unwrap(),
         );
@@ -365,8 +379,7 @@ pub(crate) mod testing {
             ),
         ])
         .unwrap();
-        let roles =
-            Arc::new(crate::role::RoleService::new(database.clone(), catalog, outbox.clone()));
+        let roles = Arc::new(crate::role::RoleService::new(catalog, outbox.clone()));
         let mails = Arc::new(FakeMailer::default());
         let translations = autoxide_kernel::i18n::Translations::new(vec![(
             "auth",
@@ -375,7 +388,6 @@ pub(crate) mod testing {
         .unwrap();
 
         let verifications = Arc::new(crate::verify::EmailVerifications {
-            database: database.clone(),
             users: users.clone(),
             sessions: sessions.clone(),
             mailer: mails.clone(),
@@ -384,6 +396,7 @@ pub(crate) mod testing {
             jobs: autoxide_kernel::job::JobQueue::new("auth"),
             url: None,
             report_url: None,
+            databases: registry.clone(),
         });
         let passkey_config = crate::config::PasskeyConfig {
             rp_id: PASSKEY_RP_ID.to_owned(),
@@ -391,7 +404,6 @@ pub(crate) mod testing {
         };
         let passkeys = Arc::new(
             crate::passkey::PasskeyService::new(
-                database.clone(),
                 users.clone(),
                 sessions.clone(),
                 autoxide_kernel::event::Outbox::standalone("auth"),
@@ -400,7 +412,6 @@ pub(crate) mod testing {
             .unwrap(),
         );
         let api_keys = Arc::new(crate::api_key::ApiKeyService::new(
-            database.clone(),
             users.clone(),
             roles.clone(),
             sessions.clone(),
@@ -409,13 +420,13 @@ pub(crate) mod testing {
             passkeys.clone(),
         ));
         let resets = Arc::new(crate::reset::PasswordResets {
-            database: database.clone(),
             jobs: autoxide_kernel::job::JobQueue::new("auth"),
             users: users.clone(),
             mailer: mails.clone(),
             translations: translations.clone(),
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
             url: None,
+            databases: registry.clone(),
         });
         let personal_data = autoxide_kernel::privacy::PersonalDataExport::default();
         personal_data
@@ -442,6 +453,7 @@ pub(crate) mod testing {
             resets,
             verifications,
             mails,
+            tenant: TenantContext::default_on(database.clone()),
             database,
         }
     }
@@ -453,7 +465,7 @@ pub(crate) mod testing {
         email: &str,
         language: autoxide_kernel::i18n::Language,
     ) {
-        services.resets.request(email, language).await.unwrap();
+        services.resets.request(&services.tenant, email, language).await.unwrap();
         send_resets(services).await;
     }
 
@@ -497,7 +509,7 @@ pub(crate) mod testing {
             let id: uuid::Uuid = row.try_get("", "id").unwrap();
             let payload: String = row.try_get("", "payload").unwrap();
             let job: crate::reset::ResetJob = serde_json::from_str(&payload).unwrap();
-            services.resets.send(&job).await.unwrap();
+            services.resets.send(&services.tenant, &job).await.unwrap();
             let done = Query::update()
                 .table(Alias::new("auth_jobs"))
                 .value(Alias::new("completed_at"), chrono::Utc::now())
@@ -540,9 +552,9 @@ pub(crate) mod testing {
     /// Service phiên đăng nhập kèm service người dùng dùng chung database.
     pub async fn sessions(
         test: &TestDatabase,
-    ) -> (Arc<crate::session::SessionService>, Arc<crate::user::UserService>) {
+    ) -> (Arc<crate::session::SessionService>, Arc<crate::user::UserService>, TenantContext) {
         let services = services(test).await;
-        (services.sessions, services.users)
+        (services.sessions, services.users, services.tenant)
     }
 
     /// Các event đã ghi vào `auth_events`, theo thứ tự: (tên, người dùng gây ra,

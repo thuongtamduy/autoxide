@@ -1,13 +1,17 @@
 //! `Mailer` của module: đưa mail vào job queue; job gửi qua [`Transport`].
+//!
+//! Theo khách (bước 33): mail xếp hàng trên database của khách gửi nó; job gửi qua máy chủ SMTP và
+//! địa chỉ người gửi của khách đó khi khách đã đặt (`mail.smtp_url`, `mail.from` — D-274), không thì
+//! qua cấu hình chung của máy chủ.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Event, Outbox};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use autoxide_kernel::mail::{DELIVERY_FAILED, Mail, Mailer};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{TenantContext, TenantSetting, TenantSettings};
 use lettre::Message;
 use lettre::message::header::{HeaderName, HeaderValue};
 use lettre::message::{Mailbox, MultiPart, SinglePart};
@@ -51,14 +55,28 @@ impl Event for DeliveryFailed {
     const NAME: &'static str = DELIVERY_FAILED;
 }
 
+/// Máy chủ SMTP riêng của khách (URL có mật khẩu: lưu mã hoá, không bao giờ trả ra).
+pub(crate) const TENANT_SMTP_URL: TenantSetting = TenantSetting::new(
+    "mail.smtp_url",
+    "SMTP server this tenant's mail goes through, like `smtps://user:password@smtp.example.com`; \
+     unset: the server's own (`AUTOXIDE_MAIL_SMTP_URL`).",
+)
+.secret();
+
+/// Người gửi riêng của khách.
+pub(crate) const TENANT_FROM: TenantSetting = TenantSetting::new(
+    "mail.from",
+    "Sender of this tenant's mail, like `Shop <no-reply@shop.example>`; unset: the server's own \
+     (`AUTOXIDE_MAIL_FROM`). Its domain must be allowed to send through the SMTP server.",
+);
+
 pub(crate) struct MailService {
-    database: Database,
     queue: JobQueue,
 }
 
 impl MailService {
-    pub(crate) fn new(database: Database, queue: JobQueue) -> Self {
-        MailService { database, queue }
+    pub(crate) fn new(queue: JobQueue) -> Self {
+        MailService { queue }
     }
 }
 
@@ -98,7 +116,7 @@ impl Mailer for MailService {
             headers: mail.headers,
             dedupe_key: mail.dedupe_key,
         };
-        let id = self.queue.enqueue(self.database.write(), tenant, &job, options).await?;
+        let id = self.queue.enqueue(tenant.database().write(), tenant, &job, options).await?;
         // Không ghi địa chỉ hay nội dung vào log: chỉ ID của job.
         tracing::info!(job_id = ?id, "mail queued");
         Ok(())
@@ -109,18 +127,48 @@ impl Mailer for MailService {
 pub(crate) struct Sender {
     transport: Arc<Transport>,
     from: Mailbox,
-    database: Database,
     outbox: Outbox,
+    settings: Arc<dyn TenantSettings>,
+    /// Kết nối SMTP riêng của khách, theo URL: dựng một lần, dùng lại (pool của lettre).
+    tenant_transports: Mutex<HashMap<String, Arc<Transport>>>,
 }
 
 impl Sender {
     pub(crate) fn new(
         transport: Arc<Transport>,
         from: Mailbox,
-        database: Database,
         outbox: Outbox,
+        settings: Arc<dyn TenantSettings>,
     ) -> Self {
-        Sender { transport, from, database, outbox }
+        Sender { transport, from, outbox, settings, tenant_transports: Mutex::new(HashMap::new()) }
+    }
+
+    /// Đường gửi và người gửi của `tenant`: của riêng khách khi đã đặt, không thì của máy chủ.
+    async fn delivery_for(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<(Arc<Transport>, Mailbox), Error> {
+        let from = match self.settings.get(tenant, &TENANT_FROM).await? {
+            Some(value) => value.as_str().parse::<Mailbox>().map_err(|error| {
+                Error::internal(format!("tenant setting `mail.from` is not a mailbox: {error}"))
+            })?,
+            None => self.from.clone(),
+        };
+        let Some(url) = self.settings.get(tenant, &TENANT_SMTP_URL).await? else {
+            return Ok((self.transport.clone(), from));
+        };
+        // Khoá chỉ giữ trong lúc tra / thêm vào bảng (không qua `await`); lỗi khoá (một thread
+        // khác đã panic) thì dựng kết nối mới, không dùng bảng.
+        if let Ok(cache) = self.tenant_transports.lock()
+            && let Some(found) = cache.get(url.as_str())
+        {
+            return Ok((found.clone(), from));
+        }
+        let transport = Arc::new(Transport::smtp(url.as_str())?);
+        if let Ok(mut cache) = self.tenant_transports.lock() {
+            cache.insert(url.as_str().to_owned(), transport.clone());
+        }
+        Ok((transport, from))
     }
 }
 
@@ -132,7 +180,12 @@ impl JobHandler for Sender {
         let to: Mailbox = mail.to.parse().map_err(|error| {
             Error::internal(format!("the recipient address is invalid: {error}"))
         })?;
-        let mut builder = Message::builder().from(self.from.clone()).to(to).subject(mail.subject);
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("a mail job must belong to a tenant"))?;
+        let (transport, from) = self.delivery_for(tenant).await?;
+        let mut builder = Message::builder().from(from).to(to).subject(mail.subject);
         if let Some(reply_to) = &mail.reply_to {
             let reply_to = reply_to.parse().map_err(|error| {
                 Error::internal(format!("the reply-to address is invalid: {error}"))
@@ -149,7 +202,7 @@ impl JobHandler for Sender {
             None => builder.singlepart(SinglePart::plain(mail.text)),
         }
         .map_err(|error| Error::internal(format!("cannot build the mail: {error}")))?;
-        match self.transport.deliver(message).await? {
+        match transport.deliver(message).await? {
             Delivery::Sent => {
                 tracing::info!(job_id = %job.id, "mail sent");
             }
@@ -157,16 +210,8 @@ impl JobHandler for Sender {
             Delivery::Rejected { code } => {
                 tracing::warn!(job_id = %job.id, code = %code, "mail rejected for good by the receiving server");
                 let event = DeliveryFailed { to: mail.to, dedupe_key: mail.dedupe_key, code };
-                let transaction = self.database.begin_write().await?;
-                self.outbox
-                    .record(
-                        &transaction,
-                        &TenantContext::legacy_default(&self.database),
-                        Actor::system(),
-                        None,
-                        &event,
-                    )
-                    .await?;
+                let transaction = tenant.database().begin_write().await?;
+                self.outbox.record(&transaction, tenant, Actor::system(), None, &event).await?;
                 transaction.commit().await?;
                 metrics::counter!("mail_rejected_total").increment(1);
             }

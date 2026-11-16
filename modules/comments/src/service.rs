@@ -14,13 +14,13 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::PostingVerification;
 use autoxide_kernel::antispam::SpamGuard;
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::i18n::Translations;
 use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::resource::ResourceDirectory;
 use autoxide_kernel::secret::SecretKey;
+use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext};
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
@@ -37,7 +37,8 @@ use crate::entity::{comment, profile, target};
 pub(crate) const MODULE: &str = "comments";
 
 pub(crate) struct CommentsService {
-    pub(crate) database: Database,
+    /// Sổ database: endpoint nhận token trong link tìm khách từ token.
+    pub(crate) databases: DatabaseRegistry,
     pub(crate) outbox: Outbox,
     pub(crate) guard: Arc<SpamGuard>,
     pub(crate) secret: SecretKey,
@@ -51,7 +52,7 @@ pub(crate) struct CommentsService {
 
 /// Thứ service cần từ kernel và module khác.
 pub(crate) struct Parts {
-    pub database: Database,
+    pub databases: DatabaseRegistry,
     pub outbox: Outbox,
     pub guard: Arc<SpamGuard>,
     pub secret: SecretKey,
@@ -64,7 +65,7 @@ pub(crate) struct Parts {
 impl CommentsService {
     pub(crate) fn new(parts: Parts, config: CommentsConfig) -> Self {
         CommentsService {
-            database: parts.database,
+            databases: parts.databases,
             outbox: parts.outbox,
             guard: parts.guard,
             secret: parts.secret,
@@ -159,6 +160,7 @@ pub(crate) fn summary(row: &comment::Model) -> Value {
 /// cùng lúc ra một dòng). Đích mới tự đóng sau `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS` (nếu đặt).
 pub(crate) async fn ensure_target<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     config: &CommentsConfig,
     kind: &str,
     id: &str,
@@ -167,6 +169,7 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
     let closes_at = (config.auto_close_days > 0)
         .then(|| now + chrono::Duration::days(i64::from(config.auto_close_days)));
     let row = target::ActiveModel {
+        tenant_id: Set(tenant.id().as_uuid()),
         target_type: Set(kind.to_owned()),
         target_id: Set(id.to_owned()),
         uid: Set(Uuid::now_v7()),
@@ -182,9 +185,13 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
     };
     target::Entity::insert(row)
         .on_conflict(
-            OnConflict::columns([target::Column::TargetType, target::Column::TargetId])
-                .do_nothing()
-                .to_owned(),
+            OnConflict::columns([
+                target::Column::TenantId,
+                target::Column::TargetType,
+                target::Column::TargetId,
+            ])
+            .do_nothing()
+            .to_owned(),
         )
         .exec_without_returning(connection)
         .await?;
@@ -199,6 +206,7 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
 /// deadlock (hai transaction giữ khoá của nhau rồi chờ nhau).
 pub(crate) async fn shift_counts<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     row: &comment::Model,
     from: Option<Status>,
     to: Option<Status>,
@@ -211,10 +219,11 @@ pub(crate) async fn shift_counts<C: ConnectionTrait>(
                 Expr::col(comment::Column::ReplyCount).add(published),
             )
             .filter(comment::Column::Id.eq(row.root_id))
+            .scoped(tenant)
             .exec(connection)
             .await?;
     }
-    shift_target_counts(connection, row, from, to).await
+    shift_target_counts(connection, tenant, row, from, to).await
 }
 
 /// `+1` / `-1` / `0`: bình luận vào hay ra khỏi trạng thái `status`.
@@ -226,6 +235,7 @@ pub(crate) fn delta(from: Option<Status>, to: Option<Status>, status: Status) ->
 /// thêm số câu hỏi (`…_thread_count`, D-202) trong cùng câu lệnh.
 pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     row: &comment::Model,
     from: Option<Status>,
     to: Option<Status>,
@@ -253,6 +263,7 @@ pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
             )
             .filter(target::Column::TargetType.eq(row.target_type.as_str()))
             .filter(target::Column::TargetId.eq(row.target_id.as_str()))
+            .scoped(tenant)
             .exec(connection)
             .await?;
     }
@@ -262,6 +273,7 @@ pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
 /// Tên hiển thị của người dùng `user_ids` (bảng hồ sơ của module).
 pub(crate) async fn display_names<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_ids: impl IntoIterator<Item = Uuid>,
 ) -> Result<HashMap<Uuid, String>, Error> {
     let mut ids: Vec<Uuid> = user_ids.into_iter().collect();
@@ -271,6 +283,7 @@ pub(crate) async fn display_names<C: ConnectionTrait>(
         return Ok(HashMap::new());
     }
     Ok(profile::Entity::find()
+        .scoped(tenant)
         .filter(profile::Column::UserId.is_in(ids))
         .all(connection)
         .await?
@@ -300,9 +313,17 @@ impl Comment {
 
 impl CommentsService {
     /// Gắn tên hiển thị cho `rows` (một câu truy vấn hồ sơ cho cả trang).
-    pub(crate) async fn named(&self, rows: Vec<comment::Model>) -> Result<Vec<Comment>, Error> {
-        let names =
-            display_names(self.database.read(), rows.iter().filter_map(|row| row.user_id)).await?;
+    pub(crate) async fn named(
+        &self,
+        tenant: &TenantContext,
+        rows: Vec<comment::Model>,
+    ) -> Result<Vec<Comment>, Error> {
+        let names = display_names(
+            tenant.database().read(),
+            tenant,
+            rows.iter().filter_map(|row| row.user_id),
+        )
+        .await?;
         Ok(rows
             .into_iter()
             .map(|row| {
@@ -317,16 +338,25 @@ impl CommentsService {
     }
 
     /// Bình luận `id`, mọi trạng thái.
-    pub(crate) async fn find(&self, id: Uuid) -> Result<comment::Model, Error> {
+    pub(crate) async fn find(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<comment::Model, Error> {
         comment::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| comment_not_found(id))
     }
 
-    pub(crate) async fn find_named(&self, id: Uuid) -> Result<Comment, Error> {
-        let row = self.find(id).await?;
-        self.named(vec![row])
+    pub(crate) async fn find_named(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Comment, Error> {
+        let row = self.find(tenant, id).await?;
+        self.named(tenant, vec![row])
             .await?
             .into_iter()
             .next()

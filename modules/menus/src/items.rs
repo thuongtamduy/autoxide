@@ -272,6 +272,8 @@ fn check(
     }
     item::Model {
         id: Uuid::now_v7(),
+        // Khách và menu: service điền lúc ghi.
+        tenant_id: Uuid::nil(),
         menu_id: Uuid::nil(),
         parent_id: None,
         position: 0,

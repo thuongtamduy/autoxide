@@ -4,7 +4,7 @@ Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và Postgres**; agen
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–32 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 33 đang
-làm: nhóm A (nền kernel) xong, tiếp theo nhóm B (chuyển module)**; bước 50 chờ
+làm: nhóm A (nền kernel) và nhóm B (13 module theo khách) xong, tiếp theo nhóm C (tên miền, dời khách, vận hành)**; bước 50 chờ
 chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai
 (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
@@ -77,37 +77,39 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
 - [x] Mặt điều khiển: sổ khách hàng (trạng thái, khách cha), vị trí dữ liệu (`shared` /
       `dedicated`, database nào), tên miền → khách / nút; chế độ `single` mặc định (một khách,
       mặt điều khiển và dữ liệu chung một database, không cấu hình gì thêm)
-- [ ] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
+- [x] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
       sự nền tảng; sổ kết nối database theo khách (mở lười, có giới hạn); extractor cho handler,
       tool MCP; thiếu ngữ cảnh ở route cần khách thì lỗi rõ
-- [ ] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 14 module có
+- [x] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 14 module có
       `tenant_id` (migration mới), khoá unique và index bắt đầu bằng nó; testkit và `cargo xtask
       check` chặn bảng cấp khách hàng thiếu `tenant_id`; sổ đối tượng nhận khách ở `resolve`,
       `resolve_many`, `children` và cache menu công khai của `menus` theo khách (D-238)
-- [ ] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
+- [x] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
       giữa khách** chạy cho mọi module (ghi ở khách A, đọc bằng người của khách B: không thấy gì)
-- [ ] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
+- [x] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
       được giao; `autoxide migrate up --all` cho cả đội database; dời một khách `shared` ↔ `dedicated`
       bằng chép dữ liệu (mở rộng `autoxide copy`)
 - [ ] Đo đường nóng trước và sau (`scripts/loadtest.sh`); hướng dẫn viết module (EN + VI) có quy
       tắc phân loại bảng và lọc theo khách
-- [ ] Mã hoá dữ liệu nhạy cảm khi lưu (dời từ bước 37, D-190 — kho secret theo khách cần nó):
+- [x] Mã hoá dữ liệu nhạy cảm khi lưu (dời từ bước 37, D-190 — kho secret theo khách cần nó):
       secret TOTP của MFA (hiện lưu chữ thường trong `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
       database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
       dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
       liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
       chưa đặt thì khoá gốc nằm trong database (`kernel/src/security/secret.rs`), mã hoá không bảo vệ được
       bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
-- [ ] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
+- [x] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
       toán, SMTP, hoá đơn điện tử, khoá AI) lưu mã hoá bằng cơ chế trên; module đọc qua một trait
       của kernel, không đọc biến môi trường cho thứ thuộc về khách
-- [ ] Mọi thứ ngoài bảng cũng theo khách (D-190): khoá file lưu trữ có tiền tố khách (khách
+- [x] Mọi thứ ngoài bảng cũng theo khách (D-190): khoá file lưu trữ có tiền tố khách (khách
       `dedicated` được bucket riêng); cache trong bộ nhớ (vd cache tìm theo ý nghĩa của `content`),
       rate limiting, login throttling, idempotency key, con trỏ pagination có khách trong khoá;
       token và URL đã ký mang khách, dùng ở khách khác thì bị từ chối
-- [ ] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
+- [x] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
       miền, endpoint "có phục vụ tên miền này không" cho reverse proxy cấp chứng chỉ TLS tự động
       (vd Caddy on-demand TLS); tài liệu deploy (EN + VI)
+- [x] Kiểm lại hằng ngày tên miền đã xác minh: bản ghi TXT mất 3 lần liên tiếp thì `failed` (cột đếm lần trượt,
+      migration mới; D-291 mục 8)
 - [x] An toàn khi nhiều database (D-190): mỗi database ghi phiên bản migration của nó; database
       chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
       chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
@@ -728,6 +730,10 @@ bước 35.
       bảng xổ là danh sách sản phẩm công khai lọc theo danh mục, sắp `best_selling`
 - [ ] Tạo sản phẩm nháp từ ảnh bằng AI (tên, mô tả, danh mục trong cây của khách, thuộc tính, SEO — D-229);
       khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối (bước 67)
+- [ ] Website bán hàng (web-build-api-gaps, 16/11/2026): thông tin hiển thị theo biến thể trong `by-slug`, theo
+      ngôn ngữ (vd số người dùng, trong hộp có gì, cách dùng / chăm sóc, dùng được máy rửa bát) — thuộc tính khai
+      theo loại sản phẩm, không viết cứng ngành nào; catalog công khai lọc theo người bán và đường dẫn trang sản
+      phẩm cho hàng người bán (cùng 46)
 
 ## 42. Kho (`inventory`)
 
@@ -797,6 +803,8 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [ ] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
 - [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67);
       `promotions.promotion` trong sổ đối tượng (chỉ công khai khi đang chạy) để menu của website trỏ tới (D-238)
+- [ ] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
+      mức giảm tối đa theo luật đang áp (dữ liệu có ngày hiệu lực, luật số hai)
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -821,6 +829,8 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
 - [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang sản
       phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
 - [ ] Câu trả lời tự động về hành trình vận đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
+- [ ] Website bán hàng (16/11/2026): phí và ngày giao dự kiến theo tỉnh khi chưa có giỏ (trang sản phẩm), kèm giờ
+      chốt đơn trong ngày của nơi bán
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
 
@@ -874,6 +884,10 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       `buyer_input`; checkout kiểm cùng bộ gom lỗi; mail xác nhận đọc được các trường này
 - [ ] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,
       người bán huỷ hoàn đủ, người mua huỷ theo điều kiện công bố; không mặc định là "đặt cọc" (BLDS Điều 328)
+- [ ] Website bán hàng (16/11/2026): báo giá giỏ trả thêm số điểm tối đa dùng được, cách trả dùng được cho giỏ
+      (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán; đơn có sẵn `return_until`,
+      `buyer_cancel_until`; đánh giá: số đếm có ảnh và theo biến thể, "chủ đề người mua hay nhắc" kèm bản tóm tắt AI
+      đã được người duyệt (D-109: AI chỉ là gợi ý)
 
 ## 46. Sàn (`marketplace`)
 
@@ -900,6 +914,10 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
       dõi gian hàng (đồng ý riêng cho tin hàng mới); huy hiệu chỉ từ dữ liệu thật
 - [ ] Quyết toán theo ai trả tiền giảm giá (D-222): voucher sàn thì người bán nhận đủ, voucher shop trừ doanh
       thu người bán; gốc tính phí sàn là dữ liệu có ngày hiệu lực; người bán đồng ý trước khi cùng chịu chi phí
+- [ ] Website bán hàng (16/11/2026): hồ sơ người bán công khai có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn,
+      trạng thái tạm ngừng; phí sàn công khai (không cần `marketplace.sell`); đăng ký bán trước khi có tài khoản;
+      endpoint công khai báo vi phạm cho sản phẩm, đánh giá, livestream (lý do theo danh sách cố định; cơ chế tiếp
+      nhận phản ánh của sàn theo luật thương mại điện tử — cần đối chiếu văn bản gốc)
 
 ## 47. Khách hàng và giữ chân khách (`customers`)
 
@@ -923,6 +941,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
       `grant_voucher`, gọi lại không cấp thêm
 - [ ] Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (D-233): người mua tự bật, đồng ý riêng, chỉ giảm thật
       ≥ ngưỡng so với giá mốc, tối đa 1 lần / 7 ngày mỗi sản phẩm, gom lô theo khung giờ
+- [ ] Website bán hàng (16/11/2026): đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay
+      passkey (gửi SMS qua đối tác, không giữ secret trong code)
 
 ## 48. Bán đa kênh (`channels`)
 
@@ -959,6 +979,7 @@ liên kết (bước 37).
 - [ ] Phiên livestream: người phát đã xác thực, sản phẩm gắn trong phiên, đơn ghi nhận theo phiên,
       lưu vết phiên theo yêu cầu của luật
 - [ ] Đối chiếu đợt 2: `paid_on` khi đánh dấu đã chi
+- [ ] Website bán hàng (16/11/2026): danh sách phiên livestream công khai (lịch phát), không chỉ một phiên theo id
 
 ## 55. Giao diện cửa hàng qua API: banner, bộ sưu tập, thông tin cửa hàng (D-219)
 

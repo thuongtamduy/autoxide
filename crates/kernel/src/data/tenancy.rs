@@ -10,13 +10,22 @@
 //!   (vị trí dữ liệu: chung `shared` hay riêng `dedicated`), mở lười, có giới hạn.
 //! - Chế độ ([`TenancyMode`], `AUTOXIDE_TENANCY_MODE`): `single` (mặc định — một khách, không truy
 //!   vấn gì thêm mỗi request) hay `multi`.
+//! - Tên miền riêng của khách ([`TenantDomains`], `domains.rs`): xác minh bằng bản ghi TXT, request
+//!   tới tên miền đã xác minh vào thẳng khách (D-190).
+//! - Dời khách giữa các placement ([`TenantMoves`], `moves.rs`): `shared` ↔ `dedicated`, chạy lại
+//!   được khi hỏng giữa chừng.
+//! - Token trong link của thư mang khách ([`link_token`], [`resolve_link_token`],
+//!   [`OptionalTenant`]): bấm link ở tên miền chính vẫn tới đúng khách (D-281).
 //!
 //! Bảng mặt điều khiển (`kernel_tenants`, `kernel_placements`, `kernel_tenant_domains`) do
 //! module nội bộ `kernel` tạo (`schema.rs`); chúng chỉ có dữ liệu ở database điều khiển.
 
 pub(crate) mod admin;
 mod config;
+pub(crate) mod domains;
+mod link_token;
 pub mod migration;
+pub(crate) mod moves;
 mod placements;
 mod registry;
 pub(crate) mod request;
@@ -34,17 +43,35 @@ use crate::database::Database;
 use crate::error::Error;
 
 pub use admin::{
-    CurrentTenant, NewTenant, PLACEMENTS_READ, Placement, TENANTS_MANAGE, TENANTS_READ, Tenant,
-    TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
+    CurrentTenant, NewTenant, PLACEMENTS_READ, Placement, PlacementStorage, TENANTS_MANAGE,
+    TENANTS_READ, Tenant, TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
 };
 pub use config::{TenancyConfig, WorkerPlacements};
+pub use domains::{
+    CHALLENGE_PREFIX, CHALLENGE_VALUE_PREFIX, DOMAINS_MANAGE, DnsTxtLookup, DomainRecord,
+    TenantDomain, TenantDomains, normalize_domain,
+};
+pub use link_token::{OptionalTenant, link_token, resolve_link_token, split_link_token};
+pub use moves::{
+    TENANTS_MOVE, TenantMove, TenantMoveBlocker, TenantMovePlan, TenantMoves, TenantTableRows,
+};
 pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
-pub use registry::{DatabaseRegistry, PLACEMENT_READ_URL, PLACEMENT_URL};
+pub use registry::{
+    DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
+};
 pub use request::{TENANT_HEADER, TenantHint};
 pub use scope::{ScopeExt, TenantScoped};
 pub use settings::{PUBLIC_URL, SETTINGS_MANAGE, SettingValue, TenantSetting, TenantSettings};
 
 pub(crate) use config::read_setting;
+
+/// Chỗ module `kernel` nhận thứ của mọi module khi chúng đã khởi động (`Modules::start_in` điền):
+/// bộ gieo dữ liệu cho khách mới, bộ tra DNS, thứ việc dời khách cần.
+pub(crate) struct Slots {
+    pub(crate) seeds: admin::Seeds,
+    pub(crate) dns: domains::DnsSlot,
+    pub(crate) moves: moves::MoveSetup,
+}
 
 /// ID của một khách hàng.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -124,9 +151,9 @@ pub const NO_TENANT: TenantId = TenantId(Uuid::nil());
 pub const MAIN_PLACEMENT: PlacementId =
     PlacementId(Uuid::from_u128(0x0000_0000_0000_7000_8000_0000_0000_0002));
 
-/// `false` tới khi mọi module đã chuyển sang theo khách (D-253 mục 6): trước đó chế độ `multi` là
-/// lỗi cấu hình — không ai bật được nó trên bản đang chuyển dở. Testkit vẫn bật được.
-pub const MULTI_TENANT_READY: bool = false;
+/// `true` từ khi mọi module đã chuyển sang theo khách (bước 33 B14, D-253 mục 6): bật được chế độ
+/// `multi` bằng `AUTOXIDE_TENANCY_MODE`.
+pub const MULTI_TENANT_READY: bool = true;
 
 /// Chế độ của bản cài (`AUTOXIDE_TENANCY_MODE`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -221,6 +248,8 @@ struct Inner {
     /// Placement đã áp dụng đủ migration (`schema_state = ready`); chưa thì khách nhận
     /// `tenant_maintenance`.
     schema_ready: bool,
+    /// Nơi lưu file riêng của placement (`autoxide placement storage`); `None`: nơi lưu chung.
+    storage: Option<Arc<dyn crate::storage::Storage>>,
 }
 
 impl TenantContext {
@@ -241,7 +270,28 @@ impl TenantContext {
             placement,
             database,
             schema_ready: true,
+            storage: None,
         }))
+    }
+
+    /// Cùng khách, file lưu ở `storage` (nơi lưu riêng của placement của nó) thay cho nơi lưu chung.
+    /// Sổ database dựng; test dựng để thử placement có nơi lưu riêng.
+    #[must_use]
+    pub fn with_storage(self, storage: Arc<dyn crate::storage::Storage>) -> Self {
+        let inner = Arc::unwrap_or_clone(self.0);
+        TenantContext(Arc::new(Inner { storage: Some(storage), ..inner }))
+    }
+
+    /// Nơi lưu file riêng của placement của khách; `None`: khách dùng nơi lưu chung.
+    /// [`TenantStorage::new`](crate::storage::TenantStorage::new) tự chọn.
+    pub fn own_storage(&self) -> Option<&Arc<dyn crate::storage::Storage>> {
+        self.0.storage.as_ref()
+    }
+
+    /// Placement có nơi lưu riêng mà khách dùng; `None`: khách dùng nơi lưu chung. Job dọn file
+    /// mồ côi so với [`FileStore::placement`] để chỉ xét khách của nơi lưu đang quét.
+    pub fn storage_placement(&self) -> Option<PlacementId> {
+        self.0.storage.as_ref().map(|_| self.0.placement)
     }
 
     /// Cùng khách, đánh dấu placement chưa áp dụng đủ migration (sổ database dựng khi
@@ -274,6 +324,9 @@ impl TenantContext {
     /// dùng khách mặc định trên database nó đang giữ. Bị `#[deprecated]` khi phần B xong (không còn
     /// ai gọi), xoá ở đầu bước 34 (D-253 mục 7).
     #[doc(hidden)]
+    #[deprecated(
+        note = "dùng `TenantContext` của request, job hay event; cần khách mặc định thì `default_on`"
+    )]
     pub fn legacy_default(database: &Database) -> Self {
         Self::default_on(database.clone())
     }
@@ -422,6 +475,177 @@ pub mod errors {
     pub fn tenant_placement_not_found(placement: &str) -> Error {
         Error::not_found("tenant_placement_not_found", "There is no placement `{placement}`.")
             .with_param("placement", placement)
+    }
+
+    pub fn tenant_placement_storage_in_use(placement: &str, tenants: u64) -> Error {
+        Error::conflict(
+            "tenant_placement_storage_in_use",
+            "{tenants} tenant(s) keep their data on the placement `{placement}`; changing its file \
+             storage would hide their files. Move them to another placement first, or pass \
+             `--force` when the new storage already holds the same files (e.g. a new access key).",
+        )
+        .with_param("placement", placement)
+        .with_param("tenants", tenants)
+    }
+
+    pub fn tenant_domain_invalid(domain: &str) -> Error {
+        // Giá trị do client gửi: chỉ nhắc lại phần đầu.
+        let shown: String = domain.chars().take(100).collect();
+        Error::new(
+            crate::error::ErrorKind::Validation,
+            "tenant_domain_invalid",
+            "`{domain}` is not a domain that can be used: send a name such as `shop.example` \
+             (punycode for international names), not an IP address, `localhost` or the \
+             platform's own domain.",
+        )
+        .with_param("domain", shown)
+    }
+
+    pub fn tenant_domain_taken(domain: &str) -> Error {
+        Error::conflict("tenant_domain_taken", "The domain `{domain}` belongs to another tenant.")
+            .with_param("domain", domain)
+    }
+
+    pub fn tenant_domain_not_found() -> Error {
+        Error::not_found(
+            "tenant_domain_not_found",
+            "This domain is not one of the current tenant's domains.",
+        )
+    }
+
+    pub fn tenant_domain_dns_failed(error: &str) -> Error {
+        Error::unavailable("tenant_domain_dns_failed", "The DNS lookup failed: {error}")
+            .with_param("error", error)
+    }
+
+    pub fn tenant_moving() -> Error {
+        Error::conflict(
+            "tenant_moving",
+            "The tenant is being moved to another placement. Wait until the move is done, or \
+             abort it with `autoxide tenant move <tenant> --abort`.",
+        )
+    }
+
+    pub fn tenant_move_platform() -> Error {
+        Error::conflict(
+            "tenant_move_platform",
+            "The platform tenant always keeps its data on the placement `main`; it cannot be moved.",
+        )
+    }
+
+    pub fn tenant_move_same_placement(placement: &str) -> Error {
+        Error::conflict(
+            "tenant_move_same_placement",
+            "The tenant already keeps its data on the placement `{placement}`.",
+        )
+        .with_param("placement", placement)
+    }
+
+    pub fn tenant_move_not_active(status: &str) -> Error {
+        Error::conflict(
+            "tenant_move_not_active",
+            "Only an active tenant can be moved; this one is `{status}`.",
+        )
+        .with_param("status", status)
+    }
+
+    pub fn tenant_move_running(placement: &str) -> Error {
+        Error::conflict(
+            "tenant_move_running",
+            "A move of this tenant to the placement `{placement}` is running now. Follow it with \
+             the move status (`GET /api/v1/kernel/tenants/<tenant>/moves/<move>`) and try again when it is done.",
+        )
+        .with_param("placement", placement)
+    }
+
+    pub fn tenant_move_unfinished(placement: &str) -> Error {
+        Error::conflict(
+            "tenant_move_unfinished",
+            "A move of this tenant to the placement `{placement}` stopped before the end. Resume \
+             it by moving the tenant to `{placement}` again, or abort it with \
+             `autoxide tenant move <tenant> --abort`.",
+        )
+        .with_param("placement", placement)
+    }
+
+    pub fn tenant_move_not_abortable() -> Error {
+        Error::conflict(
+            "tenant_move_not_abortable",
+            "The tenant already uses its new placement; the move only has to clean the old one. \
+             Resume it instead of aborting: move the tenant to the same placement again.",
+        )
+    }
+
+    pub fn tenant_move_schema_differs(placement: &str, pending: usize) -> Error {
+        Error::conflict(
+            "tenant_move_schema_differs",
+            "The placement `{placement}` has {pending} migration(s) not applied: run \
+             `autoxide migrate up --all` so both databases have the same schema.",
+        )
+        .with_param("placement", placement)
+        .with_param("pending", pending)
+    }
+
+    pub fn tenant_move_same_database(placement: &str) -> Error {
+        Error::conflict(
+            "tenant_move_same_database",
+            "The placement `{placement}` is the same database as the tenant's current one; moving \
+             would delete the tenant's data. Give each placement its own database.",
+        )
+        .with_param("placement", placement)
+    }
+
+    pub fn tenant_move_unreachable(placement: &str, error: &str) -> Error {
+        Error::unavailable(
+            "tenant_move_unreachable",
+            "Cannot reach the database of the placement `{placement}`: {error}",
+        )
+        .with_param("placement", placement)
+        .with_param("error", error)
+    }
+
+    pub fn tenant_move_storage_unavailable(placement: &str, error: &str) -> Error {
+        Error::unavailable(
+            "tenant_move_storage_unavailable",
+            "Cannot reach the file storage of the placement `{placement}`: {error}",
+        )
+        .with_param("placement", placement)
+        .with_param("error", error)
+    }
+
+    pub fn tenant_move_busy(jobs: u64) -> Error {
+        Error::unavailable(
+            "tenant_move_busy",
+            "{jobs} job(s) or event(s) of the tenant are still being run at the old placement. \
+             The move is paused; run it again in a few minutes.",
+        )
+        .with_param("jobs", jobs)
+    }
+
+    pub fn tenant_move_count_mismatch(table: &str, source: u64, target: u64) -> Error {
+        Error::conflict(
+            "tenant_move_count_mismatch",
+            "After copying, `{table}` has {target} row(s) of the tenant at the new placement and \
+             {source} at the old one; the tenant keeps its old placement. Run the move again to \
+             copy once more.",
+        )
+        .with_param("table", table)
+        .with_param("source", source)
+        .with_param("target", target)
+    }
+
+    pub fn tenant_move_not_found(id: &str) -> Error {
+        Error::not_found("tenant_move_not_found", "The tenant has no move `{id}`.")
+            .with_param("id", id)
+    }
+
+    pub fn tenant_purge_current(placement: &str) -> Error {
+        Error::conflict(
+            "tenant_purge_current",
+            "The placement `{placement}` keeps the tenant's live data; only a copy left on \
+             another placement (by `--keep-source`) can be deleted.",
+        )
+        .with_param("placement", placement)
     }
 }
 

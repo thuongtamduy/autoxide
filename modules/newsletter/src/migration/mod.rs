@@ -5,6 +5,7 @@ mod m0001_create_newsletter;
 mod m0009_delivery_unsubscribed;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -36,5 +37,58 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Lần huỷ đăng ký bằng link của từng thư (D-269).
         Box::new(m0009_delivery_unsubscribed::Migration),
+        // Danh sách, người đăng ký, đăng ký, chiến dịch, lượt gửi và danh sách chặn thuộc một khách
+        // (bước 33): cùng email / cùng `key` ở hai khách là hai dòng riêng. Mọi index bắt đầu bằng
+        // `tenant_id`; job dọn dẹp tìm khách trên database rồi dọn theo từng khách, nên không cần
+        // index quét cả database. Khoá chính của `newsletter_subscriptions` thêm `tenant_id` đầu
+        // (helper đòi khoá chính ghép phải chứa `tenant_id`), ngữ nghĩa giữ nguyên.
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0010_tenancy",
+            vec![
+                TenantTable::new("newsletter_lists")
+                    .unique("newsletter_lists_key_unique", ["tenant_id", "key"])
+                    .index("newsletter_lists_created_by_idx", ["tenant_id", "created_by"]),
+                TenantTable::new("newsletter_subscribers")
+                    .unique("newsletter_subscribers_email_unique", ["tenant_id", "email"])
+                    .index("newsletter_subscribers_created_idx", ["tenant_id", "created_at"]),
+                TenantTable::new("newsletter_subscriptions")
+                    .primary_key(["tenant_id", "subscriber_id", "list_id"])
+                    .index(
+                        "newsletter_subscriptions_list_idx",
+                        ["tenant_id", "list_id", "status", "subscriber_id"],
+                    )
+                    .index(
+                        "newsletter_subscriptions_status_idx",
+                        ["tenant_id", "status", "requested_at"],
+                    ),
+                TenantTable::new("newsletter_campaigns")
+                    .unique(
+                        "newsletter_campaigns_source_unique",
+                        ["tenant_id", "source", "source_ref"],
+                    )
+                    .index("newsletter_campaigns_status_idx", ["tenant_id", "status", "id"])
+                    .index("newsletter_campaigns_list_idx", ["tenant_id", "list_id", "id"])
+                    .index("newsletter_campaigns_created_by_idx", ["tenant_id", "created_by"]),
+                TenantTable::new("newsletter_deliveries")
+                    .unique(
+                        "newsletter_deliveries_unique",
+                        ["tenant_id", "campaign_id", "subscriber_id"],
+                    )
+                    .unique(
+                        "newsletter_deliveries_token_unique",
+                        ["tenant_id", "unsubscribe_token_hash"],
+                    )
+                    .index(
+                        "newsletter_deliveries_status_idx",
+                        ["tenant_id", "campaign_id", "status", "id"],
+                    )
+                    .index(
+                        "newsletter_deliveries_subscriber_idx",
+                        ["tenant_id", "subscriber_id", "sent_at"],
+                    ),
+                TenantTable::new("newsletter_suppressions")
+                    .unique("newsletter_suppressions_email_unique", ["tenant_id", "email"]),
+            ],
+        ),
     ]
 }

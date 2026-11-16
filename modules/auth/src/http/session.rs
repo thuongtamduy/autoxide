@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -159,11 +160,13 @@ impl MeResponse {
     /// Tài khoản của người gọi, kèm có mật khẩu chưa và email đang chờ xác minh.
     pub(crate) async fn load(
         state: &HttpState,
+        tenant: &TenantContext,
         user: User,
         principal: &Principal,
     ) -> Result<Self, Error> {
-        let facts = state.users.facts(&[user.id]).await?.remove(&user.id).unwrap_or_default();
-        let pending = state.verifications.pending_change(&user).await?;
+        let facts =
+            state.users.facts(tenant, &[user.id]).await?.remove(&user.id).unwrap_or_default();
+        let pending = state.verifications.pending_change(tenant, &user).await?;
         Ok(MeResponse {
             id: user.id,
             email: user.email,
@@ -184,7 +187,9 @@ impl MeResponse {
 /// two-step sign-in on, answers 202 instead: send the `mfa_token` and a code to
 /// `POST /api/v1/auth/login/mfa`. The same error answers an unknown email and a
 /// wrong password. After several failed attempts the email is locked for a while,
-/// even for the right password.
+/// even for the right password. On a server with several tenants, sign in on the
+/// tenant's domain or with the `Autoxide-Tenant` header; the tokens returned name
+/// their tenant, so later requests need neither.
 #[utoipa::path(
     post,
     path = "/login",
@@ -202,14 +207,15 @@ impl MeResponse {
 )]
 async fn login(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     headers: HeaderMap,
     ValidJson(input): ValidJson<LoginRequest>,
 ) -> Result<Response, Error> {
     let user_agent = super::user_agent(&headers);
     // Hai kết quả, hai hình dạng: `Response` là kiểu chung của mọi response.
-    Ok(match state.sessions.login(&input.email, &input.password, user_agent).await? {
+    Ok(match state.sessions.login(&tenant, &input.email, &input.password, user_agent).await? {
         LoginOutcome::Tokens(tokens) => {
-            super::note_country(&state, &headers, tokens.session_id).await;
+            super::note_country(&state, &tenant, &headers, tokens.session_id).await;
             Data { data: TokenResponse::from(tokens) }.into_response()
         }
         LoginOutcome::MfaRequired { mfa_token, expires_in } => {
@@ -230,7 +236,8 @@ const METHODS: [&str; 2] = ["totp", "recovery_code"];
 ///
 /// Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`
 /// seconds. Each `mfa_token` allows five wrong codes; wrong codes also count
-/// towards the sign-in lock of the email.
+/// towards the sign-in lock of the email. Needs no tenant header: the `mfa_token`
+/// names its tenant.
 #[utoipa::path(
     post,
     path = "/login/mfa",
@@ -247,19 +254,25 @@ const METHODS: [&str; 2] = ["totp", "recovery_code"];
 )]
 async fn login_mfa(
     State(state): State<Arc<HttpState>>,
+    OptionalTenant(tenant): OptionalTenant,
     headers: HeaderMap,
     ValidJson(input): ValidJson<LoginMfaRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
     let user_agent = super::user_agent(&headers);
-    let tokens = state.sessions.complete_mfa(&input.mfa_token, &input.code, user_agent).await?;
-    super::note_country(&state, &headers, tokens.session_id).await;
+    // Khách lấy từ `mfa_token`: chạy cả trên tên miền chính không header.
+    let (tenant, tokens) = state
+        .sessions
+        .complete_mfa(tenant.as_ref(), &input.mfa_token, &input.code, user_agent)
+        .await?;
+    super::note_country(&state, &tenant, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 
 /// Exchange a refresh token for a new pair of tokens.
 ///
 /// The refresh token sent is used up. Sending a used refresh token again ends the
-/// whole session (it may have been stolen): sign in again.
+/// whole session (it may have been stolen): sign in again. Needs no tenant header:
+/// the refresh token names its tenant (a header of another tenant makes it invalid).
 #[utoipa::path(
     post,
     path = "/refresh",
@@ -275,16 +288,19 @@ async fn login_mfa(
 )]
 async fn refresh(
     State(state): State<Arc<HttpState>>,
+    OptionalTenant(tenant): OptionalTenant,
     ValidJson(input): ValidJson<RefreshRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
-    let tokens = state.sessions.refresh(&input.refresh_token).await?;
+    // Khách lấy từ refresh token: chạy cả trên tên miền chính không header.
+    let tokens = state.sessions.refresh(tenant.as_ref(), &input.refresh_token).await?;
     Ok(Data { data: tokens.into() })
 }
 
 /// Sign out: end the session of a refresh token.
 ///
 /// Every refresh token of the session stops working; access tokens already issued
-/// keep working until they expire. Safe to repeat.
+/// keep working until they expire. Safe to repeat. Needs no tenant header: the
+/// refresh token names its tenant.
 #[utoipa::path(
     post,
     path = "/logout",
@@ -298,9 +314,11 @@ async fn refresh(
 )]
 async fn logout(
     State(state): State<Arc<HttpState>>,
+    OptionalTenant(tenant): OptionalTenant,
     ValidJson(input): ValidJson<RefreshRequest>,
 ) -> Result<StatusCode, Error> {
-    state.sessions.logout(&input.refresh_token).await?;
+    // Khách lấy từ refresh token: chạy cả trên tên miền chính không header.
+    state.sessions.logout(tenant.as_ref(), &input.refresh_token).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -319,11 +337,15 @@ async fn logout(
 )]
 async fn me(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<MeResponse>, Error> {
-    let user =
-        state.users.get(principal.user_id()).await?.ok_or_else(crate::token::invalid_token)?;
-    Ok(Data { data: MeResponse::load(&state, user, &principal).await? })
+    let user = state
+        .users
+        .get(&tenant, principal.user_id())
+        .await?
+        .ok_or_else(crate::token::invalid_token)?;
+    Ok(Data { data: MeResponse::load(&state, &tenant, user, &principal).await? })
 }
 
 /// Change your own password.
@@ -350,6 +372,7 @@ async fn me(
 )]
 async fn change_password(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     headers: HeaderMap,
     ValidJson(input): ValidJson<ChangePasswordRequest>,
@@ -359,13 +382,14 @@ async fn change_password(
     let tokens = state
         .sessions
         .change_password(
+            &tenant,
             principal.user_id(),
             &input.current_password,
             input.new_password,
             user_agent,
         )
         .await?;
-    super::note_country(&state, &headers, tokens.session_id).await;
+    super::note_country(&state, &tenant, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 

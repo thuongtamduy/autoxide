@@ -17,7 +17,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -192,6 +192,7 @@ impl NewsletterService {
     /// Soạn chiến dịch nháp. Cần `newsletter.manage`.
     pub(crate) async fn create_campaign(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: CampaignInput,
     ) -> Result<Campaign, Error> {
@@ -207,19 +208,19 @@ impl NewsletterService {
             }
         }
         let now = now();
-        let mut row = blank(Uuid::nil(), now);
+        let mut row = blank(tenant, Uuid::nil(), now);
         row.created_by = Some(principal.user_id());
-        self.apply(&mut row, input, &mut problems).await?;
+        self.apply(tenant, &mut row, input, &mut problems).await?;
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = row.into_active_model().insert(&transaction).await?;
         let event = events::CampaignCreated(Change { before: None, after: Some(summary(&row)) });
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::campaign_subject(row.id),
                 &event,
@@ -233,31 +234,38 @@ impl NewsletterService {
     /// Chiến dịch `id` kèm tiến độ. Cần `newsletter.read`.
     pub(crate) async fn get_campaign(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<Campaign, Error> {
         principal.require(&NEWSLETTER_READ)?;
-        self.find_campaign(id).await
+        self.find_campaign(tenant, id).await
     }
 
-    pub(crate) async fn find_campaign(&self, id: Uuid) -> Result<Campaign, Error> {
+    pub(crate) async fn find_campaign(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Campaign, Error> {
         let row = campaign::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(campaign_not_found)?;
-        let mut counts = self.delivery_counts(&[id]).await?;
+        let mut counts = self.delivery_counts(tenant, &[id]).await?;
         Ok(Campaign { row, counts: counts.remove(&id).unwrap_or_default() })
     }
 
     /// Một trang chiến dịch, mới trước (mặc định). Cần `newsletter.read`.
     pub(crate) async fn list_campaigns(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         filter: &CampaignFilter,
         page: &PageRequest,
     ) -> Result<Page<Campaign>, Error> {
         principal.require(&NEWSLETTER_READ)?;
-        let mut select = campaign::Entity::find();
+        let mut select = campaign::Entity::find().scoped(tenant);
         if let Some(status) = filter.status {
             select = select.filter(campaign::Column::Status.eq(status.as_str()));
         }
@@ -265,16 +273,17 @@ impl NewsletterService {
             select = select.filter(campaign::Column::ListId.eq(list_id));
         }
         let found =
-            fetch_page(select, campaign::Column::Id, |row| row.id, page, self.database.read())
+            fetch_page(select, campaign::Column::Id, |row| row.id, page, tenant.database().read())
                 .await?;
         let ids: Vec<Uuid> = found.data.iter().map(|row| row.id).collect();
-        let mut counts = self.delivery_counts(&ids).await?;
+        let mut counts = self.delivery_counts(tenant, &ids).await?;
         Ok(found.map(|row| Campaign { counts: counts.remove(&row.id).unwrap_or_default(), row }))
     }
 
     /// Số lượt gửi theo trạng thái của từng chiến dịch trong `ids`.
     pub(crate) async fn delivery_counts(
         &self,
+        tenant: &TenantContext,
         ids: &[Uuid],
     ) -> Result<HashMap<Uuid, DeliveryCounts>, Error> {
         if ids.is_empty() {
@@ -282,6 +291,7 @@ impl NewsletterService {
         }
         // Nhóm thêm theo `error` để đếm bounce trong cùng câu; số huỷ đăng ký là câu thứ hai.
         let rows: Vec<(Uuid, String, Option<String>, i64)> = delivery::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(delivery::Column::CampaignId)
             .column(delivery::Column::Status)
@@ -292,7 +302,7 @@ impl NewsletterService {
             .group_by(delivery::Column::Status)
             .group_by(delivery::Column::Error)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let mut counts: HashMap<Uuid, DeliveryCounts> = HashMap::new();
         for (id, status, error, count) in rows {
@@ -312,6 +322,7 @@ impl NewsletterService {
             }
         }
         let unsubscribed: Vec<(Uuid, i64)> = delivery::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(delivery::Column::CampaignId)
             .column_as(Expr::col(delivery::Column::Id).count(), "count")
@@ -319,7 +330,7 @@ impl NewsletterService {
             .filter(delivery::Column::UnsubscribedAt.is_not_null())
             .group_by(delivery::Column::CampaignId)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         for (id, count) in unsubscribed {
             counts.entry(id).or_default().unsubscribed = u64::try_from(count).unwrap_or_default();
@@ -335,13 +346,14 @@ impl NewsletterService {
     /// không đổi được thư sắp gửi sau lưng người đã duyệt.
     pub(crate) async fn update_campaign(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         input: CampaignInput,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Campaign, Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
-        let before = self.find_campaign(id).await?;
+        let before = self.find_campaign(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -350,7 +362,7 @@ impl NewsletterService {
         }
         let mut problems = Vec::new();
         let mut next = before.row.clone();
-        self.apply(&mut next, input, &mut problems).await?;
+        self.apply(tenant, &mut next, input, &mut problems).await?;
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -371,9 +383,10 @@ impl NewsletterService {
             row.scheduled_at = Set(None);
             row.run = Set(before.row.run + 1);
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let update = campaign::Entity::update(row)
             .validate()?
+            .scoped(tenant)
             .filter(campaign::Column::UpdatedAt.eq(expected.unwrap_or(before.row.updated_at)))
             .filter(campaign::Column::Status.eq(before.row.status.as_str()));
         let after = match update.exec(&transaction).await {
@@ -390,7 +403,7 @@ impl NewsletterService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::campaign_subject(id),
                 &event,
@@ -407,12 +420,13 @@ impl NewsletterService {
     /// gửi thì giữ: link huỷ đăng ký trong mail đã gửi trỏ vào nó. Cần `newsletter.manage`.
     pub(crate) async fn delete_campaign(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<(), Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
-        let before = self.find_campaign(id).await?;
+        let before = self.find_campaign(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -427,8 +441,9 @@ impl NewsletterService {
                  this one.",
             ));
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let deleted = campaign::Entity::delete_many()
+            .scoped(tenant)
             .filter(campaign::Column::Id.eq(id))
             .filter(campaign::Column::UpdatedAt.eq(expected.unwrap_or(before.row.updated_at)))
             .filter(campaign::Column::Status.eq(before.row.status.as_str()))
@@ -442,7 +457,7 @@ impl NewsletterService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::campaign_subject(id),
                 &event,
@@ -455,13 +470,14 @@ impl NewsletterService {
     /// Đổi trạng thái chiến dịch `id`. Cần `newsletter.send`.
     pub(crate) async fn change_state(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         action: Action,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Campaign, Error> {
         principal.require(&NEWSLETTER_SEND)?;
-        let before = self.find_campaign(id).await?;
+        let before = self.find_campaign(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -489,7 +505,7 @@ impl NewsletterService {
         if matches!(action, Action::Send | Action::Schedule(_) | Action::Resume) {
             // Thiếu cấu hình thì báo NGAY, không để job hỏng lặng lẽ.
             self.check_ready(&before.row)?;
-            self.find_list(before.row.list_id).await?;
+            self.find_list(tenant, before.row.list_id).await?;
         }
         let mut next = before.row.clone();
         next.updated_at = now;
@@ -516,8 +532,9 @@ impl NewsletterService {
                 next.finished_at = Some(now);
             }
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let updated = campaign::Entity::update_many()
+            .scoped(tenant)
             .col_expr(campaign::Column::Status, Expr::value(next.status.clone()))
             .col_expr(campaign::Column::ScheduledAt, Expr::value(next.scheduled_at))
             .col_expr(campaign::Column::StartedAt, Expr::value(next.started_at))
@@ -535,15 +552,18 @@ impl NewsletterService {
         match action {
             Action::Send | Action::Schedule(_) => {
                 let run_at = next.scheduled_at;
-                self.enqueue_prepare(&transaction, id, next.run, None, run_at).await?;
+                self.enqueue_prepare(&transaction, tenant, id, next.run, None, run_at).await?;
             }
             Action::Resume if next.prepared_at.is_some() => {
-                self.enqueue_send(&transaction, id, next.run, 0, None).await?;
+                self.enqueue_send(&transaction, tenant, id, next.run, 0, None).await?;
             }
-            Action::Resume => self.enqueue_prepare(&transaction, id, next.run, None, None).await?,
+            Action::Resume => {
+                self.enqueue_prepare(&transaction, tenant, id, next.run, None, None).await?
+            }
             Action::Cancel => {
                 // Lượt chưa gửi (và chưa có worker nào nhận) thành `skipped`.
                 delivery::Entity::update_many()
+                    .scoped(tenant)
                     .col_expr(
                         delivery::Column::Status,
                         Expr::value(DeliveryStatus::Skipped.as_str()),
@@ -563,20 +583,14 @@ impl NewsletterService {
         match action {
             Action::Send => {
                 self.outbox
-                    .record(
-                        &transaction,
-                        &TenantContext::legacy_default(&self.database),
-                        actor,
-                        subject,
-                        &events::CampaignStarted(change),
-                    )
+                    .record(&transaction, tenant, actor, subject, &events::CampaignStarted(change))
                     .await?
             }
             Action::Schedule(_) => {
                 self.outbox
                     .record(
                         &transaction,
-                        &TenantContext::legacy_default(&self.database),
+                        tenant,
                         actor,
                         subject,
                         &events::CampaignScheduled(change),
@@ -585,31 +599,19 @@ impl NewsletterService {
             }
             Action::Pause => {
                 self.outbox
-                    .record(
-                        &transaction,
-                        &TenantContext::legacy_default(&self.database),
-                        actor,
-                        subject,
-                        &events::CampaignPaused(change),
-                    )
+                    .record(&transaction, tenant, actor, subject, &events::CampaignPaused(change))
                     .await?
             }
             Action::Resume => {
                 self.outbox
-                    .record(
-                        &transaction,
-                        &TenantContext::legacy_default(&self.database),
-                        actor,
-                        subject,
-                        &events::CampaignResumed(change),
-                    )
+                    .record(&transaction, tenant, actor, subject, &events::CampaignResumed(change))
                     .await?
             }
             Action::Cancel => {
                 self.outbox
                     .record(
                         &transaction,
-                        &TenantContext::legacy_default(&self.database),
+                        tenant,
                         actor,
                         subject,
                         &events::CampaignCancelled(change),
@@ -619,13 +621,14 @@ impl NewsletterService {
         }
         transaction.commit().await?;
         tracing::info!(campaign_id = %id, action = action.name(), started, "newsletter campaign state changed");
-        self.find_campaign(id).await
+        self.find_campaign(tenant, id).await
     }
 
     /// Gửi thử chiến dịch `id` tới một địa chỉ (không ghi lượt gửi; link huỷ trong mail thử không
     /// dùng được). Cần `newsletter.send`.
     pub(crate) async fn send_test(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         email: &str,
@@ -634,11 +637,12 @@ impl NewsletterService {
         let mut problems = Vec::new();
         let email = autoxide_kernel::email::checked(email, "email", &mut problems)
             .ok_or_else(|| Error::validation(problems))?;
-        let campaign = self.find_campaign(id).await?;
-        let list = self.find_list(campaign.row.list_id).await?;
+        let campaign = self.find_campaign(tenant, id).await?;
+        let list = self.find_list(tenant, campaign.row.list_id).await?;
         let token = autoxide_kernel::secret::random_token(32)?;
+        let token = autoxide_kernel::tenancy::link_token(tenant, &token);
         let mail = self.campaign_mail(&campaign.row, &list, &email, &token, None)?;
-        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await?;
+        self.mailer.send(tenant, mail).await?;
         tracing::info!(campaign_id = %id, "newsletter test mail queued");
         Ok(())
     }
@@ -657,6 +661,7 @@ impl NewsletterService {
     pub(crate) async fn enqueue_prepare<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         id: Uuid,
         run: i32,
         after: Option<Uuid>,
@@ -671,12 +676,7 @@ impl NewsletterService {
             options = options.run_at(run_at);
         }
         self.jobs
-            .enqueue(
-                connection,
-                &TenantContext::legacy_default(&self.database),
-                &PrepareJob { campaign_id: id, run, after },
-                options,
-            )
+            .enqueue(connection, tenant, &PrepareJob { campaign_id: id, run, after }, options)
             .await?;
         Ok(())
     }
@@ -685,6 +685,7 @@ impl NewsletterService {
     pub(crate) async fn enqueue_send<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         id: Uuid,
         run: i32,
         seq: u32,
@@ -696,12 +697,7 @@ impl NewsletterService {
             options = options.run_at(run_at);
         }
         self.jobs
-            .enqueue(
-                connection,
-                &TenantContext::legacy_default(&self.database),
-                &SendJob { campaign_id: id, run, seq },
-                options,
-            )
+            .enqueue(connection, tenant, &SendJob { campaign_id: id, run, seq }, options)
             .await?;
         Ok(())
     }
@@ -709,12 +705,13 @@ impl NewsletterService {
     /// Áp `input` lên `row` rồi kiểm toàn bộ (mọi lỗi vào `problems`).
     async fn apply(
         &self,
+        tenant: &TenantContext,
         row: &mut campaign::Model,
         input: CampaignInput,
         problems: &mut Vec<FieldError>,
     ) -> Result<(), Error> {
         if let Some(list_id) = input.list_id {
-            if self.lists_by_id(self.database.read(), [list_id]).await?.is_empty() {
+            if self.lists_by_id(tenant.database().read(), tenant, [list_id]).await?.is_empty() {
                 problems.push(FieldError::new("list_id", "invalid", "no list has this id"));
             }
             row.list_id = list_id;
@@ -768,9 +765,10 @@ fn content_changed(before: &campaign::Model, after: &campaign::Model) -> bool {
 }
 
 /// Chiến dịch nháp rỗng của danh sách `list_id`.
-pub(crate) fn blank(list_id: Uuid, now: DateTime<Utc>) -> campaign::Model {
+pub(crate) fn blank(tenant: &TenantContext, list_id: Uuid, now: DateTime<Utc>) -> campaign::Model {
     campaign::Model {
         id: Uuid::now_v7(),
+        tenant_id: tenant.id().as_uuid(),
         list_id,
         subject: String::new(),
         preheader: None,

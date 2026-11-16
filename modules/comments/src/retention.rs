@@ -10,14 +10,19 @@
 //! - nonce, bộ đếm, token đã hết hạn bị dọn.
 //!
 //! Chạy lại bao nhiêu lần cũng ra cùng kết quả.
+//!
+//! Job theo lịch chạy một lần cho mỗi database (bước 33): bình luận hết hạn (kèm event) dọn theo
+//! từng khách có bình luận trên database đó; xoá dấu vết IP, khoá người báo, nonce, bộ đếm, token
+//! quét cả database.
 
 use std::sync::Arc;
 use std::time::Duration;
 
+use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::throttle::Throttle;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
@@ -25,7 +30,7 @@ use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::entity::{comment, report, subscription};
+use crate::entity::{comment, report, subscription, target};
 use crate::events::{self, Change};
 use crate::posting::authoring::{Deletion, soft_delete};
 use crate::service::{CommentsService, MODULE, Status, now, shift_counts};
@@ -59,62 +64,49 @@ pub(crate) enum Expired {
     Cleared,
 }
 
-pub(crate) struct Cleanup(pub Arc<CommentsService>);
+pub(crate) struct Cleanup {
+    pub service: Arc<CommentsService>,
+    /// Sổ database: tra ngữ cảnh của từng khách có dữ liệu trên database của job.
+    pub databases: DatabaseRegistry,
+}
 
 #[async_trait::async_trait]
 impl JobHandler for Cleanup {
-    async fn run(&self, _: &JobContext) -> Result<(), Error> {
-        self.0.cleanup(now()).await.map(|_| ())
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.service.cleanup(&self.databases, &job.database, now()).await.map(|_| ())
     }
 }
 
 impl CommentsService {
-    /// Dọn theo thời hạn, coi `now` là bây giờ (test truyền thời điểm tương lai).
-    pub(crate) async fn cleanup(&self, now: DateTime<Utc>) -> Result<Cleaned, Error> {
+    /// Dọn `database` theo thời hạn, coi `now` là bây giờ (test truyền thời điểm tương lai).
+    pub(crate) async fn cleanup(
+        &self,
+        databases: &DatabaseRegistry,
+        database: &Database,
+        now: DateTime<Utc>,
+    ) -> Result<Cleaned, Error> {
         let mut cleaned = Cleaned::default();
         let before = now - chrono::Duration::days(i64::from(self.config.retention_days));
-        let mut after = Uuid::nil();
-        let mut ids = Vec::new();
-        loop {
-            let rows = comment::Entity::find()
-                .filter(comment::Column::Status.is_in(EXPIRING))
-                .filter(comment::Column::PublishedAt.is_null())
-                .filter(comment::Column::CreatedAt.lt(before))
-                .filter(comment::Column::Id.gt(after))
-                .order_by_asc(comment::Column::Id)
-                .limit(BATCH)
-                .all(self.database.read())
-                .await?;
-            let Some(last) = rows.last() else { break };
-            after = last.id;
-            for row in rows {
-                match self.expire(&row).await? {
-                    Some(Expired::Deleted) => cleaned.deleted += 1,
-                    Some(Expired::Cleared) => cleaned.cleared += 1,
-                    None => continue,
+        // Khách có bình luận trên database này: mọi bình luận có dòng đích (`ensure_target`), nên
+        // đọc bảng đích — nhỏ, khoá chính có `tenant_id` đứng đầu.
+        let tenants: Vec<Uuid> = target::Entity::find()
+            .select_only()
+            .column(target::Column::TenantId)
+            .distinct()
+            .into_tuple()
+            .all(database.read())
+            .await?;
+        for id in tenants {
+            match databases.tenant(TenantId::from_uuid(id)).await {
+                Ok(tenant) => self.expire_tenant(&tenant, before, &mut cleaned).await?,
+                // Khách đã bị xoá khỏi sổ: dữ liệu còn lại do việc xoá khách lo, không đoán ở đây.
+                Err(error) => {
+                    tracing::warn!(tenant_id = %id, error = %error, "comments cleanup skipped a tenant");
                 }
-                ids.push(row.id);
             }
         }
-        if !ids.is_empty() {
-            let change = Change {
-                before: Some(
-                    json!({"comment_ids": ids, "count": ids.len(), "reason": "retention"}),
-                ),
-                after: None,
-            };
-            self.outbox
-                .record(
-                    self.database.write(),
-                    &TenantContext::legacy_default(&self.database),
-                    Actor::system(),
-                    None,
-                    &events::CommentsExpired(change),
-                )
-                .await?;
-        }
         let ip_before = now - chrono::Duration::days(i64::from(self.config.ip_retention_days));
-        let write = self.database.write();
+        let write = database.write();
         cleaned.fingerprints = comment::Entity::update_many()
             .col_expr(comment::Column::IpFingerprint, Expr::value(Option::<String>::None))
             .filter(comment::Column::IpFingerprint.is_not_null())
@@ -123,7 +115,7 @@ impl CommentsService {
             .await?
             .rows_affected;
         // Khoá người báo của khách (`ip:<dấu vết>`) cũng là dấu vết IP: quá hạn thì thành
-        // `expired:<id báo cáo>` — vẫn duy nhất trong `(comment_id, reporter_key)`.
+        // `expired:<id báo cáo>` — vẫn duy nhất trong `(tenant_id, comment_id, reporter_key)`.
         loop {
             let expired: Vec<Uuid> = report::Entity::find()
                 .select_only()
@@ -133,7 +125,7 @@ impl CommentsService {
                 .order_by_asc(report::Column::Id)
                 .limit(BATCH)
                 .into_tuple()
-                .all(self.database.read())
+                .all(database.read())
                 .await?;
             if expired.is_empty() {
                 break;
@@ -151,7 +143,7 @@ impl CommentsService {
         self.guard.purge_nonces(write, MODULE).await?;
         self.tokens.purge(write, now).await?;
         Throttle::new(MODULE, 1, Duration::from_secs(3600))?
-            .purge(&self.database, now - chrono::Duration::days(1))
+            .purge(database, now - chrono::Duration::days(1))
             .await?;
         if cleaned != Cleaned::default() {
             tracing::info!(
@@ -165,17 +157,73 @@ impl CommentsService {
         Ok(cleaned)
     }
 
+    /// Phần dọn của khách `tenant`: bình luận chưa từng hiện tạo trước `before`, kèm một event.
+    async fn expire_tenant(
+        &self,
+        tenant: &TenantContext,
+        before: DateTime<Utc>,
+        cleaned: &mut Cleaned,
+    ) -> Result<(), Error> {
+        let mut after = Uuid::nil();
+        let mut ids = Vec::new();
+        loop {
+            let rows = comment::Entity::find()
+                .scoped(tenant)
+                .filter(comment::Column::Status.is_in(EXPIRING))
+                .filter(comment::Column::PublishedAt.is_null())
+                .filter(comment::Column::CreatedAt.lt(before))
+                .filter(comment::Column::Id.gt(after))
+                .order_by_asc(comment::Column::Id)
+                .limit(BATCH)
+                .all(tenant.database().read())
+                .await?;
+            let Some(last) = rows.last() else { break };
+            after = last.id;
+            for row in rows {
+                match self.expire(tenant, &row).await? {
+                    Some(Expired::Deleted) => cleaned.deleted += 1,
+                    Some(Expired::Cleared) => cleaned.cleared += 1,
+                    None => continue,
+                }
+                ids.push(row.id);
+            }
+        }
+        if !ids.is_empty() {
+            let change = Change {
+                before: Some(
+                    json!({"comment_ids": ids, "count": ids.len(), "reason": "retention"}),
+                ),
+                after: None,
+            };
+            self.outbox
+                .record(
+                    tenant.database().write(),
+                    tenant,
+                    Actor::system(),
+                    None,
+                    &events::CommentsExpired(change),
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
     /// Dọn MỘT bình luận hết hạn `row` (đọc ở lô, có thể đã cũ). Chỉ dọn khi nó vẫn đúng như lúc
     /// đọc (cùng trạng thái, cùng `updated_at`, chưa từng hiện): ai đó vừa duyệt / sửa nó thì
     /// thôi (`None`), không xoá nhầm và không đổi số đếm theo trạng thái cũ.
-    pub(crate) async fn expire(&self, row: &comment::Model) -> Result<Option<Expired>, Error> {
+    pub(crate) async fn expire(
+        &self,
+        tenant: &TenantContext,
+        row: &comment::Model,
+    ) -> Result<Option<Expired>, Error> {
         let status = Status::of(row);
         if !EXPIRING.contains(&status.as_str()) || row.published_at.is_some() {
             return Ok(None);
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let others = if row.depth == 0 {
             comment::Entity::find()
+                .scoped(tenant)
                 .filter(comment::Column::RootId.eq(row.id))
                 .filter(comment::Column::Id.ne(row.id))
                 .count(&transaction)
@@ -185,7 +233,7 @@ impl CommentsService {
         };
         let done = if others > 0 {
             // `soft_delete` ghi có điều kiện trạng thái + `updated_at` (đổi rồi thì 412).
-            match soft_delete(self, &transaction, row, Deletion::Erased).await {
+            match soft_delete(self, &transaction, tenant, row, Deletion::Erased).await {
                 Ok(_) => Expired::Cleared,
                 Err(error) if error.kind() == ErrorKind::PreconditionFailed => {
                     transaction.rollback().await?;
@@ -196,6 +244,7 @@ impl CommentsService {
         } else {
             // Xoá trước (khoá dòng, như mọi lệnh ghi: bình luận → gốc → đích), có điều kiện.
             let removed = comment::Entity::delete_many()
+                .scoped(tenant)
                 .filter(comment::Column::Id.eq(row.id))
                 .filter(comment::Column::Status.eq(status.as_str()))
                 .filter(comment::Column::UpdatedAt.eq(row.updated_at))
@@ -207,22 +256,18 @@ impl CommentsService {
                 transaction.rollback().await?;
                 return Ok(None);
             }
-            shift_counts(&transaction, row, Some(status), None).await?;
+            shift_counts(&transaction, tenant, row, Some(status), None).await?;
             report::Entity::delete_many()
+                .scoped(tenant)
                 .filter(report::Column::CommentId.eq(row.id))
                 .exec(&transaction)
                 .await?;
             subscription::Entity::delete_many()
+                .scoped(tenant)
                 .filter(subscription::Column::CommentId.eq(row.id))
                 .exec(&transaction)
                 .await?;
-            self.tokens
-                .forget(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    &row.id.to_string(),
-                )
-                .await?;
+            self.tokens.forget(&transaction, tenant, &row.id.to_string()).await?;
             Expired::Deleted
         };
         transaction.commit().await?;

@@ -4,7 +4,6 @@
 //! phần còn lại (nếu có) vào `details`. Event bị giao lại (giao ít nhất một lần) thì
 //! dòng đã có — bỏ qua, không lỗi. Mỗi dòng nối vào chuỗi băm (`crate::chain`, D-183).
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::deleted_user;
@@ -16,15 +15,8 @@ use serde_json::Value;
 use crate::chain::{self, Link};
 use crate::entity;
 
-pub(crate) struct Recorder {
-    database: Database,
-}
-
-impl Recorder {
-    pub(crate) fn new(database: Database) -> Self {
-        Recorder { database }
-    }
-}
+/// Ghi audit log. Không giữ database: dòng ghi vào database của khách mang event (bước 33).
+pub(crate) struct Recorder;
 
 #[async_trait::async_trait]
 impl EventHandler for Recorder {
@@ -33,8 +25,10 @@ impl EventHandler for Recorder {
         let payload_hash =
             chain::payload_hash(before.as_deref(), after.as_deref(), details.as_deref());
         // Lưu và băm ở độ chính xác micro giây — độ chính xác của cả hai database.
+        let tenant = event.tenant.id().as_uuid();
         let row = entity::Model {
             id: event.id,
+            tenant_id: tenant,
             module: event.module.to_owned(),
             action: event.name.clone(),
             actor_user_id: event.actor.user_id,
@@ -52,13 +46,18 @@ impl EventHandler for Recorder {
         };
         // Nối vào chuỗi: khoá đầu chuỗi, thêm dòng, dời đầu chuỗi — một transaction. Các dòng
         // nối đuôi nhau; deadlock / bận thì chạy lại cả transaction.
-        let (row, database) = (&row, &self.database);
+        let (row, database) = (&row, event.tenant.database());
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
-                let head = chain::lock_head(&transaction).await?;
+                let head = chain::lock_head(&transaction, tenant).await?;
                 // Kiểm SAU khi khoá: hai lần giao cùng một event không cùng qua được.
-                if entity::Entity::find_by_id(row.id).one(&transaction).await?.is_some() {
+                if entity::Entity::find_by_id(row.id)
+                    .filter(entity::Column::TenantId.eq(tenant))
+                    .one(&transaction)
+                    .await?
+                    .is_some()
+                {
                     // Đã ghi ở lần giao trước: đúng như mong muốn.
                     return Ok(());
                 }
@@ -69,7 +68,7 @@ impl EventHandler for Recorder {
                 active.sequence = Set(Some(sequence));
                 active.chain_hash = Set(Some(hash.clone()));
                 active.insert(&transaction).await?;
-                chain::advance(&transaction, sequence, &hash).await?;
+                chain::advance(&transaction, tenant, sequence, &hash).await?;
                 transaction.commit().await?;
                 Ok(())
             })
@@ -94,9 +93,10 @@ impl Recorder {
             .col_expr(entity::Column::Before, Expr::value(None::<String>))
             .col_expr(entity::Column::After, Expr::value(None::<String>))
             .col_expr(entity::Column::Details, Expr::value(None::<String>))
+            .filter(entity::Column::TenantId.eq(event.tenant.id().as_uuid()))
             .filter(entity::Column::Subject.eq(subject.as_str()))
             .filter(entity::Column::Id.ne(event.id))
-            .exec(self.database.write())
+            .exec(event.tenant.database().write())
             .await?;
         tracing::info!(rows = cleared.rows_affected, "audit entries of a deleted user cleared");
         Ok(())
@@ -158,6 +158,7 @@ mod tests {
 mod database_tests {
     use super::*;
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
+    use autoxide_kernel::database::Database;
     use autoxide_kernel::event::Actor;
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
     use autoxide_testkit::TestDatabase;
@@ -184,7 +185,8 @@ mod database_tests {
         TestDatabase::run(async |test| {
             let database = database(test).await;
             let event = Delivered::new(
-                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone())
+                    .default_tenant(),
                 "mail",
                 "mail.delivery_failed".to_owned(),
                 json!({"to": " Ada@Example.com", "dedupe_key": null, "code": "550"}),
@@ -205,10 +207,11 @@ mod database_tests {
     async fn moi_event_mot_dong_ke_ca_khi_giao_lai() {
         TestDatabase::run(async |test| {
             let database = database(test).await;
-            let recorder = Recorder::new(database.clone());
+            let recorder = Recorder;
             let user = Uuid::now_v7();
             let event = Delivered::new(
-                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone())
+                    .default_tenant(),
                 "notes",
                 "notes.note_renamed".to_owned(),
                 json!({"before": {"title": "a"}, "after": {"title": "b"}}),
@@ -241,12 +244,13 @@ mod database_tests {
     async fn xoa_tai_khoan_thi_bo_du_lieu_cua_cac_dong_ve_no() {
         TestDatabase::run(async |test| {
             let database = database(test).await;
-            let recorder = Recorder::new(database.clone());
+            let recorder = Recorder;
             let user = Uuid::now_v7();
             let subject = Some(format!("auth.user:{user}"));
             let happened = |name: &str, subject: Option<String>, payload| {
                 Delivered::new(
-                    autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone())
+                        .default_tenant(),
                     "auth",
                     name.to_owned(),
                     payload,

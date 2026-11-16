@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -91,6 +92,7 @@ pub(crate) struct UpdateFolderRequest {
 )]
 pub(crate) async fn list_folders(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<FoldersQuery>,
     Query(paging): Query<PageQuery>,
@@ -99,18 +101,22 @@ pub(crate) async fn list_folders(
     let parent = folder_filter(query.parent_id.as_deref(), "parent_id", &mut problems);
     let order: FolderSort = sort(query.sort.as_deref(), "`created_at`, `name`", &mut problems);
     let page = page_request(paging, problems)?;
-    let page = service.list_folders(&principal, parent, order, &page).await?;
+    let page = service.list_folders(&tenant, &principal, parent, order, &page).await?;
     let autoxide_kernel::pagination::Page { data, pagination } = page;
-    Ok(autoxide_kernel::pagination::Page { data: counted(&service, data).await?, pagination })
+    Ok(autoxide_kernel::pagination::Page {
+        data: counted(&service, &tenant, data).await?,
+        pagination,
+    })
 }
 
 /// Thư mục như API trả về, kèm số item của từng cái (một câu đếm cho cả trang).
 async fn counted(
     service: &MediaService,
+    tenant: &TenantContext,
     folders: Vec<Folder>,
 ) -> Result<Vec<FolderResponse>, Error> {
     let ids: Vec<Uuid> = folders.iter().map(|folder| folder.id).collect();
-    let counts = service.folder_item_counts(&ids).await?;
+    let counts = service.folder_item_counts(tenant, &ids).await?;
     Ok(folders
         .into_iter()
         .map(|folder| {
@@ -121,8 +127,12 @@ async fn counted(
 }
 
 /// Một thư mục kèm số item.
-async fn counted_one(service: &MediaService, folder: Folder) -> Result<FolderResponse, Error> {
-    let described = counted(service, vec![folder]).await?.into_iter().next();
+async fn counted_one(
+    service: &MediaService,
+    tenant: &TenantContext,
+    folder: Folder,
+) -> Result<FolderResponse, Error> {
+    let described = counted(service, tenant, vec![folder]).await?.into_iter().next();
     described.ok_or_else(|| Error::internal("describing a media folder returned nothing"))
 }
 
@@ -146,10 +156,11 @@ async fn counted_one(service: &MediaService, folder: Folder) -> Result<FolderRes
 )]
 pub(crate) async fn create_folder(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateFolderRequest>,
 ) -> Result<Created<FolderResponse>, Error> {
-    let folder = service.create_folder(&principal, &input.name, input.parent_id).await?;
+    let folder = service.create_folder(&tenant, &principal, &input.name, input.parent_id).await?;
     Ok(Created::new(format!("/media/folders/{}", folder.id), folder.into()))
 }
 
@@ -172,11 +183,12 @@ pub(crate) async fn create_folder(
 )]
 pub(crate) async fn get_folder(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<FolderResponse>, Error> {
-    let folder = service.get_folder(&principal, id).await?;
-    Ok(Tagged { version: folder.updated_at, data: counted_one(&service, folder).await? })
+    let folder = service.get_folder(&tenant, &principal, id).await?;
+    Ok(Tagged { version: folder.updated_at, data: counted_one(&service, &tenant, folder).await? })
 }
 
 /// Rename or move a media folder.
@@ -203,6 +215,7 @@ pub(crate) async fn get_folder(
 )]
 pub(crate) async fn update_folder(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -210,8 +223,8 @@ pub(crate) async fn update_folder(
 ) -> Result<Tagged<FolderResponse>, Error> {
     let expected = if_match.required()?;
     let changes = FolderChanges { name: input.name, parent_id: input.parent_id };
-    let folder = service.update_folder(&principal, id, changes, expected).await?;
-    Ok(Tagged { version: folder.updated_at, data: counted_one(&service, folder).await? })
+    let folder = service.update_folder(&tenant, &principal, id, changes, expected).await?;
+    Ok(Tagged { version: folder.updated_at, data: counted_one(&service, &tenant, folder).await? })
 }
 
 /// Delete an empty media folder.
@@ -235,9 +248,10 @@ pub(crate) async fn update_folder(
 )]
 pub(crate) async fn delete_folder(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete_folder(&principal, id).await?;
+    service.delete_folder(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

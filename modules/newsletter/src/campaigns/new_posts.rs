@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use uuid::Uuid;
@@ -55,7 +55,8 @@ impl EventHandler for NewPostHandler {
             })
             .and_then(|id| id.parse::<Uuid>().ok());
         match id {
-            Some(id) => self.0.new_post(id).await.map(|_| ()),
+            // Bài thuộc khách của event: chiến dịch tạo ở danh sách của cùng khách.
+            Some(id) => self.0.new_post(&event.tenant, id).await.map(|_| ()),
             None => Ok(()),
         }
     }
@@ -64,14 +65,15 @@ impl EventHandler for NewPostHandler {
 impl NewsletterService {
     /// Tạo chiến dịch cho bài `entry_id` ở mọi danh sách bật chế độ "bài mới". Trả số chiến dịch
     /// vừa tạo (0 khi đã có từ trước).
-    pub(crate) async fn new_post(&self, entry_id: Uuid) -> Result<usize, Error> {
+    pub(crate) async fn new_post(
+        &self,
+        tenant: &TenantContext,
+        entry_id: Uuid,
+    ) -> Result<usize, Error> {
         if !self.resources.knows(ENTRY) {
             return Ok(0);
         }
-        let Some(resource) = self
-            .resources
-            .resolve(&TenantContext::legacy_default(&self.database), ENTRY, &entry_id.to_string())
-            .await?
+        let Some(resource) = self.resources.resolve(tenant, ENTRY, &entry_id.to_string()).await?
         else {
             return Ok(0);
         };
@@ -79,8 +81,9 @@ impl NewsletterService {
             return Ok(0);
         }
         let rows = list::Entity::find()
+            .scoped(tenant)
             .filter(list::Column::NewPosts.ne(NewPosts::Off.as_str()))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let post_locale = resource.locale.as_deref().and_then(Locale::parse);
         let url = match (&self.config.site_url, &resource.url) {
@@ -102,7 +105,7 @@ impl NewsletterService {
             ];
             let rendered = NEW_POST.render(&self.translations, locale.language(), &params);
             let now = now();
-            let mut row = blank(list.row.id, now);
+            let mut row = blank(tenant, list.row.id, now);
             row.subject = rendered.subject.chars().take(200).collect();
             row.body_text = rendered.text;
             row.locale = locale.as_str().to_owned();
@@ -120,12 +123,16 @@ impl NewsletterService {
                 row.started_at = Some(now);
                 row.run = 1;
             }
-            let transaction = self.database.begin_write().await?;
+            let transaction = tenant.database().begin_write().await?;
             let inserted = campaign::Entity::insert(row.clone().into_active_model())
                 .on_conflict(
-                    OnConflict::columns([campaign::Column::Source, campaign::Column::SourceRef])
-                        .do_nothing()
-                        .to_owned(),
+                    OnConflict::columns([
+                        campaign::Column::TenantId,
+                        campaign::Column::Source,
+                        campaign::Column::SourceRef,
+                    ])
+                    .do_nothing()
+                    .to_owned(),
                 )
                 .exec_without_returning(&transaction)
                 .await?;
@@ -138,19 +145,19 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     Actor::system(),
                     subject.clone(),
                     &events::CampaignCreated(change),
                 )
                 .await?;
             if send {
-                self.enqueue_prepare(&transaction, row.id, row.run, None, None).await?;
+                self.enqueue_prepare(&transaction, tenant, row.id, row.run, None, None).await?;
                 let change = Change { before: None, after: Some(summary(&row)) };
                 self.outbox
                     .record(
                         &transaction,
-                        &TenantContext::legacy_default(&self.database),
+                        tenant,
                         Actor::system(),
                         subject,
                         &events::CampaignStarted(change),

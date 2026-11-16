@@ -6,7 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
@@ -49,30 +49,33 @@ pub(crate) enum Resolved {
 impl ContentService {
     pub(crate) async fn list_redirects(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         locale: Option<&str>,
         source: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<Redirect>, Error> {
         principal.require(&CONTENT_MANAGE)?;
-        let mut select = redirect::Entity::find();
+        let mut select = redirect::Entity::find().scoped(tenant);
         if let Some(locale) = locale {
             select = select.filter(redirect::Column::Locale.eq(locale));
         }
         if let Some(source) = source {
             select = select.filter(redirect::Column::Source.eq(source));
         }
-        fetch_page(select, redirect::Column::Id, |row| row.id, page, self.database.read()).await
+        fetch_page(select, redirect::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     pub(crate) async fn get_redirect(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<Redirect, Error> {
         principal.require(&CONTENT_MANAGE)?;
         redirect::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| redirect_not_found(id))
     }
@@ -80,17 +83,19 @@ impl ContentService {
     /// Tạo chuyển hướng làm tay. Chặn vòng lặp và đường dẫn đang có nội dung công khai.
     pub(crate) async fn create_redirect(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: RedirectInput,
     ) -> Result<Redirect, Error> {
         principal.require(&CONTENT_MANAGE)?;
         let now = now();
-        let row = self.check_redirect(Uuid::now_v7(), input, principal.user_id(), now).await?;
-        let transaction = self.database.begin_write().await?;
+        let row =
+            self.check_redirect(tenant, Uuid::now_v7(), input, principal.user_id(), now).await?;
+        let transaction = tenant.database().begin_write().await?;
         // Khoá chung của ngôn ngữ: hai chuyển hướng trỏ vào nhau ghi cùng lúc không thể cùng
         // qua bước kiểm vòng lặp (Postgres); cùng khoá với mọi thay đổi đường dẫn.
-        paths::lock_tree(&transaction, &row.locale).await?;
-        self.check_loop(&transaction, &row).await?;
+        paths::lock_tree(&transaction, tenant, &row.locale).await?;
+        self.check_loop(tenant, &transaction, &row).await?;
         let saved = row.into_active_model().insert(&transaction).await.map_err(|error| {
             if crate::entries::is_unique_violation(&error) {
                 Error::conflict(
@@ -106,7 +111,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("redirect", saved.id),
                 &events::RedirectChanged(change),
@@ -119,25 +124,27 @@ impl ContentService {
     /// Thay chuyển hướng `id` (đích, mã); nó thành chuyển hướng làm tay.
     pub(crate) async fn update_redirect(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         input: RedirectInput,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Redirect, Error> {
         principal.require(&CONTENT_MANAGE)?;
-        let before = self.get_redirect(principal, id).await?;
+        let before = self.get_redirect(tenant, principal, id).await?;
         let now = now();
-        let mut row = self.check_redirect(id, input, principal.user_id(), now).await?;
+        let mut row = self.check_redirect(tenant, id, input, principal.user_id(), now).await?;
         row.created_at = before.created_at;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Khoá chung của ngôn ngữ: hai chuyển hướng trỏ vào nhau ghi cùng lúc không thể cùng
         // qua bước kiểm vòng lặp (Postgres); cùng khoá với mọi thay đổi đường dẫn.
-        paths::lock_tree(&transaction, &row.locale).await?;
-        self.check_loop(&transaction, &row).await?;
+        paths::lock_tree(&transaction, tenant, &row.locale).await?;
+        self.check_loop(tenant, &transaction, &row).await?;
         let mut active = row.into_active_model().reset_all();
         active.id = sea_orm::ActiveValue::Unchanged(id);
         let update = redirect::Entity::update(active)
             .validate()?
+            .scoped(tenant)
             .filter(redirect::Column::UpdatedAt.eq(expected.unwrap_or(before.updated_at)));
         let after = match update.exec(&transaction).await {
             Ok(after) => after,
@@ -160,7 +167,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("redirect", id),
                 &events::RedirectChanged(change),
@@ -172,22 +179,24 @@ impl ContentService {
 
     pub(crate) async fn delete_redirect(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
         principal.require(&CONTENT_MANAGE)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let before = redirect::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| redirect_not_found(id))?;
-        redirect::Entity::delete_by_id(id).exec(&transaction).await?;
+        redirect::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         let change =
             Change { before: Some(redirect_summary(&before)), after: None, published: None };
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("redirect", id),
                 &events::RedirectChanged(change),
@@ -200,6 +209,7 @@ impl ContentService {
     /// Kiểm đầu vào, mọi lỗi một lần; trả dòng sẵn để ghi.
     async fn check_redirect(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         input: RedirectInput,
         by: Uuid,
@@ -249,7 +259,11 @@ impl ContentService {
             }
         }
         if let Some(target) = input.to_entry_id {
-            match entry::Entity::find_by_id(target).one(self.database.read()).await? {
+            match entry::Entity::find_by_id(target)
+                .scoped(tenant)
+                .one(tenant.database().read())
+                .await?
+            {
                 None => problems.push(FieldError::new(
                     "to_entry_id",
                     "not_found",
@@ -268,7 +282,7 @@ impl ContentService {
         let Some(from) = from.filter(|_| problems.is_empty()) else {
             return Err(invalid(problems));
         };
-        if paths::path_used(self.database.read(), &locale, &from, Uuid::nil()).await? {
+        if paths::path_used(tenant.database().read(), tenant, &locale, &from, Uuid::nil()).await? {
             return Err(Error::conflict(
                 "content.path_taken",
                 "A published entry is at `{path}`; a redirect there would never be used.",
@@ -277,6 +291,7 @@ impl ContentService {
         }
         Ok(Redirect {
             id,
+            tenant_id: tenant.id().as_uuid(),
             locale,
             from_path: from,
             to_entry_id: input.to_entry_id,
@@ -292,10 +307,11 @@ impl ContentService {
     /// Đi theo chuyển hướng từ đích của `row`; quay về đường dẫn gốc thì là vòng lặp.
     async fn check_loop<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         connection: &C,
         row: &Redirect,
     ) -> Result<(), Error> {
-        let mut next = self.target_path(connection, row).await?;
+        let mut next = self.target_path(tenant, connection, row).await?;
         for _ in 0..MAX_HOPS {
             let Some(path) = next else { return Ok(()) };
             if path == row.from_path {
@@ -305,12 +321,13 @@ impl ContentService {
                 ));
             }
             let found = redirect::Entity::find()
+                .scoped(tenant)
                 .filter(redirect::Column::Locale.eq(row.locale.as_str()))
                 .filter(redirect::Column::FromPath.eq(path.as_str()))
                 .one(connection)
                 .await?;
             next = match found {
-                Some(found) => self.target_path(connection, &found).await?,
+                Some(found) => self.target_path(tenant, connection, &found).await?,
                 None => None,
             };
         }
@@ -323,11 +340,14 @@ impl ContentService {
     /// Đường dẫn trong site mà chuyển hướng `row` trỏ tới, nếu có.
     async fn target_path<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         connection: &C,
         row: &Redirect,
     ) -> Result<Option<String>, Error> {
         if let Some(id) = row.to_entry_id {
-            return Ok(published::Entity::find_by_id(id)
+            return Ok(published::Entity::find()
+                .scoped(tenant)
+                .filter(published::Column::EntryId.eq(id))
                 .one(connection)
                 .await?
                 .map(|row| row.path));
@@ -337,7 +357,12 @@ impl ContentService {
 
     /// Tra đường dẫn `path` của ngôn ngữ `locale`: bản công khai → chuyển hướng → không có.
     /// Không cần đăng nhập; không bao giờ trả bản nháp.
-    pub(crate) async fn resolve(&self, locale: &str, path: &str) -> Result<Resolved, Error> {
+    pub(crate) async fn resolve(
+        &self,
+        tenant: &TenantContext,
+        locale: &str,
+        path: &str,
+    ) -> Result<Resolved, Error> {
         let not_found = || {
             Error::not_found("content.not_found", "Nothing is published at `{path}`.")
                 .with_param("path", path)
@@ -351,8 +376,9 @@ impl ContentService {
         let Some(path) = normalized.filter(|_| problems.is_empty()) else {
             return Err(Error::validation(problems));
         };
-        let read = self.database.read();
+        let read = tenant.database().read();
         if let Some(found) = published::Entity::find()
+            .scoped(tenant)
             .filter(published::Column::Locale.eq(locale.as_str()))
             .filter(published::Column::Path.eq(path.as_str()))
             .one(read)
@@ -361,6 +387,7 @@ impl ContentService {
             return Ok(Resolved::Entry(Box::new(found)));
         }
         let Some(found) = redirect::Entity::find()
+            .scoped(tenant)
             .filter(redirect::Column::Locale.eq(locale.as_str()))
             .filter(redirect::Column::FromPath.eq(path.as_str()))
             .one(read)
@@ -372,18 +399,26 @@ impl ContentService {
             return Ok(Resolved::Gone);
         }
         let location = match (found.to_entry_id, found.to_url) {
-            (Some(id), _) => match published::Entity::find_by_id(id).one(read).await? {
-                Some(row) => Some(row.path),
-                // Đích đã lưu trữ: gỡ hẳn, đường dẫn cũ cũng "đã gỡ" như đường dẫn của nó.
-                None if entry::Entity::find_by_id(id)
+            (Some(id), _) => {
+                match published::Entity::find()
+                    .scoped(tenant)
+                    .filter(published::Column::EntryId.eq(id))
                     .one(read)
                     .await?
-                    .is_some_and(|entry| entry.status == Status::Archived.as_str()) =>
                 {
-                    return Ok(Resolved::Gone);
+                    Some(row) => Some(row.path),
+                    // Đích đã lưu trữ: gỡ hẳn, đường dẫn cũ cũng "đã gỡ" như đường dẫn của nó.
+                    None if entry::Entity::find_by_id(id)
+                        .scoped(tenant)
+                        .one(read)
+                        .await?
+                        .is_some_and(|entry| entry.status == Status::Archived.as_str()) =>
+                    {
+                        return Ok(Resolved::Gone);
+                    }
+                    None => None,
                 }
-                None => None,
-            },
+            }
             (None, url) => url,
         };
         match location {

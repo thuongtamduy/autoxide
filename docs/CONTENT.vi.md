@@ -167,6 +167,12 @@ Không cần đăng nhập. Chỉ trả bản đã đăng — không bao giờ t
 
 (Tất cả dưới `/api/v1/content`.)
 
+**Nhiều site trên một máy chủ.** Máy chủ có nhiều khách thì mỗi khách là một site riêng: endpoint
+công khai trả lời cho khách của request — tên miền riêng của khách, hay header `Autoxide-Tenant`
+(tên rút gọn của khách). Hai khách được dùng cùng slug, cùng địa chỉ, cùng slug tác giả và term,
+cùng menu và chuyển hướng; khách này không bao giờ thấy bài của khách kia. `ETag` của khách này
+không bao giờ khớp ở khách khác.
+
 **Hiển thị một địa chỉ.** Với mỗi request, website gọi `resolve` với ngôn ngữ và đường dẫn, rồi
 làm theo `type`:
 
@@ -218,6 +224,10 @@ Người biên tập có thể cho một người không có tài khoản xem b�
    nháp. Câu trả lời có `Cache-Control: no-store`, luôn là bản nháp mới nhất, và chỉ có nội dung
    — không có ai tạo hay ai xin duyệt. Token sai hay hết hạn trả `404`
    (`content.preview_token_invalid`). Đổi secret là thu hồi mọi token.
+
+Máy chủ có nhiều khách thì token chỉ mở bản nháp của khách đã tạo ra nó: token ghi khách của nó,
+nên trang xem trước chạy được trên tên miền chính không cần header khách, còn cùng token gửi tới
+khách khác (qua tên miền hay header) trả `404` như token sai.
 
 ## AI agent
 

@@ -8,17 +8,19 @@
 //!   hỏng thì xoá nội dung vừa ghi;
 //! - xoá: xoá dòng (kèm event) trước, rồi nội dung; xoá nội dung hỏng thì chỉ còn một
 //!   file mồ côi ở nơi lưu (ghi log), người dùng không thấy gì sai.
+//!
+//! Theo khách (bước 33): mọi hàm nhận `&TenantContext`; dòng ở database của khách, lọc `.scoped`;
+//! nội dung ở nơi lưu của khách (`TenantStorage`: khoá có tiền tố khách, D-259).
 
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
-use autoxide_kernel::storage::{ByteStream, Storage};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::storage::{ByteStream, Storage, TenantStorage};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, SubsecRound, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::{
@@ -39,45 +41,52 @@ const NAME_MAX_LENGTH: usize = 255;
 /// Thông tin của một file.
 pub(crate) type FileRecord = entity::Model;
 
+/// Thông tin của một file vừa ghi nội dung, chờ lưu dòng.
+struct NewFile {
+    id: Uuid,
+    name: String,
+    content_type: String,
+    size: u64,
+    sha256: String,
+}
+
 /// Một file đang được tải xuống.
 pub(crate) struct Download {
     pub file: FileRecord,
     pub content: ByteStream,
 }
 
+// Service không giữ database: database và nơi lưu là của khách, đi theo `TenantContext`.
 pub(crate) struct FileService {
-    pub(crate) database: Database,
     storage: Arc<dyn Storage>,
     outbox: Outbox,
     limits: Limits,
 }
 
 impl FileService {
-    pub(crate) fn new(
-        database: Database,
-        storage: Arc<dyn Storage>,
-        outbox: Outbox,
-        limits: Limits,
-    ) -> Self {
-        FileService { database, storage, outbox, limits }
+    pub(crate) fn new(storage: Arc<dyn Storage>, outbox: Outbox, limits: Limits) -> Self {
+        FileService { storage, outbox, limits }
     }
 
     pub(crate) fn limits(&self) -> &Limits {
         &self.limits
     }
 
+    /// Nơi lưu chung (mọi khách); chỉ job dọn mồ côi dùng trực tiếp.
     pub(crate) fn storage(&self) -> &Arc<dyn Storage> {
         &self.storage
     }
 
-    pub(crate) fn database(&self) -> &Database {
-        &self.database
+    /// Nơi lưu của khách `tenant`.
+    pub(crate) fn store(&self, tenant: &TenantContext) -> TenantStorage {
+        TenantStorage::new(self.storage.clone(), tenant)
     }
 
     /// Tải lên `content` với tên `name` và loại `content_type`; người tải là chủ file.
     /// Tên và loại được kiểm TRƯỚC khi đọc nội dung.
     pub(crate) async fn upload(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         name: &str,
         content_type: Option<&str>,
@@ -91,16 +100,18 @@ impl FileService {
         let key = entity::storage_key(id);
         let hasher = Arc::new(Mutex::new(Sha256::new()));
         let content = self.measure(content, hasher.clone());
-        let size = self.storage.put(&key, content).await?;
+        let store = self.store(tenant);
+        let size = store.put(&key, content).await?;
         let sha256 = {
             let hasher = hasher.lock().map_err(|_| Error::internal("hasher lock"))?;
             hex(&hasher.clone().finalize())
         };
 
-        let saved = self.save(principal, id, name, content_type, size, sha256).await;
+        let saved =
+            self.save(tenant, principal, NewFile { id, name, content_type, size, sha256 }).await;
         if saved.is_err() {
             // Không để nội dung không ai trỏ tới nằm lại ở nơi lưu.
-            if let Err(error) = self.storage.delete(&key).await {
+            if let Err(error) = store.delete(&key).await {
                 tracing::warn!(file_id = %id, error = %error, "cannot remove an unsaved upload");
             }
         }
@@ -111,20 +122,26 @@ impl FileService {
     }
 
     /// Thông tin file `id`, nếu người gọi được xem.
-    pub(crate) async fn get(&self, principal: &Principal, id: Uuid) -> Result<FileRecord, Error> {
-        let file = Entity::find_by_id(id).one(self.database.read()).await?;
+    pub(crate) async fn get(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<FileRecord, Error> {
+        let file = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
         visible(principal, file, id)
     }
 
     /// Một trang file của người gọi, mới tải trước (mặc định).
     pub(crate) async fn list(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         page: &PageRequest,
     ) -> Result<Page<FileRecord>, Error> {
         principal.require(&FILES_UPLOAD)?;
-        let select = Entity::find().filter(Column::OwnerId.eq(principal.user_id()));
-        fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await
+        let select = Entity::find().filter(Column::OwnerId.eq(principal.user_id())).scoped(tenant);
+        fetch_page(select, Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// Thông tin và nội dung của file `id`. `unchanged(etag)` trả `true` (client đã có đúng bản
@@ -132,15 +149,16 @@ impl FileService {
     /// tiền rồi bỏ dở (D-157).
     pub(crate) async fn download(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         unchanged: impl FnOnce(&str) -> bool,
     ) -> Result<Option<Download>, Error> {
-        let file = self.get(principal, id).await?;
+        let file = self.get(tenant, principal, id).await?;
         if unchanged(&file.etag()) {
             return Ok(None);
         }
-        let stored = self.storage.get(&file.storage_key()).await?.ok_or_else(|| {
+        let stored = self.store(tenant).get(&file.storage_key()).await?.ok_or_else(|| {
             // Có dòng mà không có nội dung: nơi lưu bị đổi từ bên ngoài.
             Error::internal(format!("the content of file {id} is missing from storage"))
         })?;
@@ -148,10 +166,15 @@ impl FileService {
     }
 
     /// Xoá file `id`.
-    pub(crate) async fn delete(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
-        let file = self.get(principal, id).await?;
-        let transaction = self.database.begin_write().await?;
-        let deleted = Entity::delete_by_id(id).exec(&transaction).await?;
+    pub(crate) async fn delete(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        let file = self.get(tenant, principal, id).await?;
+        let transaction = tenant.database().begin_write().await?;
+        let deleted = Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             // Một request khác vừa xoá trước.
             transaction.rollback().await?;
@@ -159,17 +182,9 @@ impl FileService {
         }
         let event = events::FileDeleted { before: details(&file) };
         let actor = Actor::from(principal);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::file_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::file_subject(id), &event).await?;
         transaction.commit().await?;
-        if let Err(error) = self.storage.delete(&file.storage_key()).await {
+        if let Err(error) = self.store(tenant).delete(&file.storage_key()).await {
             tracing::warn!(file_id = %id, error = %error, "file deleted but its content remains");
         }
         tracing::info!(file_id = %id, "file deleted");
@@ -218,16 +233,15 @@ impl FileService {
 
     async fn save(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
-        id: Uuid,
-        name: String,
-        content_type: String,
-        size: u64,
-        sha256: String,
+        new: NewFile,
     ) -> Result<FileRecord, Error> {
-        let transaction = self.database.begin_write().await?;
+        let NewFile { id, name, content_type, size, sha256 } = new;
+        let transaction = tenant.database().begin_write().await?;
         let file = entity::ActiveModel {
             id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             owner_id: Set(principal.user_id()),
             name: Set(name),
             content_type: Set(content_type),
@@ -239,15 +253,7 @@ impl FileService {
         .await?;
         let event = events::FileUploaded { after: details(&file) };
         let actor = Actor::from(principal);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::file_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::file_subject(id), &event).await?;
         transaction.commit().await?;
         Ok(file)
     }
@@ -313,13 +319,14 @@ const ERASE_BATCH: u64 = 100;
 impl PersonalData for FileService {
     async fn export(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         user_id: Uuid,
     ) -> Result<serde_json::Value, Error> {
         let files = Entity::find()
             .filter(Column::OwnerId.eq(user_id))
+            .scoped(tenant)
             .order_by_asc(Column::Id)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let files: Vec<serde_json::Value> = files
             .iter()
@@ -346,21 +353,28 @@ impl EventHandler for FileService {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
+        let tenant = &event.tenant;
+        let store = self.store(tenant);
         let mut removed: u64 = 0;
         loop {
             let files = Entity::find()
                 .filter(Column::OwnerId.eq(user_id))
+                .scoped(tenant)
                 .order_by_asc(Column::Id)
                 .limit(ERASE_BATCH)
-                .all(self.database.write())
+                .all(tenant.database().write())
                 .await?;
             if files.is_empty() {
                 break;
             }
             let ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
-            Entity::delete_many().filter(Column::Id.is_in(ids)).exec(self.database.write()).await?;
+            Entity::delete_many()
+                .filter(Column::Id.is_in(ids))
+                .scoped(tenant)
+                .exec(tenant.database().write())
+                .await?;
             for file in &files {
-                if let Err(error) = self.storage.delete(&file.storage_key()).await {
+                if let Err(error) = store.delete(&file.storage_key()).await {
                     tracing::warn!(file_id = %file.id, error = %error, "file deleted but its content remains");
                 }
             }
@@ -406,6 +420,7 @@ fn now() -> DateTime<Utc> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use autoxide_kernel::database::Database;
     use autoxide_testkit::TestDatabase;
     use bytes::Bytes;
     use futures_util::TryStreamExt as _;
@@ -437,10 +452,17 @@ mod tests {
     async fn tai_len_xem_tai_xuong_va_xoa() {
         TestDatabase::run(async |test| {
             let (files, database) = service(test, no_limits()).await;
+            let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
             let ada = uploader(Uuid::now_v7());
 
             let file = files
-                .upload(&ada, " notes.txt ", Some("Text/Plain; charset=utf-8"), body("hello"))
+                .upload(
+                    &tenant,
+                    &ada,
+                    " notes.txt ",
+                    Some("Text/Plain; charset=utf-8"),
+                    body("hello"),
+                )
                 .await
                 .unwrap();
 
@@ -452,18 +474,23 @@ mod tests {
                 file.sha256,
                 "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
             );
-            assert_eq!(files.get(&ada, file.id).await.unwrap(), file);
-            let page = files.list(&ada, &PageRequest::first(10, Default::default())).await.unwrap();
+            assert_eq!(files.get(&tenant, &ada, file.id).await.unwrap(), file);
+            let page = files
+                .list(&tenant, &ada, &PageRequest::first(10, Default::default()))
+                .await
+                .unwrap();
             assert_eq!(page.data, vec![file.clone()]);
-            let download = files.download(&ada, file.id, |_| false).await.unwrap().unwrap();
+            let download =
+                files.download(&tenant, &ada, file.id, |_| false).await.unwrap().unwrap();
             assert_eq!(content(download).await, b"hello");
             // Client đã có đúng bản này: không mở nội dung (D-157).
             let etag = file.etag();
-            let known = files.download(&ada, file.id, |current| current == etag).await.unwrap();
+            let known =
+                files.download(&tenant, &ada, file.id, |current| current == etag).await.unwrap();
             assert!(known.is_none());
 
-            files.delete(&ada, file.id).await.unwrap();
-            let gone = files.get(&ada, file.id).await.unwrap_err();
+            files.delete(&tenant, &ada, file.id).await.unwrap();
+            let gone = files.get(&tenant, &ada, file.id).await.unwrap_err();
             assert_eq!(gone.code(), "files.file_not_found");
             assert!(files.storage.get(&file.storage_key()).await.unwrap().is_none());
             assert_eq!(events(&database).await, ["files.file_uploaded", "files.file_deleted"]);
@@ -477,43 +504,29 @@ mod tests {
     #[tokio::test]
     async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
         TestDatabase::run(async |test| {
-            let (files, _) = service(test, no_limits()).await;
+            let (files, database) = service(test, no_limits()).await;
+            let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
             let (ada, bob) = (uploader(Uuid::now_v7()), uploader(Uuid::now_v7()));
-            let mine = files.upload(&ada, "a.txt", None, body("a")).await.unwrap();
-            files.upload(&ada, "b.txt", None, body("b")).await.unwrap();
-            files.upload(&bob, "c.txt", None, body("c")).await.unwrap();
+            let mine = files.upload(&tenant, &ada, "a.txt", None, body("a")).await.unwrap();
+            files.upload(&tenant, &ada, "b.txt", None, body("b")).await.unwrap();
+            files.upload(&tenant, &bob, "c.txt", None, body("c")).await.unwrap();
 
-            let exported = files
-                .export(&TenantContext::legacy_default(&files.database), ada.user_id())
-                .await
-                .unwrap();
+            let exported = files.export(&tenant, ada.user_id()).await.unwrap();
             assert_eq!(exported.as_array().unwrap().len(), 2);
             assert_eq!(exported[0]["name"], "a.txt");
 
             let deleted = Delivered::new(
-                autoxide_kernel::tenancy::TenantContext::legacy_default(&files.database),
+                tenant.clone(),
                 "auth",
                 autoxide_kernel::privacy::USER_DELETED.to_owned(),
                 json!({"before": {"id": ada.user_id()}}),
             );
             files.handle(&deleted).await.unwrap();
             files.handle(&deleted).await.unwrap();
-            assert_eq!(
-                files
-                    .export(&TenantContext::legacy_default(&files.database), ada.user_id())
-                    .await
-                    .unwrap(),
-                json!([])
-            );
+            assert_eq!(files.export(&tenant, ada.user_id()).await.unwrap(), json!([]));
             assert!(files.storage.get(&mine.storage_key()).await.unwrap().is_none());
             assert_eq!(
-                files
-                    .export(&TenantContext::legacy_default(&files.database), bob.user_id())
-                    .await
-                    .unwrap()
-                    .as_array()
-                    .unwrap()
-                    .len(),
+                files.export(&tenant, bob.user_id()).await.unwrap().as_array().unwrap().len(),
                 1
             );
         })
@@ -524,29 +537,35 @@ mod tests {
     #[tokio::test]
     async fn chi_chu_file_va_nguoi_quan_ly_thay_file() {
         TestDatabase::run(async |test| {
-            let (files, _) = service(test, no_limits()).await;
+            let (files, database) = service(test, no_limits()).await;
+            let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
             let (ada, bob) = (uploader(Uuid::now_v7()), uploader(Uuid::now_v7()));
             let manager = Principal::new(Uuid::now_v7(), ["files.manage".to_owned()]);
             let nobody = Principal::new(ada.user_id(), []);
-            let file = files.upload(&ada, "a.txt", None, body("a")).await.unwrap();
+            let file = files.upload(&tenant, &ada, "a.txt", None, body("a")).await.unwrap();
             assert_eq!(file.content_type, "application/octet-stream");
 
             // Người khác: như thể file không có.
-            assert_eq!(files.get(&bob, file.id).await.unwrap_err().code(), "files.file_not_found");
             assert_eq!(
-                files.delete(&bob, file.id).await.unwrap_err().code(),
+                files.get(&tenant, &bob, file.id).await.unwrap_err().code(),
                 "files.file_not_found"
             );
-            let empty = files.list(&bob, &PageRequest::first(10, Default::default())).await;
+            assert_eq!(
+                files.delete(&tenant, &bob, file.id).await.unwrap_err().code(),
+                "files.file_not_found"
+            );
+            let empty =
+                files.list(&tenant, &bob, &PageRequest::first(10, Default::default())).await;
             assert!(empty.unwrap().data.is_empty());
             // Mất permission: kể cả file của mình cũng không.
-            let denied = files.get(&nobody, file.id).await.unwrap_err();
+            let denied = files.get(&tenant, &nobody, file.id).await.unwrap_err();
             assert_eq!(denied.code(), "permission_denied");
-            let denied = files.upload(&nobody, "b.txt", None, body("b")).await.unwrap_err();
+            let denied =
+                files.upload(&tenant, &nobody, "b.txt", None, body("b")).await.unwrap_err();
             assert_eq!(denied.code(), "permission_denied");
 
-            assert_eq!(files.get(&manager, file.id).await.unwrap().id, file.id);
-            files.delete(&manager, file.id).await.unwrap();
+            assert_eq!(files.get(&tenant, &manager, file.id).await.unwrap().id, file.id);
+            files.delete(&tenant, &manager, file.id).await.unwrap();
         })
         .await
         .unwrap();
@@ -557,30 +576,34 @@ mod tests {
         TestDatabase::run(async |test| {
             let limits = Limits { max_bytes: 4, allowed_types: Some(vec!["image/*".into()]) };
             let (files, database) = service(test, limits).await;
+            let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
             let ada = uploader(Uuid::now_v7());
 
-            let large = files.upload(&ada, "a.png", Some("image/png"), body("12345")).await;
+            let large =
+                files.upload(&tenant, &ada, "a.png", Some("image/png"), body("12345")).await;
             let large = large.unwrap_err();
             assert_eq!(
                 (large.kind(), large.code()),
                 (ErrorKind::PayloadTooLarge, "files.too_large")
             );
-            let exact = files.upload(&ada, "b.png", Some("image/png"), body("1234")).await;
+            let exact = files.upload(&tenant, &ada, "b.png", Some("image/png"), body("1234")).await;
             assert_eq!(exact.unwrap().size, 4);
 
-            let pdf = files.upload(&ada, "a.pdf", Some("application/pdf"), body("1")).await;
+            let pdf =
+                files.upload(&tenant, &ada, "a.pdf", Some("application/pdf"), body("1")).await;
             let pdf = pdf.unwrap_err();
             assert_eq!(pdf.kind(), ErrorKind::UnsupportedMediaType);
             assert!(pdf.message().contains("Allowed types: image/*"), "{}", pdf.message());
-            let broken = files.upload(&ada, "a.png", Some("png"), body("1")).await.unwrap_err();
+            let broken =
+                files.upload(&tenant, &ada, "a.png", Some("png"), body("1")).await.unwrap_err();
             assert_eq!(broken.code(), "files.invalid_content_type");
             for name in ["", "   ", "a/b.png", "a\\b.png", "a\nb.png", &"x".repeat(256)] {
-                let invalid = files.upload(&ada, name, Some("image/png"), body("1")).await;
+                let invalid = files.upload(&tenant, &ada, name, Some("image/png"), body("1")).await;
                 assert_eq!(invalid.unwrap_err().code(), "validation_failed", "{name:?}");
             }
 
             // Chỉ file hợp lệ có dòng trong database.
-            let page = files.list(&ada, &PageRequest::first(10, Default::default())).await;
+            let page = files.list(&tenant, &ada, &PageRequest::first(10, Default::default())).await;
             assert_eq!(page.unwrap().data.len(), 1);
             assert_eq!(events(&database).await, ["files.file_uploaded"]);
         })
@@ -593,13 +616,14 @@ mod tests {
     async fn xoa_dong_thoi_chi_mot_ben_duoc() {
         TestDatabase::run(async |test| {
             let (files, database) = service(test, no_limits()).await;
+            let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
             let ada = uploader(Uuid::now_v7());
-            let file = files.upload(&ada, "a.txt", None, body("a")).await.unwrap();
+            let file = files.upload(&tenant, &ada, "a.txt", None, body("a")).await.unwrap();
 
             let attempts: Vec<_> = (0..5)
                 .map(|_| {
-                    let (files, ada) = (files.clone(), ada.clone());
-                    tokio::spawn(async move { files.delete(&ada, file.id).await })
+                    let (files, ada, tenant) = (files.clone(), ada.clone(), tenant.clone());
+                    tokio::spawn(async move { files.delete(&tenant, &ada, file.id).await })
                 })
                 .collect();
             let mut deleted = 0;

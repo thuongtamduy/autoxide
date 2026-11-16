@@ -14,6 +14,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageRequest, Pagination, fetch_page, fetch_page_tiers};
 use autoxide_kernel::search;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -44,25 +45,33 @@ impl CommentsService {
     /// chỉ bình luận gốc có chữ hay tên chứa chuỗi này (đã kiểm độ dài), đúng dấu xếp trước.
     pub(crate) async fn thread(
         &self,
+        tenant: &TenantContext,
         kind: &str,
         id: &str,
         page: &PageRequest,
         replies: u32,
         search: Option<&str>,
     ) -> Result<Page<ThreadRoot>, Error> {
-        let target = self.target(kind, id).await?;
+        let target = self.target(tenant, kind, id).await?;
         if target.hidden {
             return Ok(Page { data: Vec::new(), pagination: Pagination::new(page.limit(), None) });
         }
         let select = comment::Entity::find()
+            .scoped(tenant)
             .filter(comment::Column::TargetType.eq(kind))
             .filter(comment::Column::TargetId.eq(id))
             .filter(comment::Column::Depth.eq(0))
             .filter(visible_root());
         let Page { data: roots, pagination } = match search {
             None => {
-                fetch_page(select, comment::Column::Id, |row| row.id, page, self.database.read())
-                    .await?
+                fetch_page(
+                    select,
+                    comment::Column::Id,
+                    |row| row.id,
+                    page,
+                    tenant.database().read(),
+                )
+                .await?
             }
             Some(text) => {
                 let tiers = [
@@ -75,7 +84,7 @@ impl CommentsService {
                     comment::Column::Id,
                     |row| row.id,
                     page,
-                    self.database.read(),
+                    tenant.database().read(),
                 )
                 .await?
             }
@@ -86,12 +95,13 @@ impl CommentsService {
         for root in &roots {
             let found = if replies > 0 && root.reply_count > 0 {
                 comment::Entity::find()
+                    .scoped(tenant)
                     .filter(comment::Column::RootId.eq(root.id))
                     .filter(comment::Column::Depth.eq(1))
                     .filter(comment::Column::Status.eq(Status::Published.as_str()))
                     .order_by_asc(comment::Column::Id)
                     .limit(u64::from(replies))
-                    .all(self.database.read())
+                    .all(tenant.database().read())
                     .await?
             } else {
                 Vec::new()
@@ -99,8 +109,8 @@ impl CommentsService {
             counts.push(found.len());
             all.extend(found);
         }
-        let mut named_roots = self.named(roots).await?.into_iter();
-        let mut named_replies = self.named(all).await?.into_iter();
+        let mut named_roots = self.named(tenant, roots).await?.into_iter();
+        let mut named_replies = self.named(tenant, all).await?.into_iter();
         let data = counts
             .into_iter()
             .filter_map(|count| {
@@ -115,34 +125,40 @@ impl CommentsService {
     /// Một trang trả lời đang hiện của bình luận gốc `id` (cũ trước khi không nêu `order`).
     pub(crate) async fn replies(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         page: &PageRequest,
     ) -> Result<Page<Comment>, Error> {
-        let root = self.public_row(id).await?;
+        let root = self.public_row(tenant, id).await?;
         let select = comment::Entity::find()
+            .scoped(tenant)
             .filter(comment::Column::RootId.eq(root.root_id))
             .filter(comment::Column::Depth.eq(1))
             .filter(comment::Column::Status.eq(Status::Published.as_str()));
         let Page { data, pagination } =
-            fetch_page(select, comment::Column::Id, |row| row.id, page, self.database.read())
+            fetch_page(select, comment::Column::Id, |row| row.id, page, tenant.database().read())
                 .await?;
-        Ok(Page { data: self.named(data).await?, pagination })
+        Ok(Page { data: self.named(tenant, data).await?, pagination })
     }
 
     /// Bình luận `id` khi người lạ được thấy nó.
-    pub(crate) async fn public_comment(&self, id: Uuid) -> Result<Comment, Error> {
-        let row = self.public_row(id).await?;
-        self.named(vec![row]).await?.into_iter().next().ok_or_else(|| comment_not_found(id))
+    pub(crate) async fn public_comment(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Comment, Error> {
+        let row = self.public_row(tenant, id).await?;
+        self.named(tenant, vec![row]).await?.into_iter().next().ok_or_else(|| comment_not_found(id))
     }
 
-    async fn public_row(&self, id: Uuid) -> Result<comment::Model, Error> {
-        let row = self.find(id).await?;
+    async fn public_row(&self, tenant: &TenantContext, id: Uuid) -> Result<comment::Model, Error> {
+        let row = self.find(tenant, id).await?;
         let shown = match Status::of(&row) {
             Status::Published => true,
             Status::Deleted => row.depth == 0 && row.reply_count > 0,
             _ => false,
         };
-        if !shown || self.target(&row.target_type, &row.target_id).await?.hidden {
+        if !shown || self.target(tenant, &row.target_type, &row.target_id).await?.hidden {
             return Err(comment_not_found(id));
         }
         Ok(row)

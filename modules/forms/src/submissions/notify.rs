@@ -40,7 +40,7 @@ impl EventHandler for Notifier {
         let id =
             event.payload.get("after").and_then(|after| after.get("id")).and_then(|id| id.as_str());
         match id.and_then(|id| id.parse::<Uuid>().ok()) {
-            Some(id) => self.0.notify(id).await.map(|_| ()),
+            Some(id) => self.0.notify(&event.tenant, id).await.map(|_| ()),
             None => Ok(()),
         }
     }
@@ -49,8 +49,8 @@ impl EventHandler for Notifier {
 impl FormsService {
     /// Gửi mail báo bài gửi `id` tới mọi `notify_emails` của form. Trả số mail đã xếp hàng.
     /// Bài đã bị xoá hay đã về `spam` thì thôi.
-    pub(crate) async fn notify(&self, id: Uuid) -> Result<usize, Error> {
-        let submission = match self.find_submission(id).await {
+    pub(crate) async fn notify(&self, tenant: &TenantContext, id: Uuid) -> Result<usize, Error> {
+        let submission = match self.find_submission(tenant, id).await {
             Ok(found) => found,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(0),
             Err(error) => return Err(error),
@@ -58,7 +58,7 @@ impl FormsService {
         if submission.status() == SubmissionStatus::Spam {
             return Ok(0);
         }
-        let form = match self.find_form(submission.row.form_id).await {
+        let form = match self.find_form(tenant, submission.row.form_id).await {
             Ok(form) => form,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(0),
             Err(error) => return Err(error),
@@ -93,11 +93,7 @@ impl FormsService {
             // Khoá ngắn (cột `unique_key` của job giới hạn độ dài): địa chỉ băm.
             mail.dedupe_key =
                 Some(format!("forms.notify:{id}:{}", autoxide_kernel::secret::sha256(to)));
-            match self
-                .mailer
-                .send(&TenantContext::legacy_default(&self.database), mail.clone())
-                .await
-            {
+            match self.mailer.send(tenant, mail.clone()).await {
                 Ok(()) => {}
                 // Bên gửi mail không nhận địa chỉ người gửi làm `Reply-To` (địa chỉ cũ lưu từ
                 // trước khi kiểm chặt hơn…): vẫn báo quản trị viên, chỉ bỏ `Reply-To` — không để
@@ -108,7 +104,7 @@ impl FormsService {
                         "the mailer refused the sender's address as Reply-To; notifying without it"
                     );
                     mail.reply_to = None;
-                    self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await?;
+                    self.mailer.send(tenant, mail).await?;
                 }
                 Err(error) => return Err(error),
             }

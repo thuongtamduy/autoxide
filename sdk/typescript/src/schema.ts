@@ -37,6 +37,11 @@ export type AiStatus = {
   tokens_today: number;
 };
 
+/** A domain that may get a TLS certificate. */
+export type AllowedTenantDomain = {
+  domain: string;
+};
+
 /** What the alt text is for. */
 export type AltRequest = {
   /**
@@ -89,7 +94,11 @@ export type ApiKeyResponse = {
    * owner has at the moment of the request.
    */
   permissions: string[];
-  /** The first characters of the key, to recognize it. */
+  /**
+   * A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+   * key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+   * their first 12 characters.
+   */
   prefix: string;
 };
 
@@ -325,7 +334,10 @@ export type ClientConfigResponse = {
     locales: string[];
     /** Largest entry body accepted, in bytes. */
     max_body_bytes: number;
-    /** Path prefix of posts on the website (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), e.g. `/blog/`. */
+    /**
+     * First segment of the address of every post (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), without
+     * slashes: `blog` gives posts at `/blog/<slug>`.
+     */
     post_path_prefix: string;
   };
   /** Kernel's own section. */
@@ -464,8 +476,9 @@ export type CommentDetail = {
   status: CommentStatus;
   target_id: string;
   /**
-   * Title of the target (e.g. the post's title), from the module that owns it; absent when
-   * that kind has no lookup or the target is not public now.
+   * Title of the target (e.g. the post's title), from the module that owns it. Only given while
+   * the target is public: for a draft, unpublished or deleted target (or a kind with no
+   * lookup) the field is absent and only `target_type` and `target_id` identify it.
    */
   target_title?: string | null;
   target_type: string;
@@ -487,7 +500,7 @@ export type CommentFollow = {
 
 /** A token from a mail link. */
 export type CommentMailToken = {
-  /** The `token` of the link. */
+  /** The `token` of the link, exactly as received (it may contain a `.`). */
   token: string;
 };
 
@@ -619,7 +632,10 @@ export type CommentsUnsubscribed = {
 
 /** The token of a confirmation link. */
 export type ConfirmBody = {
-  /** The `{token}` of the link in the confirmation mail. */
+  /**
+   * The `{token}` of the link in the confirmation mail, exactly as received (it may contain a
+   * `.`).
+   */
   token: string;
 };
 
@@ -845,8 +861,10 @@ export type CreateUserRequest = {
 /** A new API key, with its secret. The secret is shown only here. */
 export type CreatedApiKeyResponse = ApiKeyResponse & {
   /**
-   * The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be
-   * shown again.
+   * The key. Send it as `Authorization: Bearer <key>`; no other header is needed: the key
+   * names its tenant. Store it now: it cannot be shown again. Shape: `axk1_`, the tenant ID
+   * (32 lowercase hex digits), `_`, then a random part. Keys created in older versions start
+   * with `axk_` and keep working.
    */
   key: string;
 };
@@ -894,6 +912,14 @@ export type Data_AiStatus = {
     provider: string;
     /** Tokens used today (UTC), text and embeddings together. */
     tokens_today: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AllowedTenantDomain = {
+  /** A domain that may get a TLS certificate. */
+  data: {
+    domain: string;
   };
 };
 
@@ -1131,8 +1157,9 @@ export type Data_CommentDetail = {
     status: CommentStatus;
     target_id: string;
     /**
-     * Title of the target (e.g. the post's title), from the module that owns it; absent when
-     * that kind has no lookup or the target is not public now.
+     * Title of the target (e.g. the post's title), from the module that owns it. Only given while
+     * the target is public: for a draft, unpublished or deleted target (or a kind with no
+     * lookup) the field is absent and only `target_type` and `target_id` identify it.
      */
     target_title?: string | null;
     target_type: string;
@@ -1286,8 +1313,10 @@ export type Data_CreatedApiKeyResponse = {
   /** A new API key, with its secret. The secret is shown only here. */
   data: ApiKeyResponse & {
     /**
-     * The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be
-     * shown again.
+     * The key. Send it as `Authorization: Bearer <key>`; no other header is needed: the key
+     * names its tenant. Store it now: it cannot be shown again. Shape: `axk1_`, the tenant ID
+     * (32 lowercase hex digits), `_`, then a random part. Keys created in older versions start
+     * with `axk_` and keep working.
      */
     key: string;
   };
@@ -2468,6 +2497,98 @@ export type Data_Tenant = {
 };
 
 /** Envelope of a single result. */
+export type Data_TenantDomain = {
+  /** A domain of the tenant: requests to a verified domain reach this tenant. */
+  data: {
+    /** Why the last lookup did not verify the domain. */
+    check_error?: string | null;
+    created_at: string;
+    /** Lower case, without port or trailing dot; international names in punycode. */
+    domain: string;
+    /**
+     * Daily checks in a row of the verified domain that did not find the DNS record; at 3 the
+     * domain becomes `failed`. Keep the record in place: one successful check resets it to 0.
+     */
+    failed_checks: number;
+    id: string;
+    /** Last time the DNS record was looked up. */
+    last_checked_at?: string | null;
+    /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
+    record: TenantDomainRecord;
+    /**
+     * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
+     * days, or a verified domain whose record was missing at 3 daily checks in a row: fix the
+     * record and verify again).
+     */
+    status: string;
+    /** When the status last changed; a `pending` domain fails 7 days after it. */
+    updated_at: string;
+    verified_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TenantMove = {
+  /** A move of a tenant to another placement. */
+  data: {
+    created_at: string;
+    /** Why the last run stopped, when it did; running the move again resumes it. */
+    error?: string | null;
+    finished_at?: string | null;
+    from: string;
+    id: string;
+    keep_source: boolean;
+    /** Sum of `tables[].rows`. */
+    rows: number;
+    /**
+     * `copying` (the tenant answers `503`), `copied`, `switched` (the tenant works from `to`;
+     * the old placement is being cleaned), `done` or `aborted`.
+     */
+    state: string;
+    /** Rows copied per table (after `copied`). */
+    tables: TenantTableRows[];
+    tenant_id: string;
+    to: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TenantMovePlan = {
+  /** What a move would do (dry run). Nothing is changed. */
+  data: {
+    /** What must be fixed first; empty when the move can run. */
+    blocking: TenantMoveBlocker[];
+    /**
+     * Files of the tenant that would be copied to the file storage of `to`; `0` when both
+     * placements keep files in the same storage (nothing to copy).
+     */
+    files: number;
+    /** Placement that keeps the tenant's data now. */
+    from: string;
+    keep_source: boolean;
+    /** `true` when nothing blocks the move (`blocking` is empty). */
+    ready: boolean;
+    /** An interrupted move to `to` that a real run resumes. */
+    resumes?: string | null;
+    /** Sum of `tables[].rows`. */
+    rows: number;
+    /**
+     * Seconds the tenant answers `503 tenant_maintenance` before copying starts (other servers
+     * see the move and requests in progress finish); copying takes longer for many rows.
+     */
+    settle_seconds: number;
+    /** Rows of the tenant that would be copied, per table, in copy order. */
+    tables: TenantTableRows[];
+    /** Slug of the tenant. */
+    tenant: string;
+    tenant_id: string;
+    /** Placement the data would move to. */
+    to: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TenantSettingState = {
   /** A setting the installed modules take per tenant, and its state in the current tenant. */
   data: {
@@ -2745,6 +2866,7 @@ export type Data_Vec_Placement = {
     name: string;
     /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
     schema_state: string;
+    storage?: PlacementStorage | null;
   }[];
 };
 
@@ -3358,7 +3480,10 @@ export type LastDelivery = {
   last_attempt_at?: string | null;
   /** HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer. */
   response_status?: number | null;
-  /** `pending`, `delivered` or `failed`. */
+  /**
+   * `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up) — the same values
+   * as a delivery's `status`.
+   */
   status: string;
 };
 
@@ -3766,6 +3891,15 @@ export type NewTenant = {
   slug: string;
 };
 
+/** A domain to add to the tenant. */
+export type NewTenantDomain = {
+  /**
+   * The domain, e.g. `shop.example` (punycode for international names). Not an IP address,
+   * `localhost` or the platform's own domain.
+   */
+  domain: string;
+};
+
 /** One mail of a campaign to the person. */
 export type NewsletterDelivery = {
   campaign_id: string;
@@ -3870,7 +4004,11 @@ export type Page_ApiKeyResponse = {
      * owner has at the moment of the request.
      */
     permissions: string[];
-    /** The first characters of the key, to recognize it. */
+    /**
+     * A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+     * key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+     * their first 12 characters.
+     */
     prefix: string;
   }[];
   pagination: Pagination;
@@ -4041,8 +4179,9 @@ export type Page_CommentDetail = {
     status: CommentStatus;
     target_id: string;
     /**
-     * Title of the target (e.g. the post's title), from the module that owns it; absent when
-     * that kind has no lookup or the target is not public now.
+     * Title of the target (e.g. the post's title), from the module that owns it. Only given while
+     * the target is public: for a draft, unpublished or deleted target (or a kind with no
+     * lookup) the field is absent and only `target_type` and `target_id` identify it.
      */
     target_title?: string | null;
     target_type: string;
@@ -4550,6 +4689,16 @@ export type Page_PublicEntryResponse = {
 };
 
 /** One page of a list. */
+export type Page_PublicTermCount = {
+  /** The items of this page, in the requested order. */
+  data: (PublicTerm & {
+    /** Published posts in `locale` that carry the term. */
+    posts: number;
+  })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_RedirectResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -4862,6 +5011,38 @@ export type Page_Tenant = {
 };
 
 /** One page of a list. */
+export type Page_TenantDomain = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Why the last lookup did not verify the domain. */
+    check_error?: string | null;
+    created_at: string;
+    /** Lower case, without port or trailing dot; international names in punycode. */
+    domain: string;
+    /**
+     * Daily checks in a row of the verified domain that did not find the DNS record; at 3 the
+     * domain becomes `failed`. Keep the record in place: one successful check resets it to 0.
+     */
+    failed_checks: number;
+    id: string;
+    /** Last time the DNS record was looked up. */
+    last_checked_at?: string | null;
+    /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
+    record: TenantDomainRecord;
+    /**
+     * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
+     * days, or a verified domain whose record was missing at 3 daily checks in a row: fix the
+     * record and verify again).
+     */
+    status: string;
+    /** When the status last changed; a `pending` domain fails 7 days after it. */
+    updated_at: string;
+    verified_at?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_TermResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -5044,6 +5225,28 @@ export type Placement = {
   name: string;
   /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
   schema_state: string;
+  storage?: PlacementStorage | null;
+};
+
+/** Where a placement keeps its tenants' files. Access keys are never shown. */
+export type PlacementStorage = {
+  /** Bucket (`s3`). */
+  bucket?: string | null;
+  /** Whether an access key is stored (`s3`); its value is never shown. */
+  credentials: boolean;
+  /** Directory on the server (`local`). */
+  dir?: string | null;
+  /** Address of the S3-compatible service (`s3`); `null` for Amazon S3. */
+  endpoint?: string | null;
+  /**
+   * `local` (a directory on the server), `s3` (an S3 or S3-compatible bucket), or
+   * `unreadable` (the stored settings cannot be decrypted with the configured secret key).
+   */
+  kind: string;
+  /** Folder inside the bucket (`s3`). */
+  prefix?: string | null;
+  /** Region of the bucket (`s3`). */
+  region?: string | null;
 };
 
 /** A comment just posted, for its author. */
@@ -5474,6 +5677,12 @@ export type PublicTerm = {
   slug: string;
   /** `category` or `tag`. */
   taxonomy: string;
+};
+
+/** A category or tag with the number of its published posts. */
+export type PublicTermCount = PublicTerm & {
+  /** Published posts in `locale` that carry the term. */
+  posts: number;
 };
 
 /** A category or tag as readers see it. */
@@ -6149,6 +6358,122 @@ export type TenantChanges = {
   status?: string | null;
 };
 
+/** A domain of the tenant: requests to a verified domain reach this tenant. */
+export type TenantDomain = {
+  /** Why the last lookup did not verify the domain. */
+  check_error?: string | null;
+  created_at: string;
+  /** Lower case, without port or trailing dot; international names in punycode. */
+  domain: string;
+  /**
+   * Daily checks in a row of the verified domain that did not find the DNS record; at 3 the
+   * domain becomes `failed`. Keep the record in place: one successful check resets it to 0.
+   */
+  failed_checks: number;
+  id: string;
+  /** Last time the DNS record was looked up. */
+  last_checked_at?: string | null;
+  /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
+  record: TenantDomainRecord;
+  /**
+   * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
+   * days, or a verified domain whose record was missing at 3 daily checks in a row: fix the
+   * record and verify again).
+   */
+  status: string;
+  /** When the status last changed; a `pending` domain fails 7 days after it. */
+  updated_at: string;
+  verified_at?: string | null;
+};
+
+/** The DNS record that proves the tenant owns the domain. */
+export type TenantDomainRecord = {
+  /** Full name of the record. */
+  name: string;
+  /** Always `TXT`. */
+  type: string;
+  /** Exact value of the record. */
+  value: string;
+};
+
+/** A move of a tenant to another placement. */
+export type TenantMove = {
+  created_at: string;
+  /** Why the last run stopped, when it did; running the move again resumes it. */
+  error?: string | null;
+  finished_at?: string | null;
+  from: string;
+  id: string;
+  keep_source: boolean;
+  /** Sum of `tables[].rows`. */
+  rows: number;
+  /**
+   * `copying` (the tenant answers `503`), `copied`, `switched` (the tenant works from `to`;
+   * the old placement is being cleaned), `done` or `aborted`.
+   */
+  state: string;
+  /** Rows copied per table (after `copied`). */
+  tables: TenantTableRows[];
+  tenant_id: string;
+  to: string;
+  updated_at: string;
+};
+
+/** Why the move cannot run now. */
+export type TenantMoveBlocker = {
+  /** Stable code, the same as the error a real run would answer. */
+  code: string;
+  message: string;
+};
+
+/** What a move would do (dry run). Nothing is changed. */
+export type TenantMovePlan = {
+  /** What must be fixed first; empty when the move can run. */
+  blocking: TenantMoveBlocker[];
+  /**
+   * Files of the tenant that would be copied to the file storage of `to`; `0` when both
+   * placements keep files in the same storage (nothing to copy).
+   */
+  files: number;
+  /** Placement that keeps the tenant's data now. */
+  from: string;
+  keep_source: boolean;
+  /** `true` when nothing blocks the move (`blocking` is empty). */
+  ready: boolean;
+  /** An interrupted move to `to` that a real run resumes. */
+  resumes?: string | null;
+  /** Sum of `tables[].rows`. */
+  rows: number;
+  /**
+   * Seconds the tenant answers `503 tenant_maintenance` before copying starts (other servers
+   * see the move and requests in progress finish); copying takes longer for many rows.
+   */
+  settle_seconds: number;
+  /** Rows of the tenant that would be copied, per table, in copy order. */
+  tables: TenantTableRows[];
+  /** Slug of the tenant. */
+  tenant: string;
+  tenant_id: string;
+  /** Placement the data would move to. */
+  to: string;
+};
+
+/** Where to move the tenant's data. */
+export type TenantMoveRequest = {
+  /**
+   * Only report what the move would do, changing nothing. Defaults to `true`: send `false` to
+   * move.
+   */
+  dry_run?: boolean;
+  /**
+   * Keep the tenant's data at the old placement as a backup copy (its queued jobs and events
+   * are removed there so nothing runs twice). Defaults to `false`: the old copy is deleted.
+   */
+  keep_source?: boolean;
+  /** Name of the placement (database) to move the data to. */
+  to: string;
+};
+
 /** A setting the installed modules take per tenant, and its state in the current tenant. */
 export type TenantSettingState = {
   description: string;
@@ -6167,6 +6492,12 @@ export type TenantSettingState = {
 export type TenantSettingValue = {
   /** 1 to 4000 characters. Secret values are stored encrypted and never returned. */
   value: string;
+};
+
+/** Rows of the tenant in one table. */
+export type TenantTableRows = {
+  rows: number;
+  table: string;
 };
 
 /** The name of a term in one language, and its parent. Omitted fields stay as they are. */
@@ -6304,7 +6635,7 @@ export type TranslationStatus = "queued" | "running" | "succeeded" | "failed";
 export type UnsubscribeRequest = {
   /** Stop mails about every comment followed with this address, not just this one. */
   all?: boolean;
-  /** The `token` of the link in a reply mail. */
+  /** The `token` of the link in a reply mail, exactly as received (it may contain a `.`). */
   token: string;
 };
 
@@ -8227,6 +8558,17 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/public/terms": {
+    /** List categories and tags that have published posts (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_PublicTermCount;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/public/terms/{taxonomy}/{slug}": {
     /** Get a category or tag by slug (public). */
     get: {
@@ -8733,6 +9075,71 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/domains": {
+    /** List this tenant's domains. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_TenantDomain;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a domain to this tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewTenantDomain;
+      responses: {
+        201: Data_TenantDomain;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/domains/allowed": {
+    /** Tell whether a domain may get a TLS certificate. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { domain: string }; };
+      responses: {
+        200: Data_AllowedTenantDomain;
+        400: Problem;
+        404: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/domains/{id}": {
+    /** Remove a domain from this tenant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/domains/{id}/verify": {
+    /** Verify a domain now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_TenantDomain;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/modules": {
     /** List the installed modules. */
     get: {
@@ -8868,6 +9275,37 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/move": {
+    /** Move a tenant to another placement. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TenantMoveRequest;
+      responses: {
+        200: Data_TenantMovePlan;
+        201: Data_TenantMove;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/moves/{move_id}": {
+    /** Get a move of a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; move_id: string }; };
+      responses: {
+        200: Data_TenantMove;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

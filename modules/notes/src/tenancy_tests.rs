@@ -75,6 +75,46 @@ async fn khong_ro_ri_giua_khach() {
     .unwrap();
 }
 
+/// Con trỏ pagination lấy ở khách này gửi bằng người của khách kia (một khách database chung, một
+/// database riêng): chỉ thấy dữ liệu của khách kia, không bao giờ của khách sở hữu con trỏ (D-259
+/// mục 5 — con trỏ chỉ là vị trí trong danh sách đã lọc theo khách).
+#[tokio::test]
+async fn con_tro_cua_khach_khac_khong_lo_du_lieu() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        for (owner, other) in [("token-shared", "token-own"), ("token-own", "token-shared")] {
+            let marker = format!("CURSOR-{owner}");
+            let mut ids = Vec::new();
+            for index in 0..3 {
+                let (status, created) = create(&app, owner, &format!("{marker}-{index}")).await;
+                assert_eq!(status, StatusCode::CREATED, "{created}");
+                ids.push(("id", created["data"]["id"].as_str().unwrap().to_owned()));
+            }
+            let (status, _) = create(&app, other, &format!("theirs-{owner}")).await;
+            assert_eq!(status, StatusCode::CREATED);
+
+            let (violations, tried) =
+                autoxide_testkit::cursor_leak_check(&app, owner, other, &marker, &ids)
+                    .await
+                    .unwrap();
+            assert_eq!(violations, Vec::<String>::new());
+            assert!(tried >= 1, "no list gave a cursor");
+
+            // Cụ thể: con trỏ của trang đầu (mới nhất trước) ở khách sở hữu; khách kia chỉ nhận dòng
+            // của chính nó.
+            let first = app.get("/api/v1/notes?limit=1").token(owner).send().await.unwrap();
+            let cursor = first.json()["pagination"]["next_cursor"].as_str().unwrap().to_owned();
+            let uri = format!("/api/v1/notes?order=asc&cursor={cursor}");
+            let theirs = app.get(&uri).token(other).send().await.unwrap();
+            assert_eq!(theirs.status(), StatusCode::OK);
+            let rows = theirs.json()["data"].as_array().unwrap().clone();
+            assert!(rows.iter().all(|row| !row["title"].as_str().unwrap().contains(&marker)));
+        }
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn trung_ten_o_hai_khach_duoc_phep() {
     TestDatabase::run(async |test| {
@@ -198,8 +238,7 @@ async fn bang_dung_luat_theo_khach() {
         let app = TestApp::builder(test).module(crate::module()).build().await.unwrap();
         let snapshot = autoxide_testkit::schema_snapshot(app.database().write()).await.unwrap();
         let control_plane = app.modules().control_plane_tables();
-        let violations =
-            autoxide_testkit::schema_tenancy_violations(&snapshot, &control_plane, &[]);
+        let violations = autoxide_testkit::schema_tenancy_violations(&snapshot, &control_plane);
         assert_eq!(violations, Vec::<String>::new());
     })
     .await

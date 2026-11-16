@@ -5,21 +5,28 @@
 //! vì không có foreign key), xoá bản xuất CSV quá `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` (file
 //! trước, dòng sau), và dọn nonce, bộ đếm đã hết hạn. Chạy lại bao nhiêu lần cũng ra
 //! cùng kết quả.
+//!
+//! Job theo lịch chạy một lần cho mỗi database (bước 33): việc gắn với form (thời hạn giữ, bản
+//! xuất, event) chạy theo từng khách có dữ liệu trên database đó; xoá dấu vết IP, bài mồ côi,
+//! nonce và bộ đếm quét cả database.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
+use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::throttle::Throttle;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, Query};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde_json::json;
+use uuid::Uuid;
 
-use crate::entity::{form, submission};
+use crate::entity::{export, form, submission};
 use crate::events::{self, Change};
 use crate::service::{FormsService, now};
 use crate::submissions::inbox::SubmissionStatus;
@@ -38,35 +45,59 @@ pub(crate) struct Cleaned {
     pub exports: u64,
 }
 
-pub(crate) struct Cleanup(pub Arc<FormsService>);
+pub(crate) struct Cleanup {
+    pub service: Arc<FormsService>,
+    /// Sổ database: tra ngữ cảnh của từng khách có dữ liệu trên database của job.
+    pub databases: DatabaseRegistry,
+}
 
 #[async_trait::async_trait]
 impl JobHandler for Cleanup {
-    async fn run(&self, _: &JobContext) -> Result<(), Error> {
-        self.0.cleanup(now()).await.map(|_| ())
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.service.cleanup(&self.databases, &job.database, now()).await.map(|_| ())
     }
 }
 
 impl FormsService {
-    /// Dọn theo thời hạn, coi `now` là bây giờ (test truyền thời điểm tương lai).
-    pub(crate) async fn cleanup(&self, now: DateTime<Utc>) -> Result<Cleaned, Error> {
+    /// Dọn `database` theo thời hạn, coi `now` là bây giờ (test truyền thời điểm tương lai).
+    pub(crate) async fn cleanup(
+        &self,
+        databases: &DatabaseRegistry,
+        database: &Database,
+        now: DateTime<Utc>,
+    ) -> Result<Cleaned, Error> {
         let mut cleaned = Cleaned::default();
-        let spam_before = now - chrono::Duration::days(i64::from(self.config.spam_retention_days));
-        let forms = form::Entity::find().all(self.database.read()).await?;
-        for form in &forms {
-            cleaned.spam +=
-                self.expire(form, spam_before, Some(SubmissionStatus::Spam), "spam").await?;
-            let days = form
-                .retention_days
-                .and_then(|days| u32::try_from(days).ok())
-                .unwrap_or(self.config.retention_days);
-            if days > 0 {
-                let before = now - chrono::Duration::days(i64::from(days));
-                cleaned.expired += self.expire(form, before, None, "retention").await?;
+        // Khách có form hay bản xuất trên database này (quét cả database, qua index có
+        // `tenant_id` đứng đầu).
+        let mut tenants: BTreeSet<Uuid> = form::Entity::find()
+            .select_only()
+            .column(form::Column::TenantId)
+            .distinct()
+            .into_tuple::<Uuid>()
+            .all(database.read())
+            .await?
+            .into_iter()
+            .collect();
+        tenants.extend(
+            export::Entity::find()
+                .select_only()
+                .column(export::Column::TenantId)
+                .distinct()
+                .into_tuple::<Uuid>()
+                .all(database.read())
+                .await?,
+        );
+        for id in tenants {
+            match databases.tenant(TenantId::from_uuid(id)).await {
+                Ok(tenant) => self.cleanup_tenant(&tenant, now, &mut cleaned).await?,
+                // Khách đã bị xoá khỏi sổ: dữ liệu còn lại do việc xoá khách lo, không đoán ở đây.
+                Err(error) => {
+                    tracing::warn!(tenant_id = %id, error = %error, "forms cleanup skipped a tenant");
+                }
             }
         }
         let ip_before = now - chrono::Duration::days(i64::from(self.config.ip_retention_days));
-        let write = self.database.write();
+        let write = database.write();
         cleaned.fingerprints = submission::Entity::update_many()
             .col_expr(submission::Column::IpFingerprint, Expr::value(Option::<String>::None))
             .filter(submission::Column::IpFingerprint.is_not_null())
@@ -84,11 +115,9 @@ impl FormsService {
             .exec(write)
             .await?
             .rows_affected;
-        let expired = self.expired_exports(now).await?;
-        cleaned.exports = self.purge_exports(expired).await?;
         self.guard.purge_nonces(write, "forms").await?;
         Throttle::new("forms", 1, Duration::from_secs(3600))?
-            .purge(&self.database, now - chrono::Duration::days(1))
+            .purge(database, now - chrono::Duration::days(1))
             .await?;
         if cleaned != Cleaned::default() {
             tracing::info!(
@@ -103,16 +132,45 @@ impl FormsService {
         Ok(cleaned)
     }
 
+    /// Phần dọn của khách `tenant`: bài quá hạn giữ của từng form, bản xuất quá hạn.
+    async fn cleanup_tenant(
+        &self,
+        tenant: &TenantContext,
+        now: DateTime<Utc>,
+        cleaned: &mut Cleaned,
+    ) -> Result<(), Error> {
+        let spam_before = now - chrono::Duration::days(i64::from(self.config.spam_retention_days));
+        let forms = form::Entity::find().scoped(tenant).all(tenant.database().read()).await?;
+        for form in &forms {
+            cleaned.spam += self
+                .expire(tenant, form, spam_before, Some(SubmissionStatus::Spam), "spam")
+                .await?;
+            let days = form
+                .retention_days
+                .and_then(|days| u32::try_from(days).ok())
+                .unwrap_or(self.config.retention_days);
+            if days > 0 {
+                let before = now - chrono::Duration::days(i64::from(days));
+                cleaned.expired += self.expire(tenant, form, before, None, "retention").await?;
+            }
+        }
+        let expired = self.expired_exports(tenant, now).await?;
+        cleaned.exports += self.purge_exports(tenant, expired).await?;
+        Ok(())
+    }
+
     /// Xoá bài của `form` gửi trước `before` (chỉ trạng thái `status`, nếu có), kèm một event.
     async fn expire(
         &self,
+        tenant: &TenantContext,
         form: &form::Model,
         before: DateTime<Utc>,
         status: Option<SubmissionStatus>,
         reason: &str,
     ) -> Result<u64, Error> {
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let mut delete = submission::Entity::delete_many()
+            .scoped(tenant)
             .filter(submission::Column::FormId.eq(form.id))
             .filter(submission::Column::CreatedAt.lt(before));
         if let Some(status) = status {
@@ -129,7 +187,7 @@ impl FormsService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     Actor::system(),
                     events::form_subject(form.id),
                     &events::SubmissionsExpired(change),

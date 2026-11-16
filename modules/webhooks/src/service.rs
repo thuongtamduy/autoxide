@@ -3,11 +3,10 @@
 
 use std::collections::HashMap;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, EventCatalog, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QuerySelect, Set,
@@ -97,8 +96,12 @@ pub(crate) struct EndpointChanges {
 /// Một lần gửi một event tới một endpoint.
 pub(crate) type Delivery = delivery::Model;
 
+/// Mục đích của secret ký khi mã hoá (D-257): giá trị chép sang dòng hay khách khác không mở được.
+pub(crate) const SECRET_PURPOSE: &str = "webhooks.endpoint_secret";
+
+// Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
 pub(crate) struct WebhookService {
-    database: Database,
+    secrets: autoxide_kernel::secret::SecretKey,
     outbox: Outbox,
     catalog: EventCatalog,
     allow_http: bool,
@@ -109,14 +112,14 @@ pub(crate) struct WebhookService {
 
 impl WebhookService {
     pub(crate) fn new(
-        database: Database,
+        secrets: autoxide_kernel::secret::SecretKey,
         outbox: Outbox,
         catalog: EventCatalog,
         allow_http: bool,
         allow_private_networks: bool,
     ) -> Self {
         WebhookService {
-            database,
+            secrets,
             outbox,
             catalog,
             allow_http,
@@ -150,6 +153,7 @@ impl WebhookService {
 
     pub(crate) async fn create(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         input: NewEndpoint,
     ) -> Result<CreatedEndpoint, Error> {
@@ -158,12 +162,16 @@ impl WebhookService {
         let (url, events) = (url.unwrap_or_default(), events.unwrap_or_default());
         let secret = signature::new_secret()?;
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let id = Uuid::now_v7();
+        // Lưu secret đã mã hoá (D-257): bản sao database không đủ để giả chữ ký.
+        let sealed = self.seal(tenant, id, &secret).await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = endpoint::ActiveModel {
-            id: Set(Uuid::now_v7()),
+            id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             url: Set(url),
             description: Set(input.description.trim().to_owned()),
-            secret: Set(secret.clone()),
+            secret: Set(sealed),
             events: Set(Value::from(events).to_string()),
             disabled_at: Set(None),
             created_at: Set(now),
@@ -175,13 +183,7 @@ impl WebhookService {
         let event =
             events::EndpointCreated(Change { before: None, after: Some(snapshot(&endpoint)) });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::endpoint_subject(endpoint.id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::endpoint_subject(endpoint.id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %endpoint.id, "webhook endpoint created");
@@ -192,17 +194,19 @@ impl WebhookService {
     /// giao diện B3): thời điểm tạo mới nhất theo endpoint, rồi các dòng đúng thời điểm đó.
     pub(crate) async fn last_deliveries(
         &self,
+        tenant: &TenantContext,
         ids: &[Uuid],
     ) -> Result<HashMap<Uuid, delivery::Model>, Error> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
-        let read = self.database.read();
+        let read = tenant.database().read();
         let latest: Vec<(Uuid, chrono::DateTime<chrono::Utc>)> = delivery::Entity::find()
             .select_only()
             .column(delivery::Column::EndpointId)
             .column_as(delivery::Column::CreatedAt.max(), "latest")
             .filter(delivery::Column::EndpointId.is_in(ids.iter().copied()))
+            .scoped(tenant)
             .group_by(delivery::Column::EndpointId)
             .into_tuple()
             .all(read)
@@ -214,6 +218,7 @@ impl WebhookService {
         let rows = delivery::Entity::find()
             .filter(delivery::Column::EndpointId.is_in(wanted.keys().copied()))
             .filter(delivery::Column::CreatedAt.is_in(wanted.values().copied()))
+            .scoped(tenant)
             .all(read)
             .await?;
         let mut found = HashMap::new();
@@ -229,6 +234,7 @@ impl WebhookService {
     /// (`Some(true)`) hay đã tắt (`Some(false)`).
     pub(crate) async fn list(
         &self,
+        tenant: &TenantContext,
         active: Option<bool>,
         page: &PageRequest,
     ) -> Result<Page<Endpoint>, Error> {
@@ -239,8 +245,9 @@ impl WebhookService {
             }
             None => endpoint::Entity::find(),
         };
+        let read = tenant.database().read();
         let rows =
-            fetch_page(select, endpoint::Column::Id, |row| row.id, page, self.database.read())
+            fetch_page(select.scoped(tenant), endpoint::Column::Id, |row| row.id, page, read)
                 .await?;
         let mut endpoints = Vec::with_capacity(rows.data.len());
         for row in rows.data {
@@ -249,14 +256,16 @@ impl WebhookService {
         Ok(Page { data: endpoints, pagination: rows.pagination })
     }
 
-    pub(crate) async fn get(&self, id: Uuid) -> Result<Endpoint, Error> {
-        let row = endpoint::Entity::find_by_id(id).one(self.database.read()).await?;
+    pub(crate) async fn get(&self, tenant: &TenantContext, id: Uuid) -> Result<Endpoint, Error> {
+        let read = tenant.database().read();
+        let row = endpoint::Entity::find_by_id(id).scoped(tenant).one(read).await?;
         Endpoint::from_row(row.ok_or_else(|| endpoint_not_found(id))?)
     }
 
     /// Đổi địa chỉ, mô tả, danh sách event hoặc bật / tắt endpoint `id`.
     pub(crate) async fn update(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         id: Uuid,
         changes: EndpointChanges,
@@ -264,8 +273,9 @@ impl WebhookService {
     ) -> Result<Endpoint, Error> {
         let (url, events) =
             self.check(changes.url.as_deref(), changes.description.as_deref(), changes.events)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = endpoint::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| endpoint_not_found(id))?;
@@ -287,7 +297,9 @@ impl WebhookService {
             _ => {}
         }
         active.updated_at = Set(now);
-        let mut update = endpoint::Entity::update(active).validate()?;
+        let mut update = endpoint::Entity::update(active)
+            .validate()?
+            .filter(endpoint::Column::TenantId.eq(tenant.id().as_uuid()));
         if let Some(expected) = expected {
             // Kiểm phiên bản ngay trong câu `UPDATE` (D-084).
             update = update.filter(endpoint::Column::UpdatedAt.eq(expected));
@@ -300,13 +312,7 @@ impl WebhookService {
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::EndpointUpdated(change);
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::endpoint_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::endpoint_subject(id), &event)
             .await?;
         transaction.commit().await?;
         Ok(after)
@@ -314,13 +320,20 @@ impl WebhookService {
 
     /// Thay secret của endpoint `id`; secret cũ hết hiệu lực ngay. Trả secret mới (chỉ
     /// lần này).
-    pub(crate) async fn rotate_secret(&self, actor: Actor, id: Uuid) -> Result<String, Error> {
+    pub(crate) async fn rotate_secret(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<String, Error> {
         let secret = signature::new_secret()?;
-        let transaction = self.database.begin_write().await?;
+        let sealed = self.seal(tenant, id, &secret).await?;
+        let transaction = tenant.database().begin_write().await?;
         let updated = endpoint::Entity::update_many()
-            .col_expr(endpoint::Column::Secret, sea_orm::sea_query::Expr::value(secret.clone()))
+            .col_expr(endpoint::Column::Secret, sea_orm::sea_query::Expr::value(sealed))
             .col_expr(endpoint::Column::UpdatedAt, sea_orm::sea_query::Expr::value(now()))
             .filter(endpoint::Column::Id.eq(id))
+            .scoped(tenant)
             .exec(&transaction)
             .await?;
         if updated.rows_affected == 0 {
@@ -332,13 +345,7 @@ impl WebhookService {
             after: Some(json!({"secret_replaced": true})),
         });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::endpoint_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::endpoint_subject(id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %id, "webhook secret replaced");
@@ -346,13 +353,19 @@ impl WebhookService {
     }
 
     /// Xoá endpoint `id` cùng lịch sử gửi của nó; lần gửi còn chờ bị bỏ.
-    pub(crate) async fn delete(&self, actor: Actor, id: Uuid) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
+    pub(crate) async fn delete(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        let transaction = tenant.database().begin_write().await?;
         let row = endpoint::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| endpoint_not_found(id))?;
-        let deleted = endpoint::Entity::delete_by_id(id).exec(&transaction).await?;
+        let deleted = endpoint::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             transaction.rollback().await?;
             return Err(endpoint_not_found(id));
@@ -361,13 +374,7 @@ impl WebhookService {
         let event =
             events::EndpointDeleted(Change { before: Some(snapshot(&before)), after: None });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::endpoint_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::endpoint_subject(id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %id, "webhook endpoint deleted");
@@ -377,12 +384,20 @@ impl WebhookService {
     /// Một trang lần gửi của endpoint `id`, mới trước (mặc định).
     pub(crate) async fn deliveries(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         page: &PageRequest,
     ) -> Result<Page<Delivery>, Error> {
-        self.get(id).await?;
-        let select = delivery::Entity::find().filter(delivery::Column::EndpointId.eq(id));
-        fetch_page(select, delivery::Column::Id, |row| row.id, page, self.database.read()).await
+        self.get(tenant, id).await?;
+        let select =
+            delivery::Entity::find().filter(delivery::Column::EndpointId.eq(id)).scoped(tenant);
+        fetch_page(select, delivery::Column::Id, |row| row.id, page, tenant.database().read()).await
+    }
+
+    /// Mã hoá secret ký của endpoint `id` thuộc khách `tenant`.
+    async fn seal(&self, tenant: &TenantContext, id: Uuid, secret: &str) -> Result<String, Error> {
+        let sealer = self.secrets.sealer().await?;
+        sealer.seal(tenant.id(), SECRET_PURPOSE, &id.to_string(), secret.as_bytes())
     }
 
     /// Kiểm đầu vào của một endpoint (trường `None` bỏ qua) và báo mọi lỗi một lần. Trả

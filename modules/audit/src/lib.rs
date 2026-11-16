@@ -50,11 +50,14 @@ impl Module for AuditModule {
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        self.recorder = Some(Arc::new(Recorder::new(context.database().clone())));
-        self.service =
-            Some(Arc::new(AuditService::new(context.database().clone(), context.resources())));
-        self.chain = Some(Arc::new(chain::ChainProbe { database: context.database().clone() }));
+        self.recorder = Some(Arc::new(Recorder));
+        self.service = Some(Arc::new(AuditService::new(context.resources())));
+        self.chain = Some(Arc::new(chain::ChainProbe { databases: context.tenancy() }));
         Ok(())
+    }
+
+    fn seed_tenant(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::TenantSeed>> {
+        Some(Arc::new(HeadSeed))
     }
 
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
@@ -93,5 +96,15 @@ impl Module for AuditModule {
             Some(recorder) => vec![Subscription::new(Subscription::ALL, recorder.clone())],
             None => Vec::new(),
         }
+    }
+}
+
+/// Gieo đầu chuỗi băm trống cho khách mới (bước 33, D-276).
+struct HeadSeed;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::TenantSeed for HeadSeed {
+    async fn seed(&self, tenant: &autoxide_kernel::tenancy::TenantContext) -> Result<(), Error> {
+        chain::seed_head(tenant.database().write(), tenant.id().as_uuid()).await
     }
 }

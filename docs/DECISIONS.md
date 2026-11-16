@@ -6874,3 +6874,328 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
 - Không phát hành, không tạo tag: bản phát hành vẫn theo D-248 (cuối giai đoạn A hay khi chủ dự án bảo).
 - Điều kiện để `main` luôn dùng được: phần dở của bước 33 không đổi hành vi mặc định (chế độ `single`; `multi` vẫn bị
   từ chối tới khi mọi module theo khách), và mọi thay đổi chỉ thêm (D-059).
+
+## D-274 · `mail` theo khách: hàng đợi trên database của khách, SMTP và người gửi riêng của khách (bước 33 B3) — 2026-11-15 — agent quyết
+
+- `mail` không có bảng riêng: mail xếp hàng (job `mail.send`) trên **database của khách gửi**, event
+  `mail.delivery_failed` ghi cùng khách — `newsletter`, `auth` của khách đó nhận đúng event.
+- Hai cấu hình theo khách (D-190, `Module::tenant_settings`): `mail.smtp_url` (secret, lưu mã hoá, không bao giờ trả
+  ra) và `mail.from`. Khách chưa đặt thì dùng `AUTOXIDE_MAIL_SMTP_URL` / `AUTOXIDE_MAIL_FROM` của máy chủ. Kết nối
+  SMTP của khách dựng một lần theo URL rồi dùng lại (pool của `lettre`), không giữ secret trong log hay lỗi.
+- Job gửi mail phải có khách (job theo khách, không phải job quét cả database); thiếu thì lỗi nội bộ, không gửi bằng
+  cấu hình của khách khác.
+- `client-config` của `mail` (D-271) vẫn chỉ nói về cấu hình chung của máy chủ; khách xem cấu hình của mình qua
+  `GET /api/v1/kernel/settings`.
+
+## D-275 · `ai` theo khách: hạn mức đếm riêng, khoá và mô hình riêng của khách (bước 33 B4) — 2026-11-15 — agent quyết
+
+- `ai_usage` mang `tenant_id`; unique `(tenant_id, day, purpose)`. `AUTOXIDE_AI_DAILY_TOKEN_LIMIT` là hạn mức **mỗi
+  khách** mỗi ngày: khách này dùng hết không chặn khách khác. Job dọn quét cả database theo `ai_usage_day_sweep_idx`.
+- Cấu hình theo khách: `ai.api_key` (secret) và `ai.model`. Đặc tả 33 nêu cả `ai.provider`; **không làm**: đổi nhà
+  cung cấp kéo theo địa chỉ, cách gọi, tuỳ chọn riêng của từng nhà (base URL, schema mode, fallback…) — mở cho khách
+  đổi nghĩa là đưa cả bộ đó thành cấu hình theo khách. Khách dùng tài khoản riêng **của cùng nhà cung cấp và địa chỉ**
+  máy chủ đã cấu hình. Máy chủ chưa bật AI thì khoá của khách không bật AI (cần cấu hình nền của máy chủ).
+- Embedding chưa theo khách: vector đã lưu phải cùng một mô hình trong cả database (tìm theo ý nghĩa của `content`);
+  đổi theo khách là việc của bước sau nếu có nhu cầu.
+- Adapter dựng theo (khoá, mô hình) một lần rồi dùng lại; khoá không vào log hay lỗi.
+
+## D-276 · `audit` theo khách: mỗi khách một chuỗi băm (bước 33 B5) — 2026-11-15 — agent quyết
+
+- `audit_entry` và `audit_chain` mang `tenant_id`. Đầu chuỗi khoá chính `(tenant_id, name)`; số thứ tự duy nhất
+  trong khách (`(tenant_id, sequence)`). Mỗi khách đếm từ 1, khoá đầu chuỗi của riêng mình — ghi của khách này không
+  chờ khoá của khách khác, và dữ liệu của khách không chen vào chuỗi của khách khác (dời khách giữa database mang theo
+  nguyên chuỗi).
+- Dòng ghi vào database của khách mang event (`Delivered::tenant`). Đầu chuỗi trống gieo khi tạo khách
+  (`Module::seed_tenant`); khách mặc định có từ migration `m0004`. Thiếu đầu chuỗi vẫn là lỗi (không tự tạo): tự tạo
+  lại sẽ che việc xoá đầu chuỗi.
+- `doctor audit.chain` duyệt mọi database (placement) và mọi đầu chuỗi trên đó, báo chỗ hỏng kèm khách và placement.
+- Định dạng băm `audit-v1` không đổi (không băm `tenant_id`): chuỗi đã ghi trước bước 33 vẫn kiểm được.
+
+## D-277 · `files` theo khách: dòng theo khách, nội dung dưới tiền tố của khách, dọn mồ côi tra đúng database (bước 33 B6) — 2026-11-15 — agent quyết
+
+- `files_file` mang `tenant_id`; service không giữ database, mọi hàm nhận `&TenantContext`.
+- Nội dung đọc / ghi qua `TenantStorage` (D-259): khách mặc định giữ `files/<id>` (file cũ không phải dời), khách
+  khác `tenants/<khách>/files/<id>`. Module khác nhận `dyn Storage` (nơi lưu chung) từ `files` như trước; khi chuyển
+  sang theo khách, mỗi module tự bọc `TenantStorage::new(storage, tenant)`.
+- Job dọn mồ côi chạy theo lịch trên từng database nhưng đối chiếu mỗi khoá với **database của chính khách đó** (tra
+  qua sổ database theo khách đọc từ khoá) — không bao giờ coi một file là mồ côi chỉ vì job đang chạy trên database
+  khác. Khoá của khách không còn trong sổ thì để nguyên (không đoán). Chạy trên N database thì quét N lần: chấp nhận
+  (xoá idempotent, mỗi ngày một lần); tối ưu khi đo thấy chậm.
+
+## D-278 · `webhooks` theo khách: chỉ gửi tới endpoint cùng khách, secret ký lưu mã hoá (bước 33 B7) — 2026-11-15 — agent quyết
+
+- `webhooks_endpoint`, `webhooks_delivery` mang `tenant_id`. Bộ phát (`Fanout`) chỉ đọc endpoint **cùng khách với
+  event** trên database của khách đó: event của khách này không bao giờ tạo lần gửi tới địa chỉ của khách khác. Job
+  gửi là job theo khách; job dọn lần gửi cũ quét cả database (`webhooks_delivery_created_sweep_idx`).
+- Secret ký lưu bằng `Sealer` (D-257), mục đích `webhooks.endpoint_secret`, dữ liệu đi kèm là khách + ID endpoint;
+  chỉ mở lúc ký. Endpoint có sẵn được mã hoá bằng upgrade dữ liệu `u0001_seal_secrets` (chạy lại được, có `down`).
+  Giá trị mã hoá dài hơn cột `varchar(100)` cũ: migration `m0007_widen_secret` đổi cột thành `text` trên Postgres
+  (SQLite không giới hạn độ dài, không làm gì) — rẽ nhánh theo database chỉ trong migration này.
+
+## D-279 · `forms` theo khách: form, bài gửi, bản xuất theo khách; job dọn chạy theo từng khách trên database (bước 33 B8) — 2026-11-15 — agent quyết
+
+- `forms_forms`, `forms_form_versions`, `forms_submissions`, `forms_exports` mang `tenant_id`; index đều có
+  `tenant_id` đứng đầu, `key` của form duy nhất **trong khách** (hai khách dùng chung một `key` được). Service không
+  giữ database, mọi hàm nhận `&TenantContext`; endpoint công khai lấy khách theo tên miền / header `autoxide-tenant`.
+- File xuất CSV ghi qua `TenantStorage`: khách mặc định giữ `forms/exports/<id>.csv` (không phải dời), khách khác
+  dưới `tenants/<khách>/`. Cột `storage_key` vẫn lưu khoá không tiền tố.
+- Link tải bản xuất ký bằng khoá riêng mỗi khách (`SecretKey::derive_for`): link của khách này không mở được ở khách
+  khác. Khách mặc định dùng đúng khoá cũ, nên link đã phát trước khi nâng cấp vẫn dùng được tới hạn.
+- Job dọn hằng ngày chạy một lần cho mỗi database: tìm các khách có form hay bản xuất trên database đó, tra ngữ cảnh
+  qua sổ database, rồi dọn theo khách (thời hạn giữ của từng form, bản xuất quá hạn, event ghi đúng khách). Khách
+  không còn trong sổ thì bỏ qua (không đoán). Xoá dấu vết IP, bài mồ côi, nonce, bộ đếm quét cả database
+  (`forms_submissions_created_sweep_idx`).
+
+## D-280 · `media` theo khách: item, thư mục, nhãn, ảnh thu nhỏ theo khách; khoá cây thư mục gieo mỗi khách (bước 33 B9) — 2026-11-15 — agent quyết
+
+- Bảy bảng của `media` mang `tenant_id`; mọi unique, index và khoá chính có `tenant_id` đứng đầu (thư mục gốc vẫn
+  dùng UUID toàn số 0 thay cho `NULL`, nên tên thư mục duy nhất trong cùng thư mục cha vẫn chống trùng được trên cả
+  hai database, nay trong từng khách). Service không giữ database; trait `media::api::Media` vốn đã nhận
+  `&TenantContext`, nay dùng thật.
+- Dòng khoá `folder_tree` của `media_lock` gieo cho mỗi khách mới (`Module::seed_tenant`, chèn bỏ qua nếu đã có);
+  khách mặc định giữ dòng cũ. Thiếu dòng (khách tạo trước khi có bước gieo) thì gieo rồi thử lại một lần.
+- Nội dung qua `TenantStorage`: khách mặc định giữ `media/<id>/<version>`, khách khác dưới `tenants/<khách>/`.
+- Job theo lịch chạy một lần cho mỗi database: dọn thùng rác tìm khách có item quá hạn (`media_item_trashed_sweep_idx`)
+  rồi xoá theo từng khách (event ghi đúng khách); dọn mồ côi liệt kê khoá của mọi khách, đối chiếu với database của
+  chính khách đó, khoá của khách không còn trong sổ thì để nguyên. Lệnh `autoxide task media.refresh_variants` duyệt
+  mọi database và mọi khách trên đó.
+
+## D-281 · `newsletter` theo khách; token trong link mang khách để huỷ đăng ký luôn chạy (bước 33 B10) — 2026-11-15 — agent quyết
+
+- Sáu bảng của `newsletter` mang `tenant_id`; mọi unique, index có `tenant_id` đứng đầu (cùng email, cùng `key`
+  danh sách ở hai khách không đụng nhau). Khoá chính `newsletter_subscriptions` thành `(tenant_id, subscriber_id,
+  list_id)` (đặc tả ghi "giữ", nhưng `adopt` đòi khoá chính ghép có `tenant_id`; ngữ nghĩa không đổi). Job gửi, chuẩn
+  bị, đăng ký là job theo khách; job dọn hằng ngày chạy mỗi database, tìm khách rồi dọn theo khách (event đúng khách),
+  còn token, nonce, bộ đếm quét cả database. Subscriber event (`auth.user_deleted`, `content` đăng bài, `mail` gửi
+  hỏng) ghi bằng `event.tenant`.
+- **Token trong link mang khách.** Link huỷ đăng ký (kể cả một chạm, RFC 8058), xác nhận và trang lựa chọn dựng từ
+  một địa chỉ chung (`AUTOXIDE_HTTP_PUBLIC_URL`, URL trang của website); nếu khách chỉ suy từ tên miền / header thì
+  người nhận thư của khách không mặc định sẽ không huỷ được — trái yêu cầu thư quảng cáo phải huỷ nhận được. Nên token
+  của khách không mặc định có dạng `t<UUID khách, 32 hex>.<phần ngẫu nhiên>`; endpoint tìm khách từ token (sổ database,
+  khách phải đang phục vụ) rồi mới tra bản băm trong khách đó. Token khách mặc định giữ nguyên dạng cũ (thư đã gửi vẫn
+  dùng được). Tiền tố sai, khách không có hay bị khoá: cùng lỗi như token sai, không lộ khách nào tồn tại. Ghép ID khách
+  khác vào phần ngẫu nhiên thì tra ở khách kia, không thấy. Database chỉ lưu băm phần ngẫu nhiên — không cần migration.
+  Theo hướng đặc tả 33 đã chọn cho credential của `auth` (token mang khách để định tuyến trước khi tra bản băm).
+
+## D-282 · `comments` theo khách; công cụ token trong link mang khách đưa lên kernel (bước 33 B11) — 2026-11-15 — agent quyết
+
+- Công cụ của D-281 thành của chung: `autoxide_kernel::tenancy::{link_token, split_link_token, resolve_link_token,
+  OptionalTenant}`. Dựng token đặt vào link trong mail (khách mặc định giữ dạng cũ, khách khác `t<UUID>.<phần ngẫu
+  nhiên>`), tìm khách từ token (khách phải đang phục vụ; sai, không có, bị khoá → như token sai), và extractor cho
+  endpoint nhận token (thiếu khách ở tên miền chính thì `None`, lỗi khác vẫn từ chối). `newsletter` bỏ bản riêng, dùng
+  bản của kernel; `comments` dùng cho link xác minh email và link huỷ nhận mail trả lời; `auth` sẽ dùng ở B12.
+- Sáu bảng của `comments` mang `tenant_id`, migration `m0013_tenancy`: khoá chính `comments_profiles` thành
+  `(tenant_id, user_id)`, `comments_targets` thành `(tenant_id, target_type, target_id)` (`uid` duy nhất trong khách);
+  mọi index có `tenant_id` đứng đầu; `comments_comments_created_idx` thay bằng `comments_comments_created_sweep_idx` cho
+  việc xoá dấu vết IP quét cả database.
+- Job dọn hằng ngày chạy mỗi database: tìm khách qua `comments_targets` (mọi bình luận đều có dòng đích, bảng nhỏ, khoá
+  chính bắt đầu bằng `tenant_id`), xoá bình luận quá hạn theo từng khách (event đúng khách); dấu vết IP, khoá người báo
+  cáo theo IP, nonce, token, bộ đếm quét cả database. Subscriber event dùng `event.tenant`.
+
+## D-283 · `menus` theo khách: cache menu công khai và `ETag` theo khách; lệnh nhập menu cũ nhận khách (bước 33 B, D-238) — 2026-11-15 — agent quyết
+
+- `menus_menus`, `menus_items` mang `tenant_id`, migration `m0006_tenancy`: `(tenant_id, key, locale)` duy nhất (bước 34
+  chèn `org_id` sau `tenant_id`), `(tenant_id, menu_id, position)`.
+- Cache menu công khai khoá theo `(khách, key, locale)`, mỗi khách một bộ đếm thế hệ: khách ghi thì chỉ bản cache của
+  khách đó bị bỏ; kết quả giải trước lần ghi không được cất. Bản hết hạn được dọn khi cất bản mới (cache không lớn dần
+  theo số khách). `ETag` băm cả ID khách: hai khách có menu giống hệt nhau vẫn khác `ETag`, gửi `ETag` của khách này ở
+  khách kia không ra 304.
+- Lệnh `menus.import_content_menus` nhận `tenant=<slug>` (bỏ trống: khách mặc định, nơi có mọi menu cũ làm trước bước
+  33), không tự duyệt mọi khách vì `menus` không biết khách nào có menu cũ trong `content`. Chạy lại bỏ qua menu đã có.
+  Đọc đúng menu cũ của từng khách khi `content` chuyển xong (B13).
+
+## D-284 · Mọi response mang `Vary: autoxide-tenant` (bước 33) — 2026-11-15 — agent quyết
+
+Khách chọn được bằng header `autoxide-tenant` (ngoài tên miền). Endpoint công khai trả `Cache-Control: public` (vd menu,
+nội dung): một cache dùng chung đứng trước API (CDN, reverse proxy) không biết header này sẽ trả bản của khách này cho
+khách khác. Kernel thêm `autoxide-tenant` vào `Vary` của mọi response (cả lỗi và 304), giữ các giá trị `Vary` đã có.
+Một lớp ở kernel thay cho việc mỗi module tự nhớ — áp cho cả endpoint của module sau này.
+
+## D-285 · `auth` theo khách, lượt dữ liệu: bảng, role `admin` gieo mỗi khách, TOTP lưu mã hoá, CLI `--tenant` (bước 33 B12a) — 2026-11-15 — agent quyết
+
+- 12 bảng `auth_*` mang `tenant_id`, migration `m0026_tenancy`: email, tên role, băm key / refresh token / lượt MFA,
+  credential passkey, TOTP của người dùng duy nhất **trong khách** (cùng email ở hai khách được); index thường có
+  `tenant_id` đứng đầu; index hạn dùng của refresh token / lượt passkey thành `_sweep_idx` (job dọn mỗi giờ quét cả
+  database); thêm `auth_mfa_challenge_user_idx`, `auth_mfa_challenge_expires_sweep_idx`,
+  `auth_passkey_ceremony_user_idx` (đổi mật khẩu và job dọn dùng). Khoá chính giữ `id`, foreign key trong `auth` giữ.
+  `down` của `adopt` dựng lại bảng theo tên index hiện tại, nên `m0026` bọc `adopt` và tự đặt lại tên index cũ khi
+  `down` (để `down` của migration cũ chạy được) — module đầu tiên cần.
+- Secret TOTP lưu bằng `Sealer` (D-257), mục đích `auth.totp_secret`, dữ liệu đi kèm khách + ID dòng; chỉ mở khi kiểm
+  mã. Upgrade `u0001_seal_totp` mã hoá secret cũ (chạy lại được, có `down`); `m0027_widen_totp_secret` đổi cột thành
+  `text` trên Postgres. Bản backup sau `migrate up` không còn secret TOTP dạng đọc được. Căn cứ: Luật Bảo vệ dữ liệu
+  cá nhân 91/2025/QH15 + NĐ 356/2025/NĐ-CP (hiệu lực 01/01/2026) về biện pháp bảo vệ dữ liệu — cần đối chiếu điều khoản
+  cụ thể với người có chuyên môn pháp lý.
+- Khách mới được gieo role `admin` (mọi permission; bỏ qua nếu khách đã có role mọi quyền). Đăng nhập, đăng ký, xin
+  đặt lại mật khẩu lấy khách theo request (tên miền / header). `autoxide user create | reset-mfa | remove-passkeys`
+  nhận `--tenant <slug>` (bỏ trống: khách mặc định).
+- Chưa xong ở lượt này (B12b): access token, API key, refresh token và token trong link mail chưa mang khách — bộ xác
+  thực còn tra ở khách mặc định (chỗ đánh dấu `// B12b` trong code).
+
+## D-286 · `auth` theo khách, lượt credential: token và API key mang khách (bước 33 B12b) — 2026-11-15 — agent quyết
+
+- **Access token (JWT)** có claim `tid`. Khoá ký riêng mỗi khách dẫn từ `AUTOXIDE_AUTH_TOKEN_SECRET` bằng
+  `HMAC-SHA256(secret, "auth.access_token\0tenant\0<id>")` (cùng cách `SecretKey::derive_for`; khoá này không phải
+  `SecretKey` nên dẫn tại chỗ); khách mặc định dùng nguyên secret đã cấu hình, nên token cấp trước nâng cấp (không có
+  `tid`) vẫn hợp lệ và thuộc khách mặc định. Kiểm: đọc `tid` (chưa tin) chỉ để chọn khoá, chữ ký phải khớp khoá của khách
+  đó — sửa `tid` thì chữ ký sai.
+- **API key** mới có dạng `axk1_<UUID khách, 32 hex thường>_<phần ngẫu nhiên>` cho mọi khách (cả khách mặc định), tách
+  theo độ dài cố định (phần ngẫu nhiên chứa `_` vẫn đúng); key cũ `axk_…` thuộc khách mặc định, vẫn dùng được. Băm lưu
+  như cũ (băm cả key), một lần tra có index trong database của khách. `prefix` hiển thị là `axk1_` + 8 ký tự ngẫu nhiên
+  đầu (12 ký tự đầu như cũ chỉ là ID khách, mọi key của một khách giống nhau).
+- **Refresh token, `mfa_token`, token đặt lại mật khẩu, xác minh email, báo đổi email** dùng `link_token` của kernel
+  (D-282). Endpoint đổi token (`/login/mfa`, `/refresh`, `/logout`, `/password-reset/confirm`,
+  `/email-verification/confirm`, `/email-change/report`) nhận `OptionalTenant`: chạy trên tên miền chính không cần
+  header; request nêu khách khác khách của token thì coi như token sai.
+- Bộ xác thực chọn khách từ credential, không từ header / tên miền (kernel vẫn kiểm `tenant_mismatch` và nhân sự nền
+  tảng). Khách không có → cùng lỗi 401 như credential sai. Khách **tạm khoá / bảo trì** → `tenant_suspended` (403) /
+  `tenant_maintenance` (503 + `Retry-After`) như trước bước này, không 401: 401 làm client vứt phiên và key còn hợp lệ
+  trong lúc dời khách. Với JWT chữ ký được kiểm trước nên không lộ gì; với API key chỉ lộ trạng thái của một khách mà
+  bên gọi đã biết ID (ID khách không phải bí mật — nằm trong key và link mail).
+
+## D-287 · `OptionalTenant` bỏ qua credential hỏng (bước 33) — 2026-11-15 — agent quyết
+
+Endpoint nhận token tự mang khách (`/refresh`, `/logout`, xác nhận email, huỷ đăng ký…) dùng `OptionalTenant`. Ở chế độ
+`multi`, client gửi kèm `Authorization` với access token đã hết hạn (nhiều SDK gắn header này vào mọi request) thì
+extractor khách xác thực trước và trả `auth.token_expired` — không refresh được đúng lúc cần. Nay lỗi xác thực
+(`Unauthenticated`) trong `OptionalTenant` bị bỏ qua: khách chọn theo header / tên miền như request không đăng nhập (không
+có thì `None`, token tự nêu khách). Lỗi khác (`tenant_mismatch`, khách tạm khoá…) vẫn từ chối. Extractor `TenantContext`
+và `Principal` không đổi.
+
+## D-288 · `content` theo khách (bước 33 B13) — 2026-11-15 — agent quyết
+
+- 16 bảng `content_*` mang `tenant_id`, migration `m0010_tenancy` (một `adopt`): slug, đường dẫn công khai
+  `(tenant_id, locale, path)`, tác giả, thẻ, chuyển hướng, menu cũ, yêu cầu dịch, embedding duy nhất **trong khách**; mọi
+  index có `tenant_id` đứng đầu. Khoá chính đổi: `content_tree_locks (tenant_id, locale)`, `content_term_translations`,
+  `content_entry_terms`, `content_entry_authors` (tenant đứng đầu). Dòng khoá cây và trạng thái embedding tạo khi cần lần
+  đầu (ON CONFLICT theo khách), không cần `seed_tenant`.
+- **Lệch đặc tả, có lý do:**
+  1. Khoá chính `content_published` thành `(tenant_id, entry_id)` thay vì giữ `entry_id`: `adopt` chỉ giữ khoá chính một
+     cột tên `id`. Ngữ nghĩa không đổi (một bản đăng mỗi mục).
+  2. `content_schedules_due_idx` giữ tên, thành `(tenant_id, status, run_at)`, không thành `_sweep_idx`: lịch đăng chạy
+     bằng job của từng khách, xếp cùng transaction lúc tạo lịch — không job nào quét lịch cả database; index phục vụ
+     danh sách "Sắp đăng" của một khách.
+  3. Link xem trước ký bằng `AUTOXIDE_CONTENT_PREVIEW_SECRET` như cũ (không thêm cấu hình); khách không mặc định ghi ID
+     khách trong phần đã ký và ký bằng khoá dẫn từ secret theo khách (cùng cách `derive_for`); khách mặc định giữ dạng và
+     khoá cũ (link đã phát vẫn mở). Endpoint dùng `OptionalTenant` (mở trên tên miền chính); request nêu khách khác khách
+     của token → `content.preview_token_invalid`.
+- Cache tìm theo ý nghĩa khoá `(khách, scope, locale)`, cache câu tìm `(khách, mô hình + câu)`, ngân sách tìm công khai
+  đếm theo khách; `ETag` của `/public/resolve` băm cả ID khách. Job của khách (`run_schedule`, `index_embeddings`,
+  `translate`) đọc `job.tenant`; job theo lịch (`prune_revisions`, `catch_up_embeddings`) chạy mỗi database, tra từng khách
+  qua sổ database. API menu cũ cho `menus` đọc đúng khách được truyền (D-283 hết điều kiện chờ).
+
+## D-289 · Đóng phần B bước 33: chế độ `multi` bật được, bắt buộc `AUTOXIDE_SECRET_KEY` — 2026-11-15 — agent quyết
+
+- Cả 13 module đã theo khách (D-274…D-288): xoá `PENDING_TENANCY` khỏi testkit, app và `cargo xtask check` — kiểm
+  schema theo khách không còn ngoại lệ tạm. `TenantContext::legacy_default` bị `#[deprecated]` (không còn ai gọi; xoá
+  đầu bước 34, D-253 mục 7); code và test dùng `TenantContext` của request / job / event, hay `default_on` khi thật sự
+  cần khách mặc định (lệnh CLI, test).
+- `MULTI_TENANT_READY = true`: `AUTOXIDE_TENANCY_MODE=multi` bật được. Chế độ `multi` **bắt buộc**
+  `AUTOXIDE_SECRET_KEY` (theo khuyến nghị của đặc tả 33): secret của mọi khách mã hoá bằng khoá gốc; khoá nằm trong
+  database không bảo vệ được bản backup của khách nào. Thiếu → lỗi cấu hình nói rõ cách tạo và phải backup khoá riêng
+  khỏi database. Chế độ `single` vẫn chỉ cảnh báo như trước (bản cài cũ không phải cấu hình gì thêm).
+- `cargo xtask new-module` chép khuôn `notes` (đã theo khách từ B1): module sinh ra có `tenant_id`, `TenantScoped`, bài
+  rò rỉ; test của scaffold chặn khuôn mất điều đó.
+- Còn lại cho phần C (dòng lộ trình "Mọi thứ ngoài bảng" chưa đánh dấu): bucket lưu trữ riêng cho khách `dedicated`
+  (`kernel_placements.storage_sealed` đã có cột, chưa dùng), con trỏ pagination mang khách.
+
+## D-290 · `autoxide backup` ở chế độ `multi` cảnh báo placement không được chép (bước 33 C3) — 2026-11-15 — agent quyết
+
+Backup chép database chính (sổ khách, khách trên placement chung) và mọi file (khoá có tiền tố khách đi kèm); database
+của placement khác chưa được chép (bước 39 làm đủ). Thay vì im lặng, lệnh in `WARNING: …` nêu tên từng placement bị bỏ
+và ghi log; hướng dẫn deploy (EN + VI) nói backup chúng bằng công cụ của database và cất `AUTOXIDE_SECRET_KEY` tách khỏi
+bản backup. Chế độ `single` không đổi gì.
+
+## D-291 · Tên miền riêng của khách (bước 33 C1, D-190) — 2026-11-15 — agent quyết
+
+1. Xác minh bằng bản ghi TXT `_autoxide-challenge.<tên miền>` = `autoxide-verify=<token>` (token ngẫu nhiên 24 byte),
+   tra qua trait `DnsTxtLookup` của kernel. Bản thật dùng thư viện mới `hickory-resolver` 0.26 (chỉ feature `tokio`,
+   `system-config`; thư viện chuẩn không tra được TXT): đọc cấu hình DNS của hệ điều hành, cache tối đa 60 giây, chờ
+   tối đa 10 giây. Test dùng `FakeDns` của testkit (mọi `TestApp` có sẵn, không bao giờ tra DNS thật).
+2. Chuẩn hoá: chữ thường, bỏ cổng và dấu chấm cuối, chỉ nhãn ASCII chữ / số / `-` (punycode), tối đa 253 ký tự, ít
+   nhất hai nhãn. Từ chối IP, `localhost`, `*.localhost` và đúng tên máy của `AUTOXIDE_HTTP_PUBLIC_URL`.
+3. Chỉ `pending` / `verified` giữ tên miền; `failed` / `revoked` thì khách khác nhận lại được (dòng cũ, token mới) —
+   không ai chiếm chỗ mãi mà không chứng minh sở hữu. `pending` quá 7 ngày (tính từ lần đổi trạng thái) thành `failed`.
+   Đổi trạng thái bằng UPDATE có điều kiện: hai lượt xác minh cùng lúc chỉ một bên ghi event.
+4. Job `kernel.verify_domains` mỗi 10 phút, chỉ ở chế độ `multi`. Thêm `Schedule::on_control_only()`: lịch chỉ xếp job
+   ở database điều khiển (tên miền chỉ nằm ở đó). Kernel có thêm bảng `kernel_jobs` (migration m0009/m0010).
+5. `X-Forwarded-Host` / `Forwarded: host=` chỉ đọc khi kết nối đến từ dải `AUTOXIDE_HTTP_TRUSTED_PROXIES` (cấu hình chỉ
+   đếm proxy thì không đọc); không có thì dùng `Host`.
+6. `GET /api/v1/kernel/domains/allowed` công khai, cho `ask` của Caddy on-demand TLS; đi qua cache của sổ database và
+   rate limiting theo địa chỉ. REST: `GET`/`POST /domains`, `POST /domains/{id}/verify` (luôn 200 kèm trạng thái mới;
+   lý do còn chờ ở `check_error`), `DELETE /domains/{id}` (→ `revoked`). Chế độ `single`: thêm tên miền → 409
+   `tenant_single_mode`.
+7. Một permission `kernel.domains.manage` (mức `write`); tool chỉ đọc `kernel.list_domains` là ngoại lệ của luật "tool
+   chỉ đọc cần permission mức xem", như `files.list_files`. Không có tool MCP xoá tên miền (làm qua REST).
+8. Chưa làm (dòng lộ trình riêng): kiểm lại hằng ngày tên miền `verified`, `failed` sau 3 lần trượt liên tiếp.
+
+## D-292 · Dời khách giữa placement (bước 33 C2) — 2026-11-16 — agent quyết
+
+- Lượt dời là dòng `kernel_tenant_moves` (mặt điều khiển) đi qua `copying` → `copied` → `switched` → `done` (hoặc
+  `aborted`), có lease (`runner` / `runner_until` 120 giây, gia hạn khi đang chạy) để hai bên không chạy cùng một
+  lượt. Khách thành `moving` (request nhận 503 `tenant_maintenance` + `Retry-After`) cùng transaction với việc ghi lượt
+  dời. Trước khi chép: chờ TTL cache khách cộng thời gian tối đa của một request (máy chủ khác kịp thấy `moving`), và
+  chờ hết job / event của khách đang bị giữ (tối đa 330 giây, quá thì `tenant_move_busy`). Hai database phải đủ
+  migration và không phải cùng một database (SQLite so file; Postgres so `current_database` / `current_schema` /
+  `pg_postmaster_start_time`).
+- Chép mọi bảng cấp khách hàng (kể cả `<m>_jobs`, `<m>_events`, `kernel_tenant_settings`) trong **một transaction ở
+  đích**: xoá dòng của khách ở đích trước (chạy lại an toàn), chép theo thứ tự tạo bảng, ghi event
+  `kernel.tenant_moved`, rồi so số dòng từng bảng. Bảng mặt điều khiển và `<m>_migrations` không chép.
+- **Khác thứ tự của đặc tả 33:** đổi `placement_id` và đặt lại `active` trong cùng một bước, **trước** khi xoá nguồn —
+  khách chạy lại sớm hơn, nguồn hỏng lúc xoá không làm khách ngừng; vẫn chỉ một bản sống vì nguồn chỉ bị xoá sau khi đã
+  đổi, và worker / bộ phát không chạy dòng job / event còn sót ở placement khách không còn dùng. Trong lúc `moving`,
+  worker và bộ phát trả việc của khách về hàng đợi (không tính lần chạy); `TenantAdmin::update` từ chối thay đổi.
+- `keep_source` vẫn xoá hàng đợi job và outbox ở nguồn (không gì chạy hai lần); bản sao dữ liệu còn lại xoá bằng
+  `autoxide tenant purge-copy`. Huỷ (`--abort`) chỉ được trước bước đổi placement; chết giữa chừng thì gọi lại cùng
+  `--to` để chạy tiếp từ trạng thái đã ghi. Khách mặc định (nền tảng) không dời được.
+- REST `POST /api/v1/kernel/tenants/{id}/move` (dry-run mặc định, trả kế hoạch: bảng, số dòng, lý do chặn) và MCP
+  `kernel.move_tenant` chỉ cho nhân sự nền tảng (`kernel.tenants.move`); chạy thật bằng job `kernel.move_tenant` của
+  database điều khiển (giới hạn thời gian như mọi job), xem trạng thái ở `GET …/moves/{id}`. Khách lớn dời bằng CLI
+  `autoxide tenant move <khách> --to <placement>` (đồng bộ, không giới hạn; phải chạy với cùng cấu hình như máy chủ vì
+  thời gian chờ đọc từ cấu hình).
+- File không chép: nơi lưu dùng chung (khoá dưới `tenants/<id>/`); bucket theo placement là dòng lộ trình riêng.
+
+## D-293 · Nơi lưu file riêng theo placement; con trỏ pagination; kiểm lại tên miền hằng ngày (bước 33, đóng "Thứ ngoài bảng" và D-291 mục 8) — 2026-11-16 — agent quyết
+
+1. Placement (trừ `main`) có thể có nơi lưu file riêng: thư mục hay bucket S3, cùng thông số với `files`; lưu mã hoá
+   trong `kernel_placements.storage_sealed` (mục đích `kernel.placement_storage`, gắn ID placement). Chỉ đặt bằng CLI
+   `autoxide placement storage`; API chỉ trả phần không bí mật (`kind`, `bucket`, `prefix`, `region`, `endpoint`,
+   `dir`, `credentials: bool`). Cho mọi placement trừ `main`, không chỉ `dedicated`: khoá vẫn có tiền tố
+   `tenants/<id>/` nên dùng chung không lẫn. Placement đang có khách thì không đổi được, trừ khi `--force` (khi nơi lưu
+   mới đã có đúng các file đó). Không thử kết nối lúc đặt (lỗi hiện ở lần đọc / ghi đầu tiên).
+2. Kernel định nghĩa `StorageLocation` và trait `StorageOpener` (module `files` công bố bộ mở); sổ database gắn nơi lưu
+   riêng vào `TenantContext`, nên module vẫn chỉ gọi `TenantStorage::new(nơi_lưu_chung, khách)`. Client cache theo
+   placement, dựng lại khi giá trị đã lưu đổi. Không mở được thì chỉ thao tác file báo lỗi, khách vẫn phục vụ.
+3. Dời khách (D-292): hai placement khác nơi lưu thì chép file trước khi chép dòng (xoá file thừa ở đích, so số file);
+   xoá ở nguồn ở bước dọn, trừ `keep_source`; `abort` / `purge` xoá phần tương ứng. Trước mọi lần chép hay xoá, ghi thử
+   một file đánh dấu để phát hiện hai cấu hình cùng một chỗ — khi đó không chép, không xoá. Kế hoạch có thêm `files`.
+4. Job dọn mồ côi của `files` và `media` chạy một lần mỗi ngày trên database điều khiển (`on_control_only`), quét mọi
+   nơi lưu, ở mỗi nơi chỉ xét khách lưu file ở đó — thay phần "quét N lần" của D-277 và D-280.
+5. Con trỏ pagination: giữ D-259 mục 5, không gắn khách, không đổi định dạng. Con trỏ chỉ là vị trí trong truy vấn đã
+   lọc theo khách; gắn khách phải đổi 52 chỗ gọi `fetch_page*` mà không thêm an toàn. Bằng chứng là bài
+   `autoxide_testkit::cursor_leak_check` (con trỏ theo ID và theo cột), chạy ở `notes` và `media`.
+6. Tên miền `verified` được kiểm lại mỗi 24 giờ trong job `kernel.verify_domains` (migration
+   `m0012_domain_check_failures`, cột `check_failures`, API `failed_checks`): 3 lần liên tiếp không thấy bản ghi thì
+   `failed`, event `kernel.domain_failed` (cũng ghi khi `pending` quá 7 ngày), xoá cache. DNS lỗi hay quá giờ không tính
+   là trượt (sự cố DNS không lấy mất tên miền của khách); một lần thấy bản ghi thì đếm lại từ 0.
+
+Chưa làm: `autoxide doctor` kiểm nơi lưu riêng của từng placement; `autoxide backup` chép nơi lưu riêng (bước 39).
+
+## D-294 · Yêu cầu website bán hàng (web-build-api-gaps, 16/11/2026): danh mục / thẻ công khai, xếp phần thương mại vào lộ trình — 2026-11-16 — agent quyết
+
+- `GET /api/v1/content/public/terms?locale=&taxonomy=` (công khai): danh mục / thẻ có **ít nhất một bài đã đăng** ở
+  `locale`, mỗi cái kèm `posts` (số bài đó) — term chưa có bài công khai không hiện (trang blog không có chủ đề rỗng).
+  Phân trang theo ID như mọi danh sách; số bài đếm bằng một câu `GROUP BY` cho cả trang. Tên theo `locale`, thiếu bản
+  dịch thì ngôn ngữ mặc định (như `get_term`).
+- Biểu tượng menu: core không đổi — mục menu đã có `icon` (chuỗi tự do); bộ biểu tượng là tài nguyên của giao diện.
+- Phần thương mại của website ("mới" trong file yêu cầu) thành dòng lộ trình ở đúng bước 41, 43–47, 49 — làm theo thứ tự
+  lộ trình, không nhảy bước. Endpoint công khai đơn vị hành chính đã có ở bước 34 (`address`).
+- Bốn chỗ "core trả khác mô tả OpenAPI": sửa mô tả cho khớp giá trị (`LastDelivery.status` = `succeeded`,
+  `post_path_prefix` không có `/`, `target_title` chỉ khi đích công khai) — giá trị không đổi nên không phá client;
+  `Location` của `POST /kernel/tenants` vốn có `/api/v1`, thêm test giữ hành vi.
+
+## D-295 · Merge vào `main` trước khi gate đầy đủ chạy xong (một lần) — 2026-11-16 — chủ dự án quyết
+
+Chủ dự án bảo "merge luôn" để team giao diện dùng ngay các sửa của đợt yêu cầu web (D-294) và phần đa khách đã xong của
+bước 33, trong lúc `./gate.sh` đầy đủ còn đang chạy. Ngoại lệ một lần cho luật "chỉ merge khi gate đầy đủ xanh"
+(CLAUDE.md): mọi commit đã qua `./gate.sh --quick`; gate đầy đủ lần trước (sau phần B) xanh; test Postgres của kernel và
+app đã chạy cho C1, C2. Gate đầy đủ vẫn chạy tiếp; đỏ thì sửa ngay trên nhánh làm việc và merge bản sửa. Không phát hành.

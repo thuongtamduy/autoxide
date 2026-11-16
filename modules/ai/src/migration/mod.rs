@@ -4,6 +4,7 @@
 mod m0001_create_usage;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -14,6 +15,15 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::tenancy::migration::adopt(
             "m0003_tenancy_helpers",
             vec![autoxide_kernel::job::tenant_table("ai")],
+        ),
+        // Số token đếm theo khách (bước 33); job dọn quét theo ngày trên cả database.
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0004_tenancy",
+            vec![
+                TenantTable::new("ai_usage")
+                    .unique("ai_usage_day_purpose_unique", ["tenant_id", "day", "purpose"])
+                    .sweep_index("ai_usage_day_sweep_idx", ["day"]),
+            ],
         ),
     ]
 }

@@ -25,8 +25,8 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::rows;
-use autoxide_kernel::storage::{ByteStream, StoredFile};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::storage::{ByteStream, Storage as _, StoredFile};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt as _;
@@ -112,9 +112,13 @@ pub(crate) struct Exporter(pub Arc<FormsService>);
 #[async_trait::async_trait]
 impl JobHandler for Exporter {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("a forms export job must belong to a tenant"))?;
         let job: ExportJob =
             serde_json::from_value(job.payload.clone()).map_err(Error::internal)?;
-        FormsService::run_export(&self.0, job.export_id).await
+        FormsService::run_export(&self.0, tenant, job.export_id).await
     }
 }
 
@@ -123,18 +127,23 @@ impl FormsService {
     /// chưa xong: `forms.export_in_progress`.
     pub(crate) async fn request_export(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         form_id: Uuid,
         status: Option<SubmissionStatus>,
     ) -> Result<ExportView, Error> {
         principal.require(&FORMS_EXPORT)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Khoá dòng form tới hết transaction: hai yêu cầu cùng lúc cho một form xét lần lượt,
         // bên sau thấy bản của bên trước (Postgres chờ khoá; SQLite chỉ một bên ghi).
-        if rows::lock_one(&transaction, form::Entity::find_by_id(form_id)).await?.is_none() {
+        if rows::lock_one(&transaction, form::Entity::find_by_id(form_id).scoped(tenant))
+            .await?
+            .is_none()
+        {
             return Err(form_not_found());
         }
         let running = export::Entity::find()
+            .scoped(tenant)
             .filter(export::Column::FormId.eq(form_id))
             .filter(
                 export::Column::State
@@ -147,6 +156,7 @@ impl FormsService {
         }
         let row = export::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             form_id: Set(form_id),
             requested_by: Set(Some(principal.user_id())),
             status_filter: Set(status.map(|status| status.as_str().to_owned())),
@@ -163,38 +173,40 @@ impl FormsService {
         self.jobs
             .enqueue(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 &ExportJob { export_id: row.id },
                 EnqueueOptions::default(),
             )
             .await?;
         transaction.commit().await?;
         tracing::info!(form_id = %form_id, export_id = %row.id, "forms export requested");
-        self.view(row).await
+        self.view(tenant, row).await
     }
 
     /// Bản xuất `id`. Cần `forms.export`.
     pub(crate) async fn get_export(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<ExportView, Error> {
         principal.require(&FORMS_EXPORT)?;
         let row = export::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(export_not_found)?;
-        self.view(row).await
+        self.view(tenant, row).await
     }
 
-    async fn view(&self, row: export::Model) -> Result<ExportView, Error> {
+    async fn view(&self, tenant: &TenantContext, row: export::Model) -> Result<ExportView, Error> {
         let state = ExportState::parse(&row.state)?;
         let download = match (state, row.expires_at) {
             (ExportState::Ready, Some(kept)) if kept > now() => {
                 let minutes = i64::from(self.config.export_link_minutes);
                 // Link không sống lâu hơn file.
                 let expires = (now() + chrono::Duration::minutes(minutes)).min(kept);
-                let signature = self.signature(row.id, expires.timestamp()).await?;
+                let signature = self.signature(tenant, row.id, expires.timestamp()).await?;
                 let path = format!(
                     "/api/v1/forms/exports/{}/file?expires={}&signature={signature}",
                     row.id,
@@ -209,13 +221,24 @@ impl FormsService {
     }
 
     /// Chữ ký (hex) của link tải bản xuất `id` hết hạn lúc `expires` (giây Unix).
-    pub(crate) async fn signature(&self, id: Uuid, expires: i64) -> Result<String, Error> {
-        let mac = self.link_mac(id, expires).await?;
+    pub(crate) async fn signature(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        expires: i64,
+    ) -> Result<String, Error> {
+        let mac = self.link_mac(tenant, id, expires).await?;
         Ok(mac.finalize().into_bytes().iter().map(|byte| format!("{byte:02x}")).collect())
     }
 
-    async fn link_mac(&self, id: Uuid, expires: i64) -> Result<HmacSha256, Error> {
-        let key = self.secret.derive(LINK_KEY).await?;
+    async fn link_mac(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        expires: i64,
+    ) -> Result<HmacSha256, Error> {
+        // Khoá riêng mỗi khách: link ký cho khách này không mở được ở khách khác.
+        let key = self.secret.derive_for(tenant.id(), LINK_KEY).await?;
         let mut mac = <HmacSha256 as KeyInit>::new_from_slice(&key)
             .map_err(|error| Error::internal(format!("hmac: {error}")))?;
         mac.update(id.as_bytes());
@@ -227,26 +250,31 @@ impl FormsService {
     /// sai hay hết hạn: `forms.export_link_invalid`; file đã bị xoá: `forms.export_not_found`.
     pub(crate) async fn download_export(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         expires: i64,
         signature: &str,
     ) -> Result<(String, StoredFile), Error> {
         let signature = hex(signature).ok_or_else(link_invalid)?;
         // `verify_slice` so sánh trong thời gian không đổi: không lộ dần chữ ký đúng.
-        self.link_mac(id, expires).await?.verify_slice(&signature).map_err(|_| link_invalid())?;
+        self.link_mac(tenant, id, expires)
+            .await?
+            .verify_slice(&signature)
+            .map_err(|_| link_invalid())?;
         if expires < now().timestamp() {
             return Err(link_invalid());
         }
         let row = export::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(export_not_found)?;
         let key = row.storage_key.as_deref().ok_or_else(export_not_found)?;
         if row.state != ExportState::Ready.as_str() {
             return Err(export_not_found());
         }
-        let file = self.storage.get(key).await?.ok_or_else(export_not_found)?;
-        let name = match self.find_form(row.form_id).await {
+        let file = self.store(tenant).get(key).await?.ok_or_else(export_not_found)?;
+        let name = match self.find_form(tenant, row.form_id).await {
             Ok(form) => export_file_name(&form),
             Err(_) => format!("{}-submissions.csv", row.form_id),
         };
@@ -254,8 +282,14 @@ impl FormsService {
     }
 
     /// Chạy job xuất `id`: ghi file, đổi trạng thái. Chạy lại khi đã xong thì không làm gì.
-    pub(crate) async fn run_export(service: &Arc<FormsService>, id: Uuid) -> Result<(), Error> {
-        let Some(row) = export::Entity::find_by_id(id).one(service.database.read()).await? else {
+    pub(crate) async fn run_export(
+        service: &Arc<FormsService>,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        let Some(row) =
+            export::Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?
+        else {
             // Bản xuất đã bị xoá (form bị xoá, xoá theo email) trước khi job chạy.
             return Ok(());
         };
@@ -264,11 +298,11 @@ impl FormsService {
         }
         let mut running = row.clone().into_active_model();
         running.state = Set(ExportState::Running.as_str().to_owned());
-        running.update(service.database.write()).await?;
-        let result = Self::write_export(service, &row).await;
+        running.update(tenant.database().write()).await?;
+        let result = Self::write_export(service, tenant, &row).await;
         let finished = now();
         let keep = chrono::Duration::hours(i64::from(service.config.export_keep_hours));
-        let transaction = service.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let mut done = row.clone().into_active_model();
         done.finished_at = Set(Some(finished));
         done.expires_at = Set(Some(finished + keep));
@@ -287,7 +321,7 @@ impl FormsService {
                     .outbox
                     .record(
                         &transaction,
-                        &TenantContext::legacy_default(&service.database),
+                        tenant,
                         actor,
                         events::form_subject(row.form_id),
                         &events::SubmissionsExported(change),
@@ -310,32 +344,40 @@ impl FormsService {
     /// Ghi file của bản xuất `row` theo luồng: (số dòng, số byte, khoá).
     async fn write_export(
         service: &Arc<FormsService>,
+        tenant: &TenantContext,
         row: &export::Model,
     ) -> Result<(u64, u64, String), Error> {
-        let form = service.find_form(row.form_id).await?;
-        let columns = service.export_columns(&form).await?;
+        let form = service.find_form(tenant, row.form_id).await?;
+        let columns = service.export_columns(tenant, &form).await?;
         let status = row.status_filter.as_deref().and_then(SubmissionStatus::parse);
         let count = Arc::new(AtomicU64::new(0));
-        let stream = lines(service.clone(), row.form_id, status, columns, count.clone());
+        let stream =
+            lines(service.clone(), tenant.clone(), row.form_id, status, columns, count.clone());
         let key = storage_key(row.id);
         // Chạy lại sau lần hỏng giữa chừng: ghi đè cùng khoá.
-        let size = service.storage.put(&key, stream).await?;
+        let size = service.store(tenant).put(&key, stream).await?;
         Ok((count.load(Ordering::SeqCst), size, key))
     }
 
     /// Xoá các bản xuất `rows`: file trước, dòng sau; xoá file lỗi thì để dòng lại cho lần dọn
     /// sau. Trả số bản đã xoá.
-    pub(crate) async fn purge_exports(&self, rows: Vec<export::Model>) -> Result<u64, Error> {
+    pub(crate) async fn purge_exports(
+        &self,
+        tenant: &TenantContext,
+        rows: Vec<export::Model>,
+    ) -> Result<u64, Error> {
+        let store = self.store(tenant);
         let mut purged = 0;
         for row in rows {
             if let Some(key) = &row.storage_key
-                && let Err(error) = self.storage.delete(key).await
+                && let Err(error) = store.delete(key).await
             {
                 tracing::warn!(export_id = %row.id, error = %error, "forms export file not deleted");
                 continue;
             }
             purged += export::Entity::delete_by_id(row.id)
-                .exec(self.database.write())
+                .scoped(tenant)
+                .exec(tenant.database().write())
                 .await?
                 .rows_affected;
         }
@@ -345,24 +387,28 @@ impl FormsService {
     /// Mọi bản xuất của các form `form_ids`.
     pub(crate) async fn exports_of(
         &self,
+        tenant: &TenantContext,
         form_ids: Vec<Uuid>,
     ) -> Result<Vec<export::Model>, Error> {
         Ok(export::Entity::find()
+            .scoped(tenant)
             .filter(export::Column::FormId.is_in(form_ids))
             .order_by_asc(export::Column::Id)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?)
     }
 
     /// Bản xuất quá hạn giữ lúc `now`.
     pub(crate) async fn expired_exports(
         &self,
+        tenant: &TenantContext,
         now: DateTime<Utc>,
     ) -> Result<Vec<export::Model>, Error> {
         Ok(export::Entity::find()
+            .scoped(tenant)
             .filter(export::Column::ExpiresAt.lt(now))
             .order_by_asc(export::Column::Id)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?)
     }
 }
@@ -383,6 +429,7 @@ enum Next {
 /// file trong bộ nhớ.
 fn lines(
     service: Arc<FormsService>,
+    tenant: TenantContext,
     form_id: Uuid,
     status: Option<SubmissionStatus>,
     columns: ExportColumns,
@@ -394,6 +441,7 @@ fn lines(
     // với hàm đã tạo ra nó — điều `Storage::put` đòi (`'static`).
     futures_util::stream::try_unfold(Next::Header(header), move |next| {
         let service = service.clone();
+        let tenant = tenant.clone();
         let keys = keys.clone();
         let count = count.clone();
         async move {
@@ -404,7 +452,8 @@ fn lines(
                     Ok(Some((Bytes::from(chunk), Next::Page(None))))
                 }
                 Next::Page(after) => {
-                    let (rows, cursor) = service.export_page(form_id, status, &keys, after).await?;
+                    let (rows, cursor) =
+                        service.export_page(&tenant, form_id, status, &keys, after).await?;
                     count.fetch_add(rows.len() as u64, Ordering::SeqCst);
                     let chunk: String = rows.iter().map(|row| csv::line(row)).collect();
                     let next = cursor.map_or(Next::Done, |cursor| Next::Page(Some(cursor)));

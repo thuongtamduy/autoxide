@@ -25,9 +25,14 @@
 //!
 //! Nhiều khách (bước 33): `.tenant("a")` thêm khách trên database của app (placement chung),
 //! `.tenant_dedicated("b")` thêm khách trên database riêng (một database trống nữa cùng loại);
+//! `.placement("p")` thêm placement riêng chưa có khách (đích để dời khách tới);
 //! `.user_in("a", "token-a", 1, &[…])` là người của khách `a`. Khai khách nào thì app chạy chế độ
 //! `multi` (bỏ qua việc chế độ này chưa mở cho người dùng); `app.tenant("a")` cho ngữ cảnh của
 //! khách để gọi service trực tiếp.
+//!
+//! Tên miền riêng (D-190): `.domain("a", "shop-a.test")` gắn tên miền đã xác minh cho khách `a`;
+//! `app.get(…).host("shop-a.test")` gửi request tới tên miền đó. App không bao giờ hỏi DNS thật:
+//! bản ghi TXT đặt ở `app.dns()` ([`FakeDns`]).
 
 use std::collections::HashMap;
 use std::fmt;
@@ -42,7 +47,7 @@ use autoxide_kernel::idempotency::IdempotencyStore;
 use autoxide_kernel::module::{Module, Modules, StartContext};
 use autoxide_kernel::tenancy::{
     DatabaseRegistry, NewPlacement, NewTenant, PlacementKind, TenancyConfig, TenancyMode,
-    TenantAdmin, TenantContext,
+    TenantAdmin, TenantContext, TenantDomains,
 };
 use axum::Router;
 use axum::body::Body;
@@ -58,6 +63,7 @@ use utoipa::openapi::OpenApi;
 use uuid::Uuid;
 
 use crate::TestDatabase;
+use crate::dns::FakeDns;
 
 /// Lỗi khi dựng hay gọi [`TestApp`]. Thông báo nói bước nào hỏng.
 #[derive(Debug)]
@@ -91,6 +97,7 @@ pub struct TestApp {
     modules: Modules,
     database: Database,
     registry: DatabaseRegistry,
+    dns: FakeDns,
 }
 
 /// Cấu hình của [`TestApp`] trước khi dựng.
@@ -103,8 +110,12 @@ pub struct TestAppBuilder<'a> {
     multi: bool,
     /// Khách khai thêm: (slug, có database riêng không).
     tenants: Vec<(String, bool)>,
+    /// Placement riêng chưa có khách nào (đích để dời khách tới).
+    placements: Vec<String>,
     /// Người của khách: (slug, token, bên gọi).
     tenant_users: Vec<(String, String, Principal)>,
+    /// Tên miền đã xác minh của khách: (slug, tên miền).
+    domains: Vec<(String, String)>,
 }
 
 // `for<'c>`: hàm nhận `StartContext` với lifetime bất kỳ — lifetime thật chỉ biết lúc
@@ -122,7 +133,9 @@ impl TestApp {
             users: HashMap::new(),
             multi: false,
             tenants: Vec::new(),
+            placements: Vec::new(),
             tenant_users: Vec::new(),
+            domains: Vec::new(),
         }
     }
 
@@ -140,6 +153,12 @@ impl TestApp {
     /// [`TestAppBuilder::tenant_dedicated`] (theo slug).
     pub async fn tenant(&self, slug: &str) -> Result<TenantContext, TestAppError> {
         self.registry.tenant_by_slug(slug).await.map_err(|e| fail("tenant", e))
+    }
+
+    /// Bộ tra DNS giả của app: tên miền riêng được xác minh theo bản ghi TXT đặt ở đây
+    /// ([`FakeDns::set_challenge`]); app không bao giờ hỏi DNS thật.
+    pub fn dns(&self) -> &FakeDns {
+        &self.dns
     }
 
     /// Router đầy đủ (mọi lớp HTTP của kernel), để tự gửi request khi helper không đủ.
@@ -293,12 +312,29 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
+    /// Thêm placement `dedicated` tên `name` trên một database trống nữa cùng loại (dọn cùng bài
+    /// test), chưa có khách nào — vd đích để dời khách tới. Bật chế độ nhiều khách.
+    pub fn placement(mut self, name: &str) -> Self {
+        self.multi = true;
+        self.placements.push(name.to_owned());
+        self
+    }
+
     /// Như [`user`](Self::user), cho người của khách `slug` (khai bằng [`tenant`](Self::tenant)
     /// hay [`tenant_dedicated`](Self::tenant_dedicated)).
     pub fn user_in(mut self, slug: &str, token: &str, user_id: u128, permissions: &[&str]) -> Self {
         let permissions = permissions.iter().map(|p| (*p).to_owned());
         let principal = Principal::new(Uuid::from_u128(user_id), permissions);
         self.tenant_users.push((slug.to_owned(), token.to_owned(), principal));
+        self
+    }
+
+    /// Gắn tên miền `domain` (đã xác minh) cho khách `slug` (khai bằng [`tenant`](Self::tenant),
+    /// hay `default` cho khách nền tảng): request mang `Host: <domain>` vào khách đó. Đi đúng đường
+    /// thật — thêm, đặt bản ghi TXT ở [`FakeDns`], xác minh. Bật chế độ nhiều khách.
+    pub fn domain(mut self, slug: &str, domain: &str) -> Self {
+        self.multi = true;
+        self.domains.push((slug.to_owned(), domain.to_owned()));
         self
     }
 
@@ -326,25 +362,28 @@ impl<'a> TestAppBuilder<'a> {
         let migrator = modules.migrator().map_err(|e| fail("migrations", e))?;
         migrator.up(&database).await.map_err(|e| fail("migrations", e))?;
         let registry = if self.multi {
-            // Dựng thẳng cấu hình: chế độ `multi` chưa mở cho người dùng (đọc từ biến môi trường
-            // bị từ chối) nhưng test của module cần nó.
-            let tenancy = TenancyConfig::with_mode(TenancyMode::Multi);
+            // Đặt thẳng chế độ (đặt `AUTOXIDE_TENANCY_MODE=multi` thì phải có cả khoá gốc); các
+            // biến `AUTOXIDE_TENANCY_*` khác test đặt bằng `setting` vẫn có tác dụng.
+            let mut tenancy: TenancyConfig = config.tenancy.clone();
+            tenancy.mode = TenancyMode::Multi;
             DatabaseRegistry::new(database.clone(), config.database.clone(), tenancy)
         } else {
             DatabaseRegistry::single(database.clone())
         };
+        let dns = FakeDns::default();
+        modules.use_dns(Arc::new(dns.clone()));
         modules.start_in(&registry).map_err(|e| fail("start", e))?;
 
         let mut users = self.users;
-        if !self.tenants.is_empty() {
+        if !self.tenants.is_empty() || !self.placements.is_empty() {
             let placements = modules.placements(&registry).map_err(|e| fail("placements", e))?;
-            for (slug, dedicated) in &self.tenants {
-                if *dedicated {
-                    let url = self.test.extra_database().await.map_err(|e| fail("placement", e))?;
-                    let url = url.parse().map_err(|e| fail("placement", e))?;
-                    let new = NewPlacement::new(slug.clone(), PlacementKind::Dedicated, url);
-                    placements.add(new).await.map_err(|e| fail("placement", e))?;
-                }
+            let dedicated = self.tenants.iter().filter(|(_, dedicated)| *dedicated);
+            let names = dedicated.map(|(slug, _)| slug).chain(&self.placements);
+            for name in names {
+                let url = self.test.extra_database().await.map_err(|e| fail("placement", e))?;
+                let url = url.parse().map_err(|e| fail("placement", e))?;
+                let new = NewPlacement::new(name.clone(), PlacementKind::Dedicated, url);
+                placements.add(new).await.map_err(|e| fail("placement", e))?;
             }
             placements.up_all().await.map_err(|e| fail("placement migrations", e))?;
             let admin = modules
@@ -359,6 +398,25 @@ impl<'a> TestAppBuilder<'a> {
                 };
                 let actor = autoxide_kernel::event::Actor::system();
                 admin.create(actor, input).await.map_err(|e| fail("tenant", e))?;
+            }
+        }
+        if !self.domains.is_empty() {
+            let domains = modules
+                .api::<TenantDomains>()
+                .ok_or_else(|| fail("domains", "the kernel did not start its domain service"))?;
+            for (slug, domain) in &self.domains {
+                let tenant = registry.tenant_by_slug(slug).await.map_err(|e| fail("domain", e))?;
+                let actor = autoxide_kernel::event::Actor::system;
+                let added =
+                    domains.add(actor(), &tenant, domain).await.map_err(|e| fail("domain", e))?;
+                dns.set_txt(&added.record.name, &[&added.record.value]);
+                let verified = domains
+                    .verify(actor(), &tenant, added.id)
+                    .await
+                    .map_err(|e| fail("domain", e))?;
+                if verified.status != "verified" {
+                    return Err(fail("domain", format!("`{domain}` was not verified")));
+                }
             }
         }
         for (slug, token, principal) in self.tenant_users {
@@ -394,6 +452,7 @@ impl<'a> TestAppBuilder<'a> {
             modules,
             database,
             registry,
+            dns,
         })
     }
 }
@@ -451,6 +510,12 @@ impl TestRequest<'_> {
     /// `Authorization: Bearer <token>`.
     pub fn token(self, token: &str) -> Self {
         self.header(header::AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+    }
+
+    /// `Host: <host>` — request tới tên miền riêng của khách (khai bằng
+    /// [`TestAppBuilder::domain`]).
+    pub fn host(self, host: &str) -> Self {
+        self.header(header::HOST.as_str(), host)
     }
 
     /// Thêm một header.

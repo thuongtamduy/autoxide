@@ -66,6 +66,7 @@ use crate::idempotency::IdempotencyStore;
 
 pub use body_limit::{BodyLimit, is_too_large};
 pub use client::ClientInfo;
+pub(crate) use client::ForwardedHost;
 pub use deprecation::Deprecation;
 pub use disposition::{Disposition, content_disposition};
 pub use extract::ValidJson;
@@ -250,6 +251,10 @@ pub fn build(
     // request gặp đầu tiên. Đọc từ dưới lên sẽ ra thứ tự ở đầu file.
     let router = router
         .layer(middleware::from_fn(conditional::not_modified))
+        // Khách có thể chọn bằng header `autoxide-tenant` (bước 33): cache dùng chung đứng trước API
+        // (CDN, reverse proxy) phải tách bản lưu theo header này, không thì trả nội dung của khách
+        // này cho khách khác. Đặt ngoài lớp 304 để cả 304 cũng mang nó.
+        .layer(middleware::map_response(vary_tenant))
         // Giới hạn mặc định của axum (2 MiB cho extractor) tắt đi: lớp `body_limit`
         // đã giới hạn theo từng route.
         .layer(DefaultBodyLimit::disable())
@@ -319,6 +324,12 @@ fn timed_out(limit: Duration) -> Error {
         "The server did not finish handling the request within {seconds} seconds. Retry later.",
     )
     .with_param("seconds", limit.as_secs())
+}
+
+/// Thêm `autoxide-tenant` vào `Vary` của response (giữ các giá trị đã có).
+async fn vary_tenant(mut response: Response) -> Response {
+    response.headers_mut().append(header::VARY, HeaderValue::from_static("autoxide-tenant"));
+    response
 }
 
 fn cors(origins: &CorsOrigins) -> CorsLayer {

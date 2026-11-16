@@ -56,6 +56,8 @@ struct FormsModule {
     config: Option<FormsConfig>,
     /// Có sau `start`.
     service: Option<Arc<FormsService>>,
+    /// Sổ database, có sau `start`: job dọn dẹp tra ngữ cảnh từng khách.
+    databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
 
 impl Module for FormsModule {
@@ -90,7 +92,6 @@ impl Module for FormsModule {
             .clone()
             .ok_or_else(|| Error::internal("module `forms` started before it was configured"))?;
         let parts = Parts {
-            database: context.database().clone(),
             outbox: context.outbox()?,
             guard: context.require::<SpamGuard>()?,
             secret: (*context.require::<SecretKey>()?).clone(),
@@ -103,6 +104,7 @@ impl Module for FormsModule {
         let service = Arc::new(FormsService::new(parts, config));
         context.personal_data(service.clone())?;
         self.service = Some(service);
+        self.databases = Some(context.tenancy());
         Ok(())
     }
 
@@ -121,18 +123,19 @@ impl Module for FormsModule {
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
-        self.service.clone().map_or_else(Vec::new, |service| {
-            vec![
+        match (self.service.clone(), self.databases.clone()) {
+            (Some(service), Some(databases)) => vec![
                 JobRegistration::new(
                     retention::CLEANUP,
-                    Arc::new(retention::Cleanup(service.clone())),
+                    Arc::new(retention::Cleanup { service: service.clone(), databases }),
                 ),
                 JobRegistration::new(
                     submissions::exports::EXPORT,
                     Arc::new(submissions::exports::Exporter(service)),
                 ),
-            ]
-        })
+            ],
+            _ => Vec::new(),
+        }
     }
 
     fn schedules(&self) -> Vec<Schedule> {
@@ -254,7 +257,6 @@ pub(crate) mod testing {
             Translations::new(vec![("forms", vec![("vi", include_str!("../locales/vi.json"))])])
                 .unwrap();
         let parts = Parts {
-            database: database.clone(),
             outbox: Outbox::standalone("forms"),
             guard,
             secret,

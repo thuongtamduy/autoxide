@@ -15,7 +15,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::rows;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
@@ -102,42 +102,55 @@ pub(crate) fn check_tags(
 /// Nhãn chưa có thì tạo. Trả tên các nhãn, như đã lưu, theo thứ tự tên.
 pub(crate) async fn set_item_tags<C: ConnectionTrait>(
     transaction: &C,
+    tenant: &TenantContext,
     item_id: Uuid,
     names: &[String],
 ) -> Result<Vec<String>, Error> {
     let mut ids = Vec::with_capacity(names.len());
     for name in names {
-        ids.push(ensure_tag(transaction, name).await?);
+        ids.push(ensure_tag(transaction, tenant, name).await?);
     }
-    let mut stale = item_tag::Entity::delete_many().filter(item_tag::Column::ItemId.eq(item_id));
+    let mut stale =
+        item_tag::Entity::delete_many().scoped(tenant).filter(item_tag::Column::ItemId.eq(item_id));
     if !ids.is_empty() {
         stale = stale.filter(item_tag::Column::TagId.is_not_in(ids.clone()));
     }
     stale.exec(transaction).await?;
     if !ids.is_empty() {
-        let links = ids
-            .iter()
-            .map(|tag_id| item_tag::ActiveModel { item_id: Set(item_id), tag_id: Set(*tag_id) });
+        let links = ids.iter().map(|tag_id| item_tag::ActiveModel {
+            tenant_id: Set(tenant.id().as_uuid()),
+            item_id: Set(item_id),
+            tag_id: Set(*tag_id),
+        });
         item_tag::Entity::insert_many(links)
             .on_conflict(
-                OnConflict::columns([item_tag::Column::ItemId, item_tag::Column::TagId])
-                    .do_nothing()
-                    .to_owned(),
+                OnConflict::columns([
+                    item_tag::Column::TenantId,
+                    item_tag::Column::ItemId,
+                    item_tag::Column::TagId,
+                ])
+                .do_nothing()
+                .to_owned(),
             )
             .exec_without_returning(transaction)
             .await?;
     }
-    Ok(tags_of(transaction, &[item_id]).await?.remove(&item_id).unwrap_or_default())
+    Ok(tags_of(transaction, tenant, &[item_id]).await?.remove(&item_id).unwrap_or_default())
 }
 
 /// ID của nhãn `name`, tạo nếu chưa có; dòng nhãn bị khoá tới hết `transaction`.
-async fn ensure_tag<C: ConnectionTrait>(transaction: &C, name: &str) -> Result<Uuid, Error> {
+async fn ensure_tag<C: ConnectionTrait>(
+    transaction: &C,
+    tenant: &TenantContext,
+    name: &str,
+) -> Result<Uuid, Error> {
     let key = autoxide_kernel::search::normalize(name);
     // Vài lần: lệnh xoá nhãn có thể chen vào giữa lúc tạo và lúc khoá.
     for _ in 0..3 {
         let now = now();
         let row = tag::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             name: Set(name.to_owned()),
             name_key: Set(key.clone()),
             search_key: Set(autoxide_kernel::search::fold(name)),
@@ -145,17 +158,25 @@ async fn ensure_tag<C: ConnectionTrait>(transaction: &C, name: &str) -> Result<U
             updated_at: Set(now),
         };
         tag::Entity::insert(row)
-            .on_conflict(OnConflict::column(tag::Column::NameKey).do_nothing().to_owned())
+            .on_conflict(
+                OnConflict::columns([tag::Column::TenantId, tag::Column::NameKey])
+                    .do_nothing()
+                    .to_owned(),
+            )
             .exec_without_returning(transaction)
             .await?;
         let Some(found) = tag::Entity::find()
+            .scoped(tenant)
             .filter(tag::Column::NameKey.eq(key.as_str()))
             .one(transaction)
             .await?
         else {
             continue;
         };
-        if rows::lock_one(transaction, tag::Entity::find_by_id(found.id)).await?.is_some() {
+        if rows::lock_one(transaction, tag::Entity::find_by_id(found.id).scoped(tenant))
+            .await?
+            .is_some()
+        {
             return Ok(found.id);
         }
     }
@@ -166,17 +187,20 @@ async fn ensure_tag<C: ConnectionTrait>(transaction: &C, name: &str) -> Result<U
 /// Hai câu query cho mọi item, không N+1.
 pub(crate) async fn tags_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ids: &[Uuid],
 ) -> Result<HashMap<Uuid, Vec<String>>, Error> {
     if ids.is_empty() {
         return Ok(HashMap::new());
     }
     let links = item_tag::Entity::find()
+        .scoped(tenant)
         .filter(item_tag::Column::ItemId.is_in(ids.to_vec()))
         .all(connection)
         .await?;
     let tag_ids: Vec<Uuid> = links.iter().map(|link| link.tag_id).collect();
     let tags: HashMap<Uuid, Tag> = tag::Entity::find()
+        .scoped(tenant)
         .filter(tag::Column::Id.is_in(tag_ids))
         .all(connection)
         .await?
@@ -201,10 +225,12 @@ pub(crate) async fn tags_of<C: ConnectionTrait>(
 /// ID của nhãn tên `name` (không phân biệt hoa thường), nếu có.
 pub(crate) async fn find_tag<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     name: &str,
 ) -> Result<Option<Uuid>, Error> {
     let key = autoxide_kernel::search::normalize(name);
     Ok(tag::Entity::find()
+        .scoped(tenant)
         .filter(tag::Column::NameKey.eq(key))
         .one(connection)
         .await?
@@ -212,11 +238,12 @@ pub(crate) async fn find_tag<C: ConnectionTrait>(
 }
 
 /// Điều kiện "item mang nhãn `tag_id`", cho bộ lọc của danh sách.
-pub(crate) fn has_tag(tag_id: Uuid) -> sea_orm::sea_query::SimpleExpr {
+pub(crate) fn has_tag(tenant: &TenantContext, tag_id: Uuid) -> sea_orm::sea_query::SimpleExpr {
     item::Column::Id.in_subquery(
         Query::select()
             .column(item_tag::Column::ItemId)
             .from(item_tag::Entity)
+            .and_where(item_tag::Column::TenantId.eq(tenant.id().as_uuid()))
             .and_where(item_tag::Column::TagId.eq(tag_id))
             .to_owned(),
     )
@@ -226,18 +253,19 @@ impl MediaService {
     /// Một trang nhãn, kèm số item mang mỗi nhãn. Cần `media.read`.
     pub(crate) async fn list_tags(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         search: Option<&str>,
         sort: TagSort,
         page: &PageRequest,
     ) -> Result<Page<TagWithCount>, Error> {
         principal.require(&MEDIA_READ)?;
-        let mut select = tag::Entity::find();
+        let mut select = tag::Entity::find().scoped(tenant);
         if let Some(search) = search.filter(|search| !search.trim().is_empty()) {
             select =
                 select.filter(autoxide_kernel::search::contains(tag::Column::SearchKey, search));
         }
-        let read = self.database.read();
+        let read = tenant.database().read();
         let page = match sort {
             TagSort::CreatedAt => {
                 fetch_page(select, tag::Column::Id, |row| row.id, page, read).await?
@@ -256,29 +284,33 @@ impl MediaService {
                 .await?
             }
         };
-        let counts =
-            self.count_items(&page.data.iter().map(|tag| tag.id).collect::<Vec<_>>()).await?;
+        let counts = self
+            .count_items(tenant, &page.data.iter().map(|tag| tag.id).collect::<Vec<_>>())
+            .await?;
         Ok(page.map(|tag| TagWithCount { items: counts.get(&tag.id).copied().unwrap_or(0), tag }))
     }
 
     /// Nhãn `id`, kèm số item. Cần `media.read`.
     pub(crate) async fn get_tag(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<TagWithCount, Error> {
         principal.require(&MEDIA_READ)?;
         let tag = tag::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| tag_not_found(id))?;
-        let items = self.count_items(&[id]).await?.get(&id).copied().unwrap_or(0);
+        let items = self.count_items(tenant, &[id]).await?.get(&id).copied().unwrap_or(0);
         Ok(TagWithCount { tag, items })
     }
 
     /// Đổi tên nhãn `id` (mọi item mang nó thấy tên mới). Cần `media.write`.
     pub(crate) async fn rename_tag(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         name: &str,
@@ -290,8 +322,9 @@ impl MediaService {
         let Some(name) = names.into_iter().next().filter(|_| problems.is_empty()) else {
             return Err(Error::validation(problems));
         };
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let before = tag::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| tag_not_found(id))?;
@@ -300,7 +333,7 @@ impl MediaService {
         row.search_key = Set(autoxide_kernel::search::fold(&name));
         row.name = Set(name.clone());
         row.updated_at = Set(now());
-        let mut update = tag::Entity::update(row).validate()?;
+        let mut update = tag::Entity::update(row).validate()?.scoped(tenant);
         if let Some(expected) = expected {
             update = update.filter(tag::Column::UpdatedAt.eq(expected));
         }
@@ -319,32 +352,39 @@ impl MediaService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 actor,
                 events::tag_subject(id),
                 &events::TagUpdated(change),
             )
             .await?;
         transaction.commit().await?;
-        let items = self.count_items(&[id]).await?.get(&id).copied().unwrap_or(0);
+        let items = self.count_items(tenant, &[id]).await?.get(&id).copied().unwrap_or(0);
         Ok(TagWithCount { tag: after, items })
     }
 
     /// Xoá nhãn `id` và gỡ nó khỏi mọi item. Cần `media.write`.
-    pub(crate) async fn delete_tag(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn delete_tag(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
         principal.require(&MEDIA_WRITE)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let tag = tag::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| tag_not_found(id))?;
         // Xoá dòng nhãn TRƯỚC (khoá nó), rồi mới gỡ khỏi item (xem đầu file).
-        let deleted = tag::Entity::delete_by_id(id).exec(&transaction).await?;
+        let deleted = tag::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             transaction.rollback().await?;
             return Err(tag_not_found(id));
         }
         let unlinked = item_tag::Entity::delete_many()
+            .scoped(tenant)
             .filter(item_tag::Column::TagId.eq(id))
             .exec(&transaction)
             .await?;
@@ -354,7 +394,7 @@ impl MediaService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 actor,
                 events::tag_subject(id),
                 &events::TagDeleted(change),
@@ -365,16 +405,22 @@ impl MediaService {
     }
 
     /// Số item ngoài thùng rác mang từng nhãn trong `ids`.
-    async fn count_items(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, u64>, Error> {
+    async fn count_items(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, u64>, Error> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
         let live = Query::select()
             .column(item::Column::Id)
             .from(item::Entity)
+            .and_where(item::Column::TenantId.eq(tenant.id().as_uuid()))
             .and_where(item::Column::TrashedAt.is_null())
             .to_owned();
         let rows: Vec<(Uuid, i64)> = item_tag::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(item_tag::Column::TagId)
             .column_as(item_tag::Column::ItemId.count(), "items")
@@ -382,7 +428,7 @@ impl MediaService {
             .filter(item_tag::Column::ItemId.in_subquery(live))
             .group_by(item_tag::Column::TagId)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         Ok(rows.into_iter().map(|(id, count)| (id, u64::try_from(count).unwrap_or(0))).collect())
     }

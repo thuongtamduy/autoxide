@@ -58,6 +58,10 @@ impl Module for AiModule {
         migration::all()
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![service::TENANT_API_KEY, service::TENANT_MODEL]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(AiConfig::read(reader)?);
         Ok(())
@@ -76,14 +80,14 @@ impl Module for AiModule {
             .config
             .clone()
             .ok_or_else(|| Error::internal("module `ai` started before it was configured"))?;
-        let book = Arc::new(UsageBook::new(context.database().clone(), config.daily_token_limit));
-        let (provider, capabilities): (Option<Box<dyn providers::Provider>>, Capabilities) =
+        let book = Arc::new(UsageBook::new(config.daily_token_limit));
+        let (provider, capabilities): (Option<Arc<dyn providers::Provider>>, Capabilities) =
             match &config.text {
                 None => (None, Capabilities::default()),
                 Some(text) => {
-                    let provider: Box<dyn providers::Provider> = match text.provider {
-                        Provider::Anthropic => Box::new(providers::Anthropic::new(text)?),
-                        Provider::OpenAi => Box::new(providers::OpenAi::new(text)?),
+                    let provider: Arc<dyn providers::Provider> = match text.provider {
+                        Provider::Anthropic => Arc::new(providers::Anthropic::new(text)?),
+                        Provider::OpenAi => Arc::new(providers::OpenAi::new(text)?),
                     };
                     tracing::info!(provider = text.provider.name(), model = %text.model, "AI text generation is on");
                     let capabilities =
@@ -99,7 +103,10 @@ impl Module for AiModule {
                 Some(embedding::OpenAiEmbeddings::new(embedding)?)
             }
         };
-        let text = Arc::new(Text { provider, capabilities, book: book.clone() });
+        let settings = context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?;
+        let tenant_override =
+            config.text.clone().map(|text| service::TenantOverride::new(text, settings));
+        let text = Arc::new(Text { provider, capabilities, book: book.clone(), tenant_override });
         let embeddings = Arc::new(Embeddings { client, book: book.clone() });
         context.provide::<dyn TextModel>(text.clone())?;
         context.provide::<dyn Embedder>(embeddings.clone())?;

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::resource::{Resource, ResourceRef, ResourceResolver};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -31,7 +31,8 @@ fn uuids(ids: &[String]) -> Vec<Uuid> {
     found
 }
 
-pub(crate) struct EntryResolver(pub Arc<ContentService>);
+// Không cần service: mọi thứ đọc từ database của khách được hỏi.
+pub(crate) struct EntryResolver;
 
 #[async_trait::async_trait]
 impl ResourceResolver for EntryResolver {
@@ -42,7 +43,7 @@ impl ResourceResolver for EntryResolver {
     // Bài nào cũng có một ngôn ngữ riêng (bản dịch là bài khác), nên `locale` không dùng.
     async fn resolve_many(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         ids: &[String],
         _locale: Option<&str>,
     ) -> Result<HashMap<String, Resource>, Error> {
@@ -50,10 +51,14 @@ impl ResourceResolver for EntryResolver {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
-        let read = self.0.database.read();
-        let drafts =
-            entry::Entity::find().filter(entry::Column::Id.is_in(ids.clone())).all(read).await?;
+        let read = tenant.database().read();
+        let drafts = entry::Entity::find()
+            .scoped(tenant)
+            .filter(entry::Column::Id.is_in(ids.clone()))
+            .all(read)
+            .await?;
         let mut live: HashMap<Uuid, published::Model> = published::Entity::find()
+            .scoped(tenant)
             .filter(published::Column::EntryId.is_in(ids))
             .all(read)
             .await?
@@ -97,7 +102,7 @@ impl ResourceResolver for TermResolver {
     /// Danh mục và thẻ luôn công khai (không có bản nháp).
     async fn resolve_many(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         ids: &[String],
         locale: Option<&str>,
     ) -> Result<HashMap<String, Resource>, Error> {
@@ -107,8 +112,9 @@ impl ResourceResolver for TermResolver {
         }
         let config = &self.0.config;
         let texts = term_translation::Entity::find()
+            .scoped(tenant)
             .filter(term_translation::Column::TermId.is_in(ids))
-            .all(self.0.database.read())
+            .all(tenant.database().read())
             .await?;
         let mut by_term: HashMap<Uuid, Vec<term_translation::Model>> = HashMap::new();
         for text in texts {
@@ -142,7 +148,7 @@ impl ResourceResolver for TermResolver {
     /// Danh mục con trực tiếp, theo thứ tự tạo. Thẻ không có con.
     async fn children(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         id: &str,
         _locale: Option<&str>,
         limit: usize,
@@ -151,10 +157,11 @@ impl ResourceResolver for TermResolver {
             return Ok(Vec::new());
         };
         let rows = term::Entity::find()
+            .scoped(tenant)
             .filter(term::Column::ParentId.eq(id))
             .order_by_asc(term::Column::Id)
             .limit(u64::try_from(limit).unwrap_or(u64::MAX))
-            .all(self.0.database.read())
+            .all(tenant.database().read())
             .await?;
         Ok(rows.into_iter().map(|row| ResourceRef::new(TERM, row.id.to_string())).collect())
     }

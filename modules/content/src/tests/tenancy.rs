@@ -1,0 +1,218 @@
+//! Theo khách (bước 33): slug, đường dẫn, tác giả, term, chuyển hướng chỉ không trùng trong một
+//! khách; cache tìm theo ý nghĩa không dùng chung giữa khách; lịch đăng của khách không mặc định
+//! đăng và ghi event ở đúng khách đó. Hai khách thật của `TestApp`: `a` dùng chung database chính,
+//! `b` có database riêng.
+
+use std::sync::Arc;
+
+use autoxide_kernel::ai::{Embedder, TextModel};
+use autoxide_kernel::job::{JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
+use autoxide_media::api::Media;
+use autoxide_testkit::TestApp;
+use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+use chrono::Utc;
+
+use super::*;
+use crate::ai::semantic::{Scope, SearchQuery};
+use crate::publishing::redirects::{RedirectInput, Resolved};
+use crate::publishing::schedules::{Action, RunSchedule};
+use crate::service::ContentService;
+use crate::taxonomy::authors::AuthorInput;
+use crate::taxonomy::terms::{Taxonomy, TermInput};
+use crate::testing::{FakeMedia, service_in};
+
+/// App có module `content` (để migrate database riêng của `b`) và hai khách `a`, `b`; service
+/// tra khách qua sổ của app.
+async fn two_tenants(
+    test: &TestDatabase,
+    embedder: Arc<dyn Embedder>,
+) -> (TestApp, Arc<ContentService>, TenantContext, TenantContext) {
+    let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+    let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+    let app = TestApp::builder(test)
+        .tenant("a")
+        .tenant_dedicated("b")
+        .provide::<dyn Media>(media)
+        .provide::<dyn TextModel>(text.clone())
+        .provide::<dyn Embedder>(embedder.clone())
+        .module(crate::module())
+        .build()
+        .await
+        .unwrap();
+    let (content, _, _) =
+        service_in(test, config(&[]), text, embedder, app.registry().clone()).await;
+    let a = app.tenant("a").await.unwrap();
+    let b = app.tenant("b").await.unwrap();
+    (app, content, a, b)
+}
+
+/// Tên các event `content` của khách `tenant` (trong database của khách đó), theo thứ tự.
+async fn events_of(tenant: &TenantContext) -> Vec<String> {
+    let database = tenant.database();
+    let backend = database.read().get_database_backend();
+    let sql = "SELECT name, tenant_id FROM content_events ORDER BY id";
+    let rows = database.read().query_all_raw(Statement::from_string(backend, sql)).await;
+    rows.unwrap()
+        .iter()
+        .filter(|row| row.try_get::<Uuid>("", "tenant_id").unwrap() == tenant.id().as_uuid())
+        .map(|row| row.try_get("", "name").unwrap())
+        .collect()
+}
+
+/// Cùng slug bài, đường dẫn công khai, slug tác giả, slug thẻ và chuyển hướng ở hai khách đều
+/// tạo được, mỗi khách thấy bản của mình; trong một khách vẫn bị chặn như trước.
+#[tokio::test]
+async fn trung_ten_o_hai_khach_duoc_phep() {
+    TestDatabase::run(async |test| {
+        let (_app, content, a, b) = two_tenants(test, Arc::new(FakeEmbedder::disabled())).await;
+        let ada = editor();
+        let author = || AuthorInput {
+            display_name: Some("Ada".into()),
+            slug: Some("ada".into()),
+            ..Default::default()
+        };
+        let tag = || TermInput {
+            locale: Some("en".into()),
+            name: Some("Travel".into()),
+            slug: Some("travel".into()),
+            ..Default::default()
+        };
+        let redirect = || RedirectInput {
+            locale: None,
+            from_path: "/old".into(),
+            to_entry_id: None,
+            to_url: Some("https://example.com/".into()),
+            status_code: 301,
+        };
+        let mut published = Vec::new();
+        for tenant in [&a, &b] {
+            let entry = content.create(tenant, &ada, post("Hello")).await.unwrap();
+            assert_eq!(entry.slug, "hello");
+            content.publish(tenant, &ada, entry.id, None, None, false).await.unwrap();
+            published.push(entry.id);
+            assert_eq!(content.create_author(tenant, &ada, author()).await.unwrap().slug, "ada");
+            let term = content.create_term(tenant, &ada, Taxonomy::Tag, tag()).await.unwrap();
+            assert_eq!(term.texts[0].slug, "travel");
+            content.create_redirect(tenant, &ada, redirect()).await.unwrap();
+        }
+        for (tenant, id) in [(&a, published[0]), (&b, published[1])] {
+            match content.resolve(tenant, "en", "/blog/hello").await.unwrap() {
+                Resolved::Entry(row) => assert_eq!(row.entry_id, id),
+                other => panic!("expected an entry, got {other:?}"),
+            }
+            assert_eq!(content.author_by_slug(tenant, "ada").await.unwrap().slug, "ada");
+        }
+        // Mục của khách này không thấy được từ khách kia.
+        assert_eq!(
+            content.get(&b, &ada, published[0]).await.unwrap_err().code(),
+            "content.not_found"
+        );
+
+        // Trong một khách: vẫn bị chặn.
+        let mut again = post("Hello again");
+        again.fields.slug = Some("hello".into());
+        assert_eq!(content.create(&a, &ada, again).await.unwrap_err().code(), "content.slug_taken");
+        assert_eq!(
+            content.create_author(&a, &ada, author()).await.unwrap_err().code(),
+            "content.slug_taken"
+        );
+        assert_eq!(
+            content.create_term(&a, &ada, Taxonomy::Tag, tag()).await.unwrap_err().code(),
+            "content.slug_taken"
+        );
+        assert_eq!(
+            content.create_redirect(&a, &ada, redirect()).await.unwrap_err().code(),
+            "content.redirect_exists"
+        );
+    })
+    .await
+    .unwrap();
+}
+
+/// Vector trong bộ nhớ giữ theo khách: hai khách cùng (`scope`, `locale`) và cùng số `version`
+/// không lấy nhầm vector của nhau; sửa ở khách `b` chỉ làm `b` nạp lại.
+#[tokio::test]
+async fn cache_tim_theo_y_nghia_khong_dung_chung() {
+    TestDatabase::run(async |test| {
+        let embedder = Arc::new(FakeEmbedder::new(128));
+        let (_app, content, a, b) = two_tenants(test, embedder).await;
+        let ada = editor();
+        let vi_post = |title: &str, text: &str| {
+            let mut input = post(title);
+            input.locale = Some("vi".into());
+            input.fields.body = Some(paragraph(text));
+            input
+        };
+        let query =
+            |q: &str| SearchQuery { q: q.into(), locale: Some("vi".into()), ..Default::default() };
+        // `b` lập index và tìm trước: vector của `b` (version 1) vào bộ nhớ.
+        let in_b = content
+            .create(&b, &ada, vi_post("Đà Lạt mùa hoa", "Hoa dã quỳ nở vàng đồi thông."))
+            .await
+            .unwrap();
+        content.index_entry(&b, in_b.id).await.unwrap();
+        let hits = content.search(&b, Some(&ada), &query("hoa đà lạt"), false).await.unwrap();
+        assert_eq!(hits[0].entry_id, in_b.id);
+        assert_eq!(content.search_cache.cached_version(b.id(), Scope::Draft, "vi"), Some(1));
+
+        // `a` cũng ở version 1 cho cùng (`draft`, `vi`): chỉ thấy mục của chính mình.
+        let in_a =
+            content.create(&a, &ada, vi_post("Học Rust", "Ownership và lifetime.")).await.unwrap();
+        content.index_entry(&a, in_a.id).await.unwrap();
+        let hits = content.search(&a, Some(&ada), &query("hoa đà lạt"), false).await.unwrap();
+        assert!(hits.iter().all(|hit| hit.entry_id == in_a.id), "{hits:?}");
+        assert!(hits.iter().all(|hit| hit.entry_id != in_b.id));
+        let hits = content.search(&a, Some(&ada), &query("ownership"), false).await.unwrap();
+        assert_eq!(hits[0].entry_id, in_a.id);
+        assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));
+
+        // Sửa mục của `b`: chỉ `b` nạp lại (version 2), bản của `a` giữ nguyên.
+        let changes = crate::entries::EntryFields {
+            title: Some("Đà Lạt mùa mưa".into()),
+            ..Default::default()
+        };
+        content.update(&b, &ada, in_b.id, changes, false, None).await.unwrap();
+        content.index_entry(&b, in_b.id).await.unwrap();
+        let hits = content.search(&b, Some(&ada), &query("mùa mưa"), false).await.unwrap();
+        assert_eq!(hits[0].entry_id, in_b.id);
+        assert_eq!(content.search_cache.cached_version(b.id(), Scope::Draft, "vi"), Some(2));
+        assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));
+    })
+    .await
+    .unwrap();
+}
+
+/// Lịch đăng của khách `b` (database riêng) chạy bằng job của khách đó: đăng ở `b`, event ghi ở
+/// database của `b`; khách `a` không có gì. Job định kỳ dọn revision và lập index bù chạy theo
+/// từng database.
+#[tokio::test]
+async fn lich_dang_chay_dung_khach() {
+    TestDatabase::run(async |test| {
+        let (_app, content, a, b) = two_tenants(test, Arc::new(FakeEmbedder::disabled())).await;
+        let ada = editor();
+        let entry = content.create(&b, &ada, post("Later")).await.unwrap();
+        let at = Utc::now() + chrono::Duration::hours(1);
+        let schedule =
+            content.create_schedule(&b, &ada, entry.id, Action::Publish, at, None).await.unwrap();
+        let payload = serde_json::to_value(RunSchedule { schedule_id: schedule.id }).unwrap();
+        let job = JobContext::for_tenant(b.clone(), crate::publishing::schedules::RUN, payload, 1);
+        crate::publishing::schedules::Runner(content.clone()).run(&job).await.unwrap();
+
+        assert_eq!(content.get(&b, &ada, entry.id).await.unwrap().status, "published");
+        assert!(matches!(
+            content.resolve(&b, "en", "/blog/later").await.unwrap(),
+            Resolved::Entry(_)
+        ));
+        assert!(content.resolve(&a, "en", "/blog/later").await.is_err());
+        let events = events_of(&b).await;
+        assert!(events.contains(&"content.entry_published".to_owned()), "{events:?}");
+        assert!(events_of(&a).await.is_empty());
+
+        // Job của cả database: chỉ chạm khách có dữ liệu trên database đó.
+        assert_eq!(content.prune_revisions(a.database()).await.unwrap(), 0);
+        assert_eq!(content.prune_revisions(b.database()).await.unwrap(), 0);
+    })
+    .await
+    .unwrap();
+}

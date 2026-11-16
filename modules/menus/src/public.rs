@@ -8,8 +8,13 @@
 //! - Thiếu menu ở ngôn ngữ hỏi thì dùng ngôn ngữ mặc định.
 //!
 //! **Cache:** bản đã giải giữ trong bộ nhớ tới `AUTOXIDE_MENUS_PUBLIC_CACHE_SECONDS`, rút ngắn tới
-//! mốc bật / tắt gần nhất của nhãn nổi bật; mọi lệnh ghi của module xoá cache. Đối tượng đổi tên
-//! hay đổi đường dẫn thì hiện sau tối đa một thời hạn cache — không nghe event của module khác.
+//! mốc bật / tắt gần nhất của nhãn nổi bật; lệnh ghi của module xoá cache **của khách đó**. Đối
+//! tượng đổi tên hay đổi đường dẫn thì hiện sau tối đa một thời hạn cache — không nghe event của
+//! module khác.
+//!
+//! **Theo khách (bước 33, D-238):** khoá cache gồm khách, nên hai khách cùng (`key`, `locale`) không
+//! bao giờ nhận menu của nhau; mỗi khách một bộ đếm thế hệ, nên lệnh ghi của khách này không làm
+//! mất cache của khách khác. `ETag` tính cả ID khách.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -17,7 +22,7 @@ use std::sync::{Arc, Mutex};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::resource::{Resource, ResourceRef};
 use autoxide_kernel::response::Data;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use autoxide_media::api::{MediaRef, MediaVisibility};
 use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
@@ -110,8 +115,11 @@ pub(crate) struct Ready {
     pub expires_at: DateTime<Utc>,
 }
 
-/// Cache trong bộ nhớ của tiến trình: (khoá, ngôn ngữ hỏi) → menu đã giải. Khoá chỉ gồm menu có
-/// thật và ngôn ngữ được phép, nên số mục có giới hạn.
+/// Khoá cache: (khách, khoá menu, ngôn ngữ hỏi).
+type CacheKey = (TenantId, String, String);
+
+/// Cache trong bộ nhớ của tiến trình: (khách, khoá, ngôn ngữ hỏi) → menu đã giải. Khoá chỉ gồm menu
+/// có thật và ngôn ngữ được phép; bản hết hạn bị dọn mỗi lần cất bản mới.
 #[derive(Default)]
 pub(crate) struct PublicCache {
     inner: Mutex<CacheState>,
@@ -119,40 +127,48 @@ pub(crate) struct PublicCache {
 
 #[derive(Default)]
 struct CacheState {
-    /// Tăng mỗi lần xoá: bản giải xong sau một lệnh ghi không được cất lại.
-    generation: u64,
-    entries: HashMap<(String, String), Arc<Ready>>,
+    /// Thế hệ của từng khách, tăng mỗi lần xoá cache của khách đó: bản giải xong sau một lệnh ghi
+    /// không được cất lại. Khách chưa xoá lần nào: 0.
+    generations: HashMap<TenantId, u64>,
+    entries: HashMap<CacheKey, Arc<Ready>>,
 }
 
 impl PublicCache {
-    pub(crate) fn clear(&self) {
+    /// Xoá cache của khách `tenant` (sau mỗi lệnh ghi của khách đó); khách khác giữ nguyên.
+    pub(crate) fn clear(&self, tenant: TenantId) {
         if let Ok(mut state) = self.inner.lock() {
-            state.generation = state.generation.wrapping_add(1);
-            state.entries.clear();
+            let generation = state.generations.entry(tenant).or_default();
+            *generation = generation.wrapping_add(1);
+            state.entries.retain(|(owner, _, _), _| *owner != tenant);
         }
     }
 
-    fn get(&self, key: &(String, String), now: DateTime<Utc>) -> (u64, Option<Arc<Ready>>) {
+    fn get(&self, key: &CacheKey, now: DateTime<Utc>) -> (u64, Option<Arc<Ready>>) {
         let Ok(state) = self.inner.lock() else {
             return (0, None);
         };
+        let generation = state.generations.get(&key.0).copied().unwrap_or_default();
         let hit = state.entries.get(key).filter(|ready| ready.expires_at > now).cloned();
-        (state.generation, hit)
+        (generation, hit)
     }
 
-    fn put(&self, generation: u64, key: (String, String), ready: Arc<Ready>) {
+    fn put(&self, generation: u64, key: CacheKey, ready: Arc<Ready>, now: DateTime<Utc>) {
         if let Ok(mut state) = self.inner.lock()
-            && state.generation == generation
+            && state.generations.get(&key.0).copied().unwrap_or_default() == generation
         {
+            // Bản hết hạn không bao giờ được dùng lại: dọn để cache không lớn dần theo số khách.
+            state.entries.retain(|_, cached| cached.expires_at > now);
             state.entries.insert(key, ready);
         }
     }
 }
 
 impl MenuService {
-    /// Menu công khai `key` ở ngôn ngữ `locale` (không gửi: mặc định), lúc `now`.
+    /// Menu công khai `key` của khách `tenant` ở ngôn ngữ `locale` (không gửi: mặc định), lúc
+    /// `now`.
     pub(crate) async fn public_menu(
         &self,
+        tenant: &TenantContext,
         key: &str,
         locale: Option<&str>,
         now: DateTime<Utc>,
@@ -162,31 +178,31 @@ impl MenuService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let cache_key = (key.to_owned(), locale.clone());
+        let cache_key = (tenant.id(), key.to_owned(), locale.clone());
         let ttl = i64::from(self.config.public_cache_seconds);
         let (generation, hit) = self.cache.get(&cache_key, now);
         if let Some(hit) = hit {
             return Ok(hit);
         }
-        let found = match self.find_by_key(key, &locale).await? {
+        let found = match self.find_by_key(tenant, key, &locale).await? {
             Some(found) => found,
             None => self
-                .find_by_key(key, &self.config.default_locale)
+                .find_by_key(tenant, key, &self.config.default_locale)
                 .await?
                 .ok_or_else(|| public_not_found(key, &locale))?,
         };
-        let items = self.items_of(self.database.read(), found.id).await?;
+        let items = self.items_of(tenant.database().read(), tenant, found.id).await?;
         let next_change = next_badge_change(&items, now);
-        let resolved = self.resolve(&tree(items), &found.locale, now).await?;
+        let resolved = self.resolve(tenant, &tree(items), &found.locale, now).await?;
         let menu = PublicSiteMenu { key: found.key, locale: found.locale, items: resolved };
-        let etag = fingerprint(&Data { data: &menu })?;
+        let etag = fingerprint(tenant.id(), &Data { data: &menu })?;
         let mut expires_at = now + Duration::seconds(ttl);
         if let Some(next_change) = next_change {
             expires_at = expires_at.min(next_change);
         }
         let ready = Arc::new(Ready { menu, etag, expires_at });
         if ttl > 0 {
-            self.cache.put(generation, cache_key, ready.clone());
+            self.cache.put(generation, cache_key, ready.clone(), now);
         }
         Ok(ready)
     }
@@ -194,6 +210,7 @@ impl MenuService {
     /// Giải cây: hỏi sổ đối tượng theo lô (mỗi loại một lần), mở nhóm con, lấy ảnh của ô gợi ý.
     async fn resolve(
         &self,
+        tenant: &TenantContext,
         nodes: &[Node],
         locale: &str,
         now: DateTime<Utc>,
@@ -210,16 +227,8 @@ impl MenuService {
                         .auto_children_limit
                         .and_then(|limit| usize::try_from(limit).ok())
                         .unwrap_or(0);
-                    let children = self
-                        .resources
-                        .children(
-                            &TenantContext::legacy_default(&self.database),
-                            kind,
-                            id,
-                            Some(locale),
-                            limit,
-                        )
-                        .await?;
+                    let children =
+                        self.resources.children(tenant, kind, id, Some(locale), limit).await?;
                     for child in &children {
                         wanted.entry(child.kind.clone()).or_default().push(child.id.clone());
                     }
@@ -238,15 +247,7 @@ impl MenuService {
             }
             ids.sort_unstable();
             ids.dedup();
-            let found = self
-                .resources
-                .resolve_many(
-                    &TenantContext::legacy_default(&self.database),
-                    &kind,
-                    &ids,
-                    Some(locale),
-                )
-                .await?;
+            let found = self.resources.resolve_many(tenant, &kind, &ids, Some(locale)).await?;
             objects.extend(
                 found
                     .into_iter()
@@ -263,7 +264,7 @@ impl MenuService {
             HashMap::new()
         } else {
             self.media
-                .find_many_in(&TenantContext::legacy_default(&self.database), &image_ids, locale)
+                .find_many_in(tenant, &image_ids, locale)
                 .await?
                 .into_iter()
                 .filter(|media| media.visibility == MediaVisibility::Public)
@@ -384,13 +385,17 @@ fn next_badge_change(items: &[item::Model], now: DateTime<Utc>) -> Option<DateTi
         .min()
 }
 
-/// `ETag` của cả câu trả lời: 16 byte đầu của SHA-256 của thân JSON.
-fn fingerprint<T: Serialize>(value: &T) -> Result<String, Error> {
+/// `ETag` của cả câu trả lời: 16 byte đầu của SHA-256 của ID khách và thân JSON — hai khách có
+/// menu giống hệt nhau vẫn nhận hai `ETag` khác nhau.
+fn fingerprint<T: Serialize>(tenant: TenantId, value: &T) -> Result<String, Error> {
     use base64::Engine;
     use sha2::{Digest, Sha256};
     let bytes = serde_json::to_vec(value)
         .map_err(|error| Error::internal(format!("cannot serialize the menu: {error}")))?;
-    let digest = Sha256::digest(&bytes);
+    let mut hasher = Sha256::new();
+    hasher.update(tenant.as_uuid().as_bytes());
+    hasher.update(&bytes);
+    let digest = hasher.finalize();
     let short = digest.get(..16).unwrap_or_default();
     Ok(format!("\"{}\"", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(short)))
 }

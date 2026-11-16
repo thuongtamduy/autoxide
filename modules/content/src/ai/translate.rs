@@ -16,7 +16,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -68,14 +68,16 @@ impl ContentService {
     /// bản gốc (và bản dịch có sẵn, nếu có) là của mình. Trả yêu cầu đã xếp hàng.
     pub(crate) async fn request_translation(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         source_id: Uuid,
         locale: &str,
     ) -> Result<TranslationRequest, Error> {
         permissions::require_create(principal)?;
         self.ai.ready()?;
-        let read = self.database.read();
+        let read = tenant.database().read();
         let source = entry::Entity::find_by_id(source_id)
+            .scoped(tenant)
             .one(read)
             .await?
             .ok_or_else(|| entry_not_found(source_id))?;
@@ -93,15 +95,17 @@ impl ContentService {
             return Err(invalid(problems));
         }
         let target = entry::Entity::find()
+            .scoped(tenant)
             .filter(entry::Column::TranslationGroupId.eq(source.translation_group_id))
             .filter(entry::Column::Locale.eq(target_locale.as_str()))
             .one(read)
             .await?;
         match &target {
             Some(target) => permissions::require_write(principal, target)?,
-            None => self.check_parent_translated(&source, &target_locale).await?,
+            None => self.check_parent_translated(tenant, &source, &target_locale).await?,
         }
         let latest = revision::Entity::find()
+            .scoped(tenant)
             .filter(revision::Column::EntryId.eq(source.id))
             .order_by_desc(revision::Column::CreatedAt)
             .order_by_desc(revision::Column::Id)
@@ -114,7 +118,7 @@ impl ContentService {
         });
 
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Ghim đúng nội dung lúc yêu cầu: bản nháp đã đổi so với revision gần nhất thì lưu một
         // revision mới — sửa bản gốc sau đó không đổi bản dịch đang làm.
         let revision_id = match pinned {
@@ -122,6 +126,7 @@ impl ContentService {
             None => {
                 revisions::record(
                     &transaction,
+                    tenant,
                     &source,
                     Reason::ExplicitSave,
                     Some(principal.user_id()),
@@ -133,6 +138,7 @@ impl ContentService {
         };
         let row = translation_request::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             source_entry_id: Set(source.id),
             source_revision_id: Set(revision_id),
             target_locale: Set(target_locale.clone()),
@@ -150,6 +156,7 @@ impl ContentService {
         // Yêu cầu cũ cùng ngôn ngữ đã chết (đứng yên quá lâu ở `running`): đánh dấu thất bại và
         // nhả khoá để yêu cầu này thay chỗ. Job cũ nếu còn chạy tới sẽ thấy đã xong và thôi.
         translation_request::Entity::update_many()
+            .scoped(tenant)
             .col_expr(translation_request::Column::Status, Expr::value(status::FAILED))
             .col_expr(
                 translation_request::Column::ErrorCode,
@@ -179,17 +186,12 @@ impl ContentService {
         };
         let options = EnqueueOptions::default().max_attempts(MAX_ATTEMPTS);
         self.jobs
-            .enqueue(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                &TranslateJob { request_id: request.id },
-                options,
-            )
+            .enqueue(&transaction, tenant, &TranslateJob { request_id: request.id }, options)
             .await?;
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::entry_subject(source.id),
                 &events::TranslationRequested(Change {
@@ -207,12 +209,14 @@ impl ContentService {
     /// Yêu cầu dịch `id`. Cần `content.read`, hoặc là yêu cầu của chính mình.
     pub(crate) async fn translation_request(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<TranslationRequest, Error> {
         permissions::require_create(principal).or_else(|_| principal.require(&CONTENT_READ))?;
         let request = translation_request::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| request_not_found(id))?;
         let own = request.created_by == Some(principal.user_id())
@@ -226,19 +230,21 @@ impl ContentService {
     /// Các yêu cầu dịch của mục `entry_id` (làm bản gốc), mới nhất trước. Cần `content.read`.
     pub(crate) async fn translation_requests_of(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         entry_id: Uuid,
         page: &PageRequest,
     ) -> Result<Page<TranslationRequest>, Error> {
         principal.require(&CONTENT_READ)?;
         let select = translation_request::Entity::find()
+            .scoped(tenant)
             .filter(translation_request::Column::SourceEntryId.eq(entry_id));
         fetch_page(
             select,
             translation_request::Column::Id,
             |row| row.id,
             page,
-            self.database.read(),
+            tenant.database().read(),
         )
         .await
     }
@@ -246,16 +252,19 @@ impl ContentService {
     /// Trang cha của `source` phải đã có bản dịch `locale` (như khi tạo bản dịch bằng tay).
     async fn check_parent_translated(
         &self,
+        tenant: &TenantContext,
         source: &crate::entries::Entry,
         locale: &str,
     ) -> Result<(), Error> {
         let Some(parent) = source.parent_id else { return Ok(()) };
-        let read = self.database.read();
+        let read = tenant.database().read();
         let parent = entry::Entity::find_by_id(parent)
+            .scoped(tenant)
             .one(read)
             .await?
             .ok_or_else(|| entry_not_found(parent))?;
         let translated = entry::Entity::find()
+            .scoped(tenant)
             .filter(entry::Column::TranslationGroupId.eq(parent.translation_group_id))
             .filter(entry::Column::Locale.eq(locale))
             .one(read)
@@ -273,11 +282,14 @@ impl ContentService {
     /// Chạy yêu cầu dịch `request_id` (lần chạy thứ `attempt` của job).
     pub(crate) async fn run_translation(
         &self,
+        tenant: &TenantContext,
         request_id: Uuid,
         attempt: i32,
     ) -> Result<(), Error> {
-        let Some(request) =
-            translation_request::Entity::find_by_id(request_id).one(self.database.write()).await?
+        let Some(request) = translation_request::Entity::find_by_id(request_id)
+            .scoped(tenant)
+            .one(tenant.database().write())
+            .await?
         else {
             return Ok(());
         };
@@ -286,15 +298,19 @@ impl ContentService {
         }
         if request.created_by.is_none() {
             // Tài khoản đã yêu cầu bị xoá (huỷ ở `privacy.rs`; đây là lưới an toàn).
-            return self.finish(&request, Err("content.translation_canceled".to_owned())).await;
+            return self
+                .finish(tenant, &request, Err("content.translation_canceled".to_owned()))
+                .await;
         }
         translation_request::Entity::update_many()
+            .scoped(tenant)
             .col_expr(translation_request::Column::Status, Expr::value(status::RUNNING))
             .col_expr(translation_request::Column::UpdatedAt, Expr::value(now()))
             .filter(translation_request::Column::Id.eq(request.id))
-            .exec(self.database.write())
+            .exec(tenant.database().write())
             .await?;
-        let outcome = match tokio::time::timeout(RUN_BUDGET, self.translate(&request)).await {
+        let outcome = match tokio::time::timeout(RUN_BUDGET, self.translate(tenant, &request)).await
+        {
             Ok(outcome) => outcome,
             Err(_) => Err(Error::unavailable(
                 "content.translation_timed_out",
@@ -303,28 +319,34 @@ impl ContentService {
             )),
         };
         match outcome {
-            Ok(entry_id) => self.finish(&request, Ok(entry_id)).await,
+            Ok(entry_id) => self.finish(tenant, &request, Ok(entry_id)).await,
             Err(error) if transient(&error) && attempt < MAX_ATTEMPTS => {
                 tracing::warn!(request_id = %request.id, attempt, code = error.code(), "content translation will be retried");
                 Err(error)
             }
             Err(error) => {
                 tracing::warn!(request_id = %request.id, code = error.code(), "content translation failed");
-                self.finish(&request, Err(error.code().to_owned())).await
+                self.finish(tenant, &request, Err(error.code().to_owned())).await
             }
         }
     }
 
     /// Dịch và ghi; trả ID bản dịch.
-    async fn translate(&self, request: &TranslationRequest) -> Result<Uuid, Error> {
-        let read = self.database.read();
-        let pinned = revisions::revision_entity(read, request.source_revision_id).await?;
+    async fn translate(
+        &self,
+        tenant: &TenantContext,
+        request: &TranslationRequest,
+    ) -> Result<Uuid, Error> {
+        let read = tenant.database().read();
+        let pinned = revisions::revision_entity(read, tenant, request.source_revision_id).await?;
         let snapshot: Snapshot = serde_json::from_str(&pinned.snapshot).map_err(Error::internal)?;
         let source = entry::Entity::find_by_id(request.source_entry_id)
+            .scoped(tenant)
             .one(read)
             .await?
             .ok_or_else(|| entry_not_found(request.source_entry_id))?;
         let existing = entry::Entity::find()
+            .scoped(tenant)
             .filter(entry::Column::TranslationGroupId.eq(source.translation_group_id))
             .filter(entry::Column::Locale.eq(request.target_locale.as_str()))
             .one(read)
@@ -359,7 +381,8 @@ impl ContentService {
             batches(&split.segments, self.config.translate_batch_tokens as usize * CHARS_PER_TOKEN)
         {
             translated.extend(
-                self.translate_batch(&split, batch, &source.locale, &request.target_locale).await?,
+                self.translate_batch(tenant, &split, batch, &source.locale, &request.target_locale)
+                    .await?,
             );
         }
         let (body, texts) =
@@ -386,16 +409,20 @@ impl ContentService {
             // Bản dịch mới: slug sinh từ tiêu đề đã dịch. Bản có sẵn giữ slug (địa chỉ không đổi).
             None => {
                 let changes = EntryFields { slug: Some(String::new()), ..changes };
-                self.create_translation(&acting, source.id, &request.target_locale, changes).await
+                self.create_translation(tenant, &acting, source.id, &request.target_locale, changes)
+                    .await
             }
             Some(target) => {
                 self.update_inner(
+                    tenant,
                     &acting,
                     target,
                     changes,
-                    Some(Reason::ExplicitSave),
+                    crate::entries::Revise {
+                        forced: Some(Reason::ExplicitSave),
+                        restored_from: None,
+                    },
                     request.target_updated_at,
-                    None,
                 )
                 .await
             }
@@ -421,6 +448,7 @@ impl ContentService {
     /// Dịch một lô mẩu; sai dạng thì thử lại một lần.
     async fn translate_batch(
         &self,
+        tenant: &TenantContext,
         split: &segments::Split,
         batch: &[Segment],
         from: &str,
@@ -429,13 +457,7 @@ impl ContentService {
         let ids: Vec<String> = batch.iter().map(|segment| segment.id.clone()).collect();
         let size: usize = batch.iter().map(|segment| segment.text.len()).sum();
         for attempt in 1..=2 {
-            let answer = self
-                .ai
-                .generate(
-                    &TenantContext::legacy_default(&self.database),
-                    batch_prompt(batch, from, to, size),
-                )
-                .await?;
+            let answer = self.ai.generate(tenant, batch_prompt(batch, from, to, size)).await?;
             let mut found = BTreeMap::new();
             for item in
                 answer.output.get("segments").and_then(Value::as_array).into_iter().flatten()
@@ -460,11 +482,12 @@ impl ContentService {
     /// Đánh dấu xong (thành công hay thất bại) và phát event, trong một transaction.
     async fn finish(
         &self,
+        tenant: &TenantContext,
         request: &TranslationRequest,
         outcome: Result<Uuid, String>,
     ) -> Result<(), Error> {
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let (state, result, code) = match &outcome {
             Ok(entry_id) => (status::SUCCEEDED, Some(*entry_id), None),
             Err(code) => (status::FAILED, None, Some(code.clone())),
@@ -472,6 +495,7 @@ impl ContentService {
         // Chỉ ghi khi yêu cầu còn đang chờ hay đang chạy: đã bị huỷ (tài khoản bị xoá) hay đã
         // được thay (yêu cầu cũ chết) thì giữ nguyên.
         let updated = translation_request::Entity::update_many()
+            .scoped(tenant)
             .col_expr(translation_request::Column::Status, Expr::value(state))
             .col_expr(translation_request::Column::ResultEntryId, Expr::value(result))
             .col_expr(translation_request::Column::ErrorCode, Expr::value(code))
@@ -485,6 +509,7 @@ impl ContentService {
             return Ok(());
         }
         let done = translation_request::Entity::find_by_id(request.id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| request_not_found(request.id))?;
@@ -494,7 +519,7 @@ impl ContentService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     Actor::system(),
                     subject,
                     &events::TranslationSucceeded(change),
@@ -504,7 +529,7 @@ impl ContentService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     Actor::system(),
                     subject,
                     &events::TranslationFailed(change),
@@ -516,8 +541,13 @@ impl ContentService {
     }
 
     /// Huỷ các yêu cầu dịch còn chờ của người dùng `user_id` (tài khoản bị xoá).
-    pub(crate) async fn cancel_translations_of(&self, user_id: Uuid) -> Result<u64, Error> {
+    pub(crate) async fn cancel_translations_of(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<u64, Error> {
         let result = translation_request::Entity::update_many()
+            .scoped(tenant)
             .col_expr(translation_request::Column::Status, Expr::value(status::FAILED))
             .col_expr(
                 translation_request::Column::ErrorCode,
@@ -527,7 +557,7 @@ impl ContentService {
             .col_expr(translation_request::Column::UpdatedAt, Expr::value(now()))
             .filter(translation_request::Column::CreatedBy.eq(user_id))
             .filter(translation_request::Column::Status.is_in([status::QUEUED, status::RUNNING]))
-            .exec(self.database.write())
+            .exec(tenant.database().write())
             .await?;
         Ok(result.rows_affected)
     }
@@ -538,6 +568,7 @@ impl ContentService {
 /// xin duyệt cũng đổi `updated_at` mà không đổi chữ. Hai câu query cho cả danh sách.
 pub(crate) async fn outdated<C: sea_orm::ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     entries: &[crate::entries::Entry],
 ) -> Result<std::collections::BTreeSet<Uuid>, Error> {
     let pinned: Vec<Uuid> =
@@ -546,10 +577,14 @@ pub(crate) async fn outdated<C: sea_orm::ConnectionTrait>(
     if pinned.is_empty() {
         return Ok(stale);
     }
-    let revisions =
-        revision::Entity::find().filter(revision::Column::Id.is_in(pinned)).all(connection).await?;
+    let revisions = revision::Entity::find()
+        .scoped(tenant)
+        .filter(revision::Column::Id.is_in(pinned))
+        .all(connection)
+        .await?;
     let sources: Vec<Uuid> = revisions.iter().map(|row| row.entry_id).collect();
     let current: BTreeMap<Uuid, Snapshot> = entry::Entity::find()
+        .scoped(tenant)
         .filter(entry::Column::Id.is_in(sources))
         .all(connection)
         .await?
@@ -577,9 +612,10 @@ impl ContentService {
     /// Trong `entries`, những bản dịch AI đã cũ (xem [`outdated`]).
     pub(crate) async fn outdated_translations(
         &self,
+        tenant: &TenantContext,
         entries: &[crate::entries::Entry],
     ) -> Result<std::collections::BTreeSet<Uuid>, Error> {
-        outdated(self.database.read(), entries).await
+        outdated(tenant.database().read(), tenant, entries).await
     }
 }
 
@@ -693,9 +729,13 @@ pub(crate) struct Translator(pub Arc<ContentService>);
 #[async_trait::async_trait]
 impl JobHandler for Translator {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("a content translate job must belong to a tenant"))?;
         let input: TranslateJob = serde_json::from_value(job.payload.clone())
             .map_err(|error| Error::internal(format!("content translate job payload: {error}")))?;
-        self.0.run_translation(input.request_id, job.attempt).await
+        self.0.run_translation(tenant, input.request_id, job.attempt).await
     }
 }
 

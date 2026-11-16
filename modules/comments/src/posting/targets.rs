@@ -14,9 +14,9 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::resource::{Resource, ResourceChange, ResourceEvent};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::json;
 
 use crate::entity::target;
@@ -141,6 +141,7 @@ impl CommentsService {
     /// có bộ tra được chấp nhận theo cấu hình (`None`). Gọi NGOÀI transaction.
     pub(crate) async fn resolve_target(
         &self,
+        tenant: &TenantContext,
         kind: &str,
         id: &str,
     ) -> Result<Option<Resource>, Error> {
@@ -148,46 +149,51 @@ impl CommentsService {
         if !self.resources.knows(kind) {
             return Ok(None);
         }
-        match self
-            .resources
-            .resolve(&TenantContext::legacy_default(&self.database), kind, id)
-            .await?
-        {
+        match self.resources.resolve(tenant, kind, id).await? {
             Some(resource) if resource.public => Ok(Some(resource)),
             _ => Err(target_not_found()),
         }
     }
 
     /// Trạng thái của đích (mặc định khi chưa có dòng).
-    pub(crate) async fn target(&self, kind: &str, id: &str) -> Result<Target, Error> {
+    pub(crate) async fn target(
+        &self,
+        tenant: &TenantContext,
+        kind: &str,
+        id: &str,
+    ) -> Result<Target, Error> {
         self.check_target(kind, id)?;
-        let row = target::Entity::find_by_id((kind.to_owned(), id.to_owned()))
-            .one(self.database.read())
-            .await?;
+        let row =
+            target::Entity::find_by_id((tenant.id().as_uuid(), kind.to_owned(), id.to_owned()))
+                .scoped(tenant)
+                .one(tenant.database().read())
+                .await?;
         Ok(row.map_or_else(|| Target::blank(kind, id), Target::from_row))
     }
 
     /// Trạng thái của đích cho quản trị viên. Cần `comments.read`.
     pub(crate) async fn admin_target(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         kind: &str,
         id: &str,
     ) -> Result<Target, Error> {
         principal.require(&COMMENTS_READ)?;
-        self.target(kind, id).await
+        self.target(tenant, kind, id).await
     }
 
     /// Một trang đích có bình luận (hoặc đã được đặt trạng thái), mới tạo trước. Cần
     /// `comments.read`.
     pub(crate) async fn list_targets(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         filter: &TargetFilter,
         page: &autoxide_kernel::pagination::PageRequest,
     ) -> Result<autoxide_kernel::pagination::Page<Target>, Error> {
         principal.require(&COMMENTS_READ)?;
-        let mut select = target::Entity::find();
+        let mut select = target::Entity::find().scoped(tenant);
         if let Some(kind) = filter.kind.as_deref().map(str::trim).filter(|kind| !kind.is_empty()) {
             select = select.filter(target::Column::TargetType.eq(kind));
         }
@@ -212,7 +218,7 @@ impl CommentsService {
             target::Column::Uid,
             |row| row.uid,
             page,
-            self.database.read(),
+            tenant.database().read(),
         )
         .await?;
         Ok(found.map(Target::from_row))
@@ -223,6 +229,7 @@ impl CommentsService {
     /// vắng trong kết quả (không lộ tiêu đề của bản nháp).
     pub(crate) async fn target_titles(
         &self,
+        tenant: &TenantContext,
         targets: &[(String, String)],
     ) -> Result<HashMap<(String, String), Resource>, Error> {
         let mut by_kind: HashMap<&str, Vec<String>> = HashMap::new();
@@ -232,13 +239,12 @@ impl CommentsService {
                 ids.push(id.clone());
             }
         }
-        let tenant = TenantContext::legacy_default(&self.database);
         let mut found = HashMap::new();
         for (kind, ids) in by_kind {
             if !self.resources.knows(kind) {
                 continue;
             }
-            for (id, resource) in self.resources.resolve_many(&tenant, kind, &ids, None).await? {
+            for (id, resource) in self.resources.resolve_many(tenant, kind, &ids, None).await? {
                 if resource.public {
                     found.insert((kind.to_owned(), id), resource);
                 }
@@ -251,6 +257,7 @@ impl CommentsService {
     /// hỏi: (ID, mọi bình luận, bình luận gốc); đích ẩn đếm 0.
     pub(crate) async fn counts(
         &self,
+        tenant: &TenantContext,
         kind: &str,
         ids: &[String],
     ) -> Result<Vec<(String, i32, i32)>, Error> {
@@ -268,9 +275,10 @@ impl CommentsService {
             self.check_target(kind, id)?;
         }
         let found: HashMap<String, (i32, i32)> = target::Entity::find()
+            .scoped(tenant)
             .filter(target::Column::TargetType.eq(kind))
             .filter(target::Column::TargetId.is_in(ids.to_vec()))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?
             .into_iter()
             .map(|row| {
@@ -294,6 +302,7 @@ impl CommentsService {
     /// Mở / đóng / ẩn đích. Cần `comments.manage`. `expected`: phiên bản đã đọc (`If-Match`).
     pub(crate) async fn set_target(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         kind: &str,
         id: &str,
@@ -312,12 +321,13 @@ impl CommentsService {
                 "must be `open` or `closed`",
             )]));
         }
-        self.change_target(Actor::from(principal), kind, id, change, expected).await
+        self.change_target(tenant, Actor::from(principal), kind, id, change, expected).await
     }
 
     /// Đổi trạng thái đích trong một transaction, kèm event khi trạng thái thật đổi.
     pub(crate) async fn change_target(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         kind: &str,
         id: &str,
@@ -325,9 +335,10 @@ impl CommentsService {
         expected: Option<DateTime<Utc>>,
     ) -> Result<Target, Error> {
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
+        let key = (tenant.id().as_uuid(), kind.to_owned(), id.to_owned());
         let existing =
-            target::Entity::find_by_id((kind.to_owned(), id.to_owned())).one(&transaction).await?;
+            target::Entity::find_by_id(key.clone()).scoped(tenant).one(&transaction).await?;
         // Chưa có dòng thì phiên bản đã đọc phải là "chưa có" (`If-Match: *` hay không gửi).
         if let Some(expected) = expected
             && existing.as_ref().is_none_or(|row| row.updated_at != expected)
@@ -335,9 +346,10 @@ impl CommentsService {
             return Err(autoxide_kernel::version::changed());
         }
         if existing.is_none() {
-            ensure_target(&transaction, &self.config, kind, id, now).await?;
+            ensure_target(&transaction, tenant, &self.config, kind, id, now).await?;
         }
-        let before = target::Entity::find_by_id((kind.to_owned(), id.to_owned()))
+        let before = target::Entity::find_by_id(key)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| Error::internal("target row missing after insert"))?;
@@ -360,7 +372,8 @@ impl CommentsService {
             row.closes_at = Set(closes_at);
         }
         row.updated_at = Set(now);
-        let after = row.update(&transaction).await?;
+        let after =
+            target::Entity::update(row).validate()?.scoped(tenant).exec(&transaction).await?;
         let (old, new) = (Target::from_row(before), Target::from_row(after));
         let snapshot = |target: &Target| {
             json!({
@@ -377,23 +390,11 @@ impl CommentsService {
             let subject = events::target_subject(kind, id);
             if opened {
                 self.outbox
-                    .record(
-                        &transaction,
-                        &TenantContext::legacy_default(&self.database),
-                        actor,
-                        subject,
-                        &events::TargetOpened(change),
-                    )
+                    .record(&transaction, tenant, actor, subject, &events::TargetOpened(change))
                     .await?;
             } else {
                 self.outbox
-                    .record(
-                        &transaction,
-                        &TenantContext::legacy_default(&self.database),
-                        actor,
-                        subject,
-                        &events::TargetClosed(change),
-                    )
+                    .record(&transaction, tenant, actor, subject, &events::TargetClosed(change))
                     .await?;
             }
         }
@@ -449,7 +450,7 @@ impl EventHandler for OwnerEvents {
             closes_at: None,
         };
         // Nhận lại cùng event: trạng thái đã đúng, không phát event mới.
-        service.change_target(Actor::system(), kind, id, change, None).await?;
+        service.change_target(&event.tenant, Actor::system(), kind, id, change, None).await?;
         tracing::info!(
             target_type = kind,
             target_id = id,

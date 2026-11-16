@@ -11,7 +11,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::secret::sha256;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
@@ -83,13 +83,14 @@ impl CommentsService {
     /// Tác giả sửa bình luận `id`.
     pub(crate) async fn edit(
         &self,
+        tenant: &TenantContext,
         principal: Option<&Principal>,
         id: Uuid,
         edit_token: Option<&str>,
         body: &str,
         format: Option<Format>,
     ) -> Result<Comment, Error> {
-        let before = self.find(id).await?;
+        let before = self.find(tenant, id).await?;
         self.check_author(&before, principal, edit_token)?;
         let from = Status::of(&before);
         if matches!(from, Status::Rejected | Status::Deleted) {
@@ -110,6 +111,7 @@ impl CommentsService {
         }
         if self
             .is_banned(
+                tenant,
                 before.user_id,
                 before.author_email.as_deref(),
                 before.ip_fingerprint.as_deref(),
@@ -139,7 +141,7 @@ impl CommentsService {
         } else {
             let author = principal.filter(|principal| before.user_id == Some(principal.user_id()));
             let moderator = author.is_some_and(|principal| principal.has(&COMMENTS_MODERATE));
-            self.mode_hold(&before.target_type, author, moderator).await?.map(str::to_owned)
+            self.mode_hold(tenant, &before.target_type, author, moderator).await?.map(str::to_owned)
         };
         let to = if hold.is_some() { Status::Pending } else { from };
 
@@ -161,22 +163,26 @@ impl CommentsService {
             row.status = Set(to.as_str().to_owned());
             row.hold_reason = Set(hold);
         }
-        let transaction = self.database.begin_write().await?;
-        let after = update_if_unchanged(&transaction, row, &before).await?;
-        shift_counts(&transaction, &after, Some(from), Some(to)).await?;
+        let transaction = tenant.database().begin_write().await?;
+        let after = update_if_unchanged(&transaction, tenant, row, &before).await?;
+        shift_counts(&transaction, tenant, &after, Some(from), Some(to)).await?;
         let actor = principal.map_or_else(Actor::public, Actor::from);
         let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 actor,
                 events::comment_subject(id),
                 &events::CommentEdited(change),
             )
             .await?;
         transaction.commit().await?;
-        self.named(vec![after]).await?.into_iter().next().ok_or_else(|| Error::internal("named"))
+        self.named(tenant, vec![after])
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| Error::internal("named"))
     }
 
     /// Tác giả xoá bình luận `id` (xoá mềm). Đã xoá rồi thì thôi. Không có bình luận `id` (đã
@@ -184,40 +190,50 @@ impl CommentsService {
     /// phân biệt được bài bị bỏ với bài bị giữ chờ duyệt bằng cách xoá thử.
     pub(crate) async fn delete_own(
         &self,
+        tenant: &TenantContext,
         principal: Option<&Principal>,
         id: Uuid,
         edit_token: Option<&str>,
     ) -> Result<(), Error> {
-        let Some(before) = comment::Entity::find_by_id(id).one(self.database.read()).await? else {
+        let Some(before) =
+            comment::Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?
+        else {
             return Ok(());
         };
         self.check_author(&before, principal, edit_token)?;
         if Status::of(&before) == Status::Deleted {
             return Ok(());
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let actor = principal.map_or_else(Actor::public, Actor::from);
-        soft_delete(self, &transaction, &before, Deletion::ByAuthor(actor)).await?;
+        soft_delete(self, &transaction, tenant, &before, Deletion::ByAuthor(actor)).await?;
         transaction.commit().await?;
         Ok(())
     }
 
     /// Tên hiển thị của người gọi. Cần `comments.post`.
-    pub(crate) async fn profile(&self, principal: &Principal) -> Result<Option<Profile>, Error> {
+    pub(crate) async fn profile(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+    ) -> Result<Option<Profile>, Error> {
         principal.require(&COMMENTS_POST)?;
-        Ok(profile::Entity::find_by_id(principal.user_id()).one(self.database.read()).await?.map(
-            |row| Profile {
+        Ok(profile::Entity::find_by_id((tenant.id().as_uuid(), principal.user_id()))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .map(|row| Profile {
                 user_id: row.user_id,
                 display_name: row.display_name,
                 updated_at: row.updated_at,
-            },
-        ))
+            }))
     }
 
     /// Đặt tên hiển thị của người gọi. Cần `comments.post`. Tên dành riêng chỉ người kiểm duyệt
     /// dùng được; hai người không trùng tên.
     pub(crate) async fn set_profile(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         display_name: &str,
     ) -> Result<Profile, Error> {
@@ -239,25 +255,31 @@ impl CommentsService {
         }
         let now = now();
         let key = text::name_key(&name);
-        let existing =
-            profile::Entity::find_by_id(principal.user_id()).one(self.database.read()).await?;
+        let existing = profile::Entity::find_by_id((tenant.id().as_uuid(), principal.user_id()))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
         let saved = match existing {
             Some(existing) => {
                 let mut row = existing.into_active_model();
                 row.display_name = Set(name);
                 row.name_key = Set(key);
                 row.updated_at = Set(now);
-                row.update(self.database.write()).await
+                match profile::Entity::update(row).validate() {
+                    Ok(update) => update.scoped(tenant).exec(tenant.database().write()).await,
+                    Err(error) => Err(error),
+                }
             }
             None => {
                 profile::ActiveModel {
+                    tenant_id: Set(tenant.id().as_uuid()),
                     user_id: Set(principal.user_id()),
                     display_name: Set(name),
                     name_key: Set(key),
                     created_at: Set(now),
                     updated_at: Set(now),
                 }
-                .insert(self.database.write())
+                .insert(tenant.database().write())
                 .await
             }
         };
@@ -277,11 +299,13 @@ impl CommentsService {
 /// vừa đổi nó).
 pub(crate) async fn update_if_unchanged<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     row: comment::ActiveModel,
     before: &comment::Model,
 ) -> Result<comment::Model, Error> {
     let update = comment::Entity::update(row)
         .validate()?
+        .scoped(tenant)
         .filter(comment::Column::Status.eq(before.status.as_str()))
         .filter(comment::Column::UpdatedAt.eq(before.updated_at));
     match update.exec(connection).await {
@@ -307,6 +331,7 @@ pub(crate) enum Deletion {
 pub(crate) async fn soft_delete<C: ConnectionTrait>(
     service: &CommentsService,
     connection: &C,
+    tenant: &TenantContext,
     before: &comment::Model,
     how: Deletion,
 ) -> Result<comment::Model, Error> {
@@ -327,20 +352,15 @@ pub(crate) async fn soft_delete<C: ConnectionTrait>(
         row.user_id = Set(None);
         row.ip_fingerprint = Set(None);
     }
-    let after = update_if_unchanged(connection, row, before).await?;
-    shift_counts(connection, &after, Some(Status::of(before)), Some(Status::Deleted)).await?;
+    let after = update_if_unchanged(connection, tenant, row, before).await?;
+    shift_counts(connection, tenant, &after, Some(Status::of(before)), Some(Status::Deleted))
+        .await?;
     subscription::Entity::delete_many()
         .filter(subscription::Column::CommentId.eq(before.id))
+        .scoped(tenant)
         .exec(connection)
         .await?;
-    service
-        .tokens
-        .forget(
-            connection,
-            &TenantContext::legacy_default(&service.database),
-            &before.id.to_string(),
-        )
-        .await?;
+    service.tokens.forget(connection, tenant, &before.id.to_string()).await?;
     if let Deletion::ByAuthor(actor) = how {
         let mut after_summary = summary(&after);
         after_summary["hard"] = json!(false);
@@ -349,7 +369,7 @@ pub(crate) async fn soft_delete<C: ConnectionTrait>(
             .outbox
             .record(
                 connection,
-                &TenantContext::legacy_default(&service.database),
+                tenant,
                 actor,
                 events::comment_subject(before.id),
                 &events::CommentDeleted(change),

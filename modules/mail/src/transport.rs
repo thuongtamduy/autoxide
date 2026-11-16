@@ -26,13 +26,18 @@ pub(crate) enum Delivery {
 impl Transport {
     pub(crate) fn new(smtp_url: Option<&str>, file_dir: PathBuf) -> Result<Self, Error> {
         match smtp_url {
-            Some(url) => Ok(Transport::Smtp(
-                AsyncSmtpTransport::<Tokio1Executor>::from_url(url)
-                    .map_err(|error| Error::internal(format!("smtp: {error}")))?
-                    .build(),
-            )),
+            Some(url) => Self::smtp(url),
             None => Ok(Transport::File(file_dir)),
         }
+    }
+
+    /// Đường gửi qua máy chủ SMTP ở `url`. Lỗi không nhắc lại URL (có mật khẩu).
+    pub(crate) fn smtp(url: &str) -> Result<Self, Error> {
+        Ok(Transport::Smtp(
+            AsyncSmtpTransport::<Tokio1Executor>::from_url(url)
+                .map_err(|error| Error::internal(format!("smtp: {error}")))?
+                .build(),
+        ))
     }
 
     pub(crate) async fn deliver(&self, message: Message) -> Result<Delivery, Error> {

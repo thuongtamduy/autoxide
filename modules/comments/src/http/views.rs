@@ -189,8 +189,9 @@ pub(crate) struct CommentDetail {
     pub id: Uuid,
     pub target_type: String,
     pub target_id: String,
-    /// Title of the target (e.g. the post's title), from the module that owns it; absent when
-    /// that kind has no lookup or the target is not public now.
+    /// Title of the target (e.g. the post's title), from the module that owns it. Only given while
+    /// the target is public: for a draft, unpublished or deleted target (or a kind with no
+    /// lookup) the field is absent and only `target_type` and `target_id` identify it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_title: Option<String>,
     /// Public path of the target (without the domain), e.g. `/blog/hello`; absent like

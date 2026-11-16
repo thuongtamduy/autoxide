@@ -26,7 +26,8 @@ cập theo role: mỗi module khai permission của mình, role gom chúng lại
 khoản qua `/api/v1/auth/users`. Người dùng chỉ tự tạo được tài khoản khi đặt
 `AUTOXIDE_AUTH_SELF_REGISTRATION=true`. Chương trình và AI agent dùng API key
 (`/api/v1/auth/api-keys`): key hành động thay người tạo ra nó, chỉ trong các permission
-ghi trên key, và được gửi như access token (`Authorization: Bearer axk_…`). Tạo key,
+ghi trên key, và được gửi như access token (`Authorization: Bearer axk1_…`; key ghi sẵn
+khách của nó nên không cần header nào khác). Tạo key,
 cũng như thêm passkey, phải nhập lại mật khẩu hiện tại; đặt lại mật khẩu thì mọi key và
 passkey của tài khoản bị xoá. Người
 dùng có thể bật đăng nhập hai bước bằng ứng dụng authenticator (TOTP) kèm recovery

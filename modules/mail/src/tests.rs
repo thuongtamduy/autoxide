@@ -37,7 +37,7 @@ async fn setup(
     pairs: &[(&str, &str)],
 ) -> (Arc<dyn Mailer>, autoxide_kernel::job::Worker, TenantContext) {
     let (mailer, worker, database) = setup_with_database(test, pairs).await;
-    (mailer, worker, TenantContext::legacy_default(&database))
+    (mailer, worker, autoxide_kernel::tenancy::DatabaseRegistry::single(database).default_tenant())
 }
 
 async fn setup_with_database(
@@ -234,7 +234,14 @@ async fn tu_choi_han_thi_phat_event_tu_choi_tam_thi_thu_lai() {
             setup_with_database(test, &[("AUTOXIDE_MAIL_SMTP_URL", url.as_str())]).await;
         let mut mail = welcome("ghost@example.com");
         mail.dedupe_key = Some("delivery-9".to_owned());
-        mailer.send(&TenantContext::legacy_default(&database), mail).await.unwrap();
+        mailer
+            .send(
+                &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone())
+                    .default_tenant(),
+                mail,
+            )
+            .await
+            .unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
         let done =
             worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
@@ -255,7 +262,11 @@ async fn tu_choi_han_thi_phat_event_tu_choi_tam_thi_thu_lai() {
         let (mailer, worker, database) =
             setup_with_database(test, &[("AUTOXIDE_MAIL_SMTP_URL", url.as_str())]).await;
         mailer
-            .send(&TenantContext::legacy_default(&database), welcome("ada@example.com"))
+            .send(
+                &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone())
+                    .default_tenant(),
+                welcome("ada@example.com"),
+            )
             .await
             .unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
@@ -263,6 +274,58 @@ async fn tu_choi_han_thi_phat_event_tu_choi_tam_thi_thu_lai() {
             worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
         assert!(done.is_empty(), "will be retried");
         assert!(failures(&database).await.is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+/// Bước 33 (D-274): khách đã đặt máy chủ SMTP và người gửi riêng thì mail của khách đi qua đó;
+/// khách khác vẫn dùng cấu hình chung (ở đây: ghi file).
+#[tokio::test]
+async fn smtp_va_nguoi_gui_rieng_cua_khach() {
+    TestDatabase::run(async |test| {
+        use axum::http::{Method, StatusCode};
+        let directory = TempDir::new("tenant");
+        let path = directory.0.to_string_lossy().into_owned();
+        let (port, received) = fake_smtp().await;
+        let app = autoxide_testkit::TestApp::builder(test)
+            .setting("AUTOXIDE_MAIL_FILE_DIR", &path)
+            .tenant("shop")
+            .user_in("shop", "owner", 1, &["kernel.settings.manage"])
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        for (name, value) in [
+            ("mail.smtp_url", format!("smtp://127.0.0.1:{port}")),
+            ("mail.from", "Shop <hello@shop.example>".to_owned()),
+        ] {
+            let answer = app
+                .request(Method::PUT, &format!("/api/v1/kernel/settings/{name}"))
+                .token("owner")
+                .json(serde_json::json!({"value": value}))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+            assert!(!answer.text().contains("127.0.0.1"), "a secret is never answered");
+        }
+        let mailer = app.modules().api::<dyn Mailer>().unwrap();
+        let shop = app.tenant("shop").await.unwrap();
+        mailer.send(&shop, welcome("ada@example.com")).await.unwrap();
+        mailer.send(&app.default_tenant(), welcome("bob@example.com")).await.unwrap();
+        let worker = app.modules().worker(4).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+
+        let lines = received.lock().unwrap().clone();
+        assert!(
+            lines.iter().any(|line| line.contains("MAIL FROM:<hello@shop.example>")),
+            "{lines:?}"
+        );
+        assert!(lines.iter().any(|line| line.contains("RCPT TO:<ada@example.com>")), "{lines:?}");
+        assert!(!lines.iter().any(|line| line.contains("bob@example.com")), "{lines:?}");
+        let files: Vec<_> = std::fs::read_dir(&directory.0).unwrap().collect();
+        assert_eq!(files.len(), 1, "the default tenant still writes files");
     })
     .await
     .unwrap();

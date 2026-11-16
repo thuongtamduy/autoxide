@@ -284,6 +284,10 @@ async fn tenant(setup: &Setup, slug: &str, placement: Option<&str>) -> TenantCon
     setup.registry.tenant(TenantId::from_uuid(id)).await.unwrap()
 }
 
+/// Job lịch của module nội bộ `kernel` ở chế độ `multi`: `kernel.verify_domains`, chỉ trên database
+/// chính (D-190).
+const KERNEL_JOBS: usize = 1;
+
 #[tokio::test]
 async fn worker_chia_luot_cong_bang() {
     TestDatabase::run(async |test| {
@@ -302,7 +306,8 @@ async fn worker_chia_luot_cong_bang() {
         queue.enqueue(setup.control.write(), &b, &job, EnqueueOptions::default()).await.unwrap();
 
         let worker = setup.modules.worker(4).unwrap();
-        assert_eq!(worker.run_once().await.unwrap(), 4);
+        // 4 job của `reports` và job lịch `kernel.verify_domains` (chế độ `multi`, database chính).
+        assert_eq!(worker.run_once().await.unwrap(), 4 + KERNEL_JOBS);
         let runs = setup.recorder.runs.lock().unwrap().clone();
         assert!(
             runs.iter().any(|(tenant, _, to)| *tenant == Some(b.id()) && to == "b"),
@@ -329,7 +334,7 @@ async fn job_trung_unique_key_khac_khach_deu_chay() {
         assert!(queue.enqueue(write, &a, &job("again"), unique()).await.unwrap().is_none());
 
         let worker = setup.modules.worker(4).unwrap();
-        assert_eq!(worker.run_once().await.unwrap(), 2);
+        assert_eq!(worker.run_once().await.unwrap(), 2 + KERNEL_JOBS);
         let mut seen: Vec<_> = setup
             .recorder
             .runs
@@ -353,7 +358,8 @@ async fn lich_chay_mot_lan_moi_database() {
         let schedule = Schedule::new("reports.nightly", "reports.send", Duration::from_secs(3600));
         let setup = setup(test, vec![schedule], true).await;
         let worker = setup.modules.worker(4).unwrap();
-        assert_eq!(worker.run_once().await.unwrap(), 2);
+        // Lịch `reports` một job mỗi database; lịch của kernel chỉ ở database chính.
+        assert_eq!(worker.run_once().await.unwrap(), 2 + KERNEL_JOBS);
         // Lượt sau cùng khoảng: không thêm job nào; worker khác cũng không.
         assert_eq!(worker.run_once().await.unwrap(), 0);
         assert_eq!(setup.modules.worker(4).unwrap().run_once().await.unwrap(), 0);
@@ -399,7 +405,7 @@ async fn dispatcher_giao_event_tren_moi_database() {
         expected.sort();
         assert_eq!(events, expected);
 
-        assert_eq!(setup.modules.worker(4).unwrap().run_once().await.unwrap(), 1);
+        assert_eq!(setup.modules.worker(4).unwrap().run_once().await.unwrap(), 1 + KERNEL_JOBS);
         let runs = setup.recorder.runs.lock().unwrap().clone();
         assert_eq!(runs, [(Some(far.id()), "p1".to_owned(), "far".to_owned())]);
     })

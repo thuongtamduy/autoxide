@@ -6,96 +6,11 @@
 //! - mọi khoá unique (kể cả khoá chính) bắt đầu bằng `tenant_id`, trừ khoá chỉ gồm cột UUID (ID
 //!   sinh trong ứng dụng, duy nhất toàn cục — vd khoá chính `id`);
 //! - mọi index thường bắt đầu bằng `tenant_id`, trừ index quét cả database có tên `…_sweep_idx`.
-//!
-//! Trong lúc chuyển module (phần B của bước 33), bảng chưa chuyển nằm trong [`PENDING_TENANCY`];
-//! mỗi commit chuyển module xoá bảng của nó khỏi danh sách, commit cuối xoá cả danh sách.
 
 use crate::schema::{SchemaSnapshot, TableSnapshot};
 
-/// Bảng cấp khách hàng chưa có `tenant_id` (chưa chuyển). Bảng đã có `tenant_id` mà còn trong danh
-/// sách cũng là vi phạm — để danh sách chỉ ngắn đi.
-pub const PENDING_TENANCY: &[&str] = &[
-    // ai
-    "ai_usage",
-    // audit
-    "audit_chain",
-    "audit_entry",
-    // auth
-    "auth_api_key",
-    "auth_api_key_permission",
-    "auth_mfa_challenge",
-    "auth_passkey",
-    "auth_passkey_ceremony",
-    "auth_recovery_code",
-    "auth_refresh_token",
-    "auth_role",
-    "auth_role_permission",
-    "auth_totp",
-    "auth_user",
-    "auth_user_role",
-    // comments
-    "comments_bans",
-    "comments_comments",
-    "comments_profiles",
-    "comments_reply_subscriptions",
-    "comments_reports",
-    "comments_targets",
-    // content
-    "content_authors",
-    "content_embedding_state",
-    "content_embeddings",
-    "content_entries",
-    "content_entry_authors",
-    "content_entry_terms",
-    "content_menu_items",
-    "content_menus",
-    "content_published",
-    "content_redirects",
-    "content_revisions",
-    "content_schedules",
-    "content_term_translations",
-    "content_terms",
-    "content_translation_requests",
-    "content_tree_locks",
-    // files
-    "files_file",
-    // forms
-    "forms_exports",
-    "forms_form_versions",
-    "forms_forms",
-    "forms_submissions",
-    // idempotency
-    "idempotency_record",
-    // media
-    "media_alt_translations",
-    "media_folder",
-    "media_item",
-    "media_item_tag",
-    "media_lock",
-    "media_tag",
-    "media_variant",
-    // menus
-    "menus_items",
-    "menus_menus",
-    // newsletter
-    "newsletter_campaigns",
-    "newsletter_deliveries",
-    "newsletter_lists",
-    "newsletter_subscribers",
-    "newsletter_subscriptions",
-    "newsletter_suppressions",
-    // webhooks
-    "webhooks_delivery",
-    "webhooks_endpoint",
-];
-
-/// Các vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ. `control_plane`: bảng mặt điều khiển đã khai;
-/// `pending`: bảng chưa chuyển (thường là [`PENDING_TENANCY`]).
-pub fn schema_tenancy_violations(
-    snapshot: &SchemaSnapshot,
-    control_plane: &[&str],
-    pending: &[&str],
-) -> Vec<String> {
+/// Các vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ. `control_plane`: bảng mặt điều khiển đã khai.
+pub fn schema_tenancy_violations(snapshot: &SchemaSnapshot, control_plane: &[&str]) -> Vec<String> {
     let mut violations = Vec::new();
     for table in &snapshot.tables {
         let name = table.name.as_str();
@@ -103,14 +18,6 @@ pub fn schema_tenancy_violations(
             continue;
         }
         let tenant = table.columns.iter().find(|column| column.name == "tenant_id");
-        if pending.contains(&name) {
-            if tenant.is_some() {
-                violations.push(format!(
-                    "table `{name}` has `tenant_id`: remove it from `PENDING_TENANCY`"
-                ));
-            }
-            continue;
-        }
         match tenant {
             None => {
                 // Thiếu cột thì báo một lần; khoá và index của bảng xét sau khi nâng.
@@ -239,20 +146,14 @@ mod tests {
                     vec![],
                 ),
                 table("shop_plain", vec![id()], vec![index("shop_plain_x", &["x"], false)]),
-                table("shop_moved", vec![tenant(), id()], vec![]),
-                table("shop_waiting", vec![id()], vec![]),
                 table("shop_migrations", vec![], vec![]),
                 table("kernel_secrets", vec![id()], vec![]),
             ],
         };
-        let violations = schema_tenancy_violations(
-            &snapshot,
-            &["kernel_secrets"],
-            &["shop_moved", "shop_waiting"],
-        );
+        let violations = schema_tenancy_violations(&snapshot, &["kernel_secrets"]);
         let found: Vec<&str> =
             violations.iter().map(|text| text.split(':').next().unwrap_or_default()).collect();
-        assert_eq!(violations.len(), 6, "{violations:#?}");
+        assert_eq!(violations.len(), 5, "{violations:#?}");
         assert!(violations.iter().any(|v| v.contains("`shop_bad.tenant_id` must be NOT NULL")));
         assert!(
             violations.iter().any(|v| v.contains("`shop_defaulted.tenant_id` must be NOT NULL"))
@@ -260,7 +161,6 @@ mod tests {
         assert!(violations.iter().any(|v| v.contains("unique index `shop_bad_sku`")));
         assert!(violations.iter().any(|v| v.contains("index `shop_bad_sku_idx`")));
         assert!(violations.iter().any(|v| v.contains("table `shop_plain` has no `tenant_id`")));
-        assert!(violations.iter().any(|v| v.contains("`shop_moved` has `tenant_id`: remove it")));
         assert!(!found.iter().any(|v| v.contains("shop_item") || v.contains("kernel_secrets")));
     }
 }

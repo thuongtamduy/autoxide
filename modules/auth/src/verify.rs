@@ -12,14 +12,13 @@
 
 use std::sync::Arc;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::mail::{MailTemplate, Mailer};
-use autoxide_kernel::tenancy::TenantContext;
-use autoxide_kernel::tokens::OneTimeTokens;
+use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, link_token};
+use autoxide_kernel::tokens::{OneTimeTokens, TokenRejection};
 use chrono::{DateTime, SubsecRound, Utc};
 use serde_json::json;
 use uuid::Uuid;
@@ -58,7 +57,6 @@ const VERIFY_CODE: MailTemplate = MailTemplate::new(
 );
 
 pub(crate) struct EmailVerifications {
-    pub database: Database,
     pub users: Arc<UserService>,
     pub sessions: Arc<SessionService>,
     pub mailer: Arc<dyn Mailer>,
@@ -70,13 +68,21 @@ pub(crate) struct EmailVerifications {
     pub url: Option<String>,
     /// Trang báo "không phải tôi", có `{token}`; `None`: mail chứa token.
     pub report_url: Option<String>,
+    /// Sổ database: tìm khách ghi trong token của link.
+    pub databases: DatabaseRegistry,
 }
 
 impl EmailVerifications {
     /// Gửi mail xác minh cho tài khoản vừa tạo. Hỏng thì chỉ ghi log: tài khoản đã tạo
     /// xong, người dùng xin gửi lại được (`send_current`).
-    pub(crate) async fn after_signup(&self, actor: Actor, user: &User, language: Language) {
-        if let Err(error) = self.send(actor, user, &user.email, language).await {
+    pub(crate) async fn after_signup(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        user: &User,
+        language: Language,
+    ) {
+        if let Err(error) = self.send(tenant, actor, user, &user.email, language).await {
             tracing::warn!(user_id = %user.id, error = %error, "cannot send the verification mail");
         }
     }
@@ -84,20 +90,23 @@ impl EmailVerifications {
     /// Gửi lại mail xác minh email hiện tại của người dùng `user_id`.
     pub(crate) async fn send_current(
         &self,
+        tenant: &TenantContext,
         user_id: Uuid,
         language: Language,
     ) -> Result<(), Error> {
-        let user = self.users.get(user_id).await?.ok_or_else(|| user::user_not_found(user_id))?;
+        let user =
+            self.users.get(tenant, user_id).await?.ok_or_else(|| user::user_not_found(user_id))?;
         if user.email_verified_at.is_some() {
             return Err(already_verified());
         }
-        self.send(Actor::user(user_id), &user, &user.email, language).await
+        self.send(tenant, Actor::user(user_id), &user, &user.email, language).await
     }
 
     /// Người dùng `user_id` xin đổi email sang `new_email`: kiểm mật khẩu hiện tại, rồi
     /// gửi mail xác minh tới địa chỉ mới. Email chỉ đổi khi địa chỉ mới được xác nhận.
     pub(crate) async fn change_email(
         &self,
+        tenant: &TenantContext,
         user_id: Uuid,
         current_password: &str,
         new_email: &str,
@@ -111,25 +120,25 @@ impl EmailVerifications {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let (user, _) = self.sessions.check_password(user_id, current_password).await?;
+        let (user, _) = self.sessions.check_password(tenant, user_id, current_password).await?;
         if email == user.email && user.email_verified_at.is_some() {
             return Err(already_verified());
         }
-        if email != user.email && self.users.find_by_email(&email).await?.is_some() {
+        if email != user.email && self.users.find_by_email(tenant, &email).await?.is_some() {
             return Err(user::email_taken(&email));
         }
-        self.send(Actor::user(user_id), &user, &email, language).await
+        self.send(tenant, Actor::user(user_id), &user, &email, language).await
     }
 
     /// Email đang chờ xác minh sau khi `user` xin đổi (địa chỉ mới, hạn của link); `None` khi
     /// không có (token xác minh còn dùng được mà địa chỉ khác email hiện tại).
     pub(crate) async fn pending_change(
         &self,
+        tenant: &TenantContext,
         user: &User,
     ) -> Result<Option<(String, DateTime<Utc>)>, Error> {
-        let tenant = TenantContext::legacy_default(&self.database);
         let subject = user.id.to_string();
-        let live = tokens().live(self.database.read(), &tenant, PURPOSE, &subject).await?;
+        let live = tokens().live(tenant.database().read(), tenant, PURPOSE, &subject).await?;
         Ok(live.into_iter().find_map(|token| {
             let email = token.data.filter(|email| *email != user.email)?;
             Some((email, token.expires_at))
@@ -139,62 +148,71 @@ impl EmailVerifications {
     /// Huỷ yêu cầu đổi email của người dùng `user_id`: link đã gửi tới địa chỉ mới hết dùng được
     /// (cùng mọi link xác minh khác của tài khoản — xin lại được). Không có yêu cầu nào thì
     /// `auth.no_pending_email_change`.
-    pub(crate) async fn cancel_change(&self, user_id: Uuid) -> Result<(), Error> {
-        let user = self.users.get(user_id).await?.ok_or_else(|| user::user_not_found(user_id))?;
-        let Some((email, _)) = self.pending_change(&user).await? else {
+    pub(crate) async fn cancel_change(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<(), Error> {
+        let user =
+            self.users.get(tenant, user_id).await?.ok_or_else(|| user::user_not_found(user_id))?;
+        let Some((email, _)) = self.pending_change(tenant, &user).await? else {
             return Err(no_pending_change());
         };
-        let tenant = TenantContext::legacy_default(&self.database);
-        let transaction = self.database.begin_write().await?;
-        tokens().revoke(&transaction, &tenant, PURPOSE, &user_id.to_string()).await?;
+        let transaction = tenant.database().begin_write().await?;
+        tokens().revoke(&transaction, tenant, PURPOSE, &user_id.to_string()).await?;
         let event =
             events::EmailChangeCancelled { before: Some(json!({"email": email})), after: None };
         let actor = Actor::user(user_id);
         self.outbox
-            .record(&transaction, &tenant, actor, events::user_subject(user_id), &event)
+            .record(&transaction, tenant, actor, events::user_subject(user_id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "pending email change cancelled");
         Ok(())
     }
 
-    /// Xác nhận email bằng `token` lấy từ mail. Trả tài khoản sau khi xác minh. Email đổi thì
-    /// xếp mail báo tới địa chỉ cũ (bằng `language`) trong cùng transaction.
-    pub(crate) async fn confirm(&self, token: &str, language: Language) -> Result<User, Error> {
+    /// Xác nhận email bằng `token` lấy từ mail. Trả khách của token và tài khoản sau khi xác
+    /// minh. Email đổi thì xếp mail báo tới địa chỉ cũ (bằng `language`) trong cùng transaction.
+    /// Khách lấy từ token (`request`: khách của request, nếu xác định được — xem
+    /// `token::resolve`).
+    pub(crate) async fn confirm(
+        &self,
+        request: Option<&TenantContext>,
+        token: &str,
+        language: Language,
+    ) -> Result<(TenantContext, User), Error> {
+        let Some((tenant, raw)) = crate::token::resolve(&self.databases, request, token).await?
+        else {
+            return Err(invalid_token().with_reason(TokenRejection::Unknown.as_str()));
+        };
+        let user = self.confirm_in(&tenant, raw, language).await?;
+        Ok((tenant, user))
+    }
+
+    async fn confirm_in(
+        &self,
+        tenant: &TenantContext,
+        token: &str,
+        language: Language,
+    ) -> Result<User, Error> {
         let now = now();
-        let transaction = self.database.begin_write().await?;
-        let consumed = tokens()
-            .consume(&transaction, &TenantContext::legacy_default(&self.database), PURPOSE, token)
-            .await?;
+        let transaction = tenant.database().begin_write().await?;
+        let consumed = tokens().consume(&transaction, tenant, PURPOSE, token).await?;
         let found = consumed
             .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
         let Some((user_id, email)) = found else {
-            let tenant = TenantContext::legacy_default(&self.database);
-            let why = tokens().rejection(&transaction, &tenant, PURPOSE, token).await?;
+            let why = tokens().rejection(&transaction, tenant, PURPOSE, token).await?;
             transaction.rollback().await?;
             return Err(invalid_token().with_reason(why.as_str()));
         };
-        let old = self.users.apply_verified_email(&transaction, user_id, &email, now).await?;
+        let old =
+            self.users.apply_verified_email(tenant, &transaction, user_id, &email, now).await?;
         // Token khác của người này (mail cũ hơn, hay cho địa chỉ khác) hết dùng được.
         // Mọi token xác minh khác của người này hết hiệu lực.
-        tokens()
-            .revoke(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                PURPOSE,
-                &user_id.to_string(),
-            )
-            .await?;
+        tokens().revoke(&transaction, tenant, PURPOSE, &user_id.to_string()).await?;
         // Email đổi: mail đặt lại mật khẩu đã gửi tới địa chỉ cũ hết dùng được (D-156).
         if old != email {
-            tokens()
-                .revoke(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    "password_reset",
-                    &user_id.to_string(),
-                )
-                .await?;
+            tokens().revoke(&transaction, tenant, "password_reset", &user_id.to_string()).await?;
             let job = EmailChangedJob {
                 user_id,
                 old_email: old.clone(),
@@ -202,29 +220,22 @@ impl EmailVerifications {
                 changed_at: now,
                 language: language.tag().to_owned(),
             };
-            self.enqueue_email_changed(&transaction, &job).await?;
+            self.enqueue_email_changed(tenant, &transaction, &job).await?;
         }
         let before = (old != email).then(|| json!({"email": old}));
         let event = events::EmailVerified { before, after: Some(json!({"email": email})) };
         let subject = events::user_subject(user_id);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::user(user_id),
-                subject,
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, Actor::user(user_id), subject, &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, changed = old != email, "email verified");
-        self.users.get(user_id).await?.ok_or_else(|| user::user_not_found(user_id))
+        self.users.get(tenant, user_id).await?.ok_or_else(|| user::user_not_found(user_id))
     }
 
     /// Tạo token cho (`user`, `email`) và gửi mail tới `email`. Vừa gửi cho địa chỉ đó
     /// chưa quá [`COOLDOWN_SECONDS`] thì thôi.
     async fn send(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         user: &User,
         email: &str,
@@ -233,44 +244,24 @@ impl EmailVerifications {
         let now = now();
         let subject = user.id.to_string();
         let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
-        let recent = tokens()
-            .recent(
-                self.database.write(),
-                &TenantContext::legacy_default(&self.database),
-                PURPOSE,
-                &subject,
-                since,
-            )
-            .await?;
+        let recent =
+            tokens().recent(tenant.database().write(), tenant, PURPOSE, &subject, since).await?;
         if recent.iter().any(|token| token.data.as_deref() == Some(email)) {
             return Ok(());
         }
 
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let ttl = chrono::Duration::hours(TOKEN_HOURS);
-        let token = tokens()
-            .issue(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                PURPOSE,
-                &subject,
-                Some(email),
-                ttl,
-            )
-            .await?
-            .token;
+        let raw =
+            tokens().issue(&transaction, tenant, PURPOSE, &subject, Some(email), ttl).await?.token;
+        // Token trong mail mang khách: link mở trên tên miền chính vẫn tìm được khách.
+        let token = link_token(tenant, &raw);
         let event = events::EmailVerificationRequested {
             before: None,
             after: Some(json!({"email": email})),
         };
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::user_subject(user.id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::user_subject(user.id), &event)
             .await?;
         transaction.commit().await?;
 
@@ -286,7 +277,7 @@ impl EmailVerifications {
                 VERIFY_CODE.mail(email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
+        self.mailer.send(tenant, mail).await
     }
 }
 
@@ -324,12 +315,13 @@ mod tests {
 
     async fn setup(test: &TestDatabase) -> (Services, User) {
         let services = crate::testing::services(test).await;
+        let tenant = services.tenant.clone();
         let ada = NewUser {
             email: "ada@example.com".to_owned(),
             name: "Ada".to_owned(),
             password: Some(PASSWORD.to_owned()),
         };
-        let ada = services.users.create(Actor::system(), ada).await.unwrap();
+        let ada = services.users.create(&tenant, Actor::system(), ada).await.unwrap();
         (services, ada)
     }
 
@@ -369,27 +361,31 @@ mod tests {
     async fn tai_khoan_moi_xac_minh_bang_token_trong_mail() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             let verifications = &services.verifications;
             assert!(ada.email_verified_at.is_none());
 
-            verifications.after_signup(Actor::system(), &ada, Language::Vi).await;
+            verifications.after_signup(&tenant, Actor::system(), &ada, Language::Vi).await;
             let (to, token) = last_mail(&services);
             assert_eq!(to, "ada@example.com");
             assert_eq!(services.mails.sent.lock().unwrap()[0].subject, "Xác nhận địa chỉ email");
             // Xin gửi lại ngay: không thêm mail.
-            verifications.send_current(ada.id, Language::En).await.unwrap();
+            verifications.send_current(&tenant, ada.id, Language::En).await.unwrap();
             assert_eq!(sent(&services), 1);
 
-            let verified = verifications.confirm(&token, Language::En).await.unwrap();
+            let (_, verified) =
+                verifications.confirm(Some(&tenant), &token, Language::En).await.unwrap();
             assert_eq!(verified.email, "ada@example.com");
             assert!(verified.email_verified_at.is_some());
-            let again = verifications.confirm(&token, Language::En).await.unwrap_err();
+            let again =
+                verifications.confirm(Some(&tenant), &token, Language::En).await.unwrap_err();
             assert_eq!(again.code(), "auth.invalid_verification_token");
             // Giao diện nói được "link đã dùng rồi" thay vì "link sai".
             assert_eq!(again.reason(), Some("used"));
-            let done = verifications.send_current(ada.id, Language::En).await.unwrap_err();
+            let done = verifications.send_current(&tenant, ada.id, Language::En).await.unwrap_err();
             assert_eq!(done.code(), "auth.email_already_verified");
-            let unknown = verifications.confirm("nope", Language::En).await.unwrap_err();
+            let unknown =
+                verifications.confirm(Some(&tenant), "nope", Language::En).await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_verification_token");
             assert_eq!(unknown.reason(), Some("unknown"));
         })
@@ -401,12 +397,17 @@ mod tests {
     async fn token_het_han_khong_dung_duoc() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
-            services.verifications.send_current(ada.id, Language::En).await.unwrap();
+            let tenant = services.tenant.clone();
+            services.verifications.send_current(&tenant, ada.id, Language::En).await.unwrap();
             let (_, token) = last_mail(&services);
 
             time_passes(&services, 25).await;
 
-            let expired = services.verifications.confirm(&token, Language::En).await.unwrap_err();
+            let expired = services
+                .verifications
+                .confirm(Some(&tenant), &token, Language::En)
+                .await
+                .unwrap_err();
             assert_eq!(expired.code(), "auth.invalid_verification_token");
             assert_eq!(expired.reason(), Some("expired"));
         })
@@ -418,18 +419,19 @@ mod tests {
     async fn doi_email_chi_xay_ra_khi_dia_chi_moi_duoc_xac_nhan() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             let bob = NewUser {
                 email: "bob@example.com".to_owned(),
                 name: "Bob".to_owned(),
                 password: None,
             };
-            services.users.create(Actor::system(), bob).await.unwrap();
+            services.users.create(&tenant, Actor::system(), bob).await.unwrap();
             let verifications = &services.verifications;
-            verifications.send_current(ada.id, Language::En).await.unwrap();
+            verifications.send_current(&tenant, ada.id, Language::En).await.unwrap();
             let (_, old_token) = last_mail(&services);
 
             let change = |password: &'static str, email: &'static str| {
-                verifications.change_email(ada.id, password, email, Language::En)
+                verifications.change_email(&tenant, ada.id, password, email, Language::En)
             };
             assert_eq!(
                 change("wrong", "ada@new.example").await.unwrap_err().code(),
@@ -447,16 +449,20 @@ mod tests {
             let (to, token) = last_mail(&services);
             assert_eq!(to, "ada@new.example");
             // Chưa xác nhận: email cũ vẫn dùng.
-            let before = services.users.get(ada.id).await.unwrap().unwrap();
+            let before = services.users.get(&tenant, ada.id).await.unwrap().unwrap();
             assert_eq!(before.email, "ada@example.com");
 
-            let changed = verifications.confirm(&token, Language::En).await.unwrap();
+            let (_, changed) =
+                verifications.confirm(Some(&tenant), &token, Language::En).await.unwrap();
             assert_eq!(changed.email, "ada@new.example");
             assert!(changed.email_verified_at.is_some());
-            services.sessions.login("ada@new.example", PASSWORD, None).await.unwrap();
-            assert!(services.sessions.login("ada@example.com", PASSWORD, None).await.is_err());
+            services.sessions.login(&tenant, "ada@new.example", PASSWORD, None).await.unwrap();
+            assert!(
+                services.sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.is_err()
+            );
             // Token cũ (cho địa chỉ cũ) hết dùng được: không quay email về được.
-            let stale = verifications.confirm(&old_token, Language::En).await.unwrap_err();
+            let stale =
+                verifications.confirm(Some(&tenant), &old_token, Language::En).await.unwrap_err();
             assert_eq!(stale.code(), "auth.invalid_verification_token");
         })
         .await
@@ -467,9 +473,10 @@ mod tests {
     async fn email_bi_nguoi_khac_lay_trong_luc_cho_thi_khong_doi() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             let verifications = &services.verifications;
             verifications
-                .change_email(ada.id, PASSWORD, "shared@example.com", Language::En)
+                .change_email(&tenant, ada.id, PASSWORD, "shared@example.com", Language::En)
                 .await
                 .unwrap();
             let (_, token) = last_mail(&services);
@@ -478,12 +485,13 @@ mod tests {
                 name: "Carol".to_owned(),
                 password: None,
             };
-            services.users.create(Actor::system(), carol).await.unwrap();
+            services.users.create(&tenant, Actor::system(), carol).await.unwrap();
 
-            let taken = verifications.confirm(&token, Language::En).await.unwrap_err();
+            let taken =
+                verifications.confirm(Some(&tenant), &token, Language::En).await.unwrap_err();
 
             assert_eq!(taken.code(), "auth.email_taken");
-            let ada = services.users.get(ada.id).await.unwrap().unwrap();
+            let ada = services.users.get(&tenant, ada.id).await.unwrap().unwrap();
             assert_eq!((ada.email.as_str(), ada.email_verified_at), ("ada@example.com", None));
         })
         .await
@@ -495,14 +503,18 @@ mod tests {
     async fn xac_nhan_dong_thoi_chi_mot_ben_duoc() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
-            services.verifications.send_current(ada.id, Language::En).await.unwrap();
+            let tenant = services.tenant.clone();
+            services.verifications.send_current(&tenant, ada.id, Language::En).await.unwrap();
             let (_, token) = last_mail(&services);
 
             let attempts: Vec<_> = (0..5)
                 .map(|_| {
                     let verifications = services.verifications.clone();
                     let token = token.clone();
-                    tokio::spawn(async move { verifications.confirm(&token, Language::En).await })
+                    let tenant = tenant.clone();
+                    tokio::spawn(async move {
+                        verifications.confirm(Some(&tenant), &token, Language::En).await
+                    })
                 })
                 .collect();
             let mut succeeded = 0;

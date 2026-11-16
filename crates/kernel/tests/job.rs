@@ -102,7 +102,7 @@ async fn setup(
 
 async fn enqueue(database: &Database, to: &str, options: EnqueueOptions) -> Option<Uuid> {
     let queue = JobQueue::new("reports");
-    let tenant = TenantContext::legacy_default(database);
+    let tenant = TenantContext::default_on(database.clone());
     queue
         .enqueue(database.write(), &tenant, &SendReport { to: to.to_owned() }, options)
         .await
@@ -127,7 +127,7 @@ async fn job_trong_transaction_bi_huy_thi_khong_ton_tai() {
         queue
             .enqueue(
                 &transaction,
-                &TenantContext::legacy_default(&database),
+                &TenantContext::default_on(database.clone()),
                 &draft,
                 EnqueueOptions::default(),
             )
@@ -193,7 +193,7 @@ async fn trung_khoa_giua_transaction_khong_hong_transaction() {
             queue
                 .enqueue(
                     &transaction,
-                    &TenantContext::legacy_default(&database),
+                    &TenantContext::default_on(database.clone()),
                     &again,
                     unique("a")
                 )
@@ -206,7 +206,7 @@ async fn trung_khoa_giua_transaction_khong_hong_transaction() {
             queue
                 .enqueue(
                     &transaction,
-                    &TenantContext::legacy_default(&database),
+                    &TenantContext::default_on(database.clone()),
                     &next,
                     unique("b")
                 )

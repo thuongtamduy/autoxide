@@ -9,6 +9,7 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
@@ -133,11 +134,12 @@ impl From<Suggestion> for SeoSuggestion {
 )]
 pub(crate) async fn seo_check(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     language: Language,
 ) -> Result<Data<SeoReport>, Error> {
-    let findings = service.seo_check(&principal, id).await?;
+    let findings = service.seo_check(&tenant, &principal, id).await?;
     Ok(Data { data: SeoReport::new(findings, &service.translations, language) })
 }
 
@@ -168,10 +170,11 @@ pub(crate) async fn seo_check(
 )]
 pub(crate) async fn seo_suggestions(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<SeoSuggestion>, Error> {
-    Ok(Data { data: service.suggest_seo(&principal, id).await?.into() })
+    Ok(Data { data: service.suggest_seo(&tenant, &principal, id).await?.into() })
 }
 
 /// The language to translate into.
@@ -292,11 +295,12 @@ impl IntoResponse for Accepted {
 )]
 pub(crate) async fn translate(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<TranslateRequest>,
 ) -> Result<Accepted, Error> {
-    let request = service.request_translation(&principal, id, &input.locale).await?;
+    let request = service.request_translation(&tenant, &principal, id, &input.locale).await?;
     Ok(Accepted(request.into()))
 }
 
@@ -319,10 +323,11 @@ pub(crate) async fn translate(
 )]
 pub(crate) async fn get_translation_request(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<TranslationRequestResponse>, Error> {
-    Ok(Data { data: service.translation_request(&principal, id).await?.into() })
+    Ok(Data { data: service.translation_request(&tenant, &principal, id).await?.into() })
 }
 
 /// List the AI translation requests of an entry.
@@ -344,12 +349,13 @@ pub(crate) async fn get_translation_request(
 )]
 pub(crate) async fn list_translation_requests(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<TranslationRequestResponse>, Error> {
     let page = PageRequest::try_from(query)?;
-    let found = service.translation_requests_of(&principal, id, &page).await?;
+    let found = service.translation_requests_of(&tenant, &principal, id, &page).await?;
     Ok(found.map(TranslationRequestResponse::from))
 }
 
@@ -477,11 +483,12 @@ fn page_of(hits: Vec<crate::ai::semantic::Hit>, limit: Option<u32>) -> Page<Sear
 )]
 pub(crate) async fn search(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(params): Query<SearchParams>,
 ) -> Result<Page<SearchHit>, Error> {
     let limit = params.limit;
-    let hits = service.search(Some(&principal), &params.query()?, false).await?;
+    let hits = service.search(&tenant, Some(&principal), &params.query()?, false).await?;
     Ok(page_of(hits, limit))
 }
 
@@ -506,10 +513,11 @@ pub(crate) async fn search(
 )]
 pub(crate) async fn public_search(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     Query(params): Query<SearchParams>,
 ) -> Result<Page<SearchHit>, Error> {
     let limit = params.limit;
-    let hits = service.search(principal.as_ref(), &params.query()?, true).await?;
+    let hits = service.search(&tenant, principal.as_ref(), &params.query()?, true).await?;
     Ok(page_of(hits, limit))
 }

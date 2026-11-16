@@ -7,7 +7,6 @@
 use std::sync::Arc;
 
 use autoxide_kernel::antispam::SpamGuard;
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::i18n::Translations;
@@ -15,14 +14,15 @@ use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::public_url::PublicUrl;
 use autoxide_kernel::secret::SecretKey;
-use autoxide_kernel::storage::Storage;
+use autoxide_kernel::storage::{Storage, TenantStorage};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{DbErr, SqlErr};
 
 use crate::config::FormsConfig;
 
+// Service không giữ database: mỗi hàm nhận `tenant` và dùng database của khách đó (bước 33).
 pub(crate) struct FormsService {
-    pub(crate) database: Database,
     pub(crate) outbox: Outbox,
     pub(crate) guard: Arc<SpamGuard>,
     pub(crate) secret: SecretKey,
@@ -38,7 +38,6 @@ pub(crate) struct FormsService {
 
 /// Thứ service cần từ kernel và module khác.
 pub(crate) struct Parts {
-    pub database: Database,
     pub outbox: Outbox,
     pub guard: Arc<SpamGuard>,
     pub secret: SecretKey,
@@ -52,7 +51,6 @@ pub(crate) struct Parts {
 impl FormsService {
     pub(crate) fn new(parts: Parts, config: FormsConfig) -> Self {
         FormsService {
-            database: parts.database,
             outbox: parts.outbox,
             guard: parts.guard,
             secret: parts.secret,
@@ -63,6 +61,11 @@ impl FormsService {
             public_url: parts.public_url,
             config,
         }
+    }
+
+    /// Nơi lưu file xuất của khách `tenant` (khoá có tiền tố khách, D-259).
+    pub(crate) fn store(&self, tenant: &TenantContext) -> TenantStorage {
+        TenantStorage::new(self.storage.clone(), tenant)
     }
 }
 

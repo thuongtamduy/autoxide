@@ -8,6 +8,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -87,6 +88,7 @@ impl QueueQuery {
 )]
 pub(crate) async fn list_comments(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<QueueQuery>,
     Query(paging): Query<PageQuery>,
@@ -94,21 +96,25 @@ pub(crate) async fn list_comments(
     let mut problems = Vec::new();
     let filter = query.filter(&mut problems);
     let page = page_request(paging, problems)?;
-    let page = service.queue(&principal, &filter, &page).await?.map(CommentDetail::from);
+    let page = service.queue(&tenant, &principal, &filter, &page).await?.map(CommentDetail::from);
     let autoxide_kernel::pagination::Page { data, pagination } = page;
-    Ok(autoxide_kernel::pagination::Page { data: with_targets(&service, data).await?, pagination })
+    Ok(autoxide_kernel::pagination::Page {
+        data: with_targets(&service, &tenant, data).await?,
+        pagination,
+    })
 }
 
 /// Bình luận kèm tiêu đề và đường dẫn của đích (một lần tra cho mỗi loại đích của trang).
 async fn with_targets(
     service: &CommentsService,
+    tenant: &TenantContext,
     comments: Vec<CommentDetail>,
 ) -> Result<Vec<CommentDetail>, Error> {
     let targets: Vec<(String, String)> = comments
         .iter()
         .map(|comment| (comment.target_type.clone(), comment.target_id.clone()))
         .collect();
-    let found = service.target_titles(&targets).await?;
+    let found = service.target_titles(tenant, &targets).await?;
     Ok(comments
         .into_iter()
         .map(|comment| {
@@ -138,12 +144,13 @@ async fn with_targets(
 )]
 pub(crate) async fn get_comment(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<CommentDetail>, Error> {
-    let found = service.get(&principal, id).await?;
+    let found = service.get(&tenant, &principal, id).await?;
     let version = found.row.updated_at;
-    let described = with_targets(&service, vec![found.into()]).await?.into_iter().next();
+    let described = with_targets(&service, &tenant, vec![found.into()]).await?.into_iter().next();
     let data = described.ok_or_else(|| Error::internal("describing a comment returned nothing"))?;
     Ok(Tagged { version, data })
 }
@@ -182,13 +189,14 @@ pub(crate) struct UpdateCommentRequest {
 )]
 pub(crate) async fn update_comment(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<UpdateCommentRequest>,
 ) -> Result<Tagged<CommentDetail>, Error> {
     let expected = if_match.required()?;
-    let found = service.set_status(&principal, id, input.status, expected).await?;
+    let found = service.set_status(&tenant, &principal, id, input.status, expected).await?;
     Ok(Tagged { version: found.row.updated_at, data: found.into() })
 }
 
@@ -220,10 +228,11 @@ pub(crate) struct PurgedResponse {
 )]
 pub(crate) async fn delete_comment(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<PurgedResponse>, Error> {
-    let deleted = service.hard_delete(&principal, id).await?;
+    let deleted = service.hard_delete(&tenant, &principal, id).await?;
     Ok(Data { data: PurgedResponse { deleted } })
 }
 
@@ -247,12 +256,13 @@ pub(crate) async fn delete_comment(
 )]
 pub(crate) async fn list_reports(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<ReportResponse>, Error> {
     let page = page_request(paging, Vec::new())?;
-    Ok(service.reports_of(&principal, id, &page).await?.map(ReportResponse::from))
+    Ok(service.reports_of(&tenant, &principal, id, &page).await?.map(ReportResponse::from))
 }
 
 /// Which bans to list.
@@ -285,6 +295,7 @@ pub(crate) struct BansQuery {
 )]
 pub(crate) async fn list_bans(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<BansQuery>,
     Query(paging): Query<PageQuery>,
@@ -307,7 +318,7 @@ pub(crate) async fn list_bans(
     };
     let page = page_request(paging, problems)?;
     let filter = BanFilter { kind: kind.map(str::to_owned), active };
-    Ok(service.bans(&principal, &filter, &page).await?.map(BanResponse::from))
+    Ok(service.bans(&tenant, &principal, &filter, &page).await?.map(BanResponse::from))
 }
 
 /// A new ban.
@@ -344,11 +355,13 @@ pub(crate) struct BanRequest {
 )]
 pub(crate) async fn create_ban(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<BanRequest>,
 ) -> Result<Created<BanResponse>, Error> {
     let ban = service
         .ban(
+            &tenant,
             &principal,
             NewBan {
                 kind: input.kind,
@@ -380,10 +393,11 @@ pub(crate) async fn create_ban(
 )]
 pub(crate) async fn delete_ban(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.unban(&principal, id).await?;
+    service.unban(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -410,11 +424,12 @@ pub(crate) async fn delete_ban(
 )]
 pub(crate) async fn get_target(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path((kind, id)): Path<(String, String)>,
 ) -> Result<axum::response::Response, Error> {
     use axum::response::IntoResponse as _;
-    let target = service.admin_target(&principal, &kind, &id).await?;
+    let target = service.admin_target(&tenant, &principal, &kind, &id).await?;
     Ok(match target.updated_at {
         Some(version) => {
             Tagged { version, data: TargetResponse::new(target, true) }.into_response()
@@ -468,6 +483,7 @@ pub(crate) enum TargetStateParam {
 )]
 pub(crate) async fn list_targets(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<TargetsQuery>,
     Query(paging): Query<PageQuery>,
@@ -492,10 +508,10 @@ pub(crate) async fn list_targets(
     };
     let page = page_request(paging, problems)?;
     let filter = TargetFilter { kind: query.target_type, state, pending };
-    let page = service.list_targets(&principal, &filter, &page).await?;
+    let page = service.list_targets(&tenant, &principal, &filter, &page).await?;
     let keys: Vec<(String, String)> =
         page.data.iter().map(|target| (target.kind.clone(), target.id.clone())).collect();
-    let found = service.target_titles(&keys).await?;
+    let found = service.target_titles(&tenant, &keys).await?;
     Ok(page.map(|target| {
         let key = (target.kind.clone(), target.id.clone());
         let (title, url) = super::views::described(found.get(&key));
@@ -553,6 +569,7 @@ pub(crate) struct TargetRequest {
 )]
 pub(crate) async fn set_target(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path((kind, id)): Path<(String, String)>,
     if_match: IfMatch,
@@ -561,7 +578,7 @@ pub(crate) async fn set_target(
     let expected = if_match.expected()?;
     let change =
         TargetChange { state: input.state, hidden: input.hidden, closes_at: input.closes_at };
-    let target = service.set_target(&principal, &kind, &id, change, expected).await?;
+    let target = service.set_target(&tenant, &principal, &kind, &id, change, expected).await?;
     let version = target.updated_at.unwrap_or_default();
     Ok(Tagged { version, data: TargetResponse::new(target, true) })
 }
@@ -632,12 +649,13 @@ pub(crate) struct ErasedResponse {
 )]
 pub(crate) async fn get_email_data(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<EmailDataResponse>, Error> {
     // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
     principal.require(&crate::permissions::COMMENTS_EXPORT)?;
-    let found = service.email_data(&principal, query.email()?).await?;
+    let found = service.email_data(&tenant, &principal, query.email()?).await?;
     Ok(Data {
         data: EmailDataResponse {
             email: autoxide_kernel::email::normalize(query.email()?),
@@ -673,11 +691,12 @@ pub(crate) async fn get_email_data(
 )]
 pub(crate) async fn delete_email_data(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<ErasedResponse>, Error> {
     // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
     principal.require(&crate::permissions::COMMENTS_EXPORT)?;
-    let cleared = service.erase_email(&principal, query.email()?).await?;
+    let cleared = service.erase_email(&tenant, &principal, query.email()?).await?;
     Ok(Data { data: ErasedResponse { cleared } })
 }

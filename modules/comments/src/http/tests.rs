@@ -544,3 +544,99 @@ async fn dich_kem_tieu_de_va_danh_sach_dich() {
     .await
     .unwrap();
 }
+
+/// Hai khách (một dùng chung database, một database riêng): bình luận, lệnh cấm, báo cáo của khách
+/// A không lộ cho người của khách B qua bất kỳ `GET` hay tool MCP chỉ đọc nào. Token trong mail
+/// xác minh của khách A mang khách của nó: gọi ở tên miền chính (không header) vẫn xác minh ở
+/// khách A; ghép ID khách B với phần thô của nó là token sai (bước 33).
+#[tokio::test]
+async fn hai_khach_khong_ro_ri_token_mail_mang_khach() {
+    TestDatabase::run(async |test| {
+        let mailer = Arc::new(FakeMailer::default());
+        let shared: Arc<dyn Mailer> = mailer.clone();
+        let all = [
+            "comments.post",
+            "comments.read",
+            "comments.moderate",
+            "comments.manage",
+            "comments.export",
+        ];
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_ANTISPAM_MIN_FILL_SECONDS", "0")
+            .setting("AUTOXIDE_COMMENTS_VERIFY_URL", "https://www.example.com/verify?token={token}")
+            .setting(
+                "AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL",
+                "https://www.example.com/stop?token={token}",
+            )
+            .tenant("a")
+            .tenant_dedicated("b")
+            .user_in("a", "admin-a", 1, &all)
+            .user_in("b", "admin-b", 2, &all)
+            .provide::<dyn Mailer>(shared)
+            .module(TestContent)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let marker = "marker-comments-a";
+        let in_a = [("autoxide-tenant", "a")];
+
+        // Người của khách A bình luận (người kiểm duyệt: hiện ngay), báo cáo, cấm.
+        let named = send(&app, "PUT", "/comments/profile", Some("admin-a"), &[], Some(json!({"display_name": "Ada"}))).await;
+        assert_eq!(named.status(), StatusCode::OK, "{}", named.json());
+        let body = json!({"target_type": "content.entry", "target_id": "public-1", "body": format!("Hello {marker}")});
+        let posted = send(&app, "POST", "/comments/public/comments", Some("admin-a"), &[], Some(body)).await;
+        assert_eq!(posted.status(), StatusCode::CREATED, "{}", posted.json());
+        assert_eq!(posted.json()["data"]["status"], "published");
+        let comment_id = posted.json()["data"]["id"].as_str().unwrap().to_owned();
+        let report = json!({"reason": "abuse", "note": marker});
+        let reported = send(&app, "POST", &format!("/comments/public/comments/{comment_id}/reports"), Some("admin-a"), &[], Some(report)).await;
+        assert_eq!(reported.status(), StatusCode::OK, "{}", reported.json());
+        let ban = json!({"kind": "email", "value": "bad@example.com", "reason": marker});
+        let ban = send(&app, "POST", "/comments/bans", Some("admin-a"), &[], Some(ban)).await;
+        assert_eq!(ban.status(), StatusCode::CREATED, "{}", ban.json());
+        let ban_id = ban.json()["data"]["id"].as_str().unwrap().to_owned();
+
+        // Khách vãng lai ở website của khách A, xin mail báo trả lời.
+        let issued = send(&app, "GET", "/antispam/token?scope=comments:content.entry", None, &in_a, None).await;
+        assert_eq!(issued.status(), StatusCode::OK, "{}", issued.json());
+        let token = issued.json()["data"]["token"].as_str().unwrap().to_owned();
+        let mut guest = comment(&token, "Guest", "guest@example.com", &format!("Question {marker}"));
+        guest["notify_replies"] = json!(true);
+        let held = send(&app, "POST", "/comments/public/comments", None, &in_a, Some(guest)).await;
+        assert_eq!(held.status(), StatusCode::CREATED, "{}", held.json());
+        let guest_id = held.json()["data"]["id"].as_str().unwrap().to_owned();
+        let mail = mailer.sent().into_iter().find(|mail| mail.to == "guest@example.com").unwrap();
+        let start = mail.text.find("token=").unwrap() + "token=".len();
+        let link: String = mail.text[start..]
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+            .collect();
+        let id_of = async |slug: &str| app.tenant(slug).await.unwrap().id().as_uuid().simple();
+        let (a_id, b_id) = (id_of("a").await, id_of("b").await);
+        assert!(link.starts_with(&format!("t{a_id}.")), "{link}");
+        let raw = link.rsplit('.').next().unwrap();
+        let verify = async |token: String| {
+            send(&app, "POST", "/comments/public/verify", None, &[], Some(json!({"token": token}))).await
+        };
+        let forged = verify(format!("t{b_id}.{raw}")).await;
+        assert_eq!((forged.status(), forged.code().as_deref()), (StatusCode::BAD_REQUEST, Some("comments.link_invalid")));
+        let verified = verify(link.clone()).await;
+        assert_eq!(verified.status(), StatusCode::OK, "{}", verified.json());
+        let one = send(&app, "GET", &format!("/comments/{guest_id}"), Some("admin-a"), &[], None).await;
+        assert_eq!(one.json()["data"]["email_verified"], true, "{}", one.json());
+
+        // Người của khách B không thấy gì của khách A.
+        let missing = send(&app, "GET", &format!("/comments/{comment_id}"), Some("admin-b"), &[], None).await;
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND, "{}", missing.json());
+        let seeded = [
+            ("id", comment_id.clone()),
+            ("id", guest_id),
+            ("id", ban_id),
+        ];
+        let violations = autoxide_testkit::leak_check(&app, "admin-b", marker, &seeded).await.unwrap();
+        assert_eq!(violations, Vec::<String>::new());
+    })
+    .await
+    .unwrap();
+}

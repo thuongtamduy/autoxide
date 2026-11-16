@@ -14,6 +14,8 @@ mod redirects;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_tenancy;
+#[cfg(test)]
 mod tests_web;
 
 use std::collections::HashMap;
@@ -76,6 +78,7 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(public::resolve))
         .routes(routes!(public::list_posts))
         .routes(routes!(public::get_menu))
+        .routes(routes!(public::list_terms))
         .routes(routes!(public::get_term))
         .routes(routes!(public::get_author))
         .routes(routes!(public::sitemap))

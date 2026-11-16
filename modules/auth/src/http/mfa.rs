@@ -8,6 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -103,9 +104,10 @@ pub(crate) struct CodeRequest {
 )]
 async fn mfa_status(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<MfaStatusResponse>, Error> {
-    Ok(Data { data: state.mfa.status(principal.user_id()).await?.into() })
+    Ok(Data { data: state.mfa.status(&tenant, principal.user_id()).await?.into() })
 }
 
 /// Start turning on two-step sign-in with an authenticator app.
@@ -132,11 +134,13 @@ async fn mfa_status(
 )]
 async fn start_totp(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<StartTotpRequest>,
 ) -> Result<Data<TotpSetupResponse>, Error> {
     require_session(&principal)?;
-    let setup = state.sessions.start_totp(principal.user_id(), &input.current_password).await?;
+    let setup =
+        state.sessions.start_totp(&tenant, principal.user_id(), &input.current_password).await?;
     Ok(Data { data: TotpSetupResponse { secret: setup.secret, otpauth_url: setup.otpauth_url } })
 }
 
@@ -161,11 +165,12 @@ async fn start_totp(
 )]
 async fn confirm_totp(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CodeRequest>,
 ) -> Result<Data<RecoveryCodesResponse>, Error> {
     require_session(&principal)?;
-    let recovery_codes = state.mfa.confirm_totp(principal.user_id(), &input.code).await?;
+    let recovery_codes = state.mfa.confirm_totp(&tenant, principal.user_id(), &input.code).await?;
     Ok(Data { data: RecoveryCodesResponse { recovery_codes } })
 }
 
@@ -190,12 +195,13 @@ async fn confirm_totp(
 )]
 async fn regenerate_recovery_codes(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CodeRequest>,
 ) -> Result<Data<RecoveryCodesResponse>, Error> {
     require_session(&principal)?;
     let recovery_codes =
-        state.mfa.regenerate_recovery_codes(principal.user_id(), &input.code).await?;
+        state.mfa.regenerate_recovery_codes(&tenant, principal.user_id(), &input.code).await?;
     Ok(Data { data: RecoveryCodesResponse { recovery_codes } })
 }
 
@@ -220,12 +226,13 @@ async fn regenerate_recovery_codes(
 )]
 async fn disable_totp(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CodeRequest>,
 ) -> Result<Data<MfaStatusResponse>, Error> {
     require_session(&principal)?;
-    state.mfa.disable_totp(principal.user_id(), &input.code).await?;
-    Ok(Data { data: state.mfa.status(principal.user_id()).await?.into() })
+    state.mfa.disable_totp(&tenant, principal.user_id(), &input.code).await?;
+    Ok(Data { data: state.mfa.status(&tenant, principal.user_id()).await?.into() })
 }
 
 /// Turn off two-step sign-in for a user who lost their device.
@@ -248,13 +255,14 @@ async fn disable_totp(
 )]
 async fn reset_user_mfa(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     principal.require(&USERS_MANAGE)?;
-    state.users.get(id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
-    state.roles.require_covers(&principal, id).await?;
-    state.mfa.reset(Actor::from(&principal), id).await?;
+    state.users.get(&tenant, id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
+    state.roles.require_covers(&tenant, &principal, id).await?;
+    state.mfa.reset(&tenant, Actor::from(&principal), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::Deserialize;
@@ -68,10 +69,11 @@ pub(crate) struct EmailChangeReport {
 )]
 async fn resend_verification(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     language: Language,
 ) -> Result<StatusCode, Error> {
-    state.verifications.send_current(principal.user_id(), language).await?;
+    state.verifications.send_current(&tenant, principal.user_id(), language).await?;
     Ok(StatusCode::ACCEPTED)
 }
 
@@ -103,6 +105,7 @@ async fn resend_verification(
 )]
 async fn change_email(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     language: Language,
     ValidJson(input): ValidJson<ChangeEmailRequest>,
@@ -110,7 +113,13 @@ async fn change_email(
     super::require_session(&principal)?;
     state
         .verifications
-        .change_email(principal.user_id(), &input.current_password, &input.new_email, language)
+        .change_email(
+            &tenant,
+            principal.user_id(),
+            &input.current_password,
+            &input.new_email,
+            language,
+        )
         .await?;
     Ok(StatusCode::ACCEPTED)
 }
@@ -134,9 +143,10 @@ async fn change_email(
 )]
 async fn cancel_email_change(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<StatusCode, Error> {
-    state.verifications.cancel_change(principal.user_id()).await?;
+    state.verifications.cancel_change(&tenant, principal.user_id()).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -145,7 +155,7 @@ async fn cancel_email_change(
 /// Needs no sign-in: the token proves the mail was received. When the token was sent
 /// for a new address (`POST /api/v1/auth/me/email`), the account's email becomes that
 /// address; sign in with it from now on. Every other verification token of the
-/// account stops working.
+/// account stops working. Needs no tenant header: the token names its tenant.
 #[utoipa::path(
     post,
     path = "/email-verification/confirm",
@@ -161,11 +171,14 @@ async fn cancel_email_change(
 )]
 async fn confirm_email(
     State(state): State<Arc<HttpState>>,
+    OptionalTenant(tenant): OptionalTenant,
     language: Language,
     ValidJson(input): ValidJson<VerificationConfirmation>,
 ) -> Result<Data<UserResponse>, Error> {
-    let user = state.verifications.confirm(&input.token, language).await?;
-    Ok(Data { data: super::users::describe(&state.users, user).await? })
+    // Khách lấy từ token trong link: chạy cả trên tên miền chính không header.
+    let (tenant, user) =
+        state.verifications.confirm(tenant.as_ref(), &input.token, language).await?;
+    Ok(Data { data: super::users::describe(&state.users, &tenant, user).await? })
 }
 
 /// Report an email change you did not make.
@@ -176,6 +189,7 @@ async fn confirm_email(
 /// keys, passkeys, two-step sign-in and pending tokens removed. When no other account took
 /// the old address meanwhile, the email goes back to it and a mail to choose a new password
 /// is sent there (in the language of `Accept-Language`); otherwise ask an administrator.
+/// Needs no tenant header: the token names its tenant.
 #[utoipa::path(
     post,
     path = "/email-change/report",
@@ -190,10 +204,12 @@ async fn confirm_email(
 )]
 async fn report_email_change(
     State(state): State<Arc<HttpState>>,
+    OptionalTenant(tenant): OptionalTenant,
     language: Language,
     ValidJson(input): ValidJson<EmailChangeReport>,
 ) -> Result<StatusCode, Error> {
-    state.verifications.report(&input.token, language).await?;
+    // Khách lấy từ token trong link: chạy cả trên tên miền chính không header.
+    state.verifications.report(tenant.as_ref(), &input.token, language).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

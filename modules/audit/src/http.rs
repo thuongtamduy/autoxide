@@ -154,7 +154,7 @@ async fn list_entries(
         action: filter.action,
         module: filter.module,
     };
-    let page = service.list(filter, &PageRequest::try_from(page)?).await?;
+    let page = service.list(&tenant, filter, &PageRequest::try_from(page)?).await?;
     if !with_actor {
         return Ok(page.map(AuditEntryResponse::from));
     }
@@ -187,11 +187,12 @@ async fn list_entries(
 )]
 async fn get_entry(
     State(service): State<Arc<AuditService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<AuditEntryResponse>, Error> {
     principal.require(&AUDIT_READ)?;
-    Ok(Data { data: service.get(id).await?.into() })
+    Ok(Data { data: service.get(&tenant, id).await?.into() })
 }
 
 #[cfg(test)]
@@ -202,6 +203,7 @@ mod tests {
     use autoxide_testkit::{TestApp, TestDatabase};
     use axum::http::StatusCode;
     use chrono::SubsecRound;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
     use serde_json::json;
 
     /// `Bearer auditor` có `audit.read`; `Bearer nobody` không có gì.
@@ -213,13 +215,13 @@ mod tests {
             .build()
             .await
             .unwrap();
-        let recorder = crate::recorder::Recorder::new(app.database().clone());
+        let recorder = crate::recorder::Recorder;
         (app, recorder)
     }
 
     fn event(database: &Database, name: &str, actor: Uuid, subject: &str) -> Delivered {
         Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+            autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()).default_tenant(),
             "auth",
             name.to_owned(),
             json!({"before": {"name": "a"}, "after": {"name": "b"}}),
@@ -328,7 +330,7 @@ mod tests {
                 .build()
                 .await
                 .unwrap();
-            let recorder = crate::recorder::Recorder::new(app.database().clone());
+            let recorder = crate::recorder::Recorder;
             let gone = Uuid::now_v7();
             recorder
                 .handle(&event(app.database(), "auth.user_updated", ada, "auth.user:1"))
@@ -346,6 +348,87 @@ mod tests {
             assert!(page["data"][1]["actor_name"].is_null(), "{page}");
             let (_, plain) = get(&app, "/api/v1/audit", "auditor").await;
             assert!(plain["data"][0].get("actor_name").is_none());
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Bước 33 (D-276): mỗi khách một chuỗi băm (khách trên database chung và khách có database
+    /// riêng), `doctor` kiểm từng chuỗi; người của khách này không đọc được audit của khách kia.
+    #[tokio::test]
+    async fn chuoi_rieng_moi_khach_va_doctor_kiem_tung_khach() {
+        TestDatabase::run(async |test| {
+            use autoxide_kernel::doctor::{Probe as _, Status};
+            let app = TestApp::builder(test)
+                .tenant("a")
+                .tenant_dedicated("b")
+                .user_in("a", "auditor-a", 1, &["audit.read"])
+                .user_in("b", "auditor-b", 2, &["audit.read"])
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
+            let marker = "MARKER-a-7f3";
+            let mut seeded = Vec::new();
+            for (tenant, subject) in [
+                (&a, format!("auth.user:{marker}")),
+                (&a, "x:1".to_owned()),
+                (&b, "x:2".to_owned()),
+            ] {
+                let event = Delivered::new(
+                    tenant.clone(),
+                    "auth",
+                    "auth.user_updated".to_owned(),
+                    json!({}),
+                )
+                .actor(Actor::user(Uuid::now_v7()))
+                .subject(Some(subject))
+                .occurred_at(Utc::now().trunc_subsecs(6));
+                if tenant.id() == a.id() {
+                    seeded.push(("id", event.id.to_string()));
+                }
+                crate::recorder::Recorder.handle(&event).await.unwrap();
+            }
+            for (tenant, expected) in [(&a, 2), (&b, 1)] {
+                let rows = crate::entity::Entity::find()
+                    .filter(crate::entity::Column::TenantId.eq(tenant.id().as_uuid()))
+                    .all(tenant.database().read())
+                    .await
+                    .unwrap();
+                let mut sequences: Vec<_> = rows.iter().filter_map(|row| row.sequence).collect();
+                sequences.sort_unstable();
+                assert_eq!(
+                    sequences,
+                    (1..=expected).collect::<Vec<i64>>(),
+                    "each tenant counts from 1"
+                );
+            }
+            let probe = crate::chain::ChainProbe { databases: app.registry().clone() };
+            let finding = probe.probe().await;
+            assert_eq!(finding.status, Status::Ok, "{finding:?}");
+            assert!(finding.message.contains("3 entries"), "{finding:?}");
+
+            let (status, page) = get(&app, "/api/v1/audit", "auditor-b").await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(page["data"].as_array().unwrap().len(), 1);
+            let violations =
+                autoxide_testkit::leak_check(&app, "auditor-b", marker, &seeded).await.unwrap();
+            assert_eq!(violations, Vec::<String>::new());
+
+            // Sửa một dòng của `a`: doctor báo đúng khách.
+            crate::entity::Entity::update_many()
+                .col_expr(
+                    crate::entity::Column::Action,
+                    sea_orm::sea_query::Expr::value("auth.forged"),
+                )
+                .filter(crate::entity::Column::TenantId.eq(a.id().as_uuid()))
+                .exec(a.database().write())
+                .await
+                .unwrap();
+            let finding = probe.probe().await;
+            assert_eq!(finding.status, Status::Failed);
+            assert!(finding.message.contains(&a.id().as_uuid().to_string()), "{finding:?}");
         })
         .await
         .unwrap();

@@ -214,6 +214,17 @@ async fn request_id_duoc_sinh_va_tra_lai() {
     assert!(response.headers().contains_key("x-request-id"));
 }
 
+/// Khách chọn được bằng header `autoxide-tenant`: mọi response (cả lỗi) báo cho cache dùng chung
+/// phải tách bản lưu theo header đó.
+#[tokio::test]
+async fn moi_response_vary_theo_header_khach() {
+    for uri in ["/api/v1/notes", "/nowhere"] {
+        let response = send(app(), get(uri)).await;
+        let vary: Vec<_> = response.headers().get_all("vary").iter().collect();
+        assert!(vary.iter().any(|value| *value == "autoxide-tenant"), "{uri}: {vary:?}");
+    }
+}
+
 #[tokio::test]
 async fn request_id_cua_client_duoc_giu_neu_hop_le() {
     let with_id = |id: &str| {

@@ -1,5 +1,10 @@
 //! Endpoint công khai (không cần đăng nhập, `/public/…`) và tên hiển thị của người dùng
 //! (`/profile`). Không bao giờ trả email, dấu vết IP, lý do giữ lại hay bình luận chưa hiện.
+//!
+//! Endpoint nhận token trong link của mail (xác minh email, thôi nhận mail báo) lấy khách TỪ TOKEN
+//! khi token mang khách (`autoxide_kernel::tenancy::link_token`): người nhận bấm link có thể tới tên
+//! miền chính, không header `Autoxide-Tenant`. Vì vậy chúng nhận [`OptionalTenant`] thay cho
+//! `TenantContext`.
 
 use std::sync::Arc;
 
@@ -8,6 +13,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::{ClientInfo, ValidJson};
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use autoxide_kernel::version::Tagged;
 use axum::extract::{Path, Query, State};
 use chrono::{DateTime, Utc};
@@ -147,6 +153,7 @@ fn target_of(
 )]
 pub(crate) async fn list_thread(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<ThreadQuery>,
     Query(paging): Query<PageQuery>,
@@ -180,7 +187,7 @@ pub(crate) async fn list_thread(
         );
     }
     let page = page_request(paging, problems)?;
-    Ok(service.thread(&kind, &id, &page, replies, search).await?.map(ThreadComment::from))
+    Ok(service.thread(&tenant, &kind, &id, &page, replies, search).await?.map(ThreadComment::from))
 }
 
 /// Get a comment (public).
@@ -201,10 +208,11 @@ pub(crate) async fn list_thread(
 )]
 pub(crate) async fn get_public_comment(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Path(id): Path<Uuid>,
 ) -> Result<Data<PublicComment>, Error> {
-    Ok(Data { data: service.public_comment(id).await?.into() })
+    Ok(Data { data: service.public_comment(&tenant, id).await?.into() })
 }
 
 /// List the replies of a comment (public).
@@ -226,13 +234,14 @@ pub(crate) async fn get_public_comment(
 )]
 pub(crate) async fn list_replies(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Path(id): Path<Uuid>,
     Query(mut paging): Query<PageQuery>,
 ) -> Result<Page<PublicComment>, Error> {
     paging.order = oldest_first(paging.order.as_deref());
     let page = page_request(paging, Vec::new())?;
-    Ok(service.replies(id, &page).await?.map(PublicComment::from))
+    Ok(service.replies(&tenant, id, &page).await?.map(PublicComment::from))
 }
 
 /// A new comment.
@@ -300,6 +309,7 @@ pub(crate) struct CreateCommentRequest {
 )]
 pub(crate) async fn create_comment(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     client: ClientInfo,
     ValidJson(input): ValidJson<CreateCommentRequest>,
@@ -318,7 +328,7 @@ pub(crate) async fn create_comment(
         trap: input.trap,
         challenge: input.challenge,
     };
-    let posted = service.post(principal.as_ref(), &client, new).await?;
+    let posted = service.post(&tenant, principal.as_ref(), &client, new).await?;
     let id = posted.comment.row.id;
     Ok(Created::new(
         format!("/comments/public/comments/{id}"),
@@ -364,12 +374,20 @@ pub(crate) struct EditCommentRequest {
 )]
 pub(crate) async fn edit_comment(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<EditCommentRequest>,
 ) -> Result<Data<EditedComment>, Error> {
     let found = service
-        .edit(principal.as_ref(), id, input.edit_token.as_deref(), &input.body, input.format)
+        .edit(
+            &tenant,
+            principal.as_ref(),
+            id,
+            input.edit_token.as_deref(),
+            &input.body,
+            input.format,
+        )
         .await?;
     Ok(Data { data: found.into() })
 }
@@ -405,11 +423,12 @@ pub(crate) struct DeleteOwnRequest {
 )]
 pub(crate) async fn delete_own_comment(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<DeleteOwnRequest>,
 ) -> Result<Data<DeletedResponse>, Error> {
-    service.delete_own(principal.as_ref(), id, input.edit_token.as_deref()).await?;
+    service.delete_own(&tenant, principal.as_ref(), id, input.edit_token.as_deref()).await?;
     Ok(Data { data: DeletedResponse { deleted: true } })
 }
 
@@ -458,12 +477,15 @@ pub(crate) struct ReportedResponse {
 )]
 pub(crate) async fn report_comment(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     client: ClientInfo,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<ReportRequest>,
 ) -> Result<Data<ReportedResponse>, Error> {
-    service.report(principal.as_ref(), &client, id, input.reason, input.note.as_deref()).await?;
+    service
+        .report(&tenant, principal.as_ref(), &client, id, input.reason, input.note.as_deref())
+        .await?;
     Ok(Data { data: ReportedResponse { received: true } })
 }
 
@@ -507,6 +529,7 @@ pub(crate) struct CommentCount {
 )]
 pub(crate) async fn count_comments(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<CountsQuery>,
 ) -> Result<Data<Vec<CommentCount>>, Error> {
@@ -529,7 +552,7 @@ pub(crate) async fn count_comments(
     }
     let ids: Vec<String> =
         ids.split(',').map(str::trim).filter(|id| !id.is_empty()).map(str::to_owned).collect();
-    let counts = service.counts(&kind, &ids).await?;
+    let counts = service.counts(&tenant, &kind, &ids).await?;
     Ok(Data {
         data: counts
             .into_iter()
@@ -559,10 +582,11 @@ pub(crate) async fn count_comments(
 )]
 pub(crate) async fn get_public_target(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Path((kind, id)): Path<(String, String)>,
 ) -> Result<Data<TargetResponse>, Error> {
-    Ok(Data { data: TargetResponse::new(service.target(&kind, &id).await?, false) })
+    Ok(Data { data: TargetResponse::new(service.target(&tenant, &kind, &id).await?, false) })
 }
 
 /// A token from a mail link.
@@ -570,7 +594,7 @@ pub(crate) async fn get_public_target(
 #[serde(deny_unknown_fields)]
 #[schema(as = CommentMailToken)]
 pub(crate) struct TokenRequest {
-    /// The `token` of the link.
+    /// The `token` of the link, exactly as received (it may contain a `.`).
     token: String,
 }
 
@@ -584,7 +608,8 @@ pub(crate) struct VerifiedResponse {
 ///
 /// The page at `AUTOXIDE_COMMENTS_VERIFY_URL` sends the token of the mail link here (a `POST`,
 /// so mail scanners opening the link change nothing). From then on, the address gets a mail
-/// when that comment receives a shown reply.
+/// when that comment receives a shown reply. The token tells the tenant: the call works on any
+/// host of the API, without `Autoxide-Tenant`.
 #[utoipa::path(
     post,
     path = "/public/verify",
@@ -599,9 +624,10 @@ pub(crate) struct VerifiedResponse {
 )]
 pub(crate) async fn verify_email(
     State(service): State<Arc<CommentsService>>,
+    tenant: OptionalTenant,
     ValidJson(input): ValidJson<TokenRequest>,
 ) -> Result<Data<VerifiedResponse>, Error> {
-    service.verify(&input.token).await?;
+    service.verify(tenant.get(), &input.token).await?;
     Ok(Data { data: VerifiedResponse { verified: true } })
 }
 
@@ -609,7 +635,7 @@ pub(crate) async fn verify_email(
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UnsubscribeRequest {
-    /// The `token` of the link in a reply mail.
+    /// The `token` of the link in a reply mail, exactly as received (it may contain a `.`).
     token: String,
     /// Stop mails about every comment followed with this address, not just this one.
     #[serde(default)]
@@ -627,7 +653,8 @@ pub(crate) struct UnsubscribedResponse {
 /// Stop reply mails (public).
 ///
 /// The page at `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` sends the token of the link in a reply mail
-/// here. Takes effect at once.
+/// here. Takes effect at once. The token tells the tenant: the call works on any host of the
+/// API, without `Autoxide-Tenant`.
 #[utoipa::path(
     post,
     path = "/public/unsubscribe",
@@ -639,9 +666,10 @@ pub(crate) struct UnsubscribedResponse {
 )]
 pub(crate) async fn unsubscribe(
     State(service): State<Arc<CommentsService>>,
+    tenant: OptionalTenant,
     ValidJson(input): ValidJson<UnsubscribeRequest>,
 ) -> Result<Data<UnsubscribedResponse>, Error> {
-    service.unsubscribe(&input.token, input.all).await?;
+    service.unsubscribe(tenant.get(), &input.token, input.all).await?;
     Ok(Data { data: UnsubscribedResponse { unsubscribed: true } })
 }
 
@@ -671,9 +699,10 @@ pub(crate) struct ProfileResponse {
 )]
 pub(crate) async fn get_profile(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<ProfileResponse>, Error> {
-    let found = service.profile(&principal).await?;
+    let found = service.profile(&tenant, &principal).await?;
     Ok(Data {
         data: ProfileResponse {
             updated_at: found.as_ref().map(|profile| profile.updated_at),
@@ -712,10 +741,11 @@ pub(crate) struct ProfileRequest {
 )]
 pub(crate) async fn set_profile(
     State(service): State<Arc<CommentsService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<ProfileRequest>,
 ) -> Result<Tagged<ProfileResponse>, Error> {
-    let saved = service.set_profile(&principal, &input.display_name).await?;
+    let saved = service.set_profile(&tenant, &principal, &input.display_name).await?;
     Ok(Tagged {
         version: saved.updated_at,
         data: ProfileResponse {

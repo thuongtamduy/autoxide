@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -72,16 +73,17 @@ pub(crate) struct AllApiKeysQuery {
 )]
 async fn list_all_api_keys(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(filter): Query<AllApiKeysQuery>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<ManagedApiKeyResponse>, Error> {
     let page = PageRequest::try_from(query)?;
-    let page = state.api_keys.list_all(&principal, filter.user_id, &page).await?;
+    let page = state.api_keys.list_all(&tenant, &principal, filter.user_id, &page).await?;
     let mut owners: Vec<Uuid> = page.data.iter().map(|key| key.user_id).collect();
     owners.sort_unstable();
     owners.dedup();
-    let users = state.users.by_ids(&owners).await?;
+    let users = state.users.by_ids(&tenant, &owners).await?;
     Ok(page.map(|key| {
         let owner = users.get(&key.user_id);
         ManagedApiKeyResponse {
@@ -113,10 +115,11 @@ async fn list_all_api_keys(
 )]
 async fn revoke_any_api_key(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    state.api_keys.revoke_any(&principal, id).await?;
+    state.api_keys.revoke_any(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -127,8 +130,10 @@ pub(crate) struct ApiKeyResponse {
     /// What the key is for.
     #[schema(example = "nightly report agent")]
     name: String,
-    /// The first characters of the key, to recognize it.
-    #[schema(example = "axk_3q9ZbXcV")]
+    /// A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+    /// key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+    /// their first 12 characters.
+    #[schema(example = "axk1_…3q9ZbXcV")]
     prefix: String,
     /// Permissions the key may use, sorted by name. The key never has more than its
     /// owner has at the moment of the request.
@@ -158,9 +163,11 @@ impl From<ApiKey> for ApiKeyResponse {
 /// A new API key, with its secret. The secret is shown only here.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(crate) struct CreatedApiKeyResponse {
-    /// The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be
-    /// shown again.
-    #[schema(example = "axk_3q9ZbXcV…")]
+    /// The key. Send it as `Authorization: Bearer <key>`; no other header is needed: the key
+    /// names its tenant. Store it now: it cannot be shown again. Shape: `axk1_`, the tenant ID
+    /// (32 lowercase hex digits), `_`, then a random part. Keys created in older versions start
+    /// with `axk_` and keep working.
+    #[schema(example = "axk1_0193c5c0d2f87b2a9e4f6a1b2c3d4e5f_3q9ZbXcV…")]
     key: String,
     #[serde(flatten)]
     details: ApiKeyResponse,
@@ -242,10 +249,12 @@ impl From<CreatedApiKey> for CreatedApiKeyResponse {
 )]
 async fn list_api_keys(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<ApiKeyResponse>, Error> {
-    let page = state.api_keys.list(principal.user_id(), &PageRequest::try_from(query)?).await?;
+    let page =
+        state.api_keys.list(&tenant, principal.user_id(), &PageRequest::try_from(query)?).await?;
     Ok(page.map(ApiKeyResponse::from))
 }
 
@@ -275,10 +284,11 @@ async fn list_api_keys(
 )]
 async fn create_api_key(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateApiKeyRequest>,
 ) -> Result<Created<CreatedApiKeyResponse>, Error> {
-    let created = state.api_keys.create(&principal, input.into()).await?;
+    let created = state.api_keys.create(&tenant, &principal, input.into()).await?;
     Ok(Created::new(format!("/auth/api-keys/{}", created.key.id), created.into()))
 }
 
@@ -300,16 +310,16 @@ async fn create_api_key(
 )]
 async fn revoke_api_key(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    state.api_keys.revoke(&principal, id).await?;
+    state.api_keys.revoke(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]
 mod tests {
-    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -327,7 +337,7 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), &TenantContext::legacy_default(&services.database), root).await.unwrap();
+            Accounts::create(services.users.as_ref(), &services.tenant, root).await.unwrap();
             let session = bearer(&app, "root@example.com", PASSWORD).await;
 
             // Thiếu hay sai mật khẩu hiện tại: không tạo được (token lộ không đủ).
@@ -345,7 +355,7 @@ mod tests {
             // Secret chỉ trả một lần: không ai được lưu response (D-149).
             assert_eq!(headers["cache-control"], "no-store");
             let key = created["data"]["key"].as_str().unwrap().to_owned();
-            assert!(key.starts_with("axk_"));
+            assert!(key.starts_with("axk1_"), "{key}");
             assert_eq!(created["data"]["permissions"], json!(["auth.users.read"]));
             let id = created["data"]["id"].as_str().unwrap().to_owned();
 
@@ -364,7 +374,8 @@ mod tests {
             let (status, _, list) = call(&app, "GET", "/api-keys", Some(&session), None).await;
             assert_eq!(status, StatusCode::OK, "{list}");
             assert!(list["data"][0].get("key").is_none());
-            assert_eq!(list["data"][0]["prefix"], json!(&key[..12]));
+            // `axk1_` + ID khách (32 hex) + `_`: phần nhận diện là đầu phần ngẫu nhiên.
+            assert_eq!(list["data"][0]["prefix"], json!(format!("axk1_…{}", &key[38..46])));
 
             let path = format!("/api-keys/{id}");
             let (status, _, _) = call(&app, "DELETE", &path, Some(&session), None).await;

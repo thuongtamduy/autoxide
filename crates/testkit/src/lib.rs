@@ -33,6 +33,7 @@
 pub mod ai;
 mod app;
 mod contract;
+mod dns;
 mod leak;
 mod ownership;
 mod postgres;
@@ -44,14 +45,15 @@ mod storage;
 mod tenancy;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
-pub use leak::leak_check;
+pub use dns::FakeDns;
+pub use leak::{cursor_leak_check, leak_check};
 pub use ownership::schema_ownership_violations;
 pub use s3::{
     TEST_S3_ACCESS_KEY_ID, TEST_S3_BUCKET, TEST_S3_ENDPOINT, TEST_S3_SECRET_ACCESS_KEY, s3_settings,
 };
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
-pub use storage::MemoryStorage;
-pub use tenancy::{PENDING_TENANCY, schema_tenancy_violations};
+pub use storage::{MemoryStorage, MemoryStorageOpener};
+pub use tenancy::schema_tenancy_violations;
 
 use std::fmt;
 use std::path::PathBuf;

@@ -8,7 +8,6 @@
 use std::sync::Arc;
 
 use autoxide_kernel::antispam::SpamGuard;
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::i18n::Translations;
@@ -17,6 +16,7 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::public_url::PublicUrl;
 use autoxide_kernel::resource::ResourceDirectory;
 use autoxide_kernel::secret::SecretKey;
+use autoxide_kernel::tenancy::DatabaseRegistry;
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{DbErr, SqlErr};
@@ -26,8 +26,8 @@ use crate::config::NewsletterConfig;
 
 pub(crate) const MODULE: &str = "newsletter";
 
+// Service không giữ database: mỗi hàm nhận `tenant` và dùng database của khách đó (bước 33).
 pub(crate) struct NewsletterService {
-    pub(crate) database: Database,
     pub(crate) outbox: Outbox,
     pub(crate) guard: Arc<SpamGuard>,
     pub(crate) secret: SecretKey,
@@ -37,12 +37,13 @@ pub(crate) struct NewsletterService {
     pub(crate) tokens: OneTimeTokens,
     pub(crate) public_url: Arc<PublicUrl>,
     pub(crate) resources: ResourceDirectory,
+    /// Sổ database: token trong link mang khách của nó (`autoxide_kernel::tenancy::link_token`).
+    pub(crate) databases: DatabaseRegistry,
     pub(crate) config: NewsletterConfig,
 }
 
 /// Thứ service cần từ kernel và module khác.
 pub(crate) struct Parts {
-    pub database: Database,
     pub outbox: Outbox,
     pub guard: Arc<SpamGuard>,
     pub secret: SecretKey,
@@ -51,12 +52,12 @@ pub(crate) struct Parts {
     pub jobs: JobQueue,
     pub public_url: Arc<PublicUrl>,
     pub resources: ResourceDirectory,
+    pub databases: DatabaseRegistry,
 }
 
 impl NewsletterService {
     pub(crate) fn new(parts: Parts, config: NewsletterConfig) -> Self {
         NewsletterService {
-            database: parts.database,
             outbox: parts.outbox,
             guard: parts.guard,
             secret: parts.secret,
@@ -66,6 +67,7 @@ impl NewsletterService {
             tokens: OneTimeTokens::new(MODULE),
             public_url: parts.public_url,
             resources: parts.resources,
+            databases: parts.databases,
             config,
         }
     }

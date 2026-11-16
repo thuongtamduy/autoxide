@@ -183,6 +183,9 @@ impl LegacyMenus for FakeLegacy {
 pub(crate) struct Harness {
     pub service: Arc<MenuService>,
     pub legacy: Arc<FakeLegacy>,
+    pub database: Database,
+    /// Khách mặc định trên database của test.
+    pub tenant: TenantContext,
 }
 
 /// Service trên database (đã migrate) của test, ngôn ngữ `en` (mặc định) và `vi`.
@@ -203,13 +206,10 @@ pub(crate) async fn harness(test: &TestDatabase) -> Harness {
         media: Arc::new(FakeMedia),
         legacy: Some(legacy.clone()),
     };
-    let service = MenuService::new(
-        database,
-        Outbox::standalone("menus"),
-        dependencies,
-        MenusConfig::default(),
-    );
-    Harness { service: Arc::new(service), legacy }
+    let service =
+        MenuService::new(Outbox::standalone("menus"), dependencies, MenusConfig::default());
+    let tenant = TenantContext::default_on(database.clone());
+    Harness { service: Arc::new(service), legacy, database, tenant }
 }
 
 /// Người quản trị menu.

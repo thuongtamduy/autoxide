@@ -158,7 +158,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "List media items (images, video, audio, documents), newest first. Filter by \
              folder, type, visibility, trash, name or missing alt text; sort by `created_at`, `name` or `size`. \
              Follow `pagination.next_cursor` with the same filters for more.",
-            move |_tenant: TenantContext, principal: Principal, input: ListMediaInput| {
+            move |tenant: TenantContext, principal: Principal, input: ListMediaInput| {
                 let service = list.clone();
                 async move {
                     let query = ItemsQuery {
@@ -176,8 +176,8 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                     let mut problems = Vec::new();
                     let filter = query.filter(&mut problems);
                     let page = crate::http::page_request(paging, problems)?;
-                    let page = service.list(&principal, &filter, &page).await?;
-                    crate::http::page_of(&service, page).await
+                    let page = service.list(&tenant, &principal, &filter, &page).await?;
+                    crate::http::page_of(&service, &tenant, page).await
                 }
             },
         )
@@ -187,11 +187,11 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "get",
             "Get a media item: name, type, size, image width and height, texts, visibility, \
              and the `url` of its content.",
-            move |_tenant: TenantContext, principal: Principal, input: MediaId| {
+            move |tenant: TenantContext, principal: Principal, input: MediaId| {
                 let service = get.clone();
                 async move {
-                    let item = service.get(&principal, input.id).await?;
-                    crate::http::describe(&service, item).await
+                    let item = service.get(&tenant, &principal, input.id).await?;
+                    crate::http::describe(&service, &tenant, item).await
                 }
             },
         )
@@ -202,7 +202,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "Change the details of a media item: name, alt text, title, caption, decorative \
              flag, folder or visibility. Pass the `updated_at` you read; the change is refused if someone \
              changed the item since.",
-            move |_tenant: TenantContext, principal: Principal, input: UpdateMediaInput| {
+            move |tenant: TenantContext, principal: Principal, input: UpdateMediaInput| {
                 let service = update.clone();
                 async move {
                     let visibility = match input.visibility.as_deref() {
@@ -228,9 +228,9 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         tags: input.tags,
                     };
                     let item = service
-                        .update(&principal, input.id, changes, Some(input.updated_at))
+                        .update(&tenant, &principal, input.id, changes, Some(input.updated_at))
                         .await?;
-                    crate::http::describe(&service, item).await
+                    crate::http::describe(&service, &tenant, item).await
                 }
             },
         )
@@ -241,11 +241,12 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
              language, e.g. `vi` on a bilingual site; the item's own `alt` stays the default for \
              other languages. Pass the `updated_at` you read; the change is refused if someone \
              changed the item since.",
-            move |_tenant: TenantContext, principal: Principal, input: SetAltInput| {
+            move |tenant: TenantContext, principal: Principal, input: SetAltInput| {
                 let service = set_alt.clone();
                 async move {
                     let item = service
                         .set_alt(
+                            &tenant,
                             &principal,
                             input.id,
                             &input.locale,
@@ -253,7 +254,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                             Some(input.updated_at),
                         )
                         .await?;
-                    crate::http::describe(&service, item).await
+                    crate::http::describe(&service, &tenant, item).await
                 }
             },
         )
@@ -262,11 +263,11 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "trash",
             "Move a media item to the trash. Its public link stops working; it can be \
              restored until the server deletes it for good (30 days by default).",
-            move |_tenant: TenantContext, principal: Principal, input: MediaId| {
+            move |tenant: TenantContext, principal: Principal, input: MediaId| {
                 let service = trash.clone();
                 async move {
-                    let item = service.trash(&principal, input.id).await?;
-                    crate::http::describe(&service, item).await
+                    let item = service.trash(&tenant, &principal, input.id).await?;
+                    crate::http::describe(&service, &tenant, item).await
                 }
             },
         )
@@ -277,7 +278,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
              checks the content really is of its type and reads image sizes. Upload larger \
              files with `POST /api/v1/media`. The answer lists items that already had the same \
              content in `duplicates`.",
-            move |_tenant: TenantContext, principal: Principal, input: UploadMediaInput| {
+            move |tenant: TenantContext, principal: Principal, input: UploadMediaInput| {
                 let service = upload.clone();
                 async move {
                     let bytes = STANDARD.decode(input.content_base64.trim()).map_err(|_| {
@@ -297,7 +298,8 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         tags: input.tags.unwrap_or_default(),
                     };
                     let body = futures_util::stream::iter([Ok(bytes::Bytes::from(bytes))]);
-                    let uploaded = service.upload(&principal, upload, Box::pin(body)).await?;
+                    let uploaded =
+                        service.upload(&tenant, &principal, upload, Box::pin(body)).await?;
                     let duplicates = uploaded
                         .duplicates
                         .into_iter()
@@ -308,7 +310,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                             folder_id: crate::entity::api_folder(item.folder_id),
                         })
                         .collect();
-                    let item = crate::http::describe(&service, uploaded.item).await?;
+                    let item = crate::http::describe(&service, &tenant, uploaded.item).await?;
                     Ok(UploadedResponse { item, duplicates })
                 }
             },
@@ -317,13 +319,13 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
         Tool::new(
             "list_tags",
             "List media tags by name, each with the number of items carrying it.",
-            move |_tenant: TenantContext, principal: Principal, input: ListTagsInput| {
+            move |tenant: TenantContext, principal: Principal, input: ListTagsInput| {
                 let service = list_tags.clone();
                 async move {
                     let paging = PageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, Some("asc".to_owned()));
                     let page = crate::http::page_request(paging, Vec::new())?;
                     let tags = service
-                        .list_tags(&principal, input.q.as_deref(), TagSort::Name, &page)
+                        .list_tags(&tenant, &principal, input.q.as_deref(), TagSort::Name, &page)
                         .await?;
                     Ok::<Page<TagResponse>, Error>(tags.map(TagResponse::from))
                 }
@@ -336,11 +338,17 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "Ask the server's AI model to suggest alt text for an image (JPEG, PNG, GIF, WebP) in a \
              language, optionally with context such as the post title. Saves nothing: store what \
              you accept with `update`. Uses AI tokens.",
-            move |_tenant: TenantContext, principal: Principal, input: SuggestAltInput| {
+            move |tenant: TenantContext, principal: Principal, input: SuggestAltInput| {
                 let service = alt.clone();
                 async move {
                     let suggestion = service
-                        .suggest_alt(&principal, input.id, &input.locale, input.context.as_deref())
+                        .suggest_alt(
+                            &tenant,
+                            &principal,
+                            input.id,
+                            &input.locale,
+                            input.context.as_deref(),
+                        )
                         .await?;
                     Ok::<AltSuggestionResponse, Error>(suggestion.into())
                 }

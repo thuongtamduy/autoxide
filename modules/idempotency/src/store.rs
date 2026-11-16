@@ -1,16 +1,16 @@
 //! `IdempotencyStore` trên bảng `idempotency_record`.
 //!
-//! Hai request cùng key đến cùng lúc: index unique `(scope, key)` để đúng một bên chèn
+//! Hai request cùng key đến cùng lúc: index unique `(tenant_id, scope, key)` để đúng một bên chèn
 //! được dòng và chạy; bên kia đọc dòng đó và nhận `InProgress` (hoặc kết quả, nếu bên
-//! đầu đã xong).
+//! đầu đã xong). Key thuộc khách của request (bước 33): database là của khách, mọi truy vấn lọc
+//! theo khách (`.scoped`).
 
 use std::time::Duration;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::idempotency::{Begin, IdempotencyStore, StoredResponse};
 use autoxide_kernel::job::{JobContext, JobHandler, Schedule};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
@@ -28,18 +28,14 @@ pub(crate) fn cleanup_schedule() -> Schedule {
     Schedule::new(CLEANUP, CLEANUP, Duration::from_secs(3600))
 }
 
-pub(crate) struct Store {
-    database: Database,
-}
+// Store không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
+pub(crate) struct Store;
 
 impl Store {
-    pub(crate) fn new(database: Database) -> Self {
-        Store { database }
-    }
-
     /// Chèn dòng mới cho lần đầu. `None` nếu dòng của key đã có.
     async fn insert(
         &self,
+        tenant: &TenantContext,
         scope: &str,
         key: &str,
         fingerprint: &str,
@@ -49,6 +45,7 @@ impl Store {
         let id = Uuid::now_v7();
         let inserted = entity::ActiveModel {
             id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             scope: Set(scope.to_owned()),
             key: Set(key.to_owned()),
             fingerprint: Set(fingerprint.to_owned()),
@@ -59,7 +56,7 @@ impl Store {
             expires_at: Set(now + KEEP),
             created_at: Set(now),
         }
-        .insert(self.database.write())
+        .insert(tenant.database().write())
         .await;
         match inserted {
             Ok(_) => Ok(Some(id)),
@@ -75,7 +72,7 @@ impl Store {
 impl IdempotencyStore for Store {
     async fn begin(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         scope: &str,
         key: &str,
         fingerprint: &str,
@@ -83,20 +80,21 @@ impl IdempotencyStore for Store {
     ) -> Result<Begin, Error> {
         // Vòng lặp chạy lại nhiều nhất một lần: khi dòng cũ đã hết hạn và vừa bị xoá.
         for _ in 0..2 {
-            if let Some(id) = self.insert(scope, key, fingerprint, locked_until).await? {
+            if let Some(id) = self.insert(tenant, scope, key, fingerprint, locked_until).await? {
                 return Ok(Begin::Started { id });
             }
             let Some(row) = Entity::find()
                 .filter(Column::Scope.eq(scope))
                 .filter(Column::Key.eq(key))
-                .one(self.database.write())
+                .scoped(tenant)
+                .one(tenant.database().write())
                 .await?
             else {
                 continue; // vừa bị dọn giữa hai câu lệnh
             };
             let now = now();
             if row.expires_at <= now {
-                Entity::delete_by_id(row.id).exec(self.database.write()).await?;
+                Entity::delete_by_id(row.id).scoped(tenant).exec(tenant.database().write()).await?;
                 continue;
             }
             if row.fingerprint != fingerprint {
@@ -124,7 +122,8 @@ impl IdempotencyStore for Store {
                 .filter(Column::Id.eq(row.id))
                 .filter(Column::Status.is_null())
                 .filter(Column::LockedUntil.lte(now))
-                .exec(self.database.write())
+                .scoped(tenant)
+                .exec(tenant.database().write())
                 .await?;
             return Ok(if taken.rows_affected == 1 {
                 Begin::Started { id: row.id }
@@ -137,7 +136,7 @@ impl IdempotencyStore for Store {
 
     async fn complete(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         id: Uuid,
         response: StoredResponse,
     ) -> Result<(), Error> {
@@ -147,34 +146,28 @@ impl IdempotencyStore for Store {
             .col_expr(Column::Headers, Expr::value(Some(headers)))
             .col_expr(Column::Body, Expr::value(Some(response.body)))
             .filter(Column::Id.eq(id))
-            .exec(self.database.write())
+            .scoped(tenant)
+            .exec(tenant.database().write())
             .await?;
         Ok(())
     }
 
-    async fn abandon(&self, _tenant: &TenantContext, id: Uuid) -> Result<(), Error> {
-        Entity::delete_by_id(id).exec(self.database.write()).await?;
+    async fn abandon(&self, tenant: &TenantContext, id: Uuid) -> Result<(), Error> {
+        Entity::delete_by_id(id).scoped(tenant).exec(tenant.database().write()).await?;
         Ok(())
     }
 }
 
-/// Job dọn key đã hết hạn.
-pub(crate) struct Cleanup {
-    database: Database,
-}
-
-impl Cleanup {
-    pub(crate) fn new(database: Database) -> Self {
-        Cleanup { database }
-    }
-}
+/// Job dọn key đã hết hạn: chạy theo lịch trên từng database, dọn key của mọi khách trên đó
+/// (index `_sweep_idx`).
+pub(crate) struct Cleanup;
 
 #[async_trait::async_trait]
 impl JobHandler for Cleanup {
-    async fn run(&self, _job: &JobContext) -> Result<(), Error> {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let removed = Entity::delete_many()
             .filter(Column::ExpiresAt.lt(now()))
-            .exec(self.database.write())
+            .exec(job.database.write())
             .await?;
         tracing::info!(removed = removed.rows_affected, "expired idempotency keys removed");
         Ok(())
@@ -191,6 +184,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
+    use autoxide_kernel::database::Database;
     use autoxide_kernel::module::Module;
     use autoxide_testkit::{TestApp, TestDatabase};
     use axum::extract::State;
@@ -498,24 +492,16 @@ mod tests {
     #[tokio::test]
     async fn key_het_han_va_lan_dau_chet_giua_chung() {
         TestDatabase::run(async |test| {
-            let (_, _, database) = setup(test).await;
-            let store = Store::new(database.clone());
+            let (app, _, database) = setup(test).await;
+            let store = Store;
+            let tenant = app.default_tenant();
             let soon = now() + chrono::Duration::seconds(60);
 
-            let Begin::Started { id } = store
-                .begin(&TenantContext::legacy_default(&database), "s", "k", "f", soon)
-                .await
-                .unwrap()
+            let Begin::Started { id } = store.begin(&tenant, "s", "k", "f", soon).await.unwrap()
             else {
                 panic!("first request must start");
             };
-            assert_eq!(
-                store
-                    .begin(&TenantContext::legacy_default(&database), "s", "k", "f", soon)
-                    .await
-                    .unwrap(),
-                Begin::InProgress
-            );
+            assert_eq!(store.begin(&tenant, "s", "k", "f", soon).await.unwrap(), Begin::InProgress);
             // Lần đầu chết giữa chừng: quá hạn giữ thì request sau nhận quyền chạy.
             Entity::update_many()
                 .col_expr(Column::LockedUntil, Expr::value(now() - chrono::Duration::seconds(1)))
@@ -523,30 +509,18 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(
-                store
-                    .begin(&TenantContext::legacy_default(&database), "s", "k", "f", soon)
-                    .await
-                    .unwrap(),
+                store.begin(&tenant, "s", "k", "f", soon).await.unwrap(),
                 Begin::Started { id }
             );
             let stored = StoredResponse::new(201, vec![], b"ok".to_vec());
-            store
-                .complete(&TenantContext::legacy_default(&database), id, stored.clone())
-                .await
-                .unwrap();
+            store.complete(&tenant, id, stored.clone()).await.unwrap();
             assert_eq!(
-                store
-                    .begin(&TenantContext::legacy_default(&database), "s", "k", "f", soon)
-                    .await
-                    .unwrap(),
+                store.begin(&tenant, "s", "k", "f", soon).await.unwrap(),
                 Begin::Replay(stored)
             );
             // Người gọi khác dùng cùng key: không đụng nhau.
             assert!(matches!(
-                store
-                    .begin(&TenantContext::legacy_default(&database), "other", "k", "f", soon)
-                    .await
-                    .unwrap(),
+                store.begin(&tenant, "other", "k", "f", soon).await.unwrap(),
                 Begin::Started { .. }
             ));
 
@@ -556,20 +530,39 @@ mod tests {
                 .exec(database.write())
                 .await
                 .unwrap();
-            let context = JobContext::for_tenant(
-                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
-                CLEANUP,
-                serde_json::Value::Null,
-                1,
-            );
-            Cleanup::new(database.clone()).run(&context).await.unwrap();
+            let context =
+                JobContext::for_database(database.clone(), CLEANUP, serde_json::Value::Null, 1);
+            Cleanup.run(&context).await.unwrap();
             assert!(matches!(
-                store
-                    .begin(&TenantContext::legacy_default(&database), "s", "k", "different", soon)
-                    .await
-                    .unwrap(),
+                store.begin(&tenant, "s", "k", "different", soon).await.unwrap(),
                 Begin::Started { .. }
             ));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Bước 33: cùng key ở hai khách là hai lần chạy khác nhau (trên database chung và database
+    /// riêng); job dọn chạy trên từng database.
+    #[tokio::test]
+    async fn cung_key_o_hai_khach_deu_chay() {
+        TestDatabase::run(async |test| {
+            let app = TestApp::builder(test)
+                .tenant("a")
+                .tenant_dedicated("b")
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let soon = now() + chrono::Duration::seconds(60);
+            let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
+            for tenant in [&a, &b, &app.default_tenant()] {
+                let started = Store.begin(tenant, "s", "k", "f", soon).await.unwrap();
+                assert!(matches!(started, Begin::Started { .. }), "{started:?}");
+            }
+            assert_eq!(Store.begin(&a, "s", "k", "f", soon).await.unwrap(), Begin::InProgress);
+            let rows = Entity::find().scoped(&b).all(b.database().read()).await.unwrap();
+            assert_eq!(rows.len(), 1);
         })
         .await
         .unwrap();

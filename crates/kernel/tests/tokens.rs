@@ -45,7 +45,7 @@ async fn database(test: &TestDatabase) -> Database {
 async fn dung_mot_lan_dung_muc_dich_con_han() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let tokens = OneTimeTokens::new("demo");
         let write = database.write();
         let issued = tokens
@@ -90,7 +90,7 @@ async fn dung_mot_lan_dung_muc_dich_con_han() {
 async fn gan_day_thu_hoi_va_don_dep() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let tokens = OneTimeTokens::new("demo");
         let write = database.write();
         let first = tokens
@@ -138,7 +138,7 @@ async fn gan_day_thu_hoi_va_don_dep() {
 async fn dung_dong_thoi_mot_ben_thang() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let tokens = Arc::new(OneTimeTokens::new("demo"));
         let issued = tokens
             .issue(database.write(), &tenant, "confirm", "s", None, Duration::hours(1))
@@ -170,7 +170,7 @@ async fn dung_dong_thoi_mot_ben_thang() {
 async fn token_cua_khach_khac_nhu_token_la() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let ours = TenantContext::legacy_default(&database);
+        let ours = TenantContext::default_on(database.clone());
         let theirs = TenantContext::new(
             TenantId::from_uuid(uuid::Uuid::now_v7()),
             "other",

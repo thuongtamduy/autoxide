@@ -10,7 +10,7 @@ use super::{MULTI_TENANT_READY, TenancyMode};
 const MODE: Setting = Setting::new(
     "AUTOXIDE_TENANCY_MODE",
     "`single` (one customer: the default, nothing else to set) or `multi` (many customers, told \
-     apart by domain, credentials or the `Autoxide-Tenant` header).",
+     apart by domain, credentials or the `Autoxide-Tenant` header; needs `AUTOXIDE_SECRET_KEY`).",
 )
 .with_default("single");
 
@@ -115,7 +115,7 @@ impl TenancyConfig {
     }
 }
 
-/// Đọc cấu hình đa khách. Chế độ `multi` là lỗi cấu hình khi chưa mọi module chuyển xong (D-253).
+/// Đọc cấu hình đa khách (chế độ `multi` cần thêm `AUTOXIDE_SECRET_KEY`, kiểm ở module `kernel`).
 pub(crate) fn read_setting(reader: &mut ConfigReader<'_>) -> Result<TenancyConfig, Invalid> {
     let mode = reader.get_with(&MODE, |raw| match raw.trim() {
         "single" => Ok(TenancyMode::Single),

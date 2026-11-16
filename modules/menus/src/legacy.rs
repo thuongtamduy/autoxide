@@ -5,14 +5,17 @@
 //! - Chạy lại nhiều lần không nhân đôi: menu đã có cùng (`key`, `locale`) thì bỏ qua — kể cả khi
 //!   nó đã được sửa sau lần nhập trước, để không đè việc của người quản trị.
 //! - Mục trỏ bài viết thành `content.entry`, mục trỏ danh mục / thẻ thành `content.term`.
+//! - Theo khách (bước 33): mỗi lần chạy nhập menu cũ của MỘT khách vào chính khách đó — tham số
+//!   `tenant=<tên rút gọn>`, bỏ trống là khách mặc định (nơi có mọi menu cũ làm trước bước 33).
+//!   Không duyệt mọi khách: menu cũ nằm ở bảng của `content`, module này không biết khách nào có.
 
 use std::sync::Arc;
 
 use autoxide_content::api::{LegacyMenuItem, LegacyTarget};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::task::{Task, TaskArgs, TaskRun};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
+use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
 
 use crate::config::canonical_locale;
 use crate::items::{ItemInput, RefInput};
@@ -30,9 +33,12 @@ pub(crate) struct ImportReport {
 }
 
 impl MenuService {
-    /// Nhập mọi menu cũ của `content` chưa có ở đây. Lệnh của người vận hành máy chủ: không kiểm
-    /// permission, event ghi là của hệ thống.
-    pub(crate) async fn import_content_menus(&self) -> Result<ImportReport, Error> {
+    /// Nhập mọi menu cũ của khách `tenant` ở `content` chưa có ở khách đó. Lệnh của người vận hành
+    /// máy chủ: không kiểm permission, event ghi là của hệ thống.
+    pub(crate) async fn import_content_menus(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<ImportReport, Error> {
         let legacy = self.legacy.as_ref().ok_or_else(|| {
             Error::bad_request(
                 "menus.import_source_missing",
@@ -40,7 +46,7 @@ impl MenuService {
             )
         })?;
         let mut report = ImportReport::default();
-        for old in legacy.legacy_menus(&TenantContext::legacy_default(&self.database)).await? {
+        for old in legacy.legacy_menus(tenant).await? {
             let pair = (old.key.clone(), old.locale.clone());
             let Some(locale) =
                 canonical_locale(&old.locale).filter(|locale| self.config.locales.contains(locale))
@@ -52,7 +58,7 @@ impl MenuService {
                 report.failed.push((pair.0, pair.1, reason));
                 continue;
             };
-            if self.find_by_key(&old.key, &locale).await?.is_some() {
+            if self.find_by_key(tenant, &old.key, &locale).await?.is_some() {
                 report.skipped.push(pair);
                 continue;
             }
@@ -61,7 +67,7 @@ impl MenuService {
                 locale: Some(locale),
                 items: old.items.iter().map(convert).collect(),
             };
-            match self.create_checked(Actor::system(), input, false).await {
+            match self.create_checked(tenant, Actor::system(), input, false).await {
                 Ok(_) => report.imported.push(pair),
                 // Hai lần nhập chạy cùng lúc: bên kia vừa tạo xong menu này.
                 Err(error) if error.code() == "menus.menu_exists" => report.skipped.push(pair),
@@ -93,21 +99,33 @@ fn convert(old: &LegacyMenuItem) -> ItemInput {
 }
 
 /// Lệnh `menus.import_content_menus`.
-pub(crate) fn task(service: Arc<MenuService>) -> Task {
+pub(crate) fn task(service: Arc<MenuService>, databases: DatabaseRegistry) -> Task {
     Task::new(
         "import_content_menus",
-        "Copy the old website menus of module `content` into module `menus`. Menus that already \
-         exist here (same key and language) are left as they are, so running it again is safe.",
-        Arc::new(Import(service)),
+        "Copy the old website menus of module `content` into module `menus`, for one tenant. \
+         Menus that already exist there (same key and language) are left as they are, so running \
+         it again is safe.",
+        Arc::new(Import { service, databases }),
     )
+    .argument(TaskArgument::optional(
+        "tenant",
+        "Short name (slug) of the tenant whose menus to copy; omitted: the default tenant.",
+    ))
 }
 
-struct Import(Arc<MenuService>);
+struct Import {
+    service: Arc<MenuService>,
+    databases: DatabaseRegistry,
+}
 
 #[async_trait::async_trait]
 impl TaskRun for Import {
-    async fn run(&self, _args: &TaskArgs) -> Result<String, Error> {
-        let report = self.0.import_content_menus().await?;
+    async fn run(&self, args: &TaskArgs) -> Result<String, Error> {
+        let tenant = match args.get("tenant") {
+            Some(slug) => self.databases.tenant_by_slug(slug.trim()).await?,
+            None => self.databases.default_tenant(),
+        };
+        let report = self.service.import_content_menus(&tenant).await?;
         let list = |pairs: &[(String, String)]| {
             pairs
                 .iter()
@@ -116,7 +134,8 @@ impl TaskRun for Import {
                 .join(", ")
         };
         let mut lines = vec![format!(
-            "Imported {} menu(s), skipped {} already here, {} failed.",
+            "Tenant `{}`: imported {} menu(s), skipped {} already here, {} failed.",
+            tenant.slug(),
             report.imported.len(),
             report.skipped.len(),
             report.failed.len()

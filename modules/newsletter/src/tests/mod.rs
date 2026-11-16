@@ -27,7 +27,6 @@ use crate::campaigns::sending::{PREPARE, PrepareJob, SEND, SendJob};
 use crate::campaigns::{Action, Campaign, CampaignInput};
 use crate::entity::{subscriber, subscription};
 use crate::public::{SCOPE, SUBSCRIBE, SubscribeJob, SubscribeRequest};
-use crate::service::NewsletterService;
 use crate::testing::{FakeMailer, Harness, admin};
 use crate::text::Localized;
 
@@ -36,7 +35,7 @@ pub(crate) fn visitor(ip: &str) -> ClientInfo {
 }
 
 /// Tạo danh sách công khai `key`.
-pub(crate) async fn list(service: &NewsletterService, key: &str, double_opt_in: bool) -> List {
+pub(crate) async fn list(h: &Harness, key: &str, double_opt_in: bool) -> List {
     let input = ListInput {
         key: Some(key.to_owned()),
         name: Some(Localized { en: Some(format!("{key} news")), vi: Some(format!("Tin {key}")) }),
@@ -44,21 +43,16 @@ pub(crate) async fn list(service: &NewsletterService, key: &str, double_opt_in: 
         public: Some(true),
         ..ListInput::default()
     };
-    service.create_list(&admin(), input).await.unwrap()
+    h.service.create_list(&h.tenant, &admin(), input).await.unwrap()
 }
 
-pub(crate) async fn form_token(service: &NewsletterService) -> String {
-    service
-        .guard
-        .issue(&autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database), SCOPE)
-        .await
-        .unwrap()
-        .token
+pub(crate) async fn form_token(h: &Harness) -> String {
+    h.service.guard.issue(&h.tenant, SCOPE).await.unwrap().token
 }
 
 /// Đăng ký `email` vào `lists` như người lạ, với token mới.
 pub(crate) async fn subscribe(
-    service: &NewsletterService,
+    h: &Harness,
     email: &str,
     lists: &[&str],
     ip: &str,
@@ -67,16 +61,16 @@ pub(crate) async fn subscribe(
         email: Some(email.to_owned()),
         lists: lists.iter().map(|key| (*key).to_owned()).collect(),
         consent_text: Some("Send me the newsletter.".to_owned()),
-        form_token: Some(form_token(service).await),
+        form_token: Some(form_token(h).await),
         ..SubscribeRequest::default()
     };
-    service.subscribe(None, &visitor(ip), request).await?;
-    store_subscriptions(service).await;
+    h.service.subscribe(&h.tenant, None, &visitor(ip), request).await?;
+    store_subscriptions(h).await;
     Ok(())
 }
 
 /// Chạy mọi job đăng ký đang chờ (như worker), theo thứ tự xếp hàng. Trả số job đã chạy.
-pub(crate) async fn store_subscriptions(service: &NewsletterService) -> usize {
+pub(crate) async fn store_subscriptions(h: &Harness) -> usize {
     let mut ran = 0;
     loop {
         let select = Query::select()
@@ -87,25 +81,25 @@ pub(crate) async fn store_subscriptions(service: &NewsletterService) -> usize {
             .order_by(Alias::new("id"), Order::Asc)
             .limit(1)
             .to_owned();
-        let Some(row) = service.database.read().query_one(&select).await.unwrap() else {
+        let Some(row) = h.database.read().query_one(&select).await.unwrap() else {
             return ran;
         };
         let id: Uuid = row.try_get("", "id").unwrap();
         let payload: String = row.try_get("", "payload").unwrap();
         let job: SubscribeJob = serde_json::from_str(&payload).unwrap();
-        service.apply_subscription(&job).await.unwrap();
+        h.service.apply_subscription(&h.tenant, &job).await.unwrap();
         let done = Query::update()
             .table(Alias::new("newsletter_jobs"))
             .value(Alias::new("completed_at"), chrono::Utc::now())
             .and_where(Expr::col(Alias::new("id")).eq(id))
             .to_owned();
-        service.database.write().execute(&done).await.unwrap();
+        h.database.write().execute(&done).await.unwrap();
         ran += 1;
     }
 }
 
 /// Nhập `emails` vào danh sách `list_id` (đã xác nhận).
-pub(crate) async fn import(service: &NewsletterService, list_id: Uuid, emails: &[String]) {
+pub(crate) async fn import(h: &Harness, list_id: Uuid, emails: &[String]) {
     let input = ImportInput {
         people: emails
             .iter()
@@ -115,7 +109,7 @@ pub(crate) async fn import(service: &NewsletterService, list_id: Uuid, emails: &
         consent_source: Some("test".to_owned()),
         ..ImportInput::default()
     };
-    service.import_subscribers(&admin(), input).await.unwrap();
+    h.service.import_subscribers(&h.tenant, &admin(), input).await.unwrap();
 }
 
 pub(crate) fn emails(prefix: &str, count: usize) -> Vec<String> {
@@ -123,11 +117,7 @@ pub(crate) fn emails(prefix: &str, count: usize) -> Vec<String> {
 }
 
 /// Chiến dịch nháp cho danh sách `list_id`.
-pub(crate) async fn campaign(
-    service: &NewsletterService,
-    list_id: Uuid,
-    advertising: bool,
-) -> Campaign {
+pub(crate) async fn campaign(h: &Harness, list_id: Uuid, advertising: bool) -> Campaign {
     let input = CampaignInput {
         list_id: Some(list_id),
         subject: Some("Hello".to_owned()),
@@ -136,12 +126,12 @@ pub(crate) async fn campaign(
         advertising: Some(advertising),
         ..CampaignInput::default()
     };
-    service.create_campaign(&admin(), input).await.unwrap()
+    h.service.create_campaign(&h.tenant, &admin(), input).await.unwrap()
 }
 
 /// Gửi chiến dịch `id` (phiên bản bất kỳ).
-pub(crate) async fn send(service: &NewsletterService, id: Uuid) -> Campaign {
-    service.change_state(&admin(), id, Action::Send, None).await.unwrap()
+pub(crate) async fn send(h: &Harness, id: Uuid) -> Campaign {
+    h.service.change_state(&h.tenant, &admin(), id, Action::Send, None).await.unwrap()
 }
 
 /// Một job chưa chạy của module (bỏ qua `run_at` nếu `any_time`).
@@ -172,15 +162,15 @@ pub(crate) async fn run_job(harness: &Harness, any_time: bool) -> Option<String>
     match kind.as_str() {
         PREPARE => {
             let job: PrepareJob = serde_json::from_value(payload).unwrap();
-            harness.service.prepare(&job).await.unwrap();
+            harness.service.prepare(&harness.tenant, &job).await.unwrap();
         }
         SEND => {
             let job: SendJob = serde_json::from_value(payload).unwrap();
-            harness.service.send_batch(&job).await.unwrap();
+            harness.service.send_batch(&harness.tenant, &job).await.unwrap();
         }
         SUBSCRIBE => {
             let job: SubscribeJob = serde_json::from_value(payload).unwrap();
-            harness.service.apply_subscription(&job).await.unwrap();
+            harness.service.apply_subscription(&harness.tenant, &job).await.unwrap();
         }
         _ => {}
     }
@@ -254,7 +244,7 @@ pub(crate) fn token_in(text: &str) -> String {
     let start = text.find("token=").unwrap() + "token=".len();
     text[start..]
         .chars()
-        .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
         .collect()
 }
 

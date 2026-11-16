@@ -8,6 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -151,6 +152,7 @@ pub(crate) struct TermsQuery {
 )]
 pub(crate) async fn list_terms(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<TermsQuery>,
     Query(paging): Query<PageQuery>,
@@ -159,9 +161,9 @@ pub(crate) async fn list_terms(
     let taxonomy =
         choice(query.taxonomy.as_deref(), "taxonomy", "`category`, `tag`", &mut problems);
     let page = page_request(paging, problems)?;
-    let page = service.list_terms(&principal, taxonomy, query.q.as_deref(), &page).await?;
+    let page = service.list_terms(&tenant, &principal, taxonomy, query.q.as_deref(), &page).await?;
     let ids: Vec<Uuid> = page.data.iter().map(|found| found.term.id).collect();
-    let counts = service.term_entry_counts(&ids).await?;
+    let counts = service.term_entry_counts(&tenant, &ids).await?;
     Ok(page.map(|found| {
         let count = counts.get(&found.term.id).copied().unwrap_or(0);
         TermResponse { entry_count: Some(count), ..TermResponse::from(found) }
@@ -189,10 +191,12 @@ pub(crate) async fn list_terms(
 )]
 pub(crate) async fn create_term(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateTermRequest>,
 ) -> Result<Created<TermResponse>, Error> {
-    let found = service.create_term(&principal, input.taxonomy, input.fields.into()).await?;
+    let found =
+        service.create_term(&tenant, &principal, input.taxonomy, input.fields.into()).await?;
     Ok(Created::new(format!("/content/terms/{}", found.term.id), found.into()))
 }
 
@@ -215,10 +219,11 @@ pub(crate) async fn create_term(
 )]
 pub(crate) async fn get_term(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<TermResponse>, Error> {
-    let found = service.get_term(&principal, id).await?;
+    let found = service.get_term(&tenant, &principal, id).await?;
     Ok(Tagged { version: found.term.updated_at, data: found.into() })
 }
 
@@ -247,13 +252,14 @@ pub(crate) async fn get_term(
 )]
 pub(crate) async fn update_term(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<TermFields>,
 ) -> Result<Tagged<TermResponse>, Error> {
     let expected = if_match.required()?;
-    let found = service.update_term(&principal, id, input.into(), expected).await?;
+    let found = service.update_term(&tenant, &principal, id, input.into(), expected).await?;
     Ok(Tagged { version: found.term.updated_at, data: found.into() })
 }
 
@@ -278,10 +284,11 @@ pub(crate) async fn update_term(
 )]
 pub(crate) async fn delete_term(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete_term(&principal, id).await?;
+    service.delete_term(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -377,14 +384,15 @@ impl From<AuthorFields> for AuthorInput {
 )]
 pub(crate) async fn list_authors(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(search): Query<AuthorsQuery>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<AuthorResponse>, Error> {
     let page = page_request(paging, Vec::new())?;
-    let page = service.list_authors(&principal, search.q.as_deref(), &page).await?;
+    let page = service.list_authors(&tenant, &principal, search.q.as_deref(), &page).await?;
     let ids: Vec<Uuid> = page.data.iter().map(|author| author.id).collect();
-    let counts = service.author_entry_counts(&ids).await?;
+    let counts = service.author_entry_counts(&tenant, &ids).await?;
     Ok(page.map(|author| {
         let count = counts.get(&author.id).copied().unwrap_or(0);
         AuthorResponse { entry_count: Some(count), ..AuthorResponse::from(author) }
@@ -419,10 +427,11 @@ pub(crate) struct AuthorsQuery {
 )]
 pub(crate) async fn create_author(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<AuthorFields>,
 ) -> Result<Created<AuthorResponse>, Error> {
-    let row = service.create_author(&principal, input.into()).await?;
+    let row = service.create_author(&tenant, &principal, input.into()).await?;
     Ok(Created::new(format!("/content/authors/{}", row.id), row.into()))
 }
 
@@ -445,10 +454,11 @@ pub(crate) async fn create_author(
 )]
 pub(crate) async fn get_author(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<AuthorResponse>, Error> {
-    let row = service.get_author(&principal, id).await?;
+    let row = service.get_author(&tenant, &principal, id).await?;
     Ok(Tagged { version: row.updated_at, data: row.into() })
 }
 
@@ -476,13 +486,14 @@ pub(crate) async fn get_author(
 )]
 pub(crate) async fn update_author(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<AuthorFields>,
 ) -> Result<Tagged<AuthorResponse>, Error> {
     let expected = if_match.required()?;
-    let row = service.update_author(&principal, id, input.into(), expected).await?;
+    let row = service.update_author(&tenant, &principal, id, input.into(), expected).await?;
     Ok(Tagged { version: row.updated_at, data: row.into() })
 }
 
@@ -505,9 +516,10 @@ pub(crate) async fn update_author(
 )]
 pub(crate) async fn delete_author(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete_author(&principal, id).await?;
+    service.delete_author(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

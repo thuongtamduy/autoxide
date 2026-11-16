@@ -9,7 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
@@ -82,14 +82,16 @@ impl CommentsService {
     /// Một trang của hàng chờ (mặc định `pending`), mới trước. Cần `comments.read`.
     pub(crate) async fn queue(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         filter: &QueueFilter,
         page: &PageRequest,
     ) -> Result<Page<Comment>, Error> {
         principal.require(&COMMENTS_READ)?;
         let status = filter.status.unwrap_or(Status::Pending);
-        let mut select =
-            comment::Entity::find().filter(comment::Column::Status.eq(status.as_str()));
+        let mut select = comment::Entity::find()
+            .scoped(tenant)
+            .filter(comment::Column::Status.eq(status.as_str()));
         if let Some(kind) = filter.target_type.as_deref().filter(|kind| !kind.is_empty()) {
             select = select.filter(comment::Column::TargetType.eq(kind));
         }
@@ -106,21 +108,27 @@ impl CommentsService {
                 .filter(autoxide_kernel::search::contains(comment::Column::SearchKey, search));
         }
         let Page { data, pagination } =
-            fetch_page(select, comment::Column::Id, |row| row.id, page, self.database.read())
+            fetch_page(select, comment::Column::Id, |row| row.id, page, tenant.database().read())
                 .await?;
-        Ok(Page { data: self.named(data).await?, pagination })
+        Ok(Page { data: self.named(tenant, data).await?, pagination })
     }
 
     /// Bình luận `id`, mọi trạng thái. Cần `comments.read`.
-    pub(crate) async fn get(&self, principal: &Principal, id: Uuid) -> Result<Comment, Error> {
+    pub(crate) async fn get(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<Comment, Error> {
         principal.require(&COMMENTS_READ)?;
-        self.find_named(id).await
+        self.find_named(tenant, id).await
     }
 
     /// Đổi trạng thái bình luận `id`: `published` (duyệt / khôi phục), `rejected`, `spam`,
     /// `pending` (giữ lại). Cần `comments.moderate`. `expected`: phiên bản đã đọc (`If-Match`).
     pub(crate) async fn set_status(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         to: Status,
@@ -134,7 +142,7 @@ impl CommentsService {
                 "must be `published`, `rejected`, `spam` or `pending`; delete with `DELETE`",
             )]));
         }
-        let before = self.find(id).await?;
+        let before = self.find(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -143,7 +151,7 @@ impl CommentsService {
             return Err(deleted_by_author());
         }
         if from == to {
-            return self.find_named(id).await;
+            return self.find_named(tenant, id).await;
         }
         let now = now();
         let mut row = before.clone().into_active_model();
@@ -159,16 +167,16 @@ impl CommentsService {
             Status::Pending => row.hold_reason = Set(Some("moderation".to_owned())),
             _ => {}
         }
-        let transaction = self.database.begin_write().await?;
-        let after = update_if_unchanged(&transaction, row, &before).await?;
-        shift_counts(&transaction, &after, Some(from), Some(to)).await?;
+        let transaction = tenant.database().begin_write().await?;
+        let after = update_if_unchanged(&transaction, tenant, row, &before).await?;
+        shift_counts(&transaction, tenant, &after, Some(from), Some(to)).await?;
         let actor = Actor::from(principal);
         let subject = events::comment_subject(id);
         let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 actor,
                 subject.clone(),
                 &events::CommentStatusChanged(change),
@@ -177,33 +185,37 @@ impl CommentsService {
         if to == Status::Published {
             let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::CommentPublished(change),
-                )
+                .record(&transaction, tenant, actor, subject, &events::CommentPublished(change))
                 .await?;
         }
         transaction.commit().await?;
         tracing::info!(comment_id = %id, from = from.as_str(), to = to.as_str(), "comment moderated");
-        self.named(vec![after]).await?.into_iter().next().ok_or_else(|| comment_not_found(id))
+        self.named(tenant, vec![after])
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| comment_not_found(id))
     }
 
     /// Xoá hẳn bình luận `id` (bình luận gốc: cả luồng). Cần `comments.moderate`. Trả số bình
     /// luận đã xoá.
-    pub(crate) async fn hard_delete(&self, principal: &Principal, id: Uuid) -> Result<u64, Error> {
+    pub(crate) async fn hard_delete(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<u64, Error> {
         principal.require(&COMMENTS_MODERATE)?;
-        let row = self.find(id).await?;
-        let transaction = self.database.begin_write().await?;
+        let row = self.find(tenant, id).await?;
+        let transaction = tenant.database().begin_write().await?;
         // Khoá (`FOR UPDATE` trên Postgres; SQLite chỉ một transaction ghi một lúc) rồi mới đọc
         // trạng thái để đổi số đếm — không đổi số đếm theo trạng thái cũ khi ai đó vừa duyệt /
         // giữ lại một bình luận trong luồng. Thứ tự khoá như mọi lệnh ghi khác (trả lời → gốc →
         // đích, xem `shift_counts`): trước các trả lời đang có, rồi bình luận gốc — trả lời mới
         // phải khoá gốc trước khi được lưu (`post`), nên sau bước này không còn trả lời mới nào
         // chen vào; cuối cùng đọc lại cả luồng (có cả trả lời vừa lưu trước khi gốc bị khoá).
-        let thread = || comment::Entity::find().filter(comment::Column::RootId.eq(id));
+        let thread =
+            || comment::Entity::find().scoped(tenant).filter(comment::Column::RootId.eq(id));
         let rows = if row.depth == 0 {
             thread()
                 .filter(comment::Column::Id.ne(id))
@@ -211,36 +223,43 @@ impl CommentsService {
                 .lock_exclusive()
                 .all(&transaction)
                 .await?;
-            if comment::Entity::find_by_id(id).lock_exclusive().one(&transaction).await?.is_none() {
+            if comment::Entity::find_by_id(id)
+                .scoped(tenant)
+                .lock_exclusive()
+                .one(&transaction)
+                .await?
+                .is_none()
+            {
                 return Err(comment_not_found(id));
             }
             thread().order_by_asc(comment::Column::Id).lock_exclusive().all(&transaction).await?
         } else {
-            comment::Entity::find_by_id(id).lock_exclusive().all(&transaction).await?
+            comment::Entity::find_by_id(id)
+                .scoped(tenant)
+                .lock_exclusive()
+                .all(&transaction)
+                .await?
         };
         if rows.is_empty() {
             return Err(comment_not_found(id));
         }
         let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
         for found in &rows {
-            shift_counts(&transaction, found, Some(Status::of(found)), None).await?;
-            self.tokens
-                .forget(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    &found.id.to_string(),
-                )
-                .await?;
+            shift_counts(&transaction, tenant, found, Some(Status::of(found)), None).await?;
+            self.tokens.forget(&transaction, tenant, &found.id.to_string()).await?;
         }
         report::Entity::delete_many()
+            .scoped(tenant)
             .filter(report::Column::CommentId.is_in(ids.clone()))
             .exec(&transaction)
             .await?;
         subscription::Entity::delete_many()
+            .scoped(tenant)
             .filter(subscription::Column::CommentId.is_in(ids.clone()))
             .exec(&transaction)
             .await?;
         let deleted = comment::Entity::delete_many()
+            .scoped(tenant)
             .filter(comment::Column::Id.is_in(ids))
             .exec(&transaction)
             .await?
@@ -252,7 +271,7 @@ impl CommentsService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::comment_subject(id),
                 &events::CommentDeleted(change),
@@ -266,12 +285,13 @@ impl CommentsService {
     /// Một trang lệnh cấm, mới trước. Cần `comments.manage`.
     pub(crate) async fn bans(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         filter: &BanFilter,
         page: &PageRequest,
     ) -> Result<Page<ban::Model>, Error> {
         principal.require(&COMMENTS_MANAGE)?;
-        let mut select = ban::Entity::find();
+        let mut select = ban::Entity::find().scoped(tenant);
         if let Some(kind) = filter.kind.as_deref() {
             select = select.filter(ban::Column::Kind.eq(kind));
         }
@@ -282,12 +302,13 @@ impl CommentsService {
                     .add(ban::Column::Until.gt(now())),
             );
         }
-        fetch_page(select, ban::Column::Id, |row| row.id, page, self.database.read()).await
+        fetch_page(select, ban::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// Cấm một người bình luận. Cần `comments.manage`.
     pub(crate) async fn ban(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: NewBan,
     ) -> Result<ban::Model, Error> {
@@ -334,9 +355,10 @@ impl CommentsService {
         let Some(value) = value.filter(|_| problems.is_empty()) else {
             return Err(Error::validation(problems));
         };
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = ban::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             kind: Set(input.kind),
             value: Set(value),
             reason: Set(reason),
@@ -350,7 +372,7 @@ impl CommentsService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::ban_subject(row.id),
                 &events::BanCreated(change),
@@ -361,19 +383,25 @@ impl CommentsService {
     }
 
     /// Bỏ lệnh cấm `id`. Cần `comments.manage`.
-    pub(crate) async fn unban(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn unban(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
         principal.require(&COMMENTS_MANAGE)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = ban::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| ban_not_found(id))?;
-        ban::Entity::delete_by_id(id).exec(&transaction).await?;
+        ban::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         let change = Change { before: Some(ban_summary(&row)), after: None };
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::ban_subject(id),
                 &events::BanDeleted(change),
@@ -386,26 +414,30 @@ impl CommentsService {
     /// Mọi thứ module giữ về `email` (yêu cầu xuất của chủ dữ liệu). Cần `comments.export`.
     pub(crate) async fn email_data(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         email: &str,
     ) -> Result<EmailData, Error> {
         principal.require(&COMMENTS_EXPORT)?;
         let email = checked_email(email)?;
         let mut rows = comment::Entity::find()
+            .scoped(tenant)
             .filter(comment::Column::AuthorEmail.eq(email.as_str()))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         rows.sort_by_key(|row| row.id);
         let subscriptions = subscription::Entity::find()
+            .scoped(tenant)
             .filter(subscription::Column::Email.eq(email.as_str()))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let bans = ban::Entity::find()
+            .scoped(tenant)
             .filter(ban::Column::Kind.eq("email"))
             .filter(ban::Column::Value.eq(email.as_str()))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
-        Ok(EmailData { comments: self.named(rows).await?, subscriptions, bans })
+        Ok(EmailData { comments: self.named(tenant, rows).await?, subscriptions, bans })
     }
 
     /// Xoá dữ liệu của `email` (yêu cầu xoá của chủ dữ liệu): mọi bình luận viết với email này
@@ -414,22 +446,25 @@ impl CommentsService {
     /// Cần `comments.export`. Trả số bình luận đã xoá.
     pub(crate) async fn erase_email(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         email: &str,
     ) -> Result<u64, Error> {
         principal.require(&COMMENTS_EXPORT)?;
         let email = checked_email(email)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let rows = comment::Entity::find()
+            .scoped(tenant)
             .filter(comment::Column::AuthorEmail.eq(email.as_str()))
             .all(&transaction)
             .await?;
         let mut ids = Vec::new();
         for row in &rows {
-            soft_delete(self, &transaction, row, Deletion::Erased).await?;
+            soft_delete(self, &transaction, tenant, row, Deletion::Erased).await?;
             ids.push(row.id);
         }
         let follows = subscription::Entity::delete_many()
+            .scoped(tenant)
             .filter(subscription::Column::Email.eq(email.as_str()))
             .exec(&transaction)
             .await?
@@ -444,7 +479,7 @@ impl CommentsService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     Actor::from(principal),
                     None,
                     &events::CommentsErased(change),

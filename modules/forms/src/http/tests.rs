@@ -500,3 +500,76 @@ async fn so_bai_va_nhan_lua_chon() {
     .await
     .unwrap();
 }
+
+/// Hai khách (một dùng chung database, một database riêng) cùng `key` form: endpoint công khai
+/// trả form của đúng khách theo header `autoxide-tenant`; người của khách B không đọc được form
+/// hay bài gửi của khách A qua bất kỳ `GET` hay tool MCP chỉ đọc nào.
+#[tokio::test]
+async fn hai_khach_cung_key_form_khong_ro_ri() {
+    TestDatabase::run(async |test| {
+        let mailer: Arc<dyn Mailer> = Arc::new(FakeMailer::default());
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new());
+        let all = ["forms.read", "forms.manage", "forms.review", "forms.export"];
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant_dedicated("b")
+            .user_in("a", "admin-a", 1, &all)
+            .user_in("a", "site-a", 2, &["forms.submit"])
+            .user_in("b", "admin-b", 3, &all)
+            .provide::<dyn Mailer>(mailer)
+            .provide::<dyn Storage>(storage)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let marker = "marker-form-a";
+        let mut forms = Vec::new();
+        for (who, name) in [("admin-a", marker), ("admin-b", "Form B")] {
+            let body = json!({"key": "contact", "name": name, "fields": [
+                {"key": "message", "type": "textarea", "label": {"en": "Message"}, "required": true}
+            ]});
+            let answer = app.post("/api/v1/forms").token(who).json(body).send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::CREATED, "{}", answer.json());
+            forms.push(answer.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        for (slug, name) in [("a", marker), ("b", "Form B")] {
+            let answer = app
+                .get("/api/v1/forms/public/contact")
+                .header("autoxide-tenant", slug)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+            assert_eq!(answer.json()["data"]["name"], name);
+        }
+        let body = json!({"data": {"message": marker}});
+        let answer = app
+            .post("/api/v1/forms/public/contact/submissions")
+            .token("site-a")
+            .json(body)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::CREATED, "{}", answer.json());
+        let submission = answer.json()["data"]["id"].as_str().unwrap().to_owned();
+        let page = app
+            .get(&format!("/api/v1/forms/{}/submissions", forms[0]))
+            .token("admin-a")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(page.json()["data"][0]["id"], submission.as_str());
+
+        let seeded = [
+            ("id", forms[0].clone()),
+            ("form_id", forms[0].clone()),
+            ("id", submission.clone()),
+            ("submission_id", submission),
+        ];
+        let violations =
+            autoxide_testkit::leak_check(&app, "admin-b", marker, &seeded).await.unwrap();
+        assert_eq!(violations, Vec::<String>::new());
+    })
+    .await
+    .unwrap();
+}

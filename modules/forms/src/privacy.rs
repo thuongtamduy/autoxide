@@ -17,8 +17,8 @@ use crate::service::FormsService;
 
 #[async_trait::async_trait]
 impl PersonalData for FormsService {
-    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let forms = self.forms_created_by(user_id).await?;
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+        let forms = self.forms_created_by(tenant, user_id).await?;
         Ok(json!({
             "forms": forms.iter().map(|form| json!({
                 "id": form.row.id,
@@ -36,7 +36,7 @@ impl EventHandler for FormsService {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
-        let forms = self.forget_creator(user_id).await?;
+        let forms = self.forget_creator(&event.tenant, user_id).await?;
         tracing::info!(user_id = %user_id, forms, "forms of a deleted user unlinked");
         Ok(())
     }

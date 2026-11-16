@@ -129,6 +129,9 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
   với mọi token.
 
 Link huỷ đăng ký không bao giờ hết hạn. Mỗi mail có token ngẫu nhiên riêng; chỉ bản băm được lưu.
+Trên máy chủ có nhiều khách, token có thể bắt đầu bằng `t<id khách>.`: token tự nêu khách của nó, nên
+lệnh xác nhận, trang lựa chọn và huỷ đăng ký chạy được trên mọi tên miền của API mà không cần header
+`Autoxide-Tenant`. Gửi lại token đúng nguyên văn (token có thể chứa dấu `.`).
 
 ## Chiến dịch
 

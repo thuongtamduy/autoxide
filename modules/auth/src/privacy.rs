@@ -30,25 +30,25 @@ pub(crate) struct AuthPersonalData {
 
 #[async_trait::async_trait]
 impl PersonalData for AuthPersonalData {
-    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let user = self.users.get(user_id).await?.ok_or_else(|| user_not_found(user_id))?;
-        let roles = self.roles.user_roles(user_id).await?;
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+        let user = self.users.get(tenant, user_id).await?.ok_or_else(|| user_not_found(user_id))?;
+        let roles = self.roles.user_roles(tenant, user_id).await?;
         let sessions = all_pages(|page| {
-            let sessions = self.sessions.clone();
-            async move { sessions.list_sessions(user_id, &page).await }
+            let (sessions, tenant) = (self.sessions.clone(), tenant.clone());
+            async move { sessions.list_sessions(&tenant, user_id, &page).await }
         })
         .await?;
         let api_keys = all_pages(|page| {
-            let api_keys = self.api_keys.clone();
-            async move { api_keys.list(user_id, &page).await }
+            let (api_keys, tenant) = (self.api_keys.clone(), tenant.clone());
+            async move { api_keys.list(&tenant, user_id, &page).await }
         })
         .await?;
         let passkeys = all_pages(|page| {
-            let passkeys = self.passkeys.clone();
-            async move { passkeys.list(user_id, &page).await }
+            let (passkeys, tenant) = (self.passkeys.clone(), tenant.clone());
+            async move { passkeys.list(&tenant, user_id, &page).await }
         })
         .await?;
-        let mfa = self.mfa.status(user_id).await?;
+        let mfa = self.mfa.status(tenant, user_id).await?;
         Ok(json!({
             "profile": {
                 "id": user.id,

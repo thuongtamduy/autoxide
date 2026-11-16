@@ -232,6 +232,14 @@ permission `auth.passkeys.manage` (`DELETE /api/v1/auth/users/{id}/passkeys`).
 sudo -u autoxide autoxide user remove-passkeys --email you@example.com
 ```
 
+These three commands act on the default tenant. With several tenants
+(`AUTOXIDE_TENANCY_MODE=multi`), add `--tenant <slug>` to act on the account of another tenant,
+for example its first administrator:
+
+```bash
+sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
+```
+
 ### 4. Run as a service
 
 `/etc/systemd/system/autoxide.service`:
@@ -285,6 +293,13 @@ sudo -u autoxide autoxide backup "backups/$(date +%F)"
 To restore on a new machine, prepare the directory (steps 1–2), then run
 `autoxide restore <backup directory>` there before starting the service.
 
+With `AUTOXIDE_TENANCY_MODE=multi`, the backup holds the main database (the tenant register and
+every tenant on it) and all files of the shared file storage, but not the databases of other
+placements nor a placement's own file storage; the command prints a warning naming them. Back
+those up with the database's (and the storage's) own tools. Keep
+`AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in
+a backup cannot be read.
+
 ## Moving from SQLite to PostgreSQL
 
 Create an empty PostgreSQL database, stop the server, and copy. The target gets every
@@ -325,6 +340,163 @@ into a new database.
 
 Check the configuration without starting anything: `autoxide config`. It lists every
 setting with its value (secrets hidden) and reports every problem at once.
+
+## Custom domains of tenants
+
+With several tenants (`AUTOXIDE_TENANCY_MODE=multi`), each tenant can serve its site on its own
+domain, such as `shop.example`: a request to a verified domain reaches that tenant without the
+`Autoxide-Tenant` header. An installation with one tenant does not need this: its domain is the
+platform's.
+
+1. An administrator of the tenant (permission `kernel.domains.manage`) adds the domain:
+
+   ```bash
+   curl -X POST https://api.example.com/api/v1/kernel/domains \
+     -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"domain": "shop.example"}'
+   ```
+
+   The answer has `"status": "pending"` and a `record` to create at the domain's DNS provider: a
+   TXT record named `_autoxide-challenge.shop.example` with the value `autoxide-verify=…`.
+2. At the DNS provider, create that TXT record and point the domain itself at your server (an
+   `A` / `AAAA` record, or a `CNAME` to the platform's domain).
+3. Verify: `POST /api/v1/kernel/domains/{id}/verify` looks the record up at once and answers
+   `verified`, or still `pending` with the reason in `check_error`. Pending domains are also
+   checked every 10 minutes; one not verified within 7 days becomes `failed` (fix the record,
+   then verify it again). `DELETE /api/v1/kernel/domains/{id}` removes a domain.
+4. Keep the TXT record. A verified domain is checked again once a day: when the record is missing
+   at 3 checks in a row, the domain becomes `failed` (event `kernel.domain_failed`) and requests
+   to it no longer reach the tenant. `failed_checks` counts the misses; one check that finds the
+   record (or `POST …/verify` after fixing it) resets it to 0. A DNS server that does not answer
+   does not count as a miss.
+
+The platform's own domain (the host of `AUTOXIDE_HTTP_PUBLIC_URL`), IP addresses and `localhost`
+are refused. A domain belongs to one tenant at a time: another tenant can claim it only after it
+was removed or failed.
+
+**TLS certificates.** Let Caddy get a certificate when the first visitor of a domain arrives
+(on-demand TLS), after asking Autoxide whether the domain is allowed:
+`GET /api/v1/kernel/domains/allowed?domain=…` answers `200` only for a verified domain of an
+active tenant, so nobody can make your server request certificates for names you do not serve.
+
+```text
+{
+    on_demand_tls {
+        ask http://127.0.0.1:8080/api/v1/kernel/domains/allowed
+    }
+}
+
+api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+
+https:// {
+    tls {
+        on_demand
+    }
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Caddy's `reverse_proxy` passes the original `Host` header on, and that is how Autoxide tells the
+tenant. When another proxy in front rewrites `Host`, it must send the visitor's domain in
+`X-Forwarded-Host` (or `Forwarded: host=…`), and its addresses must be listed in
+`AUTOXIDE_HTTP_TRUSTED_PROXIES`: Autoxide reads those headers only from trusted proxies. The
+`ask` endpoint counts toward the per-address rate limit like any other; Caddy asks once per new
+certificate. Verifying, removing a domain or suspending its tenant reaches every server within
+`AUTOXIDE_TENANCY_CACHE_SECONDS` (default `10`).
+
+## Moving a tenant to another database
+
+With several tenants, each tenant's data lives on a *placement*: `main` (the database of
+`DATABASE_URL`, shared by many tenants) or another database added with `autoxide placement add`.
+Move a tenant to give a growing customer a database of its own, or to bring it back:
+
+1. Add the target and apply the migrations to it:
+
+   ```bash
+   printf '%s' 'postgres://autoxide:<password>@db2.example.com:5432/acme' \
+     | autoxide placement add acme-db --kind dedicated --url -
+   autoxide migrate up --all
+   ```
+
+2. Try it first. A dry run changes nothing:
+
+   ```bash
+   autoxide tenant move acme --to acme-db --dry-run
+   ```
+
+   It lists the rows of the tenant that would be copied, per table, and everything that blocks
+   the move: migrations not applied on one side, a target that is the same database as the
+   source, a tenant that is not active, another move of the tenant. The platform tenant
+   (`default`) always stays on `main`.
+
+3. Move, in a maintenance window:
+
+   ```bash
+   autoxide tenant move acme --to acme-db
+   ```
+
+   From the start, the tenant answers `503 tenant_maintenance` with `Retry-After`; other tenants
+   are not affected. The command waits until every server has seen the move
+   (`AUTOXIDE_TENANCY_CACHE_SECONDS`) and requests in progress are done
+   (`AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`), and until jobs and events of the tenant already
+   being run have finished. Then it copies every row of the tenant, queued jobs and undelivered
+   events included, in one transaction; compares the row counts of every table; switches the
+   tenant to the new placement (it works again from there); and deletes the old copy. SQLite and
+   PostgreSQL can be mixed in either direction. Files (under `tenants/<id>/`) stay where they are
+   when both placements use the same file storage; when the target has its own storage (below),
+   they are copied there before the rows and deleted from the old storage at the end. The dry run
+   shows how many files would be copied.
+
+`--keep-source` keeps the old copy as a backup instead of deleting it (its queued jobs and events
+are deleted, so nothing runs twice; its files stay too). Nothing uses it; delete it once you are
+satisfied:
+
+```bash
+autoxide tenant purge-copy acme --placement main
+```
+
+Over the API, platform staff with `kernel.tenants.move` call
+`POST /api/v1/kernel/tenants/{id}/move` with `{"to": "acme-db"}`: that is a dry run. Add
+`"dry_run": false` to start the move as a background job, and follow it at the `Location` of the
+answer (`GET /api/v1/kernel/tenants/{id}/moves/{move_id}`); the MCP tool is `kernel.move_tenant`.
+A job may run for about four minutes: move large tenants (the dry run shows the row count) with
+the command, which has no time limit.
+
+**A placement's own file storage.** By default every tenant's files are kept in the storage of
+the `files` module settings (`AUTOXIDE_FILES_DIR` or `AUTOXIDE_FILES_S3_BUCKET`), under
+`tenants/<id>/`. Give a placement — typically a `dedicated` one — its own bucket or directory, so
+a customer's files live apart too:
+
+```bash
+printf '%s' "$SECRET_ACCESS_KEY" | autoxide placement storage acme-db \
+  --s3-bucket acme-files --s3-region eu-west-1 \
+  --s3-endpoint https://<account>.r2.cloudflarestorage.com \
+  --s3-access-key-id "$ACCESS_KEY_ID" --s3-secret-access-key -
+# or a directory on the server:
+autoxide placement storage acme-db --dir /var/lib/autoxide/files-acme
+```
+
+The settings are stored encrypted with `AUTOXIDE_SECRET_KEY`; `autoxide placement list` and
+`GET /api/v1/kernel/placements` show the bucket or directory, never the keys. The bucket must
+exist; a wrong key shows up at the first upload. Set the storage while the placement has no
+tenants, then move tenants onto it: the move copies their files. Changing it later is refused
+(their files are in the old storage), except with `--force` when the new storage already holds
+the same files — for example a new access key for the same bucket. `--clear` sends the files of
+new uploads back to the shared storage (same rule). Every server must run the `files` module.
+
+**When a move stops half-way** (the process dies, a database cannot be reached, row counts
+differ), nothing is lost. Before the switch the tenant keeps answering `503` on its old placement;
+after it, the tenant works from the new placement and only the old copy waits to be deleted.
+
+- Run the same `autoxide tenant move acme --to acme-db` again: it resumes where it stopped
+  (before the switch it deletes the rows it had copied to the target and copies again).
+- Or, before the switch, give up: `autoxide tenant move acme --abort` deletes what was copied and
+  makes the tenant active again on its old placement.
+- `GET /api/v1/kernel/tenants/{id}/moves/{move_id}` shows the `state` of the move and the `error`
+  that stopped it. A move started over the API is retried by its job; starting another run while
+  one is running answers `tenant_move_running`.
 
 ## Running several servers
 

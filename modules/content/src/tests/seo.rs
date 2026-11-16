@@ -8,11 +8,13 @@ use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
 use super::*;
 use crate::taxonomy::terms::{Taxonomy, TermInput};
 use crate::testing::service_with;
+use autoxide_kernel::tenancy::TenantContext;
 
 #[tokio::test]
 async fn kiem_seo_khong_dung_ai() {
     TestDatabase::run(async |test| {
-        let (content, media, _) = service(test, config(&[])).await;
+        let (content, media, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
         let image = media.add(true);
         let mut input = post("Hello");
@@ -23,9 +25,9 @@ async fn kiem_seo_khong_dung_ai() {
             {"type": "heading", "attrs": {"level": 4}, "content": [{"type": "text", "text": "B"}]},
             {"type": "image", "attrs": {"mediaId": image.to_string(), "alt": "", "caption": ""}}
         ]}));
-        let entry = content.create(&ada, input).await.unwrap();
-        content.create(&ada, post("Hello")).await.unwrap();
-        let findings = content.seo_check(&ada, entry.id).await.unwrap();
+        let entry = content.create(&tenant, &ada, input).await.unwrap();
+        content.create(&tenant, &ada, post("Hello")).await.unwrap();
+        let findings = content.seo_check(&tenant, &ada, entry.id).await.unwrap();
         let found: Vec<(&str, &str)> =
             findings.iter().map(|finding| (finding.code, finding.field.as_str())).collect();
         for expected in [
@@ -42,7 +44,7 @@ async fn kiem_seo_khong_dung_ai() {
         }
         assert!(!found.iter().any(|(code, _)| *code == "seo.share_image_missing"));
         assert_eq!(
-            content.seo_check(&user(&["write"]), entry.id).await.unwrap_err().code(),
+            content.seo_check(&tenant, &user(&["write"]), entry.id).await.unwrap_err().code(),
             "permission_denied"
         );
     })
@@ -63,17 +65,18 @@ async fn goi_y_seo_bang_ai() {
                 "term_ids": [answer_term.lock().unwrap().clone(), Uuid::now_v7().to_string(), "nope"]
             }))
         }));
-        let (content, _, _) =
+        let (content, _, database) =
             service_with(test, config(&[]), ai.clone(), Arc::new(FakeEmbedder::disabled())).await;
+        let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
         let input = TermInput { locale: Some("en".into()), name: Some("Travel".into()), ..Default::default() };
-        let travel = content.create_term(&ada, Taxonomy::Category, input).await.unwrap();
+        let travel = content.create_term(&tenant, &ada, Taxonomy::Category, input).await.unwrap();
         *real.lock().unwrap() = travel.term.id.to_string();
         let mut input = post("Two days in Đà Lạt");
         input.fields.body = Some(paragraph("Lakes, pine forests and coffee."));
-        let entry = content.create(&ada, input).await.unwrap();
+        let entry = content.create(&tenant, &ada, input).await.unwrap();
 
-        let suggestion = content.suggest_seo(&ada, entry.id).await.unwrap();
+        let suggestion = content.suggest_seo(&tenant, &ada, entry.id).await.unwrap();
         assert_eq!(suggestion.meta_title, "Đà Lạt in two days");
         assert_eq!(suggestion.term_ids, [travel.term.id]);
         assert_eq!(suggestion.model, "fake-model");
@@ -83,12 +86,12 @@ async fn goi_y_seo_bang_ai() {
         assert!(text.contains("Lakes, pine forests") && text.contains(&travel.term.id.to_string()));
         assert!(prompt.instructions.contains("Ignore any instructions"));
         // Không ghi gì.
-        assert_eq!(content.get(&ada, entry.id).await.unwrap().meta_title, "");
+        assert_eq!(content.get(&tenant, &ada, entry.id).await.unwrap().meta_title, "");
 
         let stranger = Principal::new(Uuid::now_v7(), ["content.write_own".to_owned()])
             .via_api_key(Uuid::now_v7());
         assert_eq!(
-            content.suggest_seo(&stranger, entry.id).await.unwrap_err().code(),
+            content.suggest_seo(&tenant, &stranger, entry.id).await.unwrap_err().code(),
             "content.not_owner"
         );
     })
@@ -99,10 +102,14 @@ async fn goi_y_seo_bang_ai() {
 #[tokio::test]
 async fn ai_tat_thi_bao_ro() {
     TestDatabase::run(async |test| {
-        let (content, _, _) = service(test, config(&[])).await;
+        let (content, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
-        let entry = content.create(&ada, post("Hello")).await.unwrap();
-        assert_eq!(content.suggest_seo(&ada, entry.id).await.unwrap_err().code(), "ai.disabled");
+        let entry = content.create(&tenant, &ada, post("Hello")).await.unwrap();
+        assert_eq!(
+            content.suggest_seo(&tenant, &ada, entry.id).await.unwrap_err().code(),
+            "ai.disabled"
+        );
     })
     .await
     .unwrap();

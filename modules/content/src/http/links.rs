@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -67,14 +68,16 @@ pub(crate) struct EntryAuthors {
 )]
 pub(crate) async fn create_translation(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<TranslationRequest>,
 ) -> Result<Created<EntryResponse>, Error> {
-    let entry =
-        service.create_translation(&principal, id, &input.locale, input.fields.into()).await?;
+    let entry = service
+        .create_translation(&tenant, &principal, id, &input.locale, input.fields.into())
+        .await?;
     let location = format!("/content/entries/{}", entry.id);
-    Ok(Created::new(location, tagged(&service, entry).await?.data))
+    Ok(Created::new(location, tagged(&service, &tenant, entry).await?.data))
 }
 
 /// Set the categories and tags of an entry.
@@ -100,11 +103,12 @@ pub(crate) async fn create_translation(
 )]
 pub(crate) async fn set_terms(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<EntryTerms>,
 ) -> Result<Data<EntryTerms>, Error> {
-    let term_ids = service.set_entry_terms(&principal, id, input.term_ids).await?;
+    let term_ids = service.set_entry_terms(&tenant, &principal, id, input.term_ids).await?;
     Ok(Data { data: EntryTerms { term_ids } })
 }
 
@@ -132,10 +136,11 @@ pub(crate) async fn set_terms(
 )]
 pub(crate) async fn set_authors(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<EntryAuthors>,
 ) -> Result<Data<EntryAuthors>, Error> {
-    let author_ids = service.set_entry_authors(&principal, id, input.author_ids).await?;
+    let author_ids = service.set_entry_authors(&tenant, &principal, id, input.author_ids).await?;
     Ok(Data { data: EntryAuthors { author_ids } })
 }

@@ -1,5 +1,6 @@
 use super::*;
 use crate::publishing::reading::PostFilter;
+use autoxide_kernel::tenancy::TenantContext;
 
 pub(super) const SECRET: &str = "a-test-secret-that-is-long-enough-0123456789";
 
@@ -9,24 +10,28 @@ pub(super) const SECRET: &str = "a-test-secret-that-is-long-enough-0123456789";
 #[tokio::test]
 async fn bai_cong_khai_sitemap_feed() {
     TestDatabase::run(async |test| {
-        let (content, _, _) = service(test, config(&[])).await;
+        let (content, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
         let mut published = Vec::new();
         for (index, title) in ["Phở Hà Nội", "Bún chả", "Cà phê trứng"].iter().enumerate()
         {
-            let entry = content.create(&ada, post(title)).await.unwrap();
+            let entry = content.create(&tenant, &ada, post(title)).await.unwrap();
             let at = chrono::Utc::now() - chrono::Duration::days(10 - index as i64);
-            content.publish(&ada, entry.id, None, Some(at), false).await.unwrap();
+            content.publish(&tenant, &ada, entry.id, None, Some(at), false).await.unwrap();
             published.push(entry);
         }
-        let draft = content.create(&ada, post("Bản nháp bí mật")).await.unwrap();
-        let about = content.create(&ada, page("About", None)).await.unwrap();
-        content.publish(&ada, about.id, None, None, false).await.unwrap();
-        let vi =
-            content.create_translation(&ada, published[0].id, "vi", fields("Phở")).await.unwrap();
-        content.publish(&ada, vi.id, None, None, false).await.unwrap();
+        let draft = content.create(&tenant, &ada, post("Bản nháp bí mật")).await.unwrap();
+        let about = content.create(&tenant, &ada, page("About", None)).await.unwrap();
+        content.publish(&tenant, &ada, about.id, None, None, false).await.unwrap();
+        let vi = content
+            .create_translation(&tenant, &ada, published[0].id, "vi", fields("Phở"))
+            .await
+            .unwrap();
+        content.publish(&tenant, &ada, vi.id, None, None, false).await.unwrap();
         let travel = content
             .create_term(
+                &tenant,
                 &ada,
                 crate::taxonomy::terms::Taxonomy::Tag,
                 crate::taxonomy::terms::TermInput {
@@ -37,11 +42,14 @@ async fn bai_cong_khai_sitemap_feed() {
             )
             .await
             .unwrap();
-        content.set_entry_terms(&ada, published[1].id, vec![travel.term.id]).await.unwrap();
+        content
+            .set_entry_terms(&tenant, &ada, published[1].id, vec![travel.term.id])
+            .await
+            .unwrap();
 
         let first = PageRequest::first(2, Order::Desc);
         let filter = PostFilter { locale: "en".into(), ..Default::default() };
-        let page1 = content.public_posts(&filter, &first).await.unwrap();
+        let page1 = content.public_posts(&tenant, &filter, &first).await.unwrap();
         let titles: Vec<&str> = page1.data.iter().map(|row| row.title.as_str()).collect();
         assert_eq!(titles, ["Cà phê trứng", "Bún chả"]);
         let cursor = page1.pagination.next_cursor.clone().unwrap();
@@ -51,7 +59,7 @@ async fn bai_cong_khai_sitemap_feed() {
             Some("desc".into()),
         );
         let next = PageRequest::try_from(query).unwrap();
-        let page2 = content.public_posts(&filter, &next).await.unwrap();
+        let page2 = content.public_posts(&tenant, &filter, &next).await.unwrap();
         assert_eq!(
             page2.data.iter().map(|row| row.title.as_str()).collect::<Vec<_>>(),
             ["Phở Hà Nội"]
@@ -60,33 +68,34 @@ async fn bai_cong_khai_sitemap_feed() {
 
         let tagged = PostFilter { term_id: Some(travel.term.id), ..filter.clone() };
         assert_eq!(
-            content.public_posts(&tagged, &first).await.unwrap().data[0].entry_id,
+            content.public_posts(&tenant, &tagged, &first).await.unwrap().data[0].entry_id,
             published[1].id
         );
         let search = PostFilter { search: Some("ca phe".into()), ..filter.clone() };
         assert_eq!(
-            content.public_posts(&search, &first).await.unwrap().data[0].entry_id,
+            content.public_posts(&tenant, &search, &first).await.unwrap().data[0].entry_id,
             published[2].id
         );
         let secret = PostFilter { search: Some("bí mật".into()), ..filter.clone() };
         assert!(
-            content.public_posts(&secret, &first).await.unwrap().data.is_empty(),
+            content.public_posts(&tenant, &secret, &first).await.unwrap().data.is_empty(),
             "drafts never listed"
         );
         let vi_posts = PostFilter { locale: "vi".into(), ..Default::default() };
-        assert_eq!(content.public_posts(&vi_posts, &first).await.unwrap().data.len(), 1);
+        assert_eq!(content.public_posts(&tenant, &vi_posts, &first).await.unwrap().data.len(), 1);
 
-        let all = content.sitemap(None, &PageRequest::first(50, Order::Asc)).await.unwrap().data;
+        let all =
+            content.sitemap(&tenant, None, &PageRequest::first(50, Order::Asc)).await.unwrap().data;
         assert_eq!(all.len(), 5, "3 posts, 1 page, 1 translation");
         assert!(all.iter().all(|row| row.entry_id != draft.id));
-        let translations = content.translations_of(&all).await.unwrap();
+        let translations = content.translations_of(&tenant, &all).await.unwrap();
         assert_eq!(
             translations[&published[0].id],
             [("vi".to_owned(), "/blog/pho-ha-noi".to_owned())]
         );
         assert_eq!(
             content
-                .sitemap(Some("vi"), &PageRequest::first(50, Order::Asc))
+                .sitemap(&tenant, Some("vi"), &PageRequest::first(50, Order::Asc))
                 .await
                 .unwrap()
                 .data
@@ -94,7 +103,7 @@ async fn bai_cong_khai_sitemap_feed() {
             1
         );
 
-        let feed = content.feed("en", 2).await.unwrap();
+        let feed = content.feed(&tenant, "en", 2).await.unwrap();
         assert_eq!(
             feed.iter().map(|row| row.entry_id).collect::<Vec<_>>(),
             [published[2].id, published[1].id]
@@ -109,31 +118,34 @@ async fn bai_cong_khai_sitemap_feed() {
 #[tokio::test]
 async fn xem_truoc() {
     TestDatabase::run(async |test| {
-        let (off, _, _) = service(test, config(&[])).await;
+        let (off, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
-        let entry = off.create(&ada, post("Draft")).await.unwrap();
+        let entry = off.create(&tenant, &ada, post("Draft")).await.unwrap();
         assert_eq!(
-            off.preview_token(&ada, entry.id).await.unwrap_err().code(),
+            off.preview_token(&tenant, &ada, entry.id).await.unwrap_err().code(),
             "content.preview_disabled"
         );
-        assert_eq!(off.preview("x.y").await.unwrap_err().code(), "content.preview_disabled");
+        assert_eq!(off.preview(None, "x.y").await.unwrap_err().code(), "content.preview_disabled");
 
-        let (content, _, _) =
+        let (content, _, database) =
             service(test, config(&[("AUTOXIDE_CONTENT_PREVIEW_SECRET", SECRET)])).await;
+
+        let tenant = TenantContext::default_on(database.clone());
         let reader = user(&["read"]);
         assert_eq!(
-            content.preview_token(&reader, entry.id).await.unwrap_err().code(),
+            content.preview_token(&tenant, &reader, entry.id).await.unwrap_err().code(),
             "permission_denied"
         );
         assert_eq!(
-            content.preview_token(&ada, Uuid::now_v7()).await.unwrap_err().code(),
+            content.preview_token(&tenant, &ada, Uuid::now_v7()).await.unwrap_err().code(),
             "content.not_found"
         );
-        let (token, expires) = content.preview_token(&ada, entry.id).await.unwrap();
+        let (token, expires) = content.preview_token(&tenant, &ada, entry.id).await.unwrap();
         assert!(expires > chrono::Utc::now() + chrono::Duration::seconds(590));
-        content.update(&ada, entry.id, fields("Draft v2"), false, None).await.unwrap();
+        content.update(&tenant, &ada, entry.id, fields("Draft v2"), false, None).await.unwrap();
         assert_eq!(
-            content.preview(&token).await.unwrap().title,
+            content.preview(None, &token).await.unwrap().1.title,
             "Draft v2",
             "always the latest draft"
         );
@@ -143,30 +155,45 @@ async fn xem_truoc() {
         tampered.remove(4);
         for bad in [tampered.as_str(), "nonsense", "abc.def", ""] {
             assert_eq!(
-                content.preview(bad).await.unwrap_err().code(),
+                content.preview(Some(&tenant), bad).await.unwrap_err().code(),
                 "content.preview_token_invalid",
                 "{bad}"
             );
         }
         let past = chrono::Utc::now() - chrono::Duration::seconds(1);
-        let expired = crate::publishing::preview::sign(SECRET, entry.id, past).unwrap();
+        let expired =
+            crate::publishing::preview::sign(SECRET, tenant.id(), entry.id, past).unwrap();
         assert_eq!(
-            content.preview(&expired).await.unwrap_err().code(),
+            content.preview(None, &expired).await.unwrap_err().code(),
             "content.preview_token_invalid"
         );
         let other_secret = crate::publishing::preview::sign(
             "another-secret-that-is-long-enough-012345",
+            tenant.id(),
             entry.id,
             expires,
         )
         .unwrap();
         assert_eq!(
-            content.preview(&other_secret).await.unwrap_err().code(),
+            content.preview(None, &other_secret).await.unwrap_err().code(),
             "content.preview_token_invalid"
         );
-        content.delete(&ada, entry.id, None).await.unwrap();
+        // Token ký cho một khách khác (không có trong sổ): như token sai, kể cả khi request
+        // không nêu khách.
+        let foreign = crate::publishing::preview::sign(
+            SECRET,
+            autoxide_kernel::tenancy::TenantId::from_uuid(Uuid::now_v7()),
+            entry.id,
+            expires,
+        )
+        .unwrap();
         assert_eq!(
-            content.preview(&token).await.unwrap_err().code(),
+            content.preview(None, &foreign).await.unwrap_err().code(),
+            "content.preview_token_invalid"
+        );
+        content.delete(&tenant, &ada, entry.id, None).await.unwrap();
+        assert_eq!(
+            content.preview(Some(&tenant), &token).await.unwrap_err().code(),
             "content.preview_token_invalid"
         );
     })

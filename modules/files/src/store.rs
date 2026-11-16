@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::storage::{ByteStream, Storage, StoredFile};
+use autoxide_kernel::storage::{ByteStream, Storage, StorageLocation, StorageOpener, StoredFile};
 use futures_util::{StreamExt as _, TryStreamExt as _};
 use object_store::aws::AmazonS3Builder;
 use object_store::buffered::BufWriter;
@@ -61,6 +61,27 @@ impl ObjectStorage {
             None => key.to_owned(),
         };
         Path::parse(full).map_err(Error::internal)
+    }
+}
+
+/// Mở nơi lưu file riêng của placement (bước 33) bằng đúng cài đặt của nơi lưu chung. Module công
+/// bố `dyn StorageOpener`; sổ database của kernel gọi khi khách nằm trên placement có nơi lưu riêng.
+pub(crate) struct Opener;
+
+impl StorageOpener for Opener {
+    fn open(&self, location: &StorageLocation) -> Result<Arc<dyn Storage>, Error> {
+        let backend = match location {
+            StorageLocation::Local { dir } => Backend::Local { dir: std::path::PathBuf::from(dir) },
+            StorageLocation::S3(s3) => Backend::S3(S3Config {
+                bucket: s3.bucket.clone(),
+                prefix: s3.prefix.clone(),
+                region: s3.region.clone(),
+                endpoint: s3.endpoint.clone(),
+                access_key_id: s3.access_key_id.clone(),
+                secret_access_key: s3.secret_access_key.clone(),
+            }),
+        };
+        Ok(Arc::new(ObjectStorage::open(&backend)?))
     }
 }
 

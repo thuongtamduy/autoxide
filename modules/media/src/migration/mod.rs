@@ -9,6 +9,7 @@ mod m0008_alt_translations;
 mod m0010_add_decorative;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -34,5 +35,42 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Cờ `decorative`: ảnh trang trí, `alt` trống có chủ ý (D-267).
         Box::new(m0010_add_decorative::Migration),
+        // Item, thư mục, nhãn, ảnh thu nhỏ, bản dịch `alt` và dòng khoá cây thư mục thuộc một khách
+        // (bước 33). Chỉ việc tìm khách có item quá hạn trong thùng rác quét cả database (index
+        // `_sweep_idx`); việc xoá hẳn chạy theo từng khách.
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0011_tenancy",
+            vec![
+                TenantTable::new("media_folder")
+                    .unique(
+                        "media_folder_parent_name_unique",
+                        ["tenant_id", "parent_id", "name_key"],
+                    )
+                    .index("media_folder_name_idx", ["tenant_id", "name_key", "id"]),
+                TenantTable::new("media_item")
+                    .index("media_item_folder_idx", ["tenant_id", "folder_id", "id"])
+                    .index("media_item_name_idx", ["tenant_id", "name_key", "id"])
+                    .index("media_item_size_idx", ["tenant_id", "size", "id"])
+                    .index("media_item_sha256_idx", ["tenant_id", "sha256"])
+                    .index("media_item_trashed_idx", ["tenant_id", "trashed_at"])
+                    .index("media_item_uploaded_by_idx", ["tenant_id", "uploaded_by"])
+                    .sweep_index("media_item_trashed_sweep_idx", ["trashed_at"]),
+                TenantTable::new("media_lock").primary_key(["tenant_id", "name"]),
+                TenantTable::new("media_tag")
+                    .unique("media_tag_name_unique", ["tenant_id", "name_key"]),
+                TenantTable::new("media_item_tag")
+                    .primary_key(["tenant_id", "item_id", "tag_id"])
+                    .index("media_item_tag_tag_idx", ["tenant_id", "tag_id", "item_id"]),
+                TenantTable::new("media_variant").unique(
+                    "media_variant_format_unique",
+                    ["tenant_id", "item_id", "version_id", "width", "content_type"],
+                ),
+                TenantTable::new("media_alt_translations").primary_key([
+                    "tenant_id",
+                    "media_id",
+                    "locale",
+                ]),
+            ],
+        ),
     ]
 }

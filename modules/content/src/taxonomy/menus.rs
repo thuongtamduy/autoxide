@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
@@ -56,17 +56,23 @@ pub(crate) struct PublicNode {
 }
 
 impl ContentService {
-    pub(crate) async fn list_menus(&self, principal: &Principal) -> Result<Vec<Menu>, Error> {
+    pub(crate) async fn list_menus(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+    ) -> Result<Vec<Menu>, Error> {
         principal.require(&CONTENT_READ)?;
         Ok(menu::Entity::find()
+            .scoped(tenant)
             .order_by_asc(menu::Column::Key)
             .order_by_asc(menu::Column::Locale)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?)
     }
 
     pub(crate) async fn get_menu(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         key: &str,
         locale: Option<&str>,
@@ -77,15 +83,18 @@ impl ContentService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let found =
-            self.find_menu(key, &locale).await?.ok_or_else(|| menu_not_found(key, &locale))?;
-        let items = self.menu_items(found.id).await?;
+        let found = self
+            .find_menu(tenant, key, &locale)
+            .await?
+            .ok_or_else(|| menu_not_found(key, &locale))?;
+        let items = self.menu_items(tenant, found.id).await?;
         Ok((found, tree(items)))
     }
 
     /// Thay cả cây mục của menu (`key`, `locale`); chưa có thì tạo. Cần `content.manage`.
     pub(crate) async fn put_menu(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         key: &str,
         locale: Option<&str>,
@@ -108,20 +117,21 @@ impl ContentService {
             ));
         }
         let mut flat = Vec::new();
-        flatten(&items, None, 1, "items", &mut flat, &mut problems);
+        flatten(tenant, &items, None, 1, "items", &mut flat, &mut problems);
         if flat.len() > MAX_ITEMS {
             problems.push(
                 FieldError::new("items", "length", "at most {max_items} items")
                     .with_param("max_items", MAX_ITEMS),
             );
         }
-        self.check_targets(&flat, &locale, &mut problems).await?;
+        self.check_targets(tenant, &flat, &locale, &mut problems).await?;
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let existing = menu::Entity::find()
+            .scoped(tenant)
             .filter(menu::Column::Key.eq(key))
             .filter(menu::Column::Locale.eq(locale.as_str()))
             .one(&transaction)
@@ -129,6 +139,7 @@ impl ContentService {
         let (saved, before) = match existing {
             Some(existing) => {
                 let updated = menu::Entity::update_many()
+                    .scoped(tenant)
                     .col_expr(menu::Column::UpdatedAt, sea_orm::sea_query::Expr::value(now))
                     .filter(menu::Column::Id.eq(existing.id))
                     .filter(menu::Column::UpdatedAt.eq(expected.unwrap_or(existing.updated_at)))
@@ -138,10 +149,12 @@ impl ContentService {
                     return Err(autoxide_kernel::version::changed());
                 }
                 let before = menu_item::Entity::find()
+                    .scoped(tenant)
                     .filter(menu_item::Column::MenuId.eq(existing.id))
                     .count(&transaction)
                     .await?;
                 menu_item::Entity::delete_many()
+                    .scoped(tenant)
                     .filter(menu_item::Column::MenuId.eq(existing.id))
                     .exec(&transaction)
                     .await?;
@@ -154,6 +167,7 @@ impl ContentService {
                 }
                 let row = menu::ActiveModel {
                     id: Set(Uuid::now_v7()),
+                    tenant_id: Set(tenant.id().as_uuid()),
                     key: Set(key.to_owned()),
                     locale: Set(locale.clone()),
                     created_at: Set(now),
@@ -174,6 +188,7 @@ impl ContentService {
         for (index, (item, _)) in flat.iter().enumerate() {
             menu_item::ActiveModel {
                 id: Set(item.id),
+                tenant_id: Set(tenant.id().as_uuid()),
                 menu_id: Set(saved.id),
                 parent_id: Set(item.parent_id),
                 sort_order: Set(i32::try_from(index).unwrap_or(i32::MAX)),
@@ -193,7 +208,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("menu", saved.id),
                 &events::MenuChanged(change),
@@ -208,6 +223,7 @@ impl ContentService {
     /// tính đường dẫn; mục trỏ tới nội dung chưa công khai thì ẩn.
     pub(crate) async fn public_menu(
         &self,
+        tenant: &TenantContext,
         key: &str,
         locale: &str,
     ) -> Result<(Menu, Vec<PublicNode>), Error> {
@@ -216,48 +232,60 @@ impl ContentService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let found = match self.find_menu(key, &locale).await? {
+        let found = match self.find_menu(tenant, key, &locale).await? {
             Some(found) => found,
             None => self
-                .find_menu(key, &self.config.default_locale)
+                .find_menu(tenant, key, &self.config.default_locale)
                 .await?
                 .ok_or_else(|| menu_not_found(key, &locale))?,
         };
-        let items = self.menu_items(found.id).await?;
+        let items = self.menu_items(tenant, found.id).await?;
         let entry_ids: Vec<Uuid> = items.iter().filter_map(|item| item.target_entry_id).collect();
         let live: HashMap<Uuid, String> =
-            crate::publishing::paths::paths(self.database.read(), &entry_ids).await?;
+            crate::publishing::paths::paths(tenant.database().read(), tenant, &entry_ids).await?;
         let term_ids: Vec<Uuid> = items.iter().filter_map(|item| item.target_term_id).collect();
-        let terms = self.term_refs(&term_ids, &found.locale).await?;
+        let terms = self.term_refs(tenant, &term_ids, &found.locale).await?;
         let nodes = public_nodes(&tree(items), &live, &terms);
         Ok((found, nodes))
     }
 
-    async fn find_menu(&self, key: &str, locale: &str) -> Result<Option<Menu>, Error> {
+    async fn find_menu(
+        &self,
+        tenant: &TenantContext,
+        key: &str,
+        locale: &str,
+    ) -> Result<Option<Menu>, Error> {
         Ok(menu::Entity::find()
+            .scoped(tenant)
             .filter(menu::Column::Key.eq(key))
             .filter(menu::Column::Locale.eq(locale))
-            .one(self.database.read())
+            .one(tenant.database().read())
             .await?)
     }
 
-    async fn menu_items(&self, menu_id: Uuid) -> Result<Vec<MenuItem>, Error> {
+    async fn menu_items(
+        &self,
+        tenant: &TenantContext,
+        menu_id: Uuid,
+    ) -> Result<Vec<MenuItem>, Error> {
         Ok(menu_item::Entity::find()
+            .scoped(tenant)
             .filter(menu_item::Column::MenuId.eq(menu_id))
             .order_by_asc(menu_item::Column::SortOrder)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?)
     }
 
     /// Tên của các term (theo ngôn ngữ của menu, thiếu thì mặc định).
     async fn term_refs(
         &self,
+        tenant: &TenantContext,
         ids: &[Uuid],
         locale: &str,
     ) -> Result<HashMap<Uuid, crate::taxonomy::terms::TermRef>, Error> {
         let mut found = HashMap::new();
         for id in ids {
-            if let Ok(term) = self.term_for_menu(*id, locale).await {
+            if let Ok(term) = self.term_for_menu(tenant, *id, locale).await {
                 found.insert(*id, term);
             }
         }
@@ -266,12 +294,14 @@ impl ContentService {
 
     async fn term_for_menu(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         locale: &str,
     ) -> Result<crate::taxonomy::terms::TermRef, Error> {
         let texts = crate::entity::term_translation::Entity::find()
+            .scoped(tenant)
             .filter(crate::entity::term_translation::Column::TermId.eq(id))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let chosen = texts
             .iter()
@@ -291,6 +321,7 @@ impl ContentService {
     /// Đích của mọi mục có thật: mục nội dung cùng ngôn ngữ, term có thật.
     async fn check_targets(
         &self,
+        tenant: &TenantContext,
         flat: &[(MenuItem, String)],
         locale: &str,
         problems: &mut Vec<FieldError>,
@@ -301,8 +332,9 @@ impl ContentService {
             HashMap::new()
         } else {
             entry::Entity::find()
+                .scoped(tenant)
                 .filter(entry::Column::Id.is_in(entry_ids))
-                .all(self.database.read())
+                .all(tenant.database().read())
                 .await?
                 .into_iter()
                 .map(|row| (row.id, row.locale))
@@ -313,8 +345,9 @@ impl ContentService {
             Vec::new()
         } else {
             term::Entity::find()
+                .scoped(tenant)
                 .filter(term::Column::Id.is_in(term_ids))
-                .all(self.database.read())
+                .all(tenant.database().read())
                 .await?
                 .into_iter()
                 .map(|row| row.id)
@@ -346,6 +379,7 @@ impl ContentService {
 
 /// Dàn cây mục thành danh sách (cha trước con), kiểm từng mục; kèm vị trí trong JSON.
 fn flatten(
+    tenant: &TenantContext,
     items: &[ItemInput],
     parent: Option<Uuid>,
     depth: usize,
@@ -400,6 +434,7 @@ fn flatten(
         flat.push((
             MenuItem {
                 id,
+                tenant_id: tenant.id().as_uuid(),
                 menu_id: Uuid::nil(),
                 parent_id: parent,
                 sort_order: 0,
@@ -410,7 +445,15 @@ fn flatten(
             },
             here.clone(),
         ));
-        flatten(&input.children, Some(id), depth + 1, &format!("{here}.children"), flat, problems);
+        flatten(
+            tenant,
+            &input.children,
+            Some(id),
+            depth + 1,
+            &format!("{here}.children"),
+            flat,
+            problems,
+        );
     }
 }
 
@@ -467,16 +510,17 @@ fn menu_not_found(key: &str, locale: &str) -> Error {
 impl crate::api::LegacyMenus for ContentService {
     async fn legacy_menus(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
     ) -> Result<Vec<crate::api::LegacyMenu>, Error> {
         let menus = menu::Entity::find()
+            .scoped(tenant)
             .order_by_asc(menu::Column::Key)
             .order_by_asc(menu::Column::Locale)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let mut found = Vec::with_capacity(menus.len());
         for row in menus {
-            let items = legacy_items(tree(self.menu_items(row.id).await?));
+            let items = legacy_items(tree(self.menu_items(tenant, row.id).await?));
             found.push(crate::api::LegacyMenu { key: row.key, locale: row.locale, items });
         }
         Ok(found)

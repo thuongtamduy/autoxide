@@ -56,7 +56,7 @@ pub(crate) async fn admin_token(runtime: &Runtime, email: &str) -> String {
         password: Some(password.to_owned()),
         admin: true,
     };
-    accounts.create(&TenantContext::legacy_default(&runtime.database), account).await.unwrap();
+    accounts.create(&TenantContext::default_on(runtime.database.clone()), account).await.unwrap();
     let login = json!({"email": email, "password": password}).to_string();
     let (_, _, body) = call(
         runtime,

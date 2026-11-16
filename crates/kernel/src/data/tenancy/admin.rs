@@ -91,7 +91,7 @@ pub fn require_platform(principal: &Principal) -> Result<(), Error> {
     }
 }
 
-mod tenant {
+pub(super) mod tenant {
     //! Bảng `kernel_tenants` (mặt điều khiển).
     use sea_orm::entity::prelude::*;
 
@@ -184,7 +184,32 @@ pub struct Placement {
     pub backend: String,
     /// `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`.
     pub schema_state: String,
+    /// The placement's own file storage; `null` when its tenants' files are kept in the
+    /// platform's storage (the `files` module settings). Set with `autoxide placement storage`.
+    pub storage: Option<PlacementStorage>,
     pub created_at: DateTime<Utc>,
+}
+
+/// Where a placement keeps its tenants' files. Access keys are never shown.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct PlacementStorage {
+    /// `local` (a directory on the server), `s3` (an S3 or S3-compatible bucket), or
+    /// `unreadable` (the stored settings cannot be decrypted with the configured secret key).
+    #[schema(example = "s3")]
+    pub kind: String,
+    /// Directory on the server (`local`).
+    pub dir: Option<String>,
+    /// Bucket (`s3`).
+    #[schema(example = "acme-files")]
+    pub bucket: Option<String>,
+    /// Folder inside the bucket (`s3`).
+    pub prefix: Option<String>,
+    /// Region of the bucket (`s3`).
+    pub region: Option<String>,
+    /// Address of the S3-compatible service (`s3`); `null` for Amazon S3.
+    pub endpoint: Option<String>,
+    /// Whether an access key is stored (`s3`); its value is never shown.
+    pub credentials: bool,
 }
 
 /// A new tenant.
@@ -474,6 +499,10 @@ impl TenantAdmin {
         if expected.is_some_and(|expected| expected != row.updated_at) {
             return Err(crate::version::changed());
         }
+        // Dữ liệu của khách đang được chép: đổi gì (kể cả mở lại) cũng ghi vào database cũ.
+        if row.status == TenantStatus::Moving.as_str() {
+            return Err(errors::tenant_moving());
+        }
         let mut problems = Vec::new();
         let name = changes.name.map(|name| name.trim().to_owned());
         if name.as_ref().is_some_and(|name| name.is_empty() || name.chars().count() > 200) {
@@ -534,18 +563,73 @@ impl TenantAdmin {
     pub async fn placements(&self) -> Result<Vec<Placement>, Error> {
         let mut rows = self.placement_names().await?;
         rows.sort_by(|a, b| a.name.cmp(&b.name));
-        Ok(rows.into_iter().map(describe_placement).collect())
+        let mut all = Vec::with_capacity(rows.len());
+        for row in rows {
+            all.push(describe_placement(&self.registry, row).await);
+        }
+        Ok(all)
     }
 }
 
-pub(super) fn describe_placement(row: placement::Model) -> Placement {
+/// Placement cho API: không bao giờ có URL hay khoá bí mật của nơi lưu.
+pub(super) async fn describe_placement(
+    registry: &DatabaseRegistry,
+    row: placement::Model,
+) -> Placement {
+    let storage = match &row.storage_sealed {
+        None => None,
+        Some(sealed) => {
+            let id = PlacementId::from_uuid(row.id);
+            Some(match registry.storage_location(id, sealed).await {
+                Ok(location) => describe_storage(&location),
+                Err(error) => {
+                    tracing::warn!(placement = %row.name, error = %error, "cannot read the placement's file storage settings");
+                    PlacementStorage {
+                        kind: "unreadable".to_owned(),
+                        dir: None,
+                        bucket: None,
+                        prefix: None,
+                        region: None,
+                        endpoint: None,
+                        credentials: false,
+                    }
+                }
+            })
+        }
+    };
     Placement {
         id: row.id,
         name: row.name,
         kind: row.kind,
         backend: row.backend,
         schema_state: row.schema_state,
+        storage,
         created_at: row.created_at,
+    }
+}
+
+/// Phần không bí mật của nơi lưu riêng.
+fn describe_storage(location: &crate::storage::StorageLocation) -> PlacementStorage {
+    use crate::storage::StorageLocation;
+    match location {
+        StorageLocation::Local { dir } => PlacementStorage {
+            kind: "local".to_owned(),
+            dir: Some(dir.clone()),
+            bucket: None,
+            prefix: None,
+            region: None,
+            endpoint: None,
+            credentials: false,
+        },
+        StorageLocation::S3(s3) => PlacementStorage {
+            kind: "s3".to_owned(),
+            dir: None,
+            bucket: Some(s3.bucket.clone()),
+            prefix: s3.prefix.clone(),
+            region: Some(s3.region.clone()),
+            endpoint: s3.endpoint.clone(),
+            credentials: s3.access_key_id.is_some(),
+        },
     }
 }
 

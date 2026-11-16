@@ -272,7 +272,7 @@ async fn app(test: &TestDatabase) -> TestApp {
     };
     app.api::<dyn Accounts>()
         .unwrap()
-        .create(&TenantContext::legacy_default(app.database()), account)
+        .create(&TenantContext::default_on(app.database().clone()), account)
         .await
         .unwrap();
     app

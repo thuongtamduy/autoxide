@@ -134,7 +134,7 @@ fn token_in(text: &str) -> String {
     let start = text.find("token=").unwrap() + "token=".len();
     text[start..]
         .chars()
-        .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
         .collect()
 }
 
@@ -353,4 +353,203 @@ async fn tool_mcp() {
     })
     .await
     .unwrap();
+}
+
+/// Hai khách (một dùng chung database, một database riêng) cùng `key` danh sách: endpoint công
+/// khai làm việc với đúng khách theo header `autoxide-tenant`; token xác nhận và token huỷ đăng ký
+/// của khách A không dùng được ở khách B; người của khách B không thấy danh sách, người đăng ký,
+/// chiến dịch hay danh sách chặn của A qua bất kỳ `GET` hay tool MCP chỉ đọc nào.
+#[tokio::test]
+async fn hai_khach_cung_key_danh_sach_khong_ro_ri() {
+    TestDatabase::run(async |test| {
+        let mailer = Arc::new(FakeMailer::default());
+        let shared: Arc<dyn Mailer> = mailer.clone();
+        let all = ["newsletter.read", "newsletter.manage", "newsletter.send", "newsletter.export"];
+        let http = TestApp::builder(test)
+            .setting("AUTOXIDE_HTTP_PUBLIC_URL", "https://api.example.com")
+            .setting(
+                "AUTOXIDE_NEWSLETTER_CONFIRM_URL",
+                "https://www.example.com/confirm?token={token}",
+            )
+            .setting(
+                "AUTOXIDE_NEWSLETTER_PREFERENCES_URL",
+                "https://www.example.com/prefs?token={token}",
+            )
+            .tenant("a")
+            .tenant_dedicated("b")
+            .user_in("a", "admin-a", 1, &all)
+            .user_in("a", "website-a", 2, &["newsletter.subscribe"])
+            .user_in("b", "admin-b", 3, &all)
+            .user_in("b", "website-b", 4, &["newsletter.subscribe"])
+            .provide::<dyn Mailer>(shared)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let app = App { http, mailer };
+        let http = &app.http;
+        let marker = "marker-newsletter-a";
+        let mut lists = Vec::new();
+        for (who, name) in [("admin-a", marker), ("admin-b", "List B")] {
+            let body = json!({"key": "weekly", "name": {"en": name}, "public": true});
+            let created = send(http, "POST", "/newsletter/lists", Some(who), &[], Some(body)).await;
+            assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+            lists.push(created.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        for (slug, name) in [("a", marker), ("b", "List B")] {
+            let public = send(
+                http,
+                "GET",
+                "/newsletter/public/lists",
+                None,
+                &[("autoxide-tenant", slug)],
+                None,
+            )
+            .await;
+            assert_eq!(public.status(), StatusCode::OK, "{}", public.json());
+            assert_eq!(public.json()["data"]["lists"][0]["name"], name);
+        }
+
+        // Đăng ký ở khách A và khách B (máy chủ website của từng khách).
+        let id_of = async |slug: &str| http.tenant(slug).await.unwrap().id().as_uuid().simple();
+        let (a_id, b_id) = (id_of("a").await, id_of("b").await);
+        let email = format!("{marker}@example.com");
+        let reader_b = "reader-b@example.com";
+        for (who, address) in [("website-a", email.as_str()), ("website-b", reader_b)] {
+            let body = json!({"email": address, "lists": ["weekly"]});
+            let queued =
+                send(http, "POST", "/newsletter/public/subscribe", Some(who), &[], Some(body))
+                    .await;
+            assert_eq!(queued.status(), StatusCode::ACCEPTED, "{}", queued.json());
+        }
+        app.work().await;
+        let a_confirm = token_in(&app.mailer.to(&email)[0].text);
+        let b_confirm = token_in(&app.mailer.to(reader_b)[0].text);
+        assert!(a_confirm.starts_with(&format!("t{a_id}.")), "{a_confirm}");
+        assert!(b_confirm.starts_with(&format!("t{b_id}.")), "{b_confirm}");
+
+        // Tên miền chính, không header: token mang khách của nó. Ghép ID khách B với phần thô
+        // của token khách A, hay ID khách không tồn tại: token sai.
+        let confirm = async |token: String| {
+            let body = json!({"token": token});
+            send(http, "POST", "/newsletter/public/confirm", None, &[], Some(body)).await
+        };
+        let raw = |token: &str| token.rsplit('.').next().unwrap().to_owned();
+        for forged in [
+            format!("t{b_id}.{}", raw(&a_confirm)),
+            format!("t{}.{}", uuid::Uuid::now_v7().simple(), raw(&a_confirm)),
+        ] {
+            let refused = confirm(forged).await;
+            assert_eq!(refused.status(), StatusCode::BAD_REQUEST, "{}", refused.json());
+            assert_eq!(refused.code().as_deref(), Some("newsletter.confirmation_invalid"));
+        }
+        for token in [a_confirm, b_confirm] {
+            let confirmed = confirm(token).await;
+            assert_eq!(confirmed.status(), StatusCode::OK, "{}", confirmed.json());
+        }
+        let confirmed_b = send(
+            http,
+            "GET",
+            "/newsletter/subscribers?status=confirmed",
+            Some("admin-b"),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(confirmed_b.json()["data"][0]["email"], reader_b, "{}", confirmed_b.json());
+
+        // Chiến dịch của A gửi tới người đăng ký của A.
+        let draft = json!({"list_id": lists[0], "subject": marker, "body_text": marker});
+        let campaign =
+            send(http, "POST", "/newsletter/campaigns", Some("admin-a"), &[], Some(draft)).await;
+        assert_eq!(campaign.status(), StatusCode::CREATED, "{}", campaign.json());
+        let campaign_id = campaign.json()["data"]["id"].as_str().unwrap().to_owned();
+        let read = send(
+            http,
+            "GET",
+            &format!("/newsletter/campaigns/{campaign_id}"),
+            Some("admin-a"),
+            &[],
+            None,
+        )
+        .await;
+        let etag = read.header(header::ETAG).to_owned();
+        let path = format!("/newsletter/campaigns/{campaign_id}/send");
+        let started =
+            send(http, "POST", &path, Some("admin-a"), &[("if-match", &etag)], None).await;
+        assert_eq!(started.status(), StatusCode::OK, "{}", started.json());
+        app.work().await;
+        let mail = app.mailer.to(&email).pop().unwrap();
+        let header =
+            mail.headers.iter().find(|(name, _)| name == "List-Unsubscribe").unwrap().1.clone();
+        let token = token_in(&header);
+        assert!(token.starts_with(&format!("t{a_id}.")), "{token}");
+        let forged = format!("t{b_id}.{}", raw(&token));
+        let prefs = |token: &str| format!("/newsletter/public/preferences?token={token}");
+        let refused = send(http, "GET", &prefs(&forged), None, &[], None).await;
+        assert_eq!(refused.status(), StatusCode::NOT_FOUND, "{}", refused.json());
+        let mine = send(http, "GET", &prefs(&token), None, &[], None).await;
+        assert_eq!(mine.status(), StatusCode::OK, "{}", mine.json());
+        // Huỷ một chạm ở tên miền chính như ứng dụng mail: huỷ thật ở khách A.
+        let one_click = |token: &str| format!("/newsletter/public/unsubscribe?token={token}");
+        let form = Some("application/x-www-form-urlencoded");
+        let body = || Some("List-Unsubscribe=One-Click".to_owned());
+        raw_send(http, &one_click(&forged), form, body()).await;
+        let still = send(
+            http,
+            "GET",
+            "/newsletter/subscribers?status=unsubscribed",
+            Some("admin-a"),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(still.json()["data"], json!([]), "{}", still.json());
+        let done = raw_send(http, &one_click(&token), form, body()).await;
+        assert_eq!(done.status(), StatusCode::OK);
+        let left = send(
+            http,
+            "GET",
+            "/newsletter/subscribers?status=unsubscribed",
+            Some("admin-a"),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(left.json()["data"][0]["email"], email.as_str(), "{}", left.json());
+
+        let blocked = json!({"email": format!("blocked-{marker}@example.com"), "note": marker});
+        let suppression =
+            send(http, "POST", "/newsletter/suppressions", Some("admin-a"), &[], Some(blocked))
+                .await;
+        assert_eq!(suppression.status(), StatusCode::CREATED, "{}", suppression.json());
+        let suppression_id = suppression.json()["data"]["id"].as_str().unwrap().to_owned();
+        let found = send(http, "GET", "/newsletter/subscribers", Some("admin-a"), &[], None).await;
+        let subscriber_id = found.json()["data"][0]["id"].as_str().unwrap().to_owned();
+
+        let seeded = [
+            ("id", lists[0].clone()),
+            ("list_id", lists[0].clone()),
+            ("id", subscriber_id),
+            ("id", campaign_id),
+            ("id", suppression_id),
+        ];
+        let violations =
+            autoxide_testkit::leak_check(http, "admin-b", marker, &seeded).await.unwrap();
+        assert_eq!(violations, Vec::<String>::new());
+    })
+    .await
+    .unwrap();
+}
+
+/// `POST` không đăng nhập, không header khách (như ứng dụng mail gọi tên miền chính).
+async fn raw_send(
+    http: &TestApp,
+    uri: &str,
+    content_type: Option<&str>,
+    body: Option<String>,
+) -> TestResponse {
+    let answer = raw(http, "POST", uri, None, &[], content_type, body).await;
+    assert_eq!(answer.status(), StatusCode::OK, "{}", String::from_utf8_lossy(answer.body()));
+    answer
 }

@@ -8,6 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -121,13 +122,14 @@ pub(crate) struct UpdateListRequest {
 )]
 pub(crate) async fn list_lists(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<ListResponse>, Error> {
     let page = page_request(paging, Vec::new())?;
-    let found = service.list_lists(&principal, &page).await?;
+    let found = service.list_lists(&tenant, &principal, &page).await?;
     let ids: Vec<Uuid> = found.data.iter().map(|list| list.row.id).collect();
-    let mut counts = service.subscription_counts(&ids).await?;
+    let mut counts = service.subscription_counts(&tenant, &ids).await?;
     Ok(found.map(|list| {
         let count = counts.remove(&list.row.id).unwrap_or_default();
         ListResponse::new(list, count)
@@ -156,6 +158,7 @@ pub(crate) async fn list_lists(
 )]
 pub(crate) async fn create_list(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateListRequest>,
 ) -> Result<Created<ListResponse>, Error> {
@@ -168,7 +171,7 @@ pub(crate) async fn create_list(
         new_posts: input.new_posts,
         new_post_locale: input.new_post_locale.map(Some),
     };
-    let list = service.create_list(&principal, input).await?;
+    let list = service.create_list(&tenant, &principal, input).await?;
     Ok(Created::new(
         format!("/newsletter/lists/{}", list.row.id),
         ListResponse::new(list, SubscriptionCounts::default()),
@@ -194,11 +197,12 @@ pub(crate) async fn create_list(
 )]
 pub(crate) async fn get_list(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<ListResponse>, Error> {
-    let list = service.get_list(&principal, id).await?;
-    let count = service.subscription_counts(&[id]).await?.remove(&id).unwrap_or_default();
+    let list = service.get_list(&tenant, &principal, id).await?;
+    let count = service.subscription_counts(&tenant, &[id]).await?.remove(&id).unwrap_or_default();
     Ok(Tagged { version: list.row.updated_at, data: ListResponse::new(list, count) })
 }
 
@@ -227,6 +231,7 @@ pub(crate) async fn get_list(
 )]
 pub(crate) async fn update_list(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -242,8 +247,8 @@ pub(crate) async fn update_list(
         new_posts: input.new_posts,
         new_post_locale: input.new_post_locale,
     };
-    let list = service.update_list(&principal, id, input, expected).await?;
-    let count = service.subscription_counts(&[id]).await?.remove(&id).unwrap_or_default();
+    let list = service.update_list(&tenant, &principal, id, input, expected).await?;
+    let count = service.subscription_counts(&tenant, &[id]).await?.remove(&id).unwrap_or_default();
     Ok(Tagged { version: list.row.updated_at, data: ListResponse::new(list, count) })
 }
 
@@ -270,11 +275,12 @@ pub(crate) async fn update_list(
 )]
 pub(crate) async fn delete_list(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<StatusCode, Error> {
     let expected = if_match.required()?;
-    service.delete_list(&principal, id, expected).await?;
+    service.delete_list(&tenant, &principal, id, expected).await?;
     Ok(StatusCode::NO_CONTENT)
 }

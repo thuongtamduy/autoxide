@@ -8,7 +8,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
@@ -49,19 +49,26 @@ pub(crate) struct AuthorInput {
 }
 
 /// Điều kiện "mục có tác giả `author_id`", cho bộ lọc danh sách quản trị.
-pub(crate) fn has_author(author_id: Uuid) -> sea_orm::sea_query::SimpleExpr {
-    entry::Column::Id.in_subquery(by_author(author_id))
+pub(crate) fn has_author(
+    tenant: &TenantContext,
+    author_id: Uuid,
+) -> sea_orm::sea_query::SimpleExpr {
+    entry::Column::Id.in_subquery(by_author(tenant, author_id))
 }
 
 /// Như [`has_author`], cho bảng bản công khai.
-pub(crate) fn published_has_author(author_id: Uuid) -> sea_orm::sea_query::SimpleExpr {
-    published::Column::EntryId.in_subquery(by_author(author_id))
+pub(crate) fn published_has_author(
+    tenant: &TenantContext,
+    author_id: Uuid,
+) -> sea_orm::sea_query::SimpleExpr {
+    published::Column::EntryId.in_subquery(by_author(tenant, author_id))
 }
 
-fn by_author(author_id: Uuid) -> sea_orm::sea_query::SelectStatement {
+fn by_author(tenant: &TenantContext, author_id: Uuid) -> sea_orm::sea_query::SelectStatement {
     Query::select()
         .column(entry_author::Column::EntryId)
         .from(entry_author::Entity)
+        .and_where(entry_author::Column::TenantId.eq(tenant.id().as_uuid()))
         .and_where(entry_author::Column::AuthorId.eq(author_id))
         .to_owned()
 }
@@ -69,6 +76,7 @@ fn by_author(author_id: Uuid) -> sea_orm::sea_query::SelectStatement {
 /// ID tác giả của từng mục trong `ids`, theo thứ tự.
 pub(crate) async fn author_ids_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ids: &[Uuid],
 ) -> Result<HashMap<Uuid, Vec<Uuid>>, Error> {
     let mut found: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
@@ -76,6 +84,7 @@ pub(crate) async fn author_ids_of<C: ConnectionTrait>(
         return Ok(found);
     }
     for link in entry_author::Entity::find()
+        .scoped(tenant)
         .filter(entry_author::Column::EntryId.is_in(ids.to_vec()))
         .order_by_asc(entry_author::Column::SortOrder)
         .all(connection)
@@ -89,14 +98,16 @@ pub(crate) async fn author_ids_of<C: ConnectionTrait>(
 /// Tác giả của từng mục trong `ids` (theo thứ tự; người đầu là chính).
 pub(crate) async fn authors_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ids: &[Uuid],
 ) -> Result<HashMap<Uuid, Vec<AuthorRef>>, Error> {
-    let links = author_ids_of(connection, ids).await?;
+    let links = author_ids_of(connection, tenant, ids).await?;
     let author_ids: Vec<Uuid> = links.values().flatten().copied().collect();
     if author_ids.is_empty() {
         return Ok(HashMap::new());
     }
     let authors: HashMap<Uuid, Author> = author::Entity::find()
+        .scoped(tenant)
         .filter(author::Column::Id.is_in(author_ids))
         .all(connection)
         .await?
@@ -123,27 +134,33 @@ pub(crate) async fn authors_of<C: ConnectionTrait>(
 
 impl ContentService {
     /// ID tác giả của từng mục trong `ids`, theo thứ tự (để API trả mục kèm tác giả).
-    pub(crate) async fn author_ids(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, Vec<Uuid>>, Error> {
-        author_ids_of(self.database.read(), ids).await
+    pub(crate) async fn author_ids(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, Vec<Uuid>>, Error> {
+        author_ids_of(tenant.database().read(), tenant, ids).await
     }
 
     pub(crate) async fn list_authors(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         search: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<Author>, Error> {
         principal.require(&CONTENT_READ)?;
-        let mut select = author::Entity::find();
+        let mut select = author::Entity::find().scoped(tenant);
         if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
             // Như tìm danh mục: so tên bỏ dấu trong bộ nhớ.
             let wanted = autoxide_kernel::search::fold(search);
             let names: Vec<(Uuid, String)> = author::Entity::find()
+                .scoped(tenant)
                 .select_only()
                 .column(author::Column::Id)
                 .column(author::Column::DisplayName)
                 .into_tuple()
-                .all(self.database.read())
+                .all(tenant.database().read())
                 .await?;
             let ids: Vec<Uuid> = names
                 .into_iter()
@@ -152,37 +169,41 @@ impl ContentService {
                 .collect();
             select = select.filter(author::Column::Id.is_in(ids));
         }
-        fetch_page(select, author::Column::Id, |row| row.id, page, self.database.read()).await
+        fetch_page(select, author::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// Số bài (mọi trạng thái) của từng tác giả trong `ids` — một câu cho cả trang.
     pub(crate) async fn author_entry_counts(
         &self,
+        tenant: &TenantContext,
         ids: &[Uuid],
     ) -> Result<HashMap<Uuid, u64>, Error> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
         let rows: Vec<(Uuid, i64)> = entry_author::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(entry_author::Column::AuthorId)
             .column_as(entry_author::Column::EntryId.count(), "entries")
             .filter(entry_author::Column::AuthorId.is_in(ids.iter().copied()))
             .group_by(entry_author::Column::AuthorId)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         Ok(rows.into_iter().map(|(id, count)| (id, u64::try_from(count).unwrap_or(0))).collect())
     }
 
     pub(crate) async fn get_author(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<Author, Error> {
         principal.require(&CONTENT_READ)?;
         author::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| author_not_found(id))
     }
@@ -190,6 +211,7 @@ impl ContentService {
     /// Tạo hồ sơ tác giả. Cần `content.manage`.
     pub(crate) async fn create_author(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: AuthorInput,
     ) -> Result<Author, Error> {
@@ -198,6 +220,7 @@ impl ContentService {
         let id = Uuid::now_v7();
         let mut row = Author {
             id,
+            tenant_id: tenant.id().as_uuid(),
             user_id: None,
             display_name: String::new(),
             slug: String::new(),
@@ -207,15 +230,15 @@ impl ContentService {
             created_at: now,
             updated_at: now,
         };
-        self.apply_author(&mut row, input).await?;
-        let transaction = self.database.begin_write().await?;
+        self.apply_author(tenant, &mut row, input).await?;
+        let transaction = tenant.database().begin_write().await?;
         let saved =
             row.into_active_model().insert(&transaction).await.map_err(author_slug_conflict)?;
         let change = Change { before: None, after: Some(author_summary(&saved)), published: None };
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("author", id),
                 &events::AuthorChanged(change),
@@ -228,6 +251,7 @@ impl ContentService {
     /// Sửa hồ sơ tác giả. Cần `content.manage`.
     pub(crate) async fn update_author(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         input: AuthorInput,
@@ -235,17 +259,19 @@ impl ContentService {
     ) -> Result<Author, Error> {
         principal.require(&CONTENT_MANAGE)?;
         let before = author::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| author_not_found(id))?;
         let mut row = before.clone();
-        self.apply_author(&mut row, input).await?;
+        self.apply_author(tenant, &mut row, input).await?;
         row.updated_at = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let mut active = row.into_active_model().reset_all();
         active.id = sea_orm::ActiveValue::Unchanged(id);
         let after = author::Entity::update(active)
             .validate()?
+            .scoped(tenant)
             .filter(author::Column::UpdatedAt.eq(expected.unwrap_or(before.updated_at)))
             .exec(&transaction)
             .await
@@ -261,7 +287,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("author", id),
                 &events::AuthorChanged(change),
@@ -272,25 +298,33 @@ impl ContentService {
     }
 
     /// Xoá hồ sơ tác giả (gỡ khỏi mọi mục). Cần `content.manage`.
-    pub(crate) async fn delete_author(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn delete_author(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
         principal.require(&CONTENT_MANAGE)?;
         let actor = Actor::from(principal);
-        self.remove_author(id, actor).await?.ok_or_else(|| author_not_found(id))?;
+        self.remove_author(tenant, id, actor).await?.ok_or_else(|| author_not_found(id))?;
         Ok(())
     }
 
     /// Xoá tác giả `id` và liên kết với mục; `None` nếu không có.
     pub(crate) async fn remove_author(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         actor: Actor,
     ) -> Result<Option<Author>, Error> {
-        let transaction = self.database.begin_write().await?;
-        let Some(before) = author::Entity::find_by_id(id).one(&transaction).await? else {
+        let transaction = tenant.database().begin_write().await?;
+        let Some(before) = author::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
+        else {
             return Ok(None);
         };
-        author::Entity::delete_by_id(id).exec(&transaction).await?;
+        author::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         entry_author::Entity::delete_many()
+            .scoped(tenant)
             .filter(entry_author::Column::AuthorId.eq(id))
             .exec(&transaction)
             .await?;
@@ -298,7 +332,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 actor,
                 events::subject("author", id),
                 &events::AuthorChanged(change),
@@ -315,12 +349,13 @@ impl ContentService {
     /// đã có trên mục thì giữ hay bỏ được): không đứng tên người khác.
     pub(crate) async fn set_entry_authors(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         entry_id: Uuid,
         author_ids: Vec<Uuid>,
     ) -> Result<Vec<Uuid>, Error> {
         crate::permissions::require_create(principal)?;
-        let entry = self.load_checked(entry_id, None).await?;
+        let entry = self.load_checked(tenant, entry_id, None).await?;
         crate::permissions::require_write(principal, &entry)?;
         let mut ids: Vec<Uuid> = Vec::new();
         for id in author_ids {
@@ -334,15 +369,16 @@ impl ContentService {
                     .with_param("max_per_entry", MAX_PER_ENTRY),
             ]));
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Khoá dòng mục trước khi xoá rồi chèn lại liên kết (xem `set_entry_terms`).
-        let entry = crate::entries::lock_entry(&transaction, entry.id).await?;
+        let entry = crate::entries::lock_entry(&transaction, tenant, entry.id).await?;
         if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
             // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
             // đang công khai thì cần quyền đăng.
             crate::permissions::require_publish(principal, &entry)?;
         }
         let profiles = author::Entity::find()
+            .scoped(tenant)
             .filter(author::Column::Id.is_in(ids.clone()))
             .all(&transaction)
             .await?;
@@ -353,8 +389,10 @@ impl ContentService {
                 "every id must be an existing author",
             )]));
         }
-        let before =
-            author_ids_of(&transaction, &[entry_id]).await?.remove(&entry_id).unwrap_or_default();
+        let before = author_ids_of(&transaction, tenant, &[entry_id])
+            .await?
+            .remove(&entry_id)
+            .unwrap_or_default();
         if crate::permissions::write_own_only(principal)
             && profiles.iter().any(|profile| {
                 profile.user_id != Some(principal.user_id()) && !before.contains(&profile.id)
@@ -367,11 +405,13 @@ impl ContentService {
             )]));
         }
         entry_author::Entity::delete_many()
+            .scoped(tenant)
             .filter(entry_author::Column::EntryId.eq(entry_id))
             .exec(&transaction)
             .await?;
         for (order, author_id) in ids.iter().enumerate() {
             entry_author::ActiveModel {
+                tenant_id: Set(tenant.id().as_uuid()),
                 entry_id: Set(entry_id),
                 author_id: Set(*author_id),
                 sort_order: Set(i32::try_from(order).unwrap_or(i32::MAX)),
@@ -379,17 +419,28 @@ impl ContentService {
             .insert(&transaction)
             .await?;
         }
-        self.record_link_change(&transaction, principal, &entry, "author_ids", before, ids.clone())
-            .await?;
+        self.record_link_change(
+            tenant,
+            &transaction,
+            principal,
+            &entry,
+            crate::taxonomy::terms::LinkChange { field: "author_ids", before, after: ids.clone() },
+        )
+        .await?;
         transaction.commit().await?;
         Ok(ids)
     }
 
     /// Tác giả công khai theo slug.
-    pub(crate) async fn author_by_slug(&self, slug: &str) -> Result<Author, Error> {
+    pub(crate) async fn author_by_slug(
+        &self,
+        tenant: &TenantContext,
+        slug: &str,
+    ) -> Result<Author, Error> {
         author::Entity::find()
+            .scoped(tenant)
             .filter(author::Column::Slug.eq(slug))
-            .one(self.database.read())
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| {
                 Error::not_found("content.author_not_found", "No author has the slug `{slug}`.")
@@ -397,7 +448,12 @@ impl ContentService {
             })
     }
 
-    async fn apply_author(&self, row: &mut Author, input: AuthorInput) -> Result<(), Error> {
+    async fn apply_author(
+        &self,
+        tenant: &TenantContext,
+        row: &mut Author,
+        input: AuthorInput,
+    ) -> Result<(), Error> {
         let mut problems = Vec::new();
         check_length("display_name", input.display_name.as_deref(), 200, &mut problems);
         check_length("bio", input.bio.as_deref(), 5000, &mut problems);
@@ -424,11 +480,7 @@ impl ContentService {
         if let Some(avatar) = input.avatar_media_id {
             row.avatar_media_id = avatar;
             if let Some(id) = avatar
-                && self
-                    .media
-                    .find(&TenantContext::legacy_default(&self.database), id)
-                    .await?
-                    .is_none()
+                && self.media.find(tenant, id).await?.is_none()
             {
                 problems.push(
                     FieldError::new(

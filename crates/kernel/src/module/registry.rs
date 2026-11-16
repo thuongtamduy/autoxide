@@ -68,6 +68,12 @@ pub struct Modules {
     keys: crate::secret::KeyConfig,
     /// Bộ gieo dữ liệu cho khách mới của mọi module; điền sau khi mọi module khởi động.
     seeds: crate::tenancy::admin::Seeds,
+    /// Bộ tra DNS cho tên miền riêng của khách: bản một module công bố (`dyn DnsTxtLookup`), không
+    /// thì bộ tra của hệ điều hành; điền sau khi mọi module khởi động.
+    dns: crate::tenancy::domains::DnsSlot,
+    /// Thứ việc dời khách cần (module, bảng mặt điều khiển, migration); điền sau khi mọi module
+    /// khởi động.
+    moves: crate::tenancy::moves::MoveSetup,
     /// Sổ database (bước 33); có sau [`start`](Self::start).
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
 }
@@ -94,6 +100,8 @@ impl Modules {
         let keys = crate::secret::KeyConfig::default();
         let settings = crate::tenancy::settings::Catalog::default();
         let seeds = crate::tenancy::admin::Seeds::default();
+        let dns = crate::tenancy::domains::DnsSlot::default();
+        let moves = crate::tenancy::moves::MoveSetup::default();
         let mut all: Vec<Box<dyn Module>> = vec![
             Box::new(crate::builtin::KernelModule::new(
                 catalog.clone(),
@@ -101,7 +109,11 @@ impl Modules {
                 user_flags.clone(),
                 keys.clone(),
                 settings.clone(),
-                seeds.clone(),
+                crate::tenancy::Slots {
+                    seeds: seeds.clone(),
+                    dns: dns.clone(),
+                    moves: moves.clone(),
+                },
             )),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
@@ -160,6 +172,8 @@ impl Modules {
                 user_flags,
                 keys,
                 seeds,
+                dns,
+                moves,
                 tenancy: None,
             })
         } else {
@@ -223,6 +237,12 @@ impl Modules {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
         }
+        self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
+        // Nơi lưu chung và bộ mở nơi lưu riêng của placement (module `files` công bố).
+        registry.use_storage(
+            apis.get::<dyn crate::storage::Storage>(),
+            apis.get::<dyn crate::storage::StorageOpener>(),
+        );
         self.apis = apis;
         self.tenancy = Some(registry.clone());
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
@@ -234,7 +254,16 @@ impl Modules {
                 .filter_map(|module| module.seed_tenant().map(|seed| (module.name(), seed)))
                 .collect(),
         );
+        let migrator = self.migrator().map_err(|error| ModuleError(error.to_string()))?;
+        self.moves.fill(self.names(), self.control_plane_tables(), migrator);
         Ok(())
+    }
+
+    /// Dùng `lookup` thay bộ tra DNS của hệ điều hành khi xác minh tên miền riêng của khách. Gọi
+    /// trước [`start`](Self::start) (testkit dùng bộ giả, không hỏi DNS thật); lần gọi sau và bản
+    /// một module công bố sau đó bị bỏ qua.
+    pub fn use_dns(&self, lookup: Arc<dyn crate::tenancy::DnsTxtLookup>) {
+        self.dns.fill(Some(lookup));
     }
 
     /// Sổ database đã dùng lúc khởi động; `None` trước [`start`](Self::start).
@@ -766,6 +795,26 @@ mod tests {
         assert!(message.contains("invalid configuration (2 problems):"), "{message}");
         assert!(message.contains("AUTOXIDE_NOTES_LIMIT:"), "{message}");
         assert!(message.contains("AUTOXIDE_TAGS_KEY: is required but not set"), "{message}");
+    }
+
+    /// Chế độ `multi` mà không đặt `AUTOXIDE_SECRET_KEY`: lỗi cấu hình nói rõ phải làm gì;
+    /// `single` thì không bắt buộc.
+    #[test]
+    fn che_do_multi_bat_buoc_khoa_goc() {
+        let check = |pairs: &[(&str, &str)]| {
+            let source = ConfigSource::from_pairs(pairs.iter().copied());
+            let mut reader = ConfigReader::new(&source);
+            let kernel = crate::config::Config::read(&mut reader);
+            let mut modules = Modules::new(bare(&["auth"])).unwrap();
+            let configured = modules.configure(&mut reader).and(kernel.map(|_| ()));
+            reader.finish(configured).map(|_| ()).map_err(|error| error.to_string())
+        };
+        let error = check(&[("AUTOXIDE_TENANCY_MODE", "multi")]).unwrap_err();
+        assert!(error.contains("AUTOXIDE_SECRET_KEY: is required when"), "{error}");
+        let key = "k".repeat(40);
+        check(&[("AUTOXIDE_TENANCY_MODE", "multi"), ("AUTOXIDE_SECRET_KEY", key.as_str())])
+            .unwrap();
+        check(&[]).unwrap();
     }
 
     #[test]

@@ -231,6 +231,13 @@ mật khẩu và thêm passkey mới. Quản trị viên khác làm được đi
 sudo -u autoxide autoxide user remove-passkeys --email you@example.com
 ```
 
+Ba lệnh này làm việc với khách mặc định. Khi có nhiều khách (`AUTOXIDE_TENANCY_MODE=multi`), thêm
+`--tenant <slug>` để làm với tài khoản của khách khác, ví dụ quản trị viên đầu tiên của khách đó:
+
+```bash
+sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
+```
+
 ### 4. Chạy như một service
 
 `/etc/systemd/system/autoxide.service`:
@@ -284,6 +291,12 @@ sudo -u autoxide autoxide backup "backups/$(date +%F)"
 Để khôi phục trên một máy mới, chuẩn bị thư mục (bước 1–2), rồi chạy
 `autoxide restore <thư mục backup>` ở đó trước khi khởi động service.
 
+Với `AUTOXIDE_TENANCY_MODE=multi`, bản backup có database chính (sổ khách và mọi khách trên đó) và
+mọi file ở nơi lưu file chung, nhưng không có database của các placement khác, cũng không có nơi lưu
+file riêng của placement; lệnh in cảnh báo nêu tên chúng. Backup những thứ đó bằng công cụ của chính
+database (và của nơi lưu). Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
+backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.
+
 ## Chuyển từ SQLite sang PostgreSQL
 
 Tạo một database PostgreSQL trống, dừng máy chủ, rồi chép. Database đích được áp dụng
@@ -324,6 +337,157 @@ database mới.
 
 Kiểm cấu hình mà không khởi động gì: `autoxide config`. Lệnh liệt kê mọi biến kèm giá
 trị (secret được giấu) và báo mọi vấn đề cùng một lượt.
+
+## Tên miền riêng của khách hàng
+
+Khi chạy nhiều khách hàng (`AUTOXIDE_TENANCY_MODE=multi`), mỗi khách có thể phục vụ trang của mình ở
+tên miền riêng, vd `shop.example`: request tới một tên miền đã xác minh vào thẳng khách đó, không
+cần header `Autoxide-Tenant`. Bản cài chỉ một khách thì không cần việc này: tên miền của nó là tên
+miền của nền tảng.
+
+1. Quản trị viên của khách (permission `kernel.domains.manage`) thêm tên miền:
+
+   ```bash
+   curl -X POST https://api.example.com/api/v1/kernel/domains \
+     -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"domain": "shop.example"}'
+   ```
+
+   Câu trả lời có `"status": "pending"` và `record` cần tạo ở nhà cung cấp DNS của tên miền: một
+   bản ghi TXT tên `_autoxide-challenge.shop.example` với giá trị `autoxide-verify=…`.
+2. Ở nhà cung cấp DNS, tạo bản ghi TXT đó và trỏ chính tên miền về máy chủ của bạn (bản ghi
+   `A` / `AAAA`, hoặc `CNAME` tới tên miền của nền tảng).
+3. Xác minh: `POST /api/v1/kernel/domains/{id}/verify` tra bản ghi ngay và trả `verified`, hoặc vẫn
+   `pending` kèm lý do trong `check_error`. Tên miền đang chờ cũng được tra lại mỗi 10 phút; quá 7
+   ngày chưa xác minh được thì thành `failed` (sửa bản ghi rồi xác minh lại).
+   `DELETE /api/v1/kernel/domains/{id}` gỡ một tên miền.
+4. Giữ nguyên bản ghi TXT. Tên miền đã xác minh được kiểm lại mỗi ngày một lần: 3 lần liên tiếp không
+   thấy bản ghi thì tên miền thành `failed` (event `kernel.domain_failed`) và request tới nó không
+   còn vào khách. `failed_checks` đếm số lần trượt; một lần kiểm thấy bản ghi (hay `POST …/verify`
+   sau khi sửa) đưa nó về 0. Máy chủ DNS không trả lời thì không tính là trượt.
+
+Tên miền của chính nền tảng (tên máy trong `AUTOXIDE_HTTP_PUBLIC_URL`), địa chỉ IP và `localhost`
+bị từ chối. Mỗi lúc một tên miền chỉ thuộc một khách: khách khác chỉ nhận được sau khi nó bị gỡ hay
+xác minh hỏng.
+
+**Chứng chỉ TLS.** Để Caddy lấy chứng chỉ khi người xem đầu tiên của một tên miền tới (on-demand
+TLS), sau khi hỏi Autoxide tên miền đó có được phép không:
+`GET /api/v1/kernel/domains/allowed?domain=…` chỉ trả `200` cho tên miền đã xác minh của khách đang
+hoạt động, nên không ai khiến máy chủ của bạn xin chứng chỉ cho tên bạn không phục vụ.
+
+```text
+{
+    on_demand_tls {
+        ask http://127.0.0.1:8080/api/v1/kernel/domains/allowed
+    }
+}
+
+api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+
+https:// {
+    tls {
+        on_demand
+    }
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+`reverse_proxy` của Caddy chuyển nguyên header `Host`, và Autoxide nhận ra khách nhờ header đó. Khi
+có proxy khác đứng trước và viết lại `Host`, proxy đó phải gửi tên miền người xem gõ trong
+`X-Forwarded-Host` (hoặc `Forwarded: host=…`), và địa chỉ của nó phải có trong
+`AUTOXIDE_HTTP_TRUSTED_PROXIES`: Autoxide chỉ đọc các header đó từ proxy tin cậy. Endpoint `ask`
+cũng bị tính vào rate limiting theo địa chỉ như mọi endpoint khác; Caddy chỉ hỏi một lần cho mỗi
+chứng chỉ mới. Xác minh, gỡ tên miền hay tạm khoá khách có hiệu lực trên mọi máy chủ sau tối đa
+`AUTOXIDE_TENANCY_CACHE_SECONDS` giây (mặc định `10`).
+
+## Dời khách hàng sang database khác
+
+Khi chạy nhiều khách hàng, dữ liệu của mỗi khách nằm ở một *placement* (vị trí dữ liệu): `main`
+(database của `DATABASE_URL`, nhiều khách dùng chung) hay một database khác thêm bằng
+`autoxide placement add`. Dời khách để cho một khách đang lớn database riêng, hay đưa khách về lại:
+
+1. Thêm database đích và áp dụng migration cho nó:
+
+   ```bash
+   printf '%s' 'postgres://autoxide:<password>@db2.example.com:5432/acme' \
+     | autoxide placement add acme-db --kind dedicated --url -
+   autoxide migrate up --all
+   ```
+
+2. Thử trước. Chạy thử (dry run) không đổi gì:
+
+   ```bash
+   autoxide tenant move acme --to acme-db --dry-run
+   ```
+
+   Lệnh liệt kê số dòng của khách sẽ được chép theo từng bảng, và mọi thứ đang chặn việc dời: một
+   bên còn migration chưa áp dụng, đích là cùng database với nguồn, khách không ở trạng thái hoạt
+   động, khách đang có một lượt dời khác. Khách nền tảng (`default`) luôn ở `main`.
+
+3. Dời, trong một khoảng bảo trì:
+
+   ```bash
+   autoxide tenant move acme --to acme-db
+   ```
+
+   Ngay từ đầu, khách trả `503 tenant_maintenance` kèm `Retry-After`; khách khác không bị ảnh
+   hưởng. Lệnh chờ tới khi mọi máy chủ đã thấy việc dời (`AUTOXIDE_TENANCY_CACHE_SECONDS`) và
+   request đang chạy đã xong (`AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`), và tới khi job và event của
+   khách đang được chạy đã xong. Rồi lệnh chép mọi dòng của khách, kể cả job đang chờ và event chưa
+   giao, trong một transaction; so số dòng của từng bảng; chuyển khách sang placement mới (khách
+   chạy lại từ đó); và xoá bản cũ. SQLite và PostgreSQL trộn được theo cả hai chiều. File (dưới
+   `tenants/<id>/`) ở nguyên chỗ cũ khi hai placement dùng cùng nơi lưu file; khi đích có nơi lưu
+   riêng (xem dưới), file được chép sang đó trước khi chép dòng và bị xoá ở nơi lưu cũ ở cuối. Chạy
+   thử cho biết số file sẽ chép.
+
+`--keep-source` giữ bản cũ làm bản dự phòng thay vì xoá (job đang chờ và event của bản cũ bị xoá,
+để không gì chạy hai lần; file của bản cũ cũng được giữ). Không gì dùng bản đó; xoá nó khi đã yên
+tâm:
+
+```bash
+autoxide tenant purge-copy acme --placement main
+```
+
+Qua API, nhân sự nền tảng có `kernel.tenants.move` gọi `POST /api/v1/kernel/tenants/{id}/move`
+với `{"to": "acme-db"}`: đó là chạy thử. Thêm `"dry_run": false` để bắt đầu dời bằng một job nền, và
+theo dõi ở `Location` của câu trả lời (`GET /api/v1/kernel/tenants/{id}/moves/{move_id}`); tool MCP
+là `kernel.move_tenant`. Một job chạy được khoảng bốn phút: khách lớn (chạy thử cho biết số dòng)
+thì dời bằng lệnh, lệnh không giới hạn thời gian.
+
+**Nơi lưu file riêng của placement.** Mặc định file của mọi khách nằm ở nơi lưu theo cấu hình của
+module `files` (`AUTOXIDE_FILES_DIR` hay `AUTOXIDE_FILES_S3_BUCKET`), dưới `tenants/<id>/`. Cho một
+placement — thường là placement `dedicated` — bucket hay thư mục riêng, để file của khách đó cũng
+nằm riêng:
+
+```bash
+printf '%s' "$SECRET_ACCESS_KEY" | autoxide placement storage acme-db \
+  --s3-bucket acme-files --s3-region eu-west-1 \
+  --s3-endpoint https://<account>.r2.cloudflarestorage.com \
+  --s3-access-key-id "$ACCESS_KEY_ID" --s3-secret-access-key -
+# hoặc một thư mục trên máy chủ:
+autoxide placement storage acme-db --dir /var/lib/autoxide/files-acme
+```
+
+Cấu hình được lưu mã hoá bằng `AUTOXIDE_SECRET_KEY`; `autoxide placement list` và
+`GET /api/v1/kernel/placements` cho thấy bucket hay thư mục, không bao giờ cho thấy khoá. Bucket
+phải có sẵn; khoá sai lộ ra ở lần tải lên đầu tiên. Đặt nơi lưu khi placement chưa có khách, rồi dời
+khách sang: việc dời chép file của họ. Đổi về sau bị từ chối (file của họ đang ở nơi lưu cũ), trừ khi
+thêm `--force` khi nơi lưu mới đã có đúng các file đó — ví dụ khoá truy cập mới cho cùng bucket.
+`--clear` đưa file tải lên mới về nơi lưu chung (cùng luật). Mọi máy chủ phải chạy module `files`.
+
+**Khi việc dời dừng giữa chừng** (tiến trình chết, không kết nối được database, số dòng không
+khớp), không mất gì. Trước bước chuyển, khách vẫn trả `503` ở placement cũ; sau bước chuyển, khách
+chạy từ placement mới và chỉ còn bản cũ chờ xoá.
+
+- Chạy lại đúng lệnh `autoxide tenant move acme --to acme-db`: lệnh chạy tiếp từ chỗ dừng (trước
+  bước chuyển thì xoá các dòng đã chép sang đích rồi chép lại).
+- Hoặc, trước bước chuyển, bỏ cuộc: `autoxide tenant move acme --abort` xoá những gì đã chép và cho
+  khách hoạt động lại ở placement cũ.
+- `GET /api/v1/kernel/tenants/{id}/moves/{move_id}` cho biết `state` của lượt dời và `error` đã làm
+  nó dừng. Lượt dời bắt đầu qua API được job của nó thử lại; bắt đầu một lượt khác khi một lượt
+  đang chạy thì nhận `tenant_move_running`.
 
 ## Chạy nhiều máy chủ
 

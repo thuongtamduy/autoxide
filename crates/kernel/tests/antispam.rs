@@ -79,7 +79,7 @@ fn submission<'a>(client: &'a ClientInfo, token: Option<&'a str>) -> Submission<
 async fn bay_token_va_qua_nhanh() {
     TestDatabase::run(async |test| {
         let (database, modules) = setup(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let visitor = client("203.0.113.9");
         let limits = Limits::default();
         // Bộ công bố bởi module nội bộ `antispam`: mặc định giữ lại bài gửi trong 3 giây đầu.
@@ -156,7 +156,7 @@ async fn bay_token_va_qua_nhanh() {
 async fn gioi_han_theo_ip_va_nguoi_dung() {
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let guard = make_guard(&database, quick());
         let throttle = |limit| Throttle::new("demo", limit, Duration::from_secs(3600)).unwrap();
         let limits = Limits::default().ip(Some(throttle(2))).user(Some(throttle(1)));
@@ -209,7 +209,7 @@ async fn gioi_han_theo_ip_va_nguoi_dung() {
 async fn nonce_la_idempotency_cho_nguoi_la() {
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let guard = Arc::new(make_guard(&database, quick()));
         let visitor = client("203.0.113.9");
         let token = guard.issue(&tenant, "demo:contact").await.unwrap().token;
@@ -279,7 +279,7 @@ async fn nonce_la_idempotency_cho_nguoi_la() {
 async fn gui_lai_token_da_dung_khong_dem_gioi_han() {
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let guard = make_guard(&database, quick());
         let email = Throttle::new("demo", 2, Duration::from_secs(3600)).unwrap();
         let limits = Limits::default().email(Some(email));
@@ -396,7 +396,7 @@ async fn de_altcha() {
     use autoxide_kernel::antispam::ChallengeKind;
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
-        let tenant = TenantContext::legacy_default(&database);
+        let tenant = TenantContext::default_on(database.clone());
         let guard = make_guard(&database, quick().challenge(ChallengeKind::Altcha { cost: 20 }));
         let visitor = client("203.0.113.9");
         let first = guard.issue(&tenant, "demo:contact").await.unwrap();

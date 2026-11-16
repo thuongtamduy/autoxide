@@ -162,11 +162,21 @@ pub struct Schedule {
     pub kind: &'static str,
     pub every: Duration,
     pub payload: Value,
+    /// Chỉ đưa job vào hàng đợi của database điều khiển (placement `main`), không phải mọi
+    /// database: cho việc chỉ chạm bảng mặt điều khiển (vd tra lại tên miền riêng của khách).
+    pub control_only: bool,
 }
 
 impl Schedule {
     pub fn new(name: &'static str, kind: &'static str, every: Duration) -> Self {
-        Schedule { name, kind, every, payload: Value::Null }
+        Schedule { name, kind, every, payload: Value::Null, control_only: false }
+    }
+
+    /// Chỉ chạy trên database điều khiển (xem [`Schedule::control_only`]).
+    #[must_use]
+    pub const fn on_control_only(mut self) -> Self {
+        self.control_only = true;
+        self
     }
 }
 

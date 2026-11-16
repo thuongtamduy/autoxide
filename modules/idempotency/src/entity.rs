@@ -8,6 +8,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    /// Khách của request (bước 33): mọi truy vấn lọc theo cột này (`.scoped`).
+    pub tenant_id: Uuid,
     pub scope: String,
     pub key: String,
     pub fingerprint: String,
@@ -20,3 +22,9 @@ pub struct Model {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl autoxide_kernel::tenancy::TenantScoped for Entity {
+    fn tenant_column() -> Self::Column {
+        Column::TenantId
+    }
+}

@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use axum::http::{HeaderMap, HeaderName, header};
+use axum::http::{Extensions, HeaderMap, HeaderName, header};
 use uuid::Uuid;
 
 use super::{DatabaseRegistry, TenancyMode, TenantContext, ensure_serving, errors};
@@ -62,6 +62,18 @@ impl TenantHint {
         TenantHint::new(text(&header::HOST), text(&TENANT_HEADER))
     }
 
+    /// Gợi ý của request: tên miền proxy tin cậy chuyển tới (`X-Forwarded-Host`, lớp
+    /// `client::attach`) hay header `Host`, và header `Autoxide-Tenant`.
+    pub(crate) fn of_request(headers: &HeaderMap, extensions: &Extensions) -> Self {
+        match extensions.get::<crate::http::ForwardedHost>() {
+            Some(forwarded) => {
+                let tenant = headers.get(&TENANT_HEADER).and_then(|value| value.to_str().ok());
+                TenantHint::new(Some(forwarded.0.clone()), tenant.map(str::to_owned))
+            }
+            None => TenantHint::from_headers(headers),
+        }
+    }
+
     /// Tên miền (chữ thường, không cổng, không dấu chấm cuối).
     pub fn host(&self) -> Option<&str> {
         self.host.as_deref()
@@ -100,7 +112,7 @@ pub(crate) async fn authenticate(
     if let Some(Authenticated(principal)) = parts.extensions.get::<Authenticated>() {
         return Ok(principal.clone());
     }
-    let hint = TenantHint::from_headers(&parts.headers);
+    let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
     let authorization =
         parts.headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
     let principal = authenticator.authenticate(authorization, &hint).await?;
@@ -178,18 +190,45 @@ pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
         let principal = authenticate(&authenticator, parts).await?;
         registry.tenant(principal.tenant_id()).await?
     } else {
-        let hint = TenantHint::from_headers(&parts.headers);
-        match (hint.tenant(), hint.host()) {
-            (Some(target), _) => lookup(&registry, target).await?,
-            (None, Some(host)) => {
-                registry.tenant_by_domain(host).await?.ok_or_else(errors::tenant_required)?
-            }
-            (None, None) => return Err(errors::tenant_required()),
-        }
+        by_hint(&registry, parts).await?
     };
     ensure_serving(&tenant)?;
     parts.extensions.insert(tenant.clone());
     Ok(tenant)
+}
+
+/// Khách theo header `autoxide-tenant` / tên miền, bỏ qua credential (request không đăng nhập).
+async fn by_hint(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantContext, Error> {
+    let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
+    match (hint.tenant(), hint.host()) {
+        (Some(target), _) => lookup(registry, target).await,
+        (None, Some(host)) => {
+            registry.tenant_by_domain(host).await?.ok_or_else(errors::tenant_required)
+        }
+        (None, None) => Err(errors::tenant_required()),
+    }
+}
+
+/// Khách của request cho endpoint nhận token tự mang khách (`OptionalTenant`): như [`tenant`],
+/// nhưng credential trong `Authorization` không hợp lệ (vd access token đã hết hạn mà client vẫn
+/// gửi kèm khi gọi `/refresh`) thì bỏ qua nó và chọn khách theo header / tên miền. Không xác định
+/// được khách: `tenant_required`.
+pub(crate) async fn tenant_ignoring_bad_credential(
+    parts: &mut Parts,
+) -> Result<TenantContext, Error> {
+    match tenant(parts).await {
+        Err(error) if error.kind() == crate::error::ErrorKind::Unauthenticated => {
+            let registry = parts.extensions.get::<DatabaseRegistry>().cloned().ok_or_else(|| {
+                Error::internal(
+                    "an endpoint needs the tenant of the request, but no tenancy registry is set",
+                )
+            })?;
+            let tenant = by_hint(&registry, parts).await?;
+            ensure_serving(&tenant)?;
+            Ok(tenant)
+        }
+        other => other,
+    }
 }
 
 // Handler viết `tenant: TenantContext` thì axum giải khách của request trước khi chạy handler.

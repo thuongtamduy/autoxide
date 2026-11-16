@@ -180,6 +180,18 @@ async fn tao_khach_goi_seed_cua_moi_module_va_chay_lai_duoc() {
         assert_eq!(status, StatusCode::CREATED, "{body}");
         assert_eq!(body["data"]["status"], "active");
         assert_eq!(body["data"]["placement"], "main");
+        // `Location` là đường dẫn đầy đủ, có tiền tố `/api/v1` (giao diện báo thiếu ngày 16/11/2026).
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri("/api/v1/kernel/tenants")
+            .header(header::AUTHORIZATION, "Bearer platform")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(json!({"slug": "delta", "name": "Delta"}).to_string()))
+            .unwrap();
+        let response = setup.app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let location = response.headers()[header::LOCATION].to_str().unwrap().to_owned();
+        assert!(location.starts_with("/api/v1/kernel/tenants/"), "{location}");
         let (status, body) = call(
             &setup.app,
             Method::POST,
@@ -219,7 +231,7 @@ async fn tao_khach_goi_seed_cua_moi_module_va_chay_lai_duoc() {
         assert_eq!(status, StatusCode::OK);
         let slugs: Vec<&str> =
             page["data"].as_array().unwrap().iter().map(|t| t["slug"].as_str().unwrap()).collect();
-        assert_eq!(slugs, ["beta", "acme", "default"]);
+        assert_eq!(slugs, ["delta", "beta", "acme", "default"]);
         drop(setup.modules);
     })
     .await

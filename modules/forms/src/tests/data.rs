@@ -1,17 +1,18 @@
 //! Dữ liệu đã gửi: CSV, xuất / xoá theo email, dọn theo thời hạn, tài khoản bị xoá.
 
 use super::*;
-use autoxide_kernel::tenancy::TenantContext;
 
 #[tokio::test]
 async fn xuat_csv_chan_injection_va_tim_theo_chu() {
     TestDatabase::run(async |test| {
-        let (service, _, _) = service(test, FormsConfig::default()).await;
-        let form = service.create_form(&admin(), contact("contact")).await.unwrap();
+        let (service, _, database) = service(test, FormsConfig::default()).await;
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+        let form = service.create_form(&tenant, &admin(), contact("contact")).await.unwrap();
         let mut evil = answers("=HYPERLINK(\"http://evil\",\"x\")", "eve@example.com");
         evil.insert("message".to_owned(), json!("+1, \"quoted\"\n@second line"));
-        send(&service, "contact", &visitor("203.0.113.9"), evil).await.unwrap();
+        send(&tenant, &service, "contact", &visitor("203.0.113.9"), evil).await.unwrap();
         send(
+            &tenant,
             &service,
             "contact",
             &visitor("203.0.113.9"),
@@ -21,10 +22,15 @@ async fn xuat_csv_chan_injection_va_tim_theo_chu() {
         .unwrap();
 
         assert_eq!(
-            service.export_csv(&user(&["read"]), form.row.id, None).await.unwrap_err().code(),
+            service
+                .export_csv(&tenant, &user(&["read"]), form.row.id, None)
+                .await
+                .unwrap_err()
+                .code(),
             "permission_denied"
         );
-        let (name, text) = service.export_csv(&user(&["export"]), form.row.id, None).await.unwrap();
+        let (name, text) =
+            service.export_csv(&tenant, &user(&["export"]), form.row.id, None).await.unwrap();
         assert_eq!(name, "contact-submissions.csv");
         let lines: Vec<&str> = text.split("\r\n").collect();
         assert!(lines[0].starts_with("\u{feff}\"id\",\"created_at\",\"status\""), "{}", lines[0]);
@@ -34,8 +40,10 @@ async fn xuat_csv_chan_injection_va_tim_theo_chu() {
         assert!(text.contains("Đặng Thu Hà"));
 
         let search = InboxFilter { status: None, search: Some("dang thu".to_owned()) };
-        let found =
-            service.list_submissions(&admin(), form.row.id, &search, &page()).await.unwrap();
+        let found = service
+            .list_submissions(&tenant, &admin(), form.row.id, &search, &page())
+            .await
+            .unwrap();
         assert_eq!(found.data.len(), 1);
         assert_eq!(found.data[0].data["name"], "Đặng Thu Hà");
     })
@@ -47,32 +55,40 @@ async fn xuat_csv_chan_injection_va_tim_theo_chu() {
 async fn xuat_va_xoa_theo_email() {
     TestDatabase::run(async |test| {
         let (service, _, database) = service(test, FormsConfig::default()).await;
-        service.create_form(&admin(), contact("contact")).await.unwrap();
-        service.create_form(&admin(), contact("support")).await.unwrap();
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+        service.create_form(&tenant, &admin(), contact("contact")).await.unwrap();
+        service.create_form(&tenant, &admin(), contact("support")).await.unwrap();
         let client = visitor("203.0.113.9");
-        send(&service, "contact", &client, answers("Ada", "Ada@Example.com")).await.unwrap();
-        send(&service, "support", &client, answers("Ada", "ada@example.com")).await.unwrap();
-        send(&service, "support", &client, answers("Bob", "bob@example.com")).await.unwrap();
+        send(&tenant, &service, "contact", &client, answers("Ada", "Ada@Example.com"))
+            .await
+            .unwrap();
+        send(&tenant, &service, "support", &client, answers("Ada", "ada@example.com"))
+            .await
+            .unwrap();
+        send(&tenant, &service, "support", &client, answers("Bob", "bob@example.com"))
+            .await
+            .unwrap();
 
         let exporter = user(&["export"]);
         assert_eq!(
-            service.submissions_of_email(&admin(), "nope").await.unwrap_err().code(),
+            service.submissions_of_email(&tenant, &admin(), "nope").await.unwrap_err().code(),
             "validation_failed"
         );
         assert_eq!(
             service
-                .submissions_of_email(&user(&["read"]), "ada@example.com")
+                .submissions_of_email(&tenant, &user(&["read"]), "ada@example.com")
                 .await
                 .unwrap_err()
                 .code(),
             "permission_denied"
         );
-        let found = service.submissions_of_email(&exporter, " ADA@example.com ").await.unwrap();
+        let found =
+            service.submissions_of_email(&tenant, &exporter, " ADA@example.com ").await.unwrap();
         let keys: Vec<&str> = found.iter().map(|s| s.form_key.as_str()).collect();
         assert_eq!(keys, ["contact", "support"]);
 
-        assert_eq!(service.erase_email(&exporter, "ada@example.com").await.unwrap(), 2);
-        assert_eq!(service.erase_email(&exporter, "ada@example.com").await.unwrap(), 0);
+        assert_eq!(service.erase_email(&tenant, &exporter, "ada@example.com").await.unwrap(), 2);
+        assert_eq!(service.erase_email(&tenant, &exporter, "ada@example.com").await.unwrap(), 0);
         assert_eq!(count(&database).await, 1);
         let (_, payload) = events(&database)
             .await
@@ -96,17 +112,20 @@ async fn don_theo_thoi_han_chay_lai_khong_loi() {
             ..FormsConfig::default()
         };
         let (service, _, database) = service(test, config).await;
-        let kept = service.create_form(&admin(), contact("kept")).await.unwrap();
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+        let kept = service.create_form(&tenant, &admin(), contact("kept")).await.unwrap();
         let mut short = contact("short");
         short.retention_days = Some(Some(60));
-        service.create_form(&admin(), short).await.unwrap();
+        service.create_form(&tenant, &admin(), short).await.unwrap();
         let client = visitor("203.0.113.9");
-        let held = send(&service, "kept", &client, answers("A", "a@example.com")).await.unwrap();
-        send(&service, "kept", &client, answers("B", "b@example.com")).await.unwrap();
-        send(&service, "short", &client, answers("C", "c@example.com")).await.unwrap();
-        let current = service.get_submission(&admin(), held.id).await.unwrap();
+        let held =
+            send(&tenant, &service, "kept", &client, answers("A", "a@example.com")).await.unwrap();
+        send(&tenant, &service, "kept", &client, answers("B", "b@example.com")).await.unwrap();
+        send(&tenant, &service, "short", &client, answers("C", "c@example.com")).await.unwrap();
+        let current = service.get_submission(&tenant, &admin(), held.id).await.unwrap();
         service
             .set_submission_status(
+                &tenant,
                 &admin(),
                 held.id,
                 SubmissionStatus::Spam,
@@ -116,17 +135,48 @@ async fn don_theo_thoi_han_chay_lai_khong_loi() {
             .unwrap();
 
         let now = chrono::Utc::now();
-        assert_eq!(service.cleanup(now).await.unwrap(), crate::retention::Cleaned::default());
-        let later = service.cleanup(now + chrono::Duration::days(31)).await.unwrap();
+        assert_eq!(
+            service
+                .cleanup(
+                    &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
+                    &database,
+                    now
+                )
+                .await
+                .unwrap(),
+            crate::retention::Cleaned::default()
+        );
+        let later = service
+            .cleanup(
+                &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
+                &database,
+                now + chrono::Duration::days(31),
+            )
+            .await
+            .unwrap();
         assert_eq!((later.spam, later.expired, later.fingerprints), (1, 0, 0));
-        let much_later = service.cleanup(now + chrono::Duration::days(91)).await.unwrap();
+        let much_later = service
+            .cleanup(
+                &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
+                &database,
+                now + chrono::Duration::days(91),
+            )
+            .await
+            .unwrap();
         assert_eq!((much_later.spam, much_later.expired, much_later.fingerprints), (0, 1, 1));
         assert_eq!(
-            service.cleanup(now + chrono::Duration::days(91)).await.unwrap(),
+            service
+                .cleanup(
+                    &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
+                    &database,
+                    now + chrono::Duration::days(91)
+                )
+                .await
+                .unwrap(),
             crate::retention::Cleaned::default()
         );
         let left = service
-            .list_submissions(&admin(), kept.row.id, &InboxFilter::default(), &page())
+            .list_submissions(&tenant, &admin(), kept.row.id, &InboxFilter::default(), &page())
             .await
             .unwrap();
         assert_eq!(left.data.len(), 1, "kept forever by default");
@@ -146,31 +196,26 @@ async fn don_theo_thoi_han_chay_lai_khong_loi() {
 #[tokio::test]
 async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
     TestDatabase::run(async |test| {
-        let (service, _, _) = service(test, FormsConfig::default()).await;
+        let (service, _, database) = service(test, FormsConfig::default()).await;
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
         let owner = admin();
-        let form: Form = service.create_form(&owner, contact("contact")).await.unwrap();
-        let exported = service
-            .export(&TenantContext::legacy_default(&service.database), owner.user_id())
-            .await
-            .unwrap();
+        let form: Form = service.create_form(&tenant, &owner, contact("contact")).await.unwrap();
+        let exported = service.export(&tenant, owner.user_id()).await.unwrap();
         assert_eq!(exported["forms"][0]["key"], "contact");
 
         let deleted = Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            tenant.clone(),
             "auth",
             USER_DELETED.to_owned(),
             json!({"before": {"id": owner.user_id()}}),
         );
         service.handle(&deleted).await.unwrap();
         service.handle(&deleted).await.unwrap();
-        assert_eq!(service.get_form(&owner, form.row.id).await.unwrap().row.created_by, None);
         assert_eq!(
-            service
-                .export(&TenantContext::legacy_default(&service.database), owner.user_id())
-                .await
-                .unwrap()["forms"],
-            json!([])
+            service.get_form(&tenant, &owner, form.row.id).await.unwrap().row.created_by,
+            None
         );
+        assert_eq!(service.export(&tenant, owner.user_id()).await.unwrap()["forms"], json!([]));
     })
     .await
     .unwrap();
@@ -182,6 +227,7 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
 async fn xoa_theo_email_gap_ca_cau_tra_loi_khac() {
     TestDatabase::run(async |test| {
         let (service, _, database) = service(test, FormsConfig::default()).await;
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
         let input = FormInput {
             key: Some("refer".to_owned()),
             name: Some("Refer a friend".to_owned()),
@@ -193,19 +239,20 @@ async fn xoa_theo_email_gap_ca_cau_tra_loi_khac() {
             reply_to_field: Some(Some("email".to_owned())),
             ..FormInput::default()
         };
-        service.create_form(&admin(), input).await.unwrap();
+        service.create_form(&tenant, &admin(), input).await.unwrap();
         let client = visitor("203.0.113.9");
         let submit = |email: &str, friend: &str, note: &str| {
             let data = json!({"email": email, "friend": friend, "note": note});
             let service = service.clone();
             let client = client.clone();
+            let tenant = tenant.clone();
             async move {
                 let input = PublicSubmission {
                     data: data.as_object().unwrap().clone(),
-                    form_token: Some(token(&service, "refer").await),
+                    form_token: Some(token(&tenant, &service, "refer").await),
                     ..PublicSubmission::default()
                 };
-                service.submit("refer", None, &client, input).await.unwrap()
+                service.submit(&tenant, "refer", None, &client, input).await.unwrap()
             }
         };
         submit("bob@example.com", "Ada@Example.com", "hi").await;
@@ -214,10 +261,14 @@ async fn xoa_theo_email_gap_ca_cau_tra_loi_khac() {
 
         let exporter = user(&["export"]);
         assert_eq!(
-            service.submissions_of_email(&exporter, "ada@example.com").await.unwrap().len(),
+            service
+                .submissions_of_email(&tenant, &exporter, "ada@example.com")
+                .await
+                .unwrap()
+                .len(),
             2
         );
-        assert_eq!(service.erase_email(&exporter, "ADA@example.com").await.unwrap(), 2);
+        assert_eq!(service.erase_email(&tenant, &exporter, "ADA@example.com").await.unwrap(), 2);
         assert_eq!(count(&database).await, 1);
     })
     .await
@@ -229,11 +280,12 @@ async fn xoa_theo_email_gap_ca_cau_tra_loi_khac() {
 async fn don_dep_xoa_bai_mo_coi() {
     TestDatabase::run(async |test| {
         let (service, _, database) = service(test, FormsConfig::default()).await;
-        let gone = service.create_form(&admin(), contact("gone")).await.unwrap();
-        service.create_form(&admin(), contact("kept")).await.unwrap();
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+        let gone = service.create_form(&tenant, &admin(), contact("gone")).await.unwrap();
+        service.create_form(&tenant, &admin(), contact("kept")).await.unwrap();
         let client = visitor("203.0.113.9");
-        send(&service, "gone", &client, answers("A", "a@example.com")).await.unwrap();
-        send(&service, "kept", &client, answers("B", "b@example.com")).await.unwrap();
+        send(&tenant, &service, "gone", &client, answers("A", "a@example.com")).await.unwrap();
+        send(&tenant, &service, "kept", &client, answers("B", "b@example.com")).await.unwrap();
         // Xoá dòng form mà không qua service (như form bị xoá giữa hai pha của bài gửi).
         crate::entity::form::Entity::delete_by_id(gone.row.id)
             .exec(database.write())
@@ -241,8 +293,29 @@ async fn don_dep_xoa_bai_mo_coi() {
             .unwrap();
 
         let now = chrono::Utc::now();
-        assert_eq!(service.cleanup(now).await.unwrap().orphans, 1);
-        assert_eq!(service.cleanup(now).await.unwrap(), crate::retention::Cleaned::default());
+        assert_eq!(
+            service
+                .cleanup(
+                    &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
+                    &database,
+                    now
+                )
+                .await
+                .unwrap()
+                .orphans,
+            1
+        );
+        assert_eq!(
+            service
+                .cleanup(
+                    &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
+                    &database,
+                    now
+                )
+                .await
+                .unwrap(),
+            crate::retention::Cleaned::default()
+        );
         assert_eq!(count(&database).await, 1);
     })
     .await

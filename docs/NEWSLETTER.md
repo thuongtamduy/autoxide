@@ -130,6 +130,9 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
   answer is the same for any token.
 
 Unsubscribe links never expire. Each mail has its own random token; only its hash is stored.
+On a server with several tenants, a token may start with `t<tenant id>.`: it names the tenant
+itself, so confirm, preferences and unsubscribe calls work on any host of the API without the
+`Autoxide-Tenant` header. Send tokens back exactly as received (they may contain a `.`).
 
 ## Campaigns
 

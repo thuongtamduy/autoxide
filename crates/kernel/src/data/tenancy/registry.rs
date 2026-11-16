@@ -11,6 +11,10 @@
 //!   động ([`DatabaseRegistry::use_secret_key`]).
 //! - Khách trên placement có `schema_state` khác `ready` mang `schema_ready = false` → nhận
 //!   `tenant_maintenance` (đặc tả 33); khách nơi khác chạy bình thường.
+//! - Placement có nơi lưu file riêng (`storage_sealed`, mã hoá, mục đích [`PLACEMENT_STORAGE`]):
+//!   ngữ cảnh khách mang nơi lưu đó ([`TenantContext::own_storage`]); client nơi lưu giữ trong cache
+//!   theo placement, dựng lại khi giá trị đã lưu đổi. Bộ mở nơi lưu (`dyn StorageOpener`) và nơi lưu
+//!   chung do module `files` công bố ([`DatabaseRegistry::use_storage`]).
 //! - Pool ít dùng nhất bị bỏ khỏi sổ khi cần chỗ; request đang giữ bản clone của nó vẫn chạy tới
 //!   xong (pool tự đóng khi không còn bản clone nào) — không bao giờ gọi `close()` ở đây.
 
@@ -30,11 +34,40 @@ use crate::config::{DatabaseConfig, DatabaseUrl};
 use crate::database::Database;
 use crate::error::Error;
 use crate::secret::SecretKey;
+use crate::storage::{Storage, StorageLocation, StorageOpener, UnavailableStorage};
 
 /// Mục đích (AAD của `Sealer`) của URL kết nối placement; dòng là ID placement.
 pub const PLACEMENT_URL: &str = "kernel.placement_url";
 /// Mục đích của URL đọc (read replica) của placement.
 pub const PLACEMENT_READ_URL: &str = "kernel.placement_read_url";
+/// Mục đích của nơi lưu file riêng của placement (JSON của [`StorageLocation`]); dòng là ID placement.
+pub const PLACEMENT_STORAGE: &str = "kernel.placement_storage";
+
+/// Một nơi lưu file và khách dùng nó (job dọn file mồ côi quét từng nơi): nơi lưu chung
+/// (`placement = None`) hay nơi lưu riêng của một placement.
+#[derive(Clone)]
+pub struct FileStore {
+    pub placement: Option<PlacementId>,
+    pub storage: Arc<dyn Storage>,
+}
+
+impl FileStore {
+    /// Khách `tenant` lưu file ở đây (khoá của khách khác tìm thấy ở đây — vd bản sao còn sót sau
+    /// khi dời — không phải việc của lần quét này).
+    pub fn serves(&self, tenant: &TenantContext) -> bool {
+        tenant.storage_placement() == self.placement
+    }
+}
+
+/// Nơi lưu riêng đã mở và giá trị đã lưu (mã hoá) dùng để dựng nó: giá trị trong bảng đổi (máy chủ
+/// khác đổi nơi lưu) thì dựng lại.
+type OpenStore = (String, Arc<dyn Storage>);
+
+/// Nơi lưu chung và bộ mở nơi lưu riêng (module `files` công bố; điền sau khi mọi module khởi động).
+struct StorageSlot {
+    shared: Option<Arc<dyn Storage>>,
+    opener: Option<Arc<dyn StorageOpener>>,
+}
 
 /// Sổ database của bản cài. Clone rẻ (bên trong là `Arc`).
 #[derive(Clone)]
@@ -53,6 +86,10 @@ struct Inner {
     pools: Mutex<Pools>,
     /// Khoá gốc để mở URL placement đã mã hoá; module `kernel` đặt lúc khởi động.
     secret: OnceLock<SecretKey>,
+    /// Nơi lưu chung và bộ mở nơi lưu riêng; điền sau khi mọi module khởi động.
+    storage: OnceLock<StorageSlot>,
+    /// Nơi lưu riêng đã mở, theo placement, kèm giá trị đã lưu (mã hoá) dùng để dựng nó.
+    stores: Mutex<HashMap<PlacementId, OpenStore>>,
     /// Chỉ một bên mở pool của placement cùng lúc (hai request cùng cần một placement chưa mở
     /// thì bên sau dùng pool bên trước vừa mở).
     opening: tokio::sync::Mutex<()>,
@@ -99,6 +136,8 @@ impl DatabaseRegistry {
             domains: Mutex::default(),
             pools: Mutex::default(),
             secret: OnceLock::new(),
+            storage: OnceLock::new(),
+            stores: Mutex::default(),
             opening: tokio::sync::Mutex::new(()),
         }))
     }
@@ -208,8 +247,110 @@ impl DatabaseRegistry {
         let _ = self.0.secret.set(key);
     }
 
-    /// Bỏ mọi khách trên placement `id` khỏi cache (sau khi `schema_state` của nó đổi).
+    /// Nơi lưu chung (`shared`, của module `files`) và bộ mở nơi lưu riêng của placement (`opener`).
+    /// Đặt một lần (`Modules::start_in` đặt sau khi mọi module khởi động); lần sau bị bỏ qua.
+    pub fn use_storage(
+        &self,
+        shared: Option<Arc<dyn Storage>>,
+        opener: Option<Arc<dyn StorageOpener>>,
+    ) {
+        let _ = self.0.storage.set(StorageSlot { shared, opener });
+    }
+
+    /// Nơi lưu file chung (cấu hình của module `files`), nếu có module công bố.
+    pub fn shared_storage(&self) -> Option<Arc<dyn Storage>> {
+        self.0.storage.get().and_then(|slot| slot.shared.clone())
+    }
+
+    /// Mở giá trị `sealed` (cột `storage_sealed` của placement `id`).
+    pub async fn storage_location(
+        &self,
+        id: PlacementId,
+        sealed: &str,
+    ) -> Result<StorageLocation, Error> {
+        let plain =
+            self.sealer().await?.open(NO_TENANT, PLACEMENT_STORAGE, &id.to_string(), sealed)?;
+        serde_json::from_slice(&plain).map_err(|_| {
+            Error::internal(format!(
+                "placement {id}: the stored file storage settings are not valid"
+            ))
+        })
+    }
+
+    /// Nơi lưu file riêng của placement `id` (đọc lại bảng); `None`: placement dùng nơi lưu chung.
+    pub async fn placement_storage(
+        &self,
+        id: PlacementId,
+    ) -> Result<Option<Arc<dyn Storage>>, Error> {
+        if id == MAIN_PLACEMENT {
+            return Ok(None);
+        }
+        let select = Query::select()
+            .column(Alias::new("storage_sealed"))
+            .from(Alias::new("kernel_placements"))
+            .and_where(Expr::col(Alias::new("id")).eq(id.as_uuid()))
+            .to_owned();
+        let row = self.0.control.read().query_one(&select).await?;
+        let row = row.ok_or_else(|| errors::tenant_placement_not_found(&id.to_string()))?;
+        let sealed: Option<String> = row.try_get("", "storage_sealed")?;
+        match sealed {
+            Some(sealed) => self.open_storage(id, &sealed).await.map(Some),
+            None => Ok(None),
+        }
+    }
+
+    /// Nơi lưu riêng dựng từ `sealed` của placement `id`, qua cache.
+    async fn open_storage(&self, id: PlacementId, sealed: &str) -> Result<Arc<dyn Storage>, Error> {
+        let cached = lock(&self.0.stores).get(&id).cloned();
+        if let Some((known, store)) = cached
+            && known == sealed
+        {
+            return Ok(store);
+        }
+        let location = self.storage_location(id, sealed).await?;
+        let opener =
+            self.0.storage.get().and_then(|slot| slot.opener.clone()).ok_or_else(|| {
+                Error::internal(format!(
+                    "placement {id} has its own file storage, but no module opens file storage \
+                 (register the `files` module)"
+                ))
+            })?;
+        let store = opener.open(&location)?;
+        lock(&self.0.stores).insert(id, (sealed.to_owned(), store.clone()));
+        Ok(store)
+    }
+
+    /// Mọi nơi lưu file: `shared` (nơi lưu chung) rồi nơi lưu riêng của từng placement, theo tên.
+    /// Nơi lưu riêng không mở được thì bỏ qua (ghi log) — lần sau thử lại.
+    pub async fn file_stores(&self, shared: Arc<dyn Storage>) -> Result<Vec<FileStore>, Error> {
+        let mut all = vec![FileStore { placement: None, storage: shared }];
+        if self.0.mode == TenancyMode::Single {
+            return Ok(all);
+        }
+        let select = Query::select()
+            .columns(["id", "storage_sealed"].map(Alias::new))
+            .from(Alias::new("kernel_placements"))
+            .and_where(Expr::col(Alias::new("id")).ne(MAIN_PLACEMENT.as_uuid()))
+            .and_where(Expr::col(Alias::new("storage_sealed")).is_not_null())
+            .order_by(Alias::new("name"), sea_orm::sea_query::Order::Asc)
+            .to_owned();
+        for row in self.0.control.read().query_all(&select).await? {
+            let id = PlacementId::from_uuid(row.try_get::<Uuid>("", "id")?);
+            let sealed: String = row.try_get("", "storage_sealed")?;
+            match self.open_storage(id, &sealed).await {
+                Ok(storage) => all.push(FileStore { placement: Some(id), storage }),
+                Err(error) => {
+                    tracing::warn!(placement_id = %id, error = %error, "cannot open the placement's file storage");
+                }
+            }
+        }
+        Ok(all)
+    }
+
+    /// Bỏ mọi khách trên placement `id` khỏi cache (sau khi `schema_state` hay nơi lưu file của nó
+    /// đổi).
     pub fn invalidate_placement(&self, id: PlacementId) {
+        lock(&self.0.stores).remove(&id);
         let gone: Vec<TenantId> = lock(&self.0.tenants)
             .iter()
             .filter(|(_, (_, tenant))| tenant.placement() == id)
@@ -218,6 +359,13 @@ impl DatabaseRegistry {
         for tenant in gone {
             self.invalidate(tenant);
         }
+    }
+
+    /// Bỏ tên miền `domain` khỏi cache (sau khi xác minh, thu hồi hay đổi khách của nó trên máy chủ
+    /// này): request kế tiếp tra lại bảng.
+    pub fn invalidate_domain(&self, domain: &str) {
+        let domain = domain.trim().trim_end_matches('.').to_ascii_lowercase();
+        lock(&self.0.domains).remove(&domain);
     }
 
     /// Bỏ khách `id` khỏi cache (sau khi sửa khách trên máy chủ này).
@@ -367,9 +515,25 @@ impl DatabaseRegistry {
         let schema_state: Option<String> = row.try_get("", "schema_state")?;
         // Database điều khiển luôn đủ migration (`serve` đòi trước khi khởi động).
         let ready = placement == MAIN_PLACEMENT || schema_state.as_deref() == Some("ready");
+        let storage_sealed: Option<String> = row.try_get("", "storage_sealed")?;
         let database = self.placement_database(placement).await?;
-        let tenant = TenantContext::new(id, slug.clone(), name, status, placement, database)
+        let mut tenant = TenantContext::new(id, slug.clone(), name, status, placement, database)
             .with_schema_ready(ready);
+        if let Some(sealed) = storage_sealed
+            && placement != MAIN_PLACEMENT
+        {
+            // Nơi lưu riêng hỏng không làm cả khách ngừng phục vụ: chỉ thao tác file báo lỗi.
+            let store = match self.open_storage(placement, &sealed).await {
+                Ok(store) => store,
+                Err(error) => {
+                    tracing::warn!(placement_id = %placement, error = %error, "cannot open the placement's file storage");
+                    let unavailable: Arc<dyn Storage> =
+                        Arc::new(UnavailableStorage(error.to_string()));
+                    unavailable
+                }
+            };
+            tenant = tenant.with_storage(store);
+        }
         let now = Instant::now();
         lock(&self.0.tenants).insert(id, (now, tenant.clone()));
         lock(&self.0.slugs).insert(slug, (now, id));
@@ -382,7 +546,7 @@ fn tenant_column(column: &'static str) -> Expr {
     Expr::col((Alias::new("kernel_tenants"), Alias::new(column)))
 }
 
-/// Khách kèm `schema_state` của placement chứa nó.
+/// Khách kèm `schema_state` và nơi lưu file riêng của placement chứa nó.
 fn tenant_select() -> SelectStatement {
     let tenants = Alias::new("kernel_tenants");
     let placements = Alias::new("kernel_placements");
@@ -392,6 +556,7 @@ fn tenant_select() -> SelectStatement {
                 .map(|column| (tenants.clone(), Alias::new(column))),
         )
         .column((placements.clone(), Alias::new("schema_state")))
+        .column((placements.clone(), Alias::new("storage_sealed")))
         .from(tenants.clone())
         .left_join(
             placements.clone(),

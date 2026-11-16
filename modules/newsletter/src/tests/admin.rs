@@ -32,7 +32,7 @@ fn page() -> PageRequest {
 async fn danh_sach_tao_sua_xoa() {
     TestDatabase::run(async |test| {
         let h = service(test, config()).await;
-        let weekly = list(&h.service, "weekly", true).await;
+        let weekly = list(&h, "weekly", true).await;
         assert!(weekly.row.public && weekly.row.double_opt_in);
         assert_eq!(weekly.new_posts(), NewPosts::Off);
         let again = ListInput {
@@ -41,7 +41,7 @@ async fn danh_sach_tao_sua_xoa() {
             ..ListInput::default()
         };
         assert_eq!(
-            h.service.create_list(&admin(), again).await.unwrap_err().code(),
+            h.service.create_list(&h.tenant, &admin(), again).await.unwrap_err().code(),
             "newsletter.list_key_taken"
         );
         let bad = ListInput {
@@ -49,10 +49,14 @@ async fn danh_sach_tao_sua_xoa() {
             name: Some(Localized::default()),
             ..ListInput::default()
         };
-        let error = h.service.create_list(&admin(), bad).await.unwrap_err();
+        let error = h.service.create_list(&h.tenant, &admin(), bad).await.unwrap_err();
         assert_eq!(error.fields().len(), 2, "{error:?}");
         assert_eq!(
-            h.service.create_list(&user(&["read"]), ListInput::default()).await.unwrap_err().code(),
+            h.service
+                .create_list(&h.tenant, &user(&["read"]), ListInput::default())
+                .await
+                .unwrap_err()
+                .code(),
             "permission_denied"
         );
 
@@ -63,7 +67,7 @@ async fn danh_sach_tao_sua_xoa() {
         };
         let changed = h
             .service
-            .update_list(&admin(), weekly.row.id, change, Some(weekly.row.updated_at))
+            .update_list(&h.tenant, &admin(), weekly.row.id, change, Some(weekly.row.updated_at))
             .await
             .unwrap();
         assert_eq!(
@@ -73,6 +77,7 @@ async fn danh_sach_tao_sua_xoa() {
         assert_eq!(
             h.service
                 .update_list(
+                    &h.tenant,
                     &admin(),
                     weekly.row.id,
                     ListInput::default(),
@@ -83,24 +88,28 @@ async fn danh_sach_tao_sua_xoa() {
                 .code(),
             "precondition_failed"
         );
-        import(&h.service, weekly.row.id, &emails("reader", 2)).await;
-        let counts = h.service.subscription_counts(&[weekly.row.id]).await.unwrap();
+        import(&h, weekly.row.id, &emails("reader", 2)).await;
+        let counts = h.service.subscription_counts(&h.tenant, &[weekly.row.id]).await.unwrap();
         assert_eq!(counts[&weekly.row.id].confirmed, 2);
 
         // Còn chiến dịch nháp: không xoá được; xoá nháp rồi xoá danh sách (kèm đăng ký).
-        let draft = campaign(&h.service, weekly.row.id, false).await;
+        let draft = campaign(&h, weekly.row.id, false).await;
         assert_eq!(
-            h.service.delete_list(&admin(), weekly.row.id, None).await.unwrap_err().code(),
+            h.service
+                .delete_list(&h.tenant, &admin(), weekly.row.id, None)
+                .await
+                .unwrap_err()
+                .code(),
             "newsletter.list_in_use"
         );
         h.service
-            .delete_campaign(&admin(), draft.row.id, Some(draft.row.updated_at))
+            .delete_campaign(&h.tenant, &admin(), draft.row.id, Some(draft.row.updated_at))
             .await
             .unwrap();
-        h.service.delete_list(&admin(), weekly.row.id, None).await.unwrap();
+        h.service.delete_list(&h.tenant, &admin(), weekly.row.id, None).await.unwrap();
         assert!(subscriptions(&h.database).await.is_empty());
         assert_eq!(
-            h.service.get_list(&admin(), weekly.row.id).await.unwrap_err().code(),
+            h.service.get_list(&h.tenant, &admin(), weekly.row.id).await.unwrap_err().code(),
             "newsletter.list_not_found"
         );
     })
@@ -113,7 +122,7 @@ async fn danh_sach_tao_sua_xoa() {
 async fn nhap_nguoi_dang_ky() {
     TestDatabase::run(async |test| {
         let h = service(test, config()).await;
-        let weekly = list(&h.service, "weekly", true).await;
+        let weekly = list(&h, "weekly", true).await;
         let bad = ImportInput {
             people: vec![
                 ImportPerson { email: "ok@example.com".to_owned(), ..ImportPerson::default() },
@@ -122,21 +131,18 @@ async fn nhap_nguoi_dang_ky() {
             list_ids: vec![weekly.row.id, Uuid::now_v7()],
             ..ImportInput::default()
         };
-        let error = h.service.import_subscribers(&admin(), bad).await.unwrap_err();
+        let error = h.service.import_subscribers(&h.tenant, &admin(), bad).await.unwrap_err();
         let mut fields: Vec<&str> =
             error.fields().iter().map(|field| field.field.as_str()).collect();
         fields.sort_unstable();
         assert_eq!(fields, ["consent_source", "list_ids[1]", "subscribers[1].email"]);
 
-        import(
-            &h.service,
-            weekly.row.id,
-            &["ada@example.com".to_owned(), "bob@example.com".to_owned()],
-        )
-        .await;
+        import(&h, weekly.row.id, &["ada@example.com".to_owned(), "bob@example.com".to_owned()])
+            .await;
         let ada = h
             .service
             .list_subscribers(
+                &h.tenant,
                 &admin(),
                 &crate::audience::subscribers::SubscriberFilter {
                     email: Some("ADA@".to_owned()),
@@ -154,7 +160,7 @@ async fn nhap_nguoi_dang_ky() {
             ..SubscriberChange::default()
         };
         h.service
-            .update_subscriber(&admin(), ada.row.id, change, Some(ada.row.updated_at))
+            .update_subscriber(&h.tenant, &admin(), ada.row.id, change, Some(ada.row.updated_at))
             .await
             .unwrap();
         let input = ImportInput {
@@ -175,12 +181,12 @@ async fn nhap_nguoi_dang_ky() {
             consent_source: Some("event-2026".to_owned()),
             ..ImportInput::default()
         };
-        let report = h.service.import_subscribers(&admin(), input).await.unwrap();
+        let report = h.service.import_subscribers(&h.tenant, &admin(), input).await.unwrap();
         assert_eq!(
             (report.created, report.subscribed, report.unchanged, report.kept_unsubscribed),
             (1, 1, 1, 1)
         );
-        let ada = h.service.get_subscriber(&admin(), ada.row.id).await.unwrap();
+        let ada = h.service.get_subscriber(&h.tenant, &admin(), ada.row.id).await.unwrap();
         assert_eq!(
             (ada.row.name.as_deref(), ada.subscriptions[0].row.status.as_str()),
             (Some("Ada"), "unsubscribed")
@@ -191,7 +197,12 @@ async fn nhap_nguoi_dang_ky() {
             ..Default::default()
         };
         assert_eq!(
-            h.service.list_subscribers(&admin(), &filter, &page()).await.unwrap().data.len(),
+            h.service
+                .list_subscribers(&h.tenant, &admin(), &filter, &page())
+                .await
+                .unwrap()
+                .data
+                .len(),
             2
         );
     })
@@ -204,29 +215,33 @@ async fn nhap_nguoi_dang_ky() {
 async fn xuat_va_xoa_theo_email() {
     TestDatabase::run(async |test| {
         let h = service(test, config()).await;
-        let weekly = list(&h.service, "weekly", true).await;
-        import(&h.service, weekly.row.id, &["ada@example.com".to_owned()]).await;
-        let draft = campaign(&h.service, weekly.row.id, false).await;
-        super::send(&h.service, draft.row.id).await;
+        let weekly = list(&h, "weekly", true).await;
+        import(&h, weekly.row.id, &["ada@example.com".to_owned()]).await;
+        let draft = campaign(&h, weekly.row.id, false).await;
+        super::send(&h, draft.row.id).await;
         drain(&h).await;
-        h.service.add_suppression(&admin(), "ADA@example.com", None).await.unwrap();
+        h.service.add_suppression(&h.tenant, &admin(), "ADA@example.com", None).await.unwrap();
 
-        let data = h.service.email_data(&admin(), "Ada@Example.com").await.unwrap();
+        let data = h.service.email_data(&h.tenant, &admin(), "Ada@Example.com").await.unwrap();
         assert_eq!(data.subscriber.as_ref().unwrap().subscriptions.len(), 1);
         assert_eq!(data.deliveries.len(), 1);
         assert_eq!(data.suppression.as_ref().unwrap().reason, "manual");
         assert_eq!(
-            h.service.email_data(&user(&["read"]), "ada@example.com").await.unwrap_err().code(),
+            h.service
+                .email_data(&h.tenant, &user(&["read"]), "ada@example.com")
+                .await
+                .unwrap_err()
+                .code(),
             "permission_denied"
         );
         assert_eq!(
-            h.service.email_data(&admin(), "nope").await.unwrap_err().code(),
+            h.service.email_data(&h.tenant, &admin(), "nope").await.unwrap_err().code(),
             "validation_failed"
         );
 
-        assert!(h.service.erase_email(&admin(), "ada@example.com").await.unwrap());
-        assert!(!h.service.erase_email(&admin(), "ada@example.com").await.unwrap());
-        let after = h.service.email_data(&admin(), "ada@example.com").await.unwrap();
+        assert!(h.service.erase_email(&h.tenant, &admin(), "ada@example.com").await.unwrap());
+        assert!(!h.service.erase_email(&h.tenant, &admin(), "ada@example.com").await.unwrap());
+        let after = h.service.email_data(&h.tenant, &admin(), "ada@example.com").await.unwrap();
         assert!(after.subscriber.is_none() && after.deliveries.is_empty());
         assert!(after.suppression.is_some(), "the suppression is kept");
         assert_eq!(count_events(&h.database, "newsletter.subscriber_erased").await, 1);
@@ -243,15 +258,26 @@ async fn xuat_va_xoa_theo_email() {
 async fn don_dang_ky_chua_xac_nhan() {
     TestDatabase::run(async |test| {
         let h = service(test, config()).await;
-        let weekly = list(&h.service, "weekly", true).await;
-        subscribe(&h.service, "ada@example.com", &["weekly"], "203.0.113.9").await.unwrap();
-        import(&h.service, weekly.row.id, &["bob@example.com".to_owned()]).await;
-        assert_eq!(h.service.cleanup(chrono::Utc::now()).await.unwrap().subscriptions, 0);
+        let weekly = list(&h, "weekly", true).await;
+        subscribe(&h, "ada@example.com", &["weekly"], "203.0.113.9").await.unwrap();
+        import(&h, weekly.row.id, &["bob@example.com".to_owned()]).await;
+        let registry = autoxide_kernel::tenancy::DatabaseRegistry::single(h.database.clone());
+        assert_eq!(
+            h.service
+                .cleanup(&registry, &h.database, chrono::Utc::now())
+                .await
+                .unwrap()
+                .subscriptions,
+            0
+        );
         let later = chrono::Utc::now() + chrono::Duration::days(31);
-        let cleaned = h.service.cleanup(later).await.unwrap();
+        let cleaned = h.service.cleanup(&registry, &h.database, later).await.unwrap();
         assert_eq!((cleaned.subscriptions, cleaned.subscribers), (1, 1));
         assert_eq!(subscribers(&h.database).await, 1);
-        assert_eq!(h.service.cleanup(later).await.unwrap(), crate::retention::Cleaned::default());
+        assert_eq!(
+            h.service.cleanup(&registry, &h.database, later).await.unwrap(),
+            crate::retention::Cleaned::default()
+        );
     })
     .await
     .unwrap();
@@ -275,7 +301,7 @@ impl ResourceResolver for Entries {
 
 fn published(database: &Database, entry: Uuid, kind: &str) -> Delivered {
     Delivered::new(
-        autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+        TenantContext::default_on(database.clone()),
         "content",
         ENTRY_PUBLISHED.to_owned(),
         json!({"published": {"entry_id": entry, "kind": kind, "locale": "en"}}),
@@ -290,20 +316,20 @@ async fn bai_moi_mot_chien_dich() {
     TestDatabase::run(async |test| {
         let h = service(test, config()).await;
         h.resources.register("content", "content.entry", Arc::new(Entries)).unwrap();
-        let drafts = list(&h.service, "drafts", true).await;
+        let drafts = list(&h, "drafts", true).await;
         let change = ListInput { new_posts: Some(NewPosts::Draft), ..ListInput::default() };
-        h.service.update_list(&admin(), drafts.row.id, change, None).await.unwrap();
-        let sends = list(&h.service, "sends", true).await;
+        h.service.update_list(&h.tenant, &admin(), drafts.row.id, change, None).await.unwrap();
+        let sends = list(&h, "sends", true).await;
         let change = ListInput { new_posts: Some(NewPosts::Send), ..ListInput::default() };
-        h.service.update_list(&admin(), sends.row.id, change, None).await.unwrap();
-        let vietnamese = list(&h.service, "vietnamese", true).await;
+        h.service.update_list(&h.tenant, &admin(), sends.row.id, change, None).await.unwrap();
+        let vietnamese = list(&h, "vietnamese", true).await;
         let change = ListInput {
             new_posts: Some(NewPosts::Draft),
             new_post_locale: Some(Some(Locale::Vi)),
             ..ListInput::default()
         };
-        h.service.update_list(&admin(), vietnamese.row.id, change, None).await.unwrap();
-        import(&h.service, sends.row.id, &["ada@example.com".to_owned()]).await;
+        h.service.update_list(&h.tenant, &admin(), vietnamese.row.id, change, None).await.unwrap();
+        import(&h, sends.row.id, &["ada@example.com".to_owned()]).await;
 
         let entry = Uuid::now_v7();
         let handler = NewPostHandler(h.service.clone());
@@ -316,7 +342,7 @@ async fn bai_moi_mot_chien_dich() {
         handler.handle(&published(&h.database, Uuid::nil(), "post")).await.unwrap();
         let all = h
             .service
-            .list_campaigns(&admin(), &CampaignFilter::default(), &page())
+            .list_campaigns(&h.tenant, &admin(), &CampaignFilter::default(), &page())
             .await
             .unwrap()
             .data;
@@ -340,7 +366,13 @@ async fn bai_moi_mot_chien_dich() {
         assert_eq!(count_events(&h.database, "newsletter.campaign_created").await, 2);
         // Bản nháp gửi tay được.
         h.service
-            .change_state(&admin(), draft.row.id, Action::Send, Some(draft.row.updated_at))
+            .change_state(
+                &h.tenant,
+                &admin(),
+                draft.row.id,
+                Action::Send,
+                Some(draft.row.updated_at),
+            )
             .await
             .unwrap();
     })
@@ -358,35 +390,22 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
             name: Some(Localized { en: Some("Weekly".to_owned()), vi: None }),
             ..ListInput::default()
         };
-        let weekly = h.service.create_list(&owner, input).await.unwrap();
-        let exported = h
-            .service
-            .export(
-                &autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database),
-                owner.user_id(),
-            )
-            .await
-            .unwrap();
+        let weekly = h.service.create_list(&h.tenant, &owner, input).await.unwrap();
+        let exported = h.service.export(&h.tenant, owner.user_id()).await.unwrap();
         assert_eq!(exported["lists"][0]["key"], "weekly");
         let deleted = Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database),
+            h.tenant.clone(),
             "auth",
             USER_DELETED.to_owned(),
             json!({"before": {"id": owner.user_id()}}),
         );
         h.service.handle(&deleted).await.unwrap();
         h.service.handle(&deleted).await.unwrap();
-        assert_eq!(h.service.get_list(&owner, weekly.row.id).await.unwrap().row.created_by, None);
         assert_eq!(
-            h.service
-                .export(
-                    &autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database),
-                    owner.user_id()
-                )
-                .await
-                .unwrap()["lists"],
-            json!([])
+            h.service.get_list(&h.tenant, &owner, weekly.row.id).await.unwrap().row.created_by,
+            None
         );
+        assert_eq!(h.service.export(&h.tenant, owner.user_id()).await.unwrap()["lists"], json!([]));
     })
     .await
     .unwrap();
@@ -407,20 +426,29 @@ async fn bat_tu_gui_bai_moi_can_quyen_gui() {
         };
         assert_eq!(
             h.service
-                .create_list(&manager, input("auto", NewPosts::Send))
+                .create_list(&h.tenant, &manager, input("auto", NewPosts::Send))
                 .await
                 .unwrap_err()
                 .code(),
             "permission_denied"
         );
-        let list = h.service.create_list(&manager, input("auto", NewPosts::Draft)).await.unwrap();
+        let list = h
+            .service
+            .create_list(&h.tenant, &manager, input("auto", NewPosts::Draft))
+            .await
+            .unwrap();
         let send = || ListInput { new_posts: Some(NewPosts::Send), ..ListInput::default() };
         assert_eq!(
-            h.service.update_list(&manager, list.row.id, send(), None).await.unwrap_err().code(),
+            h.service
+                .update_list(&h.tenant, &manager, list.row.id, send(), None)
+                .await
+                .unwrap_err()
+                .code(),
             "permission_denied"
         );
         let sender = user(&["manage", "send"]);
-        let changed = h.service.update_list(&sender, list.row.id, send(), None).await.unwrap();
+        let changed =
+            h.service.update_list(&h.tenant, &sender, list.row.id, send(), None).await.unwrap();
         assert_eq!(changed.new_posts(), NewPosts::Send);
         // Đã là `send`: người quản lý vẫn sửa được phần khác, và tắt được.
         let rename = ListInput {
@@ -428,10 +456,10 @@ async fn bat_tu_gui_bai_moi_can_quyen_gui() {
             new_posts: Some(NewPosts::Send),
             ..ListInput::default()
         };
-        h.service.update_list(&manager, list.row.id, rename, None).await.unwrap();
+        h.service.update_list(&h.tenant, &manager, list.row.id, rename, None).await.unwrap();
         let off = ListInput { new_posts: Some(NewPosts::Off), ..ListInput::default() };
-        h.service.update_list(&manager, list.row.id, off, None).await.unwrap();
-        h.service.create_list(&sender, input("auto-2", NewPosts::Send)).await.unwrap();
+        h.service.update_list(&h.tenant, &manager, list.row.id, off, None).await.unwrap();
+        h.service.create_list(&h.tenant, &sender, input("auto-2", NewPosts::Send)).await.unwrap();
     })
     .await
     .unwrap();

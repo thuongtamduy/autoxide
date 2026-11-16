@@ -6,6 +6,8 @@ Tiếng Anh: [`authentication.md`](authentication.md). Ví dụ dùng `curl` v�
 
 Gửi email và mật khẩu. Câu trả lời có **access token** sống ngắn (gửi kèm mọi request) và **refresh token** (để lấy cặp kế tiếp). Tài khoản bật xác thực hai bước thì trả `202` kèm `challenge_id`; hoàn tất bằng `POST /api/v1/auth/login/mfa` với mã.
 
+Trên máy chủ phục vụ nhiều khách, đăng nhập trên tên miền của khách hoặc kèm header `Autoxide-Tenant`. Token nhận được ghi sẵn khách của nó, nên các request sau — bằng access token, `/refresh`, `/logout`, `/login/mfa`, và link trong mail đặt lại mật khẩu hay xác minh email — không cần header hay tên miền nữa. Gửi token kèm header (hay tên miền) của khách khác thì bị từ chối.
+
 <!-- example: sign-in -->
 ```bash
 curl -sS "$API/api/v1/auth/login" \

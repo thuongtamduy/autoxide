@@ -191,7 +191,7 @@ mod tests {
             let reset = tokens
                 .consume(
                     database.write(),
-                    &autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    &autoxide_kernel::tenancy::TenantContext::default_on(database.clone()),
                     "password_reset",
                     "reset-live",
                 )
@@ -203,7 +203,7 @@ mod tests {
                 tokens
                     .consume(
                         database.write(),
-                        &autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                        &autoxide_kernel::tenancy::TenantContext::default_on(database.clone()),
                         "password_reset",
                         "reset-used"
                     )
@@ -214,7 +214,7 @@ mod tests {
             let verify = tokens
                 .consume(
                     database.write(),
-                    &autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    &autoxide_kernel::tenancy::TenantContext::default_on(database.clone()),
                     "email_verification",
                     "verify-live",
                 )

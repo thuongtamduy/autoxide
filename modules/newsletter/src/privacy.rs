@@ -11,7 +11,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -22,11 +22,15 @@ use crate::service::NewsletterService;
 
 #[async_trait::async_trait]
 impl PersonalData for NewsletterService {
-    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-        let read = self.database.read();
-        let lists =
-            list::Entity::find().filter(list::Column::CreatedBy.eq(user_id)).all(read).await?;
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+        let read = tenant.database().read();
+        let lists = list::Entity::find()
+            .scoped(tenant)
+            .filter(list::Column::CreatedBy.eq(user_id))
+            .all(read)
+            .await?;
         let campaigns = campaign::Entity::find()
+            .scoped(tenant)
             .filter(campaign::Column::CreatedBy.eq(user_id))
             .all(read)
             .await?;
@@ -52,14 +56,18 @@ impl EventHandler for NewsletterService {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
-        let write = self.database.write();
+        // Tài khoản bị xoá ở khách của event: chỉ bỏ `created_by` ở dữ liệu của khách đó.
+        let tenant = &event.tenant;
+        let write = tenant.database().write();
         let lists = list::Entity::update_many()
+            .scoped(tenant)
             .col_expr(list::Column::CreatedBy, Expr::value(Option::<Uuid>::None))
             .filter(list::Column::CreatedBy.eq(user_id))
             .exec(write)
             .await?
             .rows_affected;
         let campaigns = campaign::Entity::update_many()
+            .scoped(tenant)
             .col_expr(campaign::Column::CreatedBy, Expr::value(Option::<Uuid>::None))
             .filter(campaign::Column::CreatedBy.eq(user_id))
             .exec(write)

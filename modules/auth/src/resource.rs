@@ -4,20 +4,18 @@
 //! là chính người đó.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::resource::{Resource, ResourceResolver};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
-use crate::user::UserService;
 use crate::user::entity::{Column, Entity};
 
 pub(crate) const USER: &str = "auth.user";
 
-pub(crate) struct UserResolver(pub Arc<UserService>);
+pub(crate) struct UserResolver;
 
 #[async_trait::async_trait]
 impl ResourceResolver for UserResolver {
@@ -28,7 +26,7 @@ impl ResourceResolver for UserResolver {
     /// Một câu truy vấn cho mọi id; id không phải UUID hay không có tài khoản thì vắng.
     async fn resolve_many(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         ids: &[String],
         _locale: Option<&str>,
     ) -> Result<HashMap<String, Resource>, Error> {
@@ -41,8 +39,9 @@ impl ResourceResolver for UserResolver {
             .column(Column::Id)
             .column(Column::Name)
             .filter(Column::Id.is_in(ids))
+            .scoped(tenant)
             .into_tuple()
-            .all(self.0.database().read())
+            .all(tenant.database().read())
             .await?;
         Ok(rows
             .into_iter()

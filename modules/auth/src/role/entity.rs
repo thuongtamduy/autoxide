@@ -10,7 +10,8 @@ pub(crate) mod role {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
-        #[sea_orm(unique)]
+        /// Khách sở hữu dòng (bước 33).
+        pub tenant_id: Uuid,
         pub name: String,
         pub description: String,
         pub all_permissions: bool,
@@ -19,6 +20,12 @@ pub(crate) mod role {
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }
 
 pub(crate) mod role_permission {
@@ -30,11 +37,19 @@ pub(crate) mod role_permission {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
+        /// Khách sở hữu dòng (bước 33).
+        pub tenant_id: Uuid,
         pub role_id: Uuid,
         pub permission: String,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }
 
 pub(crate) mod user_role {
@@ -46,10 +61,18 @@ pub(crate) mod user_role {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
+        /// Khách sở hữu dòng (bước 33).
+        pub tenant_id: Uuid,
         pub user_id: Uuid,
         pub role_id: Uuid,
         pub created_at: DateTimeUtc,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }

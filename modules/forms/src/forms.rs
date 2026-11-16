@@ -7,7 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -121,6 +121,7 @@ impl FormsService {
     /// `notify_emails` cần thêm `forms.read`.
     pub(crate) async fn create_form(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: FormInput,
     ) -> Result<Form, Error> {
@@ -138,6 +139,7 @@ impl FormsService {
         let now = now();
         let blank = form::Model {
             id: Uuid::now_v7(),
+            tenant_id: tenant.id().as_uuid(),
             key: String::new(),
             name: String::new(),
             status: FormStatus::Open.as_str().to_owned(),
@@ -163,8 +165,8 @@ impl FormsService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let transaction = self.database.begin_write().await?;
-        if key_taken(&transaction, &candidate.row.key, None).await? {
+        let transaction = tenant.database().begin_write().await?;
+        if key_taken(&transaction, tenant, &candidate.row.key, None).await? {
             return Err(key_conflict(&candidate.row.key));
         }
         let inserted = candidate.row.clone().into_active_model().insert(&transaction).await;
@@ -175,13 +177,13 @@ impl FormsService {
             }
             Err(error) => return Err(error.into()),
         };
-        snapshot(&transaction, &row, now).await?;
+        snapshot(&transaction, tenant, &row, now).await?;
         let created = Form::parse(row)?;
         let event = events::FormCreated(Change { before: None, after: Some(created.summary()) });
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::form_subject(created.row.id),
                 &event,
@@ -193,24 +195,35 @@ impl FormsService {
     }
 
     /// Form `id`. Cần `forms.read`.
-    pub(crate) async fn get_form(&self, principal: &Principal, id: Uuid) -> Result<Form, Error> {
+    pub(crate) async fn get_form(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<Form, Error> {
         principal.require(&FORMS_READ)?;
-        self.find_form(id).await
+        self.find_form(tenant, id).await
     }
 
-    pub(crate) async fn find_form(&self, id: Uuid) -> Result<Form, Error> {
+    pub(crate) async fn find_form(&self, tenant: &TenantContext, id: Uuid) -> Result<Form, Error> {
         let row = form::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(form_not_found)?;
         Form::parse(row)
     }
 
     /// Form có `key` (cho endpoint công khai).
-    pub(crate) async fn find_by_key(&self, key: &str) -> Result<Form, Error> {
+    pub(crate) async fn find_by_key(
+        &self,
+        tenant: &TenantContext,
+        key: &str,
+    ) -> Result<Form, Error> {
         let row = form::Entity::find()
+            .scoped(tenant)
             .filter(form::Column::Key.eq(key.trim()))
-            .one(self.database.read())
+            .one(tenant.database().read())
             .await?
             .ok_or_else(form_not_found)?;
         Form::parse(row)
@@ -219,17 +232,19 @@ impl FormsService {
     /// Một trang form, mới trước (mặc định). Cần `forms.read`.
     pub(crate) async fn list_forms(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         status: Option<FormStatus>,
         page: &PageRequest,
     ) -> Result<Page<Form>, Error> {
         principal.require(&FORMS_READ)?;
-        let mut select = form::Entity::find();
+        let mut select = form::Entity::find().scoped(tenant);
         if let Some(status) = status {
             select = select.filter(form::Column::Status.eq(status.as_str()));
         }
         let found =
-            fetch_page(select, form::Column::Id, |row| row.id, page, self.database.read()).await?;
+            fetch_page(select, form::Column::Id, |row| row.id, page, tenant.database().read())
+                .await?;
         let Page { data, pagination } = found;
         let data = data.into_iter().map(Form::parse).collect::<Result<Vec<_>, _>>()?;
         Ok(Page { data, pagination })
@@ -240,13 +255,14 @@ impl FormsService {
     /// Đổi trường thì tăng `version`.
     pub(crate) async fn update_form(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         input: FormInput,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Form, Error> {
         principal.require(&FORMS_MANAGE)?;
-        let before = self.find_form(id).await?;
+        let before = self.find_form(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -270,9 +286,9 @@ impl FormsService {
             candidate.row.version = before.row.version + 1;
         }
         candidate.row.updated_at = now;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         if candidate.row.key != before.row.key
-            && key_taken(&transaction, &candidate.row.key, Some(id)).await?
+            && key_taken(&transaction, tenant, &candidate.row.key, Some(id)).await?
         {
             return Err(key_conflict(&candidate.row.key));
         }
@@ -294,6 +310,7 @@ impl FormsService {
         // Phiên bản đã đọc (`If-Match`), hay ít nhất "chưa ai sửa từ lúc đọc ở trên".
         let update = form::Entity::update(row)
             .validate()?
+            .scoped(tenant)
             .filter(form::Column::UpdatedAt.eq(expected.unwrap_or(before.row.updated_at)));
         let after = match update.exec(&transaction).await {
             Ok(after) => after,
@@ -306,7 +323,7 @@ impl FormsService {
             Err(error) => return Err(error.into()),
         };
         if fields_changed {
-            snapshot(&transaction, &after, now).await?;
+            snapshot(&transaction, tenant, &after, now).await?;
         }
         let after = Form::parse(after)?;
         let mut summary = after.summary();
@@ -316,13 +333,7 @@ impl FormsService {
         let event =
             events::FormUpdated(Change { before: Some(before.summary()), after: Some(summary) });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(principal),
-                events::form_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(principal), events::form_subject(id), &event)
             .await?;
         transaction.commit().await?;
         Ok(after)
@@ -331,17 +342,19 @@ impl FormsService {
     /// Xoá form `id` cùng mọi phiên bản và mọi bài gửi của nó. Cần `forms.manage`.
     pub(crate) async fn delete_form(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<(), Error> {
         principal.require(&FORMS_MANAGE)?;
-        let before = self.find_form(id).await?;
+        let before = self.find_form(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let deleted = form::Entity::delete_many()
+            .scoped(tenant)
             .filter(form::Column::Id.eq(id))
             .filter(form::Column::UpdatedAt.eq(expected.unwrap_or(before.row.updated_at)))
             .exec(&transaction)
@@ -350,10 +363,12 @@ impl FormsService {
             return Err(autoxide_kernel::version::changed());
         }
         form_version::Entity::delete_many()
+            .scoped(tenant)
             .filter(form_version::Column::FormId.eq(id))
             .exec(&transaction)
             .await?;
         let submissions = submission::Entity::delete_many()
+            .scoped(tenant)
             .filter(submission::Column::FormId.eq(id))
             .exec(&transaction)
             .await?;
@@ -363,19 +378,13 @@ impl FormsService {
         }
         let event = events::FormDeleted(Change { before: Some(summary), after: None });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(principal),
-                events::form_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(principal), events::form_subject(id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(form_id = %id, submissions = submissions.rows_affected, "form deleted");
         // File xuất của form chứa bài vừa xoá (sau transaction: nơi lưu có thể ở xa).
-        let exports = self.exports_of(vec![id]).await?;
-        self.purge_exports(exports).await?;
+        let exports = self.exports_of(tenant, vec![id]).await?;
+        self.purge_exports(tenant, exports).await?;
         Ok(())
     }
 
@@ -535,11 +544,13 @@ impl FormsService {
 /// Ghi ảnh chụp trường của phiên bản hiện hành của `row`.
 async fn snapshot<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     row: &form::Model,
     now: DateTime<Utc>,
 ) -> Result<(), Error> {
     form_version::Model {
         id: Uuid::now_v7(),
+        tenant_id: tenant.id().as_uuid(),
         form_id: row.id,
         version: row.version,
         fields: row.fields.clone(),
@@ -553,10 +564,11 @@ async fn snapshot<C: ConnectionTrait>(
 
 async fn key_taken<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     key: &str,
     except: Option<Uuid>,
 ) -> Result<bool, Error> {
-    let mut select = form::Entity::find().filter(form::Column::Key.eq(key));
+    let mut select = form::Entity::find().scoped(tenant).filter(form::Column::Key.eq(key));
     if let Some(id) = except {
         select = select.filter(form::Column::Id.ne(id));
     }

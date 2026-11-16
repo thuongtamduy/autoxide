@@ -7,7 +7,7 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{Effort, Part, Prompt};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::EntityTrait;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -37,6 +37,7 @@ impl MediaService {
     /// dùng ảnh — giúp mô hình biết điều gì quan trọng. Cần `media.write`.
     pub(crate) async fn suggest_alt(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         locale: &str,
@@ -70,7 +71,8 @@ impl MediaService {
             return Err(Error::validation(problems));
         }
         let item = item::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| item_not_found(id))?;
         if item.trashed_at.is_some() {
@@ -87,7 +89,7 @@ impl MediaService {
                  the operator.",
             ));
         }
-        let (bytes, media_type) = self.image_for_ai(&item).await?;
+        let (bytes, media_type) = self.image_for_ai(tenant, &item).await?;
         let instructions = format!(
             "Write the alternative text (alt text) of one image for people who cannot see it, in \
              the language whose BCP 47 code is `{locale}`. At most {ALT_MAX} characters, one or \
@@ -113,8 +115,7 @@ impl MediaService {
         ])
         .effort(Effort::Low)
         .max_output_tokens(1000);
-        let answer =
-            self.ai.generate(&TenantContext::legacy_default(&self.database), prompt).await?;
+        let answer = self.ai.generate(tenant, prompt).await?;
         let decorative = answer.output.get("decorative").and_then(Value::as_bool).unwrap_or(false);
         let alt = if decorative {
             String::new()
@@ -129,9 +130,13 @@ impl MediaService {
     /// tạm ảnh gốc trong bộ nhớ (không lưu), trên thread riêng. Không bao giờ gửi chính file
     /// gốc, kể cả khi nó đã nhỏ: làm lại ảnh bỏ hết metadata (EXIF: vị trí GPS, số máy) và
     /// phần dữ liệu nhét thêm (D-149).
-    async fn image_for_ai(&self, item: &Item) -> Result<(Vec<u8>, &'static str), Error> {
-        let copies =
-            variants::variants_of(self.database.read(), std::slice::from_ref(item)).await?;
+    async fn image_for_ai(
+        &self,
+        tenant: &TenantContext,
+        item: &Item,
+    ) -> Result<(Vec<u8>, &'static str), Error> {
+        let read = tenant.database().read();
+        let copies = variants::variants_of(read, tenant, std::slice::from_ref(item)).await?;
         let fitting = copies
             .get(&item.id)
             .into_iter()
@@ -144,7 +149,7 @@ impl MediaService {
             .max_by_key(|copy| copy.width);
         if let Some(copy) = fitting {
             // Ảnh thu nhỏ do máy chủ làm (đã sạch metadata).
-            let stored = self.read_key(&copy.storage_key(), None).await?;
+            let stored = self.read_key(tenant, &copy.storage_key(), None).await?;
             let media_type =
                 if copy.content_type == "image/png" { "image/png" } else { "image/jpeg" };
             return Ok((variants::read_all(stored).await?, media_type));
@@ -154,7 +159,7 @@ impl MediaService {
         {
             return Err(unsupported_image());
         }
-        let original = variants::read_all(self.read(item, None).await?).await?;
+        let original = variants::read_all(self.read(tenant, item, None).await?).await?;
         // Giải mã và đổi cỡ tốn CPU: chạy trên thread riêng của tokio cho việc chặn.
         let shrunk = tokio::task::spawn_blocking(move || variants::shrink(&original, AI_MAX_SIDE))
             .await

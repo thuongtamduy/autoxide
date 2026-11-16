@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
@@ -23,7 +22,7 @@ use crate::events;
 use crate::password::{self, Passwords, Verification};
 use crate::session::SessionService;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use serde_json::json;
 
 /// Độ dài tối đa của email (RFC 5321) và của tên hiển thị, theo ký tự.
@@ -73,25 +72,25 @@ pub(crate) struct AccountFacts {
     pub last_sign_in_at: Option<DateTime<Utc>>,
 }
 
+// Service không giữ database: mỗi hàm nhận khách của request (`TenantContext`) và làm việc trên
+// database của khách đó, chỉ với dòng của khách đó (bước 33).
 pub(crate) struct UserService {
-    database: Database,
     passwords: Passwords,
     outbox: Outbox,
 }
 
 impl UserService {
-    /// Database của module (cho bộ tra `auth.user` của sổ đối tượng).
-    pub(crate) fn database(&self) -> &Database {
-        &self.database
+    pub(crate) fn new(passwords: Passwords, outbox: Outbox) -> Self {
+        UserService { passwords, outbox }
     }
 
-    pub(crate) fn new(database: Database, passwords: Passwords, outbox: Outbox) -> Self {
-        UserService { database, passwords, outbox }
-    }
-
-    /// Người dùng có ID `id`.
-    pub(crate) async fn get(&self, id: Uuid) -> Result<Option<User>, Error> {
-        let row = Entity::find_by_id(id).one(self.database.read()).await?;
+    /// Người dùng có ID `id` của khách `tenant`.
+    pub(crate) async fn get(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Option<User>, Error> {
+        let row = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
         Ok(row.map(User::from))
     }
 
@@ -103,10 +102,11 @@ impl UserService {
     #[cfg(test)]
     pub(crate) async fn check_credentials(
         &self,
+        tenant: &TenantContext,
         email: &str,
         password: &str,
     ) -> Result<User, Error> {
-        self.verify_credentials(email, password).await.map(|(user, _)| user)
+        self.verify_credentials(tenant, email, password).await.map(|(user, _)| user)
     }
 
     /// Như [`check_credentials`](Self::check_credentials), kèm hash mật khẩu đang lưu lúc
@@ -114,6 +114,7 @@ impl UserService {
     /// [`SessionService::lock_grant`]: mật khẩu đổi giữa lúc kiểm và lúc cấp thì không cấp.
     pub(crate) async fn verify_credentials(
         &self,
+        tenant: &TenantContext,
         email: &str,
         password: &str,
     ) -> Result<(User, String), Error> {
@@ -122,7 +123,8 @@ impl UserService {
         }
         let row = Entity::find()
             .filter(Column::Email.eq(autoxide_kernel::email::normalize(email)))
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?;
         let stored = row.as_ref().and_then(|row| row.password_hash.clone());
         let verification = self.passwords.verify(password.to_owned(), stored.clone()).await?;
@@ -135,7 +137,9 @@ impl UserService {
             return Err(user_disabled());
         }
         let Some(mut current) = stored else { return Err(invalid_credentials()) };
-        if rehash && let Some(upgraded) = self.upgrade_hash(row.id, &current, password).await {
+        if rehash
+            && let Some(upgraded) = self.upgrade_hash(tenant, row.id, &current, password).await
+        {
             current = upgraded;
         }
         Ok((row.into(), current))
@@ -144,7 +148,13 @@ impl UserService {
     /// Hash lại mật khẩu theo tham số hiện hành. Hỏng thì chỉ ghi log: người dùng
     /// đã đăng nhập đúng, lần sau thử lại.
     /// Trả hash mới khi đã thay; `None` khi giữ hash cũ.
-    async fn upgrade_hash(&self, id: Uuid, stored: &str, password: &str) -> Option<String> {
+    async fn upgrade_hash(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        stored: &str,
+        password: &str,
+    ) -> Option<String> {
         let result = async {
             let hash = self.passwords.hash(password.to_owned()).await?;
             // Chỉ thay nếu hash vẫn là hash vừa kiểm: không đè mật khẩu vừa được
@@ -153,7 +163,8 @@ impl UserService {
                 .col_expr(Column::PasswordHash, Expr::value(Some(hash.clone())))
                 .filter(Column::Id.eq(id))
                 .filter(Column::PasswordHash.eq(stored))
-                .exec(self.database.write())
+                .scoped(tenant)
+                .exec(tenant.database().write())
                 .await?;
             Ok::<_, Error>((updated.rows_affected == 1).then_some(hash))
         }
@@ -169,14 +180,20 @@ impl UserService {
 
     /// Tạo người dùng. Email được chuẩn hoá (bỏ khoảng trắng hai đầu, chữ thường)
     /// và phải chưa ai dùng.
-    pub(crate) async fn create(&self, actor: Actor, input: NewUser) -> Result<User, Error> {
-        self.create_with_roles(actor, input, false).await
+    pub(crate) async fn create(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        input: NewUser,
+    ) -> Result<User, Error> {
+        self.create_with_roles(tenant, actor, input, false).await
     }
 
     /// Như [`create`](Self::create); `admin` thì gán luôn role `admin` trong CÙNG
     /// transaction — không bao giờ có người dùng "admin dở dang" khi một bước hỏng.
     pub(crate) async fn create_with_roles(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         input: NewUser,
         admin: bool,
@@ -199,9 +216,10 @@ impl UserService {
             None => None,
         };
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let row = entity::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             email: Set(email.clone()),
             search_text: Set(search_text(&email, &name)),
             name: Set(name),
@@ -220,18 +238,12 @@ impl UserService {
             _ => Error::from(error),
         })?;
         if admin {
-            crate::role::grant_admin(&transaction, row.id).await?;
+            crate::role::grant_admin(&transaction, tenant, row.id).await?;
         }
         let after = Some(json!({"email": row.email, "name": row.name, "admin": admin}));
         let event = events::UserCreated { before: None, after };
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::user_subject(row.id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::user_subject(row.id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %row.id, admin, "user created");
@@ -243,6 +255,7 @@ impl UserService {
     /// `expected`: phiên bản (`updated_at`) người gọi đã đọc; khác thì lỗi 412 (D-084).
     pub(crate) async fn update(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         id: Uuid,
         changes: UserChanges,
@@ -252,9 +265,12 @@ impl UserService {
         if let Some(problem) = name.as_deref().and_then(check_name) {
             return Err(Error::validation(vec![problem]));
         }
-        let transaction = self.database.begin_write().await?;
-        let before =
-            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
+        let transaction = tenant.database().begin_write().await?;
+        let before = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| user_not_found(id))?;
         if expected.is_some_and(|expected| expected != before.updated_at) {
             transaction.rollback().await?;
             return Err(autoxide_kernel::version::changed());
@@ -264,8 +280,8 @@ impl UserService {
         // `RoleService::set_user_roles`, nên hai việc chạy cùng lúc trên Postgres chờ nhau thay
         // vì deadlock (D-156).
         let admins_before = if changes.disabled == Some(true) {
-            lock_row(&transaction, id).await?;
-            crate::role::count_active_admins(&transaction).await?
+            lock_row(&transaction, tenant, id).await?;
+            crate::role::count_active_admins(&transaction, tenant).await?
         } else {
             0
         };
@@ -294,7 +310,7 @@ impl UserService {
             update = update.filter(Column::UpdatedAt.eq(expected));
         }
         // Câu `UPDATE` này cũng khoá dòng người dùng tới hết transaction.
-        let updated = update.filter(Column::Id.eq(id)).exec(&transaction).await?;
+        let updated = update.filter(Column::Id.eq(id)).scoped(tenant).exec(&transaction).await?;
         if updated.rows_affected == 0 {
             transaction.rollback().await?;
             return Err(match expected {
@@ -303,25 +319,22 @@ impl UserService {
             });
         }
         if changes.disabled == Some(true) {
-            SessionService::revoke_user(&transaction, id).await?;
-            if admins_before > 0 && crate::role::count_active_admins(&transaction).await? == 0 {
+            SessionService::revoke_user(&transaction, tenant, id).await?;
+            if admins_before > 0
+                && crate::role::count_active_admins(&transaction, tenant).await? == 0
+            {
                 transaction.rollback().await?;
                 return Err(crate::role::last_admin());
             }
         }
-        let row =
-            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
+        let row = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| user_not_found(id))?;
         let event =
             events::UserUpdated { before: Some(snapshot(&before)), after: Some(snapshot(&row)) };
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::user_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::user_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, disabled = ?changes.disabled, "user changed");
         Ok(row.into())
@@ -334,45 +347,47 @@ impl UserService {
     /// admin cuối cùng còn hoạt động.
     ///
     /// [`USER_DELETED`]: autoxide_kernel::privacy::USER_DELETED
-    pub(crate) async fn delete(&self, actor: Actor, id: Uuid) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
+    pub(crate) async fn delete(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        let transaction = tenant.database().begin_write().await?;
         // Dòng người dùng trước, role toàn quyền sau (xem `update`).
-        lock_row(&transaction, id).await?;
-        let admins_before = crate::role::count_active_admins(&transaction).await?;
-        let deleted = Entity::delete_by_id(id).exec(&transaction).await?;
+        lock_row(&transaction, tenant, id).await?;
+        let admins_before = crate::role::count_active_admins(&transaction, tenant).await?;
+        let deleted = Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             transaction.rollback().await?;
             return Err(user_not_found(id));
         }
-        if admins_before > 0 && crate::role::count_active_admins(&transaction).await? == 0 {
+        if admins_before > 0 && crate::role::count_active_admins(&transaction, tenant).await? == 0 {
             transaction.rollback().await?;
             return Err(crate::role::last_admin());
         }
         autoxide_kernel::tokens::OneTimeTokens::new("auth")
-            .forget(&transaction, &TenantContext::legacy_default(&self.database), &id.to_string())
+            .forget(&transaction, tenant, &id.to_string())
             .await?;
         // Chỉ ghi id: audit log không giữ lại email hay tên của người đã xin xoá.
         let event =
             events::UserDeleted { before: Some(serde_json::json!({"id": id})), after: None };
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::user_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::user_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "user deleted");
         Ok(())
     }
 
     /// Người dùng có email `email` (so sánh sau khi chuẩn hoá).
-    pub(crate) async fn find_by_email(&self, email: &str) -> Result<Option<User>, Error> {
+    pub(crate) async fn find_by_email(
+        &self,
+        tenant: &TenantContext,
+        email: &str,
+    ) -> Result<Option<User>, Error> {
         let row = Entity::find()
             .filter(Column::Email.eq(autoxide_kernel::email::normalize(email)))
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?;
         Ok(row.map(User::from))
     }
@@ -381,19 +396,24 @@ impl UserService {
     /// `email` khác email hiện tại thì nó thay email hiện tại (đổi email). Trả email cũ.
     pub(crate) async fn apply_verified_email(
         &self,
+        tenant: &TenantContext,
         transaction: &DatabaseTransaction,
         id: Uuid,
         email: &str,
         at: DateTime<Utc>,
     ) -> Result<String, Error> {
-        let row =
-            Entity::find_by_id(id).one(transaction).await?.ok_or_else(|| user_not_found(id))?;
+        let row = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(transaction)
+            .await?
+            .ok_or_else(|| user_not_found(id))?;
         Entity::update_many()
             .col_expr(Column::Email, Expr::value(email))
             .col_expr(Column::SearchText, Expr::value(search_text(email, &row.name)))
             .col_expr(Column::EmailVerifiedAt, Expr::value(Some(at)))
             .col_expr(Column::UpdatedAt, Expr::value(at))
             .filter(Column::Id.eq(id))
+            .scoped(tenant)
             .exec(transaction)
             .await
             .map_err(|error| match error.sql_err() {
@@ -408,11 +428,12 @@ impl UserService {
     /// email hoặc tên chứa chuỗi đó (không phân biệt hoa thường).
     pub(crate) async fn list(
         &self,
+        tenant: &TenantContext,
         search: Option<&str>,
         status: Option<UserStatus>,
         page: &PageRequest,
     ) -> Result<Page<User>, Error> {
-        let mut select = Entity::find();
+        let mut select = Entity::find().scoped(tenant);
         if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
             // Không có index nào giúp được tìm "chứa": quét bảng người dùng.
             select = select.filter(autoxide_kernel::search::contains(Column::SearchText, search));
@@ -422,19 +443,25 @@ impl UserService {
             Some(UserStatus::Disabled) => select.filter(Column::DisabledAt.is_not_null()),
             None => select,
         };
-        let page = fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await?;
+        let read = tenant.database().read();
+        let page = fetch_page(select, Column::Id, |row| row.id, page, read).await?;
         Ok(page.map(User::from))
     }
 
     /// Những người `ids` (để hiện tên, email chủ của bản ghi) — một câu cho cả trang. Người đã
     /// bị xoá: vắng.
-    pub(crate) async fn by_ids(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, User>, Error> {
+    pub(crate) async fn by_ids(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, User>, Error> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
         let rows = Entity::find()
             .filter(Column::Id.is_in(ids.iter().copied()))
-            .all(self.database.read())
+            .scoped(tenant)
+            .all(tenant.database().read())
             .await?;
         Ok(rows.into_iter().map(|row| (row.id, User::from(row))).collect())
     }
@@ -442,11 +469,15 @@ impl UserService {
     /// Dữ kiện tài khoản của những người `ids` cho trang quản trị (có mật khẩu chưa, đã bật đăng
     /// nhập hai bước chưa, lần đăng nhập cuối) — hai câu truy vấn cho cả trang, không theo từng
     /// người (đề bài giao diện B1).
-    pub(crate) async fn facts(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, AccountFacts>, Error> {
+    pub(crate) async fn facts(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, AccountFacts>, Error> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
-        let read = self.database.read();
+        let read = tenant.database().read();
         let rows: Vec<(Uuid, Option<String>, Option<DateTime<Utc>>)> = Entity::find()
             .select_only()
             .column(Column::Id)
@@ -460,6 +491,7 @@ impl UserService {
             )
             .column(Column::LastSignInAt)
             .filter(Column::Id.is_in(ids.iter().copied()))
+            .scoped(tenant)
             .into_tuple()
             .all(read)
             .await?;
@@ -468,6 +500,7 @@ impl UserService {
             .column(crate::mfa::entity::totp::Column::UserId)
             .filter(crate::mfa::entity::totp::Column::ConfirmedAt.is_not_null())
             .filter(crate::mfa::entity::totp::Column::UserId.is_in(ids.iter().copied()))
+            .scoped(tenant)
             .into_tuple::<Uuid>()
             .all(read)
             .await?
@@ -490,11 +523,12 @@ impl UserService {
     #[cfg(test)]
     pub(crate) async fn set_password(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         id: Uuid,
         password: String,
     ) -> Result<(), Error> {
-        self.write_password(actor, id, "password", password, PasswordWrite::Change).await
+        self.write_password(tenant, actor, id, "password", password, PasswordWrite::Change).await
     }
 
     /// Chủ tài khoản lấy lại tài khoản bằng mail đặt lại mật khẩu: đặt mật khẩu mới, và trong
@@ -502,11 +536,12 @@ impl UserService {
     /// giữ lại được cửa nào (D-079, D-156).
     pub(crate) async fn recover_password(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         id: Uuid,
         password: String,
     ) -> Result<(), Error> {
-        self.write_password(actor, id, "password", password, PasswordWrite::Recovery).await
+        self.write_password(tenant, actor, id, "password", password, PasswordWrite::Recovery).await
     }
 
     /// Quản trị viên đặt mật khẩu cho tài khoản tạo không kèm mật khẩu. Tài khoản đã
@@ -514,11 +549,12 @@ impl UserService {
     /// người dùng không được chiếm tài khoản của người khác bằng cách đổi mật khẩu của họ.
     pub(crate) async fn set_initial_password(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         id: Uuid,
         password: String,
     ) -> Result<(), Error> {
-        self.write_password(actor, id, "password", password, PasswordWrite::Initial).await
+        self.write_password(tenant, actor, id, "password", password, PasswordWrite::Initial).await
     }
 
     /// Hash và lưu mật khẩu. `field`: tên trường báo trong lỗi luật mật khẩu.
@@ -530,6 +566,7 @@ impl UserService {
     /// email đang chờ.
     pub(crate) async fn write_password(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         id: Uuid,
         field: &str,
@@ -543,71 +580,40 @@ impl UserService {
         let hash = self.passwords.hash(password).await?;
         // Đổi mật khẩu và thu hồi mọi phiên đăng nhập trong CÙNG một transaction: kẻ
         // giữ mật khẩu cũ (hay refresh token cũ) mất quyền ngay khi mật khẩu đổi.
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let mut update = Entity::update_many()
             .col_expr(Column::PasswordHash, Expr::value(Some(hash)))
             .col_expr(Column::UpdatedAt, Expr::value(now()))
-            .filter(Column::Id.eq(id));
+            .filter(Column::Id.eq(id))
+            .scoped(tenant);
         if only_if_unset {
             update = update.filter(Column::PasswordHash.is_null());
         }
         let updated = update.exec(&transaction).await?;
         if updated.rows_affected == 0 {
             transaction.rollback().await?;
-            if only_if_unset && self.get(id).await?.is_some() {
+            if only_if_unset && self.get(tenant, id).await?.is_some() {
                 return Err(password_already_set());
             }
             return Err(user_not_found(id));
         }
-        SessionService::revoke_user(&transaction, id).await?;
-        SessionService::drop_mfa_challenges(&transaction, id).await?;
-        crate::passkey::drop_ceremonies_in(&transaction, id).await?;
+        SessionService::revoke_user(&transaction, tenant, id).await?;
+        SessionService::drop_mfa_challenges(&transaction, tenant, id).await?;
+        crate::passkey::drop_ceremonies_in(&transaction, tenant, id).await?;
         let subject = id.to_string();
         OneTimeTokens::new("auth")
-            .revoke(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                "email_verification",
-                &subject,
-            )
+            .revoke(&transaction, tenant, "email_verification", &subject)
             .await?;
         if mode == PasswordWrite::Recovery {
-            crate::passkey::remove_all_in(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                &self.outbox,
-                actor,
-                id,
-                false,
-            )
-            .await?;
-            crate::api_key::revoke_all_in(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                &self.outbox,
-                actor,
-                id,
-            )
-            .await?;
+            crate::passkey::remove_all_in(&transaction, tenant, &self.outbox, actor, id, false)
+                .await?;
+            crate::api_key::revoke_all_in(&transaction, tenant, &self.outbox, actor, id).await?;
             OneTimeTokens::new("auth")
-                .revoke(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    "password_reset",
-                    &subject,
-                )
+                .revoke(&transaction, tenant, "password_reset", &subject)
                 .await?;
         }
         let event = events::PasswordChanged::default();
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::user_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::user_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "password changed");
         Ok(())
@@ -622,6 +628,7 @@ impl UserService {
     /// token xác minh email / đặt lại mật khẩu, và tắt TOTP kèm recovery code.
     pub(crate) async fn lock_out_in(
         &self,
+        tenant: &TenantContext,
         transaction: &DatabaseTransaction,
         actor: Actor,
         id: Uuid,
@@ -630,47 +637,18 @@ impl UserService {
             .col_expr(Column::PasswordHash, Expr::value(Option::<String>::None))
             .col_expr(Column::UpdatedAt, Expr::value(now()))
             .filter(Column::Id.eq(id))
+            .scoped(tenant)
             .exec(transaction)
             .await?;
-        SessionService::revoke_user(transaction, id).await?;
-        SessionService::drop_mfa_challenges(transaction, id).await?;
-        crate::passkey::drop_ceremonies_in(transaction, id).await?;
-        crate::passkey::remove_all_in(
-            transaction,
-            &TenantContext::legacy_default(&self.database),
-            &self.outbox,
-            actor,
-            id,
-            false,
-        )
-        .await?;
-        crate::api_key::revoke_all_in(
-            transaction,
-            &TenantContext::legacy_default(&self.database),
-            &self.outbox,
-            actor,
-            id,
-        )
-        .await?;
-        crate::mfa::service::remove_in(
-            transaction,
-            &TenantContext::legacy_default(&self.database),
-            &self.outbox,
-            actor,
-            id,
-            false,
-        )
-        .await?;
+        SessionService::revoke_user(transaction, tenant, id).await?;
+        SessionService::drop_mfa_challenges(transaction, tenant, id).await?;
+        crate::passkey::drop_ceremonies_in(transaction, tenant, id).await?;
+        crate::passkey::remove_all_in(transaction, tenant, &self.outbox, actor, id, false).await?;
+        crate::api_key::revoke_all_in(transaction, tenant, &self.outbox, actor, id).await?;
+        crate::mfa::service::remove_in(transaction, tenant, &self.outbox, actor, id, false).await?;
         let subject = id.to_string();
         for purpose in ["email_verification", "password_reset"] {
-            OneTimeTokens::new("auth")
-                .revoke(
-                    transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    purpose,
-                    &subject,
-                )
-                .await?;
+            OneTimeTokens::new("auth").revoke(transaction, tenant, purpose, &subject).await?;
         }
         Ok(())
     }
@@ -678,18 +656,18 @@ impl UserService {
 
 #[async_trait::async_trait]
 impl Accounts for UserService {
-    async fn create(&self, _tenant: &TenantContext, account: NewAccount) -> Result<User, Error> {
+    async fn create(&self, tenant: &TenantContext, account: NewAccount) -> Result<User, Error> {
         let input =
             NewUser { email: account.email, name: account.name, password: account.password };
         // Chỉ lệnh CLI dùng trait này: người vận hành máy chủ, tức "hệ thống".
-        self.create_with_roles(Actor::system(), input, account.admin).await
+        self.create_with_roles(tenant, Actor::system(), input, account.admin).await
     }
 }
 
 #[async_trait::async_trait]
 impl Users for UserService {
-    async fn find(&self, _tenant: &TenantContext, id: Uuid) -> Result<Option<User>, Error> {
-        self.get(id).await
+    async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<User>, Error> {
+        self.get(tenant, id).await
     }
 }
 
@@ -749,8 +727,12 @@ pub(crate) fn user_disabled() -> Error {
 }
 
 /// Khoá dòng người dùng `id` tới hết transaction (`rows::lock_one`, D-181).
-async fn lock_row(transaction: &DatabaseTransaction, id: Uuid) -> Result<(), Error> {
-    rows::lock_one(transaction, Entity::find_by_id(id)).await?;
+async fn lock_row(
+    transaction: &DatabaseTransaction,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<(), Error> {
+    rows::lock_one(transaction, Entity::find_by_id(id).scoped(tenant)).await?;
     Ok(())
 }
 
@@ -779,12 +761,10 @@ mod tests {
 
     const PASSWORD: &str = "correct horse battery staple";
 
-    async fn service(test: &TestDatabase) -> UserService {
-        UserService::new(
-            crate::testing::database(test).await,
-            Passwords::new(),
-            Outbox::standalone("auth"),
-        )
+    async fn service(test: &TestDatabase) -> (UserService, TenantContext) {
+        let database = crate::testing::database(test).await;
+        let users = UserService::new(Passwords::new(), Outbox::standalone("auth"));
+        (users, TenantContext::default_on(database))
     }
 
     fn new_user(email: &str) -> NewUser {
@@ -798,18 +778,23 @@ mod tests {
     #[tokio::test]
     async fn tao_roi_doc_lai_nguoi_dung() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
+            let (users, tenant) = service(test).await;
 
-            let created =
-                users.create(Actor::system(), new_user("  Ada@Example.COM ")).await.unwrap();
+            let created = users
+                .create(&tenant, Actor::system(), new_user("  Ada@Example.COM "))
+                .await
+                .unwrap();
 
             assert_eq!(created.email, "ada@example.com");
             assert_eq!(created.name, "Ada Lovelace");
             assert!(created.is_active());
             assert_eq!(created.id.get_version_num(), 7);
-            assert_eq!(users.get(created.id).await.unwrap(), Some(created.clone()));
-            assert_eq!(users.find_by_email("ADA@example.com").await.unwrap(), Some(created));
-            assert_eq!(users.get(Uuid::now_v7()).await.unwrap(), None);
+            assert_eq!(users.get(&tenant, created.id).await.unwrap(), Some(created.clone()));
+            assert_eq!(
+                users.find_by_email(&tenant, "ADA@example.com").await.unwrap(),
+                Some(created)
+            );
+            assert_eq!(users.get(&tenant, Uuid::now_v7()).await.unwrap(), None);
         })
         .await
         .unwrap();
@@ -818,10 +803,11 @@ mod tests {
     #[tokio::test]
     async fn mat_khau_luu_duoi_dang_hash_argon2id() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
-            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let (users, tenant) = service(test).await;
+            let created =
+                users.create(&tenant, Actor::system(), new_user("ada@example.com")).await.unwrap();
 
-            let row = Entity::find_by_id(created.id).one(users.database.read()).await.unwrap();
+            let row = Entity::find_by_id(created.id).one(tenant.database().read()).await.unwrap();
 
             let hash = row.unwrap().password_hash.unwrap();
             assert!(hash.starts_with("$argon2id$"), "{hash}");
@@ -834,11 +820,13 @@ mod tests {
     #[tokio::test]
     async fn email_trung_khong_phan_biet_hoa_thuong_bi_tu_choi() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
-            users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let (users, tenant) = service(test).await;
+            users.create(&tenant, Actor::system(), new_user("ada@example.com")).await.unwrap();
 
-            let error =
-                users.create(Actor::system(), new_user("ADA@example.com")).await.unwrap_err();
+            let error = users
+                .create(&tenant, Actor::system(), new_user("ADA@example.com"))
+                .await
+                .unwrap_err();
 
             assert_eq!(error.kind(), ErrorKind::Conflict);
             assert_eq!(error.code(), "auth.email_taken");
@@ -857,13 +845,15 @@ mod tests {
     #[tokio::test]
     async fn tao_dong_thoi_cung_email_chi_mot_thanh_cong() {
         TestDatabase::run(async |test| {
-            let users = std::sync::Arc::new(service(test).await);
+            let (users, tenant) = service(test).await;
+            let users = std::sync::Arc::new(users);
 
             let attempts: Vec<_> = (0..6)
                 .map(|_| {
                     let users = users.clone();
+                    let tenant = tenant.clone();
                     tokio::spawn(async move {
-                        users.create(Actor::system(), new_user("ada@example.com")).await
+                        users.create(&tenant, Actor::system(), new_user("ada@example.com")).await
                     })
                 })
                 .collect();
@@ -884,14 +874,14 @@ mod tests {
     #[tokio::test]
     async fn du_lieu_sai_bao_du_moi_truong() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
+            let (users, tenant) = service(test).await;
             let input = NewUser {
                 email: "not an email".to_owned(),
                 name: "   ".to_owned(),
                 password: Some("short".to_owned()),
             };
 
-            let error = users.create(Actor::system(), input).await.unwrap_err();
+            let error = users.create(&tenant, Actor::system(), input).await.unwrap_err();
 
             assert_eq!(error.code(), "validation_failed");
             let fields: Vec<(&str, &str)> = error
@@ -908,13 +898,16 @@ mod tests {
     #[tokio::test]
     async fn kiem_thong_tin_dang_nhap() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
-            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let (users, tenant) = service(test).await;
+            let created =
+                users.create(&tenant, Actor::system(), new_user("ada@example.com")).await.unwrap();
 
-            let signed_in = users.check_credentials(" ADA@example.com", PASSWORD).await.unwrap();
-            let wrong = users.check_credentials("ada@example.com", "wrong password").await;
-            let unknown = users.check_credentials("bob@example.com", PASSWORD).await;
-            let huge = users.check_credentials("ada@example.com", &"a".repeat(10_000)).await;
+            let signed_in =
+                users.check_credentials(&tenant, " ADA@example.com", PASSWORD).await.unwrap();
+            let wrong = users.check_credentials(&tenant, "ada@example.com", "wrong password").await;
+            let unknown = users.check_credentials(&tenant, "bob@example.com", PASSWORD).await;
+            let huge =
+                users.check_credentials(&tenant, "ada@example.com", &"a".repeat(10_000)).await;
 
             assert_eq!(signed_in, created);
             // Email lạ và mật khẩu sai: cùng một lỗi, không lộ email nào có thật.
@@ -931,11 +924,11 @@ mod tests {
     #[tokio::test]
     async fn tai_khoan_chua_co_mat_khau_khong_dang_nhap_duoc() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
+            let (users, tenant) = service(test).await;
             let input = NewUser { password: None, ..new_user("ada@example.com") };
-            users.create(Actor::system(), input).await.unwrap();
+            users.create(&tenant, Actor::system(), input).await.unwrap();
 
-            let error = users.check_credentials("ada@example.com", "").await.unwrap_err();
+            let error = users.check_credentials(&tenant, "ada@example.com", "").await.unwrap_err();
 
             assert_eq!(error.code(), "auth.invalid_credentials");
         })
@@ -946,16 +939,18 @@ mod tests {
     #[tokio::test]
     async fn tai_khoan_bi_khoa_khong_dang_nhap_duoc() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
-            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let (users, tenant) = service(test).await;
+            let created =
+                users.create(&tenant, Actor::system(), new_user("ada@example.com")).await.unwrap();
             Entity::update_many()
                 .col_expr(Column::DisabledAt, Expr::value(Some(now())))
                 .filter(Column::Id.eq(created.id))
-                .exec(users.database.write())
+                .exec(tenant.database().write())
                 .await
                 .unwrap();
 
-            let error = users.check_credentials("ada@example.com", PASSWORD).await.unwrap_err();
+            let error =
+                users.check_credentials(&tenant, "ada@example.com", PASSWORD).await.unwrap_err();
 
             assert_eq!(error.kind(), ErrorKind::Forbidden);
             assert_eq!(error.code(), "auth.user_disabled");
@@ -967,20 +962,27 @@ mod tests {
     #[tokio::test]
     async fn doi_mat_khau() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
-            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let (users, tenant) = service(test).await;
+            let created =
+                users.create(&tenant, Actor::system(), new_user("ada@example.com")).await.unwrap();
             let new_password = "a brand new passphrase";
 
-            users.set_password(Actor::system(), created.id, new_password.to_owned()).await.unwrap();
+            users
+                .set_password(&tenant, Actor::system(), created.id, new_password.to_owned())
+                .await
+                .unwrap();
 
-            assert!(users.check_credentials("ada@example.com", PASSWORD).await.is_err());
-            let user = users.check_credentials("ada@example.com", new_password).await.unwrap();
+            assert!(users.check_credentials(&tenant, "ada@example.com", PASSWORD).await.is_err());
+            let user =
+                users.check_credentials(&tenant, "ada@example.com", new_password).await.unwrap();
             assert!(user.updated_at >= created.updated_at);
 
-            let missing =
-                users.set_password(Actor::system(), Uuid::now_v7(), new_password.to_owned()).await;
+            let missing = users
+                .set_password(&tenant, Actor::system(), Uuid::now_v7(), new_password.to_owned())
+                .await;
             assert_eq!(missing.unwrap_err().code(), "auth.user_not_found");
-            let short = users.set_password(Actor::system(), created.id, "short".to_owned()).await;
+            let short =
+                users.set_password(&tenant, Actor::system(), created.id, "short".to_owned()).await;
             assert_eq!(short.unwrap_err().code(), "validation_failed");
         })
         .await
@@ -993,8 +995,9 @@ mod tests {
         use argon2::{Algorithm, Argon2, Params, Version};
 
         TestDatabase::run(async |test| {
-            let users = service(test).await;
-            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let (users, tenant) = service(test).await;
+            let created =
+                users.create(&tenant, Actor::system(), new_user("ada@example.com")).await.unwrap();
             let weak = Argon2::new(
                 Algorithm::Argon2id,
                 Version::V0x13,
@@ -1004,17 +1007,17 @@ mod tests {
             Entity::update_many()
                 .col_expr(Column::PasswordHash, Expr::value(Some(old.clone())))
                 .filter(Column::Id.eq(created.id))
-                .exec(users.database.write())
+                .exec(tenant.database().write())
                 .await
                 .unwrap();
 
-            users.check_credentials("ada@example.com", PASSWORD).await.unwrap();
+            users.check_credentials(&tenant, "ada@example.com", PASSWORD).await.unwrap();
 
-            let row = Entity::find_by_id(created.id).one(users.database.read()).await.unwrap();
+            let row = Entity::find_by_id(created.id).one(tenant.database().read()).await.unwrap();
             let upgraded = row.unwrap().password_hash.unwrap();
             assert_ne!(upgraded, old);
             assert!(upgraded.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"), "{upgraded}");
-            users.check_credentials("ada@example.com", PASSWORD).await.unwrap();
+            users.check_credentials(&tenant, "ada@example.com", PASSWORD).await.unwrap();
         })
         .await
         .unwrap();
@@ -1023,18 +1026,19 @@ mod tests {
     #[tokio::test]
     async fn danh_sach_theo_trang() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
+            let (users, tenant) = service(test).await;
             let mut created = Vec::new();
             for index in 0..3 {
                 let input =
                     NewUser { password: None, ..new_user(&format!("u{index}@example.com")) };
-                created.push(users.create(Actor::system(), input).await.unwrap().id);
+                created.push(users.create(&tenant, Actor::system(), input).await.unwrap().id);
             }
 
-            let first = users.list(None, None, &PageRequest::first(2, Order::Asc)).await.unwrap();
+            let first =
+                users.list(&tenant, None, None, &PageRequest::first(2, Order::Asc)).await.unwrap();
             let cursor: Uuid = first.pagination.next_cursor.as_deref().unwrap().parse().unwrap();
             let second = users
-                .list(None, None, &PageRequest::first(2, Order::Asc).after(cursor))
+                .list(&tenant, None, None, &PageRequest::first(2, Order::Asc).after(cursor))
                 .await
                 .unwrap();
 
@@ -1050,10 +1054,12 @@ mod tests {
     #[tokio::test]
     async fn trait_users_cho_module_khac() {
         TestDatabase::run(async |test| {
-            let service = std::sync::Arc::new(service(test).await);
-            let created =
-                service.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
-            let tenant = TenantContext::legacy_default(&service.database);
+            let (service, tenant) = service(test).await;
+            let service = std::sync::Arc::new(service);
+            let created = service
+                .create(&tenant, Actor::system(), new_user("ada@example.com"))
+                .await
+                .unwrap();
             let users: std::sync::Arc<dyn Users> = service;
 
             assert_eq!(users.find(&tenant, created.id).await.unwrap(), Some(created));
@@ -1065,24 +1071,34 @@ mod tests {
     #[tokio::test]
     async fn quan_tri_vien_chi_dat_duoc_mat_khau_dau_tien() {
         TestDatabase::run(async |test| {
-            let users = service(test).await;
+            let (users, tenant) = service(test).await;
             let bob = NewUser { password: None, ..new_user("bob@example.com") };
-            let bob = users.create(Actor::system(), bob).await.unwrap();
-            let ada = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let bob = users.create(&tenant, Actor::system(), bob).await.unwrap();
+            let ada =
+                users.create(&tenant, Actor::system(), new_user("ada@example.com")).await.unwrap();
 
-            let short = users.set_initial_password(Actor::system(), bob.id, "short".to_owned());
+            let short =
+                users.set_initial_password(&tenant, Actor::system(), bob.id, "short".to_owned());
             assert_eq!(short.await.unwrap_err().code(), "validation_failed");
-            users.set_initial_password(Actor::system(), bob.id, PASSWORD.to_owned()).await.unwrap();
-            users.check_credentials("bob@example.com", PASSWORD).await.unwrap();
+            users
+                .set_initial_password(&tenant, Actor::system(), bob.id, PASSWORD.to_owned())
+                .await
+                .unwrap();
+            users.check_credentials(&tenant, "bob@example.com", PASSWORD).await.unwrap();
 
             for id in [bob.id, ada.id] {
-                let taken = users.set_initial_password(Actor::system(), id, PASSWORD.to_owned());
+                let taken =
+                    users.set_initial_password(&tenant, Actor::system(), id, PASSWORD.to_owned());
                 let taken = taken.await.unwrap_err();
                 assert_eq!(taken.kind(), ErrorKind::Conflict);
                 assert_eq!(taken.code(), "auth.password_already_set");
             }
-            let ghost =
-                users.set_initial_password(Actor::system(), Uuid::now_v7(), PASSWORD.into());
+            let ghost = users.set_initial_password(
+                &tenant,
+                Actor::system(),
+                Uuid::now_v7(),
+                PASSWORD.into(),
+            );
             assert_eq!(ghost.await.unwrap_err().code(), "auth.user_not_found");
         })
         .await
@@ -1094,16 +1110,18 @@ mod tests {
     #[tokio::test]
     async fn dat_mat_khau_dau_tien_dong_thoi_chi_mot_ben_duoc() {
         TestDatabase::run(async |test| {
-            let users = std::sync::Arc::new(service(test).await);
+            let (users, tenant) = service(test).await;
+            let users = std::sync::Arc::new(users);
             let bob = NewUser { password: None, ..new_user("bob@example.com") };
-            let bob = users.create(Actor::system(), bob).await.unwrap();
+            let bob = users.create(&tenant, Actor::system(), bob).await.unwrap();
 
             let attempts: Vec<_> = (0..4)
                 .map(|index| {
                     let users = users.clone();
+                    let tenant = tenant.clone();
                     tokio::spawn(async move {
                         let password = format!("{PASSWORD} number {index}");
-                        users.set_initial_password(Actor::system(), bob.id, password).await
+                        users.set_initial_password(&tenant, Actor::system(), bob.id, password).await
                     })
                 })
                 .collect();
@@ -1139,25 +1157,16 @@ mod account_tests {
     async fn tao_tai_khoan_admin_co_moi_quyen() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let accounts: &dyn Accounts = services.users.as_ref();
 
-            let admin = accounts
-                .create(
-                    &TenantContext::legacy_default(&services.database),
-                    account("ada@example.com", true),
-                )
-                .await
-                .unwrap();
-            let plain = accounts
-                .create(
-                    &TenantContext::legacy_default(&services.database),
-                    account("bob@example.com", false),
-                )
-                .await
-                .unwrap();
+            let admin = accounts.create(&tenant, account("ada@example.com", true)).await.unwrap();
+            let plain = accounts.create(&tenant, account("bob@example.com", false)).await.unwrap();
 
-            assert!(services.roles.principal(admin.id).await.unwrap().has_all_permissions());
-            let bob = services.roles.principal(plain.id).await.unwrap();
+            assert!(
+                services.roles.principal(&tenant, admin.id).await.unwrap().has_all_permissions()
+            );
+            let bob = services.roles.principal(&tenant, plain.id).await.unwrap();
             assert!(!bob.has_all_permissions());
             assert!(bob.permissions().is_empty());
         })
@@ -1169,27 +1178,22 @@ mod account_tests {
     async fn tao_hong_thi_khong_de_lai_gi() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let accounts: &dyn Accounts = services.users.as_ref();
-            accounts
-                .create(
-                    &TenantContext::legacy_default(&services.database),
-                    account("ada@example.com", true),
-                )
-                .await
-                .unwrap();
+            accounts.create(&tenant, account("ada@example.com", true)).await.unwrap();
 
-            let error = accounts
-                .create(
-                    &TenantContext::legacy_default(&services.database),
-                    account("ADA@example.com", true),
-                )
-                .await
-                .unwrap_err();
+            let error =
+                accounts.create(&tenant, account("ADA@example.com", true)).await.unwrap_err();
 
             assert_eq!(error.code(), "auth.email_taken");
             let page = services
                 .users
-                .list(None, None, &PageRequest::first(10, autoxide_kernel::pagination::Order::Asc))
+                .list(
+                    &tenant,
+                    None,
+                    None,
+                    &PageRequest::first(10, autoxide_kernel::pagination::Order::Asc),
+                )
                 .await
                 .unwrap();
             assert_eq!(page.data.len(), 1);
@@ -1224,26 +1228,24 @@ mod update_tests {
     async fn doi_ten_khoa_va_mo_khoa() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let users = &services.users;
-            Accounts::create(
-                users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                account("root@example.com", true),
-            )
-            .await
-            .unwrap();
-            let ada = Accounts::create(
-                users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                account("ada@example.com", false),
-            )
-            .await
-            .unwrap();
-            let tokens =
-                services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
+            Accounts::create(users.as_ref(), &tenant, account("root@example.com", true))
+                .await
+                .unwrap();
+            let ada = Accounts::create(users.as_ref(), &tenant, account("ada@example.com", false))
+                .await
+                .unwrap();
+            let tokens = services
+                .sessions
+                .login(&tenant, "ada@example.com", PASSWORD, None)
+                .await
+                .unwrap()
+                .tokens();
 
             let renamed = users
                 .update(
+                    &tenant,
                     Actor::system(),
                     ada.id,
                     UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None },
@@ -1255,31 +1257,45 @@ mod update_tests {
             assert!(renamed.is_active());
 
             let disabled =
-                users.update(Actor::system(), ada.id, disable(true), None).await.unwrap();
+                users.update(&tenant, Actor::system(), ada.id, disable(true), None).await.unwrap();
             assert!(!disabled.is_active());
             // Khoá lần nữa giữ thời điểm khoá cũ.
-            let again = users.update(Actor::system(), ada.id, disable(true), None).await.unwrap();
+            let again =
+                users.update(&tenant, Actor::system(), ada.id, disable(true), None).await.unwrap();
             assert_eq!(again.disabled_at, disabled.disabled_at);
             // Đăng xuất ở mọi nơi: refresh token cũ hết dùng được.
-            let refresh = services.sessions.refresh(&tokens.refresh_token).await.unwrap_err();
+            let refresh =
+                services.sessions.refresh(Some(&tenant), &tokens.refresh_token).await.unwrap_err();
             assert_eq!(refresh.code(), "auth.invalid_refresh_token");
-            let login =
-                services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap_err();
+            let login = services
+                .sessions
+                .login(&tenant, "ada@example.com", PASSWORD, None)
+                .await
+                .unwrap_err();
             assert_eq!(login.code(), "auth.user_disabled");
 
             let enabled =
-                users.update(Actor::system(), ada.id, disable(false), None).await.unwrap();
+                users.update(&tenant, Actor::system(), ada.id, disable(false), None).await.unwrap();
             assert!(enabled.is_active());
-            services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
+            services
+                .sessions
+                .login(&tenant, "ada@example.com", PASSWORD, None)
+                .await
+                .unwrap()
+                .tokens();
 
             let missing = users
-                .update(Actor::system(), Uuid::now_v7(), disable(true), None)
+                .update(&tenant, Actor::system(), Uuid::now_v7(), disable(true), None)
                 .await
                 .unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");
             let empty = UserChanges { name: Some(" ".to_owned()), disabled: None };
             assert_eq!(
-                users.update(Actor::system(), ada.id, empty, None).await.unwrap_err().code(),
+                users
+                    .update(&tenant, Actor::system(), ada.id, empty, None)
+                    .await
+                    .unwrap_err()
+                    .code(),
                 "validation_failed"
             );
         })
@@ -1291,30 +1307,25 @@ mod update_tests {
     async fn khong_khoa_duoc_admin_cuoi_cung() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let users = &services.users;
-            let root = Accounts::create(
-                users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                account("root@example.com", true),
-            )
-            .await
-            .unwrap();
+            let root = Accounts::create(users.as_ref(), &tenant, account("root@example.com", true))
+                .await
+                .unwrap();
 
-            let error =
-                users.update(Actor::system(), root.id, disable(true), None).await.unwrap_err();
+            let error = users
+                .update(&tenant, Actor::system(), root.id, disable(true), None)
+                .await
+                .unwrap_err();
 
             assert_eq!(error.kind(), ErrorKind::Conflict);
             assert_eq!(error.code(), "auth.last_admin");
-            assert!(users.get(root.id).await.unwrap().unwrap().is_active());
+            assert!(users.get(&tenant, root.id).await.unwrap().unwrap().is_active());
             // Có admin khác còn hoạt động thì khoá được.
-            Accounts::create(
-                users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                account("second@example.com", true),
-            )
-            .await
-            .unwrap();
-            users.update(Actor::system(), root.id, disable(true), None).await.unwrap();
+            Accounts::create(users.as_ref(), &tenant, account("second@example.com", true))
+                .await
+                .unwrap();
+            users.update(&tenant, Actor::system(), root.id, disable(true), None).await.unwrap();
         })
         .await
         .unwrap();
@@ -1326,32 +1337,28 @@ mod update_tests {
     async fn hai_admin_cuoi_xoa_nhau_cung_luc_van_con_mot() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let users = services.users.clone();
-            let a = Accounts::create(
-                users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                account("a@example.com", true),
-            )
-            .await
-            .unwrap();
-            let b = Accounts::create(
-                users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                account("b@example.com", true),
-            )
-            .await
-            .unwrap();
+            let a = Accounts::create(users.as_ref(), &tenant, account("a@example.com", true))
+                .await
+                .unwrap();
+            let b = Accounts::create(users.as_ref(), &tenant, account("b@example.com", true))
+                .await
+                .unwrap();
             let (first, second) = (users.clone(), users.clone());
-            let delete_a = tokio::spawn(async move { first.delete(Actor::system(), a.id).await });
+            let (one, two) = (tenant.clone(), tenant.clone());
+            let delete_a =
+                tokio::spawn(async move { first.delete(&one, Actor::system(), a.id).await });
             let disable_b = tokio::spawn(async move {
-                second.update(Actor::system(), b.id, disable(true), None).await.map(|_| ())
+                second.update(&two, Actor::system(), b.id, disable(true), None).await.map(|_| ())
             });
             let outcomes = [delete_a.await.unwrap(), disable_b.await.unwrap()];
             let refused: Vec<_> =
                 outcomes.iter().filter_map(|outcome| outcome.as_ref().err()).collect();
             assert_eq!(refused.len(), 1, "{outcomes:?}");
             assert_eq!(refused[0].code(), "auth.last_admin");
-            let left = crate::role::count_active_admins(services.database.write()).await.unwrap();
+            let left =
+                crate::role::count_active_admins(services.database.write(), &tenant).await.unwrap();
             assert_eq!(left, 1);
         })
         .await

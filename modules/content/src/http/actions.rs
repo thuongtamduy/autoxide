@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -76,6 +77,7 @@ const IF_MATCH: &str = "Required: the `ETag` of the entry (or `*`). Done only if
 )]
 pub(crate) async fn publish_entry(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -97,9 +99,10 @@ pub(crate) async fn publish_entry(
             ])
         })?
     };
-    let entry =
-        service.publish(&principal, id, expected, input.published_at, input.ai_reviewed).await?;
-    tagged(&service, entry).await
+    let entry = service
+        .publish(&tenant, &principal, id, expected, input.published_at, input.ai_reviewed)
+        .await?;
+    tagged(&service, &tenant, entry).await
 }
 
 /// Take a post or page down.
@@ -127,12 +130,13 @@ pub(crate) async fn publish_entry(
 )]
 pub(crate) async fn unpublish_entry(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<Tagged<EntryResponse>, Error> {
     let expected = if_match.required()?;
-    tagged(&service, service.unpublish(&principal, id, expected).await?).await
+    tagged(&service, &tenant, service.unpublish(&tenant, &principal, id, expected).await?).await
 }
 
 /// Archive a post or page.
@@ -159,12 +163,13 @@ pub(crate) async fn unpublish_entry(
 )]
 pub(crate) async fn archive_entry(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<Tagged<EntryResponse>, Error> {
     let expected = if_match.required()?;
-    tagged(&service, service.archive(&principal, id, expected).await?).await
+    tagged(&service, &tenant, service.archive(&tenant, &principal, id, expected).await?).await
 }
 
 /// Move a page under another parent.
@@ -194,13 +199,19 @@ pub(crate) async fn archive_entry(
 )]
 pub(crate) async fn move_entry(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<MoveRequest>,
 ) -> Result<Tagged<EntryResponse>, Error> {
     let expected = if_match.required()?;
-    tagged(&service, service.move_page(&principal, id, input.parent_id, expected).await?).await
+    tagged(
+        &service,
+        &tenant,
+        service.move_page(&tenant, &principal, id, input.parent_id, expected).await?,
+    )
+    .await
 }
 
 /// Delete a post or page.
@@ -226,12 +237,13 @@ pub(crate) async fn move_entry(
 )]
 pub(crate) async fn delete_entry(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<StatusCode, Error> {
     let expected = if_match.required()?;
-    service.delete(&principal, id, expected).await?;
+    service.delete(&tenant, &principal, id, expected).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -260,12 +272,18 @@ pub(crate) async fn delete_entry(
 )]
 pub(crate) async fn request_review(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<Tagged<EntryResponse>, Error> {
     let expected = if_match.required()?;
-    tagged(&service, service.set_review_request(&principal, id, expected, false).await?).await
+    tagged(
+        &service,
+        &tenant,
+        service.set_review_request(&tenant, &principal, id, expected, false).await?,
+    )
+    .await
 }
 
 /// Withdraw a review request.
@@ -290,10 +308,16 @@ pub(crate) async fn request_review(
 )]
 pub(crate) async fn withdraw_review(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<Tagged<EntryResponse>, Error> {
     let expected = if_match.required()?;
-    tagged(&service, service.set_review_request(&principal, id, expected, true).await?).await
+    tagged(
+        &service,
+        &tenant,
+        service.set_review_request(&tenant, &principal, id, expected, true).await?,
+    )
+    .await
 }

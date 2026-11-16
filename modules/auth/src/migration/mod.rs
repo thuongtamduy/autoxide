@@ -22,6 +22,9 @@ mod m0021_add_cleanup_indexes;
 mod m0023_add_last_sign_in;
 mod m0024_session_sign_in;
 mod m0025_passkey_aaguid;
+mod m0026_tenancy;
+mod m0027_widen_totp_secret;
+pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -66,5 +69,15 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0024_session_sign_in::Migration),
         // Loại authenticator của passkey (D-272).
         Box::new(m0025_passkey_aaguid::Migration),
+        // Mọi bảng của `auth` thuộc một khách (bước 33 B12).
+        Box::new(m0026_tenancy::Migration::new()),
+        // Secret TOTP đã mã hoá dài hơn cột cũ (Postgres). Ngay sau đó upgrade `u0001_seal_totp`
+        // mã hoá secret đã có.
+        Box::new(m0027_widen_totp_secret::Migration),
     ]
+}
+
+/// Upgrade dữ liệu của module, theo thứ tự.
+pub(crate) fn upgrades() -> Vec<Box<dyn autoxide_kernel::migration::DataUpgrade>> {
+    vec![Box::new(u0001_seal_totp::SealTotp)]
 }

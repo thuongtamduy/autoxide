@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::storage::ByteStream;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::storage::{ByteStream, Storage as _};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -75,6 +75,7 @@ impl MediaService {
     /// mọi lỗi báo một lần.
     pub(crate) async fn upload(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: NewUpload,
         content: ByteStream,
@@ -83,7 +84,7 @@ impl MediaService {
         let mut problems = Vec::new();
         let name = check_name(&input.name, &mut problems);
         if let Some(folder) = input.folder_id {
-            self.check_folder_exists(folder, "folder_id", &mut problems).await?;
+            self.check_folder_exists(tenant, folder, "folder_id", &mut problems).await?;
         }
         let tags = crate::library::tags::check_tags(&input.tags, "tags", &mut problems);
         if !problems.is_empty() {
@@ -93,15 +94,21 @@ impl MediaService {
 
         let (id, version_id) = (Uuid::now_v7(), Uuid::now_v7());
         let key = storage_key(id, version_id);
-        let received = self.receive(&key, declared, content).await?;
+        let received = self.receive(tenant, &key, declared, content).await?;
         let saved = self
-            .save_new(principal, (id, version_id), name, input.folder_id, &tags, received)
+            .save_new(
+                tenant,
+                principal,
+                (id, version_id),
+                NewUpload { name, tags, ..input },
+                received,
+            )
             .await;
         if saved.is_err() {
-            self.discard(&key).await;
+            self.discard(tenant, &key).await;
         }
         let item = saved?;
-        let duplicates = self.duplicates(&item).await?;
+        let duplicates = self.duplicates(tenant, &item).await?;
         tracing::info!(media_item_id = %item.id, size = item.size, "media item uploaded");
         metrics::counter!("media_items_uploaded_total").increment(1);
         Ok(Uploaded { item, duplicates })
@@ -114,6 +121,7 @@ impl MediaService {
     /// transaction (điều kiện phiên bản ngay trong câu `UPDATE`); rồi xoá nội dung cũ.
     pub(crate) async fn replace(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         content_type: Option<&str>,
@@ -122,7 +130,8 @@ impl MediaService {
     ) -> Result<Item, Error> {
         principal.require(&MEDIA_WRITE)?;
         let current = Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| item_not_found(id))?;
         if current.trashed_at.is_some() {
@@ -135,21 +144,22 @@ impl MediaService {
         let declared = declared_type(content_type, &self.config.limits)?;
         let version_id = Uuid::now_v7();
         let key = storage_key(id, version_id);
-        let received = self.receive(&key, declared, content).await?;
+        let received = self.receive(tenant, &key, declared, content).await?;
 
-        let replaced = self.save_replacement(principal, id, version_id, received, expected).await;
+        let replaced =
+            self.save_replacement(tenant, principal, id, version_id, received, expected).await;
         let (before, after, old_copies) = match replaced {
             Ok(changed) => changed,
             Err(error) => {
-                self.discard(&key).await;
+                self.discard(tenant, &key).await;
                 return Err(error);
             }
         };
         // Nội dung cũ (và ảnh thu nhỏ của nó) không còn ai trỏ tới; xoá hỏng thì job dọn mồ
         // côi xoá sau.
-        self.discard(&before.storage_key()).await;
+        self.discard(tenant, &before.storage_key()).await;
         for copy in &old_copies {
-            self.discard(&copy.storage_key()).await;
+            self.discard(tenant, &copy.storage_key()).await;
         }
         tracing::info!(media_item_id = %id, size = after.size, "media item content replaced");
         Ok(after)
@@ -157,22 +167,24 @@ impl MediaService {
 
     async fn save_new(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         (id, version_id): (Uuid, Uuid),
-        name: String,
-        folder: Option<Uuid>,
-        tags: &[String],
+        checked: NewUpload,
         received: Received,
     ) -> Result<Item, Error> {
+        // `checked`: tên đã chuẩn hoá, nhãn đã kiểm (`upload`).
+        let NewUpload { name, folder_id, tags, .. } = checked;
         let now = now();
-        let folder = stored_folder(folder);
-        let transaction = self.database.begin_write().await?;
-        if !touch_folder(&transaction, folder).await? {
+        let folder = stored_folder(folder_id);
+        let transaction = tenant.database().begin_write().await?;
+        if !touch_folder(&transaction, tenant, folder).await? {
             // Thư mục vừa bị xoá giữa lúc kiểm và lúc ghi.
             return Err(folder_gone("folder_id"));
         }
         let item = item::ActiveModel {
             id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             folder_id: Set(folder),
             name_key: Set(autoxide_kernel::search::fold(&name)),
             name: Set(name),
@@ -197,36 +209,32 @@ impl MediaService {
         let tags = if tags.is_empty() {
             Vec::new()
         } else {
-            crate::library::tags::set_item_tags(&transaction, id, tags).await?
+            crate::library::tags::set_item_tags(&transaction, tenant, id, &tags).await?
         };
-        self.enqueue_variants(&transaction, &item).await?;
+        self.enqueue_variants(&transaction, tenant, &item).await?;
         let after = crate::service::with_tags(snapshot(&item), &tags);
         let event = events::ItemUploaded(Change { before: None, after: Some(after) });
         let actor = Actor::from(principal);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::item_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::item_subject(id), &event).await?;
         transaction.commit().await?;
         Ok(item)
     }
 
     async fn save_replacement(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         version_id: Uuid,
         received: Received,
         expected: Option<DateTime<Utc>>,
     ) -> Result<(Item, Item, Vec<crate::images::variants::Variant>), Error> {
-        let transaction = self.database.begin_write().await?;
-        let before =
-            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| item_not_found(id))?;
+        let transaction = tenant.database().begin_write().await?;
+        let before = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| item_not_found(id))?;
         let mut row = before.clone().into_active_model();
         row.content_type = Set(received.content_type);
         row.size = Set(received.size);
@@ -235,7 +243,8 @@ impl MediaService {
         row.height = Set(received.height);
         row.version_id = Set(version_id);
         row.updated_at = Set(now());
-        let mut update = Entity::update(row).validate()?.filter(Column::TrashedAt.is_null());
+        let mut update =
+            Entity::update(row).validate()?.scoped(tenant).filter(Column::TrashedAt.is_null());
         // Điều kiện "phiên bản đã đọc" (`If-Match`), hay ít nhất "chưa ai thay nội dung từ
         // lúc đọc ở trên" — hai lệnh thay cùng lúc thì đúng một lệnh thắng.
         update = match expected {
@@ -245,32 +254,26 @@ impl MediaService {
         let after = match update.exec(&transaction).await {
             Ok(after) => after,
             Err(sea_orm::DbErr::RecordNotUpdated) => {
-                return Err(self.why_not_changed(id, &transaction).await);
+                return Err(self.why_not_changed(tenant, id, &transaction).await);
             }
             Err(error) => return Err(error.into()),
         };
         use crate::entity::variant;
         let old_copies = variant::Entity::find()
+            .scoped(tenant)
             .filter(variant::Column::ItemId.eq(id))
             .all(&transaction)
             .await?;
         variant::Entity::delete_many()
+            .scoped(tenant)
             .filter(variant::Column::ItemId.eq(id))
             .exec(&transaction)
             .await?;
-        self.enqueue_variants(&transaction, &after).await?;
+        self.enqueue_variants(&transaction, tenant, &after).await?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::ItemContentReplaced(change);
         let actor = Actor::from(principal);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::item_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::item_subject(id), &event).await?;
         transaction.commit().await?;
         Ok((before, after, old_copies))
     }
@@ -278,6 +281,7 @@ impl MediaService {
     /// Ghi `content` vào `key`, kiểm trên đường đi; lỗi thì không để lại gì ở nơi lưu.
     async fn receive(
         &self,
+        tenant: &TenantContext,
         key: &str,
         declared: Option<String>,
         content: ByteStream,
@@ -312,7 +316,7 @@ impl MediaService {
                 Ok(chunk)
             })
             .boxed();
-        self.storage.put(key, checked).await?;
+        self.store(tenant).put(key, checked).await?;
 
         let finished = {
             let mut state = intake.lock().map_err(|_| Error::internal("media intake lock"))?;
@@ -320,14 +324,14 @@ impl MediaService {
             finish(state, declared.as_deref(), &self.config.limits)
         };
         if finished.is_err() {
-            self.discard(key).await;
+            self.discard(tenant, key).await;
         }
         finished
     }
 
     /// Xoá nội dung ở `key`; hỏng thì chỉ ghi log (job dọn mồ côi xoá sau).
-    async fn discard(&self, key: &str) {
-        if let Err(error) = self.storage.delete(key).await {
+    async fn discard(&self, tenant: &TenantContext, key: &str) {
+        if let Err(error) = self.store(tenant).delete(key).await {
             tracing::warn!(key, error = %error, "cannot remove unused media content");
         }
     }
