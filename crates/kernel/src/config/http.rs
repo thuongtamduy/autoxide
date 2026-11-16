@@ -124,6 +124,73 @@ pub const TRUSTED_PROXIES: Setting = Setting::new(
 )
 .with_example("10.0.0.0/8, 192.0.2.7");
 
+pub const SECURITY_HEADERS: Setting = Setting::new(
+    "AUTOXIDE_HTTP_SECURITY_HEADERS",
+    "Add security headers to every response (`true` or `false`): `X-Content-Type-Options`, \
+     `Referrer-Policy`, `X-Frame-Options`, a strict `Content-Security-Policy`, and \
+     `Strict-Transport-Security` when AUTOXIDE_HTTP_HSTS_SECONDS is set. A header a handler sets \
+     itself is kept. Keep it on even when a reverse proxy adds its own headers.",
+)
+.with_default("true");
+
+pub const REFERRER_POLICY: Setting = Setting::new(
+    "AUTOXIDE_HTTP_REFERRER_POLICY",
+    "Value of the `Referrer-Policy` header: one of `no-referrer`, `no-referrer-when-downgrade`, \
+     `origin`, `origin-when-cross-origin`, `same-origin`, `strict-origin`, \
+     `strict-origin-when-cross-origin`, `unsafe-url`.",
+)
+.with_default("no-referrer");
+
+pub const HSTS_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_HTTP_HSTS_SECONDS",
+    "`max-age` of the `Strict-Transport-Security` header, in seconds (0 to 63072000). Set it \
+     only when the API is served over HTTPS (`31536000` is one year): browsers then refuse plain \
+     HTTP to this host for that long. `0` sends no such header.",
+)
+.with_default("0");
+
+pub const HSTS_INCLUDE_SUBDOMAINS: Setting = Setting::new(
+    "AUTOXIDE_HTTP_HSTS_INCLUDE_SUBDOMAINS",
+    "Add `includeSubDomains` to the `Strict-Transport-Security` header (`true` or `false`): \
+     every subdomain must then be served over HTTPS too.",
+)
+.with_default("false");
+
+/// Giá trị `Referrer-Policy` chuẩn (W3C Referrer Policy).
+const REFERRER_POLICIES: [&str; 8] = [
+    "no-referrer",
+    "no-referrer-when-downgrade",
+    "origin",
+    "origin-when-cross-origin",
+    "same-origin",
+    "strict-origin",
+    "strict-origin-when-cross-origin",
+    "unsafe-url",
+];
+
+/// Header bảo mật gắn vào mọi response (bước 40 P1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SecurityHeaders {
+    /// `false`: không gắn header nào.
+    pub enabled: bool,
+    pub referrer_policy: String,
+    /// `max-age` của HSTS; 0 = không gửi.
+    pub hsts_seconds: u64,
+    pub hsts_include_subdomains: bool,
+}
+
+impl Default for SecurityHeaders {
+    fn default() -> Self {
+        SecurityHeaders {
+            enabled: true,
+            referrer_policy: "no-referrer".to_owned(),
+            hsts_seconds: 0,
+            hsts_include_subdomains: false,
+        }
+    }
+}
+
 /// Một địa chỉ hoặc dải địa chỉ (CIDR) của proxy tin cậy: `10.0.0.0/8`, `2001:db8::/32`,
 /// `192.0.2.7` (= `/32`). Tự viết vài chục dòng thay vì thêm thư viện CIDR.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -269,6 +336,8 @@ pub struct HttpConfig {
     pub api_key_rate_limit: RateLimit,
     /// Header chứa địa chỉ client do reverse proxy đặt; `None`: dùng địa chỉ kết nối.
     pub client_ip_header: Option<HeaderName>,
+    /// Header bảo mật cho mọi response.
+    pub security_headers: SecurityHeaders,
 }
 
 /// Giới hạn số request của một địa chỉ client.
@@ -310,6 +379,18 @@ impl HttpConfig {
             HeaderName::try_from(raw.trim())
                 .map_err(|_| "must be an HTTP header name, like `X-Forwarded-For`".to_owned())
         });
+        let security_enabled = reader.get_with(&SECURITY_HEADERS, parse_bool);
+        let referrer_policy = reader.get_with(&REFERRER_POLICY, |raw| {
+            let raw = raw.trim();
+            if REFERRER_POLICIES.contains(&raw) {
+                Ok(raw.to_owned())
+            } else {
+                Err(format!("must be one of {}", REFERRER_POLICIES.join(", ")))
+            }
+        });
+        let hsts_seconds =
+            reader.get_with(&HSTS_SECONDS, |raw| parse_in_range(raw, 0u64, 63_072_000));
+        let hsts_include_subdomains = reader.get_with(&HSTS_INCLUDE_SUBDOMAINS, parse_bool);
         let mut trusted_proxies = reader.optional_with(&TRUSTED_PROXIES, parse_ranges);
         // Dải proxy mà không có header thì không có tác dụng gì: báo sai thay vì lặng lẽ bỏ qua.
         if matches!(&trusted_proxies, Ok(Some(_))) && matches!(&client_ip_header, Ok(None)) {
@@ -333,6 +414,12 @@ impl HttpConfig {
             trusted_proxies: trusted_proxies?.unwrap_or_default(),
             api_key_rate_limit: RateLimit { per_minute: key_per_minute?, burst: key_burst? },
             client_ip_header: client_ip_header?,
+            security_headers: SecurityHeaders {
+                enabled: security_enabled?,
+                referrer_policy: referrer_policy?,
+                hsts_seconds: hsts_seconds?,
+                hsts_include_subdomains: hsts_include_subdomains?,
+            },
         })
     }
 }

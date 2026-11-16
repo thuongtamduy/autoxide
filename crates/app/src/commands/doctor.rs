@@ -101,8 +101,11 @@ fn line(name: &str, finding: Option<Finding>) -> Line {
 
 /// Chạy mọi bước sau khi cấu hình đã hợp lệ.
 async fn diagnose(settings: Settings) -> Vec<Line> {
-    let Settings { config, mut modules, .. } = settings;
+    let Settings { config, mut modules, values } = settings;
     let mut lines = vec![line("configuration", Some(Finding::ok("The configuration is valid.")))];
+    if let Some(finding) = probe_hsts(&values, &config.http) {
+        lines.push(line("hsts", Some(finding)));
+    }
     let database = match Database::connect(&config.database).await {
         Ok(database) => database,
         Err(error) => {
@@ -185,6 +188,36 @@ async fn probe_migrations(modules: &Modules, database: &Database) -> Finding {
     }
 }
 
+/// API công khai qua `https` mà không gửi HSTS (bước 40 P1): gợi ý, không lỗi. Không có URL công
+/// khai `https` thì không có bước này.
+fn probe_hsts(
+    values: &[autoxide_kernel::config::SettingValue],
+    http: &autoxide_kernel::config::HttpConfig,
+) -> Option<Finding> {
+    let public = values
+        .iter()
+        .find(|value| value.setting.name == "AUTOXIDE_HTTP_PUBLIC_URL")
+        .map(|value| value.display_value())?;
+    if !public.starts_with("https://") {
+        return None;
+    }
+    Some(if !http.security_headers.enabled || http.security_headers.hsts_seconds == 0 {
+        Finding::warning(
+            "The API is public over HTTPS but sends no Strict-Transport-Security header: a \
+             browser may still try plain HTTP first.",
+        )
+        .with_hint(
+            "Set AUTOXIDE_HTTP_HSTS_SECONDS (for example `31536000`, one year) once every client \
+             reaches the API over HTTPS.",
+        )
+    } else {
+        Finding::ok(format!(
+            "Strict-Transport-Security is sent with max-age={}.",
+            http.security_headers.hsts_seconds
+        ))
+    })
+}
+
 fn probe_secret_key(modules: &Modules) -> Finding {
     match modules.api::<SecretKey>() {
         Some(key) if !key.is_configured() => Finding::warning(
@@ -236,6 +269,21 @@ mod tests {
             ("AUTOXIDE_MAIL_FILE_DIR", mail.as_str()),
         ]);
         crate::settings::read(&source).unwrap()
+    }
+
+    /// HSTS chỉ được nhắc khi API công khai qua `https` (bước 40 P1).
+    #[test]
+    fn nhac_hsts_khi_url_cong_khai_la_https() {
+        let probe = |pairs: &[(&str, &str)]| {
+            let source = ConfigSource::from_pairs(pairs.iter().copied());
+            let settings = crate::settings::read(&source).unwrap();
+            probe_hsts(&settings.values, &settings.config.http).map(|finding| finding.status)
+        };
+        assert_eq!(probe(&[]), None);
+        assert_eq!(probe(&[("AUTOXIDE_HTTP_PUBLIC_URL", "http://localhost:8080")]), None);
+        let https = ("AUTOXIDE_HTTP_PUBLIC_URL", "https://api.example.com");
+        assert_eq!(probe(&[https]), Some(Status::Warning));
+        assert_eq!(probe(&[https, ("AUTOXIDE_HTTP_HSTS_SECONDS", "31536000")]), Some(Status::Ok));
     }
 
     fn statuses(lines: &[Line]) -> Vec<(&str, &str)> {

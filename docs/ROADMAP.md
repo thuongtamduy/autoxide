@@ -207,7 +207,7 @@ cả SQLite và Postgres.
       cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
       lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
       chung; file tải lên mà không xác nhận được dọn bằng job
-- [ ] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
+- [x] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
       `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
       HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
       có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này

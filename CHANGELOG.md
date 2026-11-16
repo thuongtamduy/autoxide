@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Security headers on every response, including errors, health checks and `/mcp`:
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy` (`AUTOXIDE_HTTP_REFERRER_POLICY`, default `no-referrer`),
+  `X-Frame-Options: DENY` and a strict `Content-Security-Policy` (the API reference page gets its own);
+  `Strict-Transport-Security` when `AUTOXIDE_HTTP_HSTS_SECONDS` is set. A header a handler sets itself is kept;
+  `AUTOXIDE_HTTP_SECURITY_HEADERS=false` turns them off. `autoxide doctor` reminds you of HSTS when the public URL
+  is `https://`. Downloads from `files` and `media` now carry the stricter common policy.
 - New module `address`: the official list of administrative units shared by every tenant
   (Vietnam after the 2025 merger: provinces and communes, no districts), imported from the
   official source with `autoxide task address.import path=<dir>` (a new list closes and opens

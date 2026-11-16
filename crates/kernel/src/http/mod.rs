@@ -23,6 +23,9 @@
 //! 9. **timeout** — request chạy quá lâu bị cắt, trả 503;
 //! 10. **giới hạn body** — body quá lớn bị từ chối, trả 413;
 //! 11. **304** — `GET` có `ETag` khớp `If-None-Match` của client thành `304 Not Modified`.
+//!
+//! Ngoài lớp log (ngay trong lớp request id) là lớp **header bảo mật**: `nosniff`, `Referrer-Policy`,
+//! `X-Frame-Options`, CSP chặt (HSTS khi cấu hình) cho mọi response — xem `security_headers`.
 
 mod body_limit;
 mod client;
@@ -40,6 +43,7 @@ mod openapi;
 mod problem;
 mod rate_limit;
 mod request_id;
+mod security_headers;
 mod server;
 
 use std::time::Duration;
@@ -77,6 +81,7 @@ pub use metrics::metrics_routes;
 pub(crate) use openapi::untranslated_text;
 pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
 pub use request_id::REQUEST_ID_HEADER;
+pub use security_headers::{API_CSP, DOCS_CSP};
 pub use server::{Shutdown, serve, shutdown_signal};
 
 /// Tiền tố của mọi route API.
@@ -247,6 +252,7 @@ pub fn build(
         config.trusted_proxies.clone(),
     ));
     let request_timeout = config.request_timeout;
+    let security = security_headers::Prepared::new(&config.security_headers);
     // `.layer` bọc thêm một lớp RA NGOÀI các lớp trước đó: lớp khai sau cùng là lớp
     // request gặp đầu tiên. Đọc từ dưới lên sẽ ra thứ tự ở đầu file.
     let router = router
@@ -289,6 +295,10 @@ pub fn build(
             deprecation::mark(deprecated.clone(), request, next)
         }))
         .layer(middleware::from_fn(log::log_requests))
+        // NGOÀI lớp log, trong lớp request id: mọi response (404, 429, preflight…) đều có header.
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            security_headers::add(security.clone(), request, next)
+        }))
         .layer(PropagateRequestIdLayer::new(REQUEST_ID_HEADER))
         .layer(SetRequestIdLayer::new(REQUEST_ID_HEADER, request_id::MakeUuidV7))
         .layer(middleware::from_fn(request_id::drop_untrusted));

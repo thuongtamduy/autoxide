@@ -326,6 +326,7 @@ database mới.
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd `10.0.0.0/8, 192.0.2.7` |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | Địa chỉ internet dùng để gọi API, vd `https://api.example.com`; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API |
+| `AUTOXIDE_HTTP_HSTS_SECONDS` | Khi mọi client đã gọi API qua HTTPS: gửi `Strict-Transport-Security` (vd `31536000`, một năm); `autoxide doctor` nhắc khi URL công khai là `https://` mà biến này là `0`. Mọi response đã có sẵn `nosniff`, `Referrer-Policy`, `X-Frame-Options` và `Content-Security-Policy` chặt (`AUTOXIDE_HTTP_SECURITY_HEADERS`, `AUTOXIDE_HTTP_REFERRER_POLICY`) |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Gửi mail (đặt lại mật khẩu, xác minh email) |
 | `AUTOXIDE_FILES_S3_BUCKET` và `AWS_…` | Lưu file trên S3 hay dịch vụ tương thích S3; nên đặt thêm lifecycle rule cho bucket để huỷ multipart upload dở sau một ngày |
 | `AUTOXIDE_AUTH_PASSWORD_RESET_URL`, `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` | Mail dẫn tới trang của bạn |

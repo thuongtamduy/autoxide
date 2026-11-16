@@ -7765,3 +7765,29 @@ Kết quả (`docs/BENCHMARKS.md` "Rút số câu SQL của đường đã đăn
 Đã cân nhắc: giữ dòng người dùng từ bước xác thực cho handler (bớt thêm một câu) — `Principal` là kiểu của kernel, gắn
 dòng người dùng của module `auth` vào là sai ranh giới; gộp cả token đổi email vào câu chung — phải đọc thẳng bảng của
 `OneTimeTokens`, lợi một câu không đáng phá lớp bọc.
+
+## D-320 · Header bảo mật chung cho mọi response (bước 40 P1) — 2026-11-16 — chủ dự án bảo làm trước
+
+Bối cảnh: mục "Header bảo mật chung" của bước 40, làm ngay theo đặc tả (P1 không phụ thuộc bước nào).
+
+Quyết định:
+
+1. **Một lớp `http/security_headers.rs`** đặt ngoài lớp log, trong lớp request id: mọi response đều có — 404 của
+   router, 429, preflight CORS, `/health/*`, `/metrics`, `/mcp`, `openapi.json`. Header chỉ đặt khi handler **chưa**
+   đặt (handler giữ quyền đặt chặt hơn).
+2. **Giá trị:** `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` (cấu hình được, kiểm thuộc tập
+   chuẩn), `X-Frame-Options: DENY`, CSP `API_CSP` = `default-src 'none'; frame-ancestors 'none'; base-uri 'none';
+   form-action 'none'; sandbox`. HSTS chỉ khi `AUTOXIDE_HTTP_HSTS_SECONDS > 0` (`includeSubDomains` tuỳ chọn). Không
+   đặt `Cross-Origin-Resource-Policy` (ảnh `media` được trang ở origin khác nhúng).
+3. **CSP của `/api/docs`** (`DOCS_CSP`), đã mở trong Chromium thật: script, style từ `cdn.jsdelivr.net`; font từ
+   `cdn.jsdelivr.net` **và `fonts.scalar.com`** (bản đầu thiếu nguồn này, Scalar 1.79 nạp font Inter từ đó và bị
+   chặn); `img-src 'self' data: https:`; `connect-src 'self'`. Lần đổi phiên bản Scalar sau mà console báo chặn thì
+   chỉ mở đúng nguồn bị chặn.
+4. `media` và `files` bỏ header tự đặt (`nosniff`, CSP `default-src 'none'; sandbox`), dựa vào lớp chung — CSP chung
+   chặt hơn và vẫn có `sandbox`.
+5. `autoxide doctor` thêm bước `hsts`: chỉ khi `AUTOXIDE_HTTP_PUBLIC_URL` là `https://`; HSTS = 0 → cảnh báo (gợi ý,
+   không lỗi).
+
+Đã cân nhắc: để reverse proxy đặt header — người cài tự làm hay quên, và response của chính máy chủ (chạy thẳng,
+không proxy) sẽ thiếu; vẫn tắt được bằng `AUTOXIDE_HTTP_SECURITY_HEADERS=false`. Thêm thư viện (`tower-helmet`…) —
+vài chục dòng tự viết là đủ.
