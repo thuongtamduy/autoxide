@@ -31,5 +31,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                     .index("menus_items_menu_position_idx", ["tenant_id", "menu_id", "position"]),
             ],
         ),
+        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-302).
+        autoxide_kernel::tenancy::migration::list_index(
+            "m0007_tenant_list_index",
+            vec!["menus_menus"],
+        ),
     ]
 }

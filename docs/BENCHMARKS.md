@@ -288,3 +288,96 @@ Dòng ERROR trong log máy chủ: 0
 
 Máy chủ vẫn sẵn sàng sau tải.
 Dòng ERROR trong log máy chủ: 0
+
+## Sau bước 33 (đa khách) — 16/11/2026
+
+Đo lại để so với mốc ở trên (đặc tả 33, mục C4). Máy khác mốc cũ nên **đo lại cả bản trước** trên cùng máy: bản
+`b5435c7` (trước phần A) và bản sau phần C kèm index `(tenant_id, id)` (D-302), cùng máy 4 CPU, máy tạo tải chạy chung,
+6 giây mỗi bài, **mỗi bài 3 lần, lấy trung vị** (D-179: dao động ±20%). `scripts/loadtest.sh`, chế độ `single`.
+
+
+### SQLite
+
+| Bài đo | Kết nối | Trước (req/s) | Sau (req/s) | Đổi | p50 trước → sau (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| GET /health/ready | 64 | 21249 | 17508 | -18% | 3.41 → 4.10 |
+| GET /auth/me (access token) | 64 | 5724 | 3351 | -41% | 11.02 → 18.81 |
+| GET /auth/me (API key) | 64 | 4016 | 2597 | -35% | 15.68 → 24.14 |
+| GET /auth/users?limit=50 | 64 | 2387 | 1300 | -46% | 25.35 → 48.76 |
+| GET /audit?limit=50 | 64 | 1507 | 1335 | -11% | 42.49 → 47.91 |
+| GET /files/{id}/content (16 KiB) | 64 | 4886 | 4183 | -14% | 12.94 → 15.20 |
+| MCP tools/call auth.whoami | 64 | 5015 | 3240 | -35% | 12.68 → 19.64 |
+| PATCH /auth/users/{id} (ghi + event) | 64 | 1336 | 1300 | -3% | 46.22 → 48.24 |
+| POST /files (4 KiB, ghi) | 64 | 1472 | 1471 | -0% | 43.78 → 42.97 |
+| POST /auth/login (Argon2id) | 16 | 4387 | 4053 | -8% | 3.43 → 3.71 |
+| đọc | 1 | 1379 | 856 | -38% | 0.69 → 1.13 |
+| đọc | 64 | 4949 | 2891 | -42% | 12.80 → 21.91 |
+| đọc | 256 | 4403 | 2681 | -39% | 57.20 → 95.24 |
+| ghi | 1 | 569 | 508 | -11% | 1.58 → 1.74 |
+| ghi | 64 | 1288 | 1269 | -1% | 47.41 → 49.24 |
+| ghi | 256 | 1332 | 1302 | -2% | 195.10 → 198.74 |
+
+### PostgreSQL 16
+
+| Bài đo | Kết nối | Trước (req/s) | Sau (req/s) | Đổi | p50 trước → sau (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| GET /health/ready | 64 | 19956 | 17641 | -12% | 3.58 → 4.06 |
+| GET /auth/me (access token) | 64 | 4937 | 2980 | -40% | 12.50 → 21.18 |
+| GET /auth/me (API key) | 64 | 3637 | 2404 | -34% | 17.11 → 25.94 |
+| GET /auth/users?limit=50 | 64 | 3833 | 2143 | -44% | 16.46 → 29.45 |
+| GET /audit?limit=50 | 64 | 3068 | 2857 | -7% | 20.42 → 22.05 |
+| GET /files/{id}/content (16 KiB) | 64 | 3816 | 3526 | -8% | 16.48 → 17.86 |
+| MCP tools/call auth.whoami | 64 | 4694 | 2637 | -44% | 13.18 → 24.17 |
+| PATCH /auth/users/{id} (ghi + event) | 64 | 1155 | 1024 | -11% | 53.09 → 60.64 |
+| POST /files (4 KiB, ghi) | 64 | 2016 | 1869 | -7% | 31.03 → 33.40 |
+| POST /auth/login (Argon2id) | 16 | 8500 | 232 | -97% | 1.70 → 100.19 |
+| đọc | 1 | 1218 | 710 | -42% | 0.78 → 1.38 |
+| đọc | 64 | 5140 | 2549 | -50% | 11.96 → 25.07 |
+| đọc | 256 | 4219 | 2433 | -42% | 57.97 → 103.15 |
+| ghi | 1 | 498 | 450 | -10% | 1.82 → 2.15 |
+| ghi | 64 | 1099 | 1060 | -4% | 55.88 → 58.34 |
+| ghi | 256 | 1124 | 1058 | -6% | 231.86 → 243.80 |
+
+Đọc kết quả:
+
+- Phần chung mọi request (giải khách ở chế độ `single`, lọc `tenant_id`) nằm trong dao động: kiểm sức khoẻ −12 / −18%,
+  tải file −8 / −14%, ghi (`PATCH`, `POST /files`, lượt ghi tăng dần) −0 đến −11%, danh sách audit −7 / −11%.
+- Trước khi thêm index `(tenant_id, id)`, danh sách audit trên SQLite chậm −47%: danh sách của một khách sắp theo `id`
+  không có index nào khớp nên SQLite đọc hết dòng của khách rồi sắp xếp tạm (chậm dần theo cỡ bảng). D-302 thêm
+  index cho 20 bảng có danh sách như vậy.
+- `GET /auth/me`, `auth.whoami` và `GET /auth/users` chậm 35–46%: các endpoint này giờ trả thêm `has_password`,
+  `mfa_enabled`, `pending_email`, `last_sign_in_at` (đề bài giao diện, không phải đa khách) — thêm 2–3 câu SQL mỗi
+  request (đếm bằng `log_statement` của Postgres: 3 → 6 câu cho một `GET /auth/me`). Ghi thành việc ở bước 39.
+- `POST /auth/login` ở bài đo này gần như toàn 429 (login throttling làm đúng việc). Trên Postgres lượt bị chặn chậm đi
+  nhiều (8500 → 232 request/s): bộ đếm lượt thử giờ cập nhật cùng một dòng bằng nhiều câu `UPDATE` nối tiếp, 16 kết
+  nối dồn vào một email thì xếp hàng trên khoá dòng. Chỉ ảnh hưởng lúc có người dò mật khẩu dồn dập một tài khoản;
+  ghi thành việc ở bước 39.
+
+### Chế độ nhiều khách: 100 khách chung + 10 khách SQLite riêng
+
+`LOADTEST_TENANCY=multi scripts/loadtest.sh` (bản sau phần C, trước index `(tenant_id, id)`, một lần). Người dùng của
+một khách, chọn khách bằng credential; database chính có 111 khách.
+
+**SQLite (database chính)**
+
+| Bài đo                             | Kết nối |  Request/s |   p50 ms |   p95 ms |   p99 ms |  Thành công |
+| ---------------------------------- | ----: | --------: | -------: | -------: | -------: | ------: |
+| khách chung: GET /auth/me          |    64 |      2609 |    24.29 |    28.80 |    30.96 | 100.00% |
+| khách chung: GET /auth/users       |    64 |      1741 |    36.51 |    41.43 |    45.83 | 100.00% |
+| khách chung: PATCH /auth/users     |    64 |      1212 |    51.12 |    64.78 |    77.16 | 100.00% |
+| khách riêng: GET /auth/me          |    64 |      2304 |    27.75 |    32.71 |    37.12 | 100.00% |
+| khách riêng: GET /auth/users       |    64 |      1537 |    40.95 |    47.30 |    52.64 | 100.00% |
+| khách riêng: PATCH /auth/users     |    64 |      1234 |    50.58 |    61.16 |    71.04 | 100.00% |
+
+**PostgreSQL 16 (database chính)**
+
+| Bài đo                             | Kết nối |  Request/s |   p50 ms |   p95 ms |   p99 ms |  Thành công |
+| ---------------------------------- | ----: | --------: | -------: | -------: | -------: | ------: |
+| khách chung: GET /auth/me          |    64 |      2063 |    30.74 |    37.87 |    41.72 | 100.00% |
+| khách chung: GET /auth/users       |    64 |      1923 |    32.92 |    40.58 |    46.25 | 100.00% |
+| khách chung: PATCH /auth/users     |    64 |       964 |    63.76 |    88.21 |   112.45 | 100.00% |
+| khách riêng: GET /auth/me          |    64 |      2015 |    31.28 |    38.27 |    42.18 | 100.00% |
+| khách riêng: GET /auth/users       |    64 |      1477 |    43.26 |    49.79 |    53.75 | 100.00% |
+| khách riêng: PATCH /auth/users     |    64 |      1297 |    47.81 |    57.61 |    60.68 | 100.00% |
+
+Khách riêng (database SQLite của riêng nó) chạy ngang khách chung; máy chủ không lỗi dòng nào trong cả hai lượt.

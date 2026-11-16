@@ -4,10 +4,9 @@ Mỗi bước xong khi `./gate.sh --quick` xanh; agent đánh dấu `[x]`, commi
 và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–32 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 33 đang
-làm: nhóm A (nền kernel) và nhóm B (13 module theo khách) xong, nhóm C còn: đo đường nóng trước và sau, hướng dẫn viết module (EN + VI), changelog rồi merge**; bước 50 chờ
-chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai
-(D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
+Trạng thái: **bước 0–33 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 34 là bước kế
+tiếp**; bước 50 chờ chủ dự án công khai repo (D-199); bản
+phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
 xếp theo **thứ tự làm**; bước kế tiếp là bước đầu tiên (từ trên xuống) còn mục `[ ]` mà các bước nó phụ
@@ -64,62 +63,6 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
 ## Giai đoạn A — Hợp đồng và nền lõi
-
-## 33. Nền đa khách: khách hàng, vị trí dữ liệu, mặt điều khiển (D-185)
-
-Đặc tả: [`docs/steps/33-tenancy.md`](steps/33-tenancy.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Thiết kế: `docs/research/business-foundation.md`, trụ 1. Bắt đầu SAU bước 31 và nhóm A của bước 32.
-Làm theo ba nhóm A (nền kernel), B (chuyển 13 module, mỗi module một commit), C (vận hành) của đặc tả;
-một người làm tuần tự. Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế độ `single` và nhiều khách. Ở chế độ
-`single`, `/api/v1` không đổi (gate chặn thay đổi phá vỡ của bước 31 kiểm) và bản cài cũ nâng cấp
-được: migration gán mọi dữ liệu có sẵn cho khách mặc định, test nâng cấp của bước 31 phải xanh.
-
-- [x] Mặt điều khiển: sổ khách hàng (trạng thái, khách cha), vị trí dữ liệu (`shared` /
-      `dedicated`, database nào), tên miền → khách / nút; chế độ `single` mặc định (một khách,
-      mặt điều khiển và dữ liệu chung một database, không cấu hình gì thêm)
-- [x] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
-      sự nền tảng; sổ kết nối database theo khách (mở lười, có giới hạn); extractor cho handler,
-      tool MCP; thiếu ngữ cảnh ở route cần khách thì lỗi rõ
-- [x] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 14 module có
-      `tenant_id` (migration mới), khoá unique và index bắt đầu bằng nó; testkit và `cargo xtask
-      check` chặn bảng cấp khách hàng thiếu `tenant_id`; sổ đối tượng nhận khách ở `resolve`,
-      `resolve_many`, `children` và cache menu công khai của `menus` theo khách (D-238)
-- [x] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
-      giữa khách** chạy cho mọi module (ghi ở khách A, đọc bằng người của khách B: không thấy gì)
-- [x] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
-      được giao; `autoxide migrate up --all` cho cả đội database; dời một khách `shared` ↔ `dedicated`
-      bằng chép dữ liệu (mở rộng `autoxide copy`)
-- [ ] Đo đường nóng trước và sau (`scripts/loadtest.sh`); hướng dẫn viết module (EN + VI) có quy
-      tắc phân loại bảng và lọc theo khách
-- [x] Mã hoá dữ liệu nhạy cảm khi lưu (dời từ bước 37, D-190 — kho secret theo khách cần nó):
-      secret TOTP của MFA (hiện lưu chữ thường trong `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
-      database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
-      dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
-      liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
-      chưa đặt thì khoá gốc nằm trong database (`kernel/src/security/secret.rs`), mã hoá không bảo vệ được
-      bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
-- [x] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
-      toán, SMTP, hoá đơn điện tử, khoá AI) lưu mã hoá bằng cơ chế trên; module đọc qua một trait
-      của kernel, không đọc biến môi trường cho thứ thuộc về khách
-- [x] Mọi thứ ngoài bảng cũng theo khách (D-190): khoá file lưu trữ có tiền tố khách (khách
-      `dedicated` được bucket riêng); cache trong bộ nhớ (vd cache tìm theo ý nghĩa của `content`),
-      rate limiting, login throttling, idempotency key, con trỏ pagination có khách trong khoá;
-      token và URL đã ký mang khách, dùng ở khách khác thì bị từ chối
-- [x] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
-      miền, endpoint "có phục vụ tên miền này không" cho reverse proxy cấp chứng chỉ TLS tự động
-      (vd Caddy on-demand TLS); tài liệu deploy (EN + VI)
-- [x] Kiểm lại hằng ngày tên miền đã xác minh: bản ghi TXT mất 3 lần liên tiếp thì `failed` (cột đếm lần trượt,
-      migration mới; D-291 mục 8)
-- [x] An toàn khi nhiều database (D-190): mỗi database ghi phiên bản migration của nó; database
-      chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
-      chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
-      các khách trong database chung (một khách không chiếm hết job queue)
-- [x] Đối chiếu thiết kế 2 (D-210, D-218 mục 33): cấu hình nghiệp vụ của module theo khách (`Module::tenant_settings`
-      cho `comments`, `forms`, `content`, `media`); `GET /kernel/tenants` có lọc và `expand`; API job di chuyển
-      database chỉ cho nhân sự nền tảng, dry-run mặc định; tách "tạm khoá" (chặn mọi route) khỏi "chỉ đọc"
-- [x] Đối chiếu đợt 2 (D-223…D-227): gắn tên miền với nút; cấu hình kết nối đối tác theo nhóm `connection` với
-      tên thống nhất (D-297)
 
 ## 34. Tổ chức, quyền theo độ sâu, danh tính (D-185)
 
@@ -545,6 +488,11 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
 - [ ] Ảnh AVIF (D-232): đo so với WebP trên bộ ảnh mẫu; chỉ thêm (job, tắt mặc định) khi nhẹ hơn ≥ 20% ở chất
       lượng tương đương, không thì ghi "không làm" kèm số đo
+- [ ] Rút số câu SQL của `GET /auth/me`, `auth.whoami`, `GET /auth/users` (D-302: 3 → 6 câu cho một `GET /auth/me`,
+      chậm 35–46%): lấy `has_password`, `last_sign_in_at` từ chính dòng người dùng đã đọc, gộp cờ MFA và email đang chờ
+      đổi vào một câu; đo lại bằng `scripts/loadtest.sh`, mục tiêu trong ±20% của mốc trước bước 33
+- [ ] Login throttling trên Postgres khi bị dò dồn dập một email (D-302: 8500 → 232 request/s cho lượt bị chặn): bộ
+      đếm cập nhật một dòng bằng một câu thay vì nhiều câu `UPDATE` nối tiếp; trả 429 không cần khoá dòng khi đã bị khoá
 
 ## Giai đoạn D — Module nền dùng chung
 

@@ -1,4 +1,4 @@
-# Lộ trình — các bước đã xong (0–32)
+# Lộ trình — các bước đã xong (0–33)
 
 Chuyển nguyên văn từ `docs/ROADMAP.md` theo D-228 để lộ trình chỉ còn việc đang mở. Lịch sử từng bước
 xem `CHANGELOG.md` và `docs/DECISIONS.md`.
@@ -552,3 +552,59 @@ Nhóm B — việc nhật ký quyết định đã ghi "để sau":
       XSS — thêm thư viện thì đo và ghi `STACK.md`; giữ test XSS sẵn có; chữ thường cũ hiển thị như cũ
 
 AVIF cho ảnh thu nhỏ: đã chuyển sang bước 39, đo trước rồi mới quyết (D-232).
+
+## 33. Nền đa khách: khách hàng, vị trí dữ liệu, mặt điều khiển (D-185)
+
+Đặc tả: [`docs/steps/33-tenancy.md`](steps/33-tenancy.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Thiết kế: `docs/research/business-foundation.md`, trụ 1. Bắt đầu SAU bước 31 và nhóm A của bước 32.
+Làm theo ba nhóm A (nền kernel), B (chuyển 13 module, mỗi module một commit), C (vận hành) của đặc tả;
+một người làm tuần tự. Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế độ `single` và nhiều khách. Ở chế độ
+`single`, `/api/v1` không đổi (gate chặn thay đổi phá vỡ của bước 31 kiểm) và bản cài cũ nâng cấp
+được: migration gán mọi dữ liệu có sẵn cho khách mặc định, test nâng cấp của bước 31 phải xanh.
+
+- [x] Mặt điều khiển: sổ khách hàng (trạng thái, khách cha), vị trí dữ liệu (`shared` /
+      `dedicated`, database nào), tên miền → khách / nút; chế độ `single` mặc định (một khách,
+      mặt điều khiển và dữ liệu chung một database, không cấu hình gì thêm)
+- [x] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
+      sự nền tảng; sổ kết nối database theo khách (mở lười, có giới hạn); extractor cho handler,
+      tool MCP; thiếu ngữ cảnh ở route cần khách thì lỗi rõ
+- [x] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 14 module có
+      `tenant_id` (migration mới), khoá unique và index bắt đầu bằng nó; testkit và `cargo xtask
+      check` chặn bảng cấp khách hàng thiếu `tenant_id`; sổ đối tượng nhận khách ở `resolve`,
+      `resolve_many`, `children` và cache menu công khai của `menus` theo khách (D-238)
+- [x] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
+      giữa khách** chạy cho mọi module (ghi ở khách A, đọc bằng người của khách B: không thấy gì)
+- [x] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
+      được giao; `autoxide migrate up --all` cho cả đội database; dời một khách `shared` ↔ `dedicated`
+      bằng chép dữ liệu (mở rộng `autoxide copy`)
+- [x] Đo đường nóng trước và sau (`scripts/loadtest.sh`); hướng dẫn viết module (EN + VI) có quy
+      tắc phân loại bảng và lọc theo khách
+- [x] Mã hoá dữ liệu nhạy cảm khi lưu (dời từ bước 37, D-190 — kho secret theo khách cần nó):
+      secret TOTP của MFA (hiện lưu chữ thường trong `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
+      database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
+      dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
+      liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
+      chưa đặt thì khoá gốc nằm trong database (`kernel/src/security/secret.rs`), mã hoá không bảo vệ được
+      bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
+- [x] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
+      toán, SMTP, hoá đơn điện tử, khoá AI) lưu mã hoá bằng cơ chế trên; module đọc qua một trait
+      của kernel, không đọc biến môi trường cho thứ thuộc về khách
+- [x] Mọi thứ ngoài bảng cũng theo khách (D-190): khoá file lưu trữ có tiền tố khách (khách
+      `dedicated` được bucket riêng); cache trong bộ nhớ (vd cache tìm theo ý nghĩa của `content`),
+      rate limiting, login throttling, idempotency key, con trỏ pagination có khách trong khoá;
+      token và URL đã ký mang khách, dùng ở khách khác thì bị từ chối
+- [x] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
+      miền, endpoint "có phục vụ tên miền này không" cho reverse proxy cấp chứng chỉ TLS tự động
+      (vd Caddy on-demand TLS); tài liệu deploy (EN + VI)
+- [x] Kiểm lại hằng ngày tên miền đã xác minh: bản ghi TXT mất 3 lần liên tiếp thì `failed` (cột đếm lần trượt,
+      migration mới; D-291 mục 8)
+- [x] An toàn khi nhiều database (D-190): mỗi database ghi phiên bản migration của nó; database
+      chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
+      chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
+      các khách trong database chung (một khách không chiếm hết job queue)
+- [x] Đối chiếu thiết kế 2 (D-210, D-218 mục 33): cấu hình nghiệp vụ của module theo khách (`Module::tenant_settings`
+      cho `comments`, `forms`, `content`, `media`); `GET /kernel/tenants` có lọc và `expand`; API job di chuyển
+      database chỉ cho nhân sự nền tảng, dry-run mặc định; tách "tạm khoá" (chặn mọi route) khỏi "chỉ đọc"
+- [x] Đối chiếu đợt 2 (D-223…D-227): gắn tên miền với nút; cấu hình kết nối đối tác theo nhóm `connection` với
+      tên thống nhất (D-297)

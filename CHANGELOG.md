@@ -129,6 +129,31 @@ endpoints are marked deprecated with a sunset date first.
   (none for the default tenant, so existing files stay where they are; `tenants/<id>/` for others) and refuses
   keys that climb out of it; `SecretKey::derive_for(tenant, purpose)` gives a signing key per tenant (the default
   tenant keeps the key `derive` gives).
+- Several tenants in one installation: `AUTOXIDE_TENANCY_MODE=multi` (needs `AUTOXIDE_SECRET_KEY`). The default
+  `single` mode needs nothing new and runs no extra query per request. A request reaches a tenant by its credential,
+  by a verified domain, or (before sign-in, and for platform staff with `kernel.tenants.operate`) by the
+  `Autoxide-Tenant` header. `cargo xtask new-module` generates a module that keeps its data per tenant.
+- Custom domains of tenants: `GET`, `POST /api/v1/kernel/domains`, `PATCH`, `DELETE /api/v1/kernel/domains/{id}`,
+  `POST /api/v1/kernel/domains/{id}/verify` (permission `kernel.domains.manage`; MCP tools `kernel.list_domains`,
+  `kernel.add_domain`, `kernel.update_domain`, `kernel.verify_domain`). A domain is verified by a DNS TXT record,
+  checked again every day, and may belong to one node of the organization tree. `GET
+  /api/v1/kernel/domains/allowed?domain=…` answers a TLS proxy (Caddy `on_demand_tls`) whether to request a
+  certificate. New events `kernel.domain_added`, `kernel.domain_verified`, `kernel.domain_updated`,
+  `kernel.domain_failed`, `kernel.domain_revoked`. See `docs/DEPLOY.md`.
+- Moving a tenant between databases (`shared` ↔ `dedicated`, SQLite and PostgreSQL in either direction):
+  `autoxide tenant move <tenant> --to <placement>` (`--dry-run` first, `--keep-source`, `--abort`),
+  `autoxide tenant purge-copy`, and `POST /api/v1/kernel/tenants/{id}/move` (a dry run unless confirmed) with
+  `GET /api/v1/kernel/tenants/{id}/moves/{move_id}` (permission `kernel.tenants.move`; MCP tools
+  `kernel.move_tenant`, `kernel.get_tenant_move`). The tenant answers `503 tenant_maintenance` while it moves; a
+  move that stopped half-way resumes. New event `kernel.tenant_moved`.
+- A placement can keep the files of its tenants in its own storage: `autoxide placement storage <name> --dir …`
+  or `--s3-bucket …` (stored encrypted), `--clear` to go back to the shared storage.
+- `autoxide backup` in the `multi` mode says which placements it does not copy.
+- `scripts/loadtest.sh` measures the multi-tenant mode too: `LOADTEST_TENANCY=multi` starts the server with 100
+  tenants on the main database and 10 tenants with SQLite databases of their own, then measures reads, lists and
+  writes of a user of each kind. Results before and after tenancy are in `docs/BENCHMARKS.md`.
+- Module guide (`docs/MODULE_GUIDE.md`): a section on tenants — how to classify tables, filter every query with
+  `.scoped`, seed a new tenant, read per-tenant settings and write the leak test.
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 
@@ -180,6 +205,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- Lists of one tenant ordered by id (audit entries, users, roles, media, content entries, terms, authors, redirects,
+  comments, bans, reports, forms, newsletter lists, subscribers, campaigns, suppressions, webhook endpoints, menus)
+  have an index on `(tenant_id, id)`; without it SQLite read and sorted every row of the tenant (the audit list was
+  about twice as slow after the multi-tenant change). For module authors: `tenancy::migration::list_index`.
 - `./gate.sh` ran `cargo xtask api-diff` and `cargo xtask sdk --check` before it stopped on errors, so a
   breaking API change or an outdated SDK did not turn the gate red. They now run as steps like the others.
 

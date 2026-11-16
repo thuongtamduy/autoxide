@@ -76,6 +76,97 @@ Entities use SeaORM (`src/entity.rs`). Read with `Database::read()`, write with
 `Database::write()`, and group writes in `Database::begin_write()`. Keep write
 transactions short: no network calls, no password hashing inside.
 
+### Tenants: classify every table, filter every query
+
+One installation serves many customers (tenants) whose data must never mix. Data of a tenant
+may live in the main database (shared with other tenants) or in a database of its own; the
+module code is the same either way. The default mode (`AUTOXIDE_TENANCY_MODE=single`) has one
+tenant and costs nothing extra per request.
+
+**Classify each table.** Every table of a module is one of:
+
+| Kind | Has `tenant_id` | Examples |
+| --- | --- | --- |
+| Tenant-level (almost all tables) | yes, `NOT NULL`, no default | `notes_note`, `<m>_events`, `<m>_jobs` |
+| Migration history | no | `<m>_migrations` |
+| Control plane (rare: describes the platform, not one tenant) | no — list it in `Module::control_plane_tables` | `kernel_tenants` |
+
+For a tenant-level table:
+
+- Add the `tenant_id` column (a UUID, `NOT NULL`, no default) — forgetting to set it on insert
+  then fails at once instead of silently landing in the wrong tenant.
+- Every unique key and index starts with `tenant_id`: `(tenant_id, email)`, not `(email)`. The same
+  title or email may exist in two tenants. Two exceptions: keys made only of UUIDs (the primary
+  key `id`, globally unique), and indexes that sweep the whole database (expiry, queues,
+  retention) — they do not start with `tenant_id` and their name ends in `_sweep_idx`.
+- A list of one tenant ordered by id (`fetch_page` over `.scoped(&tenant)` with no other selective
+  filter) needs an index on `(tenant_id, id)`; add it with
+  `autoxide_kernel::tenancy::migration::list_index("m00NN_…", vec!["<table>"])`.
+- The helpers `outbox_migration`, `jobs_migration` and the other kernel tables already follow
+  these rules.
+
+The test kit and `cargo xtask check` refuse a table or entity without `tenant_id` that is not
+declared as one of the other kinds, and an index that breaks the rule above.
+
+**Filter every query.** The entity implements `TenantScoped` (one line naming its column), and
+the service takes the `TenantContext` of the customer — handlers get it as an extractor next to
+`Principal`; events carry it in `event.tenant`; jobs in `JobContext::tenant`:
+
+```rust
+impl autoxide_kernel::tenancy::TenantScoped for Entity {
+    fn tenant_column() -> Self::Column {
+        Column::TenantId
+    }
+}
+
+// In the service: the database comes from the tenant, every query adds `.scoped(tenant)`.
+let note = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
+let transaction = tenant.database().begin_write().await?;
+ActiveModel { id: Set(Uuid::now_v7()), tenant_id: Set(tenant.id().as_uuid()), /* … */ }
+    .insert(&transaction)
+    .await?;
+```
+
+`.scoped` works on `find`, `find_also_related`, `update_many`, `delete_many` and on
+`Entity::update(model).validate()?` / `Entity::delete(model).validate()?`. An insert has no filter:
+set `tenant_id` yourself. Trait methods of `api` that read or change data take a
+`&TenantContext` too. Enqueue jobs with `JobQueue::enqueue(…, tenant, …)` in the transaction of the
+change; a clean-up that sweeps every tenant uses `enqueue_database` and a `_sweep_idx` index.
+
+**What a new tenant starts with.** Data a tenant needs before its first request (an `admin`
+role, a lock row, a counter) is created by `Module::seed_tenant`, a `TenantSeed` that runs when
+the tenant is created. It must be safe to run again: `autoxide tenant provision` repeats a
+creation that stopped half-way.
+
+**Settings per tenant.** A setting a tenant may change for itself is declared in
+`Module::tenant_settings` (named `<module>.<key>`) and read with
+`context.require::<dyn TenantSettings>()`; when the tenant has not set it, use the server's
+setting. Settings that connect to a partner service go in `CONNECTION_GROUP` and are stored
+encrypted.
+
+**Files and keys.** Keep a tenant's files with `TenantStorage` (its own prefix) and derive
+per-tenant signing keys with `SecretKey::derive_for(tenant, purpose)`.
+
+**Leak test.** Every module has a test that writes data in tenant A and reads every `GET` endpoint
+and every read-only MCP tool as a user of tenant B, who must see nothing of A:
+
+```rust
+let app = TestApp::builder(test)
+    .tenant("a")                      // a tenant on the shared database
+    .tenant_dedicated("b")            // a tenant on a database of its own
+    .user_in("a", "admin-a", 1, &all)
+    .user_in("b", "admin-b", 2, &all)
+    .module(crate::module())
+    .build()
+    .await
+    .unwrap();
+// … create data as "admin-a", with a marker string in its text …
+let leaks = autoxide_testkit::leak_check(&app, "admin-b", marker, &[("id", id)]).await.unwrap();
+assert_eq!(leaks, Vec::<String>::new());
+```
+
+`cursor_leak_check` does the same with pagination cursors. See `modules/comments/src/http/tests.rs`.
+
 ### 3. Permissions
 
 Declare them in `src/permissions.rs` as `<module>.<action>` and return them from
@@ -393,5 +484,7 @@ Rules the core follows:
 - [ ] Data about users exported (`PersonalData`) and deleted on `USER_DELETED`
 - [ ] Money as `Money`; balances changed with `rows::adjust`, rows locked in id order,
       lasting commands deduplicated by `reference`
+- [ ] Tenant-level tables have `tenant_id` first in every key and index; every query `.scoped`;
+      `seed_tenant` safe to run again; a leak test (`leak_check`)
 - [ ] Tests on both databases, including concurrent writes
 - [ ] `docs/openapi.json` and `.env.example` regenerated; gate green
