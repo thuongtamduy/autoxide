@@ -46,7 +46,7 @@ mod tenancy;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
 pub use dns::FakeDns;
-pub use leak::{cursor_leak_check, leak_check};
+pub use leak::{branch_leak_check, cursor_leak_check, leak_check};
 pub use ownership::schema_ownership_violations;
 pub use s3::{
     TEST_S3_ACCESS_KEY_ID, TEST_S3_BUCKET, TEST_S3_ENDPOINT, TEST_S3_SECRET_ACCESS_KEY, s3_settings,

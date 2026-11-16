@@ -207,6 +207,13 @@ async fn khong_ro_ri_giua_hai_nhanh_anh_em() {
         let hidden =
             client.call_tool(tool("organizations.get_unit", json!({"id": tree.s1}))).await.unwrap();
         assert_eq!(hidden.is_error, Some(true));
+        // Bài rò rỉ giữa hai nhánh của testkit: mọi GET và tool chỉ đọc, người của R2 không thấy
+        // gì của nhánh R1 (tên `Region North`, ID của R1 và S1).
+        let seeded = [("id", tree.r1.clone()), ("id", tree.s1.clone())];
+        let leaks = autoxide_testkit::branch_leak_check(&app, "south", "Region North", &seeded)
+            .await
+            .unwrap();
+        assert_eq!(leaks, Vec::<String>::new());
     })
     .await
     .unwrap();

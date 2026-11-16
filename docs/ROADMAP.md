@@ -5,7 +5,8 @@ và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi 
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–33 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 34 đang
-làm: mục 1 (cây tổ chức) xong; kế tiếp mục 2 (membership theo nút, `org_id` cho `notes`); mục 5–6 (`address`) chờ
+làm: mục 1 (cây tổ chức) và mục 2 (quyền theo nút, membership, `notes` theo nút) xong; kế tiếp mục 3 (nội dung theo
+website và nút); mục 5–6 (`address`) chờ
 nguồn dữ liệu chính thức — trang danh mục hành chính của cơ quan thống kê không truy cập được từ máy làm việc**; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
@@ -73,7 +74,7 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 
 - [x] Cây tổ chức trong khách hàng: loại nút tự đặt, độ sâu có giới hạn, bảng tổ tiên – con cháu, dời nút (khoá
       dòng), vòng đời nút (chờ duyệt, hoạt động, tạm khoá, lưu trữ — khoá một nút thì cả nhánh ngừng ghi)
-- [ ] Thành viên và quyền có độ sâu `own` / `unit` / `subtree` / `tenant`: `Principal` mang quyền theo nút, công
+- [x] Thành viên và quyền có độ sâu `own` / `unit` / `subtree` / `tenant`: `Principal` mang quyền theo nút, công
       cụ lọc theo nhánh cho service, dữ liệu nghiệp vụ mang `org_id` (`notes` làm ví dụ), membership kể cả kế
       thừa (`memberships?inherited=true`); testkit có bài rò rỉ giữa hai nhánh anh em
 - [ ] Nội dung theo website và nút (D-208): `org_id` cho `content`, `media` (`forms` tuỳ chọn), quyền của chúng

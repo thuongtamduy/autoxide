@@ -7,12 +7,18 @@
 //! Ghi chú thuộc một khách (bước 33): mọi hàm nhận `&TenantContext`, lấy database qua
 //! `tenant.database()` và lọc MỌI truy vấn bằng `.scoped(tenant)`; `INSERT` đặt `tenant_id`. Quên
 //! khách thì không có database để truy vấn — trình biên dịch chặn.
+//!
+//! Ghi chú thuộc một nút của cây tổ chức (bước 34) — đây là ví dụ mẫu của "dữ liệu theo nút":
+//! danh sách lọc bằng `principal.scope_condition(…)` (nút + người sở hữu); một ghi chú đọc bằng
+//! `require_at`, ghi bằng `require_write_at` TRONG transaction ghi (nút đang khoá thì từ chối).
+//! Ghi chú ngoài phạm vi báo như không có (404).
 
+use autoxide_kernel::access::{OrgTarget, Principal, Scope};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
@@ -24,6 +30,7 @@ use uuid::Uuid;
 use crate::api::{NoteSummary, Notes};
 use crate::entity::{self, Column, Entity};
 use crate::events::{self, Change};
+use crate::permissions::{NOTES_READ, NOTES_WRITE};
 
 /// Một ghi chú.
 pub(crate) type Note = entity::Model;
@@ -33,6 +40,8 @@ pub(crate) type Note = entity::Model;
 pub(crate) struct NewNote {
     pub title: String,
     pub body: String,
+    /// Nút của ghi chú; `None`: nút duy nhất người tạo được ghi (gốc khi có quyền toàn khách).
+    pub org_id: Option<Uuid>,
 }
 
 /// Thay đổi cho một ghi chú; trường `None` giữ nguyên.
@@ -57,16 +66,24 @@ impl NoteService {
     pub(crate) async fn create(
         &self,
         tenant: &TenantContext,
-        actor: Actor,
+        principal: &Principal,
         input: NewNote,
     ) -> Result<Note, Error> {
+        let actor = Actor::from(principal);
         let owner = owner(actor)?;
         let title = check(Some(&input.title), Some(&input.body))?.unwrap_or_default();
+        let org = match input.org_id {
+            Some(org) => OrgId::from_uuid(org),
+            None => default_org(tenant, principal)?,
+        };
         let now = now();
         let transaction = tenant.database().begin_write().await?;
+        // Nút do người gọi nêu: ngoài phạm vi → 403 `org_out_of_scope`; nút đang khoá → `org_frozen`.
+        principal.require_write_at(&transaction, &NOTES_WRITE, at(org, owner)).await?;
         let note = entity::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),
+            org_id: Set(Some(org.as_uuid())),
             owner_id: Set(owner),
             title: Set(title.clone()),
             body: Set(input.body),
@@ -85,45 +102,50 @@ impl NoteService {
         Ok(note)
     }
 
-    /// Một trang ghi chú của `actor`, mới tạo trước (mặc định).
+    /// Một trang ghi chú trong phạm vi `notes.read` của người gọi, mới tạo trước (mặc định).
     pub(crate) async fn list(
         &self,
         tenant: &TenantContext,
-        actor: Actor,
+        principal: &Principal,
         page: &PageRequest,
     ) -> Result<Page<Note>, Error> {
-        let select = Entity::find().filter(Column::OwnerId.eq(owner(actor)?)).scoped(tenant);
+        let scope = principal.scope_condition(&NOTES_READ, Column::OrgId, Some(Column::OwnerId))?;
+        let select = Entity::find().filter(scope).scoped(tenant);
         fetch_page(select, Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
-    /// Ghi chú `id` của `actor`. Ghi chú của người khác (hay của khách khác) báo như không có.
+    /// Ghi chú `id`. Ngoài phạm vi `notes.read` (hay của khách khác) báo như không có.
     pub(crate) async fn get(
         &self,
         tenant: &TenantContext,
-        actor: Actor,
+        principal: &Principal,
         id: Uuid,
     ) -> Result<Note, Error> {
-        let note = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
-        note.filter(|note| Some(note.owner_id) == actor.user_id).ok_or_else(|| not_found(id))
+        let read = tenant.database().read();
+        let note =
+            Entity::find_by_id(id).scoped(tenant).one(read).await?.ok_or_else(|| not_found(id))?;
+        hidden(principal.require_at(read, &NOTES_READ, target(tenant, &note)).await, id)?;
+        Ok(note)
     }
 
     /// Đổi tên hay nội dung ghi chú `id` của `actor`.
     pub(crate) async fn update(
         &self,
         tenant: &TenantContext,
-        actor: Actor,
+        principal: &Principal,
         id: Uuid,
         changes: NoteChanges,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Note, Error> {
+        let actor = Actor::from(principal);
         let title = check(changes.title.as_deref(), changes.body.as_deref())?;
         let transaction = tenant.database().begin_write().await?;
         let before = Entity::find_by_id(id)
             .scoped(tenant)
             .one(&transaction)
             .await?
-            .filter(|note| Some(note.owner_id) == actor.user_id)
             .ok_or_else(|| not_found(id))?;
+        writable(principal, &transaction, tenant, &before).await?;
         let mut row = before.clone().into_active_model();
         if let Some(title) = &title {
             row.title = Set(title.clone());
@@ -153,16 +175,17 @@ impl NoteService {
     pub(crate) async fn delete(
         &self,
         tenant: &TenantContext,
-        actor: Actor,
+        principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
+        let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
         let note = Entity::find_by_id(id)
             .scoped(tenant)
             .one(&transaction)
             .await?
-            .filter(|note| Some(note.owner_id) == actor.user_id)
             .ok_or_else(|| not_found(id))?;
+        writable(principal, &transaction, tenant, &note).await?;
         let deleted = Entity::delete_many()
             .filter(Column::Id.eq(id))
             .scoped(tenant)
@@ -230,6 +253,61 @@ impl Notes for NoteService {
         let note = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
         Ok(note.map(|note| NoteSummary { id: note.id, owner_id: note.owner_id, title: note.title }))
     }
+}
+
+/// Đích kiểm quyền của ghi chú: nút và người sở hữu.
+fn target(tenant: &TenantContext, note: &Note) -> OrgTarget {
+    let org = note.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid);
+    OrgTarget::new(org, Some(note.owner_id))
+}
+
+fn at(org: OrgId, owner: Uuid) -> OrgTarget {
+    OrgTarget::new(org, Some(owner))
+}
+
+/// Sửa / xoá ghi chú: cần `notes.write` phủ ghi chú (không phủ mà đọc được thì 403, đọc cũng
+/// không được thì 404 — không lộ ghi chú tồn tại); nút đang khoá → `org_frozen`.
+async fn writable<C: sea_orm::ConnectionTrait>(
+    principal: &Principal,
+    transaction: &C,
+    tenant: &TenantContext,
+    note: &Note,
+) -> Result<(), Error> {
+    let target = target(tenant, note);
+    if principal.require_at(transaction, &NOTES_READ, target).await.is_err()
+        && principal.require_at(transaction, &NOTES_WRITE, target).await.is_err()
+    {
+        return Err(not_found(note.id));
+    }
+    principal.require_write_at(transaction, &NOTES_WRITE, target).await
+}
+
+/// Ghi chú ngoài phạm vi đọc báo như không có.
+fn hidden(result: Result<(), Error>, id: Uuid) -> Result<(), Error> {
+    result.map_err(|error| if error.code() == "org_out_of_scope" { not_found(id) } else { error })
+}
+
+/// Nút của ghi chú mới khi người tạo không nêu: gốc nếu họ có `notes.write` cho cả khách; nút
+/// duy nhất nếu mọi grant ở một nút; nhiều nút thì phải chọn (`notes.org_required`).
+fn default_org(tenant: &TenantContext, principal: &Principal) -> Result<OrgId, Error> {
+    let grants = principal.grants(&NOTES_WRITE);
+    if grants.is_empty() || grants.iter().any(|grant| grant.scope == Scope::Tenant) {
+        return Ok(root_of(tenant.id()));
+    }
+    let first = grants[0].org;
+    if grants.iter().all(|grant| grant.org == first) {
+        return Ok(first);
+    }
+    Err(Error::new(
+        autoxide_kernel::error::ErrorKind::Validation,
+        "notes.org_required",
+        "You work in several organization units: give `org_id` for the note.",
+    )
+    .with_field(FieldError::new(
+        "org_id",
+        "required",
+        "you work in several organization units: choose the unit of the note",
+    )))
 }
 
 /// Người dùng của `actor`. Ghi chú luôn thuộc một người; "hệ thống" không có ghi chú.

@@ -11,6 +11,8 @@ pub struct Model {
     pub id: Uuid,
     /// Khách sở hữu ghi chú (bước 33): mọi truy vấn lọc theo cột này (`.scoped`).
     pub tenant_id: Uuid,
+    /// Nút sở hữu ghi chú (bước 34); nút gốc = ID của khách. Luôn có giá trị (cột NULL được).
+    pub org_id: Option<Uuid>,
     pub owner_id: Uuid,
     pub title: String,
     pub body: String,

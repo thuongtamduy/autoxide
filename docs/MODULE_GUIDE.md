@@ -167,6 +167,51 @@ assert_eq!(leaks, Vec::<String>::new());
 
 `cursor_leak_check` does the same with pagination cursors. See `modules/comments/src/http/tests.rs`.
 
+### Data of organization units
+
+Inside a tenant, people work in the units of an organization tree (head office → regions →
+stores, warehouses, sellers). Business data that belongs to one unit — a note, a product, an
+order — carries the unit's id, and permissions reach it with a scope: `own` (records the person
+owns), `unit` (records of their unit), `subtree` (their unit and every unit below it) or `tenant`
+(everything). The tree lives in the kernel (`autoxide_kernel::tenancy::OrgTree`); the root unit
+has the id of the tenant. `modules/notes` is the full example.
+
+- **Column.** Add `org_id` (a UUID) to the table, with an index `(tenant_id, org_id, id)`; existing
+  rows belong to the root: `UPDATE … SET org_id = tenant_id` in the migration.
+- **Permission.** Declare the permission with `.scoped()`:
+  `Permission::new("notes.read", "…").scoped()`. Only a scoped permission can be given for less
+  than the whole tenant; a permission that is not scoped (settings, catalogues) always reaches the
+  whole tenant.
+- **List.** Limit the query with the caller's scope, next to `.scoped(&tenant)`:
+
+  ```rust
+  let scope = principal.scope_condition(&NOTES_READ, Column::OrgId, Some(Column::OwnerId))?;
+  let select = Entity::find().filter(scope).scoped(tenant);
+  ```
+
+  Pass `None` for the owner column when records have no owner; `own` then means `unit`.
+- **One record.** Read with `principal.require_at(read, &NOTES_READ, OrgTarget::new(org, owner))`
+  and answer 404 when it fails with `org_out_of_scope` — never reveal that a record exists. Write
+  with `principal.require_write_at(&transaction, &NOTES_WRITE, target)` **inside** the write
+  transaction: it also refuses a unit that is pending, suspended or archived, or lies below one
+  (`org_frozen`). Jobs and event handlers, which have no `Principal`, call
+  `OrgTree::ensure_writable(&transaction, tenant.id(), org)`.
+- **Creating.** The caller names the unit (`org_id`); outside their scope it is `403
+  org_out_of_scope`. When they omit it, pick their only unit (or the root when their scope is the
+  whole tenant) and ask them to choose when they work in several.
+- **Settings that units inherit** (time zone, prices…): read the unit's chain with
+  `OrgTree::ancestors` (nearest first) and take the nearest value with `tenancy::nearest`.
+- **Branch leak test.** Give two people `subtree` scopes on sibling units with
+  `TestApp::builder(…).member(token, user, org, &[("notes.read", Scope::Subtree)])`, build the tree
+  with `OrgTree`, write data in one branch, and check the other sees nothing:
+
+  ```rust
+  let leaks = autoxide_testkit::branch_leak_check(&app, "south", marker, &[("id", id)]).await.unwrap();
+  assert_eq!(leaks, Vec::<String>::new());
+  ```
+
+  See `modules/notes/src/branch_tests.rs`.
+
 ### 3. Permissions
 
 Declare them in `src/permissions.rs` as `<module>.<action>` and return them from
@@ -486,5 +531,7 @@ Rules the core follows:
       lasting commands deduplicated by `reference`
 - [ ] Tenant-level tables have `tenant_id` first in every key and index; every query `.scoped`;
       `seed_tenant` safe to run again; a leak test (`leak_check`)
+- [ ] Data of a unit: `org_id`, permissions `.scoped()`, lists with `scope_condition`, writes with
+      `require_write_at` in the transaction; a branch leak test (`branch_leak_check`)
 - [ ] Tests on both databases, including concurrent writes
 - [ ] `docs/openapi.json` and `.env.example` regenerated; gate green

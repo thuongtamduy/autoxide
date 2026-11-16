@@ -1,11 +1,13 @@
 {
   "field:must be 1 to {title_max_length} characters, not only spaces": "phải dài 1 đến {title_max_length} ký tự, không chỉ có khoảng trắng",
   "field:must be at most {body_max_length} characters long": "phải dài tối đa {body_max_length} ký tự",
+  "field:you work in several organization units: choose the unit of the note": "bạn làm ở nhiều nút tổ chức: hãy chọn nút của ghi chú",
   "notes.note_not_found": "Bạn không có ghi chú `{id}`.",
+  "notes.org_required": "Bạn làm ở nhiều nút: hãy chọn `org_id` cho ghi chú.",
   "notes.title_taken": "Bạn đã có một ghi chú tên `{title}`. Hãy chọn tên khác.",
   "text:A note was created.": "Một ghi chú được tạo.",
   "text:A note was deleted.": "Một ghi chú bị xoá.",
   "text:A note's title or body changed.": "Tên hay nội dung một ghi chú thay đổi.",
-  "text:Create, change and delete your own notes.": "Tạo, sửa và xoá ghi chú của chính bạn.",
-  "text:See your own notes.": "Xem ghi chú của chính bạn."
+  "text:Create, change and delete the notes in your scope (with scope `own`: only your own).": "Tạo, sửa và xoá ghi chú trong phạm vi của bạn (độ sâu `own`: chỉ ghi chú của chính bạn).",
+  "text:See the notes in your scope (with scope `own`: only your own).": "Xem ghi chú trong phạm vi của bạn (độ sâu `own`: chỉ ghi chú của chính bạn)."
 }

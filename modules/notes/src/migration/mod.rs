@@ -2,6 +2,7 @@
 //! file mới và một dòng vào cuối [`all`].
 
 mod m0001_create_note;
+mod m0006_org;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -28,5 +29,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                     .index("notes_note_owner_idx", ["tenant_id", "owner_id", "id"]),
             ],
         ),
+        // Ghi chú thuộc một nút của cây tổ chức (bước 34).
+        Box::new(m0006_org::Migration),
     ]
 }

@@ -22,6 +22,29 @@ use serde_json::{Map, Value};
 
 use crate::app::{TestApp, TestAppError, tool};
 
+/// Bài rò rỉ giữa hai nhánh anh em của cây tổ chức (bước 34, đặc tả "Test bắt buộc"): cùng một
+/// khách, dữ liệu gieo ở nhánh A (chuỗi `marker`, các ID trong `ids`), gọi mọi `GET` và mọi tool
+/// MCP chỉ đọc bằng `token` của người chỉ có quyền ở nhánh B (vd `.member(token, …, b,
+/// &[("notes.read", Scope::Subtree)])`). Vi phạm là câu trả lời thành công có dấu hiệu của A.
+///
+/// ```no_run
+/// # async fn example(app: &autoxide_testkit::TestApp, note_in_a: String) {
+/// let leaks = autoxide_testkit::branch_leak_check(app, "south", "MARKER-A", &[("id", note_in_a)])
+///     .await
+///     .unwrap();
+/// assert_eq!(leaks, Vec::<String>::new());
+/// # }
+/// ```
+pub async fn branch_leak_check(
+    app: &TestApp,
+    token: &str,
+    marker: &str,
+    ids: &[(&str, String)],
+) -> Result<Vec<String>, TestAppError> {
+    // Cùng cách dò như giữa hai khách: chỉ khác người gọi (cùng khách, khác nhánh).
+    leak_check(app, token, marker, ids).await
+}
+
 /// Gọi mọi `GET` và mọi tool MCP chỉ đọc bằng `token` (người của khách B); trả danh sách vi phạm
 /// (rỗng là đạt). `ids`: ID đã gieo ở khách A, theo tên tham số (`("id", …)`, `("form_id", …)`).
 pub async fn leak_check(
@@ -43,7 +66,7 @@ pub async fn leak_check(
             let answer = app.get(&uri).token(token).unchecked().send().await?;
             if answer.status().is_success() && leaked(&answer.text()) {
                 violations.push(format!(
-                    "GET {uri} → {}: shows data of the other tenant",
+                    "GET {uri} → {}: shows data the caller must not see",
                     answer.status()
                 ));
             }
@@ -76,7 +99,7 @@ pub async fn leak_check(
             let text = serde_json::to_string(&result).unwrap_or_default();
             if leaked(&text) {
                 violations.push(format!(
-                    "tool {} {}: shows data of the other tenant",
+                    "tool {} {}: shows data the caller must not see",
                     listed.name,
                     Value::Object(arguments)
                 ));

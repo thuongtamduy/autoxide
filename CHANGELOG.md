@@ -180,11 +180,20 @@ endpoints are marked deprecated with a sunset date first.
   `scoped`. An API key can be bound to a unit (`org_id`): it then acts only on that unit and the units below it.
   Existing roles, role assignments and keys keep their meaning (the whole tenant); `PUT /users/{id}/roles` sets the
   roles at the root unit.
+- For module authors (testkit): `branch_leak_check(&app, token, marker, ids)` — the leak test between two sibling
+  units of one tenant: a person of one branch calls every `GET` and read-only MCP tool and must see nothing of the
+  other. Module guide: a section "Data of organization units" (`org_id`, `.scoped()`, `scope_condition`,
+  `require_write_at`, inherited settings, the branch leak test).
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 
 ### Changed
 
+- `notes` (the example module) keeps its notes per organization unit: each note has `org_id` (existing notes belong to
+  the root unit), `notes.read` and `notes.write` follow the scope of the role (`own`: only your own notes — what they
+  meant before; `unit`, `subtree`; `tenant`: every note), and creating a note takes `org_id` (`notes.org_required`
+  when you work in several units and give none). A role that grants `notes.read` for the whole tenant now sees every
+  note of the tenant: give it with scope `own` to keep personal notes.
 - The `detail` of some errors no longer names an endpoint: it says what the user can do (`auth.wrong_password`,
   `auth.password_already_set`, the token errors of `auth`, `media.item_in_trash`…). Which endpoint to call is in the
   description of the response in `docs/openapi.json`. Codes are unchanged.
