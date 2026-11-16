@@ -82,6 +82,8 @@ pub(crate) struct OrgService {
     pub(crate) catalog: autoxide_kernel::tenancy::OrgSettingCatalog,
     /// Kiểm địa chỉ của hồ sơ công khai (module `address`); `None`: app không có module đó.
     pub(crate) units: Option<std::sync::Arc<dyn autoxide_address::api::AdministrativeUnits>>,
+    /// Hạn mức số nút theo gói (bước 35).
+    pub(crate) entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
 }
 
 impl OrgService {
@@ -90,7 +92,7 @@ impl OrgService {
         config: OrganizationsConfig,
         catalog: autoxide_kernel::tenancy::OrgSettingCatalog,
     ) -> Self {
-        OrgService { outbox, config, catalog, units: None }
+        OrgService { outbox, config, catalog, units: None, entitlements: Default::default() }
     }
 
     pub(crate) fn with_units(
@@ -240,6 +242,29 @@ impl OrgService {
         principal: &Principal,
         input: NewUnit,
     ) -> Result<UnitRow, Error> {
+        // Hạn mức số nút (bước 35): giữ chỗ TRƯỚC transaction của module, lỗi thì trả lại.
+        let id = OrgId::from_uuid(Uuid::now_v7());
+        let reference = unit_reference(id.as_uuid());
+        self.entitlements.reserve(tenant.id(), &UNITS_LIMIT, 1, &reference).await?;
+        match self.insert_unit(tenant, principal, input, id).await {
+            Ok(row) => {
+                self.entitlements.confirm(tenant.id(), &UNITS_LIMIT, &reference).await?;
+                Ok(row)
+            }
+            Err(error) => {
+                self.entitlements.release(tenant.id(), &UNITS_LIMIT, &reference).await?;
+                Err(error)
+            }
+        }
+    }
+
+    async fn insert_unit(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        input: NewUnit,
+        id: OrgId,
+    ) -> Result<UnitRow, Error> {
         let (name, code) = check_unit(Some(&input.name), Some(input.code.as_deref()))?;
         let name = name.unwrap_or_default();
         let code = code.flatten();
@@ -258,7 +283,6 @@ impl OrgService {
         find_type(&transaction, tenant, &input.unit_type).await?;
         let approved =
             principal.require_at(&transaction, &UNITS_MANAGE, at(input.parent_id)).await.is_ok();
-        let id = OrgId::from_uuid(Uuid::now_v7());
         OrgTree::insert(&transaction, tenant.id(), id, parent, self.config.max_depth).await?;
         let status = if approved { UnitStatus::Active } else { UnitStatus::Pending };
         if !approved {
@@ -390,6 +414,41 @@ impl OrgService {
     /// Đổi trạng thái nút `id`. Chuyển hợp lệ: `pending → active`, `active ↔ suspended`,
     /// `active / suspended → archived`, `archived → active`. Gốc không đổi được.
     pub(crate) async fn change_status(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        status: &str,
+        reason: Option<String>,
+    ) -> Result<UnitRow, Error> {
+        // Hạn mức số nút đếm nút không lưu trữ: bỏ lưu trữ giữ chỗ trước, lưu trữ trả lại sau.
+        let reference = unit_reference(id);
+        let archiving = status == UnitStatus::Archived.as_str();
+        // Nút đang lưu trữ mà đổi sang trạng thái khác: lại được tính vào hạn mức.
+        let reviving = !archiving
+            && find(tenant.database().read(), tenant, id)
+                .await
+                .is_ok_and(|row| row.status == UnitStatus::Archived.as_str());
+        if reviving {
+            self.entitlements.reserve(tenant.id(), &UNITS_LIMIT, 1, &reference).await?;
+        }
+        let changed = self.set_status(tenant, principal, id, status, reason).await;
+        match (&changed, reviving) {
+            (Ok(_), true) => {
+                self.entitlements.confirm(tenant.id(), &UNITS_LIMIT, &reference).await?
+            }
+            (Err(_), true) => {
+                self.entitlements.release(tenant.id(), &UNITS_LIMIT, &reference).await?
+            }
+            (Ok(row), false) if row.status == UnitStatus::Archived.as_str() => {
+                self.entitlements.release(tenant.id(), &UNITS_LIMIT, &reference).await?;
+            }
+            _ => {}
+        }
+        changed
+    }
+
+    async fn set_status(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
@@ -823,4 +882,33 @@ fn type_snapshot(row: &UnitTypeRow) -> Value {
 /// Bây giờ, cắt tới micro giây: hai database trả cùng một giá trị.
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
+}
+
+/// Hạn mức số nút tổ chức (bước 35): mọi nút trừ gốc, trừ nút đã lưu trữ.
+pub(crate) const UNITS_LIMIT: autoxide_kernel::entitlement::Limit =
+    autoxide_kernel::entitlement::Limit::count(
+        "organizations.units",
+        "Organization units a tenant can have, besides its root (archived units do not count).",
+    );
+
+/// Mã giữ chỗ hạn mức của nút `id`.
+fn unit_reference(id: Uuid) -> String {
+    format!("organizations.unit:{id}")
+}
+
+/// Bộ đếm thật cho job đối soát của `plans`: số nút không lưu trữ, trừ gốc.
+pub(crate) struct UnitCounter;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::entitlement::UsageCounter for UnitCounter {
+    async fn count(&self, tenant: &TenantContext) -> Result<i64, Error> {
+        use sea_orm::PaginatorTrait;
+        let found = unit::Entity::find()
+            .filter(unit::Column::ParentId.is_not_null())
+            .filter(unit::Column::Status.ne(UnitStatus::Archived.as_str()))
+            .scoped(tenant)
+            .count(tenant.database().read())
+            .await?;
+        Ok(i64::try_from(found).unwrap_or(i64::MAX))
+    }
 }

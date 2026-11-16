@@ -169,20 +169,32 @@ impl PlansService {
         limit: &Limit,
         reference: &str,
     ) -> Result<(), Error> {
+        self.release_key(tenant, limit.key(), reference, false).await
+    }
+
+    /// Như [`release`](Self::release) theo khoá hạn mức; `only_held`: chỉ trả chỗ còn `held` (job
+    /// hết hạn giữ không trả nhầm chỗ vừa được xác nhận).
+    async fn release_key(
+        &self,
+        tenant: TenantId,
+        key: &str,
+        reference: &str,
+        only_held: bool,
+    ) -> Result<(), Error> {
         let id = tenant.as_uuid();
         let transaction = self.databases.control().begin_write().await?;
         let Some(row) = rows::lock_one(
             &transaction,
             reservation::Entity::find()
                 .filter(reservation::Column::TenantId.eq(id))
-                .filter(reservation::Column::LimitKey.eq(limit.key()))
+                .filter(reservation::Column::LimitKey.eq(key))
                 .filter(reservation::Column::Reference.eq(reference)),
         )
         .await?
         else {
             return Ok(());
         };
-        if row.status == "released" {
+        if row.status == "released" || (only_held && row.status != "held") {
             return Ok(());
         }
         let amount = row.amount;
@@ -193,14 +205,14 @@ impl PlansService {
         let changed = rows::adjust::<usage::Entity, _>(
             &transaction,
             usage::Column::Used,
-            usage_filter(id, limit.key(), NO_PERIOD),
+            usage_filter(id, key, NO_PERIOD),
             -amount,
             Bounds::NON_NEGATIVE,
         )
         .await?;
         if changed == 0 {
             // Số đang dùng đã lệch (nhỏ hơn chỗ trả): job đối soát đặt lại.
-            tracing::warn!(tenant_id = %tenant, limit = limit.key(), "usage below a released hold; reconcile will fix it");
+            tracing::warn!(tenant_id = %tenant, limit = key, "usage below a released hold; reconcile will fix it");
             metrics::counter!("plans_usage_drift_total").increment(1);
         }
         transaction.commit().await?;
@@ -266,6 +278,87 @@ impl PlansService {
         }
         transaction.commit().await?;
         Ok(())
+    }
+
+    /// Trả các chỗ `held` đã quá hạn (tiến trình giữ chỗ chết, hay module quên xác nhận), tối đa
+    /// `batch` chỗ một lượt. Trả số chỗ đã trả.
+    pub(crate) async fn expire_holds(&self, at: DateTime<Utc>, batch: u64) -> Result<usize, Error> {
+        use sea_orm::{QueryOrder, QuerySelect};
+        let due = reservation::Entity::find()
+            .filter(reservation::Column::Status.eq("held"))
+            .filter(reservation::Column::ExpiresAt.lt(at))
+            .order_by_asc(reservation::Column::ExpiresAt)
+            .limit(batch)
+            .all(self.databases.control().read())
+            .await?;
+        for row in &due {
+            let tenant = TenantId::from_uuid(row.tenant_id);
+            self.release_key(tenant, &row.limit_key, &row.reference, true).await?;
+        }
+        if !due.is_empty() {
+            tracing::info!(released = due.len(), "expired limit holds released");
+        }
+        Ok(due.len())
+    }
+
+    /// Đặt lại số đang dùng của mọi hạn mức `count` / `amount` có bộ đếm thật, cho mọi khách có thuê
+    /// bao: `used` = số đếm thật + Σ chỗ `held` còn hạn. Sửa lệch do tiến trình chết giữa lúc giữ chỗ
+    /// và lúc ghi, hay do khách vào gói khi đã có dữ liệu. Trả số dòng đã sửa.
+    pub(crate) async fn reconcile(&self, at: DateTime<Utc>) -> Result<usize, Error> {
+        let catalog = self.entitlements.catalog();
+        let limits: Vec<(
+            &'static str,
+            std::sync::Arc<dyn autoxide_kernel::entitlement::UsageCounter>,
+        )> = catalog
+            .limits()
+            .filter(|found| !matches!(found.limit.kind(), LimitKind::Metered { .. }))
+            .filter_map(|found| {
+                catalog.counter(found.limit.key()).map(|counter| (found.limit.key(), counter))
+            })
+            .collect();
+        if limits.is_empty() {
+            return Ok(0);
+        }
+        let tenants = crate::entity::subscription::Entity::find()
+            .filter(crate::entity::subscription::Column::Status.ne("deleted"))
+            .all(self.databases.control().read())
+            .await?;
+        let mut fixed = 0;
+        for row in tenants {
+            let tenant = TenantId::from_uuid(row.tenant_id);
+            // Khách không còn (đã xoá ở sổ khách): bỏ qua.
+            let Ok(context) = self.databases.tenant(tenant).await else {
+                continue;
+            };
+            let held: Vec<reservation::Model> = reservation::Entity::find()
+                .filter(reservation::Column::TenantId.eq(row.tenant_id))
+                .filter(reservation::Column::Status.eq("held"))
+                .filter(reservation::Column::ExpiresAt.gt(at))
+                .all(self.databases.control().read())
+                .await?;
+            for (key, counter) in &limits {
+                let real = counter.count(&context).await?;
+                let pending: i64 =
+                    held.iter().filter(|hold| hold.limit_key == *key).map(|hold| hold.amount).sum();
+                let target = real.saturating_add(pending);
+                let current = self.used(tenant, key, NO_PERIOD).await?;
+                if current == target {
+                    continue;
+                }
+                let write = self.databases.control().write();
+                ensure_usage(write, row.tenant_id, key, NO_PERIOD).await?;
+                usage::Entity::update_many()
+                    .col_expr(usage::Column::Used, sea_orm::sea_query::Expr::value(target))
+                    .col_expr(usage::Column::UpdatedAt, sea_orm::sea_query::Expr::value(now()))
+                    .filter(usage_filter(row.tenant_id, key, NO_PERIOD))
+                    .exec(write)
+                    .await?;
+                metrics::counter!("plans_usage_reconciled_total").increment(1);
+                tracing::info!(tenant_id = %tenant, limit = *key, from = current, to = target, "usage reconciled");
+                fixed += 1;
+            }
+        }
+        Ok(fixed)
     }
 
     /// Lượng đang dùng của hạn mức `key` ở kỳ `period`.

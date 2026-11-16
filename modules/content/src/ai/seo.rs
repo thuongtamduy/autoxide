@@ -175,6 +175,7 @@ impl ContentService {
             .ok_or_else(|| entry_not_found(id))?;
         permissions::require_write(principal, &entry)?;
         permissions::require_org(principal, tenant, &entry, permissions::Need::Write).await?;
+        self.entitlements.require_feature(tenant.id(), &crate::service::AI_SUGGESTIONS).await?;
         self.ai.ready()?;
         let terms: Vec<(Uuid, String)> = term_translation::Entity::find()
             .scoped(tenant)

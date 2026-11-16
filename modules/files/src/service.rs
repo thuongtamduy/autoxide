@@ -61,11 +61,26 @@ pub(crate) struct FileService {
     storage: Arc<dyn Storage>,
     outbox: Outbox,
     limits: Limits,
+    /// Hạn mức dung lượng theo gói (bước 35).
+    pub(crate) entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+}
+
+/// Hạn mức dung lượng lưu file của một khách (bước 35), theo byte.
+pub(crate) const STORAGE_LIMIT: autoxide_kernel::entitlement::Limit =
+    autoxide_kernel::entitlement::Limit::amount(
+        "files.storage_bytes",
+        "Bytes of uploaded files a tenant can keep.",
+        "bytes",
+    );
+
+/// Mã giữ chỗ hạn mức của file `id`.
+fn storage_reference(id: Uuid) -> String {
+    format!("files.file:{id}")
 }
 
 impl FileService {
     pub(crate) fn new(storage: Arc<dyn Storage>, outbox: Outbox, limits: Limits) -> Self {
-        FileService { storage, outbox, limits }
+        FileService { storage, outbox, limits, entitlements: Default::default() }
     }
 
     pub(crate) fn limits(&self) -> &Limits {
@@ -107,13 +122,29 @@ impl FileService {
             hex(&hasher.clone().finalize())
         };
 
-        let saved =
-            self.save(tenant, principal, NewFile { id, name, content_type, size, sha256 }).await;
+        // Hạn mức dung lượng (bước 35): cỡ chỉ biết sau khi ghi nội dung; giữ chỗ trước khi lưu bản
+        // ghi, ngoài transaction của module.
+        let reference = storage_reference(id);
+        let amount = i64::try_from(size).map_err(Error::internal)?;
+        let reserved = if amount > 0 {
+            self.entitlements.reserve(tenant.id(), &STORAGE_LIMIT, amount, &reference).await
+        } else {
+            Ok(())
+        };
+        let saved = match reserved {
+            Ok(()) => {
+                self.save(tenant, principal, NewFile { id, name, content_type, size, sha256 }).await
+            }
+            Err(error) => Err(error),
+        };
         if saved.is_err() {
             // Không để nội dung không ai trỏ tới nằm lại ở nơi lưu.
             if let Err(error) = store.delete(&key).await {
                 tracing::warn!(file_id = %id, error = %error, "cannot remove an unsaved upload");
             }
+            self.entitlements.release(tenant.id(), &STORAGE_LIMIT, &reference).await?;
+        } else if amount > 0 {
+            self.entitlements.confirm(tenant.id(), &STORAGE_LIMIT, &reference).await?;
         }
         let file = saved?;
         tracing::info!(file_id = %file.id, size = file.size, "file uploaded");
@@ -184,6 +215,7 @@ impl FileService {
         let actor = Actor::from(principal);
         self.outbox.record(&transaction, tenant, actor, events::file_subject(id), &event).await?;
         transaction.commit().await?;
+        self.entitlements.release(tenant.id(), &STORAGE_LIMIT, &storage_reference(id)).await?;
         if let Err(error) = self.store(tenant).delete(&file.storage_key()).await {
             tracing::warn!(file_id = %id, error = %error, "file deleted but its content remains");
         }
@@ -652,5 +684,25 @@ mod name_tests {
         for bad in ["invoice\u{202E}fdp.exe", "a\u{200B}b.txt", "a/b", "a\u{0007}b", ""] {
             assert!(check_name(bad).is_err(), "{bad:?}");
         }
+    }
+}
+
+/// Bộ đếm thật cho job đối soát của `plans`: tổng cỡ các file của khách.
+pub(crate) struct StorageCounter;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::entitlement::UsageCounter for StorageCounter {
+    async fn count(&self, tenant: &TenantContext) -> Result<i64, Error> {
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, QueryFilter, QuerySelect};
+        // `CAST … AS BIGINT`: `SUM` của Postgres trả `numeric`; ép về số nguyên cho cả hai database.
+        let total: Option<i64> = Entity::find()
+            .select_only()
+            .column_as(Expr::cust("CAST(COALESCE(SUM(size), 0) AS BIGINT)"), "total")
+            .filter(entity::Column::TenantId.eq(tenant.id().as_uuid()))
+            .into_tuple()
+            .one(tenant.database().read())
+            .await?;
+        Ok(total.unwrap_or(0))
     }
 }

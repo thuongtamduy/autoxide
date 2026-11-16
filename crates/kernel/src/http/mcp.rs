@@ -318,6 +318,8 @@ impl ServerHandler for McpServer {
         }
         let arguments = request.arguments.map_or(Value::Null, Value::Object);
         metrics::counter!("mcp_tool_calls_total").increment(1);
+        // Đếm cho hạn mức `kernel.api_requests` (REST và MCP), như lớp HTTP.
+        self.entitlements.count_request(tenant.id());
         // Gói của khách không có module của tool: cùng lỗi như REST.
         let (enabled, plan_read_only) = match self.plan_allows(tool, tenant.id()).await {
             Ok(found) => found,

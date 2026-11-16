@@ -412,6 +412,56 @@ databases.
   transaction (`amount.checked_neg()`) that points to the one it reverses; balances are
   then always explained by the history.
 
+### Features and limits (plans)
+
+A tenant's plan (module `plans`, see `docs/PLANS.md`) decides which modules it may use, which
+features are on and how much it may use. The kernel enforces the module part by itself: when the
+plan does not include your module, its endpoints answer `403 module_not_enabled`, its MCP tools are
+hidden, its jobs wait and its event handlers are skipped; a suspended or canceled subscription
+makes writes answer `403 tenant_read_only`. A module that must never be turned off by a plan (a
+foundation such as sign-in or files) returns `true` from `Module::always_enabled`. With no plan
+(or no `plans` module) nothing changes.
+
+Features and limits are yours to declare and check, through the handle every module receives:
+
+```rust
+const EXPORT: Feature = Feature::new("shop.export", "Export orders as CSV.");
+const PRODUCTS: Limit = Limit::count("shop.products", "Products a tenant can list.");
+
+fn features(&self) -> Vec<Feature> { vec![EXPORT] }
+fn limits(&self) -> Vec<Limit> { vec![PRODUCTS] }
+
+// in `start`:
+let entitlements = context.entitlements();
+context.usage_counter(&PRODUCTS, Arc::new(ProductCounter))?; // the real count, for reconciling
+```
+
+- **A feature**: `entitlements.require_feature(tenant.id(), &EXPORT).await?` before the work
+  (`403 feature_not_enabled`).
+- **A count or amount limit** (`Limit::count`, `Limit::amount`): reserve BEFORE the write
+  transaction, confirm when it committed, release when it failed — and release when the record
+  goes away. The reservation is atomic: concurrent requests never pass the limit.
+
+  ```rust
+  let reference = format!("shop.product:{id}");
+  entitlements.reserve(tenant.id(), &PRODUCTS, 1, &reference).await?; // 403 limit_exceeded
+  match self.insert(tenant, input, id).await {
+      Ok(row) => { entitlements.confirm(tenant.id(), &PRODUCTS, &reference).await?; Ok(row) }
+      Err(error) => { entitlements.release(tenant.id(), &PRODUCTS, &reference).await?; Err(error) }
+  }
+  ```
+
+  Never reserve inside your own write transaction: on SQLite there is one writer, and the
+  reservation would wait for itself. A process that dies between reserve and confirm loses
+  nothing: holds expire (`AUTOXIDE_PLANS_HOLD_MINUTES`) and a daily job resets usage from your
+  `UsageCounter`.
+- **A metered limit** (`Limit::metered`, use per month): `record_usage(tenant, &LIMIT, quantity,
+  reference)`; the same `reference` is counted once; over the month's quota it answers `429
+  quota_exhausted` with `Retry-After`.
+
+Without a provider, for the platform tenant, and for tenants with no plan, every call succeeds
+at once. `modules/notes` is the worked example (`notes.notes`).
+
 ### 9. Configuration, jobs, limits
 
 - Settings: declare each with `Setting` and read it in `Module::configure` through
@@ -549,5 +599,6 @@ Rules the core follows:
       `seed_tenant` safe to run again; a leak test (`leak_check`)
 - [ ] Data of a unit: `org_id`, permissions `.scoped()`, lists with `scope_condition`, writes with
       `require_write_at` in the transaction; a branch leak test (`branch_leak_check`)
+- [ ] Features and limits declared; limits reserved before the write, confirmed or released after
 - [ ] Tests on both databases, including concurrent writes
 - [ ] `docs/openapi.json` and `.env.example` regenerated; gate green

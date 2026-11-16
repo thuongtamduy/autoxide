@@ -94,6 +94,14 @@ impl Module for AuthModule {
     }
 
     // Module nền: không gói nào tắt được (bước 35, D-323).
+    fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
+        vec![api_key::API_KEYS_FEATURE]
+    }
+
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![crate::role::MEMBERS_LIMIT]
+    }
+
     fn always_enabled(&self) -> bool {
         true
     }
@@ -181,8 +189,10 @@ impl Module for AuthModule {
         });
         let roles = Arc::new(
             RoleService::new(context.permissions().clone(), outbox.clone())
-                .with_translations(context.translations().clone()),
+                .with_translations(context.translations().clone())
+                .with_entitlements(context.entitlements()),
         );
+        context.usage_counter(&crate::role::MEMBERS_LIMIT, Arc::new(crate::role::MemberCounter))?;
         let api_keys = Arc::new(ApiKeyService::new(
             roles.clone(),
             sessions.clone(),
@@ -268,6 +278,7 @@ impl Module for AuthModule {
             databases: databases.clone(),
             url: config.invitation_url.clone(),
             days: config.invitation_days,
+            entitlements: context.entitlements(),
         });
         context.provide::<dyn api::Invitations>(invitations.clone())?;
         self.invitations = Some(invitations.clone());

@@ -71,10 +71,10 @@ Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một ngư�
 Thiết kế: trụ 3. Bắt đầu SAU bước 34; mục tính tiền chờ `PaymentGateway` của bước 36, mục cấp phát
 chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh toán, hạn mức là dữ liệu, không phải code.
 
-- [ ] Module khai tính năng (`Module::features`) và hạn mức (`Module::limits`), mặc định rỗng
+- [x] Module khai tính năng (`Module::features`) và hạn mức (`Module::limits`), mặc định rỗng
       (D-038); gói = tập module + tính năng + hạn mức + giá theo kỳ; dùng thử, gói thêm, ghi đè
       riêng cho từng khách; API và tool MCP quản trị gói
-- [ ] Kernel cưỡng chế theo khách: module chưa bật thì route, tool MCP, job, event của nó bị chặn
+- [x] Kernel cưỡng chế theo khách: module chưa bật thì route, tool MCP, job, event của nó bị chặn
       (`module_not_enabled`); `has_feature`; hạn mức giữ chỗ / trả lại nguyên tử; số đo dùng ghi
       lại cho tính tiền; test đồng thời trên cả hai database
 - [ ] Vòng đời thuê bao: dùng thử → đang dùng → quá hạn (ân hạn) → tạm khoá (chỉ đọc) → huỷ (cho
@@ -87,6 +87,8 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
 - [ ] Đối chiếu thiết kế 2: xuất toàn bộ dữ liệu một khách bằng job khi huỷ thuê bao; `suspend` thuê bao
       cho nhân sự nền tảng; hạn mức nút đếm mọi nút trừ gốc, hạn mức theo loại nút khai riêng; thông báo
       của nền tảng tới quản trị mọi khách
+- [ ] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): loại nút là dữ liệu của khách mà sổ hạn mức của kernel
+      khai tĩnh — cần hạn mức có tham số (vd khoá `organizations.units` + loại) hay khai sẵn các loại hay dùng (D-326)
 
 ## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)
 

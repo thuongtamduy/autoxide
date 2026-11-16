@@ -197,12 +197,15 @@ pub fn build(
     let mut api = OpenApiRouter::new();
     for (name, mut routes) in modules {
         openapi::label_module(name, routes.get_openapi_mut());
-        // Module bị gói chi phối: chặn route khi gói của khách không có nó (bước 35).
-        if !extras.entitlements.catalog().is_always_enabled(name) && name != crate::user_flags::ME {
-            openapi::document_plan_gate(routes.get_openapi_mut());
+        // Gói của khách (bước 35): đếm request ở mọi module; chặn ở module bị gói chi phối.
+        if name != crate::user_flags::ME {
+            let always = extras.entitlements.catalog().is_always_enabled(name);
+            if !always {
+                openapi::document_plan_gate(routes.get_openapi_mut());
+            }
             let handle = extras.entitlements.clone();
             routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
-                entitlement::gate(handle.clone(), name, request, next)
+                entitlement::gate(handle.clone(), name, always, request, next)
             }));
         }
         api = api.nest(&format!("/{name}"), routes);

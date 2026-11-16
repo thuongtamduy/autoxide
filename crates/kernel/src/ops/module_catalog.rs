@@ -79,7 +79,10 @@ impl ModuleCatalog {
                     migrations.iter().map(|migration| migration.name().to_owned()).collect();
                 // `Migrator::new` chỉ lỗi khi khai báo sai — điều `Modules::migrator` đã kiểm
                 // trước khi chương trình chạy tới đây. Lỗi thì chỉ mất phần trạng thái.
-                let migrator = Migrator::new(vec![ModuleMigrations::new(name, migrations)]).ok();
+                // Kèm cả bản nâng cấp dữ liệu (`upgrades`): bảng lịch sử ghi cả chúng, thiếu thì đọc
+                // trạng thái báo lỗi (module `auth`, `webhooks`).
+                let set = ModuleMigrations::new(name, migrations).with_upgrades(module.upgrades());
+                let migrator = Migrator::new(vec![set]).ok();
                 let mut info = ModuleInfo::describe(module.as_ref(), position, migration_names);
                 info.always_enabled = entitlements.is_always_enabled(name);
                 info.requires =

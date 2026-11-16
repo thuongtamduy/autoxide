@@ -54,11 +54,25 @@ pub(crate) struct NoteChanges {
 // Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
 pub(crate) struct NoteService {
     outbox: Outbox,
+    /// Quyền dùng theo gói (bước 35): hạn mức số ghi chú.
+    entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+}
+
+/// Hạn mức số ghi chú của một khách (bước 35). Mẫu cho module khác: khai trong `Module::limits`,
+/// giữ chỗ trước transaction, xác nhận khi xong, trả lại khi lỗi hay khi xoá.
+pub(crate) const NOTES_LIMIT: autoxide_kernel::entitlement::Limit =
+    autoxide_kernel::entitlement::Limit::count("notes.notes", "Notes a tenant can keep.");
+
+fn note_reference(id: Uuid) -> String {
+    format!("notes.note:{id}")
 }
 
 impl NoteService {
-    pub(crate) fn new(outbox: Outbox) -> Self {
-        NoteService { outbox }
+    pub(crate) fn new(
+        outbox: Outbox,
+        entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+    ) -> Self {
+        NoteService { outbox, entitlements }
     }
 
     /// Tạo ghi chú của `actor` trong khách `tenant`. Tên trùng với ghi chú khác của cùng người
@@ -68,6 +82,26 @@ impl NoteService {
         tenant: &TenantContext,
         principal: &Principal,
         input: NewNote,
+    ) -> Result<Note, Error> {
+        // Giữ chỗ hạn mức TRƯỚC transaction ghi của module (SQLite chỉ một bên ghi), xác nhận khi
+        // ghi xong, trả lại khi lỗi.
+        let id = Uuid::now_v7();
+        let reference = note_reference(id);
+        self.entitlements.reserve(tenant.id(), &NOTES_LIMIT, 1, &reference).await?;
+        let created = self.insert(tenant, principal, input, id).await;
+        match &created {
+            Ok(_) => self.entitlements.confirm(tenant.id(), &NOTES_LIMIT, &reference).await?,
+            Err(_) => self.entitlements.release(tenant.id(), &NOTES_LIMIT, &reference).await?,
+        }
+        created
+    }
+
+    async fn insert(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        input: NewNote,
+        id: Uuid,
     ) -> Result<Note, Error> {
         let actor = Actor::from(principal);
         let owner = owner(actor)?;
@@ -81,7 +115,7 @@ impl NoteService {
         // Nút do người gọi nêu: ngoài phạm vi → 403 `org_out_of_scope`; nút đang khoá → `org_frozen`.
         principal.require_write_at(&transaction, &NOTES_WRITE, at(org, owner)).await?;
         let note = entity::ActiveModel {
-            id: Set(Uuid::now_v7()),
+            id: Set(id),
             tenant_id: Set(tenant.id().as_uuid()),
             org_id: Set(Some(org.as_uuid())),
             owner_id: Set(owner),
@@ -198,6 +232,7 @@ impl NoteService {
         let event = events::NoteDeleted(Change { before: Some(snapshot(&note)), after: None });
         self.outbox.record(&transaction, tenant, actor, events::note_subject(id), &event).await?;
         transaction.commit().await?;
+        self.entitlements.release(tenant.id(), &NOTES_LIMIT, &note_reference(id)).await?;
         Ok(())
     }
 }
@@ -371,4 +406,16 @@ fn snapshot(note: &Note) -> Value {
 /// trước để hai database trả về cùng một giá trị.
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
+}
+
+/// Bộ đếm thật cho job đối soát: số ghi chú của khách.
+pub(crate) struct NoteCounter;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::entitlement::UsageCounter for NoteCounter {
+    async fn count(&self, tenant: &TenantContext) -> Result<i64, Error> {
+        use sea_orm::PaginatorTrait;
+        let found = Entity::find().scoped(tenant).count(tenant.database().read()).await?;
+        Ok(i64::try_from(found).unwrap_or(i64::MAX))
+    }
 }

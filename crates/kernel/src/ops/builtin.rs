@@ -209,6 +209,10 @@ impl Module for KernelModule {
         ]
     }
 
+    fn limits(&self) -> Vec<crate::entitlement::Limit> {
+        vec![crate::entitlement::API_REQUESTS]
+    }
+
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
         vec![crate::tenancy::PUBLIC_URL]
     }

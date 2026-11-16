@@ -205,11 +205,78 @@ pub struct EntitlementsHandle {
     // module khởi động; đọc từ nhiều thread không cần lock.
     provider: Arc<OnceLock<Arc<dyn Entitlements>>>,
     catalog: EntitlementCatalog,
+    meter: Arc<Meter>,
+}
+
+/// Hạn mức số request API theo tháng của mỗi khách (kernel khai, đếm ở lớp HTTP).
+pub const API_REQUESTS: Limit = Limit::metered(
+    "kernel.api_requests",
+    "API requests (REST and MCP) a tenant can make each month.",
+    Period::Month,
+);
+
+/// Đếm request API theo khách trong bộ nhớ của tiến trình; [`EntitlementsHandle::flush_usage`]
+/// ghi gộp vào sổ lượng dùng (mỗi 60 giây). Tiến trình chết thì mất tối đa chừng ấy số đếm.
+#[derive(Default)]
+struct Meter {
+    // `Mutex` chuẩn: chỉ giữ trong vài phép tính, không qua `.await`.
+    counts: std::sync::Mutex<BTreeMap<TenantId, i64>>,
+    /// Khách đã hết lượng request của kỳ: tới mốc này thì thôi chặn.
+    exhausted: std::sync::Mutex<BTreeMap<TenantId, std::time::Instant>>,
 }
 
 impl EntitlementsHandle {
     pub(crate) fn new(catalog: EntitlementCatalog) -> Self {
-        EntitlementsHandle { provider: Arc::default(), catalog }
+        EntitlementsHandle { provider: Arc::default(), catalog, meter: Arc::default() }
+    }
+
+    /// Đếm một request API của khách `tenant` (lớp HTTP gọi). Không có bên cung cấp hay khách nền
+    /// tảng: không đếm.
+    pub fn count_request(&self, tenant: TenantId) {
+        if self.provider_for(tenant).is_none() {
+            return;
+        }
+        if let Ok(mut counts) = self.meter.counts.lock() {
+            *counts.entry(tenant).or_default() += 1;
+        }
+    }
+
+    /// Khách `tenant` đã hết lượng request của kỳ: số giây tới kỳ sau, để trả 429.
+    pub fn request_quota_wait(&self, tenant: TenantId) -> Option<u64> {
+        let mut exhausted = self.meter.exhausted.lock().ok()?;
+        let until = *exhausted.get(&tenant)?;
+        let now = std::time::Instant::now();
+        if until <= now {
+            exhausted.remove(&tenant);
+            return None;
+        }
+        Some((until - now).as_secs().max(1))
+    }
+
+    /// Ghi số request đã đếm vào sổ lượng dùng, mỗi khách một dòng, `reference` = `node` + mốc
+    /// `slot` (vd phút) — gọi lại cùng mốc không ghi trùng. Khách hết lượng: lần sau bị chặn tới
+    /// đầu kỳ sau. Lỗi khác: ghi log, số đếm của lượt đó bỏ đi (đếm để tính tiền, không giữ tiền).
+    pub async fn flush_usage(&self, node: &str, slot: i64) {
+        let counts = match self.meter.counts.lock() {
+            Ok(mut counts) => std::mem::take(&mut *counts),
+            Err(_) => return,
+        };
+        for (tenant, quantity) in counts {
+            let reference = format!("{node}:{slot}");
+            match self.record_usage(tenant, &API_REQUESTS, quantity, &reference).await {
+                Ok(()) => {}
+                Err(error) if error.code() == "quota_exhausted" => {
+                    let wait = error.retry_after().unwrap_or(60);
+                    let until = std::time::Instant::now() + std::time::Duration::from_secs(wait);
+                    if let Ok(mut exhausted) = self.meter.exhausted.lock() {
+                        exhausted.insert(tenant, until);
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(tenant_id = %tenant, error = %error, "cannot record API request usage");
+                }
+            }
+        }
     }
 
     /// Gắn bên cung cấp; lần gọi sau bị bỏ qua.

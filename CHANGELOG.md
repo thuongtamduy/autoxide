@@ -20,7 +20,10 @@ endpoints are marked deprecated with a sunset date first.
   both databases. The kernel enforces the plan: endpoints of a module the tenant's plan does not include answer
   `403 module_not_enabled`, its MCP tools are hidden, its jobs wait (`AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS`, not counted
   as attempts) and its event handlers are skipped; a suspended or canceled subscription makes the tenant read-only
-  (`403 tenant_read_only` on writes). The module catalog lists each module's features, limits, `always_enabled` and `requires`.
+  (`403 tenant_read_only` on writes). Limits wired so far: `organizations.units` (units besides the root, archived ones
+  not counted), `auth.members` (people holding a role), `files.storage_bytes`, `kernel.api_requests` (requests per
+  month, recorded every minute; `429 quota_exhausted` only when the plan sets a maximum); features `auth.api_keys` and
+  `content.ai_suggestions`. Held reservations expire and usage is reconciled with the real counts daily. The module catalog lists each module's features, limits, `always_enabled` and `requires`.
 - Decimal numbers for calculating with money (tax rates, exchange rates, quantities) in
   `autoxide_kernel::decimal`: `Money::apply_rate`, `Money::convert`, `Money::to_decimal` / `from_decimal`, each with
   an explicit `Rounding`; decimals are strings in JSON (`DecimalString`, error `decimal.invalid`) and text in the
@@ -346,6 +349,8 @@ endpoints are marked deprecated with a sunset date first.
   both gates run the test binaries in parallel (`cargo xtask test-all` in the full gate).
 
 ### Fixed
+
+- `GET /api/v1/kernel/modules/{name}` answered 500 for modules with data upgrades (`auth`, `webhooks`).
 
 - Lists of one tenant ordered by id (audit entries, users, roles, media, content entries, terms, authors, redirects,
   comments, bans, reports, forms, newsletter lists, subscribers, campaigns, suppressions, webhook endpoints, menus)

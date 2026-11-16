@@ -402,6 +402,54 @@ Module giữ số tiền, số dư hay giao dịch dùng các công cụ của k
   (`amount.checked_neg()`) trỏ tới giao dịch nó đảo; nhờ vậy số dư luôn giải thích được bằng
   lịch sử.
 
+### Tính năng và hạn mức (gói)
+
+Gói của khách (module `plans`, xem `docs/PLANS.vi.md`) quyết khách được dùng module nào, tính năng
+nào bật và được dùng bao nhiêu. Phần module do kernel tự cưỡng chế: gói không có module của bạn thì
+endpoint trả `403 module_not_enabled`, tool MCP bị ẩn, job phải chờ, bên nhận event bị bỏ qua;
+thuê bao tạm khoá hay đã huỷ thì lệnh ghi trả `403 tenant_read_only`. Module không bao giờ được để
+gói tắt (nền như đăng nhập, file) trả `true` ở `Module::always_enabled`. Không có gói (hay không
+cài `plans`) thì không đổi gì.
+
+Tính năng và hạn mức do module tự khai và tự kiểm, qua tay cầm mọi module nhận:
+
+```rust
+const EXPORT: Feature = Feature::new("shop.export", "Export orders as CSV.");
+const PRODUCTS: Limit = Limit::count("shop.products", "Products a tenant can list.");
+
+fn features(&self) -> Vec<Feature> { vec![EXPORT] }
+fn limits(&self) -> Vec<Limit> { vec![PRODUCTS] }
+
+// trong `start`:
+let entitlements = context.entitlements();
+context.usage_counter(&PRODUCTS, Arc::new(ProductCounter))?; // số đếm thật, để đối soát
+```
+
+- **Tính năng**: `entitlements.require_feature(tenant.id(), &EXPORT).await?` trước việc cần nó
+  (`403 feature_not_enabled`).
+- **Hạn mức đếm hay lượng** (`Limit::count`, `Limit::amount`): giữ chỗ TRƯỚC transaction ghi, xác
+  nhận khi đã commit, trả lại khi lỗi — và trả lại khi bản ghi mất đi. Giữ chỗ là nguyên tử: các
+  request đồng thời không bao giờ vượt hạn mức.
+
+  ```rust
+  let reference = format!("shop.product:{id}");
+  entitlements.reserve(tenant.id(), &PRODUCTS, 1, &reference).await?; // 403 limit_exceeded
+  match self.insert(tenant, input, id).await {
+      Ok(row) => { entitlements.confirm(tenant.id(), &PRODUCTS, &reference).await?; Ok(row) }
+      Err(error) => { entitlements.release(tenant.id(), &PRODUCTS, &reference).await?; Err(error) }
+  }
+  ```
+
+  Không bao giờ giữ chỗ bên trong transaction ghi của chính module: SQLite chỉ có một bên ghi, giữ
+  chỗ sẽ chờ chính nó. Tiến trình chết giữa lúc giữ chỗ và xác nhận thì không mất gì: chỗ giữ tự
+  hết hạn (`AUTOXIDE_PLANS_HOLD_MINUTES`) và job hằng ngày đặt lại số đang dùng theo `UsageCounter`.
+- **Hạn mức theo lượng dùng** (`Limit::metered`, lượng dùng mỗi tháng): `record_usage(tenant,
+  &LIMIT, quantity, reference)`; cùng `reference` chỉ tính một lần; vượt quota của tháng thì trả
+  `429 quota_exhausted` kèm `Retry-After`.
+
+Không có bên cung cấp, khách nền tảng, khách không có gói: mọi lời gọi thành công ngay. Ví dụ đầy
+đủ ở `modules/notes` (`notes.notes`).
+
 ### 9. Cấu hình, job, giới hạn
 
 - Cấu hình: khai mỗi biến bằng `Setting` và đọc trong `Module::configure` qua
@@ -536,5 +584,6 @@ Luật core tự giữ:
       `seed_tenant` chạy lại được; có bài rò rỉ (`leak_check`)
 - [ ] Dữ liệu theo nút: `org_id`, permission `.scoped()`, danh sách bằng `scope_condition`, ghi bằng
       `require_write_at` trong transaction; có bài rò rỉ giữa hai nhánh (`branch_leak_check`)
+- [ ] Khai tính năng và hạn mức; hạn mức giữ chỗ trước khi ghi, xác nhận hay trả lại sau
 - [ ] Test trên cả hai database, kể cả ghi đồng thời
 - [ ] Đã sinh lại `docs/openapi.json` và `.env.example`; gate xanh

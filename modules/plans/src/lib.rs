@@ -10,6 +10,7 @@ mod config;
 mod entity;
 mod events;
 mod http;
+mod jobs;
 mod merge;
 mod migration;
 mod permissions;
@@ -108,6 +109,14 @@ impl Module for PlansModule {
         context.provide::<dyn autoxide_kernel::entitlement::Entitlements>(Arc::new(
             provider::Provider(service),
         ))
+    }
+
+    fn jobs(&self) -> Vec<autoxide_kernel::job::JobRegistration> {
+        self.service.as_ref().map_or_else(Vec::new, jobs::registrations)
+    }
+
+    fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
+        jobs::schedules()
     }
 
     fn routes(&self) -> OpenApiRouter {

@@ -17,12 +17,34 @@ const ITEMS: Limit = Limit::count("demo.items", "Items kept.");
 const CALLS: Limit = Limit::metered("demo.calls", "Calls each month.", Period::Month);
 const EXPORT: Feature = Feature::new("demo.export", "Export items.");
 
-/// Module thử: một tính năng, hai hạn mức.
-struct Demo;
+/// Module thử: một tính năng, hai hạn mức; `demo.items` có bộ đếm thật (giá trị trong `real`).
+#[derive(Default)]
+struct Demo {
+    real: Arc<std::sync::atomic::AtomicI64>,
+}
+
+struct RealCount(Arc<std::sync::atomic::AtomicI64>);
+
+#[async_trait::async_trait]
+impl autoxide_kernel::entitlement::UsageCounter for RealCount {
+    async fn count(
+        &self,
+        _tenant: &autoxide_kernel::tenancy::TenantContext,
+    ) -> Result<i64, autoxide_kernel::error::Error> {
+        Ok(self.0.load(std::sync::atomic::Ordering::SeqCst))
+    }
+}
 
 impl Module for Demo {
     fn name(&self) -> &'static str {
         "demo"
+    }
+
+    fn start(
+        &mut self,
+        context: &mut autoxide_kernel::module::StartContext<'_>,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        context.usage_counter(&ITEMS, Arc::new(RealCount(self.real.clone())))
     }
 
     fn features(&self) -> Vec<Feature> {
@@ -42,9 +64,13 @@ const OPS: [&str; 4] = [
 ];
 
 async fn app(test: &TestDatabase) -> TestApp {
+    app_with(test, Demo::default()).await
+}
+
+async fn app_with(test: &TestDatabase, demo: Demo) -> TestApp {
     TestApp::builder(test)
         .setting("AUTOXIDE_PLANS_CACHE_SECONDS", "0")
-        .module(Demo)
+        .module(demo)
         .module(crate::module())
         .tenant("acme")
         .tenant("beta")
@@ -611,6 +637,60 @@ async fn tool_quyen_dung_cho_moi_nguoi_da_dang_nhap() {
         assert_ne!(answer.is_error, Some(true), "{answer:?}");
         let text = serde_json::to_string(&answer.structured_content).unwrap();
         assert!(text.contains("\"unrestricted\":true"), "{text}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Sửa thẳng database điều khiển (giả lập thời gian trôi qua / máy chủ khác).
+async fn sql(app: &TestApp, text: &str) {
+    use sea_orm::{ConnectionTrait, Statement};
+    let control = app.registry().control().write();
+    control
+        .execute_raw(Statement::from_string(control.get_database_backend(), text))
+        .await
+        .unwrap();
+}
+
+async fn used(app: &TestApp, key: &str) -> Value {
+    let usage = expect(app, "GET", "/usage", "owner", None, StatusCode::OK).await;
+    usage["data"].as_array().unwrap().iter().find(|l| l["key"] == key).unwrap()["used"].clone()
+}
+
+#[tokio::test]
+async fn giu_cho_het_han_duoc_tra() {
+    TestDatabase::run(async |test| {
+        // Bản ghi đã xác nhận có thật (bộ đếm nói 2); job đối soát chạy cùng lượt cũng không lệch.
+        let demo = Demo::default();
+        demo.real.store(2, std::sync::atomic::Ordering::SeqCst);
+        let app = app_with(test, demo).await;
+        let acme = limited(&app, 10).await;
+        let handle = handle(&app);
+        handle.reserve(acme, &ITEMS, 3, "demo.item:lost").await.unwrap();
+        handle.reserve(acme, &ITEMS, 2, "demo.item:kept").await.unwrap();
+        handle.confirm(acme, &ITEMS, "demo.item:kept").await.unwrap();
+        assert_eq!(used(&app, "demo.items").await, 5);
+        // Mọi chỗ giữ coi như quá hạn; chỗ đã xác nhận không bị trả.
+        sql(&app, "UPDATE plans_reservation SET expires_at = '2000-01-01T00:00:00Z'").await;
+        app.modules().worker(4).unwrap().run_once().await.unwrap();
+        assert_eq!(used(&app, "demo.items").await, 2);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn doi_soat_sua_so_lech() {
+    TestDatabase::run(async |test| {
+        let demo = Demo::default();
+        let real = demo.real.clone();
+        let app = app_with(test, demo).await;
+        let acme = limited(&app, 100).await;
+        handle(&app).reserve(acme, &ITEMS, 4, "demo.item:pending").await.unwrap();
+        // Bộ đếm thật nói đang có 7 bản ghi (vd khách có dữ liệu từ trước khi vào gói).
+        real.store(7, std::sync::atomic::Ordering::SeqCst);
+        app.modules().worker(4).unwrap().run_once().await.unwrap();
+        assert_eq!(used(&app, "demo.items").await, 11, "7 thật + 4 đang giữ");
     })
     .await
     .unwrap();

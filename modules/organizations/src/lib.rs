@@ -70,6 +70,10 @@ impl Module for OrganizationsModule {
         settings::all()
     }
 
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![service::UNITS_LIMIT]
+    }
+
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
     }
@@ -87,9 +91,11 @@ impl Module for OrganizationsModule {
             .config
             .ok_or_else(|| Error::internal("module `organizations` started before `configure`"))?;
         let units = context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok();
-        let service = Arc::new(
-            OrgService::new(context.outbox()?, config, context.org_settings()).with_units(units),
-        );
+        let mut service =
+            OrgService::new(context.outbox()?, config, context.org_settings()).with_units(units);
+        service.entitlements = context.entitlements();
+        context.usage_counter(&service::UNITS_LIMIT, Arc::new(service::UnitCounter))?;
+        let service = Arc::new(service);
         context.resource_type(profile::STORE, Arc::new(profile::StoreResolver))?;
         self.service = Some(service.clone());
         context.provide::<dyn api::OrgDirectory>(service)

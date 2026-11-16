@@ -65,8 +65,13 @@ impl Module for NotesModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![service::NOTES_LIMIT]
+    }
+
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let service = Arc::new(NoteService::new(context.outbox()?));
+        let service = Arc::new(NoteService::new(context.outbox()?, context.entitlements()));
+        context.usage_counter(&service::NOTES_LIMIT, Arc::new(service::NoteCounter))?;
         self.service = Some(service.clone());
         // `Arc<NoteService>` tự đổi thành `Arc<dyn Notes>`: module khác chỉ thấy trait.
         context.personal_data(service.clone())?;

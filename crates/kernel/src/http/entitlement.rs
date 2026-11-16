@@ -1,5 +1,6 @@
-//! Lớp chặn theo gói cho route REST của một module (bước 35, D-325): bọc router của từng module
-//! không `always_enabled` khi ghép dưới `/api/v1/<module>`.
+//! Lớp chặn theo gói cho route REST của một module (bước 35, D-325): bọc router của từng module khi
+//! ghép dưới `/api/v1/<module>`; đếm request cho hạn mức `kernel.api_requests` ở mọi module, chặn
+//! chỉ ở module không `always_enabled`.
 //!
 //! - Gói của khách không có module → 403 `module_not_enabled`;
 //! - khách chỉ đọc vì thuê bao (tạm khoá / huỷ) → lệnh ghi (`POST`, `PUT`, `PATCH`, `DELETE`) bị
@@ -19,6 +20,7 @@ use crate::entitlement::{EntitlementsHandle, TenantAccess, module_not_enabled};
 pub(crate) async fn gate(
     entitlements: EntitlementsHandle,
     module: &'static str,
+    always_enabled: bool,
     request: Request,
     next: Next,
 ) -> Response {
@@ -27,6 +29,19 @@ pub(crate) async fn gate(
     }
     let (mut parts, body) = request.into_parts();
     if let Ok(tenant) = crate::tenancy::request::tenant(&mut parts).await {
+        // Đếm request theo khách cho hạn mức `kernel.api_requests` (mọi module).
+        entitlements.count_request(tenant.id());
+        if always_enabled {
+            return next.run(Request::from_parts(parts, body)).await;
+        }
+        // Hết lượng request của kỳ (gói đặt mức tối đa): module nền vẫn chạy (đăng nhập, xem gói).
+        if let Some(wait) = entitlements.request_quota_wait(tenant.id()) {
+            return crate::entitlement::quota_exhausted(
+                crate::entitlement::API_REQUESTS.key(),
+                wait,
+            )
+            .into_response();
+        }
         let snapshot = match entitlements.snapshot(tenant.id()).await {
             Ok(snapshot) => snapshot,
             Err(error) => return error.into_response(),

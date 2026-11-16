@@ -74,6 +74,7 @@ impl ContentService {
         locale: &str,
     ) -> Result<TranslationRequest, Error> {
         permissions::require_create(principal)?;
+        self.entitlements.require_feature(tenant.id(), &crate::service::AI_SUGGESTIONS).await?;
         self.ai.ready()?;
         let read = tenant.database().read();
         let source = entry::Entity::find_by_id(source_id)

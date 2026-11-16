@@ -7921,3 +7921,33 @@ Quyết định:
 
 Đã cân nhắc: kiểm ở extractor `TenantContext` (một chỗ cho mọi handler) — extractor không biết route thuộc module nào;
 bọc theo module ở `http::build` biết đúng tên module mà không bắt module sửa gì.
+
+## D-326 · Nối hạn mức vào module thật; đếm request API theo khách; job hết hạn giữ và đối soát (bước 35 phần D) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Job của `plans`** (chỉ chạy ở database điều khiển): `plans.expire_holds` mỗi phút trả chỗ `held` quá hạn (lô 500,
+   chỉ trả chỗ còn `held` — không trả nhầm chỗ vừa xác nhận); `plans.reconcile_usage` hằng ngày đặt `used` = số đếm thật
+   (`UsageCounter` của module) + Σ chỗ `held` còn hạn, cho mọi khách có thuê bao, ghi số đo `plans_usage_reconciled_total`.
+2. **Hạn mức của module**, cùng một khuôn: giữ chỗ TRƯỚC transaction ghi của module, xác nhận khi commit, trả lại khi
+   lỗi hay khi bản ghi mất đi; mỗi hạn mức có bộ đếm thật.
+   - `organizations.units` (count): tạo nút, bỏ lưu trữ giữ chỗ (`organizations.unit:<id>`); lưu trữ trả lại; đếm mọi
+     nút không lưu trữ trừ gốc (A-3.12). Hạn mức theo loại nút (`organizations.units.<loại>`) **chưa làm**: loại nút là
+     dữ liệu của khách, sổ hạn mức của kernel khai tĩnh — ghi việc ở lộ trình.
+   - `auth.members` (count, người khác nhau giữ role): gán role, gán membership theo nút, nhận lời mời — người chưa giữ
+     role nào thì giữ chỗ (`auth.member:<user_id>`), mất role cuối thì trả lại. Tạo quản trị viên đầu (CLI của nhà vận
+     hành, cấp phát) không giữ chỗ — job đối soát đếm lại. Nhận lời mời của tài khoản mới: token đã tiêu trước khi biết
+     ID người dùng, hết chỗ thì tài khoản có mà không có role (quản trị viên giải phóng chỗ rồi mời lại).
+   - `files.storage_bytes` (amount bytes): cỡ chỉ biết sau khi ghi nội dung — ghi nội dung, giữ chỗ theo cỡ (vượt thì xoá
+     nội dung vừa ghi), lưu bản ghi, xác nhận; xoá file trả lại. Đếm: `CAST(COALESCE(SUM(size), 0) AS BIGINT)` (Postgres
+     `SUM` trả `numeric`).
+   - Tính năng `auth.api_keys` (tạo API key), `content.ai_suggestions` (kiểm SEO, dịch bằng AI); `notes.notes` là ví dụ
+     cho hướng dẫn viết module.
+3. **`kernel.api_requests`** (metered tháng, kernel khai): lớp HTTP bọc MỌI router của module (cả module luôn bật) đếm
+   request theo khách trong bộ nhớ; tool MCP cũng đếm. Tiến trình phục vụ API ghi gộp mỗi 60 giây
+   (`EntitlementsHandle::flush_usage`, `reference` = ID tiến trình + phút) và một lần khi dừng; tiến trình chết thì mất
+   tối đa 60 giây số đếm. Chỉ chặn khi gói đặt mức tối đa (đặc tả "tự quyết" 3): lần ghi gộp gặp `quota_exhausted` thì
+   khách bị chặn ở module không luôn bật (`429`, `Retry-After` tới đầu tháng) — đăng nhập, xem gói vẫn chạy; số đếm của
+   lần đó không ghi.
+4. Sửa lỗi có sẵn: sổ module (`GET /api/v1/kernel/modules/{name}`) trả 500 với module có bản nâng cấp dữ liệu (`auth`,
+   `webhooks`) vì bộ đọc trạng thái migration thiếu `upgrades`.

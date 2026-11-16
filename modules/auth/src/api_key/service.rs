@@ -129,6 +129,8 @@ impl ApiKeyService {
         creator: &Principal,
         input: NewApiKey,
     ) -> Result<CreatedApiKey, Error> {
+        // Tính năng theo gói (bước 35): khách bị gói giới hạn cần `auth.api_keys`.
+        self.roles.entitlements().require_feature(tenant.id(), &super::API_KEYS_FEATURE).await?;
         if creator.api_key_id().is_some() {
             return Err(Error::forbidden(
                 "auth.api_key_cannot_create_keys",

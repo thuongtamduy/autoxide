@@ -396,6 +396,7 @@ mod tests {
                 ),
                 url: None,
                 days: 7,
+                entitlements: Default::default(),
             }),
             login_links: Arc::new(crate::login_link::LoginLinks {
                 enabled: false,
