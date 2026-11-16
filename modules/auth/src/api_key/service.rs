@@ -22,7 +22,6 @@ use super::entity::{api_key, api_key_permission};
 use crate::events;
 use crate::role::RoleService;
 use crate::token;
-use crate::user::UserService;
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::tenancy::{
     DEFAULT_TENANT, OrgId, OrgTree, ScopeExt, TenantContext, TenantId, root_of,
@@ -105,7 +104,6 @@ pub(crate) enum Reauth {
 }
 
 pub(crate) struct ApiKeyService {
-    users: Arc<UserService>,
     roles: Arc<RoleService>,
     sessions: Arc<crate::session::SessionService>,
     outbox: Outbox,
@@ -115,14 +113,13 @@ pub(crate) struct ApiKeyService {
 
 impl ApiKeyService {
     pub(crate) fn new(
-        users: Arc<UserService>,
         roles: Arc<RoleService>,
         sessions: Arc<crate::session::SessionService>,
         outbox: Outbox,
         mfa: Arc<crate::mfa::MfaService>,
         passkeys: Arc<crate::passkey::PasskeyService>,
     ) -> Self {
-        ApiKeyService { users, roles, sessions, outbox, mfa, passkeys }
+        ApiKeyService { roles, sessions, outbox, mfa, passkeys }
     }
 
     /// Tạo key cho `creator`, với permission nằm trong số permission `creator` đang có.
@@ -402,11 +399,11 @@ impl ApiKeyService {
                 "This API key has expired. Create a new one.",
             ));
         }
-        let user = self.users.get(tenant, row.user_id).await?.ok_or_else(invalid_api_key)?;
+        let (user, owner) =
+            self.roles.user_principal(tenant, row.user_id).await?.ok_or_else(invalid_api_key)?;
         if !user.is_active() {
             return Err(crate::user::user_disabled());
         }
-        let owner = self.roles.principal(tenant, user.id).await?;
         let granted: Vec<String> = api_key_permission::Entity::find()
             .filter(api_key_permission::Column::ApiKeyId.eq(row.id))
             .scoped(tenant)

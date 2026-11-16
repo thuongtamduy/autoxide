@@ -269,6 +269,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- Faster signed-in requests: the user and their permissions are read in one SQL query instead of two on every
+  request (access token and API key); `GET /api/v1/auth/me` and the MCP tool `auth.whoami` need three queries in
+  all instead of seven, and `GET /api/v1/auth/users` one query per page for the account facts instead of two.
+  Responses are unchanged.
 - `notes` (the example module) keeps its notes per organization unit: each note has `org_id` (existing notes belong to
   the root unit), `notes.read` and `notes.write` follow the scope of the role (`own`: only your own notes — what they
   meant before; `unit`, `subtree`; `tenant`: every note), and creating a note takes `org_id` (`notes.org_required`

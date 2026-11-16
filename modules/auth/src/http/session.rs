@@ -19,7 +19,6 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::HttpState;
-use crate::api::User;
 use crate::session::{LoginOutcome, Tokens};
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
@@ -181,17 +180,21 @@ pub(crate) struct PendingEmail {
 }
 
 impl MeResponse {
-    /// Tài khoản của người gọi, kèm có mật khẩu chưa và email đang chờ xác minh.
+    /// Tài khoản của người gọi, kèm có mật khẩu chưa và email đang chờ xác minh. Hai câu SQL:
+    /// tài khoản cùng mọi cờ ([`UserService::own_account`](crate::user::UserService)), và token
+    /// đổi email đang chờ (D-319).
     pub(crate) async fn load(
         state: &HttpState,
         tenant: &TenantContext,
-        user: User,
         principal: &Principal,
     ) -> Result<Self, Error> {
-        let facts =
-            state.users.facts(tenant, &[user.id]).await?.remove(&user.id).unwrap_or_default();
+        let account = state
+            .users
+            .own_account(tenant, principal.user_id())
+            .await?
+            .ok_or_else(crate::token::invalid_token)?;
+        let user = account.user;
         let pending = state.verifications.pending_change(tenant, &user).await?;
-        let mfa_required = crate::role::mfa_pending(tenant, user.id).await?;
         Ok(MeResponse {
             id: user.id,
             email: user.email,
@@ -200,11 +203,11 @@ impl MeResponse {
             created_at: user.created_at,
             all_permissions: principal.has_all_permissions(),
             permissions: principal.permissions(),
-            has_password: facts.has_password,
+            has_password: account.has_password,
             pending_email: pending.map(|(email, expires_at)| PendingEmail { email, expires_at }),
             locale: user.locale,
             time_zone: user.time_zone,
-            mfa_required,
+            mfa_required: account.mfa_pending,
         })
     }
 }
@@ -374,12 +377,7 @@ async fn me(
     tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<MeResponse>, Error> {
-    let user = state
-        .users
-        .get(&tenant, principal.user_id())
-        .await?
-        .ok_or_else(crate::token::invalid_token)?;
-    Ok(Data { data: MeResponse::load(&state, &tenant, user, &principal).await? })
+    Ok(Data { data: MeResponse::load(&state, &tenant, &principal).await? })
 }
 
 // Trường JSON có ba trạng thái: không gửi (`None`), `null` (`Some(None)`), có giá trị.
@@ -439,11 +437,11 @@ async fn update_me(
         ..Default::default()
     };
     let user_id = principal.user_id();
-    let user = state
+    state
         .users
         .update(&tenant, autoxide_kernel::event::Actor::from(&principal), user_id, changes, None)
         .await?;
-    Ok(Data { data: MeResponse::load(&state, &tenant, user, &principal).await? })
+    Ok(Data { data: MeResponse::load(&state, &tenant, &principal).await? })
 }
 
 /// Change your own password.

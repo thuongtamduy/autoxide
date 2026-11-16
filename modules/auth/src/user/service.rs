@@ -69,6 +69,18 @@ pub(crate) enum UserStatus {
     Disabled,
 }
 
+/// Một dòng của [`UserService::facts`]: ID, cờ có mật khẩu, cờ bật TOTP (`x` / `NULL`), lần đăng nhập cuối.
+type FactsRow = (Uuid, Option<String>, Option<String>, Option<DateTime<Utc>>);
+
+/// Tài khoản của chính người gọi, kèm dữ kiện `GET /me` cần (xem [`UserService::own_account`]).
+#[derive(Debug, Clone)]
+pub(crate) struct OwnAccount {
+    pub user: User,
+    pub has_password: bool,
+    /// Có role bắt buộc MFA mà chưa bật MFA: quyền của các role đó đang bị giữ.
+    pub mfa_pending: bool,
+}
+
 /// Dữ kiện của một tài khoản cho trang quản trị (không có trong `api::User`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct AccountFacts {
@@ -583,6 +595,38 @@ impl UserService {
             .unwrap_or(fallback))
     }
 
+    /// Tài khoản `id` kèm dữ kiện cho chính chủ (`GET /me`, tool `whoami`) trong MỘT câu: có mật
+    /// khẩu chưa, và có role bắt buộc MFA mà chưa bật MFA (D-308). Đường nóng:
+    /// trước đây là bốn câu (dòng người dùng, `facts` hai câu, `mfa_pending`) — D-319.
+    pub(crate) async fn own_account(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Option<OwnAccount>, Error> {
+        use sea_orm::{ConnectionTrait as _, FromQueryResult as _, QueryTrait as _};
+        let pending = Expr::case(
+            crate::role::holds_mfa_role(tenant)
+                .and(crate::role::has_second_factor_condition(tenant).not()),
+            "x",
+        )
+        .finally(Expr::val(Option::<String>::None));
+        let read = tenant.database().read();
+        let statement = Entity::find_by_id(id)
+            .scoped(tenant)
+            .column_as(Into::<Expr>::into(pending), "mfa_pending")
+            .build(read.get_database_backend());
+        let Some(row) = read.query_one_raw(statement).await? else {
+            return Ok(None);
+        };
+        let model = entity::Model::from_query_result(&row, "")?;
+        let mfa_pending = row.try_get::<Option<String>>("", "mfa_pending")?.is_some();
+        Ok(Some(OwnAccount {
+            has_password: model.password_hash.is_some(),
+            mfa_pending,
+            user: User::from(model),
+        }))
+    }
+
     pub(crate) async fn facts(
         &self,
         tenant: &TenantContext,
@@ -591,41 +635,40 @@ impl UserService {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
-        let read = tenant.database().read();
-        let rows: Vec<(Uuid, Option<String>, Option<DateTime<Utc>>)> = Entity::find()
+        use crate::mfa::entity::totp;
+        // Một câu cho cả trang (D-319): cờ MFA là subquery tương quan theo `auth_user.id`, không
+        // phải câu thứ hai. Mỗi cờ chỉ là `x` hay `NULL` — chạy như nhau trên SQLite và Postgres.
+        let flag = |condition: Expr| -> Expr {
+            Expr::case(condition, "x").finally(Expr::val(Option::<String>::None)).into()
+        };
+        let confirmed_totp = sea_orm::sea_query::Query::select()
+            .expr(Expr::val(1))
+            .from(totp::Entity)
+            .and_where(Expr::col((totp::Entity, totp::Column::UserId)).equals((Entity, Column::Id)))
+            .and_where(Expr::col((totp::Entity, totp::Column::TenantId)).eq(tenant.id().as_uuid()))
+            .and_where(Expr::col((totp::Entity, totp::Column::ConfirmedAt)).is_not_null())
+            .to_owned();
+        // Chỉ cần biết có hay không: không đọc hash ra.
+        let rows: Vec<FactsRow> = Entity::find()
             .select_only()
             .column(Column::Id)
-            // Chỉ cần biết có hay không: không đọc hash ra (mỗi giá trị chỉ là `x` hay `NULL`).
             .column_as(
-                Into::<sea_orm::sea_query::Expr>::into(
-                    sea_orm::sea_query::Expr::case(Column::PasswordHash.is_not_null(), "x")
-                        .finally(sea_orm::sea_query::Expr::val(Option::<String>::None)),
-                ),
+                flag(Expr::col((Entity, Column::PasswordHash)).is_not_null()),
                 "has_password",
             )
+            .column_as(flag(Expr::exists(confirmed_totp)), "mfa_enabled")
             .column(Column::LastSignInAt)
             .filter(Column::Id.is_in(ids.iter().copied()))
             .scoped(tenant)
             .into_tuple()
-            .all(read)
+            .all(tenant.database().read())
             .await?;
-        let with_mfa: std::collections::HashSet<Uuid> = crate::mfa::entity::totp::Entity::find()
-            .select_only()
-            .column(crate::mfa::entity::totp::Column::UserId)
-            .filter(crate::mfa::entity::totp::Column::ConfirmedAt.is_not_null())
-            .filter(crate::mfa::entity::totp::Column::UserId.is_in(ids.iter().copied()))
-            .scoped(tenant)
-            .into_tuple::<Uuid>()
-            .all(read)
-            .await?
-            .into_iter()
-            .collect();
         Ok(rows
             .into_iter()
-            .map(|(id, password, last_sign_in_at)| {
+            .map(|(id, password, mfa, last_sign_in_at)| {
                 let facts = AccountFacts {
                     has_password: password.is_some(),
-                    mfa_enabled: with_mfa.contains(&id),
+                    mfa_enabled: mfa.is_some(),
                     last_sign_in_at,
                 };
                 (id, facts)

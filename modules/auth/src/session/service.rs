@@ -592,7 +592,9 @@ impl SessionService {
     }
 
     /// Người dùng `user_id` của một access token đã kiểm, tra ở khách `tenant` của token: không
-    /// còn thì token sai; bị khoá thì `auth.user_disabled`.
+    /// còn thì token sai; bị khoá thì `auth.user_disabled`. Cho test: request đi qua
+    /// `RequestAuthenticator`, đọc người dùng cùng quyền trong một câu (D-319).
+    #[cfg(test)]
     pub(crate) async fn token_user(
         &self,
         tenant: &TenantContext,
