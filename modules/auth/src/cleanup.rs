@@ -53,6 +53,10 @@ impl JobHandler for Cleanup {
         // của kernel).
         removed +=
             autoxide_kernel::tokens::OneTimeTokens::new("auth").purge(connection, now).await?;
+        // Lời mời hết hạn quá lâu (D-312); event audit của nó giữ.
+        let stale = now - chrono::Duration::days(crate::invitation::KEEP_DAYS);
+        let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(stale));
+        removed += delete(connection, "auth_invitation", expired).await?;
         // Nghi thức passkey bỏ dở.
         let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(now));
         removed += delete(connection, "auth_passkey_ceremony", expired).await?;

@@ -469,6 +469,22 @@ permission nào, tách khỏi nhân sự dù trùng email. Người mua đăng k
 `auth.customer_registration` (`false`). Nhân sự quản lý người mua bằng `GET /api/v1/auth/customers`
 và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth.customers.manage`).
 
+**Mời nhân sự.** Thay vì tạo tài khoản kèm mật khẩu, hãy mời: `POST /api/v1/auth/invitations` với
+`email`, các `role_ids` và nút (`org_id`) họ nhận (permission `auth.invitations.manage`; không mời kèm
+role có permission mà bạn không có), hoặc từ dòng lệnh:
+
+```bash
+autoxide user invite --email new.colleague@example.com --role editor
+```
+
+Mail mang link dùng một lần tới `AUTOXIDE_AUTH_INVITATION_URL` (trang của giao diện có `{token}`;
+không đặt thì mail chứa token), sống `AUTOXIDE_AUTH_INVITATION_DAYS` ngày (7). Chấp nhận thì tài
+khoản được tạo (hay, khi email đã có tài khoản, role được thêm sau khi người đó đăng nhập). **Đăng
+nhập bằng link** (không mật khẩu) tắt mặc định; bật bằng `AUTOXIDE_AUTH_LOGIN_LINK=true` và đặt
+`AUTOXIDE_AUTH_LOGIN_LINK_URL` là trang của giao diện. Cả hai cần mail chạy được
+(`AUTOXIDE_MAIL_SMTP_URL`) và worker đang chạy. Cây tổ chức của một khách sâu tối đa
+`AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` cấp (mặc định 8).
+
 Trong chuỗi khách (khách có `parent_id`), khách cha cho người giữ một role của mình làm việc ở khách
 con: `POST /api/v1/auth/delegations` với `child_tenant_id`, `role_id`, `org_id` tuỳ chọn (một nút của
 khách con), `expires_at` tuỳ chọn và `reason` (permission `auth.delegations.manage`). Những người đó

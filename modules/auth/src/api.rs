@@ -71,6 +71,51 @@ pub trait Accounts: Send + Sync {
     async fn create(&self, tenant: &TenantContext, account: NewAccount) -> Result<User, Error>;
 }
 
+/// Lời mời mới cho lệnh `autoxide user invite` và việc cấp phát khách (bước 35).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct NewInvitation {
+    pub email: String,
+    pub name: Option<String>,
+    /// Tên các role của khách gán khi người được mời chấp nhận.
+    pub roles: Vec<String>,
+    /// Nút của các role; `None`: nút gốc.
+    pub org_id: Option<Uuid>,
+}
+
+impl NewInvitation {
+    pub fn new(email: impl Into<String>, roles: Vec<String>) -> Self {
+        NewInvitation { email: email.into(), name: None, roles, org_id: None }
+    }
+
+    pub fn at(mut self, org_id: Uuid) -> Self {
+        self.org_id = Some(org_id);
+        self
+    }
+}
+
+/// Lời mời vừa tạo; mail đi trong ít phút (job).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct InvitationSummary {
+    pub id: Uuid,
+    pub email: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+/// Mời người dùng qua email (D-312). Không kiểm permission — bên gọi chịu trách nhiệm (lệnh CLI
+/// chạy với quyền của người vận hành, cấp phát của nền tảng).
+#[async_trait::async_trait]
+pub trait Invitations: Send + Sync {
+    /// Mời `invitation.email` vào khách `tenant`. Lỗi: email sai, role không có
+    /// (`validation_failed`).
+    async fn invite(
+        &self,
+        tenant: &TenantContext,
+        invitation: NewInvitation,
+    ) -> Result<InvitationSummary, Error>;
+}
+
 /// Việc của người vận hành máy chủ khi không ai đăng nhập được để làm qua API. Binary dùng cho
 /// lệnh `autoxide user reset-mfa`; không kiểm permission — lệnh CLI chạy với quyền của người
 /// vận hành (D-159).

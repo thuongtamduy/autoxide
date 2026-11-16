@@ -105,10 +105,10 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       thích và tự đổi tên hiển thị qua `PATCH /auth/me`; bắt buộc MFA theo role; `last_login_at`
 - [x] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào ngữ cảnh
       khách con bằng cùng API; audit ghi ở cả hai phía — D-310
-- [ ] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn thiết bị yêu cầu
+- [x] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn thiết bị yêu cầu
       khi được; MFA vẫn áp dụng; trả lời như nhau về thời gian dù email có hay không (như D-154, D-162); tắt mặc
       định, bật bằng cấu hình
-- [ ] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu (hay passkey)
+- [x] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu (hay passkey)
       qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh CLI tương ứng
 - [ ] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý do; mọi lần
       vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được quyền vào hỗ trợ và tự thu

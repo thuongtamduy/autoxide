@@ -1,6 +1,59 @@
 {
   "components": {
     "schemas": {
+      "AcceptInvitationRequest": {
+        "additionalProperties": false,
+        "description": "Accept an invitation.",
+        "properties": {
+          "name": {
+            "description": "For a new account: display name (default: the one in the invitation).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "password": {
+            "description": "For a new account: a password (12 to 128 characters). Omit to sign in later with a link\nor add a passkey with the tokens returned here.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token": {
+            "description": "The token from the invitation mail.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "AcceptedResponse": {
+        "description": "The result of accepting.",
+        "properties": {
+          "tokens": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TokenResponse",
+                "description": "Tokens of a new session when a new account was created; `null` when you accepted with\nyour existing account."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_id": {
+            "description": "The account that now has the roles.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "type": "object"
+      },
       "Action": {
         "description": "What a schedule does: `publish` or `unpublish`.",
         "enum": [
@@ -2541,6 +2594,40 @@
         ],
         "type": "object"
       },
+      "Data_AcceptedResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The result of accepting.",
+            "properties": {
+              "tokens": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/TokenResponse",
+                    "description": "Tokens of a new session when a new account was created; `null` when you accepted with\nyour existing account."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "user_id": {
+                "description": "The account that now has the roles.",
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "user_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_AiStatus": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -4811,6 +4898,90 @@
         ],
         "type": "object"
       },
+      "Data_InvitationResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An invitation to work in this tenant.",
+            "properties": {
+              "accepted_user_id": {
+                "description": "The account that accepted it.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "email": {
+                "example": "new.colleague@example.com",
+                "type": "string"
+              },
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "invited_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The unit the roles apply at.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "reference": {
+                "description": "Your own reference, e.g. an HR ticket.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "role_ids": {
+                "description": "The roles given on acceptance.",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "status": {
+                "description": "`pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be\naccepted; resend it.",
+                "example": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "name",
+              "org_id",
+              "role_ids",
+              "status",
+              "expires_at",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_LibrarySummaryResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -4925,6 +5096,28 @@
               "created_at",
               "updated_at"
             ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LoginLinkResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What to keep while waiting for the mail.",
+            "properties": {
+              "device_secret": {
+                "description": "With `bind_device`: send it back with the token. `null` otherwise. Returned even when no\naccount has this email, so the answer reveals nothing.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
             "type": "object"
           }
         },
@@ -10773,6 +10966,126 @@
         ],
         "type": "object"
       },
+      "InvitationRequest": {
+        "additionalProperties": false,
+        "description": "A new invitation.",
+        "properties": {
+          "email": {
+            "example": "new.colleague@example.com",
+            "type": "string"
+          },
+          "name": {
+            "description": "Display name for the new account (they can change it).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The unit they will work at; omit for the root unit. It must be in your scope.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your own reference, up to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role_ids": {
+            "description": "Roles given at that unit when they accept; you must have every permission of each role.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "email",
+          "role_ids"
+        ],
+        "type": "object"
+      },
+      "InvitationResponse": {
+        "description": "An invitation to work in this tenant.",
+        "properties": {
+          "accepted_user_id": {
+            "description": "The account that accepted it.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "example": "new.colleague@example.com",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "invited_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit the roles apply at.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your own reference, e.g. an HR ticket.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role_ids": {
+            "description": "The roles given on acceptance.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "description": "`pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be\naccepted; resend it.",
+            "example": "pending",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "org_id",
+          "role_ids",
+          "status",
+          "expires_at",
+          "created_at"
+        ],
+        "type": "object"
+      },
       "Kind": {
         "description": "What an entry is.",
         "enum": [
@@ -10967,6 +11280,61 @@
             ]
           },
           "vi": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "LoginLinkConfirmation": {
+        "additionalProperties": false,
+        "description": "Finish signing in with the token from the mail.",
+        "properties": {
+          "device_secret": {
+            "description": "The `device_secret` from `POST /api/v1/auth/login/link`, when it asked to bind the device.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "LoginLinkRequest": {
+        "additionalProperties": false,
+        "description": "Ask for a sign-in link.",
+        "properties": {
+          "bind_device": {
+            "description": "`true`: the link works only together with the `device_secret` returned here, so a link\nopened on another device (or intercepted) is useless. Keep the secret on this device.",
+            "type": "boolean"
+          },
+          "email": {
+            "example": "ada@example.com",
+            "type": "string"
+          },
+          "realm": {
+            "$ref": "#/components/schemas/Realm",
+            "description": "`staff` (default) or `customer`."
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "LoginLinkResponse": {
+        "description": "What to keep while waiting for the mail.",
+        "properties": {
+          "device_secret": {
+            "description": "With `bind_device`: send it back with the token. `null` otherwise. Returned even when no\naccount has this email, so the answer reveals nothing.",
             "type": [
               "string",
               "null"
@@ -13868,6 +14236,98 @@
         ],
         "type": "object"
       },
+      "Page_InvitationResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "An invitation to work in this tenant.",
+              "properties": {
+                "accepted_user_id": {
+                  "description": "The account that accepted it.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "email": {
+                  "example": "new.colleague@example.com",
+                  "type": "string"
+                },
+                "expires_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "invited_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The unit the roles apply at.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "reference": {
+                  "description": "Your own reference, e.g. an HR ticket.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "role_ids": {
+                  "description": "The roles given on acceptance.",
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "description": "`pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be\naccepted; resend it.",
+                  "example": "pending",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "email",
+                "name",
+                "org_id",
+                "role_ids",
+                "status",
+                "expires_at",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_ListResponse": {
         "description": "One page of a list.",
         "properties": {
@@ -15057,7 +15517,7 @@
                   "type": "string"
                 },
                 "sign_in_method": {
-                  "description": "How the session was signed in: `password`, `password_and_mfa` (password and a code),\n`passkey`, or `password_change` (a new session after changing the password); `null` for\nsessions older than this information.",
+                  "description": "How the session was signed in: `password`, `password_and_mfa` (password and a code),\n`passkey`, `email_link` (a link sent by email), or `password_change` (a new session after\nchanging the password); `null` for sessions older than this information.",
                   "example": "password_and_mfa",
                   "type": [
                     "string",
@@ -18697,7 +19157,7 @@
             "type": "string"
           },
           "sign_in_method": {
-            "description": "How the session was signed in: `password`, `password_and_mfa` (password and a code),\n`passkey`, or `password_change` (a new session after changing the password); `null` for\nsessions older than this information.",
+            "description": "How the session was signed in: `password`, `password_and_mfa` (password and a code),\n`passkey`, `email_link` (a link sent by email), or `password_change` (a new session after\nchanging the password); `null` for sessions older than this information.",
             "example": "password_and_mfa",
             "type": [
               "string",
@@ -23521,6 +23981,599 @@
         "x-public": true
       }
     },
+    "/api/v1/auth/invitations": {
+      "get": {
+        "description": "Requires `auth.invitations.manage`; only invitations at units in your scope. Newest first\nunless `order=asc`.",
+        "operationId": "auth_list_invitations",
+        "parameters": [
+          {
+            "description": "Only `pending`, `accepted` or `revoked` invitations.",
+            "example": "pending",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InvitationResponse"
+                }
+              }
+            },
+            "description": "One page of invitations."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.invitations.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List invitations.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.invitations.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `auth.invitations.manage` at the unit. The mail (in the language of\n`Accept-Language`) goes out shortly; the invitation can be accepted for\n`AUTOXIDE_AUTH_INVITATION_DAYS` days.",
+        "operationId": "auth_create_invitation",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvitationResponse"
+                }
+              }
+            },
+            "description": "The invitation; its mail is on its way.",
+            "headers": {
+              "Location": {
+                "description": "Address of the invitation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The email is invalid, a role does not exist, or a role has permissions you lack; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invite someone by email.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.invitations.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/invitations/accept": {
+      "post": {
+        "description": "No sign-in needed for a new account: it is created (its email counts as verified) and signed\nin. When the email already has an account, sign in with it first and call this with your\naccess token: the roles are added to it. The token works once.",
+        "operationId": "auth_accept_invitation",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AcceptedResponse"
+                }
+              }
+            },
+            "description": "Accepted."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The invitation is wrong, used, revoked or expired; code `auth.invitation_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You are signed in with another account than the invited email; code `auth.invitation_email_mismatch`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The email already has an account: sign in, then accept; code `auth.invitation_sign_in_required`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The password is too short or too long; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accept an invitation with the token from its mail.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/invitations/{id}": {
+      "delete": {
+        "description": "Requires `auth.invitations.manage` at its unit. Its link stops working. Revoking again\nchanges nothing; an accepted invitation cannot be revoked.",
+        "operationId": "auth_revoke_invitation",
+        "parameters": [
+          {
+            "description": "Id of the invitation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvitationResponse"
+                }
+              }
+            },
+            "description": "The invitation, revoked."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.invitations.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No invitation with this id in your scope; code `auth.invitation_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "It was already accepted; code `auth.invitation_not_pending`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke an invitation.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.invitations.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/invitations/{id}/resend": {
+      "post": {
+        "description": "Requires `auth.invitations.manage` at its unit. The old link stops working; the new one is\nvalid for `AUTOXIDE_AUTH_INVITATION_DAYS` days from now.",
+        "operationId": "auth_resend_invitation",
+        "parameters": [
+          {
+            "description": "Id of the invitation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvitationResponse"
+                }
+              }
+            },
+            "description": "The invitation; a new mail is on its way."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.invitations.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No invitation with this id in your scope; code `auth.invitation_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "It was already accepted or revoked; code `auth.invitation_not_pending`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send an invitation again.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.invitations.manage"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "description": "Returns a short-lived access token and a refresh token. When the account has\ntwo-step sign-in on, answers 202 instead: send the `mfa_token` and a code to\n`POST /api/v1/auth/login/mfa`. The same error answers an unknown email and a\nwrong password. After several failed attempts the email is locked for a while,\neven for the right password. On a server with several tenants, sign in on the\ntenant's domain or with the `Autoxide-Tenant` header; the tokens returned name\ntheir tenant, so later requests need neither.",
@@ -23622,6 +24675,190 @@
           }
         },
         "summary": "Sign in with email and password.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/login/link": {
+      "post": {
+        "description": "No sign-in needed; off unless the server turns it on (`AUTOXIDE_AUTH_LOGIN_LINK`). Always\nanswers 202 the same way, whether or not an account has this email; the mail (if any) goes\nout shortly after. The link works once, for `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES` minutes.",
+        "operationId": "auth_request_login_link",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LoginLinkResponse"
+                }
+              }
+            },
+            "description": "If the account exists, a link is on its way."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Sign-in links are off on this server; code `auth.login_link_disabled`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is missing a field or a value is invalid."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Send a sign-in link by email.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/login/link/confirm": {
+      "post": {
+        "description": "The token works once. When two-step sign-in is on, answers 202 with an `mfa_token`, as\n`POST /api/v1/auth/login` does. Needs no tenant header: the token names its tenant.",
+        "operationId": "auth_confirm_login_link",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginLinkConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TokenResponse"
+                }
+              }
+            },
+            "description": "Signed in."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MfaChallengeResponse"
+                }
+              }
+            },
+            "description": "A code is needed; continue with `POST /api/v1/auth/login/mfa`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token is wrong, used or expired, or the device secret does not match; code `auth.login_link_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The account is disabled; code `auth.user_disabled`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Sign-in links are off on this server; code `auth.login_link_disabled`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is missing a field or a value is invalid."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Sign in with the token from a sign-in link.",
         "tags": [
           "auth"
         ],

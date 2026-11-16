@@ -7616,3 +7616,38 @@ Quyết định:
    `details` (đã nằm trong chuỗi băm — không đổi cách băm). Không ghi event "bắt đầu vào" riêng mỗi request: mỗi thay
    đổi ở khách con đã mang đường vào; khách cha có `auth.delegation_granted` / `revoked`. Đã cân nhắc job
    `auth.mirror_event` ghi event ở cả hai phía mỗi lần vào — một event cho mỗi request đọc, không thêm thông tin.
+
+## D-311 · Đăng nhập bằng link qua email (bước 34 mục 11) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. Tắt mặc định (`AUTOXIDE_AUTH_LOGIN_LINK=false`); tắt thì hai endpoint trả 404 `auth.login_link_disabled`.
+2. `POST /auth/login/link` không tra tài khoản trong request: chỉ sinh `device_secret` ngẫu nhiên (khi `bind_device`,
+   mọi lần, kể cả email không có) và xếp job `auth.send_login_link` — cùng mã, cùng thân, cùng số câu ghi dù email có
+   hay không (như D-154, D-162). Job phát token một lần (`auth_tokens`, mục đích `login_link`, hạn
+   `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES` 5–60, mặc định 15), giãn cách 60 giây mỗi tài khoản, gửi mail bằng ngôn ngữ ưa
+   thích (D-308).
+3. Gắn thiết bị: `data` của token giữ SHA-256 của `device_secret`; xác nhận phải gửi đúng secret. Token bị dùng ngay
+   cả khi secret sai — không cho thử lại (người chặn được link không đoán mãi).
+4. MFA vẫn áp dụng: tài khoản bật TOTP nhận `mfa_token` như `/login`. Phiên ghi `sign_in_method = email_link`; event
+   `auth.login_link_used`. Không có tool MCP (việc đăng nhập chỉ qua REST, đặc tả).
+
+## D-312 · Mời người dùng qua email (bước 34 mục 12) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. Bảng `auth_invitation` (theo khách): email, tên, nút, **role giữ dạng mảng JSON** trong cùng dòng (thay bảng
+   `auth_invitation_role` của đặc tả — không ai truy vấn theo từng role của lời mời), trạng thái `pending` /
+   `accepted` / `revoked`, hạn (`AUTOXIDE_AUTH_INVITATION_DAYS`, 1–30, mặc định 7). Token không lưu cột `token_id`: token
+   ở `auth_tokens` (mục đích `invitation`, chủ = ID lời mời); gửi lại / thu hồi thu hồi mọi token của lời mời.
+2. Người mời cần `auth.invitations.manage` (theo nút) phủ nút; kiểm role bằng đúng hàm của membership
+   (`grant_problems`: nút trong phạm vi, `admin` chỉ ở gốc, không mời kèm role có permission mình không có).
+3. Mail đi bằng job `auth.send_invitation` (job phát token mới mỗi lần — hạn = hạn còn lại của lời mời).
+4. Chấp nhận: xem token (`OneTimeTokens::peek`, thêm ở kernel) để biết lời mời và kiểm đầu vào TRƯỚC khi tiêu token;
+   rồi `consume` (một request thắng khi gọi đồng thời). Email chưa có tài khoản nhân sự → tạo, email coi là đã xác
+   minh, mở phiên (`sign_in_method = invitation`); đã có → phải đăng nhập đúng tài khoản đó (409
+   `auth.invitation_sign_in_required` / 403 `auth.invitation_email_mismatch`), chỉ thêm role.
+5. Tool chỉ đọc `auth.list_invitations` chỉ đòi `auth.invitations.manage` (đặc tả không có permission xem riêng): thêm
+   vào ngoại lệ của test hợp đồng tool (như `kernel.list_domains`, D-245).
+6. Lệnh `autoxide user invite` qua trait `api::Invitations` (không kiểm permission — quyền người vận hành), cũng dùng
+   cho cấp phát khách ở bước 35. Job dọn xoá lời mời hết hạn quá 90 ngày; event audit giữ.

@@ -41,8 +41,8 @@ pub(crate) struct SessionResponse {
     #[schema(example = "Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0")]
     user_agent: Option<String>,
     /// How the session was signed in: `password`, `password_and_mfa` (password and a code),
-    /// `passkey`, or `password_change` (a new session after changing the password); `null` for
-    /// sessions older than this information.
+    /// `passkey`, `email_link` (a link sent by email), or `password_change` (a new session after
+    /// changing the password); `null` for sessions older than this information.
     #[schema(example = "password_and_mfa")]
     sign_in_method: Option<String>,
     /// Approximate country of the sign-in (ISO 3166-1 two-letter code), from the server's

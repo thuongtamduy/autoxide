@@ -100,6 +100,7 @@ pub(crate) fn all(state: &Arc<HttpState>) -> Vec<Tool> {
     tools.extend(memberships(state));
     tools.extend(roles(state));
     tools.extend(api_keys(state));
+    tools.extend(invitations(state));
     tools
 }
 
@@ -379,6 +380,33 @@ mod tests {
             passkeys: services.passkeys.clone(),
             reauth: services.reauth.clone(),
             orgs: None,
+            invitations: Arc::new(crate::invitation::Invitations {
+                users: services.users.clone(),
+                sessions: services.sessions.clone(),
+                jobs: autoxide_kernel::job::JobQueue::new("auth"),
+                mailer: services.mails.clone(),
+                translations: autoxide_kernel::i18n::Translations::default(),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+                url: None,
+                days: 7,
+            }),
+            login_links: Arc::new(crate::login_link::LoginLinks {
+                enabled: false,
+                jobs: autoxide_kernel::job::JobQueue::new("auth"),
+                users: services.users.clone(),
+                sessions: services.sessions.clone(),
+                mailer: services.mails.clone(),
+                translations: autoxide_kernel::i18n::Translations::default(),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                url: None,
+                minutes: 15,
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+            }),
             delegations: Arc::new(crate::delegation::DelegationService {
                 databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
                     services.database.clone(),
@@ -567,6 +595,96 @@ pub(crate) struct ListMembershipsInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+}
+
+/// A new invitation.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CreateInvitationInput {
+    /// Email to invite.
+    email: String,
+    /// Display name for the new account.
+    name: Option<String>,
+    /// Unit the roles apply at; omit for the root unit. It must be in your scope.
+    org_id: Option<Uuid>,
+    /// Roles given on acceptance; you must have every permission of each.
+    role_ids: Vec<Uuid>,
+    /// Your own reference, up to 200 characters.
+    reference: Option<String>,
+}
+
+/// Which invitations to list.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListInvitationsInput {
+    /// Only `pending`, `accepted` or `revoked`.
+    status: Option<String>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc`.
+    order: Option<String>,
+}
+
+/// Tool về lời mời (D-312): cùng service với `/api/v1/auth/invitations`.
+fn invitations(state: &Arc<HttpState>) -> Vec<Tool> {
+    use crate::http::invitations::InvitationResponse;
+    use crate::permissions::INVITATIONS_MANAGE;
+    let (create, list, revoke) = (state.clone(), state.clone(), state.clone());
+    vec![
+        Tool::new(
+            "create_invitation",
+            "Invite someone by email to work at an organization unit with given roles; the mail \
+             goes out shortly and the link can be used once.",
+            move |tenant: TenantContext, principal: Principal, input: CreateInvitationInput| {
+                let state = create.clone();
+                async move {
+                    let input = crate::invitation::NewInvitation {
+                        email: input.email,
+                        name: input.name,
+                        org_id: input.org_id,
+                        role_ids: input.role_ids,
+                        reference: input.reference,
+                    };
+                    let language = autoxide_kernel::i18n::Language::En;
+                    let row = state
+                        .invitations
+                        .create(&tenant, Some(&principal), input, language)
+                        .await?;
+                    Ok::<_, Error>(InvitationResponse::from(row))
+                }
+            },
+        )
+        .requires(INVITATIONS_MANAGE),
+        Tool::new(
+            "list_invitations",
+            "List the invitations at units in your scope, newest first; filter by status.",
+            move |tenant: TenantContext, principal: Principal, input: ListInvitationsInput| {
+                let state = list.clone();
+                async move {
+                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let status = input.status.as_deref();
+                    let page = state.invitations.list(&tenant, &principal, status, &page).await?;
+                    Ok::<_, Error>(page.map(InvitationResponse::from))
+                }
+            },
+        )
+        .requires(INVITATIONS_MANAGE)
+        .read_only(),
+        Tool::new(
+            "revoke_invitation",
+            "Revoke an invitation: its link stops working.",
+            move |tenant: TenantContext, principal: Principal, input: IdInput| {
+                let state = revoke.clone();
+                async move {
+                    let row = state.invitations.revoke(&tenant, &principal, input.id).await?;
+                    Ok::<_, Error>(InvitationResponse::from(row))
+                }
+            },
+        )
+        .requires(INVITATIONS_MANAGE),
+    ]
 }
 
 /// Tool về membership theo nút (bước 34): cùng service với `/api/v1/auth/memberships`.

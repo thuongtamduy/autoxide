@@ -238,6 +238,43 @@ impl SessionService {
         self.start_session(tenant, user_id, "password_change", user_agent, Proof::Active).await
     }
 
+    /// Mở phiên cho người dùng `user_id` vừa chứng minh qua kênh khác (vd chấp nhận lời mời bằng
+    /// link trong mail tới chính email đó, D-312). Tài khoản bị khoá thì từ chối.
+    pub(crate) async fn open_session(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        method: &str,
+        user_agent: Option<&str>,
+    ) -> Result<Tokens, Error> {
+        self.start_session(tenant, user_id, method, user_agent, Proof::Active).await
+    }
+
+    /// Người dùng `user_id` vừa chứng minh bằng link qua email (D-311): bật MFA thì vẫn cần mã
+    /// (như `/login`), không thì mở phiên. Tài khoản bị khoá thì từ chối.
+    pub(crate) async fn login_with_link(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        user_agent: Option<&str>,
+    ) -> Result<LoginOutcome, Error> {
+        let user = self.users.get(tenant, user_id).await?.ok_or_else(token::invalid_token)?;
+        if !user.is_active() {
+            return Err(crate::user::user_disabled());
+        }
+        if self.mfa.status(tenant, user.id).await?.totp_enabled {
+            let write = tenant.database().write();
+            let raw = challenge::open(write, tenant, user.id, now()).await?;
+            return Ok(LoginOutcome::MfaRequired {
+                mfa_token: link_token(tenant, &raw),
+                expires_in: challenge::CHALLENGE_TTL_SECONDS.unsigned_abs(),
+            });
+        }
+        let tokens =
+            self.start_session(tenant, user.id, "email_link", user_agent, Proof::Active).await?;
+        Ok(LoginOutcome::Tokens(tokens))
+    }
+
     /// Mở phiên cho người dùng `user_id` vừa chứng minh bằng passkey (đã kiểm ở
     /// `PasskeyService`). Tài khoản bị khoá thì từ chối.
     pub(crate) async fn login_with_passkey(

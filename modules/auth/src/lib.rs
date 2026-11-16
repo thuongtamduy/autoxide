@@ -20,6 +20,8 @@ mod doctor;
 mod email_report;
 mod events;
 mod http;
+mod invitation;
+mod login_link;
 mod mfa;
 mod migration;
 #[cfg(test)]
@@ -77,6 +79,8 @@ struct AuthModule {
     state: Option<http::HttpState>,
     cleanup: Option<Arc<cleanup::Cleanup>>,
     resets: Option<Arc<reset::PasswordResets>>,
+    login_links: Option<Arc<login_link::LoginLinks>>,
+    invitations: Option<Arc<invitation::Invitations>>,
     verifications: Option<Arc<verify::EmailVerifications>>,
     administrator: Option<Arc<doctor::Administrator>>,
 }
@@ -196,7 +200,7 @@ impl Module for AuthModule {
             sessions: sessions.clone(),
             roles: roles.clone(),
             api_keys: api_keys.clone(),
-            databases,
+            databases: databases.clone(),
             delegations: delegations.clone(),
         };
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
@@ -227,7 +231,35 @@ impl Module for AuthModule {
             ttl: chrono::Duration::from_std(config.reauth_ttl)
                 .unwrap_or_else(|_| chrono::Duration::minutes(10)),
         });
+        let login_links = Arc::new(login_link::LoginLinks {
+            enabled: config.login_link,
+            jobs: context.jobs(),
+            users: users.clone(),
+            sessions: sessions.clone(),
+            mailer: mailer.clone(),
+            translations: context.translations().clone(),
+            outbox: outbox.clone(),
+            url: config.login_link_url.clone(),
+            minutes: config.login_link_minutes,
+            databases: databases.clone(),
+        });
+        self.login_links = Some(login_links.clone());
+        let invitations = Arc::new(invitation::Invitations {
+            users: users.clone(),
+            sessions: sessions.clone(),
+            jobs: context.jobs(),
+            mailer: mailer.clone(),
+            translations: context.translations().clone(),
+            outbox: outbox.clone(),
+            databases: databases.clone(),
+            url: config.invitation_url.clone(),
+            days: config.invitation_days,
+        });
+        context.provide::<dyn api::Invitations>(invitations.clone())?;
+        self.invitations = Some(invitations.clone());
         self.state = Some(http::HttpState {
+            invitations,
+            login_links,
             delegations,
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             reauth,
@@ -268,6 +300,14 @@ impl Module for AuthModule {
         if let Some(resets) = &self.resets {
             let mailer = Arc::new(reset::ResetMailer(resets.clone()));
             jobs.push(JobRegistration::new(reset::SEND_RESET, mailer));
+        }
+        if let Some(invitations) = &self.invitations {
+            let mailer = Arc::new(invitation::InvitationMailer(invitations.clone()));
+            jobs.push(JobRegistration::new(invitation::SEND_INVITATION, mailer));
+        }
+        if let Some(links) = &self.login_links {
+            let mailer = Arc::new(login_link::LoginLinkMailer(links.clone()));
+            jobs.push(JobRegistration::new(login_link::SEND_LOGIN_LINK, mailer));
         }
         if let Some(verifications) = &self.verifications {
             let mailer = Arc::new(email_report::EmailChangedMailer(verifications.clone()));

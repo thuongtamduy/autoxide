@@ -436,7 +436,6 @@ impl RoleService {
         user_id: Uuid,
         memberships: Vec<(Uuid, Vec<Uuid>)>,
     ) -> Result<Vec<Membership>, Error> {
-        let root = root_of(tenant.id()).as_uuid();
         let mut problems = Vec::new();
         let mut wanted: Vec<(Uuid, BTreeSet<Uuid>)> = Vec::new();
         for (index, (org_id, role_ids)) in memberships.into_iter().enumerate() {
@@ -480,70 +479,10 @@ impl RoleService {
         if touched.rows_affected == 0 {
             return Err(crate::user::user_not_found(user_id));
         }
-        let all_ids: BTreeSet<Uuid> =
-            wanted.iter().flat_map(|(_, roles)| roles.iter().copied()).collect();
-        let found = role::Entity::find()
-            .filter(role::Column::Id.is_in(all_ids.iter().copied()))
-            .scoped(tenant)
-            .all(&transaction)
-            .await?;
-        let mut grants =
-            permissions_of(&transaction, tenant, found.iter().map(|row| row.id)).await?;
         for (index, (org_id, roles)) in wanted.iter().enumerate() {
-            let org = OrgId::from_uuid(*org_id);
-            if *org_id != root
-                && OrgTree::ancestors(&transaction, tenant.id(), org).await?.is_empty()
-            {
-                problems.push(FieldError::new(
-                    format!("memberships[{index}].org_id"),
-                    "unknown",
-                    "is not an organization unit of this tenant",
-                ));
-                continue;
-            }
-            if !actor.reaches(&transaction, org).await? {
-                problems.push(FieldError::new(
-                    format!("memberships[{index}].org_id"),
-                    "out_of_scope",
-                    "must be a unit you work in (one of your roles covers it)",
-                ));
-            }
-            for role_id in roles {
-                let Some(row) = found.iter().find(|row| row.id == *role_id) else {
-                    problems.push(FieldError::new(
-                        format!("memberships[{index}].role_ids"),
-                        "unknown",
-                        "every entry must be the id of an existing role",
-                    ));
-                    continue;
-                };
-                if row.all_permissions && *org_id != root {
-                    problems.push(FieldError::new(
-                        format!("memberships[{index}].role_ids"),
-                        "root_only",
-                        "the `admin` role can only be given at the root unit",
-                    ));
-                }
-                let covers = if row.all_permissions {
-                    actor.has_all_permissions()
-                } else {
-                    grants
-                        .remove(&row.id)
-                        .unwrap_or_default()
-                        .iter()
-                        .all(|(permission, _)| actor.allows(permission))
-                };
-                if !covers {
-                    problems.push(
-                        FieldError::new(
-                            format!("memberships[{index}].role_ids"),
-                            "more_than_you_have",
-                            "role `{role}` has permissions you do not have; you cannot give it",
-                        )
-                        .with_param("role", &row.name),
-                    );
-                }
-            }
+            let field = format!("memberships[{index}].");
+            problems
+                .extend(grant_problems(&transaction, tenant, actor, &field, *org_id, roles).await?);
         }
         if !problems.is_empty() {
             transaction.rollback().await?;
@@ -1167,6 +1106,128 @@ fn builtin_role() -> Error {
 
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
+}
+
+/// ID của role tên `name` của khách `tenant` (lệnh CLI nêu role bằng tên).
+pub(crate) async fn role_by_name(
+    tenant: &TenantContext,
+    name: &str,
+) -> Result<Option<Uuid>, Error> {
+    Ok(role::Entity::find()
+        .filter(role::Column::Name.eq(name.trim()))
+        .scoped(tenant)
+        .one(tenant.database().read())
+        .await?
+        .map(|row| row.id))
+}
+
+/// Vì sao `actor` không gán được các role `roles` ở nút `org_id` (rỗng: gán được): nút phải có
+/// trong khách và trong phạm vi của người gán, role phải có, `admin` chỉ ở gốc, và người gán phải
+/// có mọi permission của role (không tự nâng quyền). `field`: tiền tố tên ô (`memberships[0].`).
+/// Dùng cho membership và lời mời.
+pub(crate) async fn grant_problems<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    actor: &Principal,
+    field: &str,
+    org_id: Uuid,
+    roles: &BTreeSet<Uuid>,
+) -> Result<Vec<FieldError>, Error> {
+    let mut problems = Vec::new();
+    let root = root_of(tenant.id()).as_uuid();
+    let org = OrgId::from_uuid(org_id);
+    if org_id != root && OrgTree::ancestors(connection, tenant.id(), org).await?.is_empty() {
+        problems.push(FieldError::new(
+            format!("{field}org_id"),
+            "unknown",
+            "is not an organization unit of this tenant",
+        ));
+        return Ok(problems);
+    }
+    if !actor.reaches(connection, org).await? {
+        problems.push(FieldError::new(
+            format!("{field}org_id"),
+            "out_of_scope",
+            "must be a unit you work in (one of your roles covers it)",
+        ));
+    }
+    let found = role::Entity::find()
+        .filter(role::Column::Id.is_in(roles.iter().copied()))
+        .scoped(tenant)
+        .all(connection)
+        .await?;
+    let mut grants = permissions_of(connection, tenant, found.iter().map(|row| row.id)).await?;
+    for role_id in roles {
+        let Some(row) = found.iter().find(|row| row.id == *role_id) else {
+            problems.push(FieldError::new(
+                format!("{field}role_ids"),
+                "unknown",
+                "every entry must be the id of an existing role",
+            ));
+            continue;
+        };
+        if row.all_permissions && org_id != root {
+            problems.push(FieldError::new(
+                format!("{field}role_ids"),
+                "root_only",
+                "the `admin` role can only be given at the root unit",
+            ));
+        }
+        let covers = if row.all_permissions {
+            actor.has_all_permissions()
+        } else {
+            grants
+                .remove(&row.id)
+                .unwrap_or_default()
+                .iter()
+                .all(|(permission, _)| actor.allows(permission))
+        };
+        if !covers {
+            problems.push(
+                FieldError::new(
+                    format!("{field}role_ids"),
+                    "more_than_you_have",
+                    "role `{role}` has permissions you do not have; you cannot give it",
+                )
+                .with_param("role", &row.name),
+            );
+        }
+    }
+    Ok(problems)
+}
+
+/// Thêm các role `roles` ở nút `org_id` cho người dùng `user_id` (bỏ qua role đã có ở nút đó),
+/// trong `transaction` của bên gọi (chấp nhận lời mời).
+pub(crate) async fn add_roles<C: ConnectionTrait>(
+    transaction: &C,
+    tenant: &TenantContext,
+    user_id: Uuid,
+    org_id: Uuid,
+    roles: &BTreeSet<Uuid>,
+) -> Result<(), Error> {
+    let held: BTreeSet<Uuid> = user_role::Entity::find()
+        .filter(user_role::Column::UserId.eq(user_id))
+        .filter(user_role::Column::OrgId.eq(org_id))
+        .scoped(tenant)
+        .all(transaction)
+        .await?
+        .into_iter()
+        .map(|row| row.role_id)
+        .collect();
+    let now = now();
+    for role_id in roles.difference(&held) {
+        user_role::ActiveModel {
+            id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
+            user_id: Set(user_id),
+            role_id: Set(*role_id),
+            org_id: Set(Some(org_id)),
+            created_at: Set(now),
+        }
+        .insert(transaction)
+        .await?;
+    }
+    Ok(())
 }
 
 /// Role người dùng `user_id` giữ ở nút gốc của khách `tenant` (uỷ quyền theo cây khách hàng,

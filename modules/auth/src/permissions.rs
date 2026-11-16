@@ -48,6 +48,13 @@ pub(crate) const CUSTOMERS_MANAGE: Permission = Permission::new(
     "Rename, disable and enable customer accounts of the tenant's shop.",
 );
 
+pub(crate) const INVITATIONS_MANAGE: Permission = Permission::new(
+    "auth.invitations.manage",
+    "Invite people by email to work at the organization units in your scope, with roles whose \
+     permissions you have; see, resend and revoke those invitations.",
+)
+.scoped();
+
 pub(crate) const DELEGATIONS_READ: Permission = Permission::new(
     "auth.delegations.read",
     "See the delegations of this tenant: given to child tenants, and received from parents.",
@@ -73,5 +80,6 @@ pub(crate) fn all() -> Vec<Permission> {
         CUSTOMERS_MANAGE,
         DELEGATIONS_READ,
         DELEGATIONS_MANAGE,
+        INVITATIONS_MANAGE,
     ]
 }

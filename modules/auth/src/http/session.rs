@@ -72,6 +72,13 @@ pub(crate) struct MfaChallengeResponse {
     methods: Vec<String>,
 }
 
+impl MfaChallengeResponse {
+    /// Bước hai của đăng nhập (mật khẩu, link qua email): cùng một hình dạng.
+    pub(crate) fn new(mfa_token: String, expires_in: u64) -> Self {
+        MfaChallengeResponse { mfa_token, expires_in, methods: METHODS.map(String::from).to_vec() }
+    }
+}
+
 /// The second step of signing in.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct LoginMfaRequest {

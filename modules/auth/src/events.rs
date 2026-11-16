@@ -59,6 +59,10 @@ events! {
     EMAIL_CHANGE_CANCELLED, EmailChangeCancelled, "auth.email_change_cancelled", "A user cancelled a pending email change; the link sent to the new address (`before.email`) stopped working.";
     PASSKEY_REMOVED, PasskeyRemoved, "auth.passkey_removed", "A passkey was removed; `before.name` is its name, `after.by_administrator` is `true` when an administrator (or the server operator) removed it.";
     RECOVERY_CODES_REPLACED, RecoveryCodesReplaced, "auth.recovery_codes_replaced", "A user made new recovery codes.";
+    LOGIN_LINK_USED, LoginLinkUsed, "auth.login_link_used", "A user signed in with a link sent by email (two-step sign-in, when on, still followed).";
+    INVITATION_CREATED, InvitationCreated, "auth.invitation_created", "Someone was invited by email to work at a unit with given roles (`after`: email, unit, roles, expiry).";
+    INVITATION_ACCEPTED, InvitationAccepted, "auth.invitation_accepted", "An invitation was accepted: the person (`after.user_id`, created when new) got its roles at its unit.";
+    INVITATION_REVOKED, InvitationRevoked, "auth.invitation_revoked", "An invitation was revoked; its link stopped working.";
     DELEGATION_GRANTED, DelegationGranted, "auth.delegation_granted", "This tenant let holders of one of its roles work in a child tenant (`after`: child tenant, role, unit, expiry, reason).";
     DELEGATION_REVOKED, DelegationRevoked, "auth.delegation_revoked", "A delegation to a child tenant was revoked; holders of the role lose access at their next request.";
 }

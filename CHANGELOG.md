@@ -11,6 +11,20 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `auth`: invite people by email with roles at a unit — `GET`/`POST /api/v1/auth/invitations`,
+  `DELETE /api/v1/auth/invitations/{id}`, `POST /api/v1/auth/invitations/{id}/resend`,
+  `POST /api/v1/auth/invitations/accept` (permission `auth.invitations.manage`; settings
+  `AUTOXIDE_AUTH_INVITATION_URL`, `AUTOXIDE_AUTH_INVITATION_DAYS`), MCP tools
+  `auth.create_invitation`, `auth.list_invitations`, `auth.revoke_invitation`, and the command
+  `autoxide user invite --email … --role … [--org …] [--tenant …]`. Events
+  `auth.invitation_created`, `auth.invitation_accepted`, `auth.invitation_revoked`.
+
+- `auth`: sign in with a link sent by email (off by default: `AUTOXIDE_AUTH_LOGIN_LINK`,
+  `AUTOXIDE_AUTH_LOGIN_LINK_URL`, `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES`) — `POST /api/v1/auth/login/link`
+  (same answer whether or not the email exists; optional `bind_device`) and
+  `POST /api/v1/auth/login/link/confirm` (two-step sign-in still applies). Event
+  `auth.login_link_used`; sessions show `sign_in_method: email_link`.
+
 - `auth`: customer accounts (`realm: customer`) separate from staff in each tenant — register and
   sign in with `"realm": "customer"` (setting `auth.customer_registration` per tenant), no
   permission; `GET /api/v1/auth/customers`, `GET`/`PATCH /api/v1/auth/customers/{id}`

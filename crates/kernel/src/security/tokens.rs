@@ -233,6 +233,35 @@ impl OneTimeTokens {
         }))
     }
 
+    /// Xem `token` còn dùng được cho `purpose` không mà KHÔNG dùng nó: trả chủ và dữ liệu, hay
+    /// `None`. Cho việc phải kiểm đầu vào trước khi tiêu token (vd lời mời: biết email trước khi
+    /// đòi mật khẩu) — rồi vẫn [`consume`](Self::consume) để chỉ một bên thắng.
+    pub async fn peek<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        purpose: &str,
+        token: &str,
+    ) -> Result<Option<Consumed>, Error> {
+        let select = Query::select()
+            .columns([Alias::new("id"), Alias::new("subject"), Alias::new("data")])
+            .from(Alias::new(&self.table))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
+            .and_where(Expr::col(Alias::new("token_hash")).eq(sha256(token).as_str()))
+            .and_where(Expr::col(Alias::new("purpose")).eq(purpose))
+            .and_where(Expr::col(Alias::new("used_at")).is_null())
+            .and_where(Expr::col(Alias::new("expires_at")).gt(now()))
+            .to_owned();
+        let Some(row) = connection.query_one(&select).await? else {
+            return Ok(None);
+        };
+        Ok(Some(Consumed {
+            id: row.try_get::<Uuid>("", "id")?,
+            subject: row.try_get::<String>("", "subject")?,
+            data: row.try_get::<Option<String>>("", "data")?,
+        }))
+    }
+
     /// Vì sao `token` không dùng được cho `purpose` (sau khi [`consume`](Self::consume) trả
     /// `None`): đã dùng, hết hạn hay không có. Người giữ token biết token của mình; không lộ gì
     /// về token khác. Token quá hạn lâu đã bị dọn (`purge`) thì là `Unknown`.

@@ -2,6 +2,26 @@
 // Types of every schema, and of every operation under `paths` (parameters, request body,
 // responses by status). Used by `client.ts`.
 
+/** Accept an invitation. */
+export type AcceptInvitationRequest = {
+  /** For a new account: display name (default: the one in the invitation). */
+  name?: string | null;
+  /**
+   * For a new account: a password (12 to 128 characters). Omit to sign in later with a link
+   * or add a passkey with the tokens returned here.
+   */
+  password?: string | null;
+  /** The token from the invitation mail. */
+  token: string;
+};
+
+/** The result of accepting. */
+export type AcceptedResponse = {
+  tokens?: TokenResponse | null;
+  /** The account that now has the roles. */
+  user_id: string;
+};
+
 /** What a schedule does: `publish` or `unpublish`. */
 export type Action = "publish" | "unpublish";
 
@@ -967,6 +987,16 @@ export type CustomerResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_AcceptedResponse = {
+  /** The result of accepting. */
+  data: {
+    tokens?: TokenResponse | null;
+    /** The account that now has the roles. */
+    user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_AiStatus = {
   /** What the AI features of this server can do now. */
   data: {
@@ -1783,6 +1813,32 @@ export type Data_ImportReport = {
 };
 
 /** Envelope of a single result. */
+export type Data_InvitationResponse = {
+  /** An invitation to work in this tenant. */
+  data: {
+    /** The account that accepted it. */
+    accepted_user_id?: string | null;
+    created_at: string;
+    email: string;
+    expires_at: string;
+    id: string;
+    invited_by?: string | null;
+    name: string;
+    /** The unit the roles apply at. */
+    org_id: string;
+    /** Your own reference, e.g. an HR ticket. */
+    reference?: string | null;
+    /** The roles given on acceptance. */
+    role_ids: string[];
+    /**
+     * `pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be
+     * accepted; resend it.
+     */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LibrarySummaryResponse = {
   /** Totals of the media library. */
   data: {
@@ -1823,6 +1879,18 @@ export type Data_ListResponse = {
     /** Subscriptions by status. */
     subscriptions: SubscriptionCounts;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LoginLinkResponse = {
+  /** What to keep while waiting for the mail. */
+  data: {
+    /**
+     * With `bind_device`: send it back with the token. `null` otherwise. Returned even when no
+     * account has this email, so the answer reveals nothing.
+     */
+    device_secret?: string | null;
   };
 };
 
@@ -3876,6 +3944,42 @@ export type ImportRequest = {
   subscribers: ImportPersonRequest[];
 };
 
+/** A new invitation. */
+export type InvitationRequest = {
+  email: string;
+  /** Display name for the new account (they can change it). */
+  name?: string | null;
+  /** The unit they will work at; omit for the root unit. It must be in your scope. */
+  org_id?: string | null;
+  /** Your own reference, up to 200 characters. */
+  reference?: string | null;
+  /** Roles given at that unit when they accept; you must have every permission of each role. */
+  role_ids: string[];
+};
+
+/** An invitation to work in this tenant. */
+export type InvitationResponse = {
+  /** The account that accepted it. */
+  accepted_user_id?: string | null;
+  created_at: string;
+  email: string;
+  expires_at: string;
+  id: string;
+  invited_by?: string | null;
+  name: string;
+  /** The unit the roles apply at. */
+  org_id: string;
+  /** Your own reference, e.g. an HR ticket. */
+  reference?: string | null;
+  /** The roles given on acceptance. */
+  role_ids: string[];
+  /**
+   * `pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be
+   * accepted; resend it.
+   */
+  status: string;
+};
+
 /** What an entry is. */
 export type Kind = "post" | "page";
 
@@ -3950,6 +4054,34 @@ export type Locale = "en" | "vi";
 export type Localized = {
   en?: string | null;
   vi?: string | null;
+};
+
+/** Finish signing in with the token from the mail. */
+export type LoginLinkConfirmation = {
+  /** The `device_secret` from `POST /api/v1/auth/login/link`, when it asked to bind the device. */
+  device_secret?: string | null;
+  token: string;
+};
+
+/** Ask for a sign-in link. */
+export type LoginLinkRequest = {
+  /**
+   * `true`: the link works only together with the `device_secret` returned here, so a link
+   * opened on another device (or intercepted) is useless. Keep the secret on this device.
+   */
+  bind_device?: boolean;
+  email: string;
+  /** `staff` (default) or `customer`. */
+  realm?: Realm;
+};
+
+/** What to keep while waiting for the mail. */
+export type LoginLinkResponse = {
+  /**
+   * With `bind_device`: send it back with the token. `null` otherwise. Returned even when no
+   * account has this email, so the answer reveals nothing.
+   */
+  device_secret?: string | null;
 };
 
 /** The second step of signing in. */
@@ -4973,6 +5105,33 @@ export type Page_FormResponse = {
 };
 
 /** One page of a list. */
+export type Page_InvitationResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The account that accepted it. */
+    accepted_user_id?: string | null;
+    created_at: string;
+    email: string;
+    expires_at: string;
+    id: string;
+    invited_by?: string | null;
+    name: string;
+    /** The unit the roles apply at. */
+    org_id: string;
+    /** Your own reference, e.g. an HR ticket. */
+    reference?: string | null;
+    /** The roles given on acceptance. */
+    role_ids: string[];
+    /**
+     * `pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be
+     * accepted; resend it.
+     */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ListResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -5375,8 +5534,8 @@ export type Page_SessionResponse = {
     last_active_at: string;
     /**
      * How the session was signed in: `password`, `password_and_mfa` (password and a code),
-     * `passkey`, or `password_change` (a new session after changing the password); `null` for
-     * sessions older than this information.
+     * `passkey`, `email_link` (a link sent by email), or `password_change` (a new session after
+     * changing the password); `null` for sessions older than this information.
      */
     sign_in_method?: string | null;
     /** When the session was signed in. */
@@ -6666,8 +6825,8 @@ export type SessionResponse = {
   last_active_at: string;
   /**
    * How the session was signed in: `password`, `password_and_mfa` (password and a code),
-   * `passkey`, or `password_change` (a new session after changing the password); `null` for
-   * sessions older than this information.
+   * `passkey`, `email_link` (a link sent by email), or `password_change` (a new session after
+   * changing the password); `null` for sessions older than this information.
    */
   sign_in_method?: string | null;
   /** When the session was signed in. */
@@ -7938,6 +8097,74 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/invitations": {
+    /** List invitations. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_InvitationResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Invite someone by email. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InvitationRequest;
+      responses: {
+        201: Data_InvitationResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/invitations/accept": {
+    /** Accept an invitation with the token from its mail. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: AcceptInvitationRequest;
+      responses: {
+        200: Data_AcceptedResponse;
+        400: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/invitations/{id}": {
+    /** Revoke an invitation. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvitationResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/invitations/{id}/resend": {
+    /** Send an invitation again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvitationResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/login": {
     /** Sign in with email and password. */
     post: {
@@ -7950,6 +8177,35 @@ export interface paths {
         403: Problem;
         422: Problem;
         429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/login/link": {
+    /** Send a sign-in link by email. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: LoginLinkRequest;
+      responses: {
+        202: Data_LoginLinkResponse;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/login/link/confirm": {
+    /** Sign in with the token from a sign-in link. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: LoginLinkConfirmation;
+      responses: {
+        200: Data_TokenResponse;
+        202: Data_MfaChallengeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

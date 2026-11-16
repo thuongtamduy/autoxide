@@ -222,6 +222,66 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Invite someone by email to work at an organization unit with given roles; the mail goes out shortly and the link can be used once.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new invitation.",
+        "properties": {
+          "email": {
+            "description": "Email to invite.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Display name for the new account.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Unit the roles apply at; omit for the root unit. It must be in your scope.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your own reference, up to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role_ids": {
+            "description": "Roles given on acceptance; you must have every permission of each.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "email",
+          "role_ids"
+        ],
+        "type": "object"
+      },
+      "name": "auth.create_invitation",
+      "output_schema": null,
+      "permissions": [
+        "auth.invitations.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Create a role that grants the listed permissions (see `list_permissions`).",
       "input_schema": {
         "description": "The full content of a role.",
@@ -423,6 +483,58 @@
       "name": "auth.list_api_keys",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the invitations at units in your scope, newest first; filter by status.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which invitations to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "Only `pending`, `accepted` or `revoked`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "auth.list_invitations",
+      "output_schema": null,
+      "permissions": [
+        "auth.invitations.manage"
+      ]
     },
     {
       "annotations": {
@@ -722,6 +834,36 @@
       "name": "auth.revoke_api_key",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Revoke an invitation: its link stops working.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A role or user to act on.",
+        "properties": {
+          "id": {
+            "description": "The id.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.revoke_invitation",
+      "output_schema": null,
+      "permissions": [
+        "auth.invitations.manage"
+      ]
     },
     {
       "annotations": {

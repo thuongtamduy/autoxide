@@ -21,6 +21,10 @@ curl -sS "$API/api/v1/auth/login" \
 curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
 ```
 
+## Đăng nhập bằng link
+
+Khi máy chủ bật (`AUTOXIDE_AUTH_LOGIN_LINK=true`), `POST /api/v1/auth/login/link` với `{"email": …}` gửi một link đăng nhập dùng một lần (sống `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES`, mặc định 15 phút). Endpoint luôn trả 202 như nhau dù email có tài khoản hay không. Hoàn tất bằng `POST /api/v1/auth/login/link/confirm` với `token` trong mail; kết quả như `/login` (token, hay `mfa_token` khi bật xác thực hai bước). Gửi `"bind_device": true` để nhận `device_secret` rồi gửi lại nó cùng token: link khi đó chỉ dùng được trên thiết bị này.
+
 ## Làm mới trước khi access token hết hạn
 
 `expires_in` cho biết access token sống bao nhiêu giây. Trước lúc đó một chút, đổi refresh token lấy cặp mới. Mỗi refresh token chỉ dùng được **một lần**: giữ lại cái mới.
@@ -66,7 +70,7 @@ curl -sS "$API/api/v1/auth/logout" --json '{"refresh_token":"'"$REFRESH"'"}'
 
 ## Các phiên của bạn
 
-`GET /api/v1/auth/me/sessions` liệt kê các thiết bị đang đăng nhập tài khoản: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `password_change`) và, khi reverse proxy của máy chủ cho biết (`AUTOXIDE_AUTH_COUNTRY_HEADER`, vd `CF-IPCountry`), quốc gia gần đúng `country`. Địa chỉ IP không bao giờ được lưu. Phiên lạ thì kết thúc bằng `DELETE /api/v1/auth/me/sessions/{id}`.
+`GET /api/v1/auth/me/sessions` liệt kê các thiết bị đang đăng nhập tài khoản: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `email_link`, `password_change`) và, khi reverse proxy của máy chủ cho biết (`AUTOXIDE_AUTH_COUNTRY_HEADER`, vd `CF-IPCountry`), quốc gia gần đúng `country`. Địa chỉ IP không bao giờ được lưu. Phiên lạ thì kết thúc bằng `DELETE /api/v1/auth/me/sessions/{id}`.
 
 ## Tài khoản của bạn
 

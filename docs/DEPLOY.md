@@ -479,6 +479,23 @@ have no permission, and are separate from staff even with the same email. Custom
 `auth.customer_registration` (`false`). Staff manage them with `GET /api/v1/auth/customers` and
 `PATCH /api/v1/auth/customers/{id}` (permissions `auth.customers.read`, `auth.customers.manage`).
 
+**Inviting staff.** Instead of creating accounts with passwords, invite people:
+`POST /api/v1/auth/invitations` with an `email`, the `role_ids` and the unit (`org_id`) they get
+(permission `auth.invitations.manage`; you cannot invite with roles whose permissions you lack),
+or from the command line:
+
+```bash
+autoxide user invite --email new.colleague@example.com --role editor
+```
+
+The mail carries a one-time link to `AUTOXIDE_AUTH_INVITATION_URL` (a page of your interface with
+`{token}`; unset: the mail carries the token), valid `AUTOXIDE_AUTH_INVITATION_DAYS` days (7).
+Accepting creates the account (or, when the email already has one, adds the roles after the person
+signs in). **Signing in with a link** (no password) is off by default; turn it on with
+`AUTOXIDE_AUTH_LOGIN_LINK=true` and set `AUTOXIDE_AUTH_LOGIN_LINK_URL` to your interface's page.
+Both need working mail (`AUTOXIDE_MAIL_SMTP_URL`) and a running worker. The organization tree of
+a tenant is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (8 by default).
+
 In a chain of tenants (a tenant with `parent_id`), the parent can let holders of one of its roles
 work in a child: `POST /api/v1/auth/delegations` with `child_tenant_id`, `role_id`, optional
 `org_id` (a unit of the child) and `expires_at`, and a `reason` (permission

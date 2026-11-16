@@ -6,6 +6,8 @@ pub(crate) mod api_keys;
 mod customers;
 mod delegations;
 mod email;
+pub(crate) mod invitations;
+mod login_link;
 pub(crate) mod memberships;
 mod mfa;
 mod passkeys;
@@ -42,6 +44,10 @@ pub(crate) struct HttpState {
     /// Cây tổ chức: cài đặt của khách (`auth.customer_registration`…). `None`: app không có
     /// module `organizations`.
     pub orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
+    /// Lời mời người dùng qua email (D-312).
+    pub invitations: Arc<crate::invitation::Invitations>,
+    /// Đăng nhập bằng link qua email (D-311).
+    pub login_links: Arc<crate::login_link::LoginLinks>,
     /// Uỷ quyền theo cây khách hàng (D-310).
     pub delegations: Arc<crate::delegation::DelegationService>,
     /// Xác nhận lại danh tính (`POST /me/reauth`, D-308).
@@ -71,6 +77,8 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(reauth::routes())
         .merge(customers::routes())
         .merge(delegations::routes())
+        .merge(login_link::routes())
+        .merge(invitations::routes())
         .with_state(Arc::new(state))
         // Response của `auth` hay chứa secret chỉ trả một lần (token, API key mới, secret TOTP,
         // mã khôi phục): không ai được lưu lại — proxy, trình duyệt, lớp idempotency (RFC 6749

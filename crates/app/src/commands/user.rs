@@ -5,7 +5,7 @@
 use std::io::BufRead;
 use std::process::ExitCode;
 
-use autoxide_auth::api::{AccountRecovery, Accounts, NewAccount};
+use autoxide_auth::api::{AccountRecovery, Accounts, Invitations, NewAccount, NewInvitation};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
 use base64::Engine as _;
@@ -47,6 +47,25 @@ pub enum Action {
         #[arg(long)]
         tenant: Option<String>,
     },
+    /// Invite someone by email, with roles of the tenant.
+    ///
+    /// The mail goes out shortly (the server must be running its worker, or run `autoxide jobs`);
+    /// the link can be used once, within `AUTOXIDE_AUTH_INVITATION_DAYS` days. Run
+    /// `autoxide migrate up` first.
+    Invite {
+        /// Email to invite.
+        #[arg(long)]
+        email: String,
+        /// Name of a role given when the invitation is accepted; repeat for several.
+        #[arg(long = "role")]
+        roles: Vec<String>,
+        /// Id of the organization unit the roles apply at. Defaults to the root unit.
+        #[arg(long)]
+        org: Option<uuid::Uuid>,
+        /// Short name (slug) of the tenant. Defaults to the default tenant.
+        #[arg(long)]
+        tenant: Option<String>,
+    },
     /// Turn off two-step sign-in (authenticator app and recovery codes) of an account.
     ///
     /// For an administrator who lost their device when no other administrator can do it
@@ -82,6 +101,13 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         }
         Action::ResetMfa { email, tenant } => {
             return recovery_command(Recovery::ResetMfa(email), tenant);
+        }
+        Action::Invite { email, roles, org, tenant } => {
+            let mut invitation = NewInvitation::new(email, roles);
+            if let Some(org) = org {
+                invitation = invitation.at(org);
+            }
+            return invite_command(invitation, tenant);
         }
         Action::RemovePasskeys { email, tenant } => {
             return recovery_command(Recovery::RemovePasskeys(email), tenant);
@@ -158,6 +184,45 @@ async fn create(
     Ok(format!(
         "Created user {} (id {}){role}.\nSign in with `POST /api/v1/auth/login`.\n",
         user.email, user.id
+    ))
+}
+
+/// Lệnh `invite`: đọc cấu hình, mời qua `Invitations` của module `auth`, in kết quả.
+fn invite_command(invitation: NewInvitation, tenant: Option<String>) -> ExitCode {
+    let settings = match settings::load() {
+        Ok(settings) => settings,
+        Err(errors) => return report_invalid_configuration(&errors),
+    };
+    let config = settings.config.clone();
+    match run_with_observability(&config, invite(settings, invitation, tenant)) {
+        Ok(report) => {
+            print!("{report}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => report_failure(&error),
+    }
+}
+
+async fn invite(
+    settings: Settings,
+    invitation: NewInvitation,
+    tenant: Option<String>,
+) -> Result<String, String> {
+    let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
+    let found = tenant_of(&runtime, tenant.as_deref()).await;
+    let outcome = match (runtime.modules.api::<dyn Invitations>(), found) {
+        (Some(invitations), Ok(tenant)) => {
+            invitations.invite(&tenant, invitation).await.map_err(|error| describe(&error))
+        }
+        (None, _) => Err("no registered module manages invitations (`auth`)".to_owned()),
+        (_, Err(error)) => Err(error),
+    };
+    let closed = runtime.database.close().await.map_err(|error| format!("database: {error}"));
+    let summary = outcome?;
+    closed?;
+    Ok(format!(
+        "Invited {} (invitation {}); it can be accepted until {}.\n",
+        summary.email, summary.id, summary.expires_at
     ))
 }
 

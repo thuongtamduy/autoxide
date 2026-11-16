@@ -21,6 +21,10 @@ curl -sS "$API/api/v1/auth/login" \
 curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
 ```
 
+## Sign in with a link
+
+When the server turns it on (`AUTOXIDE_AUTH_LOGIN_LINK=true`), `POST /api/v1/auth/login/link` with `{"email": …}` sends a one-time sign-in link (valid `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES`, 15 by default). It always answers 202 the same way, whether or not the email has an account. Finish with `POST /api/v1/auth/login/link/confirm` and the `token` from the mail; the answer is the same as `/login` (tokens, or an `mfa_token` when two-step sign-in is on). Send `"bind_device": true` to get a `device_secret` and send it back with the token: the link then works only on this device.
+
 ## Refresh before the access token expires
 
 `expires_in` says how many seconds the access token lives. Shortly before, exchange the refresh token for a new pair. Each refresh token works **once**: keep the new one.
@@ -66,7 +70,7 @@ curl -sS "$API/api/v1/auth/logout" --json '{"refresh_token":"'"$REFRESH"'"}'
 
 ## Your sessions
 
-`GET /api/v1/auth/me/sessions` lists the devices signed in to your account: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `password_change`) and, when the server's reverse proxy tells it (`AUTOXIDE_AUTH_COUNTRY_HEADER`, e.g. `CF-IPCountry`), the approximate `country`. The IP address is never kept. End a session you do not know with `DELETE /api/v1/auth/me/sessions/{id}`.
+`GET /api/v1/auth/me/sessions` lists the devices signed in to your account: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `email_link`, `password_change`) and, when the server's reverse proxy tells it (`AUTOXIDE_AUTH_COUNTRY_HEADER`, e.g. `CF-IPCountry`), the approximate `country`. The IP address is never kept. End a session you do not know with `DELETE /api/v1/auth/me/sessions/{id}`.
 
 ## Your account
 
