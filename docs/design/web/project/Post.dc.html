@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Chuyển từ SQLite sang Postgres không gián đoạn — Autoxide Blog</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div class="px {{theme}}" style="min-height: 100vh; background: var(--paper); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 16px; line-height: 1.5">
+
+  <header class="hdr" style="position: sticky; top: 0; z-index: 20">
+    <div class="wrap" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 28px; min-height: 68px; padding-top: 6px; padding-bottom: 6px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink)">
+        <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16)">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 21px; height: 21px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+        </span>
+        <span class="dsp" style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em">Autoxide</span>
+        <span class="kick" style="padding: 5px 7px; border-radius: 5px; background: var(--accent-tint)">Blog</span>
+      </a>
+      <nav aria-label="Menu chính" style="display: flex; flex-wrap: wrap; gap: 0 26px">
+        <sc-for list="{{menu}}" as="m" hint-placeholder-count="5">
+          <a class="nav-a {{m.cls}}" href="{{m.href}}">{{m.label}}</a>
+        </sc-for>
+      </nav>
+      <div style="flex: 1"></div>
+      <div style="display: flex; align-items: center; gap: 6px">
+        <a class="btn quiet sm sq" href="Search.dc.html" aria-label="Tìm kiếm"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.search}}"></path></svg></a>
+        <div class="seg" role="group" aria-label="Ngôn ngữ">
+          <button class="on">VI</button>
+          <button>EN</button>
+        </div>
+        <button class="btn quiet sm sq" aria-label="Đổi giao diện sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+        <a class="btn pri sm" href="#dang-ky">Đăng ký</a>
+      </div>
+    </div>
+    <div class="progress" role="presentation"><span></span></div>
+  </header>
+
+  <main>
+    <article>
+      <div class="wrap" style="padding-top: 56px; display: flex; flex-direction: column; gap: 36px">
+        <div style="max-width: 940px; display: flex; flex-direction: column; gap: 22px">
+          <a class="kick rise" href="List.dc.html" style="align-self: flex-start; display: inline-flex; align-items: center; min-height: 28px">Hướng dẫn</a>
+          <h1 class="dsp rise d1" style="margin: 0; font-size: clamp(36px, 4.7vw, 64px); font-weight: 800; line-height: 1.06; letter-spacing: -0.04em; text-wrap: balance">Chuyển từ SQLite sang Postgres không gián đoạn</h1>
+          <p class="rise d2" style="margin: 0; max-width: 760px; font-size: 22px; line-height: 1.5; color: var(--ink-2); text-wrap: pretty">Hướng dẫn từng bước chuyển một website Autoxide từ SQLite sang Postgres: sao lưu, áp dụng migration, sao chép dữ liệu và đổi cấu hình.</p>
+        </div>
+
+        <div class="rise d3" style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px 28px; padding: 16px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair)">
+          <a href="List.dc.html" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink)">
+            <span class="av a4" style="width: 44px; height: 44px; font-size: 14px">HN</span>
+            <span style="display: flex; flex-direction: column; line-height: 1.3"><span style="font-weight: 600">Hoàng Nam</span><span class="meta">Tác giả</span></span>
+          </a>
+          <span class="meta num" style="display: flex; flex-direction: column; line-height: 1.4"><span style="color: var(--ink); font-weight: 500">9 tháng 11, 2026</span><span>Cập nhật 12 tháng 11</span></span>
+          <span class="meta num" style="display: flex; flex-direction: column; line-height: 1.4"><span style="color: var(--ink); font-weight: 500">6 phút đọc</span><span>1.240 từ</span></span>
+          <div style="flex: 1"></div>
+          <a class="txt" href="#">Read in English<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.arrow}}"></path></svg></a>
+          <button class="btn sm" onClick="{{copy}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{copyIcon}}"></path></svg>{{copyLabel}}</button>
+        </div>
+
+        <figure class="ph rise d4" style="margin: 0; aspect-ratio: 21 / 9; border-radius: 10px"><img src="/_blob/7d2adf4ea39d2632aed54359f2e22cd0" alt="Hai khối database nối với nhau bằng một mũi tên"></figure>
+      </div>
+
+      <div class="wrap" style="padding-top: 56px; padding-bottom: 72px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: stretch; gap: 32px 56px">
+
+        <aside style="flex: 0 1 220px">
+          <nav class="toc" aria-label="Mục lục" style="position: sticky; top: 104px; display: flex; flex-direction: column; gap: 14px">
+            <span class="kick" style="color: var(--ink-3)">Trong bài này</span>
+            <div style="display: flex; flex-direction: column; border-left: 1.5px solid var(--hair)">
+              <a href="#chuan-bi">Chuẩn bị</a>
+              <a href="#dung-database" class="on">Dựng database mới</a>
+              <a href="#sao-chep">Sao chép dữ liệu</a>
+              <a href="#kiem-tra">Kiểm tra sau khi chuyển</a>
+              <a href="#binh-luan">Bình luận</a>
+            </div>
+          </nav>
+        </aside>
+
+        <div style="flex: 1 1 560px; min-width: 0; max-width: 720px; display: flex; flex-direction: column; gap: 44px">
+          <div class="prose" style="display: flex; flex-direction: column; gap: 26px">
+            <p class="cap">SQLite đủ cho phần lớn website mới: toàn bộ dữ liệu nằm trong một file, không cần máy chủ database, sao lưu chỉ là chép file. Khi lượng ghi tăng lên, hoặc khi bạn cần chạy nhiều máy chủ ứng dụng, đó là lúc chuyển sang Postgres.</p>
+            <p>Autoxide chạy cùng một mã trên cả hai database, nên bạn không phải viết lại gì. Việc phải làm chỉ là chuyển dữ liệu, và bài này đi qua từng bước của việc đó.</p>
+
+            <h2 id="chuan-bi">Chuẩn bị</h2>
+            <p>Trước khi bắt đầu, hãy tạo một bản sao lưu đầy đủ bằng lệnh <code>autoxide backup</code> và thử khôi phục nó vào một database trống. Bản sao lưu gồm dữ liệu của mọi module và mọi tệp đã tải lên.</p>
+
+            <blockquote class="dsp reveal" style="margin: 10px 0; padding: 30px 0; border-top: 2px solid var(--rule); border-bottom: 1px solid var(--hair); font-size: 30px; font-weight: 600; line-height: 1.28; letter-spacing: -0.02em; text-wrap: balance">Một bản sao lưu chưa từng được khôi phục thử thì chưa đáng tin.</blockquote>
+
+            <h2 id="dung-database">Dựng database mới</h2>
+            <p>Bạn cần một database Postgres còn trống. Autoxide hỗ trợ PostgreSQL từ bản 16 trở lên.</p>
+            <ol>
+              <li>Tạo một database trống và một người dùng có quyền trên database đó.</li>
+              <li>Đặt biến <code>DATABASE_URL</code> trỏ sang database mới.</li>
+              <li>Chạy <code>autoxide migrate up</code> để tạo bảng, rồi <code>autoxide migrate status</code> để chắc không còn migration nào chờ.</li>
+            </ol>
+
+            <div class="ui" style="display: flex; gap: 14px; padding: 18px 20px; border-radius: 10px; background: var(--accent-tint); font-size: 16px; line-height: 1.6">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-top: 4px; color: var(--accent-ink)"><path d="{{ic.warn}}"></path></svg>
+              <span><strong style="font-weight: 600">Lưu ý.</strong> Migration không bao giờ tự chạy. Nếu bỏ qua bước 3, lệnh sao chép sẽ dừng vì database đích chưa có bảng.</span>
+            </div>
+
+            <h2 id="sao-chep">Sao chép dữ liệu</h2>
+            <p>Lệnh <code>autoxide copy</code> chép dữ liệu của mọi module sang một database khác, còn trống. Trong lúc chép, hãy tạm dừng máy chủ để không có thay đổi mới nào bị bỏ sót.</p>
+            <pre class="mono" style="margin: 0; padding: 20px 22px; border-radius: 10px; background: #12151C; color: #E4E6EB; font-size: 14px; line-height: 1.75; overflow-x: auto; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08)"><span style="color: #8E96A5"># Áp dụng migration trên database mới</span>
+autoxide migrate up
+<span style="color: #8E96A5"># Chép dữ liệu của mọi module; xem tham số bằng --help</span>
+autoxide copy <span style="color: #FF9A6E">--help</span></pre>
+
+            <h2 id="kiem-tra">Kiểm tra sau khi chuyển</h2>
+            <p>Khởi động lại máy chủ với cấu hình mới rồi mở trang quản trị. Ở màn hình Module, mọi migration phải ở trạng thái đã áp dụng. Sau đó đăng nhập, mở vài bài viết và thử đăng một bài nháp.</p>
+            <p>Giữ file SQLite cũ thêm vài ngày. Nếu có gì không ổn, bạn chỉ cần trỏ <code>DATABASE_URL</code> về lại file đó.</p>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+            <span class="kick" style="color: var(--ink-3); margin-right: 6px">Thẻ</span>
+            <a class="tag" href="List.dc.html">#sqlite</a>
+            <a class="tag" href="List.dc.html">#postgres</a>
+            <a class="tag" href="List.dc.html">#migration</a>
+          </div>
+
+          <div class="rule reveal" style="display: flex; flex-wrap: wrap; gap: 20px; padding-top: 24px">
+            <span class="av a4" style="width: 64px; height: 64px; font-size: 20px">HN</span>
+            <div style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 8px">
+              <span class="kick" style="color: var(--ink-3)">Về tác giả</span>
+              <span class="dsp" style="font-size: 22px; font-weight: 700; letter-spacing: -0.02em">Hoàng Nam</span>
+              <p style="margin: 0; font-size: 16px; line-height: 1.6; color: var(--ink-2); text-wrap: pretty">Hoàng Nam viết về vận hành: database, sao lưu và những việc cần làm trước mỗi lần nâng cấp.</p>
+              <a class="txt" href="List.dc.html" style="align-self: flex-start; color: var(--accent-ink)">Xem các bài của Hoàng Nam<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.arrow}}"></path></svg></a>
+            </div>
+          </div>
+
+          <div id="dang-ky" class="reveal" style="display: flex; flex-direction: column; gap: 16px; padding: 28px; border-radius: 12px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--hair)">
+            <span class="dsp" style="font-size: 24px; font-weight: 700; letter-spacing: -0.02em; text-wrap: balance">Nhận bài tiếp theo qua email</span>
+            <sc-if value="{{nlForm}}" hint-placeholder-val="{{true}}">
+              <form onSubmit="{{subscribe}}" novalidate="novalidate" style="display: flex; flex-direction: column; gap: 10px">
+                <label class="help" for="nl-email">Nhiều nhất một thư mỗi tuần. Huỷ bằng một lần bấm.</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px">
+                  <input id="nl-email" class="inp {{nlErrCls}}" type="email" value="{{email}}" onChange="{{onEmail}}" placeholder="ban@example.com" autocomplete="email" style="flex: 1 1 220px">
+                  <button class="btn pri" type="submit">Đăng ký</button>
+                </div>
+                <sc-if value="{{nlErr}}" hint-placeholder-val="{{false}}"><span class="errtxt pop" role="alert">{{nlErr}}</span></sc-if>
+              </form>
+            </sc-if>
+            <sc-if value="{{nlSent}}" hint-placeholder-val="{{false}}">
+              <div class="note ok pop" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-top: 2px"><path d="{{ic.check}}"></path></svg><span>Còn một bước nữa: hãy bấm liên kết xác nhận trong thư chúng tôi gửi tới <span class="mono" style="font-size: 13.5px">{{email}}</span>.</span></div>
+            </sc-if>
+          </div>
+        </div>
+
+        <aside style="flex: 0 1 150px"></aside>
+      </div>
+    </article>
+
+    <section style="background: var(--wash); border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair)">
+      <div class="wrap" style="padding-top: 52px; padding-bottom: 60px; display: flex; flex-direction: column; gap: 28px">
+        <div class="rule" style="display: flex; align-items: baseline; gap: 16px; padding-top: 14px">
+          <h2 class="dsp" style="flex: 1; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.025em">Cùng chủ đề Hướng dẫn</h2>
+          <a class="txt" href="List.dc.html">Xem tất cả<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.arrow}}"></path></svg></a>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 40px 32px">
+          <sc-for list="{{related}}" as="p" hint-placeholder-count="3">
+            <a class="card reveal" href="Post.dc.html">
+              <span class="ph" style="aspect-ratio: 16 / 10"><img src="{{p.img}}" alt="{{p.alt}}"></span>
+              <span style="display: flex; flex-direction: column; gap: 10px">
+                <span class="dsp" style="font-size: 21px; font-weight: 600; line-height: 1.3; letter-spacing: -0.015em; text-wrap: balance"><span class="tl">{{p.title}}</span></span>
+                <span class="meta">{{p.meta}}</span>
+              </span>
+            </a>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section id="binh-luan" style="scroll-margin-top: 90px">
+      <div class="wrap" style="padding-top: 64px; padding-bottom: 88px">
+        <div style="max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px">
+          <div class="rule" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding-top: 16px">
+            <h2 class="dsp" style="flex: 1 1 200px; margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.03em">6 bình luận</h2>
+            <div class="seg" role="group" aria-label="Thứ tự bình luận">
+              <button class="{{newOn}}" onClick="{{sortNew}}" style="padding: 0 14px">Mới nhất</button>
+              <button class="{{oldOn}}" onClick="{{sortOld}}" style="padding: 0 14px">Cũ nhất</button>
+            </div>
+          </div>
+
+          <form onSubmit="{{post}}" novalidate="novalidate" style="display: flex; flex-direction: column; gap: 14px; padding: 22px; border-radius: 12px; box-shadow: inset 0 0 0 1.5px var(--hair-2)">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span style="display: flex; align-items: baseline"><label class="lab" for="c-body" style="flex: 1">Bình luận của bạn</label><span class="help num">{{bodyCount}} / 2.000</span></span>
+              <textarea id="c-body" class="inp {{bodyErrCls}}" rows="4" value="{{body}}" onChange="{{onBody}}" placeholder="Bạn nghĩ gì về bài viết này?"></textarea>
+              <sc-if value="{{bodyErr}}" hint-placeholder-val="{{false}}"><span class="errtxt pop" role="alert">{{bodyErr}}</span></sc-if>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 14px">
+              <div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 8px">
+                <label class="lab" for="c-name">Tên hiển thị</label>
+                <input id="c-name" class="inp {{nameErrCls}}" value="{{name}}" onChange="{{onName}}" autocomplete="name">
+                <sc-if value="{{nameErr}}" hint-placeholder-val="{{false}}"><span class="errtxt pop" role="alert">{{nameErr}}</span></sc-if>
+              </div>
+              <div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 8px">
+                <label class="lab" for="c-mail">Email <span style="font-weight: 400; color: var(--ink-3)">(không bắt buộc)</span></label>
+                <input id="c-mail" class="inp" type="email" placeholder="ban@example.com" autocomplete="email">
+              </div>
+            </div>
+            <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer">
+              <input type="checkbox" class="chk" checked="{{notify}}" onChange="{{toggleNotify}}" style="margin-top: 1px">
+              <span style="font-size: 14.5px; color: var(--ink-2)">Gửi email cho tôi khi có người trả lời. Email không hiển thị trên trang.</span>
+            </label>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-top: 4px">
+              <button class="btn pri" type="submit">Gửi bình luận</button>
+              <span class="help" style="flex: 1 1 240px">Bình luận hiện trên trang sau khi được duyệt.</span>
+            </div>
+          </form>
+
+          <sc-if value="{{posted}}" hint-placeholder-val="{{false}}">
+            <div class="pop" role="status" style="display: flex; flex-direction: column; gap: 12px; padding: 20px 22px; border-radius: 12px; background: var(--warn-bg)">
+              <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px"><span class="av a0" style="width: 32px; height: 32px; font-size: 11.5px">{{postedInitials}}</span><span style="font-weight: 600">{{postedName}}</span><span class="kick" style="color: var(--warn); padding: 5px 8px; border-radius: 5px; box-shadow: inset 0 0 0 1px currentColor">Đang chờ duyệt</span></span>
+              <span style="font-size: 16px; line-height: 1.6; white-space: pre-line">{{postedBody}}</span>
+              <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; color: var(--warn); font-size: 13.5px">
+                <span style="flex: 1 1 240px">Chỉ bạn thấy bình luận này cho tới khi nó được duyệt. Bạn có thể sửa hoặc xoá trong 15 phút tới.</span>
+                <button class="txt" style="color: var(--warn)">Sửa</button>
+                <button class="txt" style="color: var(--warn)" onClick="{{unpost}}">Xoá</button>
+              </span>
+            </div>
+          </sc-if>
+
+          <div style="display: flex; flex-direction: column">
+            <sc-for list="{{threads}}" as="c" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 18px; padding: 26px 0; border-top: 1px solid var(--hair)">
+                <div class="cmt">
+                  <span class="av {{c.av}}">{{c.initials}}</span>
+                  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+                    <span style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px"><span style="font-weight: 600">{{c.name}}</span><sc-if value="{{c.member}}" hint-placeholder-val="{{false}}"><span class="kick" style="font-size: 10.5px; padding: 4px 6px; border-radius: 4px; background: var(--accent-tint)">Thành viên</span></sc-if><span class="meta num">{{c.when}}</span></span>
+                    <span style="font-size: 16.5px; line-height: 1.62; color: {{c.color}}; font-style: {{c.fstyle}}; text-wrap: pretty">{{c.text}}</span>
+                    <sc-if value="{{c.live}}" hint-placeholder-val="{{true}}">
+                      <span class="acts">
+                        <button class="txt" onClick="{{c.reply}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.reply}}"></path></svg>Trả lời</button>
+                        <sc-if value="{{c.canReport}}" hint-placeholder-val="{{true}}"><button class="txt" onClick="{{c.report}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.flag}}"></path></svg>Báo cáo</button></sc-if>
+                        <sc-if value="{{c.reported}}" hint-placeholder-val="{{false}}"><span class="meta pop" style="display: inline-flex; align-items: center; min-height: 32px; color: var(--ok)">Đã gửi báo cáo, cảm ơn bạn.</span></sc-if>
+                      </span>
+                    </sc-if>
+                    <sc-if value="{{c.reporting}}" hint-placeholder-val="{{false}}">
+                      <div class="pop" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--wash)">
+                        <span class="meta" style="margin-right: 4px">Lý do báo cáo:</span>
+                        <sc-for list="{{c.reasons}}" as="r" hint-placeholder-count="4">
+                          <button class="chip" onClick="{{r.pick}}" style="height: 34px; padding: 0 13px; font-size: 13px">{{r.label}}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+
+                <sc-if value="{{c.hasReplies}}" hint-placeholder-val="{{true}}">
+                  <div style="display: flex; flex-direction: column; gap: 18px; margin-left: 17px; padding-left: 32px; border-left: 1.5px solid var(--hair)">
+                    <sc-for list="{{c.replies}}" as="r" hint-placeholder-count="2">
+                      <div class="cmt pop">
+                        <span class="av {{r.av}}" style="width: 30px; height: 30px; font-size: 11px">{{r.initials}}</span>
+                        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+                          <span style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px"><span style="font-weight: 600">{{r.name}}</span><sc-if value="{{r.member}}" hint-placeholder-val="{{false}}"><span class="kick" style="font-size: 10.5px; padding: 4px 6px; border-radius: 4px; background: var(--accent-tint)">Thành viên</span></sc-if><span class="meta num">{{r.when}}</span></span>
+                          <span style="font-size: 16px; line-height: 1.6; text-wrap: pretty">{{r.text}}</span>
+                        </div>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{c.more}}" hint-placeholder-val="{{false}}">
+                      <button class="txt" onClick="{{c.showMore}}" style="align-self: flex-start; color: var(--accent-ink)">{{c.moreLabel}}<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.down}}"></path></svg></button>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{c.replying}}" hint-placeholder-val="{{false}}">
+                  <div class="pop" style="display: flex; flex-direction: column; gap: 10px; margin-left: 50px">
+                    <textarea class="inp" rows="3" placeholder="{{c.replyHint}}" aria-label="Nội dung trả lời"></textarea>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px">
+                      <input class="inp" placeholder="Tên hiển thị" aria-label="Tên hiển thị" style="flex: 1 1 180px; height: 44px">
+                      <button class="btn pri sm" onClick="{{c.sendReply}}" style="height: 44px">Gửi trả lời</button>
+                      <button class="btn quiet sm" onClick="{{c.reply}}" style="height: 44px">Huỷ</button>
+                    </div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{c.replySent}}" hint-placeholder-val="{{false}}">
+                  <div class="note warn pop" role="status" style="margin-left: 50px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-top: 2px"><path d="{{ic.clock}}"></path></svg><span>Trả lời của bạn đang chờ duyệt.</span></div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+
+          <button class="btn" style="align-self: center">Tải thêm bình luận</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="band">
+    <div class="wrap" style="padding-top: 52px; padding-bottom: 28px; display: flex; flex-direction: column; gap: 40px">
+      <div style="display: flex; flex-wrap: wrap; gap: 36px 64px">
+        <div style="flex: 2 1 300px; display: flex; flex-direction: column; gap: 14px">
+          <span style="display: flex; align-items: center; gap: 10px">
+            <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 21px; height: 21px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+            </span>
+            <span class="dsp" style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em">Autoxide</span>
+          </span>
+          <p style="margin: 0; max-width: 380px; font-size: 15px; line-height: 1.6; color: var(--band-ink-2)">Lõi backend mã nguồn mở viết bằng Rust, chạy trên cả SQLite và Postgres. Blog này được dựng bằng chính nó.</p>
+        </div>
+        <sc-for list="{{footer}}" as="col" hint-placeholder-count="3">
+          <div style="flex: 1 1 150px; display: flex; flex-direction: column; gap: 12px">
+            <span class="kick" style="color: #FF9A6E">{{col.label}}</span>
+            <sc-for list="{{col.items}}" as="f" hint-placeholder-count="3">
+              <a class="fl" href="{{f.href}}" style="font-size: 15px">{{f.label}}</a>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; padding-top: 22px; border-top: 1px solid var(--band-hair); font-size: 13px; color: var(--band-ink-2)">
+        <span>© 2026 Autoxide. Mã nguồn mở, giấy phép MIT hoặc Apache-2.0.</span>
+        <div style="flex: 1"></div>
+        <span>Tiếng Việt · English</span>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":5200}}'>
+class Component extends DCLogic {
+  state = {
+    dark: null, copied: false, email: '', sent: false, err: '',
+    order: 'new', body: '', name: '', notify: true, bodyErr: '', nameErr: '', posted: null,
+    replyTo: 0, replySent: {}, reportFor: 0, reported: {}, expanded: {}
+  };
+
+  renderVals() {
+    const I = {
+      search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      arrow: 'M5 12h14M13 6l6 6-6 6',
+      down: 'M6 9l6 6 6-6',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+      warn: 'M12 4l9 16H3zM12 10v4M12 17h.01',
+      reply: 'M9 14l-5-5 5-5M4 9h9a7 7 0 0 1 7 7v3',
+      flag: 'M5 21V4h11l-1.5 4L16 12H5',
+      clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2'
+    };
+    const s = this.state;
+    const dark = s.dark ?? this.props.dark ?? false;
+
+    const menu = [
+      { label: 'Bài viết', href: 'List.dc.html' },
+      { label: 'Hướng dẫn', href: 'List.dc.html', cls: 'on' },
+      { label: 'Kỹ thuật', href: 'List.dc.html' },
+      { label: 'Thông báo', href: 'List.dc.html' },
+      { label: 'Liên hệ', href: 'Page.dc.html' }
+    ];
+
+    const related = [
+      { title: 'Sao lưu và khôi phục: những điều cần biết', meta: 'Thu Hà · 7 thg 11 · 7 phút đọc', img: '/_blob/7d7d0b8853cbaf6d7c931bff0aee3b97', alt: 'Bốn lớp xếp chồng màu xanh lá, lớp trên cùng có dấu tích' },
+      { title: 'Hướng dẫn cài Autoxide trên SQLite trong 5 phút', meta: 'Thu Hà · 3 thg 11 · 4 phút đọc', img: '/_blob/bf8a142cadb8f1f03430e81c0a41bdf7', alt: 'Cửa sổ dòng lệnh bên cạnh một chiếc đồng hồ' },
+      { title: 'Kiểm duyệt bình luận: cấu hình khuyến nghị', meta: 'Thu Hà · 25 thg 10 · 5 phút đọc', img: '/_blob/260b4c0726d230b03cc956d6416383d8', alt: 'Hai bong bóng hội thoại và một dấu tích' }
+    ];
+
+    const REASONS = [['spam', 'Spam'], ['abuse', 'Xúc phạm'], ['illegal', 'Vi phạm pháp luật'], ['other', 'Khác']];
+    const data = [
+      { id: 1, name: 'Hải Đăng', initials: 'HĐ', av: 'a2', when: '10 thg 11, 21:14', text: 'Bài viết rất dễ theo. Bản SQLite có chạy được trên máy chủ 1 GB RAM không?', total: 3, replies: [
+        { name: 'Hoàng Nam', initials: 'HN', av: 'a4', member: true, when: '10 thg 11, 22:02', text: 'Chạy được. SQLite không cần tiến trình riêng, nên gần như toàn bộ bộ nhớ dành cho ứng dụng.' },
+        { name: 'Hải Đăng', initials: 'HĐ', av: 'a2', when: '11 thg 11, 08:30', text: 'Cảm ơn bạn, mình sẽ thử trên máy 1 GB trước rồi mới tính chuyện chuyển.' },
+        { name: 'Thu Hà', initials: 'TH', av: 'a3', member: true, when: '11 thg 11, 09:12', text: 'Bài cài đặt trên SQLite có phần nói về cấu hình cho máy nhỏ, bạn xem thêm nhé.' }
+      ] },
+      { id: 2, name: 'Lan Chi', initials: 'LC', av: 'a1', when: '9 thg 11, 16:45', text: 'Phần sao lưu nên nói thêm cách kiểm tra bản sao lưu có khôi phục được hay không.', total: 0, replies: [] },
+      { id: 3, deleted: true, name: 'Bình luận đã xoá', initials: '–', av: 'a0', when: '9 thg 11, 11:20', text: 'Người viết đã xoá bình luận này.', total: 1, replies: [
+        { name: 'Quốc Bảo', initials: 'QB', av: 'a2', member: true, when: '9 thg 11, 13:05', text: 'Lệnh copy chỉ nhận database đích còn trống, nên bạn không lo ghi đè dữ liệu cũ.' }
+      ] }
+    ];
+    const ordered = s.order === 'new' ? data : [...data].reverse();
+    const threads = ordered.map((c) => {
+      const open = !!s.expanded[c.id];
+      const shown = open ? c.replies : c.replies.slice(0, 2);
+      const hidden = c.replies.length - shown.length;
+      const reported = !!s.reported[c.id];
+      return {
+        ...c,
+        member: false,
+        live: !c.deleted,
+        color: c.deleted ? 'var(--ink-3)' : 'var(--ink)',
+        fstyle: c.deleted ? 'italic' : 'normal',
+        replies: shown,
+        hasReplies: shown.length > 0,
+        more: hidden > 0,
+        moreLabel: 'Xem thêm ' + hidden + ' trả lời',
+        showMore: () => this.setState({ expanded: { ...s.expanded, [c.id]: true } }),
+        replying: s.replyTo === c.id,
+        replyHint: 'Trả lời ' + c.name + '…',
+        reply: () => this.setState({ replyTo: s.replyTo === c.id ? 0 : c.id, reportFor: 0 }),
+        sendReply: () => this.setState({ replyTo: 0, replySent: { ...s.replySent, [c.id]: true } }),
+        replySent: !!s.replySent[c.id],
+        canReport: !reported,
+        reported,
+        reporting: s.reportFor === c.id,
+        report: () => this.setState({ reportFor: s.reportFor === c.id ? 0 : c.id, replyTo: 0 }),
+        reasons: REASONS.map(([, label]) => ({ label, pick: () => this.setState({ reportFor: 0, reported: { ...s.reported, [c.id]: true } }) }))
+      };
+    });
+
+    const footer = [
+      { label: 'Chủ đề', items: [{ label: 'Hướng dẫn', href: 'List.dc.html' }, { label: 'Kỹ thuật', href: 'List.dc.html' }, { label: 'Thông báo', href: 'List.dc.html' }] },
+      { label: 'Dự án', items: [{ label: 'Liên hệ', href: 'Page.dc.html' }, { label: 'Mã nguồn trên GitHub', href: 'https://github.com/thuongtamduy/autoxide' }] },
+      { label: 'Theo dõi', items: [{ label: 'Newsletter', href: '#dang-ky' }, { label: 'Nguồn RSS', href: '#' }, { label: 'Tìm kiếm', href: 'Search.dc.html' }] }
+    ];
+
+    const initialsOf = (name) => {
+      const words = name.trim().split(/\s+/).filter(Boolean);
+      const a = words[0] ? Array.from(words[0])[0] : '';
+      const b = words.length > 1 ? Array.from(words[words.length - 1])[0] : '';
+      return (a + b).toUpperCase() || '?';
+    };
+
+    return {
+      theme: dark ? 'dark' : '',
+      themeIcon: dark ? I.sun : I.moon,
+      toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, menu, related, threads, footer,
+      copyIcon: s.copied ? I.check : I.link,
+      copyLabel: s.copied ? 'Đã chép liên kết' : 'Chép liên kết',
+      copy: () => {
+        this.setState({ copied: true });
+        clearTimeout(this.copyTimer);
+        this.copyTimer = setTimeout(() => this.setState({ copied: false }), 2200);
+      },
+      email: s.email,
+      onEmail: (e) => this.setState({ email: e.target.value, err: '' }),
+      nlForm: !s.sent, nlSent: s.sent, nlErr: s.err, nlErrCls: s.err ? 'err' : '',
+      subscribe: (e) => {
+        e.preventDefault();
+        const email = s.email.trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+          this.setState({ err: 'Hãy nhập một địa chỉ email hợp lệ, ví dụ ban@example.com.' });
+          return;
+        }
+        this.setState({ sent: true, err: '', email });
+      },
+      newOn: s.order === 'new' ? 'on' : '', oldOn: s.order === 'old' ? 'on' : '',
+      sortNew: () => this.setState({ order: 'new' }),
+      sortOld: () => this.setState({ order: 'old' }),
+      body: s.body, name: s.name, notify: s.notify,
+      bodyCount: String(s.body.length),
+      onBody: (e) => this.setState({ body: e.target.value.slice(0, 2000), bodyErr: '' }),
+      onName: (e) => this.setState({ name: e.target.value, nameErr: '' }),
+      toggleNotify: () => this.setState({ notify: !s.notify }),
+      bodyErr: s.bodyErr, bodyErrCls: s.bodyErr ? 'err' : '',
+      nameErr: s.nameErr, nameErrCls: s.nameErr ? 'err' : '',
+      post: (e) => {
+        e.preventDefault();
+        // Báo mọi lỗi của form một lần, như core làm.
+        const bodyErr = s.body.trim() ? '' : 'Hãy viết nội dung bình luận.';
+        const nameErr = s.name.trim() ? '' : 'Hãy nhập tên hiển thị.';
+        if (bodyErr || nameErr) {
+          this.setState({ bodyErr, nameErr });
+          return;
+        }
+        this.setState({ posted: { name: s.name.trim(), body: s.body.trim() }, body: '', bodyErr: '', nameErr: '' });
+      },
+      posted: !!s.posted,
+      postedName: s.posted ? s.posted.name : '',
+      postedBody: s.posted ? s.posted.body : '',
+      postedInitials: s.posted ? initialsOf(s.posted.name) : '',
+      unpost: () => this.setState({ posted: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

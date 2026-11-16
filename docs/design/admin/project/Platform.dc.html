@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Nền tảng — Autoxide Admin</title>
+<script src="./support.js"></script>
+<script src="./ax-shell.js"></script>
+<link rel="stylesheet" href="./ax-r40.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+/* Riêng màn Nền tảng › Khách hàng (lớp pf) */
+.ax.pf .pf-ctx > .tav { background: var(--ink); color: var(--sheet); }
+.ax.pf .pf-scope { color: var(--st-sched); }
+.ax.pf .pf-lim { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--ink-2); }
+.ax.pf .pf-lim > .ell { flex: 1 1 auto; min-width: 0; }
+.ax.pf .pf-lim > .num { flex: none; font-weight: 500; color: var(--ink); }
+.ax.pf .pf-tenants .badge { white-space: nowrap; }
+/* Máy tính bảng: vị trí "Nền tảng › Khách hàng" đã có ở dải menu con, nhường chỗ cho ô tìm và các nút */
+@media (max-width: 1100px) { .ax.pf header > nav[aria-label="Vị trí"] { display: none !important; } }
+@media (max-width: 720px) {
+  .ax.pf .pf-acts > .btn, .ax.pf .pf-acts > .btn.danger { flex: 1 1 calc(50% - 4px); }
+  /* Hộp cấp phát: tên khách và tên miền mỗi ô một hàng để gợi ý "Ví dụ: …" và dòng lỗi không bị cắt */
+  .ax.pf .pf-prov-grid > .pf-wide { grid-column: 1 / -1; }
+}
+.ax.pf .pf-prov { max-height: 84vh; overflow-y: auto; }
+</style>
+</helmet>
+<div class="ax pf {{theme}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <nav class="rail" aria-label="Mặt điều khiển nền tảng" style="flex: 0 0 88px">
+    <a href="Platform.dc.html" aria-label="Autoxide, mặt điều khiển nền tảng" style="display: flex; justify-content: center; padding: 4px 0 14px">
+      <span style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: #1F2430; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14)">
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+      </span><span class="rail-name">Autoxide</span><span class="rail-tag">Nền tảng</span>
+    </a>
+    <div class="rail-mid">
+      <a class="ri on" aria-current="page" href="Platform.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-1.5a4 4 0 0 0-3-3.85M16 3.6a3.5 3.5 0 0 1 0 6.8"></path></svg><span class="ri-l">Khách hàng</span></a>
+      <a class="ri" href="PlatformOps.dc.html#plans"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8zM7.5 7.5h.01"></path></svg><span class="ri-l">Gói và giá</span></a>
+      <a class="ri" href="PlatformOps.dc.html#subs"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3zM3 10h18M7 15h4"></path></svg><span class="ri-l">Thuê bao</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="PlatformOps.dc.html#prov"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15c-1.5 1.5-2 4-2 6 2 0 4.5-.5 6-2M9 13l2 2M14 4c3 0 6 3 6 6l-7 7-6-6zM15 9h.01"></path></svg><span class="ri-l">Cấp phát</span></a>
+      <a class="ri" href="PlatformOps.dc.html#fleet"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg><span class="ri-l">Đội database</span></a>
+      <a class="ri" href="PlatformOps.dc.html#health"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span class="ri-l">Sức khoẻ</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="PlatformOps.dc.html#support"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 10a4 4 0 1 0-3.5 4L9 15.5V18H6.5v2H4v-2.5L10.5 11A4 4 0 0 0 14 10zM15 7h.01"></path></svg><span class="ri-l">Vào dữ liệu khách</span></a>
+    </div>
+    <a class="ri" href="Map.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"></path></svg><span class="ri-l">Bản đồ</span></a>
+    <button type="button" class="ri" popovertarget="help"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6M12 16.8h.01"></path></svg><span class="ri-l">Trợ giúp</span></button>
+    <label class="ri rail-toggle"><input type="checkbox" class="railmini" aria-label="Thu gọn thanh phân hệ"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"></path></svg><span class="t-full">Thu gọn</span><span class="t-mini">Mở rộng</span></label>
+  </nav>
+
+  <div style="flex: 999 1 560px; min-width: 0; margin: 8px; display: flex; flex-direction: column; background: var(--sheet); border: 1px solid var(--line); border-radius: 16px; overflow: hidden">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; border-bottom: 1px solid var(--line)">
+      <span class="ctx pf-ctx" role="group" aria-label="Mặt điều khiển nền tảng Autoxide" style="cursor: default">
+        <span class="tav">AX</span>
+        <span style="display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.2">
+          <span class="ell" style="font-weight: 600">Nền tảng Autoxide</span>
+          <span class="ell" style="font-size: 12px; color: var(--ink-3)">Mặt điều khiển · nhân sự vận hành</span>
+        </span>
+      </span>
+      <nav class="hide-mobile" aria-label="Vị trí" style="display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-3)">
+        <span>Nền tảng</span><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.right}}"></path></svg><span style="color: var(--ink); font-weight: 600">Khách hàng</span>
+      </nav>
+      <div style="flex: 1"></div>
+      <button type="button" class="btn" popovertarget="qs" data-cmdk="data-cmdk" aria-label="Tìm trong mọi phân hệ" style="flex: 0 1 300px; justify-content: flex-start; color: var(--ink-3); font-weight: 400; background: var(--panel)">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><span class="hide-mobile" style="flex: 1; text-align: left">Tìm trong mọi phân hệ…</span><span class="kbd hide-mobile">Ctrl</span><span class="kbd hide-mobile">K</span>
+      </button>
+      <button type="button" class="btn ghost sq pf-scope" popovertarget="tip-scope" aria-label="Phạm vi xem: bạn không thấy dữ liệu nghiệp vụ của khách" data-tip="Phạm vi xem" style="anchor-name: --tip-scope"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM9.5 11.5h5v4h-5zM10.5 11.5v-1a1.5 1.5 0 0 1 3 0v1"></path></svg></button><span class="tip" id="tip-scope" popover="auto" role="dialog" aria-label="Phạm vi xem của mặt điều khiển" style="position-anchor: --tip-scope"><b class="tip-t">Bạn không thấy dữ liệu nghiệp vụ của khách</b><span class="tip-b">Mặt điều khiển chỉ hiện sổ khách, gói, thuê bao, vị trí dữ liệu và sức khoẻ hệ thống. Đơn hàng, khách mua, bài viết… của từng khách không hiện ở đây. Muốn xem để hỗ trợ thì mở một khách và xin quyền vào: có thời hạn, phải ghi lý do, khách thấy trong nhật ký audit.</span><span class="tip-f"><a class="tip-more" href="PlatformOps.dc.html#support">Vào dữ liệu khách<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-scope" popovertargetaction="hide">Đã hiểu</button></span></span>
+      <button type="button" class="btn ghost sq" popovertarget="help" aria-label="Trợ giúp cho trang này" data-tip="Trợ giúp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6M12 16.8h.01"></path></svg></button><span class="helppanel" id="help" popover="auto" role="dialog" aria-label="Trợ giúp: Nền tảng"><span class="hp-head"><b>Trợ giúp · Nền tảng</b><button type="button" class="btn ghost sm sq" popovertarget="help" popovertargetaction="hide" aria-label="Đóng trợ giúp"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span><label class="hp-search"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><input class="inp" type="search" placeholder="Tìm trong hướng dẫn…" aria-label="Tìm trong hướng dẫn"></label><span class="cap">Trên trang này</span><a class="hp-art" href="#"><b>Cấp phát khách mới</b><span>Tạo khách, chọn gói và nơi lưu dữ liệu</span></a><a class="hp-art" href="#"><b>Database dùng chung hay riêng</b><span>Khi nào nên chuyển, khách bị ảnh hưởng gì</span></a><a class="hp-art" href="#"><b>Chạy migration cho cả đội database</b><span>Theo dõi tiến độ, xử lý database lỗi</span></a><a class="hp-art" href="#"><b>Vào dữ liệu khách để hỗ trợ</b><span>Có thời hạn, ghi lý do, khách thấy trong audit</span></a><span class="hp-hint"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg><span>Bấm biểu tượng ⓘ cạnh một mục để xem giải thích ngắn ngay tại chỗ.</span></span><span class="cap hide-mobile">Phím tắt</span><span class="hp-keys hide-mobile"><span><span class="kbd">Ctrl</span><span class="kbd">K</span></span><span>Tìm và chạy lệnh</span><span><span class="kbd">?</span></span><span>Mở trợ giúp này</span><span><span class="kbd">Esc</span></span><span>Đóng hộp đang mở</span></span><span class="cap">Cần thêm trợ giúp</span><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg><span><b>Hỏi trợ lý AI về trang này</b><span>Trả lời theo dữ liệu bạn được xem; không tự chạy lệnh ghi</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-1.5-3-5-3-5-1s3 1 5 1zM12 7c1.5-3 5-3 5-1s-3 1-5 1z"></path></svg><span><b>Có gì mới</b><span>2 cập nhật trong tháng này</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"></path></svg><span><b>Liên hệ hỗ trợ</b><span>Kèm sẵn trang đang xem và mã khách</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span><b>Tài liệu API</b><span>OpenAPI và MCP cho lập trình viên</span></span></a></span>
+      <button class="btn ghost sq" aria-label="Đổi giao diện sáng / tối" data-tip="Sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+    </header>
+    <nav class="subnav" aria-label="Menu của phân hệ Nền tảng">
+      <span class="gname">Nền tảng</span>
+      <a class="stab on" href="Platform.dc.html" aria-current="page">Khách hàng</a>
+      <a class="stab" href="PlatformOps.dc.html">Vận hành nền tảng<span class="cnt" title="6 việc đang chờ">6<span class="vh"> việc đang chờ</span></span></a>
+    </nav>
+
+    <main style="width: 100%; max-width: none; margin: 0; padding: 24px 24px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+      <section class="rise" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px">
+        <div style="flex: 1 1 360px; display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 13px; color: var(--ink-3)">Sổ khách hàng, gói, vị trí dữ liệu</span>
+          <h1 class="h1">Khách hàng</h1>
+        </div>
+        <div class="headacts" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button class="btn sec" onClick="{{migrateAll}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.db}}"></path></svg>Chạy migration mọi database</button>
+          <button class="btn pri" onClick="{{provision}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.plus}}"></path></svg>Cấp phát khách mới</button>
+          <button type="button" class="btn sq only-mobile" popovertarget="hmore" aria-label="Thao tác khác" style="anchor-name: --hmore; font-size: 18px; letter-spacing: 1px">⋯</button><span class="moremenu" id="hmore" popover="auto" role="menu" aria-label="Thao tác khác" style="position-anchor: --hmore"><button class="btn" role="menuitem" popovertarget="hmore" popovertargetaction="hide" onClick="{{migrateAll}}">Chạy migration mọi database</button></span>
+        </div>
+      </section>
+
+      <section class="kpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px">
+        <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+          <div class="card rise {{k.delay}}" style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px">
+            <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ink-2)"><span class="dot {{k.dot}}"></span>{{k.label}}</span>
+            <span class="dsp num" style="font-size: 28px; font-weight: 600; letter-spacing: -0.02em">{{k.n}}</span>
+            <span style="font-size: 12.5px; color: var(--ink-3)">{{k.note}}</span>
+          </div>
+        </sc-for>
+      </section>
+
+      <section class="card" style="overflow: hidden">
+        <div class="scrollrow" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line)">
+          <sc-for list="{{filters}}" as="f" hint-placeholder-count="5">
+            <button class="chip {{f.cls}}" aria-pressed="{{f.on}}" onClick="{{f.pick}}">{{f.label}}</button>
+          </sc-for>
+        </div>
+        <div class="tbox wst pf-tenants">
+          <div style="min-width: 800px">
+            <div class="thead" style="grid-template-columns: minmax(160px, 1.5fr) minmax(120px, 1fr) minmax(160px, 1.3fr) 150px 150px">
+              <span>Khách hàng</span><span>Gói · mô hình</span><span>Vị trí dữ liệu · migration</span><span>Thuê bao</span><span>Hạn mức gần nhất</span>
+            </div>
+            <sc-for list="{{rows}}" as="t" hint-placeholder-count="7">
+              <button class="trow {{t.sel}}" onClick="{{t.open}}" style="grid-template-columns: minmax(160px, 1.5fr) minmax(120px, 1fr) minmax(160px, 1.3fr) 150px 150px">
+                <span class="cc-open" style="display: flex; align-items: center; gap: 10px; min-width: 0"><span class="tav {{t.av}}" style="width: 28px; height: 28px; font-size: 12px">{{t.initials}}</span><span style="display: flex; flex-direction: column; min-width: 0"><span class="ell" style="font-weight: 600">{{t.name}}</span><span class="ell mono" style="font-size: 12px; color: var(--ink-3)">{{t.domain}}</span></span></span>
+                <span class="cc-kv pf-plan" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0"><span class="cl">Gói · mô hình</span><span class="kind">{{t.plan}}</span><span class="ell" style="max-width: 100%; font-size: 12.5px; color: var(--ink-2)">{{t.model}}</span></span>
+                <span class="cc-kv" style="display: flex; flex-direction: column; min-width: 0"><span class="cl">Vị trí dữ liệu</span><span class="ell">{{t.place}}</span><span class="ell" style="font-size: 12px; color: var(--ink-3)">{{t.engine}}</span><sc-if value="{{t.migPending}}" hint-placeholder-val="{{false}}"><span class="tone-warn" style="font-size: 12px; font-weight: 600">{{t.mig}}</span></sc-if></span>
+                <span class="cc-badge"><span class="badge {{t.subBadge}}" title="{{t.subLong}}"><span class="dot"></span>{{t.sub}}</span></span>
+                <span class="cc-kv pf-limit" style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span class="cl">Hạn mức gần nhất</span><span class="pf-lim"><span class="ell">{{t.limitName}}</span><span class="num">{{t.limitVal}}</span></span><span class="meter {{t.limitCls}}"><span style="width: {{t.limitPct}}"></span></span></span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px"><h2 class="h2" style="flex: 1 0 auto">Gói là dữ liệu <button type="button" class="qi" popovertarget="tip-plans" aria-label="Giải thích: Gói" style="anchor-name: --tip-plans"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-plans" popover="auto" role="dialog" aria-label="Gói" style="position-anchor: --tip-plans"><b class="tip-t">Gói là dữ liệu</b><span class="tip-b">Gói là cấu hình chứ không phải code: module, tính năng, hạn mức và giá theo kỳ. Đổi gói không cần cài lại; ghi đè cho một khách không ảnh hưởng gói chung.</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-plans" popovertargetaction="hide">Đã hiểu</button></span></span></h2><span style="font-size: 12.5px; color: var(--ink-3)">Module + tính năng + hạn mức + giá theo kỳ; ghi đè riêng được cho từng khách</span></div>
+        <div class="planrow flow" style="--fb: 210px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 12px">
+          <sc-for list="{{plans}}" as="p" hint-placeholder-count="5">
+            <div class="card" style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px">
+              <span style="display: flex; align-items: baseline; gap: 8px"><span class="dsp" style="flex: 1; font-size: 16px; font-weight: 600">{{p.name}}</span><span class="num" style="font-size: 12.5px; color: var(--ink-3)">{{p.count}}</span></span>
+              <span class="num" style="font-weight: 600">{{p.price}}</span>
+              <span style="font-size: 12.5px; color: var(--ink-2); text-wrap: pretty">{{p.mods}}</span>
+              <span style="font-size: 12px; color: var(--ink-3); text-wrap: pretty">{{p.place}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <sc-if value="{{paneOpen}}" hint-placeholder-val="{{false}}">
+    <button class="scrim" aria-label="Đóng chi tiết khách" onClick="{{close}}" style="border: 0; z-index: 24; cursor: default"></button>
+    <aside class="pane" role="dialog" aria-label="{{d.name}}">
+      <div class="panehead" style="display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--line)">
+        <span class="tav {{d.av}}" style="width: 40px; height: 40px; font-size: 14px">{{d.initials}}</span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+          <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span style="font-size: 16px; font-weight: 600">{{d.name}}</span><span class="badge {{d.subBadge}}"><span class="dot"></span>{{d.sub}}</span></span>
+          <span style="font-size: 13px; color: var(--ink-3)">{{d.model}} · {{d.plan}}</span>
+        </span>
+        <button class="btn ghost sm sq" aria-label="Đóng" onClick="{{close}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 22px; padding: 18px 20px 28px">
+        <section style="display: flex; flex-direction: column; gap: 8px">
+          <span class="cap">Vị trí dữ liệu <button type="button" class="qi" popovertarget="tip-place" aria-label="Giải thích: Vị trí dữ liệu" style="anchor-name: --tip-place"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-place" popover="auto" role="dialog" aria-label="Vị trí dữ liệu" style="position-anchor: --tip-place"><b class="tip-t">Dùng chung hay database riêng</b><span class="tip-b">Dùng chung: nhiều khách cùng một database, tách nhau bằng tenant_id. Database riêng: khách có database của mình và chọn được nơi lưu. Đổi giữa hai kiểu bằng job chép dữ liệu; khách chỉ đọc trong vài phút.</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-place" popovertargetaction="hide">Đã hiểu</button></span></span></span>
+          <span style="font-weight: 500">{{d.place}} · {{d.engine}}</span>
+          <span style="font-size: 13px; color: var(--ink-2); text-wrap: pretty">Mọi bảng vẫn mang tenant_id, nên chuyển giữa chung và riêng chỉ là chép dữ liệu bằng job; khách không phải dừng lâu.</span>
+          <button class="btn sm" onClick="{{d.move}}" style="align-self: flex-start">{{d.moveLabel}}</button>
+        </section>
+
+        <section style="display: flex; flex-direction: column; gap: 4px">
+          <span style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px"><span class="cap" style="flex: 1 0 auto">Module bật cho khách · {{d.modCount}}</span><span style="font-size: 12px; color: var(--ink-3)">Tắt thì giữ dữ liệu theo chính sách lưu</span></span>
+          <sc-for list="{{d.mods}}" as="m" hint-placeholder-count="8">
+            <div style="display: flex; align-items: center; gap: 10px; min-height: 40px; border-bottom: 1px solid var(--line)">
+              <span style="flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px"><span style="font-weight: 500">{{m.label}}</span><span class="mono" style="font-size: 12px; color: var(--ink-3)">{{m.id}}</span></span>
+              <sc-if value="{{m.extra}}" hint-placeholder-val="{{false}}"><span class="pro">Ghi đè ngoài gói</span></sc-if>
+              <button class="sw {{m.cls}}" role="switch" aria-checked="{{m.on}}" aria-label="{{m.aria}}" onClick="{{m.toggle}}"></button>
+            </div>
+          </sc-for>
+        </section>
+
+        <section class="pf-access" style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line)">
+          <span style="display: flex; align-items: center; gap: 8px"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.key}}"></path></svg><span class="h2" style="font-size: 14px">Vào dữ liệu của khách để hỗ trợ</span></span>
+          <span style="font-size: 12.5px; color: var(--ink-2); text-wrap: pretty">Có thời hạn, phải ghi lý do; khách thấy mục này trong nhật ký audit của họ (Luật Bảo vệ dữ liệu cá nhân 2025).</span>
+          <label class="lab" for="reason">Lý do</label>
+          <textarea id="reason" class="inp" rows="2" value="{{reason}}" onChange="{{onReason}}" placeholder="Ví dụ: khách báo lỗi nhập CSV, phiếu hỗ trợ #1042" aria-invalid="{{reasonInv}}" aria-describedby="{{reasonDesc}}"></textarea>
+          <sc-if value="{{reasonMsg}}" hint-placeholder-val="{{false}}"><span class="ferr" id="reason-e">{{reasonMsg}}</span></sc-if>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+            <div class="seg" role="group" aria-label="Thời hạn">
+              <sc-for list="{{durations}}" as="du" hint-placeholder-count="3">
+                <button class="{{du.cls}}" onClick="{{du.pick}}">{{du.label}}</button>
+              </sc-for>
+            </div>
+            <div style="flex: 1"></div>
+            <button class="btn sm pri" onClick="{{requestAccess}}">Xin quyền vào</button>
+          </div>
+          <sc-if value="{{reasonErr}}" hint-placeholder-val="{{false}}"><span class="tone-bad" role="alert" style="font-size: 13px">{{reasonErr}}</span></sc-if>
+        </section>
+
+        <div class="paneacts stick pf-acts" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-if value="{{d.suspAsk}}" hint-placeholder-val="{{false}}">
+            <div class="pop" role="alertdialog" aria-label="Xác nhận tạm khoá" style="flex: 1 1 100%; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: var(--bad-bg); color: var(--ink)">
+              <span style="font-size: 13.5px; text-wrap: pretty"><b>{{d.suspTitle}}</b> Mọi API và website của khách ngừng phục vụ, kể cả đăng nhập; dùng khi vi phạm điều khoản hay theo yêu cầu cơ quan có thẩm quyền. Khác với "chỉ đọc" (thuê bao quá hạn: vẫn đăng nhập, xem và xuất được dữ liệu). Ghi lý do vào audit; mở lại bất cứ lúc nào.</span>
+              <div style="display: flex; justify-content: flex-end; gap: 8px"><button class="btn sm" onClick="{{d.cancelSuspend}}">Huỷ</button><button class="btn sm danger-solid" onClick="{{d.suspend}}">Tạm khoá</button></div>
+            </div>
+          </sc-if>
+          <button class="btn" onClick="{{d.renew}}">Gia hạn</button>
+          <button class="btn" onClick="{{d.readOnly}}">Đặt chỉ đọc</button>
+          <button class="btn" onClick="{{d.export}}">Xuất dữ liệu</button>
+          <button class="btn danger" onClick="{{d.askSuspend}}">Tạm khoá hẳn</button>
+        </div>
+      </div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{provOpen}}" hint-placeholder-val="{{false}}">
+    <div style="position: fixed; inset: 0; z-index: 26; display: flex; justify-content: center; align-items: flex-start; padding: 8vh 16px 16px">
+      <button class="scrim" aria-label="Đóng" onClick="{{closeProv}}" style="border: 0; cursor: default"></button>
+      <form class="popover pf-prov" role="dialog" aria-label="Cấp phát khách mới" onSubmit="{{submitProv}}" novalidate="novalidate" style="position: relative; width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 14px; padding: 20px">
+        <div style="display: flex; align-items: center; gap: 10px"><h2 class="h2" style="flex: 1; font-size: 17px">Cấp phát khách mới</h2><button type="button" class="btn ghost sm sq" aria-label="Đóng" onClick="{{closeProv}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button></div>
+        <div class="pf-prov-grid" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+          <label class="pf-wide" style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Tên khách</span><input id="pv-name" class="inp" value="{{pv.name}}" onChange="{{onPvName}}" placeholder="Ví dụ: Trà Hoa Sen" aria-invalid="{{pe.name.inv}}" aria-describedby="{{pe.name.desc}}"><sc-if value="{{pe.name.msg}}" hint-placeholder-val="{{false}}"><span class="ferr" id="pv-name-e">{{pe.name.msg}}</span></sc-if></label>
+          <label class="pf-wide" style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Tên miền</span><input id="pv-domain" class="inp mono" value="{{pv.domain}}" onChange="{{onPvDomain}}" placeholder="Ví dụ: trahoasen.vn" aria-invalid="{{pe.domain.inv}}" aria-describedby="{{pe.domain.desc}}"><sc-if value="{{pe.domain.msg}}" hint-placeholder-val="{{false}}"><span class="ferr" id="pv-domain-e">{{pe.domain.msg}}</span></sc-if></label>
+          <label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Mô hình</span><select class="inp" value="{{pv.model}}" onChange="{{onPvModel}}"><option value="Một cửa hàng">Một cửa hàng</option><option value="Chuỗi nhiều cửa hàng">Chuỗi nhiều cửa hàng</option><option value="Chỉ nội dung">Chỉ nội dung</option><option value="Sàn">Sàn</option></select></label>
+          <label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Gói</span><select class="inp" value="{{pv.plan}}" onChange="{{onPvPlan}}"><option value="Dùng thử">Dùng thử</option><option value="Cơ bản">Cơ bản</option><option value="Pro">Pro</option><option value="Doanh nghiệp">Doanh nghiệp</option><option value="VIP">VIP</option></select></label>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 10px; background: var(--panel); font-size: 13px; color: var(--ink-2)">
+          <span><b>Vị trí dữ liệu theo gói:</b> {{pvPlace}}</span>
+          <span><b>Các bước sẽ chạy:</b> tạo khách → chọn database → chạy migration → dữ liệu mẫu → mời quản trị đầu tiên.</span>
+          <sc-if value="{{pvKyc}}" hint-placeholder-val="{{false}}"><span class="tone-warn">Mô hình sàn: khách phải hoàn tất định danh (KYC) trước khi mở bán.</span></sc-if>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Email quản trị đầu tiên</span><input id="pv-email" class="inp" type="email" value="{{pv.email}}" onChange="{{onPvEmail}}" placeholder="Ví dụ: chu.cua.hang@example.com" aria-invalid="{{pe.email.inv}}" aria-describedby="{{pe.email.desc}}"><sc-if value="{{pe.email.msg}}" hint-placeholder-val="{{false}}"><span class="ferr" id="pv-email-e">{{pe.email.msg}}</span></sc-if></label>
+        <sc-if value="{{pvErr}}" hint-placeholder-val="{{false}}"><span class="tone-bad" role="alert" style="font-size: 13px">{{pvErr}}</span></sc-if>
+        <div style="display: flex; justify-content: flex-end; gap: 8px"><button type="button" class="btn" onClick="{{closeProv}}">Huỷ</button><button type="submit" class="btn pri">Cấp phát</button></div>
+      </form>
+    </div>
+  </sc-if>
+
+<ax-sheets>
+  <div class="axsheet" id="qs" popover="auto" role="dialog" aria-label="Tìm và chạy lệnh">
+    <label class="qs-in"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><input class="inp" type="search" autofocus="autofocus" placeholder="Tìm màn, phân hệ hay lệnh…" aria-label="Tìm màn, phân hệ hay lệnh"><span class="kbd hide-mobile">Esc</span></label>
+    <span class="cap">Đi tới</span>
+    <div class="qs-list">
+      <a class="qs-it" href="Platform.dc.html" data-k="khach hang"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-1.5a4 4 0 0 0-3-3.85M16 3.6a3.5 3.5 0 0 1 0 6.8"></path></svg><span>Khách hàng</span></a>
+      <a class="qs-it" href="PlatformOps.dc.html#plans" data-k="goi va gia"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8zM7.5 7.5h.01"></path></svg><span>Gói và giá</span></a>
+      <a class="qs-it" href="PlatformOps.dc.html#subs" data-k="thue bao"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3zM3 10h18M7 15h4"></path></svg><span>Thuê bao</span></a>
+      <a class="qs-it" href="PlatformOps.dc.html#prov" data-k="cap phat"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15c-1.5 1.5-2 4-2 6 2 0 4.5-.5 6-2M9 13l2 2M14 4c3 0 6 3 6 6l-7 7-6-6zM15 9h.01"></path></svg><span>Cấp phát</span></a>
+      <a class="qs-it" href="PlatformOps.dc.html#fleet" data-k="doi database"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg><span>Đội database</span></a>
+      <a class="qs-it" href="PlatformOps.dc.html#health" data-k="suc khoe"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span>Sức khoẻ</span></a>
+      <a class="qs-it" href="PlatformOps.dc.html#support" data-k="vao du lieu khach"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 10a4 4 0 1 0-3.5 4L9 15.5V18H6.5v2H4v-2.5L10.5 11A4 4 0 0 0 14 10zM15 7h.01"></path></svg><span>Vào dữ liệu khách</span></a>
+      <span class="qs-none">Không thấy màn nào khớp. Thử gõ tên phân hệ, ví dụ "đơn hàng" hay "thuế".</span>
+    </div>
+  </div>
+  <div class="axsheet" id="mods" popover="auto" role="dialog" aria-label="Mọi phân hệ">
+    <span class="hp-head"><b>Phân hệ</b><button type="button" class="btn ghost sm sq" popovertarget="mods" popovertargetaction="hide" aria-label="Đóng"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span>
+    <div class="mods-grid">
+      <a class="mod on" href="Platform.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-1.5a4 4 0 0 0-3-3.85M16 3.6a3.5 3.5 0 0 1 0 6.8"></path></svg><span>Khách hàng</span></a>
+      <a class="mod" href="PlatformOps.dc.html#plans"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8zM7.5 7.5h.01"></path></svg><span>Gói và giá</span></a>
+      <a class="mod" href="PlatformOps.dc.html#subs"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3zM3 10h18M7 15h4"></path></svg><span>Thuê bao</span><span class="pip"></span></a>
+      <a class="mod" href="PlatformOps.dc.html#prov"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15c-1.5 1.5-2 4-2 6 2 0 4.5-.5 6-2M9 13l2 2M14 4c3 0 6 3 6 6l-7 7-6-6zM15 9h.01"></path></svg><span>Cấp phát</span></a>
+      <a class="mod" href="PlatformOps.dc.html#fleet"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg><span>Đội database</span></a>
+      <a class="mod" href="PlatformOps.dc.html#health"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span>Sức khoẻ</span><span class="pip"></span></a>
+      <a class="mod" href="PlatformOps.dc.html#support"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 10a4 4 0 1 0-3.5 4L9 15.5V18H6.5v2H4v-2.5L10.5 11A4 4 0 0 0 14 10zM15 7h.01"></path></svg><span>Vào dữ liệu khách</span></a>
+    </div>
+    <div class="mods-foot">
+      <button type="button" class="btn" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18zM12 3a9 9 0 0 1 0 18"></path></svg>Sáng / tối</button>
+      <a class="btn ghost" href="Map.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"></path></svg>Bản đồ thiết kế</a>
+    </div>
+  </div>
+</ax-sheets>
+  <nav class="bottombar only-mobile" aria-label="Điều hướng nhanh">
+    <a href="Platform.dc.html" class="on" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-1.5a4 4 0 0 0-3-3.85M16 3.6a3.5 3.5 0 0 1 0 6.8"></path></svg>Khách hàng</a>
+    <a href="PlatformOps.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>Vận hành</a>
+    <button type="button" popovertarget="qs" aria-label="Tìm và chạy lệnh"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg>Tìm</button>
+    <button type="button" popovertarget="mods" aria-label="Mọi phân hệ"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"></path></svg>Phân hệ</button>
+  </nav>
+  <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+    <div class="toast" role="status" style="z-index: 30; max-width: calc(100% - 32px)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.check}}"></path></svg><span>{{toast}}</span><sc-if value="{{toastUndo}}" hint-placeholder-val="{{false}}"><button type="button" class="undo" onClick="{{undo}}">Hoàn tác</button></sc-if></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1200}}'>
+class Component extends DCLogic {
+  state = { suspAsk: null, dark: null, filter: 'all', open: null, mods: {}, dur: '4h', reason: '', rbad: {}, toast: '', toastUndo: false, pv: null, pvBad: {}, extra: [], migrated: false };
+
+  // Thao tác đảo được thì truyền thêm hàm hoàn tác: thông báo hiện nút "Hoàn tác" lâu hơn một chút
+  say(text, undo) {
+    this.undoFn = undo || null;
+    this.setState({ toast: text, toastUndo: !!undo });
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.setState({ toast: '', toastUndo: false }), undo ? 6000 : 3200);
+  }
+
+  undo() {
+    const fn = this.undoFn; this.undoFn = null;
+    if (fn) fn();
+    this.say('Đã hoàn tác');
+  }
+
+  // Lỗi biểu mẫu theo từng ô, cùng hành vi với bộ sinh ws.py: gom mọi ô thiếu hay sai để báo một lần (role=alert),
+  // mỗi ô sai có aria-invalid và một dòng lỗi riêng ngay dưới, con trỏ về ô sai đầu tiên, gõ lại thì lỗi của ô đó tắt.
+  // bad: { khoá ô: { msg, empty } } theo thứ tự ô trên biểu mẫu (empty: ô còn trống; không thì đã điền nhưng sai).
+  static errSum(bad, labels) {
+    const ks = Object.keys(bad || {});
+    if (!ks.length) return '';
+    const empty = ks.filter((k) => bad[k].empty).length;
+    const verb = empty === ks.length ? 'điền' : empty === 0 ? 'sửa' : 'điền hoặc sửa';
+    // Chữ thường đầu tên ô, giữ nguyên chữ viết tắt (SKU, API…)
+    const lc = (l) => /^[A-ZĐ]{2}/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1);
+    return 'Còn ' + ks.length + ' ô cần ' + verb + ': ' + ks.map((k) => lc(labels[k])).join(', ') + '.';
+  }
+
+  // Bỏ lỗi của một ô khi người dùng sửa ô đó
+  static dropBad(bad, k) { const out = { ...(bad || {}) }; delete out[k]; return out; }
+
+  // Sau khi báo lỗi, đưa con trỏ về ô sai đầu tiên trong vùng this.focusBadIn (một lần mỗi lần bấm gửi).
+  // Nhóm lựa chọn (chip) không mang aria-invalid được, nên đánh dấu bằng lớp is-bad và đưa con trỏ vào nút đầu của nhóm.
+  componentDidUpdate() {
+    if (!this.focusBadIn || typeof document === 'undefined') return;
+    const root = document.querySelector(this.focusBadIn);
+    this.focusBadIn = null;
+    const el = root && root.querySelector('[aria-invalid="true"], .is-bad > button');
+    if (el) el.focus();
+  }
+
+  renderVals() {
+    const I = {
+      db: 'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+      key: 'M14 10a4 4 0 1 0-3.5 4L9 15.5V18H6.5v2H4v-2.5L10.5 11A4 4 0 0 0 14 10zM15 7h.01',
+      plus: 'M12 5v14M5 12h14',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      x: 'M6 6l12 12M18 6L6 18',
+      right: 'M9 6l6 6-6 6'
+    };
+    const s = this.state;
+    const dark = s.dark ?? (this.props.dark || (typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches));
+
+    // Tên tiếng Việt cho người vận hành; mã module giữ bên cạnh để tra cứu.
+    const MOD_LABELS = { content: 'Nội dung', media: 'Thư viện media', comments: 'Bình luận', forms: 'Biểu mẫu', newsletter: 'Bản tin', catalog: 'Sản phẩm', inventory: 'Kho', promotions: 'Khuyến mại', shipping: 'Vận chuyển', orders: 'Đơn hàng', marketplace: 'Sàn', ai: 'Trợ lý AI' };
+    const ALL_MODS = ['content', 'media', 'comments', 'forms', 'newsletter', 'catalog', 'inventory', 'promotions', 'shipping', 'orders', 'marketplace', 'ai'];
+    const PLAN_MODS = {
+      'Nội dung': ['content', 'media', 'comments', 'forms', 'newsletter', 'ai'],
+      'Cơ bản': ['content', 'media', 'forms', 'catalog', 'inventory', 'shipping', 'orders'],
+      'Pro': ['content', 'media', 'comments', 'forms', 'newsletter', 'catalog', 'inventory', 'promotions', 'shipping', 'orders', 'ai'],
+      'Doanh nghiệp': ALL_MODS,
+      'VIP': ALL_MODS
+    };
+    // sub: trial, active, overdue, suspended
+    const BASE_TENANTS = [
+      { id: 'bm', name: 'Bếp Mộc', initials: 'BM', av: '', domain: 'bepmoc.vn', model: 'Chuỗi + sàn', plan: 'Doanh nghiệp', place: 'Database riêng', engine: 'Postgres', mig: 0, sub: 'active', limit: ['Cửa hàng', 4, 10] },
+      { id: 'ts', name: 'Trà Sen', initials: 'TS', av: 't2', domain: 'trasen.vn', model: 'SaaS bán hàng', plan: 'Cơ bản', place: 'Dùng chung', engine: 'Postgres · pool-1', mig: 0, sub: 'active', limit: ['Sản phẩm', 1804, 2000] },
+      { id: 'st', name: 'Sổ Tay Bếp', initials: 'ST', av: 't3', domain: 'sotaybep.vn', model: 'Chỉ nội dung', plan: 'Nội dung', place: 'Dùng chung', engine: 'Postgres · pool-1', mig: 0, sub: 'active', limit: ['Tác giả', 6, 10] },
+      { id: 'ng', name: 'Nhà Sách Gió', initials: 'NG', av: 't4', domain: 'nhasachgio.vn', model: 'Chuỗi, 3 khách con', plan: 'VIP', place: 'Database riêng + 3 khách con', engine: 'Postgres', mig: 2, sub: 'active', limit: ['Cửa hàng', 12, 30] },
+      { id: 'lx', name: 'Nông Sản Lá Xanh', initials: 'LX', av: 't2', domain: 'laxanh.vn', model: 'Một cửa hàng', plan: 'Pro', place: 'Dùng chung', engine: 'Postgres · pool-2', mig: 1, sub: 'trial', limit: ['Sản phẩm', 312, 10000] },
+      { id: 'xm', name: 'Xưởng Mộc Hưng', initials: 'XH', av: 't4', domain: 'mochung.vn', model: 'Một cửa hàng', plan: 'Cơ bản', place: 'Database riêng', engine: 'SQLite · một file', mig: 0, sub: 'overdue', limit: ['Sản phẩm', 420, 2000] },
+      { id: 'sm', name: 'Studio Ảnh Mây', initials: 'SM', av: 't3', domain: 'anhmay.vn', model: 'Chỉ nội dung', plan: 'Nội dung', place: 'Dùng chung', engine: 'Postgres · pool-2', mig: 0, sub: 'suspended', limit: ['Dung lượng (GB)', 19, 20] }
+    ];
+    // [nhãn đủ (khung chi tiết), lớp, nhãn ngắn (bảng: không lấn sang cột bên)]
+    const SUB = { trial: ['Dùng thử · còn 9 ngày', 'b-info', 'Dùng thử · 9 ngày'], active: ['Đang dùng', 'b-ok', 'Đang dùng'], overdue: ['Quá hạn · ân hạn 4 ngày', 'b-warn', 'Quá hạn 4 ngày'], suspended: ['Chỉ đọc · quá hạn 18 ngày', 'b-bad', 'Chỉ đọc 18 ngày'] };
+    const FILTERS = [['all', 'Tất cả'], ['dedicated', 'Database riêng'], ['shared', 'Dùng chung'], ['mig', 'Chờ migration'], ['attention', 'Cần chú ý']];
+    const match = (t) => s.filter === 'all'
+      || (s.filter === 'dedicated' && t.place.startsWith('Database riêng'))
+      || (s.filter === 'shared' && t.place === 'Dùng chung')
+      || (s.filter === 'mig' && t.mig > 0)
+      || (s.filter === 'attention' && (t.sub === 'overdue' || t.sub === 'suspended' || t.limit[1] / t.limit[2] >= 0.85));
+    const filters = FILTERS.map(([id, label]) => ({ label, on: s.filter === id, cls: s.filter === id ? 'on' : '', pick: () => this.setState({ filter: id }) }));
+    const num = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const TENANTS = [...s.extra, ...BASE_TENANTS].map((x) => (s.migrated ? { ...x, mig: 0 } : x));
+    const rows = TENANTS.filter(match).map((t) => {
+      const r = t.limit[1] / t.limit[2];
+      return {
+        ...t,
+        mig: t.mig ? 'Chờ ' + t.mig + ' migration' : '', migPending: t.mig > 0,
+        sub: SUB[t.sub][2], subLong: SUB[t.sub][0], subBadge: SUB[t.sub][1],
+        limitName: t.limit[0], limitVal: num(t.limit[1]) + ' / ' + num(t.limit[2]),
+        limitPct: Math.round(r * 100) + '%', limitCls: r >= 0.85 ? 'hi' : '',
+        sel: s.open === t.id ? 'sel' : '',
+        open: () => this.setState({ open: t.id, reason: '', rbad: {} })
+      };
+    });
+
+    const kpis = [
+      { label: 'Khách đang dùng', n: '214', note: '7 mô hình khác nhau, một bản phần mềm', dot: 'pub', delay: 'd1' },
+      { label: 'Đang dùng thử', n: '31', note: '12 hết hạn trong 7 ngày tới', dot: 'sched', delay: 'd2' },
+      { label: 'Quá hạn hoặc chỉ đọc', n: '6', note: 'Chỉ đọc vẫn đăng nhập và xuất được dữ liệu', dot: 'review', delay: 'd3' },
+      { label: 'Database chờ migration', n: '3', note: '2 pool chung, 6 database riêng, 1 file SQLite', dot: 'draft', delay: 'd4' }
+    ];
+
+    const plans = [
+      { name: 'Dùng thử', count: '31 khách', price: '0 ₫ · 14 ngày', mods: 'Như gói Pro, hạn mức thấp', place: 'Dùng chung' },
+      { name: 'Nội dung', count: '58 khách', price: '[GIÁ] / tháng', mods: 'content, media, comments, forms, newsletter, ai', place: 'Dùng chung' },
+      { name: 'Cơ bản', count: '96 khách', price: '[GIÁ] / tháng', mods: 'Nội dung cơ bản + bán hàng một cửa hàng', place: 'Dùng chung' },
+      { name: 'Pro', count: '44 khách', price: '[GIÁ] / tháng', mods: 'Thêm khuyến mại, AI, nhiều cửa hàng', place: 'Dùng chung' },
+      { name: 'Doanh nghiệp / VIP', count: '16 khách', price: 'Theo hợp đồng', mods: 'Mọi module, kể cả sàn; hạn mức riêng', place: 'Database riêng, chọn được nơi lưu' }
+    ];
+
+    let d = { mods: [] };
+    const t = TENANTS.find((x) => x.id === s.open);
+    if (t) {
+      const inPlan = PLAN_MODS[t.plan] || [];
+      const mods = ALL_MODS.map((id) => {
+        const key = t.id + ':' + id;
+        const on = s.mods[key] !== undefined ? s.mods[key] : inPlan.includes(id);
+        return {
+          id, label: MOD_LABELS[id] || id, on, cls: on ? 'on' : '', extra: on && !inPlan.includes(id), aria: 'Bật module ' + id,
+          toggle: () => {
+            const before = s.mods;
+            this.setState({ mods: { ...s.mods, [key]: !on } });
+            this.say((on ? 'Đã tắt ' : 'Đã bật ') + id + ' cho ' + t.name + (on ? '; route, tool MCP, job và event của module bị chặn, dữ liệu được giữ' : ''), () => this.setState({ mods: before }));
+          }
+        };
+      });
+      const dedicated = t.place.startsWith('Database riêng');
+      d = {
+        name: t.name, initials: t.initials, av: t.av, model: t.model, plan: 'Gói ' + t.plan,
+        sub: SUB[t.sub][0], subBadge: SUB[t.sub][1], place: t.place, engine: t.engine, mods,
+        modCount: mods.filter((m) => m.on).length + ' / ' + mods.length + ' đang bật',
+        suspAsk: s.suspAsk === t.id, suspTitle: 'Tạm khoá hẳn ' + t.name + '?', askSuspend: () => this.setState({ suspAsk: t.id }), cancelSuspend: () => this.setState({ suspAsk: null }),
+        moveLabel: dedicated ? 'Gộp về database dùng chung' : 'Chuyển sang database riêng',
+        move: () => this.say('Chạy thử (dry-run) xong: ' + t.name + ' cần chép 48 bảng, khoảng 6 phút chỉ đọc. Bấm lần nữa để hẹn giờ chạy thật; tương đương lệnh autoxide tenant move'),
+        renew: () => this.say('Đã gia hạn ' + t.name),
+        suspend: () => { this.setState({ suspAsk: null }); this.say('Đã tạm khoá hẳn ' + t.name + '; mọi route trả 403 tenant_suspended'); },
+        readOnly: () => this.say(t.name + ' chuyển sang chỉ đọc (thuê bao): không bán, không đăng bài; vẫn đăng nhập và xuất được dữ liệu'),
+        export: () => this.say('Đã xếp job xuất dữ liệu của ' + t.name)
+      };
+    }
+    const durations = [['1h', '1 giờ'], ['4h', '4 giờ'], ['8h', '8 giờ (tối đa)']].map(([id, label]) => ({ label, cls: s.dur === id ? 'on' : '', pick: () => this.setState({ dur: id }) }));
+
+    return {
+      theme: dark ? 'dark' : '',
+      themeIcon: dark ? I.sun : I.moon,
+      toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, kpis, filters, rows, plans, d, durations,
+      paneOpen: !!t,
+      close: () => this.setState({ open: null }),
+      reason: s.reason, reasonErr: Component.errSum(s.rbad, { reason: 'Lý do' }),
+      reasonInv: s.rbad.reason ? 'true' : 'false', reasonMsg: s.rbad.reason ? s.rbad.reason.msg : '', reasonDesc: s.rbad.reason ? 'reason-e' : '',
+      onReason: (e) => this.setState({ reason: e.target.value, rbad: {} }),
+      requestAccess: () => {
+        if (!s.reason.trim()) { this.focusBadIn = '.pf-access'; this.setState({ rbad: { reason: { msg: 'Hãy ghi lý do trước khi xin quyền vào.', empty: true } } }); return; }
+        this.setState({ reason: '' });
+        this.say('Đã cấp quyền vào ' + (t ? t.name : '') + ' trong ' + durations.find((x) => x.cls === 'on').label + '; khách thấy mục này trong nhật ký audit');
+      },
+      migrateAll: () => { this.setState({ migrated: true }); this.say('Đã xếp job migration cho 3 database (tương đương autoxide migrate --all); mỗi database chạy riêng, lỗi một chỗ không chặn chỗ khác'); },
+      provision: () => this.setState({ pv: { name: '', domain: '', model: 'Một cửa hàng', plan: 'Dùng thử', email: '' }, pvBad: {} }),
+      ...(() => {
+        const pv = s.pv || {};
+        const bad = s.pvBad || {};
+        // Sửa một ô thì lỗi của riêng ô đó tắt
+        const setPv = (k) => (e) => this.setState({ pv: { ...pv, [k]: e.target.value }, pvBad: Component.dropBad(bad, k) });
+        const LBL = { name: 'Tên khách', domain: 'Tên miền', email: 'Email quản trị đầu tiên' };
+        const dedicated = pv.plan === 'Doanh nghiệp' || pv.plan === 'VIP';
+        return {
+          provOpen: !!s.pv, pv, pvErr: Component.errSum(bad, LBL), closeProv: () => this.setState({ pv: null, pvBad: {} }),
+          // Trạng thái lỗi của từng ô: inv cho aria-invalid, msg cho dòng lỗi dưới ô, desc nối ô với dòng lỗi
+          pe: Object.fromEntries(Object.keys(LBL).map((k) => [k, { inv: bad[k] ? 'true' : 'false', msg: bad[k] ? bad[k].msg : '', desc: bad[k] ? 'pv-' + k + '-e' : '' }])),
+          onPvName: setPv('name'), onPvDomain: setPv('domain'), onPvModel: setPv('model'), onPvPlan: setPv('plan'), onPvEmail: setPv('email'),
+          pvPlace: dedicated ? 'database riêng (Postgres), chọn được nơi lưu' : 'database dùng chung (Postgres · pool-2), tách bằng tenant_id',
+          pvKyc: pv.model === 'Sàn',
+          submitProv: (e) => {
+            e.preventDefault();
+            // Gom mọi ô thiếu hay sai để báo một lần, theo thứ tự ô trên biểu mẫu
+            const nb = {};
+            const name = (pv.name || '').trim(), domain = (pv.domain || '').trim(), email = (pv.email || '').trim();
+            if (!name) nb.name = { msg: 'Hãy nhập tên khách.', empty: true };
+            if (!domain) nb.domain = { msg: 'Hãy nhập tên miền.', empty: true };
+            else if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) nb.domain = { msg: 'Tên miền chỉ gồm chữ thường không dấu, số, gạch nối và dấu chấm. Ví dụ: trahoasen.vn.', empty: false };
+            if (!email) nb.email = { msg: 'Hãy nhập email quản trị đầu tiên.', empty: true };
+            else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) nb.email = { msg: 'Email chưa đúng dạng. Ví dụ: chu.cua.hang@example.com.', empty: false };
+            if (Object.keys(nb).length) { this.focusBadIn = '.pf-prov'; this.setState({ pvBad: nb }); return; }
+            const words = pv.name.trim().split(/\s+/);
+            const tenant = { id: 'new' + s.extra.length, name: pv.name.trim(), initials: (words[0][0] + (words[1] ? words[1][0] : '')).toUpperCase(), av: 't2', domain: pv.domain.trim(), model: pv.model, plan: pv.plan, place: dedicated ? 'Database riêng' : 'Dùng chung', engine: dedicated ? 'Postgres' : 'Postgres · pool-2', mig: 0, sub: 'trial', limit: ['Sản phẩm', 0, 2000] };
+            this.setState({ extra: [tenant, ...s.extra], pv: null, open: tenant.id });
+            this.say('Đã cấp phát ' + tenant.name + '; lời mời đã gửi tới ' + pv.email.trim());
+          }
+        };
+      })(),
+      toast: s.toast, toastUndo: s.toastUndo, undo: () => this.undo()
+    };
+  }
+}
+</script>
+</body>
+</html>

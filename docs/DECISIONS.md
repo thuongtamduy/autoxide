@@ -7343,3 +7343,24 @@ tìm commit gây ra hơn. Bản phát hành vẫn luôn xanh trên cả hai data
 
 Thay: phần "chỉ merge vào `main` khi gate đầy đủ xanh" của D-173, D-248, D-263 (mục 3). Các ngoại lệ một lần D-273,
 D-295, D-298 không còn cần.
+
+## D-301 · Chép bản vẽ thiết kế giao diện vào repo, ở `docs/design/` — 2026-11-16 — chủ dự án yêu cầu, agent chọn cách
+
+Bối cảnh: bản vẽ thiết kế 2 (D-200) chỉ nằm ở hai artifact "Design" của chủ dự án; `docs/research/ui-design.md`
+ghi "không nằm trong repo". Agent phiên sau không đọc được artifact khi không có đường dẫn, và artifact có thể mất.
+Chủ dự án gửi hai đường dẫn kèm bản zip sao lưu, yêu cầu mang về repo.
+
+Quyết định:
+
+- Chép nguyên `project/` (màn `.dc.html`, `canvas.json`, CSS, script) và `_blob/` (ảnh) của mỗi artifact vào
+  `docs/design/admin/` và `docs/design/web/`; không chép khung chạy của loại artifact (do nền tảng cấp, giống nhau ở
+  mọi artifact). `docs/design/README.md` ghi nguồn, phiên bản và cách cập nhật.
+- Đây là tài liệu tham khảo, không phải giao diện: không vi phạm luật kiến trúc 9 (core chỉ có API), không được
+  build, phục vụ hay nhúng vào binary.
+- Artifact vẫn là bản gốc; thư mục là bản chụp. Sửa thiết kế thì chép đè cả thư mục, không sửa tay ở repo.
+- Giữ cả các file CSS bản cũ (`*-rNN.css`) dù màn hiện tại không dùng: khoảng 1 MB, đổi lại bản chụp khôi phục
+  được nguyên trạng.
+
+Đã kiểm trước khi commit: không có secret; email trong màn là dữ liệu mẫu (`@example.com`, tên miền bịa).
+
+Thay: câu "Bản vẽ chi tiết … không nằm trong repo" của `docs/research/ui-design.md`.

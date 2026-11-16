@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Khách hàng — Autoxide Admin</title>
+<script src="./support.js"></script>
+<script src="./ax-shell.js"></script>
+<link rel="stylesheet" href="./ax-r40.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div class="ax {{theme}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <nav class="rail" aria-label="Phân hệ" style="flex: 0 0 88px">
+    <a href="Main.dc.html" aria-label="Autoxide, về Tổng quan" style="display: flex; justify-content: center; padding: 4px 0 14px">
+      <span style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: #1F2430; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14)">
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+      </span><span class="rail-name">Autoxide</span>
+    </a>
+    <div class="rail-mid">
+      <a class="ri" href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span class="ri-l">Tổng quan</span></a>
+      <a class="ri" href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span class="ri-l">Bán hàng</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Catalog.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span class="ri-l">Sản phẩm</span></a>
+      <a class="ri" href="Promotions.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span class="ri-l">Tiếp thị</span></a>
+      <a class="ri" href="Content.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span class="ri-l">Nội dung</span></a>
+      <a class="ri on" aria-current="page" href="Customers.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span class="ri-l">Khách hàng</span></a>
+      <a class="ri" href="Market.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span class="ri-l">Sàn</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Finance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span class="ri-l">Tài chính</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Main.dc.html#g=reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span class="ri-l">Báo cáo</span></a>
+      <a class="ri" href="Org.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span class="ri-l">Tổ chức</span></a>
+      <a class="ri" href="Compliance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span class="ri-l">Tuân thủ</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Settings.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span class="ri-l">Cài đặt</span></a>
+    </div>
+    <a class="ri" href="Map.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"></path></svg><span class="ri-l">Bản đồ</span></a>
+    <button type="button" class="ri" popovertarget="help"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6M12 16.8h.01"></path></svg><span class="ri-l">Trợ giúp</span></button>
+    <label class="ri rail-toggle"><input type="checkbox" class="railmini" aria-label="Thu gọn thanh phân hệ"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"></path></svg><span class="t-full">Thu gọn</span><span class="t-mini">Mở rộng</span></label>
+  </nav>
+
+
+  <div style="flex: 999 1 560px; min-width: 0; margin: 8px; display: flex; flex-direction: column; background: var(--sheet); border: 1px solid var(--line); border-radius: 16px; overflow: hidden">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; border-bottom: 1px solid var(--line)">
+      <a class="ctx" href="Main.dc.html" aria-label="Đổi khách hàng hoặc nút tổ chức" style="text-decoration: none">
+        <span class="tav">BM</span>
+        <span style="display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.2">
+          <span class="ell" style="font-weight: 600">Bếp Mộc</span>
+          <span class="ell" style="font-size: 12px; color: var(--ink-3)">Bếp Mộc — toàn chuỗi</span>
+        </span>
+        <svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ink-3)"><path d="{{ic.updown}}"></path></svg>
+      </a>
+      <div style="flex: 1"></div>
+      <button type="button" class="btn" popovertarget="qs" data-cmdk="data-cmdk" aria-label="Tìm trong mọi phân hệ" style="flex: 0 1 300px; justify-content: flex-start; color: var(--ink-3); font-weight: 400; background: var(--panel)">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><span class="hide-mobile" style="flex: 1; text-align: left">Tìm trong mọi phân hệ…</span><span class="kbd hide-mobile">Ctrl</span><span class="kbd hide-mobile">K</span>
+      </button>
+      <button type="button" class="btn ghost sq" popovertarget="help" aria-label="Trợ giúp cho trang này" data-tip="Trợ giúp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6M12 16.8h.01"></path></svg></button><span class="helppanel" id="help" popover="auto" role="dialog" aria-label="Trợ giúp: Khách hàng"><span class="hp-head"><b>Trợ giúp · Khách hàng</b><button type="button" class="btn ghost sm sq" popovertarget="help" popovertargetaction="hide" aria-label="Đóng trợ giúp"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span><label class="hp-search"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><input class="inp" type="search" placeholder="Tìm trong hướng dẫn…" aria-label="Tìm trong hướng dẫn"></label><span class="cap">Trên trang này</span><a class="hp-art" href="#"><b>Hồ sơ khách gồm những gì</b><span>Lịch sử mua, tổng chi, hạng, nhãn, ghi chú; nhận diện theo tài khoản hoặc số điện thoại</span></a><a class="hp-art" href="#"><b>Nhóm khách theo quy tắc</b><span>Quy tắc là dữ liệu; xem trước số khớp trước khi lưu; nhóm dùng cho bảng giá và khuyến mại</span></a><a class="hp-art" href="#"><b>Điểm thưởng là nghĩa vụ</b><span>Điểm chưa dùng nằm trong sổ cái; điều chỉnh tay cần lý do và mã tham chiếu</span></a><a class="hp-art" href="#"><b>Nhắc giỏ bỏ dở đúng luật</b><span>Chỉ nhắc khi khách đã đồng ý nhận tin quảng cáo; rút đồng ý là dừng ngay</span></a><span class="hp-hint"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg><span>Bấm biểu tượng ⓘ cạnh một mục để xem giải thích ngắn ngay tại chỗ.</span></span><span class="cap hide-mobile">Phím tắt</span><span class="hp-keys hide-mobile"><span><span class="kbd">Ctrl</span><span class="kbd">K</span></span><span>Tìm và chạy lệnh</span><span><span class="kbd">?</span></span><span>Mở trợ giúp này</span><span><span class="kbd">Esc</span></span><span>Đóng hộp đang mở</span></span><span class="cap">Cần thêm trợ giúp</span><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg><span><b>Hỏi trợ lý AI về trang này</b><span>Trả lời theo dữ liệu bạn được xem; không tự chạy lệnh ghi</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-1.5-3-5-3-5-1s3 1 5 1zM12 7c1.5-3 5-3 5-1s-3 1-5 1z"></path></svg><span><b>Có gì mới</b><span>2 cập nhật trong tháng này</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"></path></svg><span><b>Liên hệ hỗ trợ</b><span>Kèm sẵn trang đang xem và mã khách</span></span></a></span>
+      <button class="btn ghost sq" aria-label="Đổi giao diện sáng / tối" data-tip="Sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+      <a class="av a1" href="Org.dc.html" aria-label="Tài khoản của Lan Phạm" style="width: 34px; height: 34px; text-decoration: none">LP</a>
+    </header>
+
+    <main style="width: 100%; max-width: none; margin: 0; padding: 24px 24px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+      <section class="rise" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 14px">
+        <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 13px; color: var(--ink-3)">{{crumb}}</span>
+          <h1 class="h1">{{title}}</h1>
+          <sc-if value="{{desc}}" hint-placeholder-val="{{true}}"><span class="pdesc {{descCls}}" style="color: var(--ink-2); max-width: 780px; text-wrap: pretty">{{desc}}</span></sc-if>
+          <sc-if value="{{descLong}}" hint-placeholder-val="{{false}}"><button type="button" class="pdesc-more" aria-expanded="{{descOpen}}" onClick="{{toggleDesc}}">{{descMore}}</button></sc-if>
+        </div>
+        <sc-if value="{{hasActs}}" hint-placeholder-val="{{true}}">
+          <div class="headacts" style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{headActs}}" as="a" hint-placeholder-count="2"><button class="btn {{a.cls}}" onClick="{{a.run}}">{{a.label}}</button></sc-for>
+            <sc-if value="{{hasMore}}" hint-placeholder-val="{{false}}"><button type="button" class="btn sq only-mobile" popovertarget="hmore" aria-label="Thao tác khác" style="anchor-name: --hmore; font-size: 18px; letter-spacing: 1px">⋯</button><span class="moremenu" id="hmore" popover="auto" role="menu" aria-label="Thao tác khác" style="position-anchor: --hmore"><sc-for list="{{moreActs}}" as="a" hint-placeholder-count="1"><button class="btn" role="menuitem" popovertarget="hmore" popovertargetaction="hide" onClick="{{a.run}}">{{a.label}}</button></sc-for></span></sc-if>
+          </div>
+        </sc-if>
+      </section>
+      <sc-if value="{{hasTabs}}" hint-placeholder-val="{{true}}">
+        <nav class="ptabs" role="tablist" aria-label="{{tabsLabel}}">
+          <sc-for list="{{tabs}}" as="it" hint-placeholder-count="4"><button class="stab {{it.cls}}" role="tab" aria-selected="{{it.sel}}" onClick="{{it.pick}}">{{it.label}}<sc-if value="{{it.n}}" hint-placeholder-val="{{false}}"><span class="cnt {{it.hot}}">{{it.n}}</span></sc-if></button></sc-for>
+        </nav>
+      </sc-if>
+
+      <sc-for list="{{secs}}" as="sec" hint-placeholder-count="1">
+        <div class="pop" style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px">
+          <sc-if value="{{sec.desc}}" hint-placeholder-val="{{false}}"><span style="flex: 1 1 100%; color: var(--ink-2); font-size: 14px; max-width: 860px; text-wrap: pretty">{{sec.desc}}</span></sc-if>
+          <sc-for list="{{sec.blocks}}" as="b" hint-placeholder-count="2">
+            <section style="flex: {{b.flex}}; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+              <sc-if value="{{b.hasHead}}" hint-placeholder-val="{{true}}">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px">
+                  <h2 class="h2" style="flex: 1 1 auto">{{b.title}}<sc-if value="{{b.tip}}" hint-placeholder-val="{{false}}"> <button type="button" class="qi" popovertarget="tip-{{b.id}}" aria-label="Giải thích: {{b.title}}" style="anchor-name: --tip-{{b.id}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-{{b.id}}" popover="auto" role="dialog" aria-label="{{b.title}}" style="position-anchor: --tip-{{b.id}}"><b class="tip-t">{{b.title}}</b><span class="tip-b">{{b.tip}}</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-{{b.id}}" popovertargetaction="hide">Đã hiểu</button></span></span></sc-if></h2>
+                  <sc-if value="{{b.sub}}" hint-placeholder-val="{{false}}"><span style="font-size: 12.5px; color: var(--ink-3)">{{b.sub}}</span></sc-if>
+                  <sc-for list="{{b.acts}}" as="a" hint-placeholder-count="1"><button class="btn sm {{a.cls}}" onClick="{{a.run}}">{{a.label}}</button></sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{b.isKpis}}" hint-placeholder-val="{{false}}">
+                <div class="kpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px">
+                  <sc-for list="{{b.items}}" as="k" hint-placeholder-count="4">
+                    <div class="card" style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px">
+                      <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ink-2)"><span class="dot {{k.dot}}"></span>{{k.label}}</span>
+                      <span class="dsp num {{k.cls}}" style="font-size: 26px; font-weight: 600; letter-spacing: -0.02em">{{k.n}}</span>
+                      <span style="font-size: 12.5px; color: var(--ink-3)">{{k.note}}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{b.isNote}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: {{b.bg}}; font-size: 13.5px; color: var(--ink-2); text-wrap: pretty">
+                  <svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="flex: none; margin-top: 2px; color: {{b.fg}}"><path d="{{b.icon}}"></path></svg>
+                  <span><sc-if value="{{b.strong}}" hint-placeholder-val="{{false}}"><b style="color: var(--ink)">{{b.strong}} </b></sc-if>{{b.text}}</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{b.isTable}}" hint-placeholder-val="{{false}}">
+                <sc-if value="{{b.hasChips}}" hint-placeholder-val="{{false}}">
+                  <div class="scrollrow" style="display: flex; flex-wrap: wrap; gap: 8px">
+                    <sc-for list="{{b.chips}}" as="c" hint-placeholder-count="3"><button class="chip {{c.cls}}" aria-pressed="{{c.on}}" onClick="{{c.pick}}">{{c.label}}<sc-if value="{{c.n}}" hint-placeholder-val="{{false}}"><span class="cnt">{{c.n}}</span></sc-if></button></sc-for>
+                  </div>
+                </sc-if>
+                <section class="card" style="overflow: hidden">
+                  <div class="tbox wst"><div style="min-width: {{b.minW}}">
+                    <div class="thead" style="grid-template-columns: {{b.grid}}"><sc-for list="{{b.cols}}" as="c" hint-placeholder-count="4"><span class="{{c.cls}}">{{c.label}}</span></sc-for></div>
+                    <sc-for list="{{b.rows}}" as="r" hint-placeholder-count="5">
+                      <div class="trow {{r.sel}}" style="grid-template-columns: {{b.grid}}; cursor: default">
+                        <sc-for list="{{r.cells}}" as="c" hint-placeholder-count="4">
+                          <sc-if value="{{c.isOpen}}" hint-placeholder-val="{{false}}"><button class="cc-open" onClick="{{r.open}}" style="display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; padding: 8px 0; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer"><span class="{{c.cls}} ell" style="max-width: 100%; font-weight: 600; text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px">{{c.v}}</span><sc-if value="{{c.sub}}" hint-placeholder-val="{{false}}"><span class="ell" style="max-width: 100%; font-size: 12px; color: var(--ink-3)">{{c.sub}}</span></sc-if></button></sc-if>
+                          <sc-if value="{{c.isBadge}}" hint-placeholder-val="{{false}}"><span class="cc-badge"><span class="badge {{c.badge}}"><span class="dot"></span>{{c.v}}</span></span></sc-if>
+                          <sc-if value="{{c.isText}}" hint-placeholder-val="{{true}}"><span class="{{c.cls}}" style="min-width: 0; display: flex; flex-direction: column"><span class="cl">{{c.label}}</span><span class="ell">{{c.v}}</span><sc-if value="{{c.sub}}" hint-placeholder-val="{{false}}"><span class="ell" style="font-size: 12px; color: var(--ink-3)">{{c.sub}}</span></sc-if></span></sc-if>
+                          <sc-if value="{{c.isMeter}}" hint-placeholder-val="{{false}}"><span class="cc-kv" style="display: flex; flex-direction: column; gap: 4px"><span class="cl">{{c.label}}</span><span style="font-size: 12px; color: var(--ink-2)">{{c.v}}</span><span class="meter {{c.mcls}}"><span style="width: {{c.pct}}"></span></span></span></sc-if>
+                        </sc-for>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{b.empty}}" hint-placeholder-val="{{false}}"><div style="padding: 32px 18px; text-align: center; color: var(--ink-3)">{{b.emptyText}}</div></sc-if>
+                  </div></div>
+                </section>
+                <sc-if value="{{b.foot}}" hint-placeholder-val="{{false}}"><span style="font-size: 12.5px; color: var(--ink-3)">{{b.foot}}</span></sc-if>
+              </sc-if>
+
+              <sc-if value="{{b.isCards}}" hint-placeholder-val="{{false}}">
+                <section class="card" style="display: flex; flex-direction: column; padding: 6px 8px">
+                  <sc-for list="{{b.items}}" as="it" hint-placeholder-count="3">
+                    <div class="item" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 12px 10px">
+                      <span class="sq-ic {{it.tone}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{it.icon}}"></path></svg></span>
+                      <span style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">{{it.title}}</span><span style="font-size: 12.5px; color: var(--ink-3); text-wrap: pretty">{{it.meta}}</span></span>
+                      <sc-if value="{{it.badge}}" hint-placeholder-val="{{false}}"><span class="badge {{it.bcls}}"><span class="dot"></span>{{it.badge}}</span></sc-if>
+                      <sc-for list="{{it.acts}}" as="a" hint-placeholder-count="1"><button class="btn sm {{a.cls}}" onClick="{{a.run}}">{{a.label}}</button></sc-for>
+                    </div>
+                  </sc-for>
+                </section>
+              </sc-if>
+
+              <sc-if value="{{b.isForm}}" hint-placeholder-val="{{false}}">
+                <form class="card" onSubmit="{{b.submit}}" novalidate="novalidate" style="display: flex; flex-direction: column; gap: 12px; padding: 18px">
+                  <sc-for list="{{b.fields}}" as="fd" hint-placeholder-count="3">
+                    <sc-if value="{{fd.isInput}}" hint-placeholder-val="{{true}}"><label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">{{fd.label}}</span><input class="inp {{fd.mono}}" value="{{fd.v}}" onChange="{{fd.set}}" placeholder="{{fd.ph}}" aria-invalid="{{fd.inv}}"><sc-if value="{{fd.errText}}" hint-placeholder-val="{{false}}"><span class="ferr">{{fd.errText}}</span></sc-if></label></sc-if>
+                    <sc-if value="{{fd.isChoice}}" hint-placeholder-val="{{false}}"><span class="lab">{{fd.label}}</span><div class="chipwrap" role="group" aria-label="{{fd.label}}"><sc-for list="{{fd.opts}}" as="o" hint-placeholder-count="3"><button type="button" class="chip {{o.cls}}" aria-pressed="{{o.on}}" onClick="{{o.pick}}">{{o.label}}</button></sc-for></div><sc-if value="{{fd.errText}}" hint-placeholder-val="{{false}}"><span class="ferr">{{fd.errText}}</span></sc-if></sc-if>
+                    <sc-if value="{{fd.isToggle}}" hint-placeholder-val="{{false}}"><div style="display: flex; align-items: center; gap: 12px"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">{{fd.label}}</span><span style="font-size: 12.5px; color: var(--ink-3)">{{fd.help}}</span></span><button type="button" class="sw {{fd.swCls}}" role="switch" aria-checked="{{fd.on}}" aria-label="{{fd.label}}" onClick="{{fd.toggle}}"></button></div></sc-if>
+                    <sc-if value="{{fd.showHelp}}" hint-placeholder-val="{{false}}"><span style="margin-top: -6px; font-size: 12.5px; color: var(--ink-3)">{{fd.help}}</span></sc-if>
+                  </sc-for>
+                  <sc-if value="{{b.err}}" hint-placeholder-val="{{false}}"><span class="tone-bad" role="alert" style="font-size: 13px">{{b.err}}</span></sc-if>
+                  <div style="display: flex; justify-content: flex-end; gap: 8px"><button type="submit" class="btn pri">{{b.submitLabel}}</button></div>
+                </form>
+              </sc-if>
+
+              <sc-if value="{{b.isMeters}}" hint-placeholder-val="{{false}}">
+                <section class="card" style="display: flex; flex-direction: column; gap: 14px; padding: 18px">
+                  <sc-for list="{{b.items}}" as="m" hint-placeholder-count="3">
+                    <div style="display: flex; flex-direction: column; gap: 6px"><span style="display: flex; align-items: baseline; gap: 8px; font-size: 13.5px"><span style="flex: 1">{{m.label}}</span><span class="num" style="font-weight: 600">{{m.val}}</span></span><div class="meter {{m.cls}}"><span style="width: {{m.pct}}"></span></div><sc-if value="{{m.note}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--ink-3)">{{m.note}}</span></sc-if></div>
+                  </sc-for>
+                </section>
+              </sc-if>
+
+              <sc-if value="{{b.isTasks}}" hint-placeholder-val="{{false}}">
+                <div class="scrollrow" style="display: flex; flex-wrap: wrap; gap: 8px">
+                  <sc-for list="{{b.chips}}" as="c" hint-placeholder-count="3"><button class="chip {{c.cls}}" aria-pressed="{{c.on}}" onClick="{{c.pick}}">{{c.label}}<span class="cnt">{{c.n}}</span></button></sc-for>
+                </div>
+                <sc-for list="{{b.groups}}" as="gr" hint-placeholder-count="2">
+                  <section class="taskgrp" aria-label="{{gr.label}}">
+                    <span class="cap {{gr.cls}}">{{gr.label}} · {{gr.n}}</span>
+                    <div class="card" style="display: flex; flex-direction: column; padding: 4px 8px">
+                      <sc-for list="{{gr.items}}" as="it" hint-placeholder-count="3">
+                        <div class="item taskrow">
+                          <span class="sq-ic {{it.tone}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{it.icon}}"></path></svg></span>
+                          <span class="task-main"><span style="font-weight: 500; text-wrap: pretty">{{it.title}}</span><span class="task-meta"><span class="kind">{{it.tag}}</span><span class="{{it.dueCls}}">{{it.due}}</span><span>{{it.meta}}</span></span></span>
+                          <sc-if value="{{it.badge}}" hint-placeholder-val="{{false}}"><span class="badge {{it.bcls}}"><span class="dot"></span>{{it.badge}}</span></sc-if>
+                          <span class="task-acts"><sc-for list="{{it.acts}}" as="a" hint-placeholder-count="2"><button class="btn sm {{a.cls}}" onClick="{{a.run}}">{{a.label}}</button></sc-for></span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </section>
+                </sc-for>
+                <sc-if value="{{b.empty}}" hint-placeholder-val="{{false}}"><div class="card" style="padding: 28px 18px; text-align: center; color: var(--ink-3)">Không có việc nào khớp bộ lọc.</div></sc-if>
+              </sc-if>
+
+              <sc-if value="{{b.isSkel}}" hint-placeholder-val="{{false}}">
+                <section class="card" aria-busy="true" aria-label="Đang tải" style="display: flex; flex-direction: column; gap: 16px; padding: 18px">
+                  <sc-for list="{{b.items}}" as="k" hint-placeholder-count="4"><span style="display: flex; align-items: center; gap: 12px"><span class="skel" style="flex: none; width: 34px; height: 34px; border-radius: 10px"></span><span style="flex: 1; display: flex; flex-direction: column; gap: 8px"><span class="skel" style="width: {{k.w1}}"></span><span class="skel" style="width: {{k.w2}}; height: 10px"></span></span></span></sc-for>
+                </section>
+              </sc-if>
+
+              <sc-if value="{{b.isTiles}}" hint-placeholder-val="{{false}}">
+                <div class="flow" style="--fb: 240px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px">
+                  <sc-for list="{{b.items}}" as="it" hint-placeholder-count="3">
+                    <div class="card" style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px">
+                      <span style="display: flex; align-items: baseline; gap: 8px"><span style="flex: 1; font-weight: 600">{{it.title}}</span><sc-if value="{{it.badge}}" hint-placeholder-val="{{false}}"><span class="badge {{it.bcls}}" style="height: 22px">{{it.badge}}</span></sc-if></span>
+                      <sc-if value="{{it.big}}" hint-placeholder-val="{{false}}"><span class="dsp num" style="font-size: 20px; font-weight: 600">{{it.big}}</span></sc-if>
+                      <span style="font-size: 13px; color: var(--ink-2); text-wrap: pretty">{{it.text}}</span>
+                      <sc-if value="{{it.meta}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--ink-3)">{{it.meta}}</span></sc-if>
+                      <sc-for list="{{it.acts}}" as="a" hint-placeholder-count="1"><button class="btn sm {{a.cls}}" onClick="{{a.run}}" style="align-self: flex-start">{{a.label}}</button></sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </section>
+          </sc-for>
+        </div>
+      </sc-for>
+    </main>
+  </div>
+
+  <sc-if value="{{paneOpen}}" hint-placeholder-val="{{false}}">
+    <aside class="pane" role="dialog" aria-label="{{p.title}}">
+      <div class="panehead" style="display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--line)">
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+          <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span style="font-size: 16px; font-weight: 600">{{p.title}}</span><sc-if value="{{p.badge}}" hint-placeholder-val="{{false}}"><span class="badge {{p.bcls}}"><span class="dot"></span>{{p.badge}}</span></sc-if></span>
+          <sc-if value="{{p.sub}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--ink-3)">{{p.sub}}</span></sc-if>
+        </span>
+        <button class="btn ghost sm sq" aria-label="Đóng" onClick="{{closePane}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 20px; padding: 18px 20px 28px">
+        <sc-if value="{{p.hasFields}}" hint-placeholder-val="{{true}}">
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px">
+            <sc-for list="{{p.fields}}" as="f" hint-placeholder-count="4"><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13.5px"><span style="font-size: 12px; color: var(--ink-3)">{{f.k}}</span><span style="overflow-wrap: anywhere">{{f.v}}</span></span></sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{p.hasLines}}" hint-placeholder-val="{{false}}">
+          <section style="display: flex; flex-direction: column; gap: 6px">
+            <span class="cap">{{p.linesTitle}}</span>
+            <sc-for list="{{p.lines}}" as="l" hint-placeholder-count="3"><div style="display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13.5px"><span style="flex: 1; min-width: 0">{{l.k}}</span><span class="num" style="font-weight: 500">{{l.v}}</span></div></sc-for>
+          </section>
+        </sc-if>
+        <sc-if value="{{p.hasTimeline}}" hint-placeholder-val="{{false}}">
+          <section style="display: flex; flex-direction: column; gap: 8px">
+            <span class="cap">Lịch sử</span>
+            <sc-for list="{{p.timeline}}" as="tl" hint-placeholder-count="3"><div style="display: flex; gap: 10px; font-size: 13px"><span class="num" style="flex: none; width: 92px; color: var(--ink-3)">{{tl.when}}</span><span style="text-wrap: pretty">{{tl.text}}</span></div></sc-for>
+          </section>
+        </sc-if>
+        <sc-if value="{{p.note}}" hint-placeholder-val="{{false}}"><div style="padding: 12px 14px; border-radius: 12px; background: var(--panel); font-size: 13px; color: var(--ink-2); text-wrap: pretty">{{p.note}}</div></sc-if>
+        <div class="paneacts stick" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{p.acts}}" as="a" hint-placeholder-count="2"><button class="btn {{a.cls}}" onClick="{{a.run}}">{{a.label}}</button></sc-for>
+        </div>
+      </div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{dlgOpen}}" hint-placeholder-val="{{false}}">
+    <div class="sheetwrap" style="position: fixed; inset: 0; z-index: 26; display: flex; justify-content: center; align-items: flex-start; padding: 8vh 16px 16px">
+      <button class="scrim" aria-label="Đóng" onClick="{{closeDlg}}" style="border: 0; cursor: default"></button>
+      <form class="popover sheet" role="dialog" aria-label="{{g.title}}" onSubmit="{{g.submit}}" novalidate="novalidate" style="position: relative; width: 100%; max-width: 560px; max-height: 84vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 20px">
+        <div class="sheethead" style="display: flex; align-items: center; gap: 10px"><h2 class="h2" style="flex: 1; font-size: 17px">{{g.title}}</h2><button type="button" class="btn ghost sm sq" aria-label="Đóng" onClick="{{closeDlg}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button></div>
+        <sc-if value="{{g.intro}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--ink-3); text-wrap: pretty">{{g.intro}}</span></sc-if>
+        <sc-for list="{{g.fields}}" as="fd" hint-placeholder-count="3">
+          <sc-if value="{{fd.isInput}}" hint-placeholder-val="{{true}}"><label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">{{fd.label}}</span><input class="inp {{fd.mono}}" value="{{fd.v}}" onChange="{{fd.set}}" placeholder="{{fd.ph}}" aria-invalid="{{fd.inv}}"><sc-if value="{{fd.errText}}" hint-placeholder-val="{{false}}"><span class="ferr">{{fd.errText}}</span></sc-if></label></sc-if>
+          <sc-if value="{{fd.isArea}}" hint-placeholder-val="{{false}}"><label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">{{fd.label}}</span><textarea class="inp" rows="3" value="{{fd.v}}" onChange="{{fd.set}}" placeholder="{{fd.ph}}" aria-invalid="{{fd.inv}}" style="height: auto; padding: 10px 12px"></textarea><sc-if value="{{fd.errText}}" hint-placeholder-val="{{false}}"><span class="ferr">{{fd.errText}}</span></sc-if></label></sc-if>
+          <sc-if value="{{fd.isChoice}}" hint-placeholder-val="{{false}}"><span class="lab">{{fd.label}}</span><div class="chipwrap" role="group" aria-label="{{fd.label}}"><sc-for list="{{fd.opts}}" as="o" hint-placeholder-count="3"><button type="button" class="chip {{o.cls}}" aria-pressed="{{o.on}}" onClick="{{o.pick}}">{{o.label}}</button></sc-for></div><sc-if value="{{fd.errText}}" hint-placeholder-val="{{false}}"><span class="ferr">{{fd.errText}}</span></sc-if></sc-if>
+          <sc-if value="{{fd.isToggle}}" hint-placeholder-val="{{false}}"><div style="display: flex; align-items: center; gap: 12px"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">{{fd.label}}</span><span style="font-size: 12.5px; color: var(--ink-3)">{{fd.help}}</span></span><button type="button" class="sw {{fd.swCls}}" role="switch" aria-checked="{{fd.on}}" aria-label="{{fd.label}}" onClick="{{fd.toggle}}"></button></div></sc-if>
+          <sc-if value="{{fd.showHelp}}" hint-placeholder-val="{{false}}"><span style="margin-top: -6px; font-size: 12.5px; color: var(--ink-3)">{{fd.help}}</span></sc-if>
+        </sc-for>
+        <sc-if value="{{g.err}}" hint-placeholder-val="{{false}}"><span class="tone-bad" role="alert" style="font-size: 13px">{{g.err}}</span></sc-if>
+        <div style="display: flex; justify-content: flex-end; gap: 8px"><button type="button" class="btn" onClick="{{closeDlg}}">Huỷ</button><button type="submit" class="btn pri">{{g.ok}}</button></div>
+      </form>
+    </div>
+  </sc-if>
+
+<ax-sheets>
+  <div class="axsheet" id="qs" popover="auto" role="dialog" aria-label="Tìm và chạy lệnh">
+    <label class="qs-in"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><input class="inp" type="search" autofocus="autofocus" placeholder="Tìm màn, phân hệ hay lệnh…" aria-label="Tìm màn, phân hệ hay lệnh"><span class="kbd hide-mobile">Esc</span></label>
+    <span class="cap">Đi tới</span>
+    <div class="qs-list">
+      <a class="qs-it" href="Main.dc.html" data-k="tong quan"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span>Tổng quan</span></a>
+      <a class="qs-it sub" href="Main.dc.html" data-k="tong quan bang dieu khien"><span class="qs-dim">Tổng quan ›</span><span>Bảng điều khiển</span></a>
+      <a class="qs-it sub" href="Work.dc.html" data-k="tong quan viec va hoat dong"><span class="qs-dim">Tổng quan ›</span><span>Việc và hoạt động</span></a>
+      <a class="qs-it" href="Orders.dc.html" data-k="ban hang"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span>Bán hàng</span></a>
+      <a class="qs-it sub" href="Orders.dc.html" data-k="ban hang don hang"><span class="qs-dim">Bán hàng ›</span><span>Đơn hàng</span></a>
+      <a class="qs-it sub" href="Shipping.dc.html" data-k="ban hang van chuyen"><span class="qs-dim">Bán hàng ›</span><span>Vận chuyển</span></a>
+      <a class="qs-it sub" href="StoreOps.dc.html" data-k="ban hang cua hang"><span class="qs-dim">Bán hàng ›</span><span>Cửa hàng</span></a>
+      <a class="qs-it sub" href="Channels.dc.html" data-k="ban hang kenh ban"><span class="qs-dim">Bán hàng ›</span><span>Kênh bán</span></a>
+      <a class="qs-it" href="Catalog.dc.html" data-k="san pham"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span>Sản phẩm</span></a>
+      <a class="qs-it sub" href="Catalog.dc.html" data-k="san pham san pham va gia"><span class="qs-dim">Sản phẩm ›</span><span>Sản phẩm và giá</span></a>
+      <a class="qs-it sub" href="Inventory.dc.html" data-k="san pham ton kho"><span class="qs-dim">Sản phẩm ›</span><span>Tồn kho</span></a>
+      <a class="qs-it" href="Promotions.dc.html" data-k="tiep thi"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span>Tiếp thị</span></a>
+      <a class="qs-it sub" href="Promotions.dc.html" data-k="tiep thi khuyen mai"><span class="qs-dim">Tiếp thị ›</span><span>Khuyến mại</span></a>
+      <a class="qs-it sub" href="Engage.dc.html" data-k="tiep thi bieu mau, ban tin, binh luan"><span class="qs-dim">Tiếp thị ›</span><span>Biểu mẫu, bản tin, bình luận</span></a>
+      <a class="qs-it sub" href="Affiliate.dc.html" data-k="tiep thi tiep thi lien ket"><span class="qs-dim">Tiếp thị ›</span><span>Tiếp thị liên kết</span></a>
+      <a class="qs-it" href="Content.dc.html" data-k="noi dung"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span>Nội dung</span></a>
+      <a class="qs-it sub" href="Content.dc.html" data-k="noi dung bai viet"><span class="qs-dim">Nội dung ›</span><span>Bài viết</span></a>
+      <a class="qs-it sub" href="ContentMore.dc.html" data-k="noi dung trang va cau truc"><span class="qs-dim">Nội dung ›</span><span>Trang và cấu trúc</span></a>
+      <a class="qs-it sub" href="Menus.dc.html" data-k="noi dung menu"><span class="qs-dim">Nội dung ›</span><span>Menu</span></a>
+      <a class="qs-it sub" href="MediaLibrary.dc.html" data-k="noi dung thu vien media"><span class="qs-dim">Nội dung ›</span><span>Thư viện media</span></a>
+      <a class="qs-it" href="Customers.dc.html" data-k="khach hang"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Khách hàng</span></a>
+      <a class="qs-it" href="Market.dc.html" data-k="san"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span>Sàn</span></a>
+      <a class="qs-it" href="Finance.dc.html" data-k="tai chinh"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span>Tài chính</span></a>
+      <a class="qs-it" href="Main.dc.html#g=reports" data-k="bao cao"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span>Báo cáo</span></a>
+      <a class="qs-it" href="Org.dc.html" data-k="to chuc"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span>Tổ chức</span></a>
+      <a class="qs-it sub" href="Org.dc.html" data-k="to chuc cay to chuc"><span class="qs-dim">Tổ chức ›</span><span>Cây tổ chức</span></a>
+      <a class="qs-it sub" href="Access.dc.html" data-k="to chuc phan quyen"><span class="qs-dim">Tổ chức ›</span><span>Phân quyền</span></a>
+      <a class="qs-it" href="Compliance.dc.html" data-k="tuan thu"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span>Tuân thủ</span></a>
+      <a class="qs-it sub" href="Compliance.dc.html" data-k="tuan thu tinh trang tuan thu"><span class="qs-dim">Tuân thủ ›</span><span>Tình trạng tuân thủ</span></a>
+      <a class="qs-it sub" href="LegalOps.dc.html" data-k="tuan thu ho so va du lieu ca nhan"><span class="qs-dim">Tuân thủ ›</span><span>Hồ sơ và dữ liệu cá nhân</span></a>
+      <a class="qs-it" href="Settings.dc.html" data-k="cai dat"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span>Cài đặt</span></a>
+      <a class="qs-it sub" href="Settings.dc.html" data-k="cai dat cai dat chung"><span class="qs-dim">Cài đặt ›</span><span>Cài đặt chung</span></a>
+      <a class="qs-it sub" href="Agent.dc.html" data-k="cai dat api key va ai agent"><span class="qs-dim">Cài đặt ›</span><span>API key và AI agent</span></a>
+      <a class="qs-it sub" href="Devtools.dc.html" data-k="cai dat nha phat trien"><span class="qs-dim">Cài đặt ›</span><span>Nhà phát triển</span></a>
+      <a class="qs-it" href="Account.dc.html" data-k="tai khoan cua toi"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Tài khoản của tôi</span></a>
+      <span class="qs-none">Không thấy màn nào khớp. Thử gõ tên phân hệ, ví dụ "đơn hàng" hay "thuế".</span>
+    </div>
+  </div>
+  <div class="axsheet" id="mods" popover="auto" role="dialog" aria-label="Mọi phân hệ">
+    <span class="hp-head"><b>Phân hệ</b><button type="button" class="btn ghost sm sq" popovertarget="mods" popovertargetaction="hide" aria-label="Đóng"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span>
+    <div class="mods-grid">
+      <a class="mod" href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span>Tổng quan</span></a>
+      <a class="mod" href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span>Bán hàng</span><span class="pip"></span></a>
+      <a class="mod" href="Catalog.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span>Sản phẩm</span></a>
+      <a class="mod" href="Promotions.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span>Tiếp thị</span></a>
+      <a class="mod" href="Content.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span>Nội dung</span></a>
+      <a class="mod on" href="Customers.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Khách hàng</span></a>
+      <a class="mod" href="Market.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span>Sàn</span><span class="pip"></span></a>
+      <a class="mod" href="Finance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span>Tài chính</span><span class="pip"></span></a>
+      <a class="mod" href="Main.dc.html#g=reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span>Báo cáo</span></a>
+      <a class="mod" href="Org.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span>Tổ chức</span></a>
+      <a class="mod" href="Compliance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span>Tuân thủ</span><span class="pip"></span></a>
+      <a class="mod" href="Settings.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span>Cài đặt</span></a>
+      <a class="mod" href="Account.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Tài khoản của tôi</span></a>
+    </div>
+    <div class="mods-foot">
+      <button type="button" class="btn" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18zM12 3a9 9 0 0 1 0 18"></path></svg>Sáng / tối</button>
+      <a class="btn ghost" href="Map.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"></path></svg>Bản đồ thiết kế</a>
+    </div>
+  </div>
+</ax-sheets>
+  <nav class="bottombar only-mobile" aria-label="Điều hướng nhanh">
+    <a href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Tổng quan</a>
+    <a href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg>Đơn</a>
+    <a href="Work.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"></path></svg>Việc</a>
+    <button type="button" popovertarget="qs" aria-label="Tìm và chạy lệnh"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg>Tìm</button>
+    <button type="button" popovertarget="mods" class="on" aria-label="Mọi phân hệ"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"></path></svg>Phân hệ</button>
+  </nav>
+  <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+    <div class="toast" role="status" style="z-index: 30; max-width: calc(100% - 32px)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.check}}"></path></svg><span>{{toast}}</span><sc-if value="{{toastUndo}}" hint-placeholder-val="{{false}}"><button type="button" class="undo" onClick="{{undo}}">Hoàn tác</button></sc-if></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  // Mở đúng tab theo địa chỉ (#thue): liên kết từ màn khác và từ thanh bên trỏ thẳng vào một tab
+  state = { dark: null, toast: '', toastUndo: false, tab: ((ids) => { const h = typeof location === 'undefined' ? '' : location.hash.slice(1); return ids.includes(h) ? h : ids[0]; })(["profiles", "accounts", "segments", "loyalty", "carts", "referrals", "cod"]), open: null, rs: {}, chip: {}, flags: {}, form: {}, ferr: {}, dlg: null, f: {}, err: '', dbad: [], descOpen: false };
+
+  say(text, undo) {
+    this.undoFn = undo || null;
+    this.setState({ toast: text, toastUndo: !!undo });
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.setState({ toast: '', toastUndo: false }), undo ? 6000 : 3200);
+  }
+
+  undo() {
+    const fn = this.undoFn; this.undoFn = null;
+    if (fn) fn();
+    this.say('Đã hoàn tác');
+  }
+
+  renderVals() {
+    const I = {
+      key: 'M14 10a4 4 0 1 0-3.5 4L9 15.5V18H6.5v2H4v-2.5L10.5 11A4 4 0 0 0 14 10zM15 7h.01',
+      redo: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
+      scan: 'M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10',
+      file: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5',
+      lock2: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3',
+      doc: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6',
+      truck: 'M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+      ret: 'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3',
+      tag: 'M3 12V4h8l9 9-8 8zM7.5 7.5h.01',
+      chat: 'M4 5h16v11H9l-5 4z',
+      bank: 'M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18M12 3l9 5H3z',
+      warn: 'M12 3l9.5 17h-19zM12 10v4M12 17h.01',
+      live: 'M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8',
+      info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01',
+      alert: 'M12 3l9.5 17h-19zM12 10v4M12 17h.01',
+      home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+      cart: 'M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01',
+      box: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9',
+      mega: 'M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11',
+      posts: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6',
+      user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+      store: 'M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4',
+      wallet: 'M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01',
+      chart: 'M5 20V11M11 20V5M17 20v-6M3 20h18',
+      org: 'M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4',
+      shield: 'M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5',
+      gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z',
+      map: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14',
+      clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+      search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6',
+      plus: 'M12 5v14M5 12h14',
+      down: 'M12 4v12M7 11l5 5 5-5M4 20h16',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      x: 'M6 6l12 12M18 6L6 18',
+      right: 'M9 6l6 6-6 6',
+      link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+      rows: 'M4 6h16M4 12h16M4 18h16',
+      cols: 'M4 4h16v16H4zM10 4v16M16 4v16',
+      star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z',
+      users: 'M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-1.5a4 4 0 0 0-3-3.85M16 3.6a3.5 3.5 0 0 1 0 6.8',
+      spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
+      updown: 'M8 9l4-4 4 4M8 15l4 4 4-4'
+    };
+    const s = this.state;
+    const dark = s.dark ?? (this.props.dark || (typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches));
+
+    const SPEC = {"crumb": "Bếp Mộc · toàn chuỗi · hồ sơ khách và giữ chân khách", "title": "Khách hàng", "desc": "Hiểu khách của mình và giữ chân họ: hồ sơ mua hàng, nhóm theo quy tắc, điểm và hạng, nhắc giỏ bỏ dở, giới thiệu bạn và rủi ro COD. Dành cho CSKH, marketing và quản lý cửa hàng; nhân viên cửa hàng chỉ thấy khách của nhánh mình.", "acts": [{"l": "Thêm khách tại quầy", "pri": true, "dlg": "add"}, {"l": "Tạo nhóm khách", "dlg": "group", "tab": "segments", "pri": true}], "tabs": [{"id": "profiles", "label": "Hồ sơ khách", "blocks": [{"type": "kpis", "items": [["Hồ sơ khách", "52.380", "Toàn chuỗi, gồm cả sàn", "pub"], ["Có tài khoản người mua", "48.210", "Gắn với tài khoản", "pub"], ["Chỉ có số điện thoại", "4.170", "Đăng ký tại quầy", "sched"], ["Mua lại trong 90 ngày", "31%", "Tăng 3 điểm so với quý trước", "review"]]}, {"type": "table", "title": "Danh sách khách", "tip": "Mỗi người mua có một hồ sơ trong Bếp Mộc, gắn với tài khoản hoặc số điện thoại. Hồ sơ theo số điện thoại chỉ gắn vào tài khoản khi chủ số đã xác thực, để không ai chiếm được điểm của người khác.", "acts": [{"l": "Xuất CSV", "m": "Đã xếp job xuất danh sách khách theo bộ lọc; file tải ở Cài đặt › Job"}], "chips": [["acct", "Có tài khoản"], ["phone", "Chỉ SĐT tại quầy"], ["gold", "Hạng Vàng"]], "cols": [{"l": "Khách", "w": "minmax(190px, 1.5fr)"}, {"l": "Nút", "w": "minmax(120px, 1fr)"}, {"l": "Hạng", "w": "100px"}, {"l": "Đơn", "w": "60px", "r": true}, {"l": "Tổng chi", "w": "140px", "r": true}, {"l": "Nhãn", "w": "minmax(120px, 1fr)"}], "minW": 860, "rows": [{"id": "p1", "tags": ["acct", "gold"], "c": [["Nguyễn Thị Hạnh", "09•• ••• 412"], "CN Quận 3", "Vàng", "14", ["11.240.000 ₫", "1 đơn đang giao"], "thích đồ gang"], "d": {"title": "Nguyễn Thị Hạnh", "sub": "CN Quận 3 · hạng Vàng", "f": [["Tài khoản", "Có · SĐT đã xác thực"], ["Email", "h•••@vidu.vn"], ["Ngày sinh", "••/03/1988"], ["Nhóm", "Khách Vàng · Khách quen Miền Nam"], ["Điểm", "1.684 điểm (= 168.400 ₫)"], ["Mã giới thiệu", "HANH8K2Q"], ["Đơn đầu", "12/12/2025"], ["Đơn gần nhất", "08/11/2026"]], "linesTitle": "Lịch sử mua (dựng từ event của đơn hàng)", "lines": [["BM-2611-0412 · 08/11 · đang giao", "1.041.000 ₫"], ["BM-2610-0733 · 21/10 · hoàn tất", "820.000 ₫"], ["BM-2609-0518 · 14/09 · hoàn tất", "855.000 ₫"], ["11 đơn trước đó · hoàn tất", "9.565.000 ₫"], ["Tổng chi (đơn hoàn tất)", "11.240.000 ₫"]], "tl": [["02/11 10:15", "Trần Thu (CSKH): khách hỏi bảo hành chảo gang, đã hướng dẫn tôi dầu"], ["21/10 18:40", "Lên hạng Vàng (chi 12 tháng vượt 10.000.000 ₫)"]], "note": "SĐT và email che bớt trên màn hình. Tổng chi chỉ cộng đơn đã hoàn tất (qua hạn đổi trả) trừ tiền đã hoàn; đơn đang giao chưa cộng.", "acts": [{"l": "Xem sổ điểm", "m": "Mở sổ điểm của khách: tích, đổi, hết hạn, điều chỉnh (chỉ thêm, không sửa)"}, {"l": "Thêm ghi chú", "pri": true, "dlg": "note"}, {"l": "Gắn nhãn", "dlg": "tag"}, {"l": "Điều chỉnh điểm", "dlg": "points"}]}}, {"id": "p2", "tags": ["phone"], "c": [["Phạm Quốc Bảo", "09•• ••• 087"], "CN Cầu Giấy", "Bạc", "6", ["4.380.000 ₫", "mua tại quầy"], "mua tại quầy"], "d": {"title": "Phạm Quốc Bảo", "sub": "CN Cầu Giấy · hạng Bạc", "f": [["Tài khoản", "Chưa có · chỉ số điện thoại"], ["Đăng ký", "Tại quầy CN Cầu Giấy, 03/2026"], ["Nhóm", "—"], ["Điểm", "438 điểm"], ["Gắn tài khoản", "Khi chủ số đăng ký và xác thực SĐT"]], "linesTitle": "Lịch sử mua (dựng từ event của đơn hàng)", "lines": [["BM-2611-0389 · 06/11 · hoàn tất", "540.000 ₫"], ["5 đơn trước đó · hoàn tất", "3.840.000 ₫"], ["Tổng chi", "4.380.000 ₫"]], "tl": [["06/11 17:20", "Thu ngân CN Cầu Giấy tích 54 điểm theo SĐT"]], "note": "Hồ sơ theo số điện thoại (HMAC theo khách, không so được với khách khác). Nhân viên đăng ký tại quầy không làm hồ sơ thuộc tài khoản nào cho tới khi chủ số xác thực.", "acts": [{"l": "Xem sổ điểm", "m": "Mở sổ điểm của khách: tích, đổi, hết hạn, điều chỉnh (chỉ thêm, không sửa)"}, {"l": "Thêm ghi chú", "pri": true, "dlg": "note"}, {"l": "Gắn nhãn", "dlg": "tag"}, {"l": "Điều chỉnh điểm", "dlg": "points"}]}}, {"id": "p3", "tags": ["acct"], "c": [["Võ Ngọc Ánh", "09•• ••• 230"], "CN Thủ Đức", "Bạc", "5", ["3.460.000 ₫", ""], "hay mua quà"], "d": {"title": "Võ Ngọc Ánh", "sub": "CN Thủ Đức · hạng Bạc", "f": [["Tài khoản", "Có · SĐT đã xác thực"], ["Email", "a•••@vidu.vn"], ["Nhóm", "Khách quen Miền Nam"], ["Điểm", "346 điểm"]], "linesTitle": "Lịch sử mua (dựng từ event của đơn hàng)", "lines": [["BM-2610-0802 · 25/10 · hoàn tất", "420.000 ₫"], ["4 đơn trước đó · hoàn tất", "3.040.000 ₫"], ["Tổng chi", "3.460.000 ₫"]], "tl": [["13/11 09:05", "Đã gửi nhắc giỏ lần 2 (có đồng ý nhận tin)"]], "note": "SĐT và email che bớt trên màn hình. Tổng chi chỉ cộng đơn đã hoàn tất (qua hạn đổi trả) trừ tiền đã hoàn; đơn đang giao chưa cộng.", "acts": [{"l": "Xem sổ điểm", "m": "Mở sổ điểm của khách: tích, đổi, hết hạn, điều chỉnh (chỉ thêm, không sửa)"}, {"l": "Thêm ghi chú", "pri": true, "dlg": "note"}, {"l": "Gắn nhãn", "dlg": "tag"}, {"l": "Điều chỉnh điểm", "dlg": "points"}]}}, {"id": "p4", "tags": ["acct"], "c": [["Trần Minh Khoa", "09•• ••• 655"], "Chợ Bếp Mộc", "Thành viên", "3", ["1.017.000 ₫", ""], "—"], "d": {"title": "Trần Minh Khoa", "sub": "Chợ Bếp Mộc · hạng Thành viên", "f": [["Tài khoản", "Có · SĐT đã xác thực"], ["Mua lần đầu ở", "Chợ Bếp Mộc (sàn)"], ["Điểm", "101 điểm"]], "linesTitle": "Lịch sử mua (dựng từ event của đơn hàng)", "lines": [["BM-2611-0360 · 02/11 · hoàn tất", "439.000 ₫"], ["2 đơn trước đó · hoàn tất", "578.000 ₫"], ["Tổng chi", "1.017.000 ₫"]], "tl": [["12/11 21:10", "Rút đồng ý nhận tin quảng cáo; huỷ mọi nhắc giỏ đang chờ"]], "note": "SĐT và email che bớt trên màn hình. Tổng chi chỉ cộng đơn đã hoàn tất (qua hạn đổi trả) trừ tiền đã hoàn; đơn đang giao chưa cộng.", "acts": [{"l": "Xem sổ điểm", "m": "Mở sổ điểm của khách: tích, đổi, hết hạn, điều chỉnh (chỉ thêm, không sửa)"}, {"l": "Thêm ghi chú", "pri": true, "dlg": "note"}, {"l": "Gắn nhãn", "dlg": "tag"}, {"l": "Điều chỉnh điểm", "dlg": "points"}]}}, {"id": "p5", "tags": ["acct"], "c": [["Đặng Văn Long", "09•• ••• 518"], "Trụ sở · bepmoc.vn", "Thành viên", "1", ["0 ₫", "đơn đầu đang giao"], "khách mới"], "d": {"title": "Đặng Văn Long", "sub": "Trụ sở · bepmoc.vn · hạng Thành viên", "f": [["Tài khoản", "Có · SĐT đã xác thực"], ["Đăng ký tại", "bepmoc.vn, 10/11/2026"], ["Giới thiệu bởi", "Võ Ngọc Ánh"]], "linesTitle": "Lịch sử mua (dựng từ event của đơn hàng)", "lines": [["BM-2611-0448 · 11/11 · đang giao", "1.257.000 ₫"], ["Tổng chi (chưa có đơn hoàn tất)", "0 ₫"]], "tl": [["11/11 08:20", "Đặt BM-2611-0448; nhắc giỏ đã lên lịch được huỷ"]], "note": "SĐT và email che bớt trên màn hình. Tổng chi chỉ cộng đơn đã hoàn tất (qua hạn đổi trả) trừ tiền đã hoàn; đơn đang giao chưa cộng.", "acts": [{"l": "Xem sổ điểm", "m": "Mở sổ điểm của khách: tích, đổi, hết hạn, điều chỉnh (chỉ thêm, không sửa)"}, {"l": "Thêm ghi chú", "pri": true, "dlg": "note"}, {"l": "Gắn nhãn", "dlg": "tag"}, {"l": "Điều chỉnh điểm", "dlg": "points"}]}}, {"id": "p6", "tags": ["acct"], "c": [["Lê Thu Trang", "09•• ••• 904"], "Trụ sở · bepmoc.vn", "Thành viên", "1", ["0 ₫", "đơn đầu đang giao"], "—"], "d": {"title": "Lê Thu Trang", "sub": "Trụ sở · bepmoc.vn · hạng Thành viên", "f": [["Tài khoản", "Có · SĐT chưa xác thực"], ["Đồng ý nhận tin quảng cáo", "Chưa"], ["Giới thiệu bởi", "Nguyễn Thị Hạnh"]], "linesTitle": "Lịch sử mua (dựng từ event của đơn hàng)", "lines": [["BM-2611-0440 · 10/11 · đang giao", "862.000 ₫"], ["Tổng chi", "0 ₫"]], "tl": [["10/11 19:02", "Tạo hồ sơ từ đơn đầu tiên"]], "note": "SĐT và email che bớt trên màn hình. Tổng chi chỉ cộng đơn đã hoàn tất (qua hạn đổi trả) trừ tiền đã hoàn; đơn đang giao chưa cộng.", "acts": [{"l": "Xem sổ điểm", "m": "Mở sổ điểm của khách: tích, đổi, hết hạn, điều chỉnh (chỉ thêm, không sửa)"}, {"l": "Thêm ghi chú", "pri": true, "dlg": "note"}, {"l": "Gắn nhãn", "dlg": "tag"}, {"l": "Điều chỉnh điểm", "dlg": "points"}]}}]}]}, {"id": "accounts", "label": "Tài khoản người mua", "desc": "Tài khoản đăng nhập của người mua (bước 34). Người mua là tài khoản riêng của Bếp Mộc, không có permission; nhân viên cần auth.customers.read để xem, auth.customers.manage để khoá hoặc mở. Không ai xem được mật khẩu.", "blocks": [{"type": "table", "title": "Tài khoản", "chips": [["acc_active", "Hoạt động"], ["acc_locked", "Đã khoá"]], "cols": [{"l": "Tài khoản", "w": "minmax(180px, 1.5fr)"}, {"l": "Đăng ký tại", "w": "minmax(120px, 1fr)"}, {"l": "Email", "w": "110px"}, {"l": "SĐT", "w": "120px"}, {"l": "Trạng thái", "w": "130px", "k": "st"}], "rowActs": [{"l": "Khoá tài khoản", "danger": true, "to": "acc_locked", "m": "Đã khoá; mọi phiên đăng nhập của người này bị thu hồi", "when": ["acc_active"]}, {"l": "Mở khoá", "pri": true, "to": "acc_active", "m": "Đã mở khoá; người mua đăng nhập lại được", "when": ["acc_locked"]}], "rows": [{"id": "a1", "st": "acc_active", "c": [["Nguyễn Thị Hạnh", "h•••@vidu.vn"], "bepmoc.vn", "Đã xác minh", "Đã xác thực", "st"], "d": {"f": [["Đăng ký", "12/12/2025"], ["Đăng nhập gần nhất", "13/11 07:52"], ["Xác thực SĐT (bước 37)", "Có, 12/12/2025"], ["Hồ sơ khách", "Nguyễn Thị Hạnh · Vàng"]]}}, {"id": "a2", "st": "acc_active", "c": [["Lê Thu Trang", "t•••@vidu.vn"], "bepmoc.vn", "Đã xác minh", "Chưa", "st"], "d": {"f": [["Đăng ký", "10/11/2026"], ["Xác thực SĐT", "Chưa"], ["Hệ quả", "Chưa được bình luận, đánh giá (NĐ 147/2024)"]], "note": "Tài khoản chưa xác thực SĐT vẫn mua được; chưa gắn được với hồ sơ theo số điện thoại."}}, {"id": "a3", "st": "acc_active", "c": [["Trần Minh Khoa", "k•••@vidu.vn"], "cho.bepmoc.vn", "Đã xác minh", "Đã xác thực", "st"], "d": {"f": [["Đăng ký", "28/10/2026"], ["Đăng nhập gần nhất", "12/11 21:08"]]}}, {"id": "a4", "st": "acc_locked", "c": [["Bùi Hải Yến", "y•••@vidu.vn"], "bepmoc.vn", "Chưa", "Chưa", "st"], "d": {"f": [["Đăng ký", "09/11/2026"], ["Khoá bởi", "Trần Thu · 12/11 15:30"], ["Lý do", "Nghi giả mạo, đặt 5 đơn COD tên khác nhau"]]}}]}, {"type": "form", "title": "Đăng ký tài khoản người mua", "half": true, "ok": "Lưu", "m": "Đã lưu cài đặt đăng ký (auth.customer_registration)", "fields": [{"k": "reg", "l": "Cho người mua tự đăng ký", "type": "toggle", "v": true, "help": "Tắt thì trang đăng ký trả lỗi auth.customer_registration_closed; khách vẫn mua vãng lai được."}]}, {"type": "note", "half": true, "tone": "warn", "strong": "214 tài khoản chưa xác thực số điện thoại.", "text": "Họ vẫn mua hàng được nhưng chưa bình luận, đánh giá được (NĐ 147/2024 — cần đối chiếu văn bản gốc). Xác thực SĐT thuộc phần Tuân thủ (bước 37)."}]}, {"id": "segments", "label": "Nhóm khách", "desc": "Nhóm làm tay hoặc theo quy tắc. Nhóm được đánh giá lại khi hồ sơ đổi và mỗi đêm; bảng giá (bước 41) và khuyến mại (bước 43) dùng nhóm qua mã nhóm, không đọc dữ liệu khách.", "blocks": [{"type": "table", "title": "Nhóm", "tip": "Nhóm theo quy tắc tự cập nhật thành viên. Quy tắc gồm: tổng chi tối thiểu, số đơn tối thiểu, mua gần đây trong N ngày, hạng, nhãn, nút. Lưu quy tắc sai thì báo lỗi customers.rule_invalid.", "cols": [{"l": "Nhóm", "w": "minmax(180px, 1.4fr)"}, {"l": "Cách vào nhóm", "w": "minmax(220px, 1.8fr)"}, {"l": "Hồ sơ", "w": "90px", "r": true}, {"l": "Đang dùng ở", "w": "minmax(150px, 1fr)"}], "minW": 820, "rows": [{"id": "g1", "c": [["Khách Vàng", "quy tắc · gắn với hạng"], "Hạng là Vàng", "1.284", "Bảng giá thành viên"], "d": {"f": [["Quy tắc", "tier_in: [Vàng]"], ["Đánh giá lại", "13/11 02:00 (hằng đêm)"], ["Bảng giá dùng nhóm", "Giá thành viên Vàng (bước 41)"]], "acts": [{"l": "Xem trước số khớp", "pri": true, "m": "Khớp 1.284 hồ sơ (không đổi so với lần đánh giá trước)"}, {"l": "Sửa quy tắc", "dlg": "group"}]}}, {"id": "g2", "c": [["Khách quen Miền Nam", "quy tắc"], "Từ 3 đơn, mua trong 90 ngày, Miền Nam", "2.106", "Khuyến mại 20/11"], "d": {"f": [["Quy tắc", "orders_count_min 3 · last_order_within_days 90 · org_in [Miền Nam]"], ["Nút", "Miền Nam (CN Quận 3, CN Thủ Đức)"], ["Khuyến mại", "Tri ân 20/11 (bước 43)"]], "note": "Dùng nhóm để gửi tin quảng cáo vẫn phải lọc theo đồng ý nhận tin của từng người.", "acts": [{"l": "Xem trước số khớp", "pri": true, "m": "Khớp 2.106 hồ sơ; 1.312 người đã đồng ý nhận tin quảng cáo"}, {"l": "Sửa quy tắc", "dlg": "group"}]}}, {"id": "g3", "c": [["Chi trên 5 triệu", "quy tắc"], "Tổng chi từ 5.000.000 ₫", "3.912", "—"], "d": {"f": [["Quy tắc", "total_spent_min 5.000.000 ₫"]], "acts": [{"l": "Xem trước số khớp", "pri": true, "m": "Khớp 3.912 hồ sơ"}]}}, {"id": "g4", "c": [["Khách sỉ nhà hàng", "làm tay"], "Nhân viên thêm từng hồ sơ", "38", "Bảng giá sỉ"], "d": {"f": [["Cách vào nhóm", "Thêm tay, có người thêm và thời điểm"], ["Bảng giá dùng nhóm", "Giá sỉ nhà hàng"]], "acts": [{"l": "Thêm hồ sơ vào nhóm", "pri": true, "m": "Mở ô tìm khách theo tên hoặc số điện thoại"}]}}]}, {"type": "form", "title": "Thử quy tắc", "half": true, "ok": "Xem trước số khớp", "m": "Khớp 1.046 hồ sơ: chi từ 3.000.000 ₫, mua trong 60 ngày, ở CN Thủ Đức hoặc CN Quận 3", "fields": [{"k": "spent", "l": "Tổng chi tối thiểu (₫)", "v": "3000000", "mono": true}, {"k": "orders", "l": "Số đơn tối thiểu", "v": "", "mono": true, "ph": "Bỏ trống: không xét"}, {"k": "days", "l": "Mua gần đây trong (ngày)", "v": "60", "mono": true}, {"k": "org", "l": "Nút", "type": "choice", "opts": ["Toàn chuỗi", "Miền Nam", "Miền Bắc", "Chợ Bếp Mộc"], "v": "Miền Nam"}]}, {"type": "note", "half": true, "strong": "Phân khúc là xử lý dữ liệu cá nhân.", "text": "Mục đích và căn cứ ghi trong sổ của Tuân thủ. Dùng nhóm để tiếp thị cần khách đã đồng ý (Luật BVDLCN 91/2025, NĐ 356/2025 — cần đối chiếu văn bản gốc)."}]}, {"id": "loyalty", "label": "Điểm và hạng", "blocks": [{"type": "kpis", "items": [["Điểm còn hiệu lực", "4.812.300", "Của 31.906 khách", "pub"], ["Nghĩa vụ trong sổ cái", "481.230.000 ₫", "Điểm × giá trị lúc tích", "review"], ["Hết hạn trong 30 ngày", "212.400", "Tính tới cuối ngày giờ Việt Nam", "sched"], ["Đang giữ cho đơn", "8.600", "Trả lại nếu đơn huỷ", "draft"]]}, {"type": "table", "title": "Quy tắc tích và đổi điểm", "tip": "Quy tắc là dữ liệu có ngày hiệu lực. Không sửa dòng đã áp dụng: thêm dòng mới, dòng cũ tự đóng. Điểm đã tích giữ giá trị lúc tích, nên sổ cái không lệch khi đổi giá trị điểm.", "acts": [{"l": "Thêm quy tắc", "dlg": "loyalty"}], "cols": [{"l": "Tích", "w": "minmax(170px, 1.3fr)"}, {"l": "Giá trị 1 điểm", "w": "120px", "r": true}, {"l": "Đổi", "w": "minmax(170px, 1.3fr)"}, {"l": "Hiệu lực", "w": "minmax(150px, 1fr)"}, {"l": "Trạng thái", "w": "130px", "k": "st"}], "minW": 840, "rows": [{"id": "lr1", "st": "active", "c": [["1 điểm / 10.000 ₫", "hạn dùng 12 tháng"], "100 ₫", ["Từ 100 điểm", "tối đa 30% giá trị đơn"], "Từ 01/01/2026", "st"], "d": {"f": [["Cơ sở tích", "Tiền đơn sau giảm, không gồm phí giao"], ["Hệ số danh mục", "Gốm sứ × 1,5"], ["Tích khi", "Đơn hoàn tất (qua hạn đổi trả)"]], "note": "Áp từ 01/01/2026; tự đóng 31/12/2026 khi quy tắc mới có hiệu lực."}}, {"id": "lr2", "st": "scheduled", "c": [["1 điểm / 10.000 ₫", "hạn dùng 12 tháng"], "80 ₫", ["Từ 100 điểm", "tối đa 30% giá trị đơn"], "Từ 01/01/2027", "st"], "d": {"f": [["Thêm bởi", "Ngô Mai · 05/11/2026"], ["Ảnh hưởng", "Chỉ điểm tích từ 01/01/2027; điểm cũ vẫn 100 ₫"]], "note": "Điều kiện chương trình điểm phải công khai cho người mua trước ngày hiệu lực (Luật 19/2023 — cần đối chiếu)."}}, {"id": "lr3", "st": "closed", "c": [["1 điểm / 20.000 ₫", "hạn dùng 6 tháng"], "100 ₫", ["Từ 200 điểm", "tối đa 20% giá trị đơn"], "01/06 – 31/12/2025", "st"]}]}, {"type": "table", "title": "Hạng thành viên", "half": true, "tip": "Hạng xét mỗi ngày theo chi tiêu 12 tháng gần nhất. Mỗi hạng có hệ số tích điểm và có thể gắn một nhóm khách.", "cols": [{"l": "Hạng", "w": "minmax(110px, 1fr)"}, {"l": "Chi 12 tháng từ", "w": "130px", "r": true}, {"l": "Hệ số", "w": "70px", "r": true}, {"l": "Khách", "w": "80px", "r": true}], "minW": 420, "rows": [{"c": ["Thành viên", "0 ₫", "× 1", "46.330"]}, {"c": ["Bạc", "3.000.000 ₫", "× 1,2", "4.766"]}, {"c": [["Vàng", "nhóm Khách Vàng"], "10.000.000 ₫", "× 1,5", "1.284"]}], "foot": "Tổng 52.380 hồ sơ."}, {"type": "table", "title": "Điều chỉnh tay gần đây", "half": true, "tip": "Chỉ người có customers.loyalty.adjust làm được. Mỗi lần điều chỉnh có mã tham chiếu (gửi lại cùng mã không cộng hai lần) và lý do, ghi vào sổ điểm chỉ thêm.", "acts": [{"l": "Điều chỉnh", "dlg": "points"}], "cols": [{"l": "Khách", "w": "minmax(140px, 1.2fr)"}, {"l": "Điểm", "w": "70px", "r": true}, {"l": "Lý do", "w": "minmax(150px, 1.4fr)"}], "minW": 420, "rows": [{"c": [["Nguyễn Thị Hạnh", "CSKH-2611-014 · Trần Thu"], "+200", "Bù điểm đơn tích thiếu"]}, {"c": [["Phạm Quốc Bảo", "CSKH-2611-011 · Lê Quang Huy"], "−150", "Thu hồi điểm tặng nhầm"]}]}, {"type": "note", "strong": "Thẻ quà tặng và số dư cửa hàng: đang tắt.", "text": "Bật cần hai lớp: người vận hành bật biến AUTOXIDE_CUSTOMERS_STORED_VALUE_ENABLED và gói của khách có tính năng. Khi bật, thẻ chỉ dùng mua hàng của Bếp Mộc, không rút ra tiền, không chuyển cho người khác (NĐ 52/2024 — cần đối chiếu văn bản gốc và người có chuyên môn pháp lý trước khi bật)."}]}, {"id": "carts", "label": "Giỏ bỏ dở", "n": "1", "hot": true, "desc": "Giỏ khách bỏ dở được nhắc chỉ khi khách đã đồng ý nhận tin quảng cáo. Đồng ý được kiểm lúc lên lịch và kiểm lại lúc gửi; khách đặt hàng hoặc rút đồng ý thì lịch nhắc bị huỷ.", "blocks": [{"type": "kpis", "items": [["Giỏ bỏ dở 7 ngày", "412", "Của người mua có hồ sơ", "draft"], ["Đã lên lịch nhắc", "168", "Có đồng ý nhận tin", "pub"], ["Bỏ qua", "244", "Chưa đồng ý nhận tin", "sched"], ["Đặt hàng sau khi nhắc", "23", "14% số giỏ được nhắc", "review"]]}, {"type": "table", "title": "Lịch nhắc", "chips": [["scheduled_r", "Đã lên lịch"], ["sent", "Đã gửi"], ["cancelled", "Đã huỷ"], ["skipped_no_consent", "Bỏ qua"]], "cols": [{"l": "Khách", "w": "minmax(170px, 1.3fr)"}, {"l": "Giỏ", "w": "minmax(180px, 1.4fr)"}, {"l": "Giá trị", "w": "110px", "r": true}, {"l": "Lần nhắc", "w": "130px"}, {"l": "Trạng thái", "w": "170px", "k": "st"}], "minW": 860, "rowActs": [{"l": "Huỷ nhắc", "danger": true, "to": "cancelled", "m": "Đã huỷ lịch nhắc của giỏ này", "when": ["scheduled_r"]}], "rows": [{"id": "r1", "st": "scheduled_r", "c": [["Nguyễn Thị Hạnh", "đồng ý email 12/2025"], ["Chảo gang 26 cm, thớt gỗ", "2 sản phẩm"], "950.000 ₫", ["Lần 1", "13/11 16:40"], "st"], "d": {"f": [["Bỏ giỏ lúc", "13/11 15:40"], ["Kênh", "Email"], ["Mẫu tin", "Nhắc giỏ lần 1"], ["Đồng ý", "Nhận tin quảng cáo qua email · bản 2"]], "note": "Lúc gửi, hệ thống kiểm lại đồng ý và giỏ còn bỏ dở. Thông báo chỉ gửi trong khung giờ cho phép (7h–22h, là dữ liệu của phần Thông báo)."}}, {"id": "r2", "st": "sent", "c": [["Võ Ngọc Ánh", "đồng ý email"], ["Bộ dao bếp 3 món", "1 sản phẩm"], "820.000 ₫", ["Lần 2", "13/11 09:05"], "st"], "d": {"tl": [["12/11 09:00", "Bỏ giỏ"], ["12/11 10:00", "Gửi lần 1 (60 phút)"], ["13/11 09:05", "Gửi lần 2 (1 ngày), có link huỷ nhận tin"]]}}, {"id": "r3", "st": "cancelled", "c": [["Đặng Văn Long", "đã đặt BM-2611-0448"], ["Hộp thuỷ tinh 1 lít (bộ 3) × 2", "1 sản phẩm"], "630.000 ₫", ["Lần 1", "không gửi"], "st"]}, {"id": "r4", "st": "cancelled", "c": [["Trần Minh Khoa", "rút đồng ý 12/11"], ["Khăn bếp cotton (bộ 4) × 2", "1 sản phẩm"], "198.000 ₫", ["Lần 2", "không gửi"], "st"]}, {"id": "r5", "st": "skipped_no_consent", "c": [["Lê Thu Trang", "chưa đồng ý"], ["Nồi inox 3 đáy 20 cm", "1 sản phẩm"], "540.000 ₫", ["—", ""], "st"]}]}, {"type": "form", "title": "Quy tắc nhắc", "half": true, "ok": "Lưu quy tắc mới", "m": "Đã thêm quy tắc nhắc có hiệu lực từ ngày mai; giỏ đã lên lịch giữ lịch cũ", "fields": [{"k": "on", "l": "Bật nhắc giỏ bỏ dở", "type": "toggle", "v": true, "help": "Tính năng customers.cart_reminders của gói"}, {"k": "delays", "l": "Các mốc nhắc (phút sau khi bỏ giỏ)", "v": "60, 1440", "mono": true, "req": true}, {"k": "ch", "l": "Kênh", "type": "choice", "opts": ["Email", "SMS"], "v": "Email"}]}, {"type": "note", "half": true, "tone": "warn", "strong": "Tin quảng cáo theo NĐ 91/2020.", "text": "Chỉ gửi khi đã đồng ý trước, dừng ngay khi người nhận từ chối, trong khung giờ cho phép, mỗi tin có link huỷ nhận. Bản thay thế NĐ 91/2020 đang dự thảo — cần đối chiếu văn bản gốc."}]}, {"id": "referrals", "label": "Giới thiệu bạn", "desc": "Mỗi khách có một mã giới thiệu. Người được giới thiệu nhập mã trong 14 ngày sau khi tạo tài khoản và trước đơn đầu; thưởng khi đơn đầu hoàn tất và đủ giá trị tối thiểu.", "blocks": [{"type": "table", "title": "Lượt giới thiệu", "chips": [["pending", "Chờ đơn đầu"], ["qualified", "Đủ điều kiện"], ["rewarded", "Đã thưởng"], ["rejected", "Bị loại"]], "cols": [{"l": "Người giới thiệu", "w": "minmax(160px, 1.2fr)"}, {"l": "Người được giới thiệu", "w": "minmax(160px, 1.2fr)"}, {"l": "Đơn đầu", "w": "minmax(150px, 1fr)"}, {"l": "Trạng thái", "w": "140px", "k": "st"}], "rows": [{"id": "f1", "st": "pending", "c": [["Nguyễn Thị Hạnh", "HANH8K2Q"], "Lê Thu Trang", ["BM-2611-0440", "đang giao"], "st"], "d": {"f": [["Nhập mã", "10/11/2026"], ["Đơn đầu", "862.000 ₫, đủ tối thiểu 300.000 ₫"], ["Thưởng khi", "Đơn hoàn tất (qua hạn đổi trả)"]]}}, {"id": "f2", "st": "pending", "c": [["Võ Ngọc Ánh", "ANH4R7TM"], "Đặng Văn Long", ["BM-2611-0448", "đang giao"], "st"]}, {"id": "f3", "st": "qualified", "c": [["Phạm Thị Mai", "MAI2XQ9P"], "Hồ Thanh Tâm", ["BM-2611-0301", "hoàn tất 12/11"], "st"], "d": {"f": [["Thưởng người giới thiệu", "200 điểm"], ["Thưởng người được giới thiệu", "100 điểm"]], "note": "Job phát thưởng chạy trong vài phút; thưởng phát một lần, gửi lại event không phát thêm."}}, {"id": "f4", "st": "rewarded", "c": [["Nguyễn Thị Hạnh", "HANH8K2Q"], "Đinh Quang Vinh", ["BM-2610-0611", "hoàn tất"], "st"]}, {"id": "f5", "st": "rejected", "c": [["Trần Minh Khoa", "KHOA7N3D"], "Trần Minh Khôi", ["—", ""], "st"], "d": {"f": [["Lý do", "Cùng số điện thoại với người giới thiệu"], ["Mã lỗi", "customers.self_referral"]], "note": "Chống gian lận: cùng số điện thoại, email hoặc thiết bị với người giới thiệu thì bị loại."}}]}, {"type": "tiles", "title": "Quy tắc đang áp dụng", "tip": "Quy tắc giới thiệu là dữ liệu có ngày hiệu lực và được công khai cho người mua. Thưởng mặc định bằng điểm, không cần thẻ quà tặng.", "items": [{"t": "Người giới thiệu", "big": "200 điểm", "x": "Khi đơn đầu của bạn bè hoàn tất", "m": "Từ 01/10/2026"}, {"t": "Người được giới thiệu", "big": "100 điểm", "x": "Đơn đầu tối thiểu 300.000 ₫", "m": "Nhập mã trong 14 ngày"}, {"t": "Quy tắc mới", "x": "Thêm dòng mới có ngày hiệu lực; dòng cũ tự đóng", "a": [{"l": "Thêm quy tắc", "dlg": "referral"}]}]}]}, {"id": "cod", "label": "Rủi ro COD", "desc": "Chống bom hàng khi giao nhận tiền (bước 45). Thống kê theo số điện thoại đã băm theo khách nên không so được với cửa hàng khác. Không chặn vĩnh viễn: mọi lần chặn có lý do và hạn. Đơn từ sàn ngoài không tính vào thống kê.", "blocks": [{"type": "kpis", "items": [["Đơn COD 30 ngày", "2.140", "Toàn chuỗi", "pub"], ["Giao thất bại, từ chối", "4,2%", "90 đơn", "draft"], ["Quy tắc đang hiệu lực", "1", "1 quy tắc sắp hiệu lực", "sched"], ["Đang chặn COD", "3", "Có hạn, gỡ được", "review"]]}, {"type": "table", "title": "Quy tắc COD", "tip": "Quy tắc là dữ liệu có ngày hiệu lực. Khi người mua khớp quy tắc, hệ thống yêu cầu trả trước hoặc không nhận COD cho đơn đó; người mua vẫn mua được bằng cách khác.", "acts": [{"l": "Thêm quy tắc", "dlg": "codrule"}], "cols": [{"l": "Điều kiện", "w": "minmax(220px, 1.8fr)"}, {"l": "Áp ở", "w": "minmax(110px, 1fr)"}, {"l": "Xử lý", "w": "minmax(130px, 1fr)"}, {"l": "Hiệu lực", "w": "130px"}, {"l": "Trạng thái", "w": "130px", "k": "st"}], "minW": 860, "rows": [{"id": "q1", "st": "active", "c": [["Từ 2 đơn, thất bại trên 50%", "tính cả từ chối nhận"], "Toàn chuỗi", "Yêu cầu trả trước", "Từ 01/09/2026", "st"], "d": {"f": [["min_orders", "2"], ["max_fail_ratio", "50%"], ["action", "require_prepayment"], ["Lỗi trả cho người mua", "orders.cod_not_allowed"]]}}, {"id": "q2", "st": "scheduled", "c": [["Đơn từ 3.000.000 ₫", "mọi người mua"], "Chợ Bếp Mộc", "Yêu cầu trả trước", "Từ 01/12/2026", "st"]}, {"id": "q3", "st": "closed", "c": [["Từ 3 đơn, thất bại trên 60%", ""], "Toàn chuỗi", "Không nhận COD", "03 – 08/2026", "st"]}]}, {"type": "form", "title": "Tra thống kê người mua", "half": true, "ok": "Tra", "m": "Trong Bếp Mộc: giao thành công 3, thất bại 3, từ chối nhận 2 (62,5%) → khớp quy tắc \"Yêu cầu trả trước\"", "fields": [{"k": "phone", "l": "Số điện thoại", "ph": "[SỐ ĐIỆN THOẠI]", "req": true, "mono": true, "help": "Số được chuẩn hoá và băm trước khi tra; không lưu số tra."}]}, {"type": "note", "half": true, "strong": "Không chặn trái luật.", "text": "Điều kiện giao dịch phải minh bạch với người mua (Luật 19/2023, NĐ 55/2024 — cần đối chiếu điều cụ thể). Ưu tiên yêu cầu trả trước thay vì từ chối bán."}, {"type": "table", "title": "Danh sách chặn COD", "acts": [{"l": "Chặn số điện thoại", "dlg": "codblock"}], "chips": [["blocked", "Đang chặn"], ["lifted", "Đã gỡ"], ["expired", "Hết hạn"]], "cols": [{"l": "Người mua", "w": "minmax(150px, 1.1fr)"}, {"l": "Lý do", "w": "minmax(180px, 1.5fr)"}, {"l": "Hạn", "w": "110px"}, {"l": "Người chặn", "w": "minmax(120px, 1fr)"}, {"l": "Trạng thái", "w": "140px", "k": "st"}], "minW": 820, "rowActs": [{"l": "Gỡ chặn", "to": "lifted", "m": "Đã gỡ chặn; người mua đặt COD lại được", "when": ["blocked"]}], "rows": [{"id": "k1", "st": "blocked", "c": [["09•• ••• 771", "5 đơn COD"], "Từ chối nhận 4 lần liên tiếp", "13/02/2027", "Lê Quang Huy", "st"], "d": {"f": [["Mã lý do", "repeated_refusal"], ["Ghi chú", "Đơn BM-2611-0350, 0362, 0371, 0390"], ["Chặn lúc", "13/11 08:30"]], "note": "Người mua này vẫn đặt hàng được nếu trả trước."}}, {"id": "k2", "st": "blocked", "c": [["09•• ••• 112", "3 đơn COD"], "Đặt tên giả, địa chỉ không có", "30/11/2026", "Trần Thu", "st"]}, {"id": "k3", "st": "expired", "c": [["09•• ••• 345", "2 đơn COD"], "Từ chối nhận 2 lần", "01/11/2026", "Lê Quang Huy", "st"]}]}]}], "statuses": {"active": ["Đang hiệu lực", "b-ok"], "scheduled": ["Sắp hiệu lực", "b-sched"], "closed": ["Đã đóng", "b-arch"], "scheduled_r": ["Đã lên lịch", "b-sched"], "sent": ["Đã gửi", "b-ok"], "cancelled": ["Đã huỷ nhắc", "b-arch"], "skipped_no_consent": ["Bỏ qua: chưa đồng ý", "b-draft"], "pending": ["Chờ đơn đầu", "b-info"], "qualified": ["Đủ điều kiện", "b-violet"], "rewarded": ["Đã thưởng", "b-ok"], "rejected": ["Bị loại", "b-bad"], "blocked": ["Đang chặn COD", "b-bad"], "lifted": ["Đã gỡ", "b-arch"], "expired": ["Hết hạn chặn", "b-draft"], "acc_active": ["Hoạt động", "b-ok"], "acc_locked": ["Đã khoá", "b-bad"]}, "dialogs": {"add": {"title": "Thêm khách tại quầy", "intro": "Đăng ký theo số điện thoại. Hồ sơ chưa thuộc tài khoản nào cho tới khi chủ số đăng ký và xác thực SĐT.", "ok": "Thêm khách", "m": "Đã tạo hồ sơ; nếu số đã có hồ sơ, hệ thống mở hồ sơ có sẵn", "fields": [{"k": "phone", "l": "Số điện thoại", "ph": "[SỐ ĐIỆN THOẠI]", "req": true, "mono": true}, {"k": "name", "l": "Họ tên", "ph": "Không bắt buộc"}, {"k": "org", "l": "Cửa hàng", "type": "choice", "opts": ["CN Quận 3", "CN Thủ Đức", "CN Cầu Giấy"], "v": "CN Quận 3"}]}, "group": {"title": "Nhóm khách", "intro": "Đặt tên và quy tắc. Bấm \"Lưu\" sẽ báo số hồ sơ khớp trước khi áp.", "ok": "Lưu nhóm", "m": "Đã lưu nhóm; khớp 2.106 hồ sơ, job cập nhật thành viên đã xếp", "fields": [{"k": "name", "l": "Tên nhóm", "req": true}, {"k": "kind", "l": "Cách vào nhóm", "type": "choice", "opts": ["Theo quy tắc", "Làm tay"], "v": "Theo quy tắc"}, {"k": "rule", "l": "Quy tắc", "type": "area", "ph": "vd: số đơn từ 3, mua trong 90 ngày, nút Miền Nam"}]}, "note": {"title": "Thêm ghi chú nội bộ", "intro": "Ghi chú là dữ liệu cá nhân: có trong bản xuất khi khách yêu cầu, bị xoá khi khách xoá tài khoản.", "ok": "Lưu ghi chú", "m": "Đã lưu ghi chú", "fields": [{"k": "body", "l": "Nội dung", "type": "area", "req": true}]}, "tag": {"title": "Gắn nhãn", "ok": "Lưu nhãn", "m": "Đã gắn nhãn; nhóm theo nhãn sẽ cập nhật trong 1 phút", "fields": [{"k": "tags", "l": "Nhãn (cách nhau dấu phẩy)", "v": "thích đồ gang", "req": true}]}, "points": {"title": "Điều chỉnh điểm", "intro": "Cần quyền customers.loyalty.adjust. Ghi vào sổ điểm chỉ thêm và bút toán nghĩa vụ điểm.", "ok": "Điều chỉnh", "m": "Đã điều chỉnh; gửi lại cùng mã tham chiếu không cộng hai lần", "fields": [{"k": "pts", "l": "Số điểm (+ cộng, − trừ)", "ph": "+200", "req": true, "mono": true}, {"k": "ref", "l": "Mã tham chiếu", "ph": "CSKH-2611-015", "req": true, "mono": true}, {"k": "why", "l": "Lý do", "type": "area", "req": true}]}, "loyalty": {"title": "Thêm quy tắc điểm", "intro": "Không thêm quy tắc có hiệu lực trong quá khứ (customers.rule_effective_in_past).", "ok": "Thêm", "m": "Đã thêm quy tắc; quy tắc đang hiệu lực tự đóng vào ngày trước đó", "fields": [{"k": "earn", "l": "Tiền cho 1 điểm (₫)", "v": "10000", "req": true, "mono": true}, {"k": "val", "l": "Giá trị 1 điểm (₫)", "v": "100", "req": true, "mono": true}, {"k": "months", "l": "Hạn dùng (tháng)", "v": "12", "mono": true}, {"k": "from", "l": "Hiệu lực từ", "ph": "01/01/2027", "req": true, "mono": true}]}, "referral": {"title": "Thêm quy tắc giới thiệu", "ok": "Thêm", "m": "Đã thêm quy tắc giới thiệu có ngày hiệu lực", "fields": [{"k": "a", "l": "Thưởng người giới thiệu (điểm)", "v": "200", "req": true, "mono": true}, {"k": "b", "l": "Thưởng người được giới thiệu (điểm)", "v": "100", "req": true, "mono": true}, {"k": "min", "l": "Đơn đầu tối thiểu (₫)", "v": "300000", "mono": true}, {"k": "from", "l": "Hiệu lực từ", "ph": "01/12/2026", "req": true, "mono": true}]}, "codrule": {"title": "Thêm quy tắc COD", "intro": "Cần quyền orders.risk.manage. Quy tắc áp cho đơn đặt từ ngày hiệu lực.", "ok": "Thêm", "m": "Đã thêm quy tắc COD", "fields": [{"k": "min", "l": "Số đơn tối thiểu để xét", "v": "2", "mono": true, "req": true}, {"k": "ratio", "l": "Tỉ lệ thất bại vượt (%)", "v": "50", "mono": true, "req": true}, {"k": "act", "l": "Xử lý", "type": "choice", "opts": ["Yêu cầu trả trước", "Không nhận COD"], "v": "Yêu cầu trả trước"}, {"k": "from", "l": "Hiệu lực từ", "ph": "01/12/2026", "req": true, "mono": true}]}, "codblock": {"title": "Chặn COD theo số điện thoại", "intro": "Chặn luôn có hạn và lý do. Người bị chặn vẫn mua được nếu trả trước.", "ok": "Chặn", "m": "Đã chặn COD tới hạn đã chọn", "fields": [{"k": "phone", "l": "Số điện thoại", "ph": "[SỐ ĐIỆN THOẠI]", "req": true, "mono": true}, {"k": "why", "l": "Lý do", "type": "choice", "opts": ["Từ chối nhận nhiều lần", "Thông tin giả", "Khác"], "v": "Từ chối nhận nhiều lần"}, {"k": "until", "l": "Chặn tới", "ph": "13/02/2027", "req": true, "mono": true}, {"k": "note", "l": "Ghi chú", "type": "area", "req": true}]}}, "links": [["Đơn hàng", "Orders.dc.html"], ["Tuân thủ", "Compliance.dc.html"]]};
+    const say = (t) => this.say(t);
+    // Menu con của phân hệ (các màn) do khung chung vẽ; ở đây là tab của chính màn này, nằm dưới tiêu đề.
+    const pickTab = (id) => { this.setState({ tab: id, open: null, descOpen: false }); try { history.replaceState(null, '', '#' + id); } catch (e) { /* khung xem trước không cho đổi địa chỉ */ } };
+    const tabs = SPEC.tabs.map((t) => ({ label: t.label, n: t.n || '', hot: t.hot ? 'hot' : '', cls: s.tab === t.id ? 'on' : '', sel: s.tab === t.id ? 'true' : 'false', pick: () => pickTab(t.id) }));
+    const tabIdx = Math.max(0, SPEC.tabs.findIndex((t) => t.id === s.tab));
+    const curTab = SPEC.tabs[tabIdx];
+    const act = (a, ctx) => ({ label: a.l, cls: a.pri ? 'pri' : a.danger ? 'danger' : '', run: () => {
+      // `go`: chuyển sang màn khác (vd mục đã dời sang màn riêng)
+      if (a.go) { window.location.href = a.go; return; }
+      if (a.dlg) { this.setState({ dlg: a.dlg, f: {}, err: '' }); return; }
+      if (a.to && ctx) {
+        // Đổi trạng thái đảo được: thông báo kèm Hoàn tác (quy ước ui-design.md mục 5)
+        const prev = s.rs[ctx];
+        this.setState({ rs: { ...s.rs, [ctx]: a.to } });
+        this.say(a.m || 'Đã ghi nhận', () => this.setState({ rs: { ...this.state.rs, [ctx]: prev } }));
+        return;
+      }
+      if (a.flag) this.setState({ flags: { ...s.flags, [a.flag]: true } });
+      say(a.m || 'Đã ghi nhận');
+    } });
+    const ST = SPEC.statuses || {};
+    const stOf = (key) => ST[key] || [key, 'b-draft'];
+    let pane = null;
+    // Chữ thường đầu câu, giữ nguyên chữ viết tắt (SKU, API…)
+    const lc = (l) => /^[A-ZĐ]{2}/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1);
+    // Gợi ý trong ô là ví dụ, không giống giá trị đã điền; câu hướng dẫn thì giữ nguyên
+    const ex = (ph) => !ph || /^(Bỏ trống|Bắt buộc|Chỉ|Dán|Để|Nhập|Tìm|Không|Tuỳ|Mỗi|Ghi|Ví dụ|vd)/i.test(ph) || /hoặc|\)$/.test(ph) ? (ph || '') : 'Ví dụ: ' + ph;
+    const fieldVals = (fields, store, setStore, scope, bad) => fields.map((fd) => {
+      const k = scope + ':' + fd.k;
+      const v = store[k] !== undefined ? store[k] : (fd.v ?? '');
+      const type = fd.type || 'input';
+      const isBad = (bad || []).includes(fd.k);
+      return {
+        label: fd.l, ph: ex(fd.ph), help: fd.help || '', showHelp: !!fd.help && type !== 'toggle', mono: fd.mono ? 'mono' : '', v,
+        inv: isBad ? 'true' : 'false', errText: isBad ? 'Hãy ' + (type === 'choice' ? 'chọn ' : 'nhập ') + lc(fd.l) + '.' : '',
+        isInput: type === 'input', isArea: type === 'area', isChoice: type === 'choice', isToggle: type === 'toggle',
+        set: (e) => setStore({ ...store, [k]: e.target.value }),
+        opts: (fd.opts || []).map((o) => ({ label: o, on: v === o, cls: v === o ? 'on' : '', pick: () => setStore({ ...store, [k]: o }) })),
+        on: !!v, swCls: v ? 'on' : '', toggle: () => setStore({ ...store, [k]: !v })
+      };
+    });
+    const missing = (fields, store, scope) => fields.filter((fd) => fd.req && !String(store[scope + ':' + fd.k] !== undefined ? store[scope + ':' + fd.k] : (fd.v ?? '')).trim());
+    // Gom mọi ô thiếu để báo một lần, rồi đưa con trỏ về ô sai đầu tiên
+    const errMsg = (m) => (m.length === 1 ? 'Còn 1 ô cần điền: ' : 'Còn ' + m.length + ' ô cần điền: ') + m.map((fd) => lc(fd.l)).join(', ') + '.';
+    const focusBad = () => setTimeout(() => { const el = document.querySelector('[aria-invalid="true"]'); if (el) el.focus(); }, 30);
+    const secs = [curTab].map((t) => ({
+      desc: '',
+      blocks: t.blocks.map((b, bi) => {
+        const id = t.id + '-' + bi;
+        const base = { id, title: b.title || '', sub: b.sub || '', tip: b.tip || '', hasHead: !!b.title, flex: b.half ? '1 1 420px' : b.third ? '1 1 300px' : '1 1 100%', acts: (b.acts || []).map((a) => act(a)),
+          isKpis: b.type === 'kpis', isNote: b.type === 'note', isTable: b.type === 'table', isCards: b.type === 'cards', isForm: b.type === 'form', isMeters: b.type === 'meters', isTiles: b.type === 'tiles', isSkel: b.type === 'skeleton', isTasks: b.type === 'tasks' };
+        // Hộp việc: nhóm theo mức gấp như hộp việc ở trang Tổng quan; mỗi việc có nút xử lý, hoãn, giao ngay trên dòng
+        if (b.type === 'tasks') {
+          const chipKey = s.chip[id] || 'all';
+          const all = b.items.map((it) => ({ it, k: id + ':' + it.id, st: s.rs[id + ':' + it.id] || 'open' }));
+          const match = (x) => chipKey === 'all' || x.st === chipKey;
+          const chips = [['all', 'Tất cả'], ['open', 'Đang chờ'], ['assigned', 'Đã giao việc'], ['snoozed', 'Đã hoãn']].map(([cid, label]) => ({ label, n: String(all.filter((x) => cid === 'all' || x.st === cid).length), on: chipKey === cid ? 'true' : 'false', cls: chipKey === cid ? 'on' : '', pick: () => this.setState({ chip: { ...s.chip, [id]: cid } }) }));
+          const G = [['overdue', 'Quá hạn', 'tone-bad'], ['today', 'Hôm nay', ''], ['soon', 'Sắp tới', '']];
+          const groups = G.map(([gid, label, cls]) => {
+            const items = all.filter((x) => x.it.g === gid && match(x)).map(({ it, k, st }) => {
+              const acts = st === 'snoozed'
+                ? [act({ l: 'Bỏ hoãn', to: 'open', m: 'Việc đã hiện lại' }, k)]
+                : [act({ l: it.act || 'Mở', pri: true, go: it.href, m: it.href ? '' : 'Mở ' + it.tag.toLowerCase() }), act({ l: 'Hoãn', to: 'snoozed', m: 'Đã hoãn; việc hiện lại lúc 9:00 sáng mai' }, k)].concat(st === 'open' ? [act({ l: 'Giao', to: 'assigned', m: 'Đã giao cho Ngô Mai; Ngô Mai nhận thông báo' }, k)] : []);
+              return { title: it.t, meta: it.m || '', tag: it.tag, due: it.due, dueCls: gid === 'overdue' ? 'tone-bad' : '', icon: I[it.i] || I.doc, tone: it.tone || 'info',
+                badge: st === 'open' ? '' : stOf(st)[0], bcls: st === 'open' ? '' : stOf(st)[1], acts };
+            });
+            return { label, cls, n: String(items.length), items };
+          }).filter((g2) => g2.items.length);
+          return { ...base, chips, groups, empty: groups.length === 0 };
+        }
+        if (b.type === 'skeleton') return { ...base, items: ['62%', '48%', '70%', '55%'].slice(0, b.n || 4).map((w, i) => ({ w1: w, w2: ['35%', '28%', '40%', '30%'][i] })) };
+        if (b.type === 'kpis') return { ...base, items: b.items.map(([label, n, note, dot]) => ({ label, n, note, dot: dot || '', cls: /\d/.test(n) ? '' : 'kword' })) };  // ô ghi chữ (vd tên gói) dùng cỡ nhỏ hơn ô ghi số
+        if (b.type === 'note') { const tone = b.tone || 'info'; return { ...base, text: b.text, strong: b.strong || '', icon: tone === 'warn' ? I.alert : I.info, bg: tone === 'warn' ? 'var(--warn-bg)' : 'var(--panel)', fg: tone === 'warn' ? 'var(--warn)' : 'var(--accent)' }; }
+        if (b.type === 'meters') return { ...base, items: b.items.map(([label, val, pct, note]) => ({ label, val, pct: pct + '%', note: note || '', cls: pct >= 85 ? 'hi' : '' })) };
+        if (b.type === 'tiles') return { ...base, items: b.items.map((it) => ({ title: it.t, big: it.big || '', text: it.x || '', meta: it.m || '', badge: it.b || '', bcls: it.bc || 'b-draft', acts: (it.a || []).map((a) => act(a)) })) };
+        if (b.type === 'cards') return { ...base, items: b.items.filter((it) => !(it.hideIf && s.flags[it.hideIf])).map((it, ii) => {
+          const k = id + ':' + ii; const st = s.rs[k];
+          const badge = st ? stOf(st)[0] : it.b || ''; const bcls = st ? stOf(st)[1] : it.bc || 'b-plain';
+          return { title: it.t, meta: it.m || '', icon: I[it.i || 'doc'] || I.doc, tone: it.tone || 'info', badge, bcls, acts: st ? [] : (it.a || []).map((a) => act(a, k)) };
+        }) };
+        if (b.type === 'form') {
+          const scope = id; const store = s.form; const fe = s.ferr[scope] || { msg: '', keys: [] };
+          const set = (v) => { const keys = fe.keys.filter((key) => !String(v[scope + ':' + key] ?? '').trim()); this.setState({ form: v, ferr: { ...s.ferr, [scope]: { msg: keys.length ? fe.msg : '', keys } } }); };
+          return { ...base, fields: fieldVals(b.fields, store, set, scope, fe.keys), submitLabel: b.ok || 'Lưu', err: fe.msg,
+            submit: (e) => { e.preventDefault(); const m = missing(b.fields, store, scope); if (m.length) { this.setState({ ferr: { ...s.ferr, [scope]: { msg: errMsg(m), keys: m.map((fd) => fd.k) } } }); focusBad(); return; } this.setState({ ferr: { ...s.ferr, [scope]: { msg: '', keys: [] } } }); say(b.m || 'Đã lưu'); } };
+        }
+        // Bảng: lọc bằng chip, mở khung chi tiết, đổi trạng thái theo hành động
+        const chipKey = s.chip[id] || 'all';
+        const rowsAll = b.rows.map((r, ri) => ({ r, k: id + ':' + (r.id || ri), st: s.rs[id + ':' + (r.id || ri)] || r.st }));
+        const chips = b.chips ? [['all', 'Tất cả'], ...b.chips].map(([cid, label]) => ({ label, n: String(rowsAll.filter((x) => cid === 'all' || x.st === cid || (x.r.tags || []).includes(cid)).length), on: chipKey === cid, cls: chipKey === cid ? 'on' : '', pick: () => this.setState({ chip: { ...s.chip, [id]: cid } }) })) : [];
+        const shown = rowsAll.filter((x) => chipKey === 'all' || x.st === chipKey || (x.r.tags || []).includes(chipKey));
+        const rows = shown.map(({ r, k, st }) => {
+          const isOpen = s.open === k;
+          if (isOpen && r.d) {
+            const ss = stOf(st);
+            const acts = (r.d.acts || []).concat(b.rowActs || []).filter((a) => !a.when || a.when.includes(st));
+            pane = { title: r.d.title || r.c[0], sub: r.d.sub || '', badge: st ? ss[0] : '', bcls: ss[1], fields: (r.d.f || []).map(([k2, v]) => ({ k: k2, v })), hasFields: !!(r.d.f || []).length,
+              lines: (r.d.lines || []).map(([k2, v]) => ({ k: k2, v })), hasLines: !!(r.d.lines || []).length, linesTitle: r.d.linesTitle || 'Chi tiết',
+              timeline: (r.d.tl || []).map(([when, text]) => ({ when, text })), hasTimeline: !!(r.d.tl || []).length, note: r.d.note || '', acts: acts.map((a) => act(a, k)) };
+          }
+          return { sel: isOpen ? 'sel' : '', open: () => this.setState({ open: k }),
+            cells: b.cols.map((c, ci) => {
+              const raw = r.c[ci]; const v = Array.isArray(raw) ? raw[0] : raw; const sub = Array.isArray(raw) ? raw[1] : '';
+              // Trên điện thoại và máy tính bảng bảng thành thẻ: mỗi ô mang nhãn cột (c.label) để số không đứng trơ
+              const label = c.l;
+              if (c.k === 'st') { const ss = stOf(st); return { isBadge: true, v: ss[0], badge: ss[1], label }; }
+              if (c.k === 'meter') return { isMeter: true, v: raw[0], pct: raw[1] + '%', mcls: raw[1] >= 85 ? 'hi' : '', label };
+              if (ci === 0 && r.d) return { isOpen: true, v, sub, cls: c.mono ? 'mono' : '', label };
+              return { isText: true, v, sub, label, cls: [ci === 0 ? 'cc-open' : 'cc-kv', c.r ? 'r num' : '', c.mono ? 'mono' : '', c.num ? 'num' : ''].join(' ').trim() };
+            }) };
+        });
+        return { ...base, hasChips: chips.length > 0, chips, cols: b.cols.map((c) => ({ label: c.l, cls: c.r ? 'r' : '' })), grid: b.cols.map((c) => c.w || 'minmax(120px, 1fr)').join(' '), minW: (b.minW || 760) + 'px',
+          rows, empty: rows.length === 0, emptyText: b.emptyText || 'Không có mục nào khớp bộ lọc.', foot: b.foot || '' };
+      })
+    }));
+    const D = SPEC.dialogs || {};
+    const dg = D[s.dlg];
+    const g = dg ? (() => {
+      const scope = 'dlg-' + s.dlg;
+      const bad = s.dbad || [];
+      const set = (v) => { const keys = bad.filter((key) => !String(v[scope + ':' + key] ?? '').trim()); this.setState({ f: v, dbad: keys, err: keys.length ? s.err : '' }); };
+      return { title: dg.title, intro: dg.intro || '', ok: dg.ok || 'Lưu', err: s.err, fields: fieldVals(dg.fields, s.f, set, scope, bad),
+        submit: (e) => { e.preventDefault(); const m = missing(dg.fields, s.f, scope); if (m.length) { this.setState({ err: errMsg(m), dbad: m.map((fd) => fd.k) }); focusBad(); return; } this.setState({ dlg: null, f: {}, dbad: [] }); say(dg.m || 'Đã tạo'); } };
+    })() : { fields: [] };
+    // Đầu trang theo tab: tab đầu là trang tổng (tên màn, mô tả dài); tab khác lấy tên tab làm tiêu đề, mô tả của tab.
+    // Nút đầu trang: của tab (tabs[].acts), không thì của màn: nút ghi tab: 'id' ở đúng tab đó, all: true ở mọi tab, còn lại ở tab đầu.
+    // Tab đầu: mô tả của màn và của tab gộp một đoạn (điện thoại gập sau 2 dòng, có "Xem thêm")
+    const desc = tabIdx === 0 ? [SPEC.desc, curTab.desc].filter(Boolean).join(' ') : (curTab.desc || '');
+    const rawActs = curTab.acts || (SPEC.acts || []).filter((a) => a.all || (a.tab ? a.tab === curTab.id : tabIdx === 0));
+    const hasPri = rawActs.some((a) => a.pri);
+    const headActs = rawActs.map((a, i) => { const x = act(a); return { ...x, cls: (x.cls + (!a.pri && (hasPri || i > 0) ? ' sec' : '')).trim() }; });
+    const page = {
+      crumb: tabIdx === 0 ? SPEC.crumb : SPEC.title + ' · ' + SPEC.crumb, title: tabIdx === 0 ? SPEC.title : (curTab.h1 || curTab.label),
+      desc, descLong: desc.length > 110, descOpen: s.descOpen ? 'true' : 'false', descCls: s.descOpen ? 'open' : '', descMore: s.descOpen ? 'Thu gọn' : 'Xem thêm',
+      toggleDesc: () => this.setState({ descOpen: !s.descOpen }),
+      headActs, hasActs: headActs.length > 0, moreActs: headActs.filter((a) => a.cls.includes('sec')), hasMore: headActs.some((a) => a.cls.includes('sec')),
+      tabs, hasTabs: tabs.length > 1, tabsLabel: 'Mục của ' + SPEC.title, secs,
+      paneOpen: !!pane, p: pane || { fields: [], lines: [], timeline: [], acts: [] }, closePane: () => this.setState({ open: null }),
+      dlgOpen: !!dg, g, closeDlg: () => this.setState({ dlg: null, f: {}, err: '', dbad: [] })
+    };
+
+    if (!this.hashBound && typeof window !== 'undefined') {
+      this.hashBound = true;
+      const ids = SPEC.tabs.map((t) => t.id);
+      window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (ids.includes(h)) this.setState({ tab: h, open: null }); });
+    }
+    return {
+      theme: dark ? 'dark' : '', themeIcon: dark ? I.sun : I.moon, toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, toast: s.toast, toastUndo: s.toastUndo, undo: () => this.undo(), ...page
+    };
+  }
+}
+</script>
+</body>
+</html>

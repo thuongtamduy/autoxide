@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Bản đồ phân hệ — Autoxide Admin</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ax-r40.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>
+/* ===== Map: CSS riêng của màn (R4 mục 32), mọi luật dưới .pg-map ===== */
+/* Chữ không dưới 12px: nhãn bước ("Có sẵn", "Bước 44–45"), nhãn "Pro" và nhãn mô hình kinh doanh */
+.ax.pg-map .kind, .ax.pg-map .pro, .ax.pg-map .map-scope { font-size: 12px; }
+</style>
+</helmet>
+<div class="ax pg-map {{theme}}" style="min-height: 100vh; background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+  <div style="width: 100%; max-width: 1320px; margin: 0 auto; padding: 48px 32px 64px; box-sizing: border-box; display: flex; flex-direction: column; gap: 32px">
+
+    <header class="rise" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px 48px">
+      <div style="flex: 1 1 560px; display: flex; flex-direction: column; gap: 10px">
+        <span class="cap">Kiến trúc thông tin · thiết kế 2</span>
+        <h1 class="dsp" style="margin: 0; font-size: 40px; font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; text-wrap: balance">Mười hai phân hệ, một khung. Nội dung chỉ là một trong số đó.</h1>
+        <p style="margin: 0; max-width: 760px; font-size: 16px; line-height: 1.6; color: var(--ink-2); text-wrap: pretty">Mỗi phân hệ là một mục trên thanh bên trái, gom các module cùng nghiệp vụ. Menu hiện ra cho từng người được dựng từ cấu hình của khách hàng, không viết cứng: cùng một giao diện phục vụ cửa hàng độc lập, chuỗi nhiều cửa hàng, khách SaaS và sàn.</p>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <a class="btn" href="Main.dc.html">Mở khung quản trị<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.arrow}}"></path></svg></a>
+        <button class="btn ghost sq" aria-label="Đổi giao diện sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+      </div>
+    </header>
+
+    <section class="rise d1 flow" style="--fb: 300px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px">
+      <div class="card" style="display: flex; flex-direction: column; gap: 8px; padding: 18px">
+        <span style="display: flex; align-items: center; gap: 10px"><span class="sq-ic info"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.box}}"></path></svg></span><span class="h2">1 · Module đã bật cho khách</span></span>
+        <span style="color: var(--ink-2); text-wrap: pretty">Gói và cấu hình của khách quyết module nào chạy. Module chưa bật thì menu không hiện, API trả mã lỗi <span class="mono" style="font-size: 12.5px">module_not_enabled</span>.</span>
+      </div>
+      <div class="card" style="display: flex; flex-direction: column; gap: 8px; padding: 18px">
+        <span style="display: flex; align-items: center; gap: 10px"><span class="sq-ic info"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.org}}"></path></svg></span><span class="h2">2 · Permission ở nút đang chọn</span></span>
+        <span style="color: var(--ink-2); text-wrap: pretty">Mục menu và nút bấm chỉ hiện khi người dùng có permission tương ứng ở nút tổ chức đang chọn. Dữ liệu lọc theo độ sâu: của mình, nút, nút và con, toàn khách.</span>
+      </div>
+      <div class="card" style="display: flex; flex-direction: column; gap: 8px; padding: 18px">
+        <span style="display: flex; align-items: center; gap: 10px"><span class="sq-ic warn"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.lock}}"></path></svg></span><span class="h2">3 · Tính năng trong gói</span></span>
+        <span style="color: var(--ink-2); text-wrap: pretty">Có module nhưng tính năng thuộc gói cao hơn thì vẫn hiện, kèm nhãn <span class="pro">Pro</span>, để người dùng biết nâng gói sẽ mở được gì. Bấm vào chỉ giải thích, không mở màn hình.</span>
+      </div>
+    </section>
+
+    <section class="rise d2" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px">
+      <span class="h2">Xem theo mô hình:</span>
+      <div role="group" aria-label="Chọn mô hình kinh doanh" style="display: flex; flex-wrap: wrap; gap: 8px">
+        <sc-for list="{{models}}" as="m" hint-placeholder-count="5">
+          <button class="chip {{m.cls}}" aria-pressed="{{m.on}}" onClick="{{m.pick}}">{{m.label}}</button>
+        </sc-for>
+      </div>
+      <div style="flex: 1"></div>
+      <span style="font-size: 13px; color: var(--ink-3)">{{countText}}</span>
+    </section>
+
+    <section style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); gap: 16px">
+      <sc-for list="{{groups}}" as="g" hint-placeholder-count="12">
+        <article class="mapcard {{g.cls}}">
+          <div style="display: flex; align-items: flex-start; gap: 12px">
+            <span class="sq-ic" style="width: 40px; height: 40px; border-radius: 11px; background: #14171F; color: #FF8A57"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{g.icon}}"></path></svg></span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+              <span style="display: flex; align-items: baseline; gap: 8px"><span class="idx num" style="font-size: 12px; color: var(--ink-3)">{{g.no}}</span><span class="dsp" style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em">{{g.label}}</span></span>
+              <span style="font-size: 12.5px; color: var(--ink-3)">{{g.mods}}</span>
+            </span>
+            <span class="kind">{{g.steps}}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px">
+            <sc-for list="{{g.items}}" as="it" hint-placeholder-count="5">
+              <div class="li"><span class="dash"></span><span><span style="font-weight: 600">{{it.label}}</span><span style="color: var(--ink-3)"> — {{it.desc}}</span></span></div>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; border-top: 1px solid var(--line); margin-top: auto; padding-top: 12px">
+            <sc-for list="{{g.tags}}" as="t" hint-placeholder-count="4">
+              <span class="badge map-scope {{t.cls}}" style="height: 22px"><span class="dot"></span>{{t.label}}</span>
+            </sc-for>
+            <sc-if value="{{g.href}}" hint-placeholder-val="{{false}}">
+              <div style="flex: 1"></div>
+              <a class="lnk" href="{{g.href}}" style="font-size: 13px">Xem màn hình</a>
+            </sc-if>
+          </div>
+        </article>
+      </sc-for>
+    </section>
+
+    <section class="rise" style="display: flex; flex-wrap: wrap; gap: 16px">
+      <article class="card" style="flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 22px; background: #14171F; border-color: #14171F; color: #E4E6EB">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+          <span class="sq-ic" style="width: 40px; height: 40px; border-radius: 11px; background: rgba(255,255,255,.08); color: #FF8A57"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.db}}"></path></svg></span>
+          <span style="flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <span class="dsp" style="font-size: 18px; font-weight: 600">Nền tảng — mặt điều khiển</span>
+            <span style="font-size: 12.5px; color: #AEB4C0">Một khung riêng cho nhân sự vận hành; khách hàng không thấy</span>
+          </span>
+          <a class="btn sm" href="Platform.dc.html" style="background: transparent; color: #F2F3F6; border-color: rgba(255,255,255,.24)">Xem màn hình</a>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px 24px">
+          <sc-for list="{{platform}}" as="p" hint-placeholder-count="6">
+            <div class="li" style="color: #E4E6EB"><span class="dash" style="background: #8A91A0"></span><span><span style="font-weight: 600">{{p.label}}</span><span style="color: #AEB4C0"> — {{p.desc}}</span></span></div>
+          </sc-for>
+        </div>
+      </article>
+      <article class="card" style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 22px">
+        <span class="h2">Luật của khung</span>
+        <sc-for list="{{rules}}" as="r" hint-placeholder-count="5">
+          <div class="li"><span class="dash"></span><span style="text-wrap: pretty">{{r}}</span></div>
+        </sc-for>
+      </article>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  state = { dark: null, model: 'any' };
+
+  renderVals() {
+    const I = {
+      home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+      cart: 'M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01',
+      box: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9',
+      mega: 'M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11',
+      posts: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6',
+      user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+      store: 'M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4',
+      wallet: 'M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01',
+      chart: 'M5 20V11M11 20V5M17 20v-6M3 20h18',
+      org: 'M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4',
+      shield: 'M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5',
+      gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z',
+      db: 'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+      lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3',
+      arrow: 'M5 12h14M13 6l6 6-6 6',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'
+    };
+    const s = this.state;
+    const dark = s.dark ?? this.props.dark ?? false;
+
+    const MODEL_NAMES = { all: 'Chuỗi + sàn', single: 'Một cửa hàng', saas: 'SaaS gói Cơ bản', blog: 'Chỉ nội dung' };
+    const ALL = ['all', 'single', 'saas', 'blog'];
+    const SHOP = ['all', 'single', 'saas'];
+
+    const GROUPS = [
+      { label: 'Tổng quan', icon: I.home, mods: 'Gom số liệu và việc từ mọi phân hệ', steps: 'Có sẵn', in: ALL, href: 'Main.dc.html', items: [
+        ['Bảng điều khiển', 'số liệu của phạm vi đang chọn, chỉ từ phân hệ đã bật'],
+        ['Việc cần làm', 'tính từ dữ liệu của từng module, tự hết khi xử lý xong; hoãn hoặc giao cho người khác'],
+        ['Hoạt động', 'đọc từ nhật ký audit, lọc theo quyền']] },
+      { label: 'Bán hàng', icon: I.cart, mods: 'orders, shipping', steps: 'Bước 44–45', in: SHOP, href: 'Orders.dc.html', items: [
+        ['Đơn hàng', 'website, quầy và sàn chung một danh sách, lọc theo cửa hàng'],
+        ['Đổi trả và hoàn tiền', 'hoàn qua cổng thanh toán, bút toán đảo'],
+        ['Bán tại quầy', 'đơn tạo tại cửa hàng, ca thu ngân, trừ kho của cửa hàng đó'],
+        ['Nhận tại cửa hàng', 'báo hàng sẵn sàng, bàn giao bằng mã, quá hạn giữ thì trả chỗ'],
+        ['Vận đơn, phí vận chuyển, đối soát COD', 'so bảng kê của hãng với sổ cái'],
+        ['Đánh giá', 'chỉ người đã mua; không chặn đánh giá trái quy định']] },
+      { label: 'Sản phẩm', icon: I.box, mods: 'catalog, inventory', steps: 'Bước 41–42', in: SHOP, items: [
+        ['Sản phẩm và biến thể', 'SKU, ảnh, nhóm thuế, nhiều ngôn ngữ'],
+        ['Danh mục và thuộc tính', 'thuộc tính bắt buộc theo danh mục là dữ liệu'],
+        ['Bảng giá', 'trụ sở đặt, cửa hàng kế thừa hoặc ghi đè; có lịch sử giá'],
+        ['Tồn kho', 'theo kho, sổ biến động chỉ thêm, không bán quá tồn'],
+        ['Chuyển kho, kiểm kê, lô và hạn dùng', 'chênh lệch thành bút toán có lý do'],
+        ['Nhập hàng', 'nhà cung cấp, đơn đặt mua, phiếu nhập một phần, trả nhà cung cấp']] },
+      { label: 'Tiếp thị', icon: I.mega, mods: 'promotions, newsletter, forms', steps: 'Bước 20–21, 43', in: ALL, items: [
+        ['Chương trình và mã giảm giá', 'hạn mức theo luật là dữ liệu có ngày hiệu lực'],
+        ['Flash sale', 'giữ chỗ số lượng như tồn kho'],
+        ['Newsletter', 'xác nhận hai bước, huỷ đăng ký một chạm'],
+        ['Form', 'biểu mẫu công khai, chống spam']] },
+      { label: 'Nội dung', icon: I.posts, mods: 'content, media, comments', steps: 'Bước 16–17, 22', in: ALL, href: 'Content.dc.html', items: [
+        ['Bài viết và trang', 'theo từng website của khách, nhiều ngôn ngữ, duyệt và lịch đăng'],
+        ['Trang bắt buộc', 'mẫu chính sách, đổi trả, quy chế sàn — nối với Tuân thủ'],
+        ['Danh mục, thẻ, menu', 'cấu trúc website'],
+        ['Thư viện media', 'dùng chung cho bài viết, sản phẩm, người bán'],
+        ['Bình luận', 'kiểm duyệt, yêu cầu tài khoản đã xác thực khi khách bật']] },
+      { label: 'Khách hàng', icon: I.user, mods: 'Tài khoản người mua, customers', steps: 'Bước 34, 47', in: ALL, items: [
+        ['Tài khoản', 'người mua là tài khoản riêng của từng khách'],
+        ['Hồ sơ khách và nhóm theo quy tắc', 'lịch sử mua, tổng chi, nhãn; nhóm tự cập nhật'],
+        ['Điểm thưởng và hạng', 'quy tắc là dữ liệu; điều chỉnh tay phải có lý do'],
+        ['Giỏ bỏ dở, giới thiệu bạn', 'nhắc giỏ chỉ khi khách đã đồng ý nhận tin'],
+        ['Nhóm khách', 'cho bảng giá và khuyến mại B2B'],
+        ['Đồng ý nhận tin', 'mục đích và căn cứ xử lý dữ liệu cá nhân']] },
+      { label: 'Sàn', icon: I.store, mods: 'marketplace', steps: 'Bước 46', in: ['all'], items: [
+        ['Người bán', 'mỗi người bán là một nút loại seller'],
+        ['Chờ định danh', 'chưa xác thực thì chưa được đăng bán'],
+        ['Duyệt sản phẩm', 'hàng cấm, hàng có điều kiện thiếu giấy tờ'],
+        ['Phí sàn và chi trả', 'giữ tới hết hạn đổi trả, trừ phí và thuế khấu trừ thay'],
+        ['Tranh chấp', 'sàn phân xử, có hạn xử lý, lưu vết']] },
+      { label: 'Tài chính', icon: I.wallet, mods: 'ledger, thuế, chứng từ', steps: 'Bước 36', in: SHOP, items: [
+        ['Sổ cái', 'bút toán kép, chỉ thêm, sửa sai bằng bút toán đảo'],
+        ['Thanh toán và đối soát', 'tiền đi qua đối tác có giấy phép, không qua hệ thống'],
+        ['Hoá đơn điện tử', 'qua nhà cung cấp; số tuần tự không nhảy số'],
+        ['Thuế', 'biểu thuế là dữ liệu có ngày hiệu lực, cảnh báo sắp hết hạn'],
+        ['Hàng chờ sai lệch', 'tiền lệch, chuyển khoản không mã, trả trùng: xử lý tay có lý do'],
+        ['Kỳ kế toán, xuất kế toán', 'khoá sổ theo kỳ, chứng từ lưu ít nhất 10 năm']] },
+      { label: 'Kênh bán', icon: I.store, mods: 'channels', steps: 'Bước 48', in: SHOP, items: [
+        ['Tài khoản kênh', 'sàn ngoài và mạng xã hội nối qua API của kênh'],
+        ['Liên kết sản phẩm', 'mã của kênh, giá riêng theo kênh'],
+        ['Phân bổ tồn kho', 'xem trước số đẩy lên từng kênh, không bán quá tồn'],
+        ['Đơn từ kênh', 'về chung danh sách đơn; báo thiếu ánh xạ, bán quá'],
+        ['Đối soát tiền kênh trả', 'so bảng kê của kênh với sổ cái']] },
+      { label: 'Tiếp thị liên kết', icon: I.mega, mods: 'affiliate', steps: 'Bước 49', in: SHOP, items: [
+        ['Đối tác tiếp thị', 'duyệt người tiếp thị, link và mã riêng'],
+        ['Hoa hồng', 'quy tắc có ngày hiệu lực; tính khi đơn hoàn tất'],
+        ['Chi trả và thuế', 'khấu trừ thuế TNCN theo luật, chứng từ năm'],
+        ['Livestream bán hàng', 'gắn sản phẩm vào phiên, người phát đã xác thực']] },
+      { label: 'Báo cáo', icon: I.chart, mods: 'Báo cáo theo quyền độ sâu', steps: 'Bước 38, 45', in: SHOP, items: [
+        ['Bán hàng', 'theo cửa hàng, kênh, sản phẩm, thời gian'],
+        ['Tồn kho và giá vốn', 'lãi gộp theo kho'],
+        ['Gộp nhiều cửa hàng', 'cộng cả cửa hàng có database riêng'],
+        ['Xuất dữ liệu', 'chạy bằng job, tải về khi xong']] },
+      { label: 'Tổ chức', icon: I.org, mods: 'Cây tổ chức, role, permission', steps: 'Bước 34', in: ALL, href: 'Org.dc.html', items: [
+        ['Cây tổ chức', 'trụ sở, vùng, cửa hàng, kho, người bán; cài đặt kế thừa'],
+        ['Thành viên và role', 'role gắn vào nút, kèm độ sâu của quyền'],
+        ['Lời mời', 'mời bằng email, đăng nhập bằng link'],
+        ['Uỷ quyền', 'cha cấp quyền xuống khách con; có audit hai phía']] },
+      { label: 'Tuân thủ', icon: I.shield, mods: 'Theo pháp luật Việt Nam hiện hành', steps: 'Bước 37', in: ALL, href: 'Compliance.dc.html', items: [
+        ['Website TMĐT', 'thông báo hoặc đăng ký với Bộ Công Thương, theo từng tên miền'],
+        ['Định danh (KYC)', 'người bán, người livestream, tiếp thị liên kết'],
+        ['Dữ liệu cá nhân', 'đồng ý, xuất, xoá, quy trình sự cố 72 giờ'],
+        ['Văn bản pháp lý', 'có phiên bản, lưu bằng chứng ai chấp nhận bản nào'],
+        ['Báo vi phạm, nội dung do AI tạo', 'gỡ trong hạn; gắn nhãn nội dung AI']] },
+      { label: 'Cài đặt', icon: I.gear, mods: 'Cấu hình của khách', steps: 'Bước 33, 35', in: ALL, items: [
+        ['Gói và thuê bao', 'hạn mức đang dùng, gia hạn, xuất dữ liệu khi huỷ'],
+        ['Tên miền', 'gắn với nút tổ chức, xác minh bằng DNS'],
+        ['Module', 'bật, tắt; tắt thì giữ dữ liệu theo chính sách lưu'],
+        ['Kết nối đối tác', 'khoá cổng thanh toán, SMTP, hoá đơn — mã hoá khi lưu'],
+        ['API key, webhook, audit, job', 'cho nhà phát triển và AI agent']] }
+    ];
+
+    const pickModel = (id) => () => this.setState({ model: s.model === id ? 'any' : id });
+    const models = [['any', 'Tất cả phân hệ'], ...ALL.map((id) => [id, MODEL_NAMES[id]])].map(([id, label]) => ({
+      label, on: s.model === id, cls: s.model === id ? 'on' : '', pick: pickModel(id)
+    }));
+
+    const groups = GROUPS.map((g, i) => {
+      const inModel = s.model === 'any' || g.in.includes(s.model);
+      return {
+        ...g,
+        no: String(i + 1).padStart(2, '0'),
+        cls: s.model === 'any' ? '' : inModel ? 'hl' : 'dim',
+        href: g.href || '',
+        items: g.items.map(([label, desc]) => ({ label, desc })),
+        tags: g.in.length === 4
+          ? [{ label: 'Mọi mô hình', cls: 'b-ok' }]
+          : g.in.map((id) => ({ label: MODEL_NAMES[id], cls: 'b-info' }))
+      };
+    });
+    const count = GROUPS.filter((g) => s.model === 'any' || g.in.includes(s.model)).length;
+
+    const platform = [
+      { label: 'Khách hàng', desc: 'sổ khách, mô hình, vị trí dữ liệu' },
+      { label: 'Gói và giá', desc: 'module, tính năng, hạn mức, giá theo kỳ' },
+      { label: 'Cấp phát', desc: 'tạo khách, chọn database, migrate, mời quản trị' },
+      { label: 'Đội database', desc: 'phiên bản migration của từng database' },
+      { label: 'Thuê bao và tính tiền', desc: 'dùng thử, quá hạn, tạm khoá, huỷ' },
+      { label: 'Vào dữ liệu của khách', desc: 'có thời hạn, có lý do, khách xem được audit' }
+    ];
+
+    const rules = [
+      'Mọi bảng có view đã lưu (của hệ thống, chia sẻ cho nút, cá nhân), bộ lọc nằm trên đường dẫn, chọn cột và mật độ; thao tác hàng loạt chọn được cả kết quả khớp bộ lọc.',
+      'Hộp việc nhóm theo Quá hạn / Hôm nay / Sắp tới, ghi vì sao người dùng thấy việc đó, cho hoãn và giao; thông báo (chuông) là chỗ khác, có Xong và Lưu.',
+      'AI agent dùng hệ thống bằng API key loại agent; lệnh rủi ro của agent thành yêu cầu chờ người có cùng permission duyệt.',
+      'Bị khoá vì thiếu quyền hay thiếu gói thì nói rõ vì sao, ai cấp được, gói nào mở; thao tác đảo được có Hoàn tác.',
+      'Trên điện thoại, thanh phân hệ thành thanh đáy năm mục, bảng thành danh sách thẻ.',
+      'Thứ tự phân hệ trên thanh bên trái cố định cho mọi khách; cấu hình chỉ ẩn bớt, không đảo chỗ, để người làm cho nhiều khách không bị lạc.',
+      'Ngữ cảnh “khách › nút tổ chức” luôn ở góc trên bên trái. Đổi nút là đổi phạm vi của mọi số liệu, danh sách và kết quả tìm kiếm.',
+      'Ctrl + K tìm xuyên mọi phân hệ, trong phạm vi và permission của người dùng.',
+      'Module mới khai mục menu của mình trong sổ module; khung đọc sổ đó, không phải sửa khung.',
+      'Mỗi màn hình dùng chung một kiểu bảng, bộ lọc, ngăn chi tiết và thông báo, như API dùng chung một envelope.'
+    ];
+
+    return {
+      theme: dark ? 'dark' : '',
+      themeIcon: dark ? I.sun : I.moon,
+      toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, models, groups, platform, rules,
+      countText: s.model === 'any'
+        ? '12 phân hệ trong không gian của khách, cộng mặt điều khiển của nền tảng'
+        : count + ' / 12 phân hệ hiện với mô hình “' + MODEL_NAMES[s.model] + '”'
+    };
+  }
+}
+</script>
+</body>
+</html>

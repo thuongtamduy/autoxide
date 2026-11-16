@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Tìm kiếm — Autoxide Blog</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div class="px {{theme}}" style="min-height: 100vh; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 16px; line-height: 1.5">
+
+  <header class="hdr" style="position: sticky; top: 0; z-index: 20">
+    <div class="wrap" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 28px; min-height: 68px; padding-top: 6px; padding-bottom: 6px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink)">
+        <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16)">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 21px; height: 21px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+        </span>
+        <span class="dsp" style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em">Autoxide</span>
+        <span class="kick" style="padding: 5px 7px; border-radius: 5px; background: var(--accent-tint)">Blog</span>
+      </a>
+      <nav aria-label="Menu chính" style="display: flex; flex-wrap: wrap; gap: 0 26px">
+        <sc-for list="{{menu}}" as="m" hint-placeholder-count="5">
+          <a class="nav-a" href="{{m.href}}">{{m.label}}</a>
+        </sc-for>
+      </nav>
+      <div style="flex: 1"></div>
+      <div style="display: flex; align-items: center; gap: 6px">
+        <div class="seg" role="group" aria-label="Ngôn ngữ">
+          <button class="on">VI</button>
+          <button>EN</button>
+        </div>
+        <button class="btn quiet sm sq" aria-label="Đổi giao diện sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+        <a class="btn pri sm" href="Main.dc.html">Đăng ký</a>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex: 1">
+    <div class="wrap" style="padding-top: 56px; padding-bottom: 96px">
+      <div style="max-width: 920px; display: flex; flex-direction: column; gap: 32px">
+
+        <section class="rise" style="display: flex; flex-direction: column; gap: 14px">
+          <label class="kick" for="q">Tìm kiếm</label>
+          <div style="display: flex; align-items: center; gap: 16px; padding-bottom: 14px; border-bottom: 3px solid var(--rule)">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 34px; height: 34px; stroke-width: 2; color: var(--ink-3)"><path d="{{ic.search}}"></path></svg>
+            <input id="q" class="dsp" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Gõ một từ hoặc một câu hỏi" autocomplete="off" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ink); font-size: clamp(30px, 4.4vw, 56px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.15">
+            <sc-if value="{{hasQ}}" hint-placeholder-val="{{true}}">
+              <button class="btn quiet sq" aria-label="Xoá từ khoá" onClick="{{clear}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button>
+            </sc-if>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px">
+            <div class="seg" role="group" aria-label="Loại nội dung">
+              <sc-for list="{{kinds}}" as="k" hint-placeholder-count="3">
+                <button class="{{k.cls}}" onClick="{{k.pick}}" style="padding: 0 14px">{{k.label}}</button>
+              </sc-for>
+            </div>
+            <span class="meta" style="flex: 1 1 280px">Tìm theo từ, không phân biệt chữ hoa và dấu, và theo nghĩa của câu hỏi.</span>
+          </div>
+        </section>
+
+        <sc-if value="{{idle}}" hint-placeholder-val="{{false}}">
+          <section class="pop" style="display: flex; flex-direction: column; gap: 14px; padding-top: 8px">
+            <span class="meta">Thử một trong các từ khoá này:</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px">
+              <sc-for list="{{suggestions}}" as="g" hint-placeholder-count="4">
+                <button class="chip" onClick="{{g.pick}}">{{g.label}}</button>
+              </sc-for>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{hasHits}}" hint-placeholder-val="{{true}}">
+          <section style="display: flex; flex-direction: column">
+            <span class="idx" style="padding-bottom: 14px; letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px">{{hitCount}} kết quả phù hợp nhất</span>
+            <sc-for list="{{hits}}" as="h" hint-placeholder-count="3">
+              <a class="row pop" href="{{h.href}}" style="padding: 26px 0; border-top: 1px solid var(--hair)">
+                <span class="idx" style="padding-top: 5px">{{h.no}}</span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+                  <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px">
+                    <span class="kick">{{h.kind}}</span>
+                    <sc-if value="{{h.byText}}" hint-placeholder-val="{{true}}"><span class="mono" style="font-size: 11px; padding: 4px 7px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--hair-2); color: var(--ink-2)">khớp từ</span></sc-if>
+                    <sc-if value="{{h.byMeaning}}" hint-placeholder-val="{{false}}"><span class="mono" style="font-size: 11px; padding: 4px 7px; border-radius: 5px; background: var(--accent-tint); color: var(--accent-ink)">khớp nghĩa</span></sc-if>
+                  </span>
+                  <span class="dsp" style="font-size: 27px; font-weight: 700; line-height: 1.22; letter-spacing: -0.025em; text-wrap: balance"><span class="tl">{{h.title}}</span></span>
+                  <span style="font-size: 16.5px; line-height: 1.6; color: var(--ink-2); text-wrap: pretty">{{h.a}}<sc-if value="{{h.m}}" hint-placeholder-val="{{true}}"><mark>{{h.m}}</mark></sc-if>{{h.b}}</span>
+                  <span class="mono" style="font-size: 12.5px; color: var(--ink-3)">{{h.path}}</span>
+                </span>
+              </a>
+            </sc-for>
+            <div style="border-top: 1px solid var(--hair)"></div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{noHits}}" hint-placeholder-val="{{false}}">
+          <section class="pop" style="display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 40px 0; border-top: 1px solid var(--hair)">
+            <span class="dsp" style="font-size: 30px; font-weight: 700; letter-spacing: -0.025em">Không tìm thấy nội dung nào</span>
+            <span style="max-width: 520px; color: var(--ink-2)">Thử từ khoá ngắn hơn, hoặc xem danh sách mọi bài viết.</span>
+            <a class="btn" href="List.dc.html">Xem mọi bài viết<svg class="ic s go" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.arrow}}"></path></svg></a>
+          </section>
+        </sc-if>
+      </div>
+    </div>
+  </main>
+
+  <footer class="band">
+    <div class="wrap" style="padding-top: 52px; padding-bottom: 28px; display: flex; flex-direction: column; gap: 40px">
+      <div style="display: flex; flex-wrap: wrap; gap: 36px 64px">
+        <div style="flex: 2 1 300px; display: flex; flex-direction: column; gap: 14px">
+          <span style="display: flex; align-items: center; gap: 10px">
+            <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 21px; height: 21px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+            </span>
+            <span class="dsp" style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em">Autoxide</span>
+          </span>
+          <p style="margin: 0; max-width: 380px; font-size: 15px; line-height: 1.6; color: var(--band-ink-2)">Lõi backend mã nguồn mở viết bằng Rust, chạy trên cả SQLite và Postgres. Blog này được dựng bằng chính nó.</p>
+        </div>
+        <sc-for list="{{footer}}" as="col" hint-placeholder-count="3">
+          <div style="flex: 1 1 150px; display: flex; flex-direction: column; gap: 12px">
+            <span class="kick" style="color: #FF9A6E">{{col.label}}</span>
+            <sc-for list="{{col.items}}" as="f" hint-placeholder-count="3">
+              <a class="fl" href="{{f.href}}" style="font-size: 15px">{{f.label}}</a>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; padding-top: 22px; border-top: 1px solid var(--band-hair); font-size: 13px; color: var(--band-ink-2)">
+        <span>© 2026 Autoxide. Mã nguồn mở, giấy phép MIT hoặc Apache-2.0.</span>
+        <div style="flex: 1"></div>
+        <span>Tiếng Việt · English</span>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  state = { dark: null, q: 'postgres', kind: 'all' };
+
+  renderVals() {
+    const I = {
+      search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      arrow: 'M5 12h14M13 6l6 6-6 6',
+      x: 'M6 6l12 12M18 6L6 18'
+    };
+    const s = this.state;
+    const dark = s.dark ?? this.props.dark ?? false;
+
+    const menu = [
+      { label: 'Bài viết', href: 'List.dc.html' },
+      { label: 'Hướng dẫn', href: 'List.dc.html' },
+      { label: 'Kỹ thuật', href: 'List.dc.html' },
+      { label: 'Thông báo', href: 'List.dc.html' },
+      { label: 'Liên hệ', href: 'Page.dc.html' }
+    ];
+
+    const entries = [
+      { kind: 'post', title: 'Chuyển từ SQLite sang Postgres không gián đoạn', path: '/blog/sqlite-sang-postgres', text: 'Bạn cần một database Postgres còn trống. Autoxide hỗ trợ PostgreSQL từ bản 16 trở lên.', near: ['database', 'chuyển dữ liệu'] },
+      { kind: 'post', title: 'Hướng dẫn cài Autoxide trên SQLite trong 5 phút', path: '/blog/cai-autoxide-tren-sqlite', text: 'Mặc định Autoxide dùng SQLite. Muốn dùng Postgres, đặt DATABASE_URL trỏ tới máy chủ của bạn.', near: ['database', 'bắt đầu'] },
+      { kind: 'post', title: 'Sao lưu và khôi phục: những điều cần biết', path: '/blog/sao-luu-va-khoi-phuc', text: 'Lệnh backup lưu dữ liệu của mọi module và mọi tệp đã tải lên vào một thư mục, dùng được cho cả hai loại database.', near: ['postgres', 'sqlite', 'an toàn dữ liệu'] },
+      { kind: 'post', title: 'Vì sao chúng tôi chọn Rust cho lõi backend', path: '/blog/vi-sao-chon-rust', text: 'Trình biên dịch của Rust bắt lỗi trước khi chạy, và một file thực thi duy nhất là đủ để triển khai.', near: ['hiệu năng', 'module'] },
+      { kind: 'post', title: 'Gửi newsletter có xác nhận hai bước', path: '/blog/newsletter-xac-nhan-hai-buoc', text: 'Người đăng ký bấm xác nhận trong thư trước khi vào danh sách, nên không ai đăng ký hộ người khác được.', near: ['email', 'thư'] },
+      { kind: 'post', title: 'Viết module đầu tiên của bạn', path: '/blog/viet-module-dau-tien', text: 'Một module là một crate: khai bảng, permission và route của riêng nó, không sửa dòng nào trong lõi.', near: ['rust', 'mở rộng'] },
+      { kind: 'page', title: 'Liên hệ', path: '/lien-he', text: 'Báo lỗi hoặc đề xuất tính năng trên GitHub. Lỗ hổng bảo mật thì gửi qua form liên hệ.', near: ['hỗ trợ', 'sao lưu'] }
+    ];
+
+    // Gập từng ký tự (bỏ dấu, chữ thường) mà không đổi độ dài, để vị trí khớp trong bản gập
+    // cũng là vị trí trong bản gốc.
+    const fold = (text) => Array.from(text.normalize('NFC')).map((ch) => {
+      const base = ch.normalize('NFD')[0].toLowerCase();
+      return base === 'đ' ? 'd' : base;
+    }).join('');
+    const q = fold(s.q.trim());
+
+    const found = [];
+    if (q) {
+      entries.forEach((e) => {
+        if (s.kind !== 'all' && e.kind !== s.kind) return;
+        const chars = Array.from(e.text.normalize('NFC'));
+        const at = fold(e.text).indexOf(q);
+        const inTitle = fold(e.title).includes(q);
+        const byMeaning = e.near.some((word) => fold(word).includes(q) || q.includes(fold(word)));
+        if (at >= 0) {
+          found.push({ ...e, byText: true, byMeaning, a: chars.slice(0, at).join(''), m: chars.slice(at, at + q.length).join(''), b: chars.slice(at + q.length).join(''), rank: 0 });
+        } else if (inTitle) {
+          found.push({ ...e, byText: true, byMeaning, a: e.text, m: '', b: '', rank: 1 });
+        } else if (byMeaning) {
+          found.push({ ...e, byText: false, byMeaning: true, a: e.text, m: '', b: '', rank: 2 });
+        }
+      });
+    }
+    found.sort((x, y) => x.rank - y.rank);
+    const hits = found.map((h, i) => ({
+      ...h,
+      no: String(i + 1).padStart(2, '0'),
+      kind: h.kind === 'post' ? 'Bài viết' : 'Trang',
+      href: h.kind === 'post' ? 'Post.dc.html' : 'Page.dc.html'
+    }));
+
+    const kinds = [['all', 'Tất cả'], ['post', 'Bài viết'], ['page', 'Trang']].map(([id, label]) => ({
+      label, cls: s.kind === id ? 'on' : '', pick: () => this.setState({ kind: id })
+    }));
+    const suggestions = ['postgres', 'sao lưu', 'newsletter', 'module'].map((label) => ({
+      label, pick: () => this.setState({ q: label })
+    }));
+
+    const footer = [
+      { label: 'Chủ đề', items: [{ label: 'Hướng dẫn', href: 'List.dc.html' }, { label: 'Kỹ thuật', href: 'List.dc.html' }, { label: 'Thông báo', href: 'List.dc.html' }] },
+      { label: 'Dự án', items: [{ label: 'Liên hệ', href: 'Page.dc.html' }, { label: 'Mã nguồn trên GitHub', href: 'https://github.com/thuongtamduy/autoxide' }] },
+      { label: 'Theo dõi', items: [{ label: 'Newsletter', href: 'Main.dc.html' }, { label: 'Nguồn RSS', href: '#' }, { label: 'Mọi bài viết', href: 'List.dc.html' }] }
+    ];
+
+    return {
+      theme: dark ? 'dark' : '',
+      themeIcon: dark ? I.sun : I.moon,
+      toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, menu, kinds, suggestions, hits, footer,
+      q: s.q,
+      onQ: (e) => this.setState({ q: e.target.value.slice(0, 200) }),
+      clear: () => this.setState({ q: '' }),
+      hasQ: s.q.length > 0,
+      idle: !q,
+      hasHits: hits.length > 0,
+      noHits: !!q && hits.length === 0,
+      hitCount: String(hits.length)
+    };
+  }
+}
+</script>
+</body>
+</html>

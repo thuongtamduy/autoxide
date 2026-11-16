@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Bài viết — Autoxide Admin</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ax-r40.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div class="ax v1 {{theme}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <aside style="flex: 1 1 248px; min-width: 0; padding: 16px 12px 12px; display: flex; flex-direction: column; gap: 18px">
+    <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 2px 6px; text-decoration: none">
+      <span style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14)">
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 20px; height: 20px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+      </span>
+      <span style="display: flex; flex-direction: column; line-height: 1.15">
+        <span class="dsp" style="font-weight: 700; font-size: 15px; letter-spacing: -0.01em">Autoxide</span>
+        <span style="font-size: 11.5px; color: var(--ink-3)">Quản trị nội dung</span>
+      </span>
+    </a>
+    <nav aria-label="Điều hướng chính" style="display: flex; flex-direction: column; gap: 16px">
+      <sc-for list="{{nav}}" as="g" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <div class="cap" style="padding: 0 10px 6px">{{g.label}}</div>
+          <sc-for list="{{g.items}}" as="it" hint-placeholder-count="4">
+            <a class="nav {{it.cls}}" href="{{it.href}}">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{it.icon}}"></path></svg>
+              <span style="flex: 1">{{it.label}}</span>
+              <sc-if value="{{it.count}}" hint-placeholder-val="{{false}}"><span class="cnt {{it.hot}}">{{it.count}}</span></sc-if>
+            </a>
+          </sc-for>
+        </div>
+      </sc-for>
+    </nav>
+    <div style="flex: 1"></div>
+    <a class="nav" href="#" style="height: 52px; gap: 10px">
+      <span class="av a4">AD</span>
+      <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25">
+        <span class="ell" style="font-weight: 600; color: var(--ink)">Admin</span>
+        <span class="ell" style="font-size: 12px; color: var(--ink-3); font-weight: 400">admin@example.com</span>
+      </span>
+      <svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.updown}}"></path></svg>
+    </a>
+  </aside>
+
+  <div style="flex: 999 1 560px; min-width: 0; margin: 8px; display: flex; flex-direction: column; background: var(--sheet); border: 1px solid var(--line); border-radius: 16px; overflow: hidden">
+
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--line)">
+      <nav aria-label="Vị trí" style="display: flex; align-items: center; gap: 8px">
+        <a class="lnk" href="Main.dc.html" style="color: var(--ink-3)">Nội dung</a>
+        <svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ink-3)"><path d="{{ic.right}}"></path></svg>
+        <span style="font-weight: 600">Bài viết</span>
+      </nav>
+      <div style="flex: 1"></div>
+      <a class="btn" href="Main.dc.html" style="flex: 0 1 320px; justify-content: flex-start; color: var(--ink-3); font-weight: 400; background: var(--panel)">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.search}}"></path></svg>
+        <span style="flex: 1; text-align: left">Tìm bài viết, media hoặc lệnh…</span>
+        <span class="kbd">Ctrl</span><span class="kbd">K</span>
+      </a>
+      <button class="btn ghost sq" aria-label="Đổi giao diện sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+    </header>
+
+    <main style="width: 100%; max-width: 1320px; margin: 0 auto; padding: 26px 32px 96px; display: flex; flex-direction: column; gap: 18px">
+
+      <section class="rise" style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+        <div style="flex: 1 1 300px; display: flex; align-items: baseline; gap: 12px">
+          <h1 class="h1">Bài viết</h1>
+          <span style="font-size: 13px; color: var(--ink-3)">48 mục · tiếng Việt và tiếng Anh</span>
+        </div>
+        <div class="seg" role="group" aria-label="Kiểu hiển thị">
+          <button class="{{tableOn}}" onClick="{{showTable}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.list}}"></path></svg>Bảng</button>
+          <button class="{{cardsOn}}" onClick="{{showCards}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.grid}}"></path></svg>Thẻ</button>
+        </div>
+        <a class="btn pri" href="Editor.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.plus}}"></path></svg>Bài viết mới</a>
+      </section>
+
+      <div class="rise d1" role="tablist" aria-label="Lọc theo trạng thái" style="display: flex; flex-wrap: wrap; gap: 0 24px; border-bottom: 1px solid var(--line)">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="6">
+          <button class="tab {{t.cls}}" role="tab" onClick="{{t.pick}}">{{t.label}}<span class="cnt">{{t.n}}</span></button>
+        </sc-for>
+      </div>
+
+      <section class="rise d2" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+        <label style="position: relative; flex: 1 1 260px; max-width: 340px; display: flex; align-items: center">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="position: absolute; left: 12px; color: var(--ink-3)"><path d="{{ic.search}}"></path></svg>
+          <input class="inp" value="{{q}}" onChange="{{onQ}}" placeholder="Lọc theo tiêu đề…" aria-label="Lọc theo tiêu đề" style="padding-left: 38px">
+        </label>
+        <button class="chip on">Ngôn ngữ: Tất cả<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.down}}"></path></svg></button>
+        <button class="chip">Tác giả<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.down}}"></path></svg></button>
+        <button class="chip">Danh mục<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.down}}"></path></svg></button>
+        <button class="chip"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.plus}}"></path></svg>Thêm bộ lọc</button>
+        <div style="flex: 1"></div>
+        <button class="btn ghost sm"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.sort}}"></path></svg>Mới cập nhật</button>
+      </section>
+
+      <sc-if value="{{isTable}}" hint-placeholder-val="{{true}}">
+        <section class="card rise d3" style="overflow-x: auto">
+          <div role="table" aria-label="Danh sách bài viết" style="min-width: 1020px">
+            <div role="row" style="display: grid; grid-template-columns: 48px minmax(300px, 2.6fr) 150px 150px 120px 84px 76px 128px 104px; align-items: center; height: 44px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 12px; font-weight: 600; color: var(--ink-3); letter-spacing: .02em">
+              <span style="display: flex; justify-content: center"><input type="checkbox" class="chk" checked="{{allSel}}" onChange="{{toggleAll}}" aria-label="Chọn tất cả"></span>
+              <span role="columnheader">Tiêu đề</span>
+              <span role="columnheader">Trạng thái</span>
+              <span role="columnheader">Tác giả</span>
+              <span role="columnheader">Danh mục</span>
+              <span role="columnheader">Ngôn ngữ</span>
+              <span role="columnheader">SEO</span>
+              <span role="columnheader">Cập nhật</span>
+              <span></span>
+            </div>
+            <sc-for list="{{rows}}" as="e" hint-placeholder-count="8">
+              <div class="row {{e.selCls}}" role="row" style="display: grid; grid-template-columns: 48px minmax(300px, 2.6fr) 150px 150px 120px 84px 76px 128px 104px; align-items: center; min-height: 64px; border-bottom: 1px solid var(--line)">
+                <span style="display: flex; justify-content: center"><input type="checkbox" class="chk" checked="{{e.sel}}" onChange="{{e.toggle}}" aria-label="Chọn bài viết"></span>
+                <a href="Editor.dc.html" style="display: flex; align-items: center; gap: 12px; min-width: 0; padding: 10px 16px 10px 0; text-decoration: none">
+                  <sc-if value="{{e.img}}" hint-placeholder-val="{{true}}"><img src="{{e.img}}" alt="" style="width: 56px; height: 40px; flex: none; object-fit: cover; border-radius: 7px; box-shadow: 0 0 0 1px var(--line)"></sc-if>
+                  <sc-if value="{{e.noimg}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; justify-content: center; width: 56px; height: 40px; flex: none; border-radius: 7px; background: var(--hover); color: var(--ink-3)"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.image}}"></path></svg></span></sc-if>
+                  <span style="min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                    <span class="ell" style="font-weight: 500">{{e.title}}</span>
+                    <span class="mono ell" style="font-size: 11.5px; color: var(--ink-3)">{{e.slug}}</span>
+                  </span>
+                </a>
+                <span style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px">
+                  <span class="badge {{e.badge}}"><span class="dot"></span>{{e.status}}</span>
+                  <sc-if value="{{e.note}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: var(--ink-3)">{{e.note}}</span></sc-if>
+                </span>
+                <span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span class="av {{e.av}}" style="width: 24px; height: 24px; font-size: 10px">{{e.initials}}</span><span class="ell" style="color: var(--ink-2)">{{e.author}}</span></span>
+                <span class="ell" style="color: var(--ink-2)">{{e.term}}</span>
+                <span style="display: flex; gap: 4px"><span class="loc">VI</span><span class="loc {{e.en}}">EN</span></span>
+                <span><span class="score {{e.lvl}} num">{{e.seo}}</span></span>
+                <span class="num ell" style="font-size: 13px; color: var(--ink-3)">{{e.when}}</span>
+                <span class="acts" style="display: flex; justify-content: flex-end; gap: 2px; padding-right: 10px">
+                  <a class="btn ghost sm sq" href="Editor.dc.html" aria-label="Sửa"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.pencil}}"></path></svg></a>
+                  <button class="btn ghost sm sq" aria-label="Xem trước"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.eye}}"></path></svg></button>
+                  <button class="btn ghost sm sq" aria-label="Thao tác khác"><svg class="ic s dots" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.more}}"></path></svg></button>
+                </span>
+              </div>
+            </sc-for>
+            <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 56px 16px; color: var(--ink-3)">
+                <span style="font-size: 15px; font-weight: 500; color: var(--ink)">Không có bài viết nào khớp</span>
+                <span>Thử từ khoá khác hoặc bỏ bớt bộ lọc.</span>
+                <button class="btn sm" onClick="{{reset}}">Xoá bộ lọc</button>
+              </div>
+            </sc-if>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; font-size: 13px; color: var(--ink-3)">
+              <span>Đang hiện {{shown}} trong {{total}} mục</span>
+              <div style="flex: 1"></div>
+              <button class="btn sm">Tải thêm 10 mục</button>
+            </div>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{isCards}}" hint-placeholder-val="{{false}}">
+        <section style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 16px">
+          <sc-for list="{{rows}}" as="e" hint-placeholder-count="6">
+            <a class="card lift pop" href="Editor.dc.html" style="display: flex; flex-direction: column; overflow: hidden; text-decoration: none">
+              <sc-if value="{{e.img}}" hint-placeholder-val="{{true}}"><img src="{{e.img}}" alt="" style="display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-bottom: 1px solid var(--line)"></sc-if>
+              <sc-if value="{{e.noimg}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; aspect-ratio: 16 / 9; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--ink-3); font-size: 12.5px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.image}}"></path></svg>Chưa có ảnh đại diện</span></sc-if>
+              <span style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 16px">
+                <span style="display: flex; align-items: center; gap: 8px"><span class="badge {{e.badge}}"><span class="dot"></span>{{e.status}}</span><span style="flex: 1"></span><span class="score {{e.lvl}} num">SEO {{e.seo}}</span></span>
+                <span class="dsp" style="font-size: 15.5px; font-weight: 600; line-height: 1.35; text-wrap: balance">{{e.title}}</span>
+                <span style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3)"><span class="av {{e.av}}" style="width: 22px; height: 22px; font-size: 9.5px">{{e.initials}}</span><span class="ell" style="flex: 1">{{e.author}} · {{e.when}}</span><span class="loc">VI</span><span class="loc {{e.en}}">EN</span></span>
+              </span>
+            </a>
+          </sc-for>
+        </section>
+      </sc-if>
+    </main>
+  </div>
+
+  <sc-if value="{{hasSel}}" hint-placeholder-val="{{false}}">
+    <div class="floatbar" role="toolbar" aria-label="Thao tác hàng loạt" style="z-index: 20; flex-wrap: wrap; max-width: calc(100vw - 32px)">
+      <span class="num" style="padding: 0 10px 0 8px; font-weight: 600">{{selCount}} mục đã chọn</span>
+      <span style="width: 1px; height: 22px; background: rgba(255,255,255,.18)"></span>
+      <button class="btn sm" onClick="{{bulkPublish}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.send}}"></path></svg>Đăng</button>
+      <button class="btn sm"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.clock}}"></path></svg>Lên lịch</button>
+      <button class="btn sm"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.tag}}"></path></svg>Gắn thẻ</button>
+      <button class="btn sm"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.archive}}"></path></svg>Lưu trữ</button>
+      <span style="width: 1px; height: 22px; background: rgba(255,255,255,.18)"></span>
+      <button class="btn sm sq" aria-label="Bỏ chọn" onClick="{{clearSel}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+    <div class="toast" role="status" style="z-index: 30"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.check}}"></path></svg>{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1160}}'>
+class Component extends DCLogic {
+  state = { tab: 'all', q: '', view: 'table', sel: {}, dark: null, toast: '' };
+
+  say(text) {
+    this.setState({ toast: text });
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.setState({ toast: '' }), 2600);
+  }
+
+  renderVals() {
+    const I = {
+      home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+      posts: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6',
+      pages: 'M4 4h16v16H4zM4 9h16M9 9v11',
+      tag: 'M3 12V4h8l10 10-8 8zM7.5 7.5h.01',
+      menu: 'M4 6h16M4 12h10M4 18h7',
+      image: 'M4 5h16v14H4zM4 16l5-5 4 4 2.5-2.5L20 17M9 9h.01',
+      chat: 'M4 5h16v11H9l-5 4z',
+      form: 'M9 4h6v3H9zM9 5.5H5.5v15h13v-15H15M9 12h6M9 16h4',
+      mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
+      users: 'M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-1.5a4 4 0 0 0-3-3.85M16 3.6a3.5 3.5 0 0 1 0 6.8',
+      box: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9',
+      pulse: 'M3 12h4l3-8 4 16 3-8h4',
+      search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6',
+      plus: 'M12 5v14M5 12h14',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      x: 'M6 6l12 12M18 6L6 18',
+      updown: 'M8 9l4-4 4 4M8 15l4 4 4-4',
+      right: 'M9 6l6 6-6 6',
+      down: 'M6 9l6 6 6-6',
+      list: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
+      grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+      sort: 'M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4',
+      pencil: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
+      eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+      more: 'M5 12h.01M12 12h.01M19 12h.01',
+      send: 'M4 12l16-8-6 16-3-7z',
+      clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+      archive: 'M3 5h18v4H3zM5 9v10h14V9M10 13h4'
+    };
+    const dark = this.state.dark ?? this.props.dark ?? false;
+
+    const nav = [
+      { label: 'Nội dung', items: [
+        { label: 'Tổng quan', icon: I.home, href: 'Main.dc.html' },
+        { label: 'Bài viết', icon: I.posts, href: 'Entries.dc.html', count: '48', cls: 'on' },
+        { label: 'Trang', icon: I.pages, href: '#' },
+        { label: 'Danh mục và thẻ', icon: I.tag, href: '#' },
+        { label: 'Menu', icon: I.menu, href: '#' },
+        { label: 'Thư viện media', icon: I.image, href: 'Media.dc.html' }
+      ] },
+      { label: 'Tương tác', items: [
+        { label: 'Bình luận', icon: I.chat, href: '#', count: '2', hot: 'hot' },
+        { label: 'Form', icon: I.form, href: '#' },
+        { label: 'Newsletter', icon: I.mail, href: '#' }
+      ] },
+      { label: 'Hệ thống', items: [
+        { label: 'Người dùng', icon: I.users, href: '#' },
+        { label: 'Module', icon: I.box, href: '#' },
+        { label: 'Nhật ký', icon: I.pulse, href: '#' }
+      ] }
+    ];
+
+    const IMG = {
+      oxide: '/_blob/f12c2ff5a3116cb985855c432020194f',
+      migrate: '/_blob/71315ceee2aa018ed565193153fa2962',
+      gear: '/_blob/9d8fd336e420103d90482e588fae1381',
+      agent: '/_blob/2ed5327901310b1defee4b94c834cfc8',
+      backup: '/_blob/6a2a2da5fd68aff46adf7790839e6f2b',
+      mail: '/_blob/54c44eb141ed8a42d3722fb66241664d'
+    };
+    const ST = {
+      draft: ['b-draft', 'Bản nháp'], review: ['b-review', 'Chờ duyệt'], sched: ['b-sched', 'Đã lên lịch'],
+      pub: ['b-pub', 'Đã đăng'], arch: ['b-arch', 'Lưu trữ']
+    };
+    const WHO = { ma: ['Minh Anh', 'MA', 'a1'], qb: ['Quốc Bảo', 'QB', 'a2'], th: ['Thu Hà', 'TH', 'a3'], ad: ['Admin', 'AD', 'a4'] };
+    const data = [
+      { id: 1, st: 'sched', title: 'Ra mắt Autoxide 0.5: quản lý module ngay trong trang quản trị', slug: '/blog/ra-mat-autoxide-0-5', who: 'ma', term: 'Thông báo', en: true, seo: 91, when: 'Hôm nay, 10:20', img: IMG.oxide, note: 'Đăng 08:00 thứ Sáu' },
+      { id: 2, st: 'draft', title: 'Chuyển từ SQLite sang Postgres không gián đoạn', slug: '/blog/sqlite-sang-postgres', who: 'ad', term: 'Hướng dẫn', en: false, seo: 82, when: '25 phút trước', img: IMG.migrate },
+      { id: 3, st: 'review', title: 'Thiết kế API thân thiện với AI agent', slug: '/blog/api-than-thien-voi-ai-agent', who: 'qb', term: 'Kỹ thuật', en: true, seo: 77, when: '2 giờ trước', img: IMG.agent },
+      { id: 4, st: 'pub', title: 'Vì sao chúng tôi chọn Rust cho lõi backend', slug: '/blog/vi-sao-chon-rust', who: 'ma', term: 'Kỹ thuật', en: true, seo: 88, when: 'Hôm nay, 10:42', img: IMG.gear },
+      { id: 5, st: 'review', title: 'Sao lưu và khôi phục: những điều cần biết', slug: '/blog/sao-luu-va-khoi-phuc', who: 'th', term: 'Hướng dẫn', en: false, seo: 69, when: 'Hôm qua', img: IMG.backup },
+      { id: 6, st: 'review', title: 'Gửi newsletter có xác nhận hai bước', slug: '/blog/newsletter-xac-nhan-hai-buoc', who: 'ma', term: 'Hướng dẫn', en: true, seo: 73, when: '2 ngày trước', img: IMG.mail },
+      { id: 7, st: 'pub', title: 'Hướng dẫn cài Autoxide trên SQLite trong 5 phút', slug: '/blog/cai-autoxide-tren-sqlite', who: 'th', term: 'Hướng dẫn', en: true, seo: 94, when: '3 ngày trước', note: 'Có thay đổi chưa đăng' },
+      { id: 8, st: 'draft', title: 'Viết module đầu tiên của bạn', slug: '/blog/viet-module-dau-tien', who: 'qb', term: 'Kỹ thuật', en: true, seo: 64, when: 'Hôm qua' },
+      { id: 9, st: 'sched', title: 'Lộ trình quý tới', slug: '/blog/lo-trinh-quy-toi', who: 'ad', term: 'Thông báo', en: false, seo: 58, when: '4 ngày trước', note: 'Đăng 09:30 thứ Hai' },
+      { id: 10, st: 'arch', title: 'Ghi chú phát hành 0.4', slug: '/blog/ghi-chu-phat-hanh-0-4', who: 'ad', term: 'Thông báo', en: true, seo: 80, when: '2 tháng trước' }
+    ];
+
+    const q = this.state.q.trim().toLowerCase();
+    const tab = this.state.tab;
+    const visible = data.filter((e) => (tab === 'all' || e.st === tab) && (!q || e.title.toLowerCase().includes(q)));
+    const sel = this.state.sel;
+    const rows = visible.map((e) => {
+      const on = !!sel[e.id];
+      return {
+        ...e,
+        badge: ST[e.st][0], status: ST[e.st][1],
+        author: WHO[e.who][0], initials: WHO[e.who][1], av: WHO[e.who][2],
+        en: e.en ? '' : 'miss',
+        seo: String(e.seo), lvl: e.seo >= 80 ? 'good' : e.seo >= 60 ? 'mid' : 'low',
+        noimg: !e.img, sel: on, selCls: on ? 'sel' : '',
+        toggle: () => this.setState({ sel: { ...sel, [e.id]: !on } })
+      };
+    });
+    const selCount = rows.filter((r) => r.sel).length;
+    const allSel = rows.length > 0 && selCount === rows.length;
+
+    const tabDefs = [['all', 'Tất cả', '48'], ['draft', 'Bản nháp', '12'], ['review', 'Chờ duyệt', '3'], ['sched', 'Đã lên lịch', '2'], ['pub', 'Đã đăng', '29'], ['arch', 'Lưu trữ', '2']];
+    const tabs = tabDefs.map(([id, label, n]) => ({
+      label, n, cls: tab === id ? 'on' : '',
+      pick: () => this.setState({ tab: id, sel: {} })
+    }));
+    const totals = { all: '48', draft: '12', review: '3', sched: '2', pub: '29', arch: '2' };
+
+    return {
+      theme: dark ? 'dark' : '',
+      themeIcon: dark ? I.sun : I.moon,
+      ic: I, nav, tabs, rows,
+      q: this.state.q,
+      onQ: (e) => this.setState({ q: e.target.value }),
+      reset: () => this.setState({ q: '', tab: 'all' }),
+      empty: rows.length === 0,
+      shown: String(rows.length), total: q ? String(rows.length) : totals[tab],
+      isTable: this.state.view === 'table', isCards: this.state.view === 'cards',
+      tableOn: this.state.view === 'table' ? 'on' : '', cardsOn: this.state.view === 'cards' ? 'on' : '',
+      showTable: () => this.setState({ view: 'table' }),
+      showCards: () => this.setState({ view: 'cards' }),
+      allSel,
+      toggleAll: () => {
+        const next = {};
+        if (!allSel) rows.forEach((r) => { next[r.id] = true; });
+        this.setState({ sel: next });
+      },
+      hasSel: selCount > 0, selCount: String(selCount),
+      clearSel: () => this.setState({ sel: {} }),
+      bulkPublish: () => { this.setState({ sel: {} }); this.say('Đã đăng ' + selCount + ' bài viết'); },
+      toast: this.state.toast,
+      toggleTheme: () => this.setState({ dark: !dark })
+    };
+  }
+}
+</script>
+</body>
+</html>

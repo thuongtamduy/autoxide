@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Liên hệ — Autoxide Blog</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div class="px {{theme}}" style="min-height: 100vh; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 16px; line-height: 1.5">
+
+  <header class="hdr" style="position: sticky; top: 0; z-index: 20">
+    <div class="wrap" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 28px; min-height: 68px; padding-top: 6px; padding-bottom: 6px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink)">
+        <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16)">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 21px; height: 21px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+        </span>
+        <span class="dsp" style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em">Autoxide</span>
+        <span class="kick" style="padding: 5px 7px; border-radius: 5px; background: var(--accent-tint)">Blog</span>
+      </a>
+      <nav aria-label="Menu chính" style="display: flex; flex-wrap: wrap; gap: 0 26px">
+        <sc-for list="{{menu}}" as="m" hint-placeholder-count="5">
+          <a class="nav-a {{m.cls}}" href="{{m.href}}">{{m.label}}</a>
+        </sc-for>
+      </nav>
+      <div style="flex: 1"></div>
+      <div style="display: flex; align-items: center; gap: 6px">
+        <a class="btn quiet sm sq" href="Search.dc.html" aria-label="Tìm kiếm"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.search}}"></path></svg></a>
+        <div class="seg" role="group" aria-label="Ngôn ngữ">
+          <button class="on">VI</button>
+          <button>EN</button>
+        </div>
+        <button class="btn quiet sm sq" aria-label="Đổi giao diện sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+        <a class="btn pri sm" href="Main.dc.html">Đăng ký</a>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex: 1">
+    <div class="wrap" style="padding-top: 56px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 48px">
+
+      <section class="rise" style="display: flex; flex-direction: column; gap: 16px">
+        <span class="idx" style="letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px">Trang</span>
+        <h1 class="dsp" style="margin: 0; font-size: clamp(44px, 6vw, 84px); font-weight: 800; line-height: 1; letter-spacing: -0.045em">Liên hệ</h1>
+      </section>
+
+      <div class="rule" style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 48px 80px; padding-top: 36px">
+
+        <section class="rise d1" style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 30px">
+          <p class="dsp" style="margin: 0; font-size: 24px; font-weight: 500; line-height: 1.45; letter-spacing: -0.01em; text-wrap: pretty">Autoxide là dự án mã nguồn mở. Phần lớn câu hỏi có câu trả lời nhanh hơn ở những nơi dưới đây; còn lại, hãy viết cho chúng tôi.</p>
+
+          <div style="display: flex; flex-direction: column">
+            <a class="row" href="https://github.com/thuongtamduy/autoxide" style="padding: 22px 0; border-top: 1px solid var(--hair)">
+              <span class="idx" style="padding-top: 4px">01</span>
+              <span style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+                <span class="dsp" style="font-size: 20px; font-weight: 600; letter-spacing: -0.015em"><span class="tl">Báo lỗi hoặc đề xuất tính năng</span></span>
+                <span style="font-size: 15.5px; line-height: 1.55; color: var(--ink-2); text-wrap: pretty">Mở một issue trên GitHub để mọi người cùng theo dõi và góp ý.</span>
+              </span>
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-top: 4px; color: var(--ink-3)"><path d="{{ic.up}}"></path></svg>
+            </a>
+            <a class="row" href="List.dc.html" style="padding: 22px 0; border-top: 1px solid var(--hair)">
+              <span class="idx" style="padding-top: 4px">02</span>
+              <span style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+                <span class="dsp" style="font-size: 20px; font-weight: 600; letter-spacing: -0.015em"><span class="tl">Câu hỏi về cài đặt và vận hành</span></span>
+                <span style="font-size: 15.5px; line-height: 1.55; color: var(--ink-2); text-wrap: pretty">Xem các bài trong mục Hướng dẫn trước: cài đặt, sao lưu, chuyển database.</span>
+              </span>
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-top: 4px; color: var(--ink-3)"><path d="{{ic.arrow}}"></path></svg>
+            </a>
+            <div class="row" style="padding: 22px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair)">
+              <span class="idx" style="padding-top: 4px">03</span>
+              <span style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+                <span class="dsp" style="font-size: 20px; font-weight: 600; letter-spacing: -0.015em">Lỗ hổng bảo mật</span>
+                <span style="font-size: 15.5px; line-height: 1.55; color: var(--ink-2); text-wrap: pretty">Đừng mở issue công khai. Hãy gửi qua form bên cạnh và chọn chủ đề Bảo mật.</span>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="rise d2" style="flex: 1 1 440px; min-width: 0; max-width: 560px">
+          <sc-if value="{{formOpen}}" hint-placeholder-val="{{true}}">
+            <form onSubmit="{{submit}}" novalidate="novalidate" style="display: flex; flex-direction: column; gap: 22px; padding: 32px; border-radius: 14px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--hair)">
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <h2 class="dsp" style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.025em">Gửi tin nhắn</h2>
+                <span class="help" style="font-size: 14px">Các trường có dấu <span style="color: var(--accent-ink); font-weight: 600">*</span> là bắt buộc.</span>
+              </div>
+
+              <sc-if value="{{hasErrors}}" hint-placeholder-val="{{false}}">
+                <div class="note pop" role="alert" style="background: var(--bad-bg); color: var(--bad)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-top: 2px"><path d="{{ic.warn}}"></path></svg><span>{{errorSummary}}</span></div>
+              </sc-if>
+
+              <sc-for list="{{fields}}" as="f" hint-placeholder-count="5">
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <sc-if value="{{f.isText}}" hint-placeholder-val="{{true}}">
+                    <label class="lab" for="{{f.id}}">{{f.label}} <span style="color: var(--accent-ink)">*</span></label>
+                    <input id="{{f.id}}" class="inp {{f.errCls}}" type="{{f.type}}" value="{{f.value}}" onChange="{{f.onChange}}" placeholder="{{f.placeholder}}" autocomplete="{{f.auto}}">
+                  </sc-if>
+                  <sc-if value="{{f.isRadio}}" hint-placeholder-val="{{false}}">
+                    <span class="lab" id="{{f.id}}">{{f.label}} <span style="color: var(--accent-ink)">*</span></span>
+                    <div role="radiogroup" aria-labelledby="{{f.id}}" style="display: flex; flex-wrap: wrap; gap: 8px">
+                      <sc-for list="{{f.options}}" as="o" hint-placeholder-count="4">
+                        <button type="button" role="radio" aria-checked="{{o.on}}" class="chip {{o.cls}}" onClick="{{o.pick}}" style="background-color: {{o.bg}}">{{o.label}}</button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{f.isArea}}" hint-placeholder-val="{{false}}">
+                    <span style="display: flex; align-items: baseline"><label class="lab" for="{{f.id}}" style="flex: 1">{{f.label}} <span style="color: var(--accent-ink)">*</span></label><span class="help num">{{f.count}} / 2.000</span></span>
+                    <textarea id="{{f.id}}" class="inp {{f.errCls}}" rows="6" value="{{f.value}}" onChange="{{f.onChange}}" placeholder="{{f.placeholder}}"></textarea>
+                  </sc-if>
+                  <sc-if value="{{f.isConsent}}" hint-placeholder-val="{{false}}">
+                    <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer">
+                      <input type="checkbox" class="chk" checked="{{f.checked}}" onChange="{{f.toggle}}" style="margin-top: 2px">
+                      <span style="font-size: 14.5px; line-height: 1.55; color: var(--ink-2)">{{f.label}} <span style="color: var(--accent-ink)">*</span></span>
+                    </label>
+                  </sc-if>
+                  <sc-if value="{{f.help}}" hint-placeholder-val="{{false}}"><span class="help">{{f.help}}</span></sc-if>
+                  <sc-if value="{{f.error}}" hint-placeholder-val="{{false}}"><span class="errtxt pop">{{f.error}}</span></sc-if>
+                </div>
+              </sc-for>
+
+              <button class="btn pri" type="submit" style="align-self: flex-start">Gửi tin nhắn<svg class="ic s go" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.arrow}}"></path></svg></button>
+            </form>
+          </sc-if>
+
+          <sc-if value="{{formDone}}" hint-placeholder-val="{{false}}">
+            <div class="pop" role="status" style="display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding: 40px 32px; border-radius: 14px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--hair)">
+              <span style="display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 50%; background: var(--ok-bg); color: var(--ok)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 24px; height: 24px"><path d="{{ic.check}}"></path></svg></span>
+              <h2 class="dsp" style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; text-wrap: balance">Cảm ơn bạn, chúng tôi đã nhận được tin nhắn</h2>
+              <p style="margin: 0; font-size: 16.5px; line-height: 1.6; color: var(--ink-2); text-wrap: pretty">Chúng tôi sẽ trả lời qua địa chỉ <span class="mono" style="font-size: 14.5px; color: var(--ink)">{{sentEmail}}</span> trong vài ngày làm việc.</p>
+              <button class="btn" onClick="{{again}}">Gửi tin nhắn khác</button>
+            </div>
+          </sc-if>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="band">
+    <div class="wrap" style="padding-top: 52px; padding-bottom: 28px; display: flex; flex-direction: column; gap: 40px">
+      <div style="display: flex; flex-wrap: wrap; gap: 36px 64px">
+        <div style="flex: 2 1 300px; display: flex; flex-direction: column; gap: 14px">
+          <span style="display: flex; align-items: center; gap: 10px">
+            <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 21px; height: 21px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+            </span>
+            <span class="dsp" style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em">Autoxide</span>
+          </span>
+          <p style="margin: 0; max-width: 380px; font-size: 15px; line-height: 1.6; color: var(--band-ink-2)">Lõi backend mã nguồn mở viết bằng Rust, chạy trên cả SQLite và Postgres. Blog này được dựng bằng chính nó.</p>
+        </div>
+        <sc-for list="{{footer}}" as="col" hint-placeholder-count="3">
+          <div style="flex: 1 1 150px; display: flex; flex-direction: column; gap: 12px">
+            <span class="kick" style="color: #FF9A6E">{{col.label}}</span>
+            <sc-for list="{{col.items}}" as="f" hint-placeholder-count="3">
+              <a class="fl" href="{{f.href}}" style="font-size: 15px">{{f.label}}</a>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; padding-top: 22px; border-top: 1px solid var(--band-hair); font-size: 13px; color: var(--band-ink-2)">
+        <span>© 2026 Autoxide. Mã nguồn mở, giấy phép MIT hoặc Apache-2.0.</span>
+        <div style="flex: 1"></div>
+        <span>Tiếng Việt · English</span>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  state = { dark: null, values: { name: '', email: '', topic: '', message: '', consent: false }, errors: {}, done: false };
+
+  renderVals() {
+    const I = {
+      search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      arrow: 'M5 12h14M13 6l6 6-6 6',
+      up: 'M7 17L17 7M9 7h8v8',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      warn: 'M12 4l9 16H3zM12 10v4M12 17h.01'
+    };
+    const s = this.state;
+    const dark = s.dark ?? this.props.dark ?? false;
+    const v = s.values;
+    const set = (key, value) => this.setState({ values: { ...v, [key]: value }, errors: { ...s.errors, [key]: '' } });
+
+    const menu = [
+      { label: 'Bài viết', href: 'List.dc.html' },
+      { label: 'Hướng dẫn', href: 'List.dc.html' },
+      { label: 'Kỹ thuật', href: 'List.dc.html' },
+      { label: 'Thông báo', href: 'List.dc.html' },
+      { label: 'Liên hệ', href: 'Page.dc.html', cls: 'on' }
+    ];
+
+    // Các trường như core trả cho một form công khai: nhãn, kiểu, bắt buộc, lựa chọn, gợi ý.
+    const schema = [
+      { key: 'name', type: 'text', label: 'Họ tên', placeholder: '', auto: 'name' },
+      { key: 'email', type: 'email', label: 'Email', placeholder: 'ban@example.com', auto: 'email', help: 'Chỉ dùng để trả lời bạn.' },
+      { key: 'topic', type: 'radio', label: 'Chủ đề', options: ['Câu hỏi chung', 'Hợp tác', 'Bảo mật', 'Khác'] },
+      { key: 'message', type: 'textarea', label: 'Nội dung', placeholder: 'Bạn cần chúng tôi giúp gì?' },
+      { key: 'consent', type: 'consent', label: 'Tôi đồng ý để Autoxide Blog lưu thông tin này nhằm trả lời tôi.' }
+    ];
+    const fields = schema.map((f) => {
+      const error = s.errors[f.key] || '';
+      return {
+        ...f, id: 'f-' + f.key, error, errCls: error ? 'err' : '',
+        help: error ? '' : (f.help || ''),
+        isText: f.type === 'text' || f.type === 'email',
+        isRadio: f.type === 'radio',
+        isArea: f.type === 'textarea',
+        isConsent: f.type === 'consent',
+        value: typeof v[f.key] === 'string' ? v[f.key] : '',
+        count: String((v[f.key] || '').length),
+        checked: v[f.key] === true,
+        onChange: (e) => set(f.key, f.type === 'textarea' ? e.target.value.slice(0, 2000) : e.target.value),
+        toggle: () => set(f.key, !v[f.key]),
+        options: (f.options || []).map((label) => ({
+          label, on: v[f.key] === label, cls: v[f.key] === label ? 'on' : '',
+          bg: v[f.key] === label ? 'var(--ink)' : 'var(--paper)',
+          pick: () => set(f.key, label)
+        }))
+      };
+    });
+    const errorCount = Object.values(s.errors).filter(Boolean).length;
+
+    const footer = [
+      { label: 'Chủ đề', items: [{ label: 'Hướng dẫn', href: 'List.dc.html' }, { label: 'Kỹ thuật', href: 'List.dc.html' }, { label: 'Thông báo', href: 'List.dc.html' }] },
+      { label: 'Dự án', items: [{ label: 'Liên hệ', href: 'Page.dc.html' }, { label: 'Mã nguồn trên GitHub', href: 'https://github.com/thuongtamduy/autoxide' }] },
+      { label: 'Theo dõi', items: [{ label: 'Newsletter', href: 'Main.dc.html' }, { label: 'Nguồn RSS', href: '#' }, { label: 'Tìm kiếm', href: 'Search.dc.html' }] }
+    ];
+
+    return {
+      theme: dark ? 'dark' : '',
+      themeIcon: dark ? I.sun : I.moon,
+      toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, menu, fields, footer,
+      formOpen: !s.done, formDone: s.done,
+      hasErrors: errorCount > 0,
+      errorSummary: 'Còn ' + errorCount + ' chỗ cần sửa trước khi gửi.',
+      sentEmail: v.email.trim(),
+      submit: (e) => {
+        e.preventDefault();
+        // Gom mọi lỗi rồi báo một lần, như core làm với đầu vào.
+        const errors = {};
+        if (!v.name.trim()) errors.name = 'Hãy nhập họ tên.';
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email.trim())) errors.email = 'Hãy nhập một địa chỉ email hợp lệ, ví dụ ban@example.com.';
+        if (!v.topic) errors.topic = 'Hãy chọn một chủ đề.';
+        if (!v.message.trim()) errors.message = 'Hãy viết nội dung tin nhắn.';
+        if (!v.consent) errors.consent = 'Hãy tích ô đồng ý để chúng tôi có thể trả lời bạn.';
+        if (Object.keys(errors).length > 0) {
+          this.setState({ errors });
+          return;
+        }
+        this.setState({ done: true, errors: {} });
+      },
+      again: () => this.setState({ done: false, values: { name: v.name, email: v.email, topic: '', message: '', consent: false } })
+    };
+  }
+}
+</script>
+</body>
+</html>

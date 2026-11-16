@@ -1,0 +1,267 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-12T17:10:00Z"
+  },
+  "title": "Autoxide Web — website công khai",
+  "launch": {
+    "view": "canvas",
+    "page": "v2"
+  },
+  "pages": [
+    {
+      "id": "v2",
+      "name": "Thiết kế 2 — mặt tiền bán hàng"
+    },
+    {
+      "id": "v1",
+      "name": "Thiết kế 1 — blog (lưu để đối chiếu)"
+    }
+  ],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 4297,
+      "title": "1 · Trang chủ cửa hàng",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Category.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 2883,
+      "title": "2 · Danh mục sản phẩm",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Product.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 2672,
+      "title": "3 · Trang sản phẩm",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Checkout.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 1876,
+      "title": "4 · Giỏ hàng và đặt hàng",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Seller.dc.html": {
+      "x": 0,
+      "y": 4797,
+      "w": 1440,
+      "h": 2002,
+      "title": "5 · Gian hàng người bán (sàn)",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Article.dc.html": {
+      "x": 1520,
+      "y": 4797,
+      "w": 1440,
+      "h": 4099,
+      "title": "6 · Góc bếp: bài viết",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Account.dc.html": {
+      "x": 3040,
+      "y": 4797,
+      "w": 1440,
+      "h": 1649,
+      "title": "7 · Tài khoản người mua",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Post.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 5200,
+      "title": "v1 · Trang bài viết",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v1"
+    },
+    "List.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 2500,
+      "title": "v1 · Danh sách bài viết",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v1"
+    },
+    "Page.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1700,
+      "title": "v1 · Trang tĩnh: Liên hệ",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v1"
+    },
+    "Search.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 1700,
+      "title": "v1 · Kết quả tìm kiếm",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v1"
+    },
+    "Lookup.dc.html": {
+      "x": 4560,
+      "y": 4797,
+      "w": 1440,
+      "h": 1258,
+      "title": "8 · Tra cứu đơn (không cần tài khoản)",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Deals.dc.html": {
+      "x": 0,
+      "y": 9396,
+      "w": 1440,
+      "h": 2029,
+      "title": "9 · Khuyến mại và flash sale",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "SellOn.dc.html": {
+      "x": 3040,
+      "y": 9396,
+      "w": 1440,
+      "h": 1748,
+      "title": "11 · Bán trên Chợ Bếp Mộc (mời người bán)",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "Live.dc.html": {
+      "x": 1520,
+      "y": 9396,
+      "w": 1440,
+      "h": 1990,
+      "title": "10 · Livestream bán hàng",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "StyleMarket.dc.html": {
+      "x": 0,
+      "y": 11925,
+      "w": 1440,
+      "h": 3045,
+      "title": "12 · Siêu sale 12.12 (kiểu sàn, dày khuyến mại)",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "StyleMinimal.dc.html": {
+      "x": 1520,
+      "y": 11925,
+      "w": 1440,
+      "h": 5718,
+      "title": "13 · Chảo gang 26 cm (kiểu tối giản)",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    },
+    "StyleLuxe.dc.html": {
+      "x": 3040,
+      "y": 11925,
+      "w": 1440,
+      "h": 6000,
+      "title": "14 · Bộ sưu tập gốm Bát Tràng (kiểu nội thất sang trọng)",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "v2"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Category.dc.html",
+    "Product.dc.html",
+    "Checkout.dc.html",
+    "Seller.dc.html",
+    "Article.dc.html",
+    "Account.dc.html",
+    "Lookup.dc.html",
+    "Deals.dc.html",
+    "SellOn.dc.html",
+    "Post.dc.html",
+    "List.dc.html",
+    "Page.dc.html",
+    "Search.dc.html",
+    "Live.dc.html",
+    "StyleMarket.dc.html",
+    "StyleMinimal.dc.html",
+    "StyleLuxe.dc.html"
+  ],
+  "notes": {
+    "heading": {
+      "x": 0,
+      "y": -320,
+      "text": "Mặt tiền của khách: mua hàng từ đầu tới cuối",
+      "kind": "title1",
+      "maxW": 6000,
+      "page": "v2"
+    },
+    "row2": {
+      "x": 0,
+      "y": 4477,
+      "text": "Sàn, nội dung, tài khoản người mua và tra cứu đơn",
+      "kind": "title1",
+      "maxW": 6000,
+      "page": "v2"
+    },
+    "heading-v1": {
+      "x": 0,
+      "y": -320,
+      "text": "Thiết kế 1 (12/11) — website blog",
+      "kind": "title1",
+      "maxW": 6000,
+      "page": "v1"
+    },
+    "row3": {
+      "x": 0,
+      "y": 9076,
+      "text": "Khuyến mại, livestream và người bán mới",
+      "kind": "title1",
+      "maxW": 6000,
+      "page": "v2"
+    },
+    "row4": {
+      "x": 0,
+      "y": 11605,
+      "text": "Trang chiến dịch với phong cách riêng — chung đầu trang và chân trang của site",
+      "kind": "title1",
+      "maxW": 6000,
+      "page": "v2"
+    }
+  },
+  "designSystems": []
+}

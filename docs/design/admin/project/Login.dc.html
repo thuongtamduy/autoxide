@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Đăng nhập — Autoxide Admin</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ax-r40.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>
+/* ===== Login: CSS riêng của màn (R4 mục 31), mọi luật dưới .pg-login ===== */
+/* Máy tính bảng (721–1023px): hai cột không vừa nên khối giới thiệu nằm trên biểu mẫu; thu nó còn một dòng logo
+   để biểu mẫu lên màn đầu. Dưới 721px khối này đã ẩn; từ 1024px hai cột đứng cạnh nhau. */
+@media (min-width: 721px) and (max-width: 1023px) {
+  .ax.pg-login { flex-direction: column; flex-wrap: nowrap; }
+  /* Kiểu viết thẳng trên thẻ (padding 48px, display flex) thắng luật thường, nên ở đây cần !important */
+  .ax.pg-login > .lg-intro { flex: none !important; padding: 14px 24px !important; }
+  .ax.pg-login > .lg-intro > :not(.lg-logo) { display: none !important; }
+  .ax.pg-login > main { flex: 1 1 auto; }
+}
+</style>
+</helmet>
+<div class="ax pg-login {{theme}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 14px">
+  <aside class="hide-mobile lg-intro" style="flex: 1 1 420px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 48px; background: #14171F; color: #E4E6EB">
+    <span class="lg-logo" style="display: flex; align-items: center; gap: 12px"><span style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 11px; background: #1F2430; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14)"><svg viewBox="0 0 24 24" aria-hidden="true" style="width: 24px; height: 24px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg></span><span class="dsp" style="font-size: 18px; font-weight: 700">Autoxide</span></span>
+    <span style="display: flex; flex-direction: column; gap: 12px; max-width: 420px"><span class="dsp" style="font-size: 30px; font-weight: 700; line-height: 1.2; color: #fff">Quản trị Bếp Mộc</span><span style="color: #AEB4C0; font-size: 15px; line-height: 1.6">Một tài khoản cho mọi cửa hàng, kho và sàn bạn được giao. Quyền của bạn quyết định bạn thấy gì.</span></span>
+    <span style="font-size: 12.5px; color: #8A91A0">admin.bepmoc.vn · dữ liệu lưu tại Việt Nam</span>
+  </aside>
+  <main style="flex: 1 1 420px; display: flex; align-items: center; justify-content: center; padding: 32px 20px">
+    <div class="card rise" style="width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 16px; padding: 28px">
+      <div style="display: flex; align-items: center; gap: 8px"><h1 class="h1" style="flex: 1; font-size: 24px">{{heading}}</h1><button class="btn ghost sq" aria-label="Đổi giao diện sáng / tối" data-tip="Sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button></div>
+      <sc-if value="{{sub}}" hint-placeholder-val="{{true}}"><span style="margin-top: -8px; color: var(--ink-2); text-wrap: pretty">{{sub}}</span></sc-if>
+
+      <sc-if value="{{isEmail}}" hint-placeholder-val="{{true}}">
+        <form onSubmit="{{next}}" novalidate="novalidate" style="display: flex; flex-direction: column; gap: 12px">
+          <label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Email công việc</span><input class="inp" type="email" autocomplete="username webauthn" value="{{email}}" onChange="{{onEmail}}" placeholder="ten@bepmoc.vn"></label>
+          <sc-if value="{{err}}" hint-placeholder-val="{{false}}"><span class="tone-bad" style="font-size: 13px">{{err}}</span></sc-if>
+          <button type="submit" class="btn pri" style="height: 44px">Tiếp tục</button>
+        </form>
+        <button class="btn" onClick="{{passkey}}" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 10a4 4 0 1 0-3.5 4L9 15.5V18H6.5v2H4v-2.5L10.5 11A4 4 0 0 0 14 10zM15 7h.01"></path></svg>Đăng nhập bằng passkey</button>
+        <span style="font-size: 12.5px; color: var(--ink-3); text-wrap: pretty">Passkey dùng vân tay hoặc khuôn mặt trên máy này, không cần mật khẩu và không bị lừa đăng nhập vào trang giả.</span>
+      </sc-if>
+
+      <sc-if value="{{isMethod}}" hint-placeholder-val="{{false}}">
+        <span class="mtag" style="align-self: flex-start">{{email}}</span>
+        <form onSubmit="{{withPassword}}" novalidate="novalidate" style="display: flex; flex-direction: column; gap: 12px">
+          <label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Mật khẩu</span><input class="inp" type="password" autocomplete="current-password" value="{{pw}}" onChange="{{onPw}}"></label>
+          <sc-if value="{{err}}" hint-placeholder-val="{{false}}"><span class="tone-bad" style="font-size: 13px">{{err}}</span></sc-if>
+          <button type="submit" class="btn pri" style="height: 44px">Đăng nhập</button>
+        </form>
+        <button class="btn" onClick="{{magic}}" style="height: 44px">Gửi link đăng nhập qua email</button>
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 13px"><button class="lnk" onClick="{{forgot}}" style="border: 0; background: none; padding: 0; cursor: pointer">Quên mật khẩu?</button><button class="lnk" onClick="{{back}}" style="border: 0; background: none; padding: 0; cursor: pointer">Dùng email khác</button></div>
+      </sc-if>
+
+      <sc-if value="{{isMfa}}" hint-placeholder-val="{{false}}">
+        <form onSubmit="{{verify}}" novalidate="novalidate" style="display: flex; flex-direction: column; gap: 12px">
+          <label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Mã 6 số trong ứng dụng xác thực</span><input class="inp num" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="{{code}}" onChange="{{onCode}}" placeholder="••••••" style="letter-spacing: .3em"></label>
+          <sc-if value="{{err}}" hint-placeholder-val="{{false}}"><span class="tone-bad" style="font-size: 13px">{{err}}</span></sc-if>
+          <button type="submit" class="btn pri" style="height: 44px">Xác nhận</button>
+        </form>
+        <span style="font-size: 12.5px; color: var(--ink-3)">Thử mã 246810. Mất điện thoại? Dùng một mã khôi phục đã lưu khi bật xác thực hai bước.</span>
+      </sc-if>
+
+      <sc-if value="{{isSent}}" hint-placeholder-val="{{false}}">
+        <div style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--panel); color: var(--ink-2); text-wrap: pretty">Nếu {{email}} có tài khoản, một email vừa được gửi. Link dùng một lần, hết hạn sau 15 phút. Vì bảo mật, trang này trả lời như nhau dù email có tài khoản hay không.</div>
+        <button class="btn" onClick="{{back}}">Quay lại</button>
+      </sc-if>
+
+      <sc-if value="{{isInvite}}" hint-placeholder-val="{{false}}">
+        <div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--panel); font-size: 13.5px"><span><b>Lan Phạm</b> mời bạn vào <b>Bếp Mộc</b></span><span style="color: var(--ink-3)">Role: Thu ngân · nút CN Quận 3 · lời mời hết hạn 20/11/2026</span></div>
+        <button class="btn pri" onClick="{{acceptPasskey}}" style="height: 44px">Tạo passkey và vào làm việc</button>
+        <button class="btn" onClick="{{acceptPw}}">Đặt mật khẩu thay vì passkey</button>
+      </sc-if>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 14px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-3)">
+        <button class="lnk" onClick="{{showInvite}}" style="border: 0; background: none; padding: 0; cursor: pointer; font-size: 12.5px">Xem màn nhận lời mời</button>
+        <span style="flex: 1"></span><span>Tiếng Việt · English</span>
+      </div>
+    </div>
+  </main>
+  <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+    <div class="toast" role="status" style="z-index: 30; max-width: calc(100% - 32px)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  state = { dark: null, toast: '', step: 'email', email: '', pw: '', code: '', err: '' };
+
+  say(text) {
+    this.setState({ toast: text });
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.setState({ toast: '' }), 3200);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark ?? this.props.dark ?? false;
+    const go = (step, extra) => this.setState({ step, err: '', ...(extra || {}) });
+    const H = { email: ['Đăng nhập', 'Dùng email công việc của bạn.'], method: ['Chào bạn trở lại', ''], mfa: ['Xác thực hai bước', 'Tài khoản của bạn bật xác thực hai bước.'], sent: ['Kiểm tra hộp thư', ''], invite: ['Nhận lời mời', 'Đặt cách đăng nhập để bắt đầu.'] };
+    return {
+      theme: dark ? 'dark' : '', themeIcon: dark ? 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4' : 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      toggleTheme: () => this.setState({ dark: !dark }), toast: s.toast,
+      heading: H[s.step][0], sub: H[s.step][1], err: s.err, email: s.email, pw: s.pw, code: s.code,
+      isEmail: s.step === 'email', isMethod: s.step === 'method', isMfa: s.step === 'mfa', isSent: s.step === 'sent', isInvite: s.step === 'invite',
+      onEmail: (e) => this.setState({ email: e.target.value, err: '' }), onPw: (e) => this.setState({ pw: e.target.value, err: '' }), onCode: (e) => this.setState({ code: e.target.value.replace(/\D/g, ''), err: '' }),
+      next: (e) => { e.preventDefault(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.email.trim())) { this.setState({ err: 'Hãy nhập email hợp lệ, ví dụ ten@bepmoc.vn.' }); return; } go('method'); },
+      passkey: () => this.say('Trình duyệt hỏi vân tay hoặc khuôn mặt; xong là vào thẳng, không cần mã'),
+      withPassword: (e) => { e.preventDefault(); if (!s.pw) { this.setState({ err: 'Hãy nhập mật khẩu.' }); return; } go('mfa'); },
+      magic: () => go('sent'), forgot: () => { go('sent'); this.say('Nếu email có tài khoản, link đặt lại mật khẩu đã được gửi'); },
+      back: () => go('email', { pw: '', code: '' }),
+      verify: (e) => { e.preventDefault(); if (s.code !== '246810') { this.setState({ err: 'Mã chưa đúng. Sai 5 lần thì tạm khoá đăng nhập 15 phút.' }); return; } this.say('Đăng nhập thành công; mở Tổng quan'); },
+      showInvite: () => go('invite'),
+      acceptPasskey: () => this.say('Đã tạo passkey và nhận lời mời; bạn vào với role Thu ngân ở CN Quận 3'),
+      acceptPw: () => this.say('Mở bước đặt mật khẩu: tối thiểu 12 ký tự, kiểm qua danh sách mật khẩu bị lộ')
+    };
+  }
+}
+</script>
+</body>
+</html>
