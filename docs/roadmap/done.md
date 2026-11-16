@@ -1,4 +1,4 @@
-# Lộ trình — các bước đã xong (0–33)
+# Lộ trình — các bước đã xong (0–34)
 
 Chuyển nguyên văn từ `docs/ROADMAP.md` theo D-228 để lộ trình chỉ còn việc đang mở. Lịch sử từng bước
 xem `CHANGELOG.md` và `docs/DECISIONS.md`.
@@ -608,3 +608,53 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
       database chỉ cho nhân sự nền tảng, dry-run mặc định; tách "tạm khoá" (chặn mọi route) khỏi "chỉ đọc"
 - [x] Đối chiếu đợt 2 (D-223…D-227): gắn tên miền với nút; cấu hình kết nối đối tác theo nhóm `connection` với
       tên thống nhất (D-297)
+
+## 34. Tổ chức, quyền theo độ sâu, danh tính (D-185)
+
+Đặc tả: [`docs/steps/34-organizations-identity.md`](steps/34-organizations-identity.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Thiết kế: trụ 2. Bắt đầu SAU bước 33.
+
+- [x] Cây tổ chức trong khách hàng: loại nút tự đặt, độ sâu có giới hạn, bảng tổ tiên – con cháu, dời nút (khoá
+      dòng), vòng đời nút (chờ duyệt, hoạt động, tạm khoá, lưu trữ — khoá một nút thì cả nhánh ngừng ghi)
+- [x] Thành viên và quyền có độ sâu `own` / `unit` / `subtree` / `tenant`: `Principal` mang quyền theo nút, công
+      cụ lọc theo nhánh cho service, dữ liệu nghiệp vụ mang `org_id` (`notes` làm ví dụ), membership kể cả kế
+      thừa (`memberships?inherited=true`); testkit có bài rò rỉ giữa hai nhánh anh em
+- [x] Nội dung theo website và nút (D-208): `org_id` cho `content`, `media` (`forms` tuỳ chọn), quyền của chúng
+      theo độ sâu; đọc công khai lọc theo website (tên miền → nút), menu và ngôn ngữ bật theo website; bộ lọc
+      quản trị `owner_org`, `site`; `menus` cũng có `org_id`, `?site=` ở menu công khai và ngôn ngữ của website
+      (D-238)
+- [x] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu để module áp
+      cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè) — D-306; hồ sơ thuế, chính sách là cài
+      đặt do module thuế / thương mại khai khi có
+- [x] Ngôn ngữ bật theo website (D-305, D-307; cần cài đặt kế thừa ở mục trên): `content`, `menus` lấy danh sách ngôn ngữ của
+      nút website thay cho cấu hình chung; đường dẫn công khai duy nhất theo website (hai cửa hàng cùng có `/about`);
+      tìm theo ý nghĩa công khai lọc theo website
+- [x] Đơn vị hành chính VN (module nền `address`, D-193) sau sáp nhập: tỉnh → xã / phường / đặc khu, 34 tỉnh,
+      3.321 xã (QĐ 19/2025/QĐ-TTg, từ 01/7/2025), không cấp huyện, không đối chiếu địa chỉ cũ; dữ liệu chung
+      (mặt điều khiển), nguồn chính thức, ghi nguồn, ngày; đơn vị có mã, tên, loại, mã cấp trên, hiệu lực từ–tới — D-314; bộ dữ liệu
+      đóng gói ở `modules/address/data/vn-2025` (D-318)
+- [x] Dùng `address`: cập nhật bằng task khi nhà nước đổi (không sửa code); kiểu `Address` trong `api` (quốc
+      gia, mã tỉnh, mã xã, dòng, kèm tên lúc ghi), kiểm xã thuộc đúng tỉnh, dùng cho nút, KYC, hồ sơ pháp lý
+      (37), sổ địa chỉ người mua (44); endpoint công khai tỉnh, xã theo tỉnh, tìm không dấu, ETag / cache
+- [x] Hồ sơ công khai của nút (D-200): tên hiển thị, `Address`, giờ mở cửa theo ngày và ngày đặc biệt, nhận hàng
+      tại quầy, ảnh, tên miền gắn với nút; ghi qua `PATCH …/public-profile`; endpoint công khai cửa hàng theo
+      tên miền (chỉ nút "hiện công khai"), ETag / cache — cho "cửa hàng gần bạn", chọn nơi nhận hàng; loại
+      cửa hàng công khai trong sổ đối tượng để menu của website trỏ tới (D-238)
+- [x] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho nhiều khách /
+      nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút. Nâng cấp: tài khoản, role và
+      API key có sẵn thành nhân sự của khách mặc định, giữ quyền cũ — D-309: tài khoản giữ theo từng khách, một người
+      làm cho nhiều khách qua uỷ quyền / quyền vào hỗ trợ (header `Autoxide-Tenant`)
+- [x] Tài khoản: xác nhận lại danh tính `POST /auth/me/reauth` thay `current_password`; ngôn ngữ, múi giờ ưa
+      thích và tự đổi tên hiển thị qua `PATCH /auth/me`; bắt buộc MFA theo role; `last_login_at`
+- [x] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào ngữ cảnh
+      khách con bằng cùng API; audit ghi ở cả hai phía — D-310
+- [x] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn thiết bị yêu cầu
+      khi được; MFA vẫn áp dụng; trả lời như nhau về thời gian dù email có hay không (như D-154, D-162); tắt mặc
+      định, bật bằng cấu hình
+- [x] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu (hay passkey)
+      qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh CLI tương ứng
+- [x] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý do; mọi lần
+      vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được quyền vào hỗ trợ và tự thu
+      hồi lần cấp còn hạn (D-211), trừ yêu cầu của cơ quan có thẩm quyền (có audit) — D-313
+- [x] Tạo tài khoản từ số điện thoại đã xác thực: chuyển sang bước 45 (đặc tả 34 ghi "làm ở bước 45", D-316)

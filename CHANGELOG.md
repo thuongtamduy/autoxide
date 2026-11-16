@@ -17,7 +17,8 @@ endpoints are marked deprecated with a sunset date first.
   units by date; importing again changes nothing); public `GET /api/v1/address/provinces`,
   `/provinces/{code}/communes`, `/units`, `/units/{code}` (search without accents, `ETag`, one-day
   cache), `POST /api/v1/address/validate`; MCP tools; `autoxide doctor` shows the list in use. See
-  `docs/ADDRESS.md`. The server ships without the list.
+  `docs/ADDRESS.md`. Ships the Vietnamese list in force from 2025-07-01 (34 provinces, 3,321 communes):
+  import it with `autoxide task address.import`.
 - `organizations`: public profile of a unit — `GET`/`PATCH /api/v1/organizations/units/{id}/public-profile`
   (`organizations.profile.manage`): shown or not, display name, checked address, opening hours,
   special days, pickup, cover image; public `GET /api/v1/organizations/public/stores` (`ETag`);

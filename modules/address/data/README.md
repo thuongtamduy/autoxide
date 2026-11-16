@@ -1,8 +1,7 @@
 # Danh mục đơn vị hành chính
 
-Thư mục này giữ bộ dữ liệu chính thức để nhập bằng `autoxide task address.import path=<thư mục>`:
-`manifest.json` (nguồn, URL, ngày tải, ngày hiệu lực) và `units.csv`
-(`level,code,name,kind,parent_code`). Cách lấy và kiểm bộ dữ liệu: `docs/ADDRESS.md`.
-
-Chưa có bộ dữ liệu Việt Nam theo QĐ 19/2025/QĐ-TTg ở đây: trang danh mục của cơ quan thống kê không
-tải được khi dựng module (D-314). Không sinh dữ liệu bằng AI hay chép từ trang không chính thức.
+`vn-2025/`: danh mục Việt Nam hiệu lực từ 01/7/2025 (QĐ 19/2025/QĐ-TTg) — 34 tỉnh / thành (28 tỉnh, 6 thành phố
+trực thuộc trung ương), 3.321 đơn vị cấp xã (2.621 xã, 687 phường, 13 đặc khu). Lấy từ
+`https://provinces.open-api.vn/api/v2/?depth=2` ngày 16/11/2026 (bản đăng lại danh mục của cơ quan thống kê; trang
+gốc không truy cập được khi lấy), chuyển sang `units.csv` (`level,code,name,kind,parent_code`, mã giữ số 0 đầu) — D-318.
+Lệnh `autoxide task address.import` không nêu `path` nhập bộ này; test `du_lieu_goc_du_34_tinh_3321_xa` kiểm số lượng.

@@ -494,7 +494,9 @@ Accepting creates the account (or, when the email already has one, adds the role
 signs in). **Signing in with a link** (no password) is off by default; turn it on with
 `AUTOXIDE_AUTH_LOGIN_LINK=true` and set `AUTOXIDE_AUTH_LOGIN_LINK_URL` to your interface's page.
 Both need working mail (`AUTOXIDE_MAIL_SMTP_URL`) and a running worker. The organization tree of
-a tenant is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (8 by default).
+a tenant is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (8 by default). Import the list of
+administrative units once, for checking addresses: `autoxide task address.import`
+([`docs/ADDRESS.md`](ADDRESS.md)).
 
 **Platform staff and a tenant's data.** Platform staff (accounts of the platform tenant) never
 enter a tenant's data just because of their role: someone with `auth.support.grant` grants one

@@ -23,9 +23,20 @@ No sign-in needed; answers carry an `ETag` that changes when a new list is impor
 MCP tools: `address.list_provinces`, `address.list_communes`, `address.search_units`,
 `address.validate_address`.
 
-## Import the official list
+## Import the list
 
-The server ships without the list. Get it from the official source — the decision
+The server ships with the Vietnamese list in force from 2025-07-01 (34 provinces and cities, 3,321
+communes, wards and special zones, per decision QĐ 19/2025/QĐ-TTg; taken from
+provinces.open-api.vn v2, which republishes the statistics office's list — check it against the
+original decision if you need legal certainty). Import it once per installation:
+
+```bash
+autoxide task address.import
+```
+
+`autoxide doctor` warns while nothing is imported, and when a newer list ships with an update.
+
+To import another list (a later change by the state), get it from the official source — the decision
 **QĐ 19/2025/QĐ-TTg** (list and codes of administrative units, in force from 2025-07-01) and the
 electronic list of the statistics office ("Danh mục hành chính Việt Nam") — never from an
 unofficial copy, and never generated. Put two files in a directory:

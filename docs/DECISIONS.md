@@ -7726,3 +7726,15 @@ Xác thực mỗi request (`principal`) vẫn một câu cho người không có
 chỉ thêm câu khi có header `Autoxide-Tenant` khác khách nhà. Không gộp ba câu tính `Principal` bằng `UNION ALL`
 (khuyến nghị 3): đường vào khác chỉ chạy khi có header, không làm chậm đường thường. Phần tối ưu `GET /me` còn lại để
 mục sẵn có ở bước 39.
+
+## D-318 · Bộ dữ liệu hành chính lấy từ provinces.open-api.vn — 2026-11-16 — chủ dự án cho phép dùng nguồn khác
+
+Bối cảnh: trang danh mục của cơ quan thống kê không truy cập được, cổng văn bản không có phụ lục (D-314); chủ dự án cho
+phép dùng nguồn khác.
+
+Quyết định: lấy `https://provinces.open-api.vn/api/v2/?depth=2` (dự án mở đăng lại danh mục của cơ quan thống kê sau
+sáp nhập), ngày 16/11/2026. Số lượng khớp QĐ 19/2025/QĐ-TTg theo các nguồn tổng hợp: 34 tỉnh / thành (28 tỉnh, 6 thành
+phố), 3.321 đơn vị cấp xã (2.621 xã, 687 phường, 13 đặc khu); mã không trùng. Chuyển sang `units.csv` (mã tỉnh 2 chữ
+số, mã xã 5 chữ số), đóng gói ở `modules/address/data/vn-2025` và nhúng vào binary: `autoxide task address.import`
+không nêu `path` nhập bộ này; `autoxide doctor` cảnh báo khi chưa nhập hay khi bộ đóng gói mới hơn bộ đang dùng.
+Manifest ghi rõ nguồn trung gian. Tên đơn vị cần chắc về pháp lý thì **đối chiếu văn bản gốc**.

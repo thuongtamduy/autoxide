@@ -23,9 +23,19 @@ Không cần đăng nhập; kết quả có `ETag` đổi khi nhập danh mục 
 Tool MCP: `address.list_provinces`, `address.list_communes`, `address.search_units`,
 `address.validate_address`.
 
-## Nhập danh mục chính thức
+## Nhập danh mục
 
-Máy chủ không kèm sẵn danh mục. Lấy từ nguồn chính thức — **QĐ 19/2025/QĐ-TTg** (bảng danh mục và mã
+Máy chủ kèm sẵn danh mục Việt Nam hiệu lực từ 01/7/2025 (34 tỉnh / thành, 3.321 xã, phường, đặc khu theo
+QĐ 19/2025/QĐ-TTg; lấy từ provinces.open-api.vn v2, nơi đăng lại danh mục của cơ quan thống kê — cần chắc
+về pháp lý thì đối chiếu văn bản gốc). Nhập một lần cho mỗi bản cài:
+
+```bash
+autoxide task address.import
+```
+
+`autoxide doctor` cảnh báo khi chưa nhập, và khi bản cập nhật kèm danh mục mới hơn.
+
+Để nhập danh mục khác (khi nhà nước đổi), lấy từ nguồn chính thức — **QĐ 19/2025/QĐ-TTg** (bảng danh mục và mã
 số đơn vị hành chính, hiệu lực từ 01/7/2025) và danh mục điện tử của cơ quan thống kê ("Danh mục hành
 chính Việt Nam") — không lấy bản chép không chính thức, không sinh dữ liệu. Đặt hai file vào một thư mục:
 

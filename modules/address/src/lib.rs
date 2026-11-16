@@ -93,7 +93,20 @@ struct Dataset(Arc<AddressService>);
 impl autoxide_kernel::doctor::Probe for Dataset {
     async fn probe(&self) -> autoxide_kernel::doctor::Finding {
         use autoxide_kernel::doctor::Finding;
+        let bundled = import::bundled();
         match self.0.latest("VN").await {
+            Ok(Some(dataset))
+                if bundled.as_ref().is_ok_and(|(manifest, sha)| {
+                    *sha != dataset.sha256 && manifest.effective_from > dataset.effective_from
+                }) =>
+            {
+                Finding::warning(format!(
+                    "The list in use ({}, in force from {}) is older than the one shipped with this \
+                     server.",
+                    dataset.title, dataset.effective_from
+                ))
+                .with_hint("Run `autoxide task address.import` to import the shipped list.")
+            }
             Ok(Some(dataset)) => Finding::ok(format!(
                 "{} ({} provinces, {} communes), in force from {}, from {} retrieved on {}.",
                 dataset.title,
@@ -104,7 +117,7 @@ impl autoxide_kernel::doctor::Probe for Dataset {
                 dataset.retrieved_on
             )),
             Ok(None) => Finding::warning("No list of administrative units is imported: addresses cannot be checked.")
-                .with_hint("Get the official list (see docs/ADDRESS.md) and run `autoxide task address.import path=<directory>`."),
+                .with_hint("Run `autoxide task address.import` to import the list shipped with the server (see docs/ADDRESS.md)."),
             Err(error) => Finding::failed(format!("cannot read the administrative units: {error}")),
         }
     }

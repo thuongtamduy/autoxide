@@ -483,7 +483,8 @@ khoản được tạo (hay, khi email đã có tài khoản, role được thê
 nhập bằng link** (không mật khẩu) tắt mặc định; bật bằng `AUTOXIDE_AUTH_LOGIN_LINK=true` và đặt
 `AUTOXIDE_AUTH_LOGIN_LINK_URL` là trang của giao diện. Cả hai cần mail chạy được
 (`AUTOXIDE_MAIL_SMTP_URL`) và worker đang chạy. Cây tổ chức của một khách sâu tối đa
-`AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` cấp (mặc định 8).
+`AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` cấp (mặc định 8). Nhập danh mục đơn vị hành chính một lần để kiểm
+địa chỉ: `autoxide task address.import` ([`docs/ADDRESS.vi.md`](ADDRESS.vi.md)).
 
 **Nhân sự nền tảng và dữ liệu của khách.** Nhân sự nền tảng (tài khoản của khách nền tảng) không bao
 giờ vào dữ liệu của khách chỉ nhờ role: người có `auth.support.grant` cấp cho một nhân sự quyền vào có

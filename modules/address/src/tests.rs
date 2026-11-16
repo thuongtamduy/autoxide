@@ -175,3 +175,24 @@ async fn etag_tra_304() {
     .await
     .unwrap();
 }
+
+/// Bộ đóng gói (D-318): đủ 34 tỉnh / thành (28 tỉnh, 6 thành phố) và 3.321 đơn vị cấp xã (2.621 xã,
+/// 687 phường, 13 đặc khu) theo QĐ 19/2025/QĐ-TTg; nhập được, xã nào cũng thuộc một tỉnh có thật.
+#[tokio::test]
+async fn du_lieu_goc_du_34_tinh_3321_xa() {
+    let rows = parse(crate::import::BUNDLED_UNITS).unwrap();
+    let count = |kind: &str| rows.iter().filter(|row| row.kind == kind).count();
+    assert_eq!((count("province"), count("city")), (28, 6));
+    assert_eq!((count("commune"), count("ward"), count("special_zone")), (2621, 687, 13));
+    TestDatabase::run(async |test| {
+        let (_, service) = app(test).await;
+        let (manifest, sha) = crate::import::bundled().unwrap();
+        let imported = service.import(&manifest, &rows, &sha).await.unwrap();
+        assert_eq!((imported.provinces, imported.communes), (34, 3321));
+        assert_eq!(service.provinces("VN", None).await.unwrap().len(), 34);
+        let hanoi = service.communes("VN", "01", None).await.unwrap();
+        assert!(hanoi.iter().any(|unit| unit.name == "Phường Ba Đình"));
+    })
+    .await
+    .unwrap();
+}

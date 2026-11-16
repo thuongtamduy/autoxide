@@ -29,6 +29,16 @@ use crate::entity::{dataset, unit};
 use crate::events;
 use crate::service::AddressService;
 
+/// Bộ dữ liệu đóng gói sẵn (D-318): danh mục Việt Nam sau sáp nhập, nhập khi lệnh không nêu `path`.
+pub(crate) const BUNDLED_MANIFEST: &str = include_str!("../data/vn-2025/manifest.json");
+pub(crate) const BUNDLED_UNITS: &str = include_str!("../data/vn-2025/units.csv");
+
+/// Manifest của bộ đóng gói và SHA-256 của `units.csv` của nó.
+pub(crate) fn bundled() -> Result<(Manifest, String), Error> {
+    let manifest: Manifest = serde_json::from_str(BUNDLED_MANIFEST).map_err(Error::internal)?;
+    Ok((manifest, autoxide_kernel::secret::sha256(BUNDLED_UNITS)))
+}
+
 /// Loại đơn vị nhận được.
 const KINDS: [&str; 5] = ["province", "city", "commune", "ward", "special_zone"];
 
@@ -294,7 +304,11 @@ pub(crate) fn task(service: Arc<AddressService>) -> Task {
          new list closes the units it no longer has and opens the new ones.",
         Arc::new(ImportTask(service)),
     )
-    .argument(TaskArgument::required("path", "Directory holding `manifest.json` and `units.csv`."))
+    .argument(TaskArgument::optional(
+        "path",
+        "Directory holding `manifest.json` and `units.csv`. Omit to import the list shipped with \
+         the server (Vietnam, in force from 2025-07-01).",
+    ))
 }
 
 struct ImportTask(Arc<AddressService>);
@@ -302,7 +316,13 @@ struct ImportTask(Arc<AddressService>);
 #[async_trait::async_trait]
 impl TaskRun for ImportTask {
     async fn run(&self, args: &TaskArgs) -> Result<String, Error> {
-        let path = std::path::PathBuf::from(args.get("path").unwrap_or_default());
+        let Some(path) = args.get("path") else {
+            let (manifest, sha256) = bundled()?;
+            let rows = parse(BUNDLED_UNITS)?;
+            let imported = self.0.import(&manifest, &rows, &sha256).await?;
+            return Ok(report(&manifest, &imported));
+        };
+        let path = std::path::PathBuf::from(path);
         let read = |name: &str| {
             std::fs::read_to_string(path.join(name)).map_err(|error| {
                 Error::bad_request("address.import_unreadable", "Cannot read `{file}`: {reason}.")
@@ -320,18 +340,22 @@ impl TaskRun for ImportTask {
         let rows = parse(&csv)?;
         let sha256 = autoxide_kernel::secret::sha256(&csv);
         let imported = self.0.import(&manifest, &rows, &sha256).await?;
-        Ok(if imported.changed {
-            format!(
-                "Imported {} provinces and {} communes ({}, in force from {}): {} units opened, {} closed.",
-                imported.provinces,
-                imported.communes,
-                manifest.title,
-                manifest.effective_from,
-                imported.opened,
-                imported.closed
-            )
-        } else {
-            "This list was already imported; nothing changed.".to_owned()
-        })
+        Ok(report(&manifest, &imported))
+    }
+}
+
+fn report(manifest: &Manifest, imported: &Imported) -> String {
+    if imported.changed {
+        format!(
+            "Imported {} provinces and {} communes ({}, in force from {}): {} units opened, {} closed.",
+            imported.provinces,
+            imported.communes,
+            manifest.title,
+            manifest.effective_from,
+            imported.opened,
+            imported.closed
+        )
+    } else {
+        "This list was already imported; nothing changed.".to_owned()
     }
 }
