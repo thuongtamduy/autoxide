@@ -50,6 +50,8 @@ pub(crate) struct KernelModule {
     admin: Option<Arc<crate::tenancy::TenantAdmin>>,
     /// Bộ tra DNS cho tên miền riêng (điền sau khi mọi module khởi động).
     dns: crate::tenancy::domains::DnsSlot,
+    /// Cây tổ chức (bước 34) để gắn tên miền với nút (điền sau khi mọi module khởi động).
+    orgs: crate::tenancy::domains::OrgSlot,
     /// Service tên miền riêng của khách; có sau `start`.
     domains: Option<Arc<crate::tenancy::TenantDomains>>,
     /// Thứ việc dời khách cần từ mọi module (điền sau khi mọi module khởi động).
@@ -72,9 +74,10 @@ impl KernelModule {
         tenant_settings: crate::tenancy::settings::Catalog,
         slots: crate::tenancy::Slots,
     ) -> Self {
-        let crate::tenancy::Slots { seeds, dns, moves: move_setup } = slots;
+        let crate::tenancy::Slots { seeds, dns, orgs, moves: move_setup } = slots;
         KernelModule {
             dns,
+            orgs,
             domains: None,
             move_setup,
             moves: None,
@@ -197,6 +200,7 @@ impl Module for KernelModule {
             crate::tenancy::domains::DOMAIN_VERIFIED,
             crate::tenancy::domains::DOMAIN_REVOKED,
             crate::tenancy::domains::DOMAIN_FAILED,
+            crate::tenancy::domains::DOMAIN_UPDATED,
             crate::tenancy::moves::TENANT_MOVED,
         ]
     }
@@ -312,6 +316,7 @@ impl Module for KernelModule {
             context.tenancy().clone(),
             context.outbox()?,
             self.dns.clone(),
+            self.orgs.clone(),
             platform_host,
         ));
         self.domains = Some(domains.clone());

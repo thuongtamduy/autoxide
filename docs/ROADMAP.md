@@ -4,7 +4,7 @@ Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và Postgres**; agen
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–32 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 33 đang
-làm: nhóm A (nền kernel) và nhóm B (13 module theo khách) xong, tiếp theo nhóm C (tên miền, dời khách, vận hành)**; bước 50 chờ
+làm: nhóm A (nền kernel) và nhóm B (13 module theo khách) xong, nhóm C còn: đo đường nóng trước và sau, hướng dẫn viết module (EN + VI), changelog, gate đầy đủ rồi merge**; bước 50 chờ
 chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai
 (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
@@ -117,8 +117,8 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
 - [x] Đối chiếu thiết kế 2 (D-210, D-218 mục 33): cấu hình nghiệp vụ của module theo khách (`Module::tenant_settings`
       cho `comments`, `forms`, `content`, `media`); `GET /kernel/tenants` có lọc và `expand`; API job di chuyển
       database chỉ cho nhân sự nền tảng, dry-run mặc định; tách "tạm khoá" (chặn mọi route) khỏi "chỉ đọc"
-- [ ] Đối chiếu đợt 2 (D-223…D-227): gắn tên miền với nút; cấu hình kết nối đối tác theo nhóm `connection` với
-      tên thống nhất
+- [x] Đối chiếu đợt 2 (D-223…D-227): gắn tên miền với nút; cấu hình kết nối đối tác theo nhóm `connection` với
+      tên thống nhất (D-297)
 
 ## 34. Tổ chức, quyền theo độ sâu, danh tính (D-185)
 

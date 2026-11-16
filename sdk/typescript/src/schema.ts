@@ -2532,6 +2532,11 @@ export type Data_TenantDomain = {
     id: string;
     /** Last time the DNS record was looked up. */
     last_checked_at?: string | null;
+    /**
+     * Node of the tenant's organization tree the domain belongs to (e.g. one store's own
+     * site); `null`: the tenant as a whole. Set it with `PATCH /domains/{id}`.
+     */
+    org_id?: string | null;
     /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
     record: TenantDomainRecord;
     /**
@@ -2612,9 +2617,17 @@ export type Data_TenantSettingState = {
   /** A setting the installed modules take per tenant, and its state in the current tenant. */
   data: {
     description: string;
+    /**
+     * Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
+     * partner service (mail server, AI provider, payment gateway…). `null`: no group.
+     */
+    group?: string | null;
     /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
     is_set: boolean;
-    /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+    /**
+     * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
+     * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
+     */
     name: string;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
     secret: boolean;
@@ -2983,9 +2996,17 @@ export type Data_Vec_ScheduleResponse = {
 export type Data_Vec_TenantSettingState = {
   data: {
     description: string;
+    /**
+     * Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
+     * partner service (mail server, AI provider, payment gateway…). `null`: no group.
+     */
+    group?: string | null;
     /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
     is_set: boolean;
-    /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+    /**
+     * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
+     * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
+     */
     name: string;
     /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
     secret: boolean;
@@ -5055,6 +5076,11 @@ export type Page_TenantDomain = {
     id: string;
     /** Last time the DNS record was looked up. */
     last_checked_at?: string | null;
+    /**
+     * Node of the tenant's organization tree the domain belongs to (e.g. one store's own
+     * site); `null`: the tenant as a whole. Set it with `PATCH /domains/{id}`.
+     */
+    org_id?: string | null;
     /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
     record: TenantDomainRecord;
     /**
@@ -6416,6 +6442,11 @@ export type TenantDomain = {
   id: string;
   /** Last time the DNS record was looked up. */
   last_checked_at?: string | null;
+  /**
+   * Node of the tenant's organization tree the domain belongs to (e.g. one store's own
+   * site); `null`: the tenant as a whole. Set it with `PATCH /domains/{id}`.
+   */
+  org_id?: string | null;
   /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
   record: TenantDomainRecord;
   /**
@@ -6427,6 +6458,15 @@ export type TenantDomain = {
   /** When the status last changed; a `pending` domain fails 7 days after it. */
   updated_at: string;
   verified_at?: string | null;
+};
+
+/** Where a domain belongs in the tenant's organization tree. */
+export type TenantDomainChanges = {
+  /**
+   * Id of a node of the tenant's organization tree (e.g. one store, for its own site), or
+   * `null` for the tenant as a whole. Required: send `null` explicitly to detach.
+   */
+  org_id: string | null;
 };
 
 /** The DNS record that proves the tenant owns the domain. */
@@ -6535,9 +6575,17 @@ export type TenantMoveRequest = {
 /** A setting the installed modules take per tenant, and its state in the current tenant. */
 export type TenantSettingState = {
   description: string;
+  /**
+   * Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
+   * partner service (mail server, AI provider, payment gateway…). `null`: no group.
+   */
+  group?: string | null;
   /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
   is_set: boolean;
-  /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+  /**
+   * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
+   * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
+   */
   name: string;
   /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
   secret: boolean;
@@ -9176,6 +9224,20 @@ export interface paths {
     };
   };
   "/api/v1/kernel/domains/{id}": {
+    /** Attach a domain to a node of the organization tree. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TenantDomainChanges;
+      responses: {
+        200: Data_TenantDomain;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
     /** Remove a domain from this tenant. */
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
@@ -9241,7 +9303,7 @@ export interface paths {
   "/api/v1/kernel/settings": {
     /** List this tenant's settings. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { group?: string }; };
       responses: {
         200: Data_Vec_TenantSettingState;
         401: Problem;
@@ -9374,7 +9436,7 @@ export interface paths {
   "/api/v1/kernel/tenants/{id}/settings": {
     /** List a tenant's settings (platform staff). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { group?: string }; };
       responses: {
         200: Data_Vec_TenantSettingState;
         401: Problem;

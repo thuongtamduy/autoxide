@@ -1,15 +1,18 @@
 //! Tên miền riêng của khách (bước 33 C1, D-190): thêm → bản ghi TXT phải đặt; xác minh bằng DNS giả;
 //! `GET /domains/allowed` cho Caddy; tên miền sai / của khách khác; thu hồi; request theo `Host`;
-//! job `kernel.verify_domains`; khách khác không đụng được tên miền của mình. Chạy trên cả SQLite và
+//! job `kernel.verify_domains`; khách khác không đụng được tên miền của mình; gắn tên miền với một
+//! nút của cây tổ chức (`PATCH /domains/{id}`, đối chiếu thiết kế đợt 2). Chạy trên cả SQLite và
 //! Postgres.
 
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use std::sync::Arc;
+
 use autoxide_kernel::error::Error;
-use autoxide_kernel::module::Module;
+use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::response::Data;
-use autoxide_kernel::tenancy::{TenantContext, TenantDomains};
+use autoxide_kernel::tenancy::{OrgId, OrgNodes, TenantContext, TenantDomains};
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::StatusCode;
 use sea_orm::ConnectionTrait;
@@ -17,6 +20,7 @@ use sea_orm::sea_query::{Alias, Expr, Query};
 use serde_json::{Value, json};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
+use uuid::Uuid;
 
 const MANAGE: &str = "kernel.domains.manage";
 
@@ -524,6 +528,216 @@ async fn che_do_mot_khach_khong_nhan_ten_mien() {
             "{body}"
         );
         assert_eq!(allowed(&app, "shop.test").await, StatusCode::NOT_FOUND);
+    })
+    .await
+    .unwrap();
+}
+
+/// Cây tổ chức giả: mỗi khách (theo slug) có đúng một nút.
+struct Orgs(Vec<(&'static str, Uuid)>);
+
+#[async_trait::async_trait]
+impl OrgNodes for Orgs {
+    async fn has_node(&self, tenant: &TenantContext, org: OrgId) -> Result<bool, Error> {
+        Ok(self.0.iter().any(|(slug, id)| *slug == tenant.slug() && *id == org.as_uuid()))
+    }
+}
+
+/// Module thử công bố cây tổ chức giả, như module `organizations` của bước 34 sẽ làm.
+struct OrgsModule(Vec<(&'static str, Uuid)>);
+
+impl Module for OrgsModule {
+    fn name(&self) -> &'static str {
+        "orgs"
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        context.provide::<dyn OrgNodes>(Arc::new(Orgs(self.0.clone())))
+    }
+}
+
+/// Payload các event `kernel.domain_updated` của khách `tenant`, theo thứ tự ghi.
+async fn updates(tenant: &TenantContext) -> Vec<Value> {
+    use sea_orm::sea_query::ExprTrait as _;
+    let select = Query::select()
+        .column(Alias::new("payload"))
+        .from(Alias::new("kernel_events"))
+        .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
+        .and_where(Expr::col(Alias::new("name")).eq("kernel.domain_updated"))
+        .order_by(Alias::new("id"), sea_orm::sea_query::Order::Asc)
+        .to_owned();
+    let rows = tenant.database().read().query_all(&select).await.unwrap();
+    rows.iter()
+        .map(|row| serde_json::from_str(&row.try_get::<String>("", "payload").unwrap()).unwrap())
+        .collect()
+}
+
+async fn attach(app: &TestApp, token: &str, id: &str, body: Value) -> (StatusCode, Value) {
+    let answer = app
+        .patch(&format!("/api/v1/kernel/domains/{id}"))
+        .token(token)
+        .json(body)
+        .send()
+        .await
+        .unwrap();
+    (answer.status(), answer.json())
+}
+
+#[tokio::test]
+async fn gan_ten_mien_voi_nut_cua_khach() {
+    TestDatabase::run(async |test| {
+        let (store_a, store_b) = (Uuid::now_v7(), Uuid::now_v7());
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant("b")
+            .user_in("a", "admin-a", 1, &[MANAGE])
+            .user_in("b", "admin-b", 2, &[MANAGE])
+            .user_in("a", "reader-a", 3, &[])
+            .module(OrgsModule(vec![("a", store_a), ("b", store_b)]))
+            .build()
+            .await
+            .unwrap();
+        let (_, added) = add(&app, "admin-a", "store-a.test").await;
+        let id = added["data"]["id"].as_str().unwrap().to_owned();
+        assert!(added["data"]["org_id"].is_null(), "{added}");
+
+        // Gắn với nút của khách: trả `org_id`, không đổi trạng thái hay token.
+        let (status, body) = attach(&app, "admin-a", &id, json!({"org_id": store_a})).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["data"]["org_id"], json!(store_a));
+        assert_eq!(body["data"]["status"], "pending");
+        assert_eq!(body["data"]["record"], added["data"]["record"]);
+        assert_eq!(body["data"]["updated_at"], added["data"]["updated_at"]);
+        let a = app.tenant("a").await.unwrap();
+        assert_eq!(events(&a).await, ["kernel.domain_added", "kernel.domain_updated"]);
+        // Gửi lại đúng giá trị: không đổi gì, không thêm event.
+        let (status, _) = attach(&app, "admin-a", &id, json!({"org_id": store_a})).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(events(&a).await.len(), 2);
+        // Danh sách cũng mang `org_id`.
+        let list = app.get("/api/v1/kernel/domains").token("admin-a").send().await.unwrap();
+        assert_eq!(list.json()["data"][0]["org_id"], json!(store_a));
+
+        // Nút của khách khác, nút không có: 422 ở ô `org_id`, không đổi gì.
+        for other in [store_b, Uuid::now_v7()] {
+            let (status, body) = attach(&app, "admin-a", &id, json!({"org_id": other})).await;
+            assert_eq!(
+                (status, body["code"].as_str(), body["errors"][0]["field"].as_str()),
+                (StatusCode::UNPROCESSABLE_ENTITY, Some("validation_failed"), Some("org_id")),
+                "{body}"
+            );
+            assert_eq!(body["errors"][0]["code"], "not_found", "{body}");
+        }
+        // Thiếu `org_id` (phải gửi `null` rõ ràng), sai kiểu, thừa trường: 422.
+        for bad in [json!({}), json!({"org_id": "store"}), json!({"org_id": null, "status": "x"})] {
+            let (status, body) = attach(&app, "admin-a", &id, bad.clone()).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{bad}: {body}");
+        }
+        // Khách khác không đụng được; thiếu permission: 403; không có: 404.
+        let (status, body) = attach(&app, "admin-b", &id, json!({"org_id": store_b})).await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("tenant_domain_not_found")),
+            "{body}"
+        );
+        let (status, body) = attach(&app, "reader-a", &id, json!({"org_id": null})).await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("permission_denied"))
+        );
+        let missing = Uuid::now_v7().to_string();
+        let (status, _) = attach(&app, "admin-a", &missing, json!({"org_id": null})).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let list = app.get("/api/v1/kernel/domains").token("admin-a").send().await.unwrap();
+        assert_eq!(list.json()["data"][0]["org_id"], json!(store_a));
+
+        // Xác minh xong vẫn giữ nút; gỡ bằng `null`.
+        let record = &added["data"]["record"];
+        app.dns().set_txt(record["name"].as_str().unwrap(), &[record["value"].as_str().unwrap()]);
+        let (_, verified) = verify(&app, "admin-a", &id).await;
+        assert_eq!(
+            (&verified["data"]["status"], &verified["data"]["org_id"]),
+            (&json!("verified"), &json!(store_a))
+        );
+        let (status, body) = attach(&app, "admin-a", &id, json!({"org_id": null})).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert!(body["data"]["org_id"].is_null());
+        assert_eq!(body["data"]["status"], "verified");
+        assert_eq!(
+            events(&a).await,
+            [
+                "kernel.domain_added",
+                "kernel.domain_updated",
+                "kernel.domain_verified",
+                "kernel.domain_updated"
+            ]
+        );
+        // Event mang nút mới và nút cũ.
+        let payloads = updates(&a).await;
+        assert_eq!(
+            (&payloads[0]["org_id"], &payloads[0]["previous_org_id"]),
+            (&json!(store_a), &Value::Null)
+        );
+        assert_eq!(
+            (&payloads[1]["org_id"], &payloads[1]["previous_org_id"]),
+            (&Value::Null, &json!(store_a))
+        );
+
+        // Tool MCP dùng chung service.
+        let client = app.mcp("admin-a").await.unwrap();
+        let updated = client
+            .call_tool(tool("kernel.update_domain", json!({"id": id, "org_id": store_a})))
+            .await
+            .unwrap();
+        assert_eq!(updated.structured_content.unwrap()["data"]["org_id"], json!(store_a));
+        let denied = client
+            .call_tool(tool("kernel.update_domain", json!({"id": id, "org_id": store_b})))
+            .await
+            .unwrap();
+        assert_eq!(denied.is_error, Some(true));
+        client.cancel().await.unwrap();
+
+        // Đã thu hồi: 409, kể cả khi gửi `null`. Thêm lại tên miền thì bắt đầu không gắn nút nào.
+        let gone = app
+            .delete(&format!("/api/v1/kernel/domains/{id}"))
+            .token("admin-a")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(gone.status(), StatusCode::NO_CONTENT);
+        for body in [json!({"org_id": null}), json!({"org_id": store_a})] {
+            let (status, answer) = attach(&app, "admin-a", &id, body).await;
+            assert_eq!(
+                (status, answer["code"].as_str()),
+                (StatusCode::CONFLICT, Some("tenant_domain_revoked")),
+                "{answer}"
+            );
+        }
+        let (_, again) = add(&app, "admin-a", "store-a.test").await;
+        assert!(again["data"]["org_id"].is_null(), "{again}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn chua_co_cay_to_chuc_thi_chi_nhan_null() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let (_, added) = add(&app, "admin-a", "plain-a.test").await;
+        let id = added["data"]["id"].as_str().unwrap().to_owned();
+        let (status, body) = attach(&app, "admin-a", &id, json!({"org_id": Uuid::now_v7()})).await;
+        assert_eq!(
+            (status, body["errors"][0]["field"].as_str(), body["errors"][0]["code"].as_str()),
+            (StatusCode::UNPROCESSABLE_ENTITY, Some("org_id"), Some("unsupported")),
+            "{body}"
+        );
+        assert!(body["errors"][0]["detail"].as_str().unwrap().contains("send `null`"), "{body}");
+        let (status, body) = attach(&app, "admin-a", &id, json!({"org_id": null})).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert!(body["data"]["org_id"].is_null());
+        let a = app.tenant("a").await.unwrap();
+        assert_eq!(events(&a).await, ["kernel.domain_added"], "nothing changed, no event");
     })
     .await
     .unwrap();

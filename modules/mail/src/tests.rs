@@ -296,8 +296,9 @@ async fn smtp_va_nguoi_gui_rieng_cua_khach() {
             .build()
             .await
             .unwrap();
+        // Tên theo quy ước kết nối đối tác; tên cũ (`mail.from`) vẫn được nhận.
         for (name, value) in [
-            ("mail.smtp_url", format!("smtp://127.0.0.1:{port}")),
+            ("mail.connection.smtp.url", format!("smtp://127.0.0.1:{port}")),
             ("mail.from", "Shop <hello@shop.example>".to_owned()),
         ] {
             let answer = app
@@ -310,6 +311,24 @@ async fn smtp_va_nguoi_gui_rieng_cua_khach() {
             assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
             assert!(!answer.text().contains("127.0.0.1"), "a secret is never answered");
         }
+        // Màn "Kết nối đối tác": cả hai nằm trong nhóm `connection`, dưới tên mới.
+        let listed = app
+            .get("/api/v1/kernel/settings?group=connection")
+            .token("owner")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        let listed: Vec<(&str, bool, bool)> = listed["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| (s["name"].as_str().unwrap(), s["secret"] == true, s["is_set"] == true))
+            .collect();
+        assert_eq!(
+            listed,
+            [("mail.connection.smtp.from", false, true), ("mail.connection.smtp.url", true, true)]
+        );
         let mailer = app.modules().api::<dyn Mailer>().unwrap();
         let shop = app.tenant("shop").await.unwrap();
         mailer.send(&shop, welcome("ada@example.com")).await.unwrap();

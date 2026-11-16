@@ -7230,3 +7230,31 @@ app đã chạy cho C1, C2. Gate đầy đủ vẫn chạy tiếp; đỏ thì s�
 
 Chưa làm: test ở `auth` khẳng định đăng nhập chạy khi khách chỉ đọc (cơ chế miễn đã có test ở kernel bằng route giả);
 lọc mới cho tool `list_tenants`; `kernel.public_url` theo khách trong client-config.
+
+## D-297 · Đối chiếu đợt 2 của bước 33: gắn tên miền với nút; nhóm `connection` và đổi tên setting bằng tên cũ — 2026-11-16 — agent quyết
+
+1. **Gắn tên miền với nút.** `PATCH /api/v1/kernel/domains/{id}` với `{"org_id": <uuid> | null}` (`kernel.domains.manage`;
+   thiếu `org_id` → 422, muốn gỡ phải gửi `null`), tool `kernel.update_domain`, event `kernel.domain_updated`
+   (`org_id`, `previous_org_id`). Kernel hỏi "nút có thuộc khách không" qua trait hẹp `tenancy::OrgNodes::has_node`, lấy
+   muộn sau khi mọi module khởi động; module `organizations` (bước 34) công bố nó cạnh `OrgDirectory` của mình. Không
+   đặt tên `OrgDirectory` trong kernel: đặc tả 34 đã dùng tên đó cho trait của module. Chưa ai công bố thì chỉ nhận
+   `null` (422 ô `org_id`, mã `unsupported`); nút lạ hay của khách khác: 422 `not_found`. Tên miền đã thu hồi → 409
+   `tenant_domain_revoked` — lệch đặc tả (ghi `kernel.domain_revoked`): mã lỗi kernel không mang tiền tố, cùng họ
+   `tenant_domain_*` của D-291, và tên kia đã là event. Gắn nút không đổi trạng thái hay hạn xác minh; gắn lại đúng giá
+   trị đang có thì không ghi event. Hai lệnh gắn cùng lúc: lệnh ghi sau thắng.
+2. **Nhóm setting.** `TenantSetting::group(…)`; nhóm `connection` (`CONNECTION_GROUP`) là kết nối tới đối tác. Tên setting
+   được nhiều đoạn nối bằng `.`; nhóm `connection` buộc tên `<module>.connection.<loại>.<trường>` và ngược lại tên dạng
+   đó buộc khai nhóm (kiểm lúc khởi động). `GET /kernel/settings?group=`, bản của nhân sự nền tảng và tool
+   `kernel.list_settings` lọc theo nhóm (nhóm lạ: danh sách rỗng); response có `group`.
+3. **Đổi tên** (thay tên ở D-274, D-275): `mail.smtp_url` → `mail.connection.smtp.url`, `mail.from` →
+   `mail.connection.smtp.from`, `ai.api_key` → `ai.connection.text.api_key`, `ai.model` → `ai.connection.text.model`.
+   `from` / `model` vào nhóm vì đi kèm tài khoản đối tác; loại `text` vì khoá của khách chỉ áp cho sinh chữ (embedding
+   sau này là `ai.connection.embedding.…`).
+4. **Tên cũ là alias, không upgrade dữ liệu.** `TenantSetting::formerly(<tên cũ>)`: đọc dòng tên mới trước rồi tới dòng
+   tên cũ; `PUT` / `DELETE` nhận cả hai tên, response và event mang tên mới; `PUT` ghi tên mới và xoá dòng tên cũ trong
+   cùng transaction. Lý do: tên setting nằm trong AAD của Sealer nên đổi tên dòng secret phải mã hoá lại; bảng thuộc
+   kernel, module không được đụng; upgrade phải chạy trên mọi placement. Alias mở secret bằng đúng tên đã lưu và không
+   phá client đang dùng tên cũ. Chấp nhận: dòng tên cũ nằm lại tới lần đặt kế; quay về binary cũ thì giá trị đã ghi dưới
+   tên mới không được đọc. Alias chưa có ngày hết hạn — bỏ tên cũ cần một quyết định riêng.
+
+Chưa làm: `POST /kernel/settings/{name}/test` (thuộc bước 51); bản giả `OrgNodes` trong testkit (bước 34 có bản thật).

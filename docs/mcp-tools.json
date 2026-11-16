@@ -2513,10 +2513,20 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the settings of the current tenant: every setting the installed modules take per tenant, whether it is set, and its value unless it is secret.",
+      "description": "List the settings of the current tenant: every setting the installed modules take per tenant, whether it is set, and its value unless it is secret. `group: \"connection\"` lists only the connections to partner services (mail server, AI provider…).",
       "input_schema": {
         "additionalProperties": false,
-        "description": "The tool takes no arguments.",
+        "description": "Which settings to list.",
+        "properties": {
+          "group": {
+            "description": "Only settings of this group, e.g. `connection` (connections to partner services). Omit\nfor every setting.",
+            "example": "connection",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "name": "kernel.list_settings",
@@ -2612,6 +2622,45 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.move"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Attach one of the current tenant's domains to a node of its organization tree (`org_id`, e.g. a store with its own site), or to the tenant as a whole (`org_id: null`). Status and verification are not affected.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which domain, and the node of the organization tree it belongs to.",
+        "properties": {
+          "id": {
+            "description": "Id of the domain, from `kernel.list_domains` or `kernel.add_domain`.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Id of a node of the tenant's organization tree, or `null` for the tenant as a whole.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "org_id"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.update_domain",
+      "output_schema": null,
+      "permissions": [
+        "kernel.domains.manage"
       ]
     },
     {

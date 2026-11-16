@@ -448,7 +448,10 @@ async fn khoa_mo_hinh_va_han_muc_theo_khach() {
             .build()
             .await
             .unwrap();
-        for (name, value) in [("ai.api_key", "shop-key"), ("ai.model", "shop-model")] {
+        // Tên theo quy ước kết nối đối tác; tên cũ (`ai.api_key`) vẫn được nhận.
+        for (name, value) in
+            [("ai.api_key", "shop-key"), ("ai.connection.text.model", "shop-model")]
+        {
             let answer = app
                 .request(axum::http::Method::PUT, &format!("/api/v1/kernel/settings/{name}"))
                 .token("owner")
@@ -457,6 +460,9 @@ async fn khoa_mo_hinh_va_han_muc_theo_khach() {
                 .await
                 .unwrap();
             assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+            assert_eq!(answer.json()["data"]["group"], "connection");
+            let name = answer.json()["data"]["name"].as_str().unwrap().to_owned();
+            assert!(name.starts_with("ai.connection.text."), "{name}");
         }
         let model = app.modules().api::<dyn TextModel>().unwrap();
         let shop = app.tenant("shop").await.unwrap();

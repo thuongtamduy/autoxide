@@ -350,8 +350,8 @@ tenant only:
 | Tenant setting | Replaces |
 | --- | --- |
 | `kernel.public_url` | `AUTOXIDE_HTTP_PUBLIC_URL` in links sent by mail |
-| `mail.smtp_url`, `mail.from` | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` |
-| `ai.api_key`, `ai.model` | the AI provider of the server |
+| `mail.connection.smtp.url`, `mail.connection.smtp.from` | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` |
+| `ai.connection.text.api_key`, `ai.connection.text.model` | the key and model of the server's AI provider (`AUTOXIDE_AI_API_KEY`, `AUTOXIDE_AI_MODEL`) |
 | `comments.banned_words`, `comments.suspect_words`, `comments.max_links`, `comments.guest_moderation`, `comments.user_moderation` | the same `AUTOXIDE_COMMENTS_…` settings ([comments](COMMENTS.md#per-tenant)) |
 | `forms.retention_days` | `AUTOXIDE_FORMS_RETENTION_DAYS` ([forms](FORMS.md#settings)) |
 | `content.locales`, `content.default_locale` | `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CONTENT_DEFAULT_LOCALE` ([content](CONTENT.md#languages)) |
@@ -364,6 +364,17 @@ value) with `DELETE`. Platform staff do the same for any tenant under
 `/api/v1/kernel/tenants/{id}/settings` (`kernel.tenants.read` to list, `kernel.tenants.manage` to
 change). Values are checked when they are set; secret ones are stored encrypted and never shown
 again. Other servers use a new value within `AUTOXIDE_TENANCY_CACHE_SECONDS`.
+
+Settings that connect a tenant to a partner service (its mail server, its AI provider account…)
+are in the group `connection` and are named `<module>.connection.<kind>.<field>`:
+`GET /api/v1/kernel/settings?group=connection` lists only those, which is what a "partner
+connections" screen needs. Every setting in the list carries its `group` (`null` when it has
+none).
+
+The connection settings of mail and AI were renamed to this pattern. Their former names
+(`mail.smtp_url`, `mail.from`, `ai.api_key`, `ai.model`) still work: a value a tenant set under a
+former name keeps applying, and `PUT` / `DELETE` accept the former name. The list shows the
+current names only.
 
 A tenant can be stopped in two ways, independent of each other:
 
@@ -417,6 +428,14 @@ platform's.
 The platform's own domain (the host of `AUTOXIDE_HTTP_PUBLIC_URL`), IP addresses and `localhost`
 are refused. A domain belongs to one tenant at a time: another tenant can claim it only after it
 was removed or failed.
+
+A domain can belong to one node of the tenant's organization tree — a store with its own site,
+for example: `PATCH /api/v1/kernel/domains/{id}` with `{"org_id": "<id of the node>"}` attaches
+it, `{"org_id": null}` detaches it (the domain then stands for the tenant as a whole). The node
+must be one of the tenant's own; while no installed module keeps an organization tree, only
+`null` is accepted. Attaching does not change the domain's status or its DNS record; a removed
+domain answers `409 tenant_domain_revoked`. Each change records the event
+`kernel.domain_updated`.
 
 **TLS certificates.** Let Caddy get a certificate when the first visitor of a domain arrives
 (on-demand TLS), after asking Autoxide whether the domain is allowed:

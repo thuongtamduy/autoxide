@@ -63,17 +63,18 @@ pub use registry::{
 pub use request::{TENANT_HEADER, TenantHint};
 pub use scope::{ScopeExt, TenantScoped};
 pub use settings::{
-    PUBLIC_URL, SETTINGS_MANAGE, SettingCheck, SettingValue, TenantSetting, TenantSettings,
-    parsed_setting,
+    CONNECTION_GROUP, PUBLIC_URL, SETTINGS_MANAGE, SettingCheck, SettingValue, TenantSetting,
+    TenantSettings, parsed_setting,
 };
 
 pub(crate) use config::read_setting;
 
 /// Chỗ module `kernel` nhận thứ của mọi module khi chúng đã khởi động (`Modules::start_in` điền):
-/// bộ gieo dữ liệu cho khách mới, bộ tra DNS, thứ việc dời khách cần.
+/// bộ gieo dữ liệu cho khách mới, bộ tra DNS, cây tổ chức, thứ việc dời khách cần.
 pub(crate) struct Slots {
     pub(crate) seeds: admin::Seeds,
     pub(crate) dns: domains::DnsSlot,
+    pub(crate) orgs: domains::OrgSlot,
     pub(crate) moves: moves::MoveSetup,
 }
 
@@ -106,7 +107,8 @@ impl From<TenantId> for Uuid {
     }
 }
 
-/// ID của một nút trong cây tổ chức của khách. Khai sẵn cho bước 34; chưa dùng.
+/// ID của một nút trong cây tổ chức của khách (bước 34). Tên miền gắn được với một nút (đối chiếu
+/// thiết kế đợt 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OrgId(Uuid);
@@ -119,6 +121,26 @@ impl OrgId {
     pub const fn as_uuid(&self) -> Uuid {
         self.0
     }
+}
+
+impl fmt::Display for OrgId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// Cây tổ chức của khách, nhìn từ kernel: chỉ hỏi "nút này có thuộc khách không". Module giữ cây
+/// tổ chức (bước 34) công bố `context.provide::<dyn OrgNodes>(…)` trong `Module::start`; chưa
+/// module nào công bố thì kernel coi như khách không có nút nào (vd tên miền chỉ gắn được `null`).
+///
+/// Tên khác `OrgDirectory` của module `organizations` (bước 34, hợp đồng đầy đủ của cây tổ chức
+/// cho module khác): đây là phần hẹp kernel cần, kernel không phụ thuộc module nào.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait OrgNodes: Send + Sync {
+    /// `org` là một nút (còn dùng được) trong cây tổ chức của khách `tenant`.
+    async fn has_node(&self, tenant: &TenantContext, org: OrgId) -> Result<bool, Error>;
 }
 
 /// ID của một placement (vị trí dữ liệu: một database).
@@ -539,6 +561,14 @@ pub mod errors {
         Error::not_found(
             "tenant_domain_not_found",
             "This domain is not one of the current tenant's domains.",
+        )
+    }
+
+    pub fn tenant_domain_revoked() -> Error {
+        Error::conflict(
+            "tenant_domain_revoked",
+            "This domain was removed from the tenant and cannot be changed. Add it again with \
+             `POST /api/v1/kernel/domains`.",
         )
     }
 

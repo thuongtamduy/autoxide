@@ -49,7 +49,11 @@ impl TenantSettings for FakeTenantSettings {
         setting: &TenantSetting,
     ) -> Result<Option<SettingValue>, Error> {
         let values = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        Ok(values.get(&(tenant.id(), setting.name().to_owned())).map(SettingValue::new))
+        // Như kernel: tên hiện tại trước, không có thì tên cũ của cấu hình đã đổi tên.
+        let value = std::iter::once(setting.name())
+            .chain(setting.former_name())
+            .find_map(|name| values.get(&(tenant.id(), name.to_owned())));
+        Ok(value.map(SettingValue::new))
     }
 }
 
