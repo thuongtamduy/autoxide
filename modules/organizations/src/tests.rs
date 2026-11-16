@@ -9,8 +9,9 @@ use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-const ALL: [&str; 4] = [
+const ALL: [&str; 5] = [
     "organizations.units.read",
+    "organizations.settings.write",
     "organizations.units.write",
     "organizations.units.manage",
     "organizations.types.manage",
@@ -594,3 +595,5 @@ async fn khong_ro_ri_giua_khach() {
     .await
     .unwrap();
 }
+
+mod settings;

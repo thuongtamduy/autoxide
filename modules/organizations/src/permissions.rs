@@ -29,6 +29,13 @@ pub(crate) const TYPES_MANAGE: Permission = Permission::new(
     "Create, rename and delete the unit types of the tenant (store, warehouse, region…).",
 );
 
+pub(crate) const SETTINGS_WRITE: Permission = Permission::new(
+    "organizations.settings.write",
+    "Set and clear the settings of the organization units in your scope (time zone, currency, \
+     language…); units below inherit them unless they set their own.",
+)
+.scoped();
+
 pub(crate) fn all() -> Vec<Permission> {
-    vec![UNITS_READ, UNITS_WRITE, UNITS_MANAGE, TYPES_MANAGE]
+    vec![UNITS_READ, UNITS_WRITE, UNITS_MANAGE, TYPES_MANAGE, SETTINGS_WRITE]
 }

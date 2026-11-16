@@ -199,8 +199,16 @@ has the id of the tenant. `modules/notes` is the full example.
 - **Creating.** The caller names the unit (`org_id`); outside their scope it is `403
   org_out_of_scope`. When they omit it, pick their only unit (or the root when their scope is the
   whole tenant) and ask them to choose when they work in several.
-- **Settings that units inherit** (time zone, prices…): read the unit's chain with
-  `OrgTree::ancestors` (nearest first) and take the nearest value with `tenancy::nearest`.
+- **Settings that units inherit** (time zone, currency, language, a module's policy): declare
+  them in `Module::org_settings` — `OrgSetting::new("shop.return_days", "…").with_default("30")
+  .checked(check)`, key prefixed with the module, default and check in JSON. The `organizations`
+  module stores the values (`PUT /api/v1/organizations/units/{id}/settings/{key}`, permission
+  `organizations.settings.write`) and answers the value in force at a unit — the nearest unit up
+  the chain that sets it, else the default — through `OrgDirectory::setting(tenant, unit, key)`.
+  Do not keep a copy of these values in your own tables.
+- **Your own data that units override** (a price set by the chain, changed by one store): keep a
+  row per unit that sets it, read the unit's chain with `OrgTree::ancestors` (nearest first) and
+  take the nearest value with `tenancy::nearest` — one query for the chain, one for the rows.
 - **Branch leak test.** Give two people `subtree` scopes on sibling units with
   `TestApp::builder(…).member(token, user, org, &[("notes.read", Scope::Subtree)])`, build the tree
   with `OrgTree`, write data in one branch, and check the other sees nothing:

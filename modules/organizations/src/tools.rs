@@ -14,7 +14,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::http::{CreateUnitRequest, UnitResponse};
-use crate::permissions::{UNITS_MANAGE, UNITS_READ, UNITS_WRITE};
+use crate::permissions::{SETTINGS_WRITE, UNITS_MANAGE, UNITS_READ, UNITS_WRITE};
 use crate::service::{OrgService, UnitChanges, UnitFilter};
 
 /// Which units to list.
@@ -79,7 +79,60 @@ pub(crate) struct UnitStatusInput {
     reason: Option<String>,
 }
 
+/// A setting to change at a unit.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SetSettingInput {
+    /// Id of the unit.
+    id: Uuid,
+    /// Key of the setting, e.g. `organizations.timezone` (see `get_settings`).
+    key: String,
+    /// The new value; omit or `null` to clear it so the unit inherits again.
+    value: Option<serde_json::Value>,
+}
+
 pub(crate) fn all(service: &Arc<OrgService>) -> Vec<Tool> {
+    let (settings, set_setting) = (service.clone(), service.clone());
+    let mut tools = units(service);
+    tools.push(
+        Tool::new(
+            "get_settings",
+            "Get the settings in force at an organization unit (time zone, currency, language…) and \
+             where each value comes from: the unit, a unit above, or the default.",
+            move |tenant: TenantContext, principal: Principal, input: UnitId| {
+                let service = settings.clone();
+                async move {
+                    let found = service.effective_settings(&tenant, &principal, input.id).await?;
+                    let found: Vec<crate::http::UnitSettingResponse> =
+                        found.into_iter().map(Into::into).collect();
+                    Ok::<_, Error>(found)
+                }
+            },
+        )
+        .requires(UNITS_READ)
+        .read_only(),
+    );
+    tools.push(
+        Tool::new(
+            "set_setting",
+            "Set a setting of an organization unit (units below follow unless they set their own), or \
+             clear it with `value` null so the unit inherits again.",
+            move |tenant: TenantContext, principal: Principal, input: SetSettingInput| {
+                let service = set_setting.clone();
+                async move {
+                    let value = input.value.filter(|value| !value.is_null());
+                    let found =
+                        service.set_setting(&tenant, &principal, input.id, &input.key, value).await?;
+                    Ok::<_, Error>(crate::http::UnitSettingResponse::from(found))
+                }
+            },
+        )
+        .requires(SETTINGS_WRITE),
+    );
+    tools
+}
+
+fn units(service: &Arc<OrgService>) -> Vec<Tool> {
     let (list, get, create, update, relocate, status) = (
         service.clone(),
         service.clone(),

@@ -7500,3 +7500,31 @@ theo website thay vì cả khách (hiện hai cửa hàng không cùng có `/abo
 Đã cân nhắc: cờ "chia sẻ xuống" trên từng bài — thêm một khái niệm mà đặt bài ở nút cha đã làm được; kiểm phạm vi trong
 mọi hàm của `content` bằng transaction ghi — đổi thứ tự khoá của hàng chục lệnh; tra website trong handler — handler
 không được truy vấn database (luật kiến trúc 5), extractor của kernel giải một lần cho mọi module.
+
+## D-306 · Cài đặt kế thừa theo cây tổ chức (bước 34 mục 4) — 2026-11-16 — agent quyết
+
+Bối cảnh: chuỗi đặt múi giờ, tiền tệ, ngôn ngữ một lần ở trụ sở; một cửa hàng ở nước khác đổi riêng.
+Module nghiệp vụ sau này (thuế, đổi trả, giờ giao hàng) cần cùng cách mà không mỗi module tự làm.
+
+Quyết định:
+
+1. **Kernel giữ danh mục, `organizations` giữ giá trị.** Module khai cài đặt qua `Module::org_settings`
+   (`OrgSetting`: key `<module>.<tên>`, mô tả tiếng Anh, mặc định JSON tuỳ chọn, hàm kiểm trả giá trị đã chuẩn
+   hoá); kernel gom thành `OrgSettingCatalog` lúc khởi động, báo trùng key hay sai tiền tố một lần. Giá trị lưu ở
+   bảng `organizations_settings` (khách, nút, key → JSON dạng text, chạy giống nhau trên SQLite và Postgres).
+2. **Giá trị hiệu lực** ở nút N = giá trị của nút gần nhất trên chuỗi tổ tiên (gồm N) có đặt, không có thì mặc
+   định; trả kèm `source_unit_id` và `inherited`. Hai câu đọc: chuỗi tổ tiên, các dòng trên chuỗi.
+3. **Ghi** cần `organizations.settings.write` (theo nút) phủ nút, trong transaction ghi (nút khoá → `org_frozen`);
+   đọc cần `organizations.units.read`. Giá trị sai → 422 `organizations.setting_invalid` (kèm lý do), key lạ → 404
+   `organizations.setting_unknown`. Xoá = kế thừa lại. Mỗi lần đổi ghi event `organizations.setting_changed`.
+4. **Module khác đọc** qua `OrgDirectory::setting(tenant, nút, key)`, không chép giá trị vào bảng của mình.
+   Dữ liệu riêng mà nút ghi đè (giá…) giữ ở bảng của module, đọc bằng `OrgTree::ancestors` + `tenancy::nearest`
+   (MODULE_GUIDE).
+5. Ba cài đặt đầu: `organizations.timezone` (IANA, mặc định `UTC`, kiểm bằng `chrono-tz` — thêm thư viện vì danh
+   sách múi giờ đổi theo bản phát hành của IANA, tự giữ là sai dần), `organizations.currency` (ISO 4217, không mặc
+   định), `organizations.language` (`en`, `vi`, mặc định `en`). Hồ sơ thuế và chính sách là cài đặt của module
+   thuế / thương mại khi chúng có (bước 35+), khai cùng cách.
+
+Đã cân nhắc: một cột JSON "settings" trên bảng nút — không kiểm được từng key, không biết ai đổi gì; bảng cài đặt
+riêng ở mỗi module — lặp lại cách kế thừa ở mọi module; tính sẵn giá trị hiệu lực cho mọi nút con — phải tính lại
+khi dời nút hay đổi ở nút cha, trong khi đọc chuỗi tổ tiên đã có index.

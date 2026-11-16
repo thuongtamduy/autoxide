@@ -19,6 +19,10 @@ pub(crate) const UNIT_STATUS_CHANGED: EventInfo = EventInfo::new(
     "organizations.unit_status_changed",
     "An organization unit was approved, suspended, archived or reactivated.",
 );
+pub(crate) const SETTING_CHANGED: EventInfo = EventInfo::new(
+    "organizations.setting_changed",
+    "A unit set or cleared a setting; units below that do not set it themselves follow.",
+);
 pub(crate) const UNIT_TYPE_CHANGED: EventInfo = EventInfo::new(
     "organizations.unit_type_changed",
     "A unit type was created, renamed or deleted.",
@@ -50,9 +54,17 @@ event!(UnitUpdated, "organizations.unit_updated");
 event!(UnitMoved, "organizations.unit_moved");
 event!(UnitStatusChanged, "organizations.unit_status_changed");
 event!(UnitTypeChanged, "organizations.unit_type_changed");
+event!(SettingChanged, "organizations.setting_changed");
 
 pub(crate) fn all() -> Vec<EventInfo> {
-    vec![UNIT_CREATED, UNIT_UPDATED, UNIT_MOVED, UNIT_STATUS_CHANGED, UNIT_TYPE_CHANGED]
+    vec![
+        UNIT_CREATED,
+        UNIT_UPDATED,
+        UNIT_MOVED,
+        UNIT_STATUS_CHANGED,
+        UNIT_TYPE_CHANGED,
+        SETTING_CHANGED,
+    ]
 }
 
 pub(crate) fn unit_subject(id: uuid::Uuid) -> Option<String> {

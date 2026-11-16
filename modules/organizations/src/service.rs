@@ -76,13 +76,19 @@ pub(crate) struct NewUnitType {
 }
 
 pub(crate) struct OrgService {
-    outbox: Outbox,
+    pub(crate) outbox: Outbox,
     config: OrganizationsConfig,
+    /// Cài đặt theo nút mọi module đã khai (bước 34 mục 4).
+    pub(crate) catalog: autoxide_kernel::tenancy::OrgSettingCatalog,
 }
 
 impl OrgService {
-    pub(crate) fn new(outbox: Outbox, config: OrganizationsConfig) -> Self {
-        OrgService { outbox, config }
+    pub(crate) fn new(
+        outbox: Outbox,
+        config: OrganizationsConfig,
+        catalog: autoxide_kernel::tenancy::OrgSettingCatalog,
+    ) -> Self {
+        OrgService { outbox, config, catalog }
     }
 
     /// Nút gốc của khách; tạo (cùng loại `tenant`) nếu còn thiếu. Chạy lại được, kể cả hai lời gọi
@@ -626,6 +632,18 @@ impl OrgDirectory for OrgService {
         root: OrgId,
     ) -> Result<bool, Error> {
         OrgTree::is_within(tenant.database().read(), tenant.id(), id, &[root]).await
+    }
+
+    async fn setting(
+        &self,
+        tenant: &TenantContext,
+        id: OrgId,
+        key: &str,
+    ) -> Result<Option<crate::api::EffectiveSetting>, Error> {
+        if self.catalog.get(key).is_none() {
+            return Err(crate::settings::setting_unknown(key));
+        }
+        Ok(self.resolve_settings(tenant, id, Some(key)).await?.into_iter().next())
     }
 }
 

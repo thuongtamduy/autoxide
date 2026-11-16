@@ -194,8 +194,16 @@ họ), `subtree` (nút của họ và mọi nút bên dưới) hay `tenant` (m�
   org)`.
 - **Tạo mới.** Người gọi nêu nút (`org_id`); ngoài phạm vi là `403 org_out_of_scope`. Không nêu thì
   lấy nút duy nhất của họ (hay gốc khi phạm vi là toàn khách), và bắt họ chọn khi họ làm ở nhiều nút.
-- **Cài đặt kế thừa theo cây** (múi giờ, giá…): đọc chuỗi tổ tiên của nút bằng `OrgTree::ancestors`
-  (gần nhất trước) và lấy giá trị gần nhất bằng `tenancy::nearest`.
+- **Cài đặt kế thừa theo cây** (múi giờ, tiền tệ, ngôn ngữ, chính sách của module): khai trong
+  `Module::org_settings` — `OrgSetting::new("shop.return_days", "…").with_default("30")
+  .checked(check)`, key mang tiền tố của module, mặc định và hàm kiểm theo JSON. Module
+  `organizations` lưu giá trị (`PUT /api/v1/organizations/units/{id}/settings/{key}`, permission
+  `organizations.settings.write`) và trả giá trị hiệu lực ở một nút — nút gần nhất trên chuỗi có
+  đặt, không có thì mặc định — qua `OrgDirectory::setting(tenant, unit, key)`. Không chép các giá
+  trị này vào bảng của mình.
+- **Dữ liệu riêng mà nút ghi đè** (giá do chuỗi đặt, một cửa hàng đổi): giữ một dòng cho mỗi nút có
+  đặt, đọc chuỗi tổ tiên của nút bằng `OrgTree::ancestors` (gần nhất trước) và lấy giá trị gần nhất
+  bằng `tenancy::nearest` — một câu đọc chuỗi, một câu đọc các dòng.
 - **Bài rò rỉ giữa hai nhánh.** Cho hai người độ sâu `subtree` ở hai nút anh em bằng
   `TestApp::builder(…).member(token, user, org, &[("notes.read", Scope::Subtree)])`, dựng cây bằng
   `OrgTree`, ghi dữ liệu ở một nhánh, và kiểm nhánh kia không thấy gì:

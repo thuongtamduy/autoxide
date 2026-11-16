@@ -2800,6 +2800,21 @@ export type Data_UnitResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_UnitSettingResponse = {
+  /** The value of a setting at a unit. */
+  data: {
+    /** `true` when the value comes from a unit above or the default, not from this unit. */
+    inherited: boolean;
+    /** Key of the setting. */
+    key: string;
+    /** The unit that set this value (this unit or one above it); `null`: the default. */
+    source_unit_id?: string | null;
+    /** The value in force; `null` when nothing sets it and it has no default. */
+    value?: unknown;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_UnitTypeResponse = {
   /** A kind of unit the tenant uses, e.g. `store` or `warehouse`. */
   data: {
@@ -3106,6 +3121,18 @@ export type Data_Vec_ScheduleResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_SettingResponse = {
+  data: {
+    /** The value when no unit sets it; `null`: none. */
+    default?: unknown;
+    /** What it is for and which values it takes. */
+    description: string;
+    /** `<module>.<name>`, e.g. `organizations.timezone`. */
+    key: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_TenantSettingState = {
   data: {
     description: string;
@@ -3146,6 +3173,20 @@ export type Data_Vec_UnitResponse = {
     /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
     unit_type: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_UnitSettingResponse = {
+  data: {
+    /** `true` when the value comes from a unit above or the default, not from this unit. */
+    inherited: boolean;
+    /** Key of the setting. */
+    key: string;
+    /** The unit that set this value (this unit or one above it); `null`: the default. */
+    source_unit_id?: string | null;
+    /** The value in force; `null` when nothing sets it and it has no default. */
+    value?: unknown;
   }[];
 };
 
@@ -6358,6 +6399,22 @@ export type SetPasswordRequest = {
   password: string;
 };
 
+/** A setting that units can set and the units below them inherit. */
+export type SettingResponse = {
+  /** The value when no unit sets it; `null`: none. */
+  default?: unknown;
+  /** What it is for and which values it takes. */
+  description: string;
+  /** `<module>.<name>`, e.g. `organizations.timezone`. */
+  key: string;
+};
+
+/** A new value for a setting. */
+export type SettingValueRequest = {
+  /** The value, checked by the setting (see its description). */
+  value: unknown;
+};
+
 /** A website menu as saved. */
 export type SiteMenu = {
   created_at: string;
@@ -7041,6 +7098,18 @@ export type UnitResponse = {
   /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
   unit_type: string;
   updated_at: string;
+};
+
+/** The value of a setting at a unit. */
+export type UnitSettingResponse = {
+  /** `true` when the value comes from a unit above or the default, not from this unit. */
+  inherited: boolean;
+  /** Key of the setting. */
+  key: string;
+  /** The unit that set this value (this unit or one above it); `null`: the default. */
+  source_unit_id?: string | null;
+  /** The value in force; `null` when nothing sets it and it has no default. */
+  value?: unknown;
 };
 
 /** A new status for a unit. */
@@ -10783,6 +10852,17 @@ export interface paths {
       };
     };
   };
+  "/api/v1/organizations/settings": {
+    /** List the settings units can set. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_SettingResponse;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/organizations/unit-types": {
     /** List the unit types of the tenant. */
     get: {
@@ -10916,6 +10996,45 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/settings": {
+    /** Get the settings in force at an organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_UnitSettingResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/settings/{key}": {
+    /** Set a setting of an organization unit. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; key: string }; };
+      requestBody: SettingValueRequest;
+      responses: {
+        200: Data_UnitSettingResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Clear a setting of an organization unit, so it inherits again. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; key: string }; };
+      responses: {
+        200: Data_UnitSettingResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

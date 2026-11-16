@@ -20,7 +20,7 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::permissions::{TYPES_MANAGE, UNITS_MANAGE, UNITS_READ, UNITS_WRITE};
+use crate::permissions::{SETTINGS_WRITE, TYPES_MANAGE, UNITS_MANAGE, UNITS_READ, UNITS_WRITE};
 use crate::service::{
     NewUnit, NewUnitType, OrgService, UnitChanges, UnitFilter, UnitRow, UnitTypeRow,
 };
@@ -34,6 +34,9 @@ pub(crate) fn routes(service: Arc<OrgService>) -> OpenApiRouter {
         .routes(routes!(change_unit_status))
         .routes(routes!(list_unit_types, create_unit_type))
         .routes(routes!(update_unit_type, delete_unit_type))
+        .routes(routes!(list_settings))
+        .routes(routes!(get_unit_settings))
+        .routes(routes!(set_unit_setting, clear_unit_setting))
         .with_state(service)
 }
 
@@ -568,4 +571,172 @@ async fn delete_unit_type(
     principal.require(&TYPES_MANAGE)?;
     service.delete_type(&tenant, &principal, &code).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// A setting that units can set and the units below them inherit.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct SettingResponse {
+    /// `<module>.<name>`, e.g. `organizations.timezone`.
+    #[schema(example = "organizations.timezone")]
+    key: String,
+    /// What it is for and which values it takes.
+    description: String,
+    /// The value when no unit sets it; `null`: none.
+    default: Option<serde_json::Value>,
+}
+
+/// The value of a setting at a unit.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct UnitSettingResponse {
+    /// Key of the setting.
+    #[schema(example = "organizations.timezone")]
+    key: String,
+    /// The value in force; `null` when nothing sets it and it has no default.
+    #[schema(example = "Asia/Ho_Chi_Minh")]
+    value: Option<serde_json::Value>,
+    /// The unit that set this value (this unit or one above it); `null`: the default.
+    source_unit_id: Option<Uuid>,
+    /// `true` when the value comes from a unit above or the default, not from this unit.
+    inherited: bool,
+}
+
+impl From<crate::api::EffectiveSetting> for UnitSettingResponse {
+    fn from(setting: crate::api::EffectiveSetting) -> Self {
+        UnitSettingResponse {
+            key: setting.key,
+            value: setting.value,
+            source_unit_id: setting.source_unit_id.map(|org| org.as_uuid()),
+            inherited: setting.inherited,
+        }
+    }
+}
+
+/// A new value for a setting.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SettingValueRequest {
+    /// The value, checked by the setting (see its description).
+    #[schema(example = "Asia/Ho_Chi_Minh")]
+    value: serde_json::Value,
+}
+
+/// List the settings units can set.
+///
+/// Any signed-in user. Modules declare them; each unit inherits the value of the nearest unit
+/// above that sets it, or the default.
+#[utoipa::path(
+    get,
+    path = "/settings",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "list_org_settings",
+    security(("bearer" = [])),
+    responses(
+        (status = 200, description = "Every setting, sorted by key.", body = Data<Vec<SettingResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+    )
+)]
+async fn list_settings(
+    State(service): State<Arc<OrgService>>,
+    _principal: Principal,
+) -> Result<Data<Vec<SettingResponse>>, Error> {
+    let data = service
+        .catalog
+        .iter()
+        .map(|setting| SettingResponse {
+            key: setting.key().to_owned(),
+            description: setting.description().to_owned(),
+            default: setting.default_value(),
+        })
+        .collect();
+    Ok(Data { data })
+}
+
+/// Get the settings in force at an organization unit.
+///
+/// Requires `organizations.units.read` covering the unit. Each value says where it comes from:
+/// this unit, a unit above, or the default.
+#[utoipa::path(
+    get,
+    path = "/units/{id}/settings",
+    extensions(("x-permissions" = json!(["organizations.units.read"]))),
+    operation_id = "get_unit_settings",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the unit.")),
+    responses(
+        (status = 200, description = "Every setting at this unit, sorted by key.", body = Data<Vec<UnitSettingResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `organizations.units.read`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No such unit in your scope; code `organizations.unit_not_found`.", body = Problem),
+    )
+)]
+async fn get_unit_settings(
+    State(service): State<Arc<OrgService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Data<Vec<UnitSettingResponse>>, Error> {
+    principal.require(&UNITS_READ)?;
+    let found = service.effective_settings(&tenant, &principal, id).await?;
+    Ok(Data { data: found.into_iter().map(UnitSettingResponse::from).collect() })
+}
+
+/// Set a setting of an organization unit.
+///
+/// Requires `organizations.settings.write` covering the unit; the unit must be active. Units
+/// below it follow, unless they set their own value.
+#[utoipa::path(
+    put,
+    path = "/units/{id}/settings/{key}",
+    extensions(("x-permissions" = json!(["organizations.settings.write"]))),
+    operation_id = "set_unit_setting",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the unit."), ("key" = String, Path, description = "Key of the setting, e.g. `organizations.timezone`.")),
+    request_body = SettingValueRequest,
+    responses(
+        (status = 200, description = "The setting at this unit after the change.", body = Data<UnitSettingResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission (`permission_denied`), it does not cover this unit (`org_out_of_scope`), or the unit is not active (`org_frozen`).", body = Problem),
+        (status = 404, description = "No such unit in your scope (`organizations.unit_not_found`), or no such setting (`organizations.setting_unknown`).", body = Problem),
+        (status = 422, description = "The value is not accepted by the setting; code `organizations.setting_invalid`.", body = Problem),
+    )
+)]
+async fn set_unit_setting(
+    State(service): State<Arc<OrgService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path((id, key)): Path<(Uuid, String)>,
+    ValidJson(input): ValidJson<SettingValueRequest>,
+) -> Result<Data<UnitSettingResponse>, Error> {
+    principal.require(&SETTINGS_WRITE)?;
+    let setting = service.set_setting(&tenant, &principal, id, &key, Some(input.value)).await?;
+    Ok(Data { data: setting.into() })
+}
+
+/// Clear a setting of an organization unit, so it inherits again.
+///
+/// Requires `organizations.settings.write` covering the unit; the unit must be active. Clearing a
+/// setting the unit does not set changes nothing.
+#[utoipa::path(
+    delete,
+    path = "/units/{id}/settings/{key}",
+    extensions(("x-permissions" = json!(["organizations.settings.write"]))),
+    operation_id = "clear_unit_setting",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the unit."), ("key" = String, Path, description = "Key of the setting.")),
+    responses(
+        (status = 200, description = "The setting at this unit, now inherited.", body = Data<UnitSettingResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission (`permission_denied`), it does not cover this unit (`org_out_of_scope`), or the unit is not active (`org_frozen`).", body = Problem),
+        (status = 404, description = "No such unit in your scope (`organizations.unit_not_found`), or no such setting (`organizations.setting_unknown`).", body = Problem),
+    )
+)]
+async fn clear_unit_setting(
+    State(service): State<Arc<OrgService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path((id, key)): Path<(Uuid, String)>,
+) -> Result<Data<UnitSettingResponse>, Error> {
+    principal.require(&SETTINGS_WRITE)?;
+    let setting = service.set_setting(&tenant, &principal, id, &key, None).await?;
+    Ok(Data { data: setting.into() })
 }

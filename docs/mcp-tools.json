@@ -3956,6 +3956,36 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Get the settings in force at an organization unit (time zone, currency, language…) and where each value comes from: the unit, a unit above, or the default.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A unit to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the unit.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.get_settings",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Get one organization unit in your scope.",
       "input_schema": {
         "additionalProperties": false,
@@ -4086,6 +4116,44 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Set a setting of an organization unit (units below follow unless they set their own), or clear it with `value` null so the unit inherits again.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A setting to change at a unit.",
+        "properties": {
+          "id": {
+            "description": "Id of the unit.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "key": {
+            "description": "Key of the setting, e.g. `organizations.timezone` (see `get_settings`).",
+            "type": "string"
+          },
+          "value": {
+            "description": "The new value; omit or `null` to clear it so the unit inherits again."
+          }
+        },
+        "required": [
+          "id",
+          "key"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.set_setting",
+      "output_schema": null,
+      "permissions": [
+        "organizations.settings.write"
       ]
     },
     {

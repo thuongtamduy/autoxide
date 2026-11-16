@@ -2,6 +2,7 @@
 //! file mới và một dòng vào cuối [`all`].
 
 mod m0001_create_units;
+mod m0005_settings;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -15,5 +16,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0004_tenancy_events",
             vec![autoxide_kernel::event::tenant_table("organizations")],
         ),
+        // Cài đặt kế thừa theo cây (bước 34 mục 4).
+        Box::new(m0005_settings::Migration),
     ]
 }

@@ -95,6 +95,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Cài đặt kế thừa theo cây tổ chức của module (bước 34): tên `<module>.<tên>`, mặc định, bộ
+    /// kiểm. Module `organizations` lưu giá trị theo nút và phục vụ; nút không đặt thì dùng giá trị
+    /// của nút cấp trên gần nhất. Mặc định rỗng.
+    fn org_settings(&self) -> Vec<crate::tenancy::OrgSetting> {
+        Vec::new()
+    }
+
     /// Gieo dữ liệu ban đầu của module cho một khách mới (vd role `admin`, dòng khoá) — gọi sau
     /// `start`, khi tạo khách (`autoxide tenant create`, `POST /api/v1/kernel/tenants`). Phải chạy
     /// lại được. Mặc định không gieo gì.
@@ -239,6 +246,7 @@ pub struct StartContext<'a> {
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
+    org_settings: &'a crate::tenancy::OrgSettingCatalog,
 }
 
 impl StartContext<'_> {
@@ -247,6 +255,11 @@ impl StartContext<'_> {
     /// [`database`](Self::database).
     pub fn tenancy(&self) -> crate::tenancy::DatabaseRegistry {
         self.tenancy.clone()
+    }
+
+    /// Cài đặt theo nút mà mọi module đã khai (`Module::org_settings`), cho module lưu giá trị.
+    pub fn org_settings(&self) -> crate::tenancy::OrgSettingCatalog {
+        self.org_settings.clone()
     }
 
     /// Database của chương trình (database điều khiển: hai pool đọc / ghi). Cho chỗ thật sự của

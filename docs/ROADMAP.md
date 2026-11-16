@@ -5,8 +5,8 @@ và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi 
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–33 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 34 đang
-làm: mục 1–3 xong (cây tổ chức; quyền theo nút, membership; nội dung, media, form, menu theo nút và website); kế
-tiếp mục 4 (cài đặt kế thừa theo cây); mục 5–6 (`address`) chờ
+làm: mục 1–4 xong (cây tổ chức; quyền theo nút, membership; nội dung, media, form, menu theo nút và website; cài
+đặt kế thừa theo cây); kế tiếp ngôn ngữ bật theo website; mục 5–6 (`address`) chờ
 nguồn dữ liệu chính thức — trang danh mục hành chính của cơ quan thống kê không truy cập được từ máy làm việc**; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
@@ -81,8 +81,9 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       theo độ sâu; đọc công khai lọc theo website (tên miền → nút), menu và ngôn ngữ bật theo website; bộ lọc
       quản trị `owner_org`, `site`; `menus` cũng có `org_id`, `?site=` ở menu công khai và ngôn ngữ của website
       (D-238)
-- [ ] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu để module áp
-      cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè)
+- [x] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu để module áp
+      cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè) — D-306; hồ sơ thuế, chính sách là cài
+      đặt do module thuế / thương mại khai khi có
 - [ ] Ngôn ngữ bật theo website (D-305, cần cài đặt kế thừa ở mục trên): `content`, `menus` lấy danh sách ngôn ngữ của
       nút website thay cho cấu hình chung; đường dẫn công khai duy nhất theo website (hai cửa hàng cùng có `/about`);
       tìm theo ý nghĩa công khai lọc theo website

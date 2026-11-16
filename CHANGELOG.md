@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `organizations`: settings that units inherit down the tree. `GET /api/v1/organizations/settings`
+  lists them; `GET /api/v1/organizations/units/{id}/settings` gives the value in force at a unit and
+  where it comes from (the unit, a unit above, or the default); `PUT` and `DELETE
+  /api/v1/organizations/units/{id}/settings/{key}` set and clear one (new permission
+  `organizations.settings.write`, new event `organizations.setting_changed`; MCP tools
+  `organizations.get_settings`, `organizations.set_setting`). Three settings to start:
+  `organizations.timezone` (IANA, default `UTC`), `organizations.currency` (ISO 4217) and
+  `organizations.language` (`en`, `vi`; default `en`). For module authors: `Module::org_settings`
+  declares more, `OrgDirectory::setting` reads the value in force.
+
 - `auth`: `GET /api/v1/auth/users` takes `status` (`active`, `disabled`) and `include=roles` (each user's roles in
   the same answer); every user carries `has_password`, `mfa_enabled` and `last_sign_in_at`. `GET /api/v1/auth/me`
   gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);

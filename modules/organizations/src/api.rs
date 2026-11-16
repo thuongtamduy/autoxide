@@ -55,6 +55,19 @@ pub struct Unit {
     pub status: UnitStatus,
 }
 
+/// Giá trị hiệu lực của một cài đặt ở một nút (cài đặt kế thừa theo cây, bước 34 mục 4).
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct EffectiveSetting {
+    pub key: String,
+    /// `None`: không nút nào đặt và cài đặt không có mặc định.
+    pub value: Option<serde_json::Value>,
+    /// Nút đã đặt giá trị; `None`: giá trị mặc định.
+    pub source_unit_id: Option<OrgId>,
+    /// Giá trị đến từ nút khác (cấp trên) hay mặc định, không do chính nút đặt.
+    pub inherited: bool,
+}
+
 /// Tra nút của cây tổ chức.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
@@ -73,4 +86,12 @@ pub trait OrgDirectory: Send + Sync {
         id: OrgId,
         root: OrgId,
     ) -> Result<bool, Error>;
+    /// Giá trị hiệu lực của cài đặt `key` ở nút `id` (nút gần nhất trên chuỗi có đặt, hay mặc
+    /// định). Cài đặt không ai khai → `organizations.setting_unknown`.
+    async fn setting(
+        &self,
+        tenant: &TenantContext,
+        id: OrgId,
+        key: &str,
+    ) -> Result<Option<EffectiveSetting>, Error>;
 }

@@ -13,6 +13,7 @@ mod http;
 mod migration;
 mod permissions;
 mod service;
+mod settings;
 mod tools;
 
 #[cfg(test)]
@@ -58,6 +59,10 @@ impl Module for OrganizationsModule {
         Ok(())
     }
 
+    fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {
+        settings::all()
+    }
+
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
     }
@@ -74,7 +79,7 @@ impl Module for OrganizationsModule {
         let config = self
             .config
             .ok_or_else(|| Error::internal("module `organizations` started before `configure`"))?;
-        let service = Arc::new(OrgService::new(context.outbox()?, config));
+        let service = Arc::new(OrgService::new(context.outbox()?, config, context.org_settings()));
         self.service = Some(service.clone());
         context.provide::<dyn api::OrgDirectory>(service)
     }

@@ -7665,6 +7665,45 @@
         ],
         "type": "object"
       },
+      "Data_UnitSettingResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The value of a setting at a unit.",
+            "properties": {
+              "inherited": {
+                "description": "`true` when the value comes from a unit above or the default, not from this unit.",
+                "type": "boolean"
+              },
+              "key": {
+                "description": "Key of the setting.",
+                "example": "organizations.timezone",
+                "type": "string"
+              },
+              "source_unit_id": {
+                "description": "The unit that set this value (this unit or one above it); `null`: the default.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "description": "The value in force; `null` when nothing sets it and it has no default."
+              }
+            },
+            "required": [
+              "key",
+              "inherited"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_UnitTypeResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -8573,6 +8612,40 @@
         ],
         "type": "object"
       },
+      "Data_Vec_SettingResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A setting that units can set and the units below them inherit.",
+              "properties": {
+                "default": {
+                  "description": "The value when no unit sets it; `null`: none."
+                },
+                "description": {
+                  "description": "What it is for and which values it takes.",
+                  "type": "string"
+                },
+                "key": {
+                  "description": "`<module>.<name>`, e.g. `organizations.timezone`.",
+                  "example": "organizations.timezone",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "description"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_TenantSettingState": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -8698,6 +8771,48 @@
                 "status",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_UnitSettingResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "The value of a setting at a unit.",
+              "properties": {
+                "inherited": {
+                  "description": "`true` when the value comes from a unit above or the default, not from this unit.",
+                  "type": "boolean"
+                },
+                "key": {
+                  "description": "Key of the setting.",
+                  "example": "organizations.timezone",
+                  "type": "string"
+                },
+                "source_unit_id": {
+                  "description": "The unit that set this value (this unit or one above it); `null`: the default.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value": {
+                  "description": "The value in force; `null` when nothing sets it and it has no default."
+                }
+              },
+              "required": [
+                "key",
+                "inherited"
               ],
               "type": "object"
             },
@@ -17911,6 +18026,41 @@
         ],
         "type": "object"
       },
+      "SettingResponse": {
+        "description": "A setting that units can set and the units below them inherit.",
+        "properties": {
+          "default": {
+            "description": "The value when no unit sets it; `null`: none."
+          },
+          "description": {
+            "description": "What it is for and which values it takes.",
+            "type": "string"
+          },
+          "key": {
+            "description": "`<module>.<name>`, e.g. `organizations.timezone`.",
+            "example": "organizations.timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "description"
+        ],
+        "type": "object"
+      },
+      "SettingValueRequest": {
+        "additionalProperties": false,
+        "description": "A new value for a setting.",
+        "properties": {
+          "value": {
+            "description": "The value, checked by the setting (see its description)."
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
       "SiteMenu": {
         "description": "A website menu as saved.",
         "properties": {
@@ -19826,6 +19976,36 @@
           "status",
           "created_at",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "UnitSettingResponse": {
+        "description": "The value of a setting at a unit.",
+        "properties": {
+          "inherited": {
+            "description": "`true` when the value comes from a unit above or the default, not from this unit.",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Key of the setting.",
+            "example": "organizations.timezone",
+            "type": "string"
+          },
+          "source_unit_id": {
+            "description": "The unit that set this value (this unit or one above it); `null`: the default.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "description": "The value in force; `null` when nothing sets it and it has no default."
+          }
+        },
+        "required": [
+          "key",
+          "inherited"
         ],
         "type": "object"
       },
@@ -51573,6 +51753,68 @@
         ]
       }
     },
+    "/api/v1/organizations/settings": {
+      "get": {
+        "description": "Any signed-in user. Modules declare them; each unit inherits the value of the nearest unit\nabove that sets it, or the default.",
+        "operationId": "organizations_list_org_settings",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_SettingResponse"
+                }
+              }
+            },
+            "description": "Every setting, sorted by key."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the settings units can set.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/organizations/unit-types": {
       "get": {
         "description": "Requires `organizations.units.read`. Sorted by code; a small fixed set, so not paged.",
@@ -52805,6 +53047,350 @@
         ],
         "x-permissions": [
           "organizations.units.write"
+        ]
+      }
+    },
+    "/api/v1/organizations/units/{id}/settings": {
+      "get": {
+        "description": "Requires `organizations.units.read` covering the unit. Each value says where it comes from:\nthis unit, a unit above, or the default.",
+        "operationId": "organizations_get_unit_settings",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_UnitSettingResponse"
+                }
+              }
+            },
+            "description": "Every setting at this unit, sorted by key."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope; code `organizations.unit_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the settings in force at an organization unit.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      }
+    },
+    "/api/v1/organizations/units/{id}/settings/{key}": {
+      "delete": {
+        "description": "Requires `organizations.settings.write` covering the unit; the unit must be active. Clearing a\nsetting the unit does not set changes nothing.",
+        "operationId": "organizations_clear_unit_setting",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of the setting.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitSettingResponse"
+                }
+              }
+            },
+            "description": "The setting at this unit, now inherited."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`), it does not cover this unit (`org_out_of_scope`), or the unit is not active (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope (`organizations.unit_not_found`), or no such setting (`organizations.setting_unknown`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clear a setting of an organization unit, so it inherits again.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.settings.write"
+        ]
+      },
+      "put": {
+        "description": "Requires `organizations.settings.write` covering the unit; the unit must be active. Units\nbelow it follow, unless they set their own value.",
+        "operationId": "organizations_set_unit_setting",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of the setting, e.g. `organizations.timezone`.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingValueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitSettingResponse"
+                }
+              }
+            },
+            "description": "The setting at this unit after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`), it does not cover this unit (`org_out_of_scope`), or the unit is not active (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope (`organizations.unit_not_found`), or no such setting (`organizations.setting_unknown`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The value is not accepted by the setting; code `organizations.setting_invalid`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set a setting of an organization unit.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.settings.write"
         ]
       }
     },

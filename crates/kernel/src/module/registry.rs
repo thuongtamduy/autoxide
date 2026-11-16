@@ -68,6 +68,8 @@ pub struct Modules {
     keys: crate::secret::KeyConfig,
     /// Bộ gieo dữ liệu cho khách mới của mọi module; điền sau khi mọi module khởi động.
     seeds: crate::tenancy::admin::Seeds,
+    /// Cài đặt theo nút của mọi module (bước 34).
+    org_settings: crate::tenancy::OrgSettingCatalog,
     /// Bộ tra DNS cho tên miền riêng của khách: bản một module công bố (`dyn DnsTxtLookup`), không
     /// thì bộ tra của hệ điều hành; điền sau khi mọi module khởi động.
     dns: crate::tenancy::domains::DnsSlot,
@@ -148,6 +150,18 @@ impl Modules {
             declared_settings.extend(declared);
         }
         settings.fill(declared_settings);
+        let mut seen = Vec::new();
+        let mut declared_org_settings = Vec::new();
+        for module in &modules {
+            let declared = module.org_settings();
+            problems.extend(crate::tenancy::org_settings::declaration_problems(
+                module.name(),
+                &declared,
+                &mut seen,
+            ));
+            declared_org_settings.extend(declared);
+        }
+        let org_settings = crate::tenancy::OrgSettingCatalog::new(declared_org_settings);
         for module in &modules {
             for deprecation in module.deprecations() {
                 problems.extend(deprecation.problems(module.name()));
@@ -176,6 +190,7 @@ impl Modules {
                 user_flags,
                 keys,
                 seeds,
+                org_settings,
                 dns,
                 orgs,
                 moves,
@@ -237,6 +252,7 @@ impl Modules {
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,
+                org_settings: &self.org_settings,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
