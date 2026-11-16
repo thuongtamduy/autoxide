@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400">
+  <rect width="640" height="400" fill="#FBEBE7"></rect>
+  <rect x="0" y="280" width="640" height="120" fill="#F6D9D2"></rect>
+  <path d="M96 84h280a18 18 0 0 1 18 18v104a18 18 0 0 1-18 18H190l-54 44v-44H96a18 18 0 0 1-18-18V102a18 18 0 0 1 18-18z" fill="#FFFFFF" stroke="#14171F" stroke-width="8" stroke-linejoin="round"></path>
+  <rect x="118" y="124" width="200" height="12" rx="6" fill="#14171F"></rect>
+  <rect x="118" y="154" width="236" height="12" rx="6" fill="#B9BECA"></rect>
+  <rect x="118" y="184" width="140" height="12" rx="6" fill="#B9BECA"></rect>
+  <path d="M300 196h246a18 18 0 0 1 18 18v84a18 18 0 0 1-18 18h-40v40l-50-40H300a18 18 0 0 1-18-18v-84a18 18 0 0 1 18-18z" fill="#14171F"></path>
+  <rect x="318" y="232" width="150" height="12" rx="6" fill="#FFFFFF"></rect>
+  <rect x="318" y="262" width="100" height="12" rx="6" fill="#646B7A"></rect>
+  <circle cx="522" cy="256" r="26" fill="#BF3F12"></circle>
+  <path d="M510 256l9 9 16-18" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+</svg>

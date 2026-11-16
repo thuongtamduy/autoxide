@@ -123,7 +123,7 @@ impl TenantTable {
 ///
 /// Danh sách của một khách sắp theo `id` (`fetch_page` với `.scoped(&tenant)`) cần index này: thiếu
 /// nó, SQLite đọc mọi dòng của khách rồi sắp xếp tạm, Postgres quét khoá chính bỏ qua dòng của khách
-/// khác — chậm dần theo cỡ bảng (đo ở bước 33 C, D-301). Bảng có danh sách như vậy mà chưa có index
+/// khác — chậm dần theo cỡ bảng (đo ở bước 33 C, D-302). Bảng có danh sách như vậy mà chưa có index
 /// nào bắt đầu bằng `(tenant_id, id)` thì thêm bằng helper này.
 pub fn list_index(name: &'static str, tables: Vec<&'static str>) -> Box<dyn MigrationTrait> {
     Box::new(ListIndex { name, tables })

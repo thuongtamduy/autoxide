@@ -2,7 +2,7 @@
 
 Thiết kế ngày 13/11/2026 (D-200). Giao diện là repo riêng (D-096, D-097); core chỉ có API (luật kiến
 trúc 9). File này ghi lại **giao diện cần gì từ core**, để agent làm các bước sau không phải đoán. Bản vẽ
-chi tiết nằm ở canvas thiết kế của chủ dự án, không nằm trong repo.
+chi tiết: bản chụp ở [`docs/design/`](../design/README.md) (D-301), bản gốc ở canvas thiết kế của chủ dự án.
 
 Đây là tài liệu nội bộ (tiếng Việt) cho chủ dự án và agent.
 

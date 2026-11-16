@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Soạn bài — Autoxide Admin</title>
+<script src="./support.js"></script>
+<script src="./ax-shell.js"></script>
+<link rel="stylesheet" href="./ax-r40.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>
+/* ===== ContentEditor: CSS riêng của màn (R4), mọi luật dưới .pg-ce ===== */
+.pg-ce .mtag, .pg-ce .kind { font-size: 12px; }
+.pg-ce .loc { height: 22px; min-width: 28px; font-size: 12px; }
+.pg-ce .loc.miss { box-shadow: none; border: 1px dashed var(--line-2); }
+/* Điện thoại: tiêu đề bài đã là h1 trong thân bài, nên đầu trang chỉ giữ nhãn trạng thái (R4 mục 13) */
+@media (max-width: 720px) {
+  .pg-ce .ce-title { display: none; }
+}
+</style>
+</helmet>
+<div class="ax pg-ce {{theme}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <nav class="rail" aria-label="Phân hệ" style="flex: 0 0 88px">
+    <a href="Main.dc.html" aria-label="Autoxide, về Tổng quan" style="display: flex; justify-content: center; padding: 4px 0 14px">
+      <span style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: #1F2430; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14)">
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+      </span><span class="rail-name">Autoxide</span>
+    </a>
+    <div class="rail-mid">
+      <a class="ri" href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span class="ri-l">Tổng quan</span></a>
+      <a class="ri" href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span class="ri-l">Bán hàng</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Catalog.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span class="ri-l">Sản phẩm</span></a>
+      <a class="ri" href="Promotions.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span class="ri-l">Tiếp thị</span></a>
+      <a class="ri on" aria-current="page" href="Content.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span class="ri-l">Nội dung</span></a>
+      <a class="ri" href="Customers.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span class="ri-l">Khách hàng</span></a>
+      <a class="ri" href="Market.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span class="ri-l">Sàn</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Finance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span class="ri-l">Tài chính</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Main.dc.html#g=reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span class="ri-l">Báo cáo</span></a>
+      <a class="ri" href="Org.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span class="ri-l">Tổ chức</span></a>
+      <a class="ri" href="Compliance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span class="ri-l">Tuân thủ</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Settings.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span class="ri-l">Cài đặt</span></a>
+    </div>
+    <a class="ri" href="Map.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"></path></svg><span class="ri-l">Bản đồ</span></a>
+    <button type="button" class="ri" popovertarget="help"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6M12 16.8h.01"></path></svg><span class="ri-l">Trợ giúp</span></button>
+    <label class="ri rail-toggle"><input type="checkbox" class="railmini" aria-label="Thu gọn thanh phân hệ"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"></path></svg><span class="t-full">Thu gọn</span><span class="t-mini">Mở rộng</span></label>
+  </nav>
+
+
+  <div style="flex: 999 1 560px; min-width: 0; margin: 8px; display: flex; flex-direction: column; background: var(--sheet); border: 1px solid var(--line); border-radius: 16px; overflow: hidden">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; border-bottom: 1px solid var(--line)">
+      <a class="ctx" href="Main.dc.html" aria-label="Đổi khách hàng hoặc nút tổ chức" style="text-decoration: none">
+        <span class="tav">BM</span>
+        <span style="display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.2">
+          <span class="ell" style="font-weight: 600">Bếp Mộc</span>
+          <span class="ell" style="font-size: 12px; color: var(--ink-3)">Bếp Mộc — toàn chuỗi</span>
+        </span>
+        <svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ink-3)"><path d="{{ic.updown}}"></path></svg>
+      </a>
+      <div style="flex: 1"></div>
+      <button type="button" class="btn" popovertarget="qs" data-cmdk="data-cmdk" aria-label="Tìm trong mọi phân hệ" style="flex: 0 1 300px; justify-content: flex-start; color: var(--ink-3); font-weight: 400; background: var(--panel)">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><span class="hide-mobile" style="flex: 1; text-align: left">Tìm trong mọi phân hệ…</span><span class="kbd hide-mobile">Ctrl</span><span class="kbd hide-mobile">K</span>
+      </button>
+      <button type="button" class="btn ghost sq" popovertarget="help" aria-label="Trợ giúp cho trang này" data-tip="Trợ giúp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6M12 16.8h.01"></path></svg></button><span class="helppanel" id="help" popover="auto" role="dialog" aria-label="Trợ giúp: Soạn bài"><span class="hp-head"><b>Trợ giúp · Soạn bài</b><button type="button" class="btn ghost sm sq" popovertarget="help" popovertargetaction="hide" aria-label="Đóng trợ giúp"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span><label class="hp-search"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><input class="inp" type="search" placeholder="Tìm trong hướng dẫn…" aria-label="Tìm trong hướng dẫn"></label><span class="cap">Trên trang này</span><a class="hp-art" href="#"><b>Soạn bài theo khối</b><span>Bấm một khối để sửa, đổi chỗ hoặc xoá; thêm khối sau khối đang chọn</span></a><a class="hp-art" href="#"><b>Gửi duyệt và đăng</b><span>Người viết gửi duyệt; người có quyền đăng mới đăng hoặc hẹn giờ</span></a><a class="hp-art" href="#"><b>Nhãn nội dung AI</b><span>Phần có AI được ghi lại; người đăng xác nhận đã duyệt trước khi đăng</span></a><a class="hp-art" href="#"><b>Bản dịch và phiên bản</b><span>Mỗi ngôn ngữ là một mục riêng; khôi phục bản cũ không tự đăng</span></a><span class="hp-hint"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg><span>Bấm biểu tượng ⓘ cạnh một mục để xem giải thích ngắn ngay tại chỗ.</span></span><span class="cap hide-mobile">Phím tắt</span><span class="hp-keys hide-mobile"><span><span class="kbd">Ctrl</span><span class="kbd">K</span></span><span>Tìm và chạy lệnh</span><span><span class="kbd">?</span></span><span>Mở trợ giúp này</span><span><span class="kbd">Esc</span></span><span>Đóng hộp đang mở</span></span><span class="cap">Cần thêm trợ giúp</span><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg><span><b>Hỏi trợ lý AI về trang này</b><span>Trả lời theo dữ liệu bạn được xem; không tự chạy lệnh ghi</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-1.5-3-5-3-5-1s3 1 5 1zM12 7c1.5-3 5-3 5-1s-3 1-5 1z"></path></svg><span><b>Có gì mới</b><span>2 cập nhật trong tháng này</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"></path></svg><span><b>Liên hệ hỗ trợ</b><span>Kèm sẵn trang đang xem và mã khách</span></span></a></span>
+      <button class="btn ghost sq" aria-label="Đổi giao diện sáng / tối" data-tip="Sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+      <a class="av a1" href="Org.dc.html" aria-label="Tài khoản của Lan Phạm" style="width: 34px; height: 34px; text-decoration: none">LP</a>
+    </header>
+    <nav class="subnav" aria-label="Menu của phân hệ Nội dung">
+      <span class="gname">Nội dung</span>
+      <a class="stab on" href="Content.dc.html" aria-current="page">Bài viết<span class="cnt" title="3 việc đang chờ">3<span class="vh"> việc đang chờ</span></span></a>
+      <a class="stab" href="ContentMore.dc.html">Trang và cấu trúc</a>
+      <a class="stab" href="Menus.dc.html">Menu</a>
+      <a class="stab" href="MediaLibrary.dc.html">Thư viện media</a>
+    </nav>
+
+    <main style="width: 100%; max-width: none; margin: 0; padding: 20px 24px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+      <section class="rise" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px">
+        <a class="btn ghost sm" href="Content.dc.html"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.back}}"></path></svg>Bài viết</a>
+        <span style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+          <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px">
+            <b class="ell ce-title" style="min-width: 0; font-size: 15px">{{title}}</b>
+            <span class="badge {{stBadge}}"><span class="dot"></span>{{stLabel}}</span>
+            <sc-if value="{{hasAi}}" hint-placeholder-val="{{true}}"><span class="mtag"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px"><path d="{{ic.spark}}"></path></svg>Có AI hỗ trợ</span></sc-if>
+          </span>
+          <span style="font-size: 12.5px; color: var(--ink-3)">{{savedText}}</span>
+        </span>
+        <div class="edacts headacts" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button class="btn only-mobile" onClick="{{openSheet}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.gear}}"></path></svg>Thiết lập</button>
+          <button class="btn sec" onClick="{{openPreview}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.eye}}"></path></svg>Xem trước</button>
+          <button class="btn sec" onClick="{{toggleReview}}">{{reviewLabel}}</button>
+          <button type="button" class="btn sq only-mobile" popovertarget="hmore" aria-label="Thao tác khác" style="anchor-name: --hmore; font-size: 18px; letter-spacing: 1px">⋯</button><span class="moremenu" id="hmore" popover="auto" role="menu" aria-label="Thao tác khác" style="position-anchor: --hmore"><button class="btn" role="menuitem" popovertarget="hmore" popovertargetaction="hide" onClick="{{openPreview}}">Xem trước</button><button class="btn" role="menuitem" popovertarget="hmore" popovertargetaction="hide" onClick="{{toggleReview}}">{{reviewLabel}}</button></span>
+          <button class="btn pri" onClick="{{openPublish}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.send}}"></path></svg>{{pubLabel}}</button>
+        </div>
+      </section>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px">
+        <section class="card rise d1" aria-label="Nội dung bài viết" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 18px; border-bottom: 1px solid var(--line)">
+            <span class="loc">VI</span>
+            <span style="flex: 1 1 200px; min-width: 0; font-size: 13px; color: var(--ink-2)">Tiếng Việt · bản gốc · {{countText}}</span>
+            <span style="display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--ink-3)">Khối theo danh sách cho phép <button type="button" class="qi" popovertarget="tip-blocks" aria-label="Giải thích: Khối được phép" style="anchor-name: --tip-blocks"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-blocks" popover="auto" role="dialog" aria-label="Khối được phép" style="position-anchor: --tip-blocks"><b class="tip-t">Máy chủ kiểm từng khối</b><span class="tip-b">Thân bài là JSON theo danh sách khối cho phép: đoạn văn, tiêu đề 2–4, danh sách, trích dẫn, mã, bảng, ảnh từ thư viện, video từ trang được phép. Link javascript: bị chặn; ảnh chỉ giữ ID media. Lỗi báo một lần kèm vị trí.</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-blocks" popovertargetaction="hide">Đã hiểu</button></span></span></span>
+          </div>
+          <article style="display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 760px; margin: 0 auto; padding: 20px clamp(14px, 3vw, 28px) 28px; box-sizing: border-box">
+            <figure style="margin: 0; display: flex; flex-direction: column; gap: 6px">
+              <span style="position: relative; display: flex; align-items: flex-end; aspect-ratio: 21 / 9; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #3A2E28 0%, #6B4A35 55%, #C77A45 100%)">
+                <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; color: rgba(255,255,255,.55)"><path d="{{ic.image}}"></path></svg>
+              </span>
+              <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--ink-3)">
+                <span style="flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere">Ảnh đại diện · <span class="mono">chao-gang-tren-bep-tu.jpg</span> · alt <span class="loc">VI</span> <span class="loc miss">EN</span></span>
+                <a class="btn sm" href="MediaLibrary.dc.html"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.image}}"></path></svg>Đổi ảnh</a>
+              </span>
+            </figure>
+            <h1 class="dsp" style="margin: 6px 0 0; font-size: clamp(25px, 5vw, 32px); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; text-wrap: balance">{{title}}</h1>
+            <p style="margin: 0; font-size: 17px; line-height: 1.6; color: var(--ink-2); text-wrap: pretty">{{excerpt}}</p>
+
+            <sc-for list="{{blocks}}" as="b" hint-placeholder-count="6">
+              <div class="blk" role="group" aria-label="{{b.aria}}" onClick="{{b.pick}}" style="display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border-radius: 10px; background: {{b.bg}}; box-shadow: {{b.ring}}; cursor: text">
+                <sc-if value="{{b.on}}" hint-placeholder-val="{{false}}">
+                  <div role="toolbar" aria-label="Thao tác với khối" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px">
+                    <span class="mtag">{{b.label}}</span>
+                    <span style="flex: 1"></span>
+                    <button class="btn ghost sm sq" onClick="{{b.up}}" aria-label="Đưa khối lên" disabled="{{b.first}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.up}}"></path></svg></button>
+                    <button class="btn ghost sm sq" onClick="{{b.down}}" aria-label="Đưa khối xuống" disabled="{{b.last}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.chev}}"></path></svg></button>
+                    <button class="btn ghost sm sq danger" onClick="{{b.del}}" aria-label="Xoá khối"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.trash}}"></path></svg></button>
+                  </div>
+                  <sc-if value="{{b.isText}}" hint-placeholder-val="{{false}}">
+                    <textarea class="inp" rows="3" value="{{b.text}}" onChange="{{b.setText}}" aria-label="Sửa chữ của khối" style="field-sizing: content; min-height: 64px; height: auto; padding: 10px 12px; line-height: 1.55"></textarea>
+                  </sc-if>
+                </sc-if>
+                <sc-if value="{{b.isP}}" hint-placeholder-val="{{true}}"><p style="margin: 0; font-size: 16.5px; line-height: 1.7; text-wrap: pretty">{{b.text}}</p></sc-if>
+                <sc-if value="{{b.isH2}}" hint-placeholder-val="{{false}}"><h2 class="dsp" style="margin: 6px 0 0; font-size: 23px; font-weight: 600; line-height: 1.3">{{b.text}}</h2></sc-if>
+                <sc-if value="{{b.isH3}}" hint-placeholder-val="{{false}}"><h3 class="dsp" style="margin: 4px 0 0; font-size: 19px; font-weight: 600; line-height: 1.35">{{b.text}}</h3></sc-if>
+                <sc-if value="{{b.isQuote}}" hint-placeholder-val="{{false}}"><p style="margin: 0; padding: 4px 0 4px 16px; border-left: 3px solid var(--accent); font-size: 17px; font-style: italic; line-height: 1.6; color: var(--ink-2)">{{b.text}}</p></sc-if>
+                <sc-if value="{{b.isCode}}" hint-placeholder-val="{{false}}"><span class="mono" style="display: block; padding: 12px 14px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; overflow-wrap: anywhere">{{b.text}}</span></sc-if>
+                <sc-if value="{{b.isUl}}" hint-placeholder-val="{{false}}">
+                  <ul style="margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 16.5px; line-height: 1.6">
+                    <sc-for list="{{b.items}}" as="li" hint-placeholder-count="3"><li>{{li.t}}</li></sc-for>
+                  </ul>
+                </sc-if>
+                <sc-if value="{{b.isImg}}" hint-placeholder-val="{{false}}">
+                  <span style="display: flex; flex-direction: column; gap: 8px">
+                    <span style="display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; max-height: 320px; border-radius: 10px; background: {{b.bgImg}}; color: rgba(255,255,255,.6)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 34px; height: 34px"><path d="{{ic.image}}"></path></svg></span>
+                    <span style="font-size: 13px; color: var(--ink-3)">{{b.cap}}</span>
+                    <span style="display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-2)">
+                      <sc-for list="{{b.alts}}" as="a" hint-placeholder-count="2"><span style="display: flex; align-items: baseline; gap: 8px"><span class="loc {{a.miss}}">{{a.code}}</span><span style="flex: 1; min-width: 0">{{a.text}}</span></span></sc-for>
+                    </span>
+                  </span>
+                </sc-if>
+                <sc-if value="{{b.isEmbed}}" hint-placeholder-val="{{false}}">
+                  <span style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line)">
+                    <span class="sq-ic info" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.box}}"></path></svg></span>
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span class="mtag" style="align-self: flex-start">Nhúng sản phẩm</span><b style="font-weight: 600">{{b.text}}</b><span style="font-size: 12.5px; color: var(--ink-3)">{{b.cap}}</span></span>
+                  </span>
+                </sc-if>
+                <sc-if value="{{b.isVideo}}" hint-placeholder-val="{{false}}">
+                  <span style="display: flex; align-items: center; justify-content: center; gap: 10px; aspect-ratio: 16 / 9; border-radius: 10px; background: #1B1E25; color: #E4E6EB; font-size: 13px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.play}}"></path></svg>{{b.text}}</span>
+                </sc-if>
+                <sc-if value="{{b.isTable}}" hint-placeholder-val="{{false}}">
+                  <span style="display: flex; flex-direction: column; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; font-size: 14px">
+                    <sc-for list="{{b.items}}" as="tr" hint-placeholder-count="3"><span style="display: flex; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line)"><span style="flex: 1; min-width: 0">{{tr.t}}</span></span></sc-for>
+                  </span>
+                </sc-if>
+              </div>
+            </sc-for>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; padding-top: 4px">
+              <button class="btn" onClick="{{toggleIns}}" aria-expanded="{{insOpen}}" style="align-self: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.plus}}"></path></svg>Thêm khối {{insWhere}}</button>
+              <sc-if value="{{insOpen}}" hint-placeholder-val="{{false}}">
+                <div class="pop" role="group" aria-label="Chọn loại khối" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line)">
+                  <sc-for list="{{insTypes}}" as="t" hint-placeholder-count="9"><button class="btn sm" onClick="{{t.add}}">{{t.label}}</button></sc-for>
+                  <span style="flex: 1 1 100%; font-size: 12px; color: var(--ink-3)">Video chỉ nhúng được từ trang trong danh sách cho phép của máy chủ. Nhúng sản phẩm cần mục "nhúng bản ghi" của bước 51.</span>
+                </div>
+              </sc-if>
+            </div>
+          </article>
+        </section>
+
+        <sc-if value="{{sheet}}" hint-placeholder-val="{{false}}"><button class="scrim" aria-label="Đóng thiết lập" onClick="{{closeSheet}}" style="border: 0; z-index: 24; cursor: default"></button></sc-if>
+        <aside class="card {{sideCls}}" aria-label="Thiết lập bài viết" style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column">
+          <sc-if value="{{sheet}}" hint-placeholder-val="{{false}}">
+            <div class="panehead" style="flex: none; display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line)"><b style="flex: 1; font-size: 16px">Thiết lập bài viết</b><button class="btn ghost sm sq" aria-label="Đóng" onClick="{{closeSheet}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button></div>
+          </sc-if>
+          <div class="scrollx" role="tablist" aria-label="Thiết lập bài viết" style="flex: none; display: flex; gap: 0 18px; padding: 0 18px; border-bottom: 1px solid var(--line)">
+            <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4"><button class="tab {{t.cls}}" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}">{{t.label}}<sc-if value="{{t.n}}" hint-placeholder-val="{{false}}"><span class="cnt">{{t.n}}</span></sc-if></button></sc-for>
+          </div>
+
+          <sc-if value="{{tabSet}}" hint-placeholder-val="{{true}}">
+            <div style="flex: none; display: flex; flex-direction: column; gap: 18px; padding: 16px 18px 20px">
+              <section style="display: flex; flex-direction: column; gap: 8px">
+                <span class="cap">Trạng thái</span>
+                <sc-for list="{{facts}}" as="f" hint-placeholder-count="4"><span style="display: flex; align-items: baseline; gap: 10px; font-size: 13.5px"><span style="flex: 0 0 116px; color: var(--ink-3)">{{f.k}}</span><span style="flex: 1; min-width: 0">{{f.v}}</span></span></sc-for>
+              </section>
+              <section style="display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line)">
+                <span class="cap">Lịch đăng</span>
+                <sc-if value="{{hasSched}}" hint-placeholder-val="{{false}}">
+                  <span style="display: flex; align-items: center; gap: 10px"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--st-sched)"><path d="{{ic.clock}}"></path></svg><span style="flex: 1; min-width: 0; font-size: 13.5px">{{schedText}}</span><button class="btn sm" onClick="{{cancelSched}}">Huỷ lịch</button></span>
+                  <span style="font-size: 12px; color: var(--ink-3)">Lịch ghim bản nháp lúc đặt; sửa sau đó không được lịch này đăng.</span>
+                </sc-if>
+                <sc-if value="{{noSched}}" hint-placeholder-val="{{true}}">
+                  <span style="display: flex; align-items: center; gap: 10px"><span style="flex: 1; font-size: 13.5px; color: var(--ink-2)">Chưa hẹn giờ đăng hay gỡ.</span><button class="btn sm" onClick="{{openSchedule}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.clock}}"></path></svg>Hẹn giờ</button></span>
+                </sc-if>
+              </section>
+              <section style="display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line)">
+                <span class="cap" style="display: flex; align-items: center; gap: 4px">Website và nút sở hữu <button type="button" class="qi" popovertarget="tip-site" aria-label="Giải thích: Website và nút sở hữu" style="anchor-name: --tip-site"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-site" popover="auto" role="dialog" aria-label="Website và nút sở hữu" style="position-anchor: --tip-site"><b class="tip-t">Bài thuộc website nào?</b><span class="tip-b">Bài chỉ hiện trên tên miền của website đã chọn. Người ở nút sở hữu và nút cha mới sửa được. Phần gắn bài với nút và website còn chờ đặc tả (mục b1).</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-site" popovertargetaction="hide">Đã hiểu</button></span></span></span>
+                <div class="scrollrow" style="display: flex; flex-wrap: wrap; gap: 8px">
+                  <sc-for list="{{sites}}" as="w" hint-placeholder-count="2"><button class="chip {{w.cls}}" aria-pressed="{{w.on}}" onClick="{{w.pick}}">{{w.label}}</button></sc-for>
+                </div>
+                <span style="font-size: 12.5px; color: var(--ink-3)">{{siteNote}}</span>
+              </section>
+              <section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line)">
+                <label style="display: flex; flex-direction: column; gap: 6px">
+                  <span class="lab">Đường dẫn</span>
+                  <span style="display: flex; align-items: stretch; min-width: 0">
+                    <span class="mono" style="display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--line-2); border-right: 0; border-radius: 10px 0 0 10px; background: var(--panel); font-size: 12.5px; color: var(--ink-3)">/blog/</span>
+                    <input class="inp mono" value="{{slug}}" onChange="{{onSlug}}" style="min-width: 0; border-radius: 0 10px 10px 0; font-size: 12.5px">
+                  </span>
+                  <span style="font-size: 12px; color: var(--ink-3)">Đổi sau khi đăng thì máy chủ tự tạo chuyển hướng 301 từ đường dẫn cũ.</span>
+                </label>
+                <span style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Tác giả</span>
+                  <span style="display: flex; flex-wrap: wrap; gap: 6px"><span class="kind" style="height: 26px">Minh Anh</span><span class="kind" style="height: 26px">Thu Hà</span></span></span>
+                <span style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Danh mục và thẻ</span>
+                  <span style="display: flex; flex-wrap: wrap; gap: 6px"><span class="kind" style="height: 26px">Chọn mua</span><span class="loc" style="height: 26px; padding: 0 8px; font-size: 12px; letter-spacing: 0">chảo gang</span><span class="loc" style="height: 26px; padding: 0 8px; font-size: 12px; letter-spacing: 0">bếp từ</span></span></span>
+              </section>
+              <section style="display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line)">
+                <span class="cap" style="display: flex; align-items: center; gap: 4px">Nhãn nội dung AI <button type="button" class="qi" popovertarget="tip-ailabel" aria-label="Giải thích: Nhãn nội dung AI" style="anchor-name: --tip-ailabel"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-ailabel" popover="auto" role="dialog" aria-label="Nhãn nội dung AI" style="position-anchor: --tip-ailabel"><b class="tip-t">Vì sao bài có nhãn AI?</b><span class="tip-b">Nội dung tạo hay sửa từ gợi ý AI mang dấu ai_assisted; website đọc dấu này để gắn nhãn khi công khai. Luật Trí tuệ nhân tạo 134/2025/QH15 áp từ 01/3/2026; mức chi tiết theo nghị định hướng dẫn, cần đối chiếu văn bản gốc.</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-ailabel" popovertargetaction="hide">Đã hiểu</button></span></span></span>
+                <sc-for list="{{aiFacts}}" as="f" hint-placeholder-count="3"><span style="display: flex; align-items: baseline; gap: 10px; font-size: 13.5px"><span style="flex: 0 0 116px; color: var(--ink-3)">{{f.k}}</span><span style="flex: 1; min-width: 0">{{f.v}}</span></span></sc-for>
+                <span style="font-size: 12px; color: var(--ink-3)">AI chỉ gợi ý hoặc viết bản nháp; không bao giờ tự đăng.</span>
+              </section>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{tabSeo}}" hint-placeholder-val="{{false}}">
+            <div style="flex: none; display: flex; flex-direction: column; gap: 16px; padding: 16px 18px 20px">
+              <section style="display: flex; flex-direction: column; gap: 8px">
+                <span class="cap">Kiểm SEO (không dùng AI)</span>
+                <sc-for list="{{seoChecks}}" as="c" hint-placeholder-count="5"><span style="display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="flex: none; margin-top: 2px; color: {{c.color}}"><path d="{{c.icon}}"></path></svg><span style="flex: 1; min-width: 0">{{c.text}}</span></span></sc-for>
+              </section>
+              <label style="display: flex; flex-direction: column; gap: 6px"><span style="display: flex; justify-content: space-between; gap: 8px"><span class="lab">Tiêu đề SEO</span><span class="num" style="font-size: 12px; color: var(--ink-3)">{{metaTN}} / 60</span></span><input class="inp" value="{{metaT}}" onChange="{{onMetaT}}"></label>
+              <label style="display: flex; flex-direction: column; gap: 6px"><span style="display: flex; justify-content: space-between; gap: 8px"><span class="lab">Mô tả SEO</span><span class="num" style="font-size: 12px; color: var(--ink-3)">{{metaDN}} / 160</span></span><textarea class="inp" rows="4" value="{{metaD}}" onChange="{{onMetaD}}" style="field-sizing: content; min-height: 64px; height: auto; padding: 10px 12px"></textarea></label>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <span class="lab">Xem thử trên trang tìm kiếm</span>
+                <div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line)">
+                  <span class="mono" style="font-size: 12px; color: var(--ink-3); overflow-wrap: anywhere">{{snipUrl}}</span>
+                  <span style="font-size: 15.5px; font-weight: 500; line-height: 1.35; color: var(--st-sched)">{{metaT}}</span>
+                  <span style="font-size: 13px; color: var(--ink-2); text-wrap: pretty">{{metaD}}</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">Không cho máy tìm kiếm lập chỉ mục</span><span style="font-size: 12px; color: var(--ink-3)">noindex · ảnh chia sẻ: ảnh đại diện</span></span><button class="sw {{noindexCls}}" role="switch" aria-checked="{{noindex}}" aria-label="Không cho lập chỉ mục" onClick="{{toggleNoindex}}"></button></div>
+              <section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line)">
+                <button class="btn" onClick="{{suggestSeo}}" style="align-self: stretch"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--accent)"><path d="{{ic.spark}}"></path></svg>Gợi ý tiêu đề và mô tả bằng AI</button>
+                <sc-if value="{{seoBusy}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 7px"><span class="shim" style="height: 12px; width: 92%"></span><span class="shim" style="height: 12px; width: 70%"></span></div></sc-if>
+                <sc-if value="{{seoSug}}" hint-placeholder-val="{{false}}">
+                  <div class="pop" style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--st-review-bg)">
+                    <span style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--st-review)"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.spark}}"></path></svg>Gợi ý của AI · chưa áp dụng</span>
+                    <span style="font-size: 13.5px; font-weight: 500">{{sugT}}</span>
+                    <span style="font-size: 13px; color: var(--ink-2)">{{sugD}}</span>
+                    <span style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn sm pri" onClick="{{applySeo}}">Áp dụng vào bản nháp</button><button class="btn sm" onClick="{{dropSeo}}">Bỏ qua</button></span>
+                  </div>
+                </sc-if>
+                <span style="font-size: 12px; color: var(--ink-3)">AI chỉ đưa gợi ý. Bạn xem rồi mới áp dụng; áp dụng thì bài mang dấu có AI hỗ trợ.</span>
+              </section>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{tabLang}}" hint-placeholder-val="{{false}}">
+            <div style="flex: none; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 20px">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line)">
+                <span class="loc" style="height: 28px; min-width: 34px; font-size: 12px">VI</span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500">Tiếng Việt · bản gốc</span><span class="mono ell" style="font-size: 12px; color: var(--ink-3)">/blog/{{slug}}</span></span>
+                <span class="badge {{stBadge}}"><span class="dot"></span>{{stLabel}}</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line)">
+                <div style="display: flex; align-items: center; gap: 12px">
+                  <span class="loc {{enCls}}" style="height: 28px; min-width: 34px; font-size: 12px">EN</span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500">Tiếng Anh</span><span style="font-size: 12px; color: var(--ink-3)">{{enNote}}</span></span>
+                  <sc-if value="{{trDone}}" hint-placeholder-val="{{false}}"><span class="badge b-draft pop"><span class="dot"></span>Bản nháp</span></sc-if>
+                </div>
+                <sc-if value="{{trIdle}}" hint-placeholder-val="{{true}}">
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                    <button class="btn sm" style="flex: 1 1 130px" onClick="{{blankTr}}">Tạo bản trống</button>
+                    <button class="btn sm" style="flex: 1 1 130px" onClick="{{translate}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--accent)"><path d="{{ic.spark}}"></path></svg>Dịch bằng AI</button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{trBusy}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 7px"><span class="shim" style="height: 12px; width: 92%"></span><span class="shim" style="height: 12px; width: 76%"></span><span class="shim" style="height: 12px; width: 58%"></span></div></sc-if>
+                <sc-if value="{{trDone}}" hint-placeholder-val="{{false}}"><span class="mono" style="font-size: 12px; color: var(--ink-3); overflow-wrap: anywhere">/en/blog/choosing-a-cast-iron-pan-for-induction</span></sc-if>
+              </div>
+              <span style="font-size: 12px; color: var(--ink-3); text-wrap: pretty">Mỗi bản dịch là một mục riêng: đường dẫn, trạng thái, lịch đăng và lịch sử riêng. Thiếu bản dịch thì địa chỉ tiếng Anh trả 404, không lấy tiếng Việt thay. Bản gốc đổi sau khi dịch thì bản dịch báo "đã cũ".</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{tabHist}}" hint-placeholder-val="{{false}}">
+            <div style="flex: none; display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 20px">
+              <span class="cap" style="display: flex; align-items: center; gap: 4px">Phiên bản <button type="button" class="qi" popovertarget="tip-rev" aria-label="Giải thích: Phiên bản" style="anchor-name: --tip-rev"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-rev" popover="auto" role="dialog" aria-label="Phiên bản" style="position-anchor: --tip-rev"><b class="tip-t">Phiên bản là gì?</b><span class="tip-b">Máy chủ giữ một bản chép khi tạo, mỗi lần đăng hay gỡ, khi khôi phục và tự động khi bản gần nhất cũ hơn 10 phút. Khôi phục chỉ chép về bản nháp, không tự đăng.</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-rev" popovertargetaction="hide">Đã hiểu</button></span></span></span>
+              <sc-for list="{{revs}}" as="r" hint-placeholder-count="5">
+                <div class="tl {{r.cls}}" style="display: flex; flex-direction: column; gap: 6px">
+                  <span style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500">{{r.title}}</span><span style="font-size: 12.5px; color: var(--ink-3)">{{r.meta}}</span></span>
+                  <sc-if value="{{r.old}}" hint-placeholder-val="{{true}}"><span style="display: flex; flex-wrap: wrap; gap: 6px"><button class="btn sm" onClick="{{r.diff}}">Xem khác biệt</button><button class="btn sm" onClick="{{r.restore}}">Khôi phục thành bản nháp</button></span></sc-if>
+                </div>
+              </sc-for>
+              <span style="font-size: 12px; color: var(--ink-3)">Giữ 50 bản mới nhất, cộng bản đang công khai và bản của các lịch đang chờ.</span>
+            </div>
+          </sc-if>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{pubOpen}}" hint-placeholder-val="{{false}}">
+    <div class="sheetwrap" style="position: fixed; inset: 0; z-index: 26; display: flex; justify-content: center; align-items: flex-start; padding: 8vh 16px 16px">
+      <button class="scrim" aria-label="Đóng" onClick="{{closePublish}}" style="border: 0; cursor: default"></button>
+      <form class="popover sheet" role="dialog" aria-label="{{pubTitle}}" onSubmit="{{submitPublish}}" novalidate="novalidate" style="position: relative; width: 100%; max-width: 540px; max-height: 84vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 20px">
+        <div class="sheethead" style="display: flex; align-items: center; gap: 10px"><h2 class="h2" style="flex: 1; font-size: 17px">{{pubTitle}}</h2><button type="button" class="btn ghost sm sq" aria-label="Đóng" onClick="{{closePublish}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button></div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <sc-for list="{{checks}}" as="c" hint-placeholder-count="4"><span style="display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="flex: none; margin-top: 2px; color: {{c.color}}"><path d="{{c.icon}}"></path></svg><span style="flex: 1; min-width: 0">{{c.text}}</span></span></sc-for>
+        </div>
+        <div class="seg" role="group" aria-label="Thời điểm" style="align-self: stretch">
+          <button type="button" class="{{nowCls}}" onClick="{{pickNow}}" style="flex: 1; justify-content: center">Đăng ngay</button>
+          <button type="button" class="{{laterCls}}" onClick="{{pickLater}}" style="flex: 1; justify-content: center">Hẹn giờ</button>
+        </div>
+        <sc-if value="{{isLater}}" hint-placeholder-val="{{false}}">
+          <div class="pop" style="display: flex; flex-wrap: wrap; gap: 10px">
+            <label style="flex: 1 1 150px; display: flex; flex-direction: column; gap: 6px"><span class="lab">Ngày</span><input class="inp num" value="{{pubDate}}" onChange="{{onPubDate}}" placeholder="dd/mm/yyyy"></label>
+            <label style="flex: 1 1 110px; display: flex; flex-direction: column; gap: 6px"><span class="lab">Giờ (GMT+7)</span><input class="inp num" value="{{pubTime}}" onChange="{{onPubTime}}" placeholder="08:00"></label>
+          </div>
+        </sc-if>
+        <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 10px; background: var(--panel); cursor: pointer">
+          <input type="checkbox" class="chk" checked="{{aiOk}}" onChange="{{toggleAiOk}}" style="margin-top: 2px">
+          <span style="display: flex; flex-direction: column; gap: 2px; font-size: 13.5px"><b style="font-weight: 600">Tôi đã đọc và duyệt phần do AI gợi ý</b><span style="font-size: 12.5px; color: var(--ink-3)">{{aiParts}}. Bản công khai ghi ai duyệt và lúc nào (ai_reviewed); website hiện nhãn "Có sự hỗ trợ của AI".</span></span>
+        </label>
+        <sc-if value="{{pubErr}}" hint-placeholder-val="{{false}}"><span class="tone-bad" style="font-size: 13px">{{pubErr}}</span></sc-if>
+        <span style="font-size: 12px; color: var(--ink-3)">Cần quyền content.publish. Mỗi lần đăng ghi một phiên bản, event và nhật ký audit.</span>
+        <div style="display: flex; justify-content: flex-end; gap: 8px"><button type="button" class="btn" onClick="{{closePublish}}">Huỷ</button><button type="submit" class="btn pri">{{pubOk}}</button></div>
+      </form>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{pvOpen}}" hint-placeholder-val="{{false}}">
+    <div class="sheetwrap" style="position: fixed; inset: 0; z-index: 26; display: flex; justify-content: center; align-items: flex-start; padding: 4vh 16px 16px">
+      <button class="scrim" aria-label="Đóng" onClick="{{closePreview}}" style="border: 0; cursor: default"></button>
+      <div class="popover sheet" role="dialog" aria-label="Xem trước bản nháp" style="position: relative; width: 100%; max-width: 1340px; max-height: 92vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 20px">
+        <div class="sheethead" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+          <h2 class="h2" style="flex: 1 1 200px; font-size: 17px">Xem trước bản nháp</h2>
+          <div class="seg" role="group" aria-label="Khổ màn hình">
+            <sc-for list="{{sizes}}" as="z" hint-placeholder-count="3"><button type="button" class="{{z.cls}}" onClick="{{z.pick}}" aria-pressed="{{z.on}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{z.icon}}"></path></svg>{{z.label}}</button></sc-for>
+          </div>
+          <button type="button" class="btn ghost sm sq" aria-label="Đóng" onClick="{{closePreview}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.x}}"></path></svg></button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--ink-2)">
+          <span style="flex: 1 1 260px; min-width: 0">{{pvNote}}</span>
+          <button type="button" class="btn sm" onClick="{{makeToken}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.link}}"></path></svg>Tạo link xem trước</button>
+        </div>
+        <sc-if value="{{hasToken}}" hint-placeholder-val="{{false}}"><span class="mono pop" style="padding: 10px 12px; border-radius: 10px; background: var(--panel); font-size: 12px; overflow-wrap: anywhere">https://bepmoc.vn/xem-truoc?token=eyJ…8kQ · hết hạn 10:52 hôm nay · không cần tài khoản</span></sc-if>
+        <div style="display: flex; justify-content: center; padding: 16px; border-radius: 14px; background: var(--hover)">
+          <div style="width: {{pvW}}; zoom: {{pvZoom}}; display: flex; flex-direction: column; background: #FFFFFF; color: #1B1E25; border-radius: 12px; box-shadow: 0 0 0 1px rgba(20,23,31,.1); overflow: hidden">
+            <span style="display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid #ECEEF2; font-size: 13px"><b style="flex: 1">Bếp Mộc</b><span style="color: #6A7080">Góc bếp</span></span>
+            <span style="padding: 6px 18px; background: #FFF4E5; color: #8A5300; font-size: 12px">Bản nháp — người đọc chưa thấy</span>
+            <span style="display: flex; flex-direction: column; gap: 12px; padding: {{pvPad}}">
+              <span style="display: block; aspect-ratio: 21 / 9; border-radius: 10px; background: linear-gradient(135deg, #3A2E28 0%, #6B4A35 55%, #C77A45 100%)"></span>
+              <span style="font-size: 12px; color: #6A7080">Chọn mua · Minh Anh, Thu Hà · 6 phút đọc</span>
+              <b style="font-family: 'Be Vietnam Pro', sans-serif; font-size: {{pvH}}; line-height: 1.2">{{title}}</b>
+              <sc-for list="{{pvBlocks}}" as="p" hint-placeholder-count="4"><span style="font-size: {{p.size}}; font-weight: {{p.w}}; line-height: 1.65">{{p.text}}</span></sc-for>
+              <span style="align-self: flex-start; padding: 4px 8px; border-radius: 6px; background: #F1F2F5; color: #4A5060; font-size: 12px">Có sự hỗ trợ của AI</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+<ax-sheets>
+  <div class="axsheet" id="qs" popover="auto" role="dialog" aria-label="Tìm và chạy lệnh">
+    <label class="qs-in"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><input class="inp" type="search" autofocus="autofocus" placeholder="Tìm màn, phân hệ hay lệnh…" aria-label="Tìm màn, phân hệ hay lệnh"><span class="kbd hide-mobile">Esc</span></label>
+    <span class="cap">Đi tới</span>
+    <div class="qs-list">
+      <a class="qs-it" href="Main.dc.html" data-k="tong quan"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span>Tổng quan</span></a>
+      <a class="qs-it sub" href="Main.dc.html" data-k="tong quan bang dieu khien"><span class="qs-dim">Tổng quan ›</span><span>Bảng điều khiển</span></a>
+      <a class="qs-it sub" href="Work.dc.html" data-k="tong quan viec va hoat dong"><span class="qs-dim">Tổng quan ›</span><span>Việc và hoạt động</span></a>
+      <a class="qs-it" href="Orders.dc.html" data-k="ban hang"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span>Bán hàng</span></a>
+      <a class="qs-it sub" href="Orders.dc.html" data-k="ban hang don hang"><span class="qs-dim">Bán hàng ›</span><span>Đơn hàng</span></a>
+      <a class="qs-it sub" href="Shipping.dc.html" data-k="ban hang van chuyen"><span class="qs-dim">Bán hàng ›</span><span>Vận chuyển</span></a>
+      <a class="qs-it sub" href="StoreOps.dc.html" data-k="ban hang cua hang"><span class="qs-dim">Bán hàng ›</span><span>Cửa hàng</span></a>
+      <a class="qs-it sub" href="Channels.dc.html" data-k="ban hang kenh ban"><span class="qs-dim">Bán hàng ›</span><span>Kênh bán</span></a>
+      <a class="qs-it" href="Catalog.dc.html" data-k="san pham"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span>Sản phẩm</span></a>
+      <a class="qs-it sub" href="Catalog.dc.html" data-k="san pham san pham va gia"><span class="qs-dim">Sản phẩm ›</span><span>Sản phẩm và giá</span></a>
+      <a class="qs-it sub" href="Inventory.dc.html" data-k="san pham ton kho"><span class="qs-dim">Sản phẩm ›</span><span>Tồn kho</span></a>
+      <a class="qs-it" href="Promotions.dc.html" data-k="tiep thi"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span>Tiếp thị</span></a>
+      <a class="qs-it sub" href="Promotions.dc.html" data-k="tiep thi khuyen mai"><span class="qs-dim">Tiếp thị ›</span><span>Khuyến mại</span></a>
+      <a class="qs-it sub" href="Engage.dc.html" data-k="tiep thi bieu mau, ban tin, binh luan"><span class="qs-dim">Tiếp thị ›</span><span>Biểu mẫu, bản tin, bình luận</span></a>
+      <a class="qs-it sub" href="Affiliate.dc.html" data-k="tiep thi tiep thi lien ket"><span class="qs-dim">Tiếp thị ›</span><span>Tiếp thị liên kết</span></a>
+      <a class="qs-it" href="Content.dc.html" data-k="noi dung"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span>Nội dung</span></a>
+      <a class="qs-it sub" href="Content.dc.html" data-k="noi dung bai viet"><span class="qs-dim">Nội dung ›</span><span>Bài viết</span></a>
+      <a class="qs-it sub" href="ContentMore.dc.html" data-k="noi dung trang va cau truc"><span class="qs-dim">Nội dung ›</span><span>Trang và cấu trúc</span></a>
+      <a class="qs-it sub" href="Menus.dc.html" data-k="noi dung menu"><span class="qs-dim">Nội dung ›</span><span>Menu</span></a>
+      <a class="qs-it sub" href="MediaLibrary.dc.html" data-k="noi dung thu vien media"><span class="qs-dim">Nội dung ›</span><span>Thư viện media</span></a>
+      <a class="qs-it" href="Customers.dc.html" data-k="khach hang"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Khách hàng</span></a>
+      <a class="qs-it" href="Market.dc.html" data-k="san"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span>Sàn</span></a>
+      <a class="qs-it" href="Finance.dc.html" data-k="tai chinh"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span>Tài chính</span></a>
+      <a class="qs-it" href="Main.dc.html#g=reports" data-k="bao cao"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span>Báo cáo</span></a>
+      <a class="qs-it" href="Org.dc.html" data-k="to chuc"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span>Tổ chức</span></a>
+      <a class="qs-it sub" href="Org.dc.html" data-k="to chuc cay to chuc"><span class="qs-dim">Tổ chức ›</span><span>Cây tổ chức</span></a>
+      <a class="qs-it sub" href="Access.dc.html" data-k="to chuc phan quyen"><span class="qs-dim">Tổ chức ›</span><span>Phân quyền</span></a>
+      <a class="qs-it" href="Compliance.dc.html" data-k="tuan thu"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span>Tuân thủ</span></a>
+      <a class="qs-it sub" href="Compliance.dc.html" data-k="tuan thu tinh trang tuan thu"><span class="qs-dim">Tuân thủ ›</span><span>Tình trạng tuân thủ</span></a>
+      <a class="qs-it sub" href="LegalOps.dc.html" data-k="tuan thu ho so va du lieu ca nhan"><span class="qs-dim">Tuân thủ ›</span><span>Hồ sơ và dữ liệu cá nhân</span></a>
+      <a class="qs-it" href="Settings.dc.html" data-k="cai dat"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span>Cài đặt</span></a>
+      <a class="qs-it sub" href="Settings.dc.html" data-k="cai dat cai dat chung"><span class="qs-dim">Cài đặt ›</span><span>Cài đặt chung</span></a>
+      <a class="qs-it sub" href="Agent.dc.html" data-k="cai dat api key va ai agent"><span class="qs-dim">Cài đặt ›</span><span>API key và AI agent</span></a>
+      <a class="qs-it sub" href="Devtools.dc.html" data-k="cai dat nha phat trien"><span class="qs-dim">Cài đặt ›</span><span>Nhà phát triển</span></a>
+      <a class="qs-it" href="Account.dc.html" data-k="tai khoan cua toi"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Tài khoản của tôi</span></a>
+      <span class="qs-none">Không thấy màn nào khớp. Thử gõ tên phân hệ, ví dụ "đơn hàng" hay "thuế".</span>
+    </div>
+  </div>
+  <div class="axsheet" id="mods" popover="auto" role="dialog" aria-label="Mọi phân hệ">
+    <span class="hp-head"><b>Phân hệ</b><button type="button" class="btn ghost sm sq" popovertarget="mods" popovertargetaction="hide" aria-label="Đóng"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span>
+    <div class="mods-grid">
+      <a class="mod" href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span>Tổng quan</span></a>
+      <a class="mod" href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span>Bán hàng</span><span class="pip"></span></a>
+      <a class="mod" href="Catalog.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span>Sản phẩm</span></a>
+      <a class="mod" href="Promotions.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span>Tiếp thị</span></a>
+      <a class="mod on" href="Content.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span>Nội dung</span></a>
+      <a class="mod" href="Customers.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Khách hàng</span></a>
+      <a class="mod" href="Market.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span>Sàn</span><span class="pip"></span></a>
+      <a class="mod" href="Finance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span>Tài chính</span><span class="pip"></span></a>
+      <a class="mod" href="Main.dc.html#g=reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span>Báo cáo</span></a>
+      <a class="mod" href="Org.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span>Tổ chức</span></a>
+      <a class="mod" href="Compliance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span>Tuân thủ</span><span class="pip"></span></a>
+      <a class="mod" href="Settings.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span>Cài đặt</span></a>
+      <a class="mod" href="Account.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Tài khoản của tôi</span></a>
+    </div>
+    <div class="mods-foot">
+      <button type="button" class="btn" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18zM12 3a9 9 0 0 1 0 18"></path></svg>Sáng / tối</button>
+      <a class="btn ghost" href="Map.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"></path></svg>Bản đồ thiết kế</a>
+    </div>
+  </div>
+</ax-sheets>
+  <nav class="bottombar only-mobile" aria-label="Điều hướng nhanh">
+    <a href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Tổng quan</a>
+    <a href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg>Đơn</a>
+    <a href="Work.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"></path></svg>Việc</a>
+    <button type="button" popovertarget="qs" aria-label="Tìm và chạy lệnh"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg>Tìm</button>
+    <button type="button" popovertarget="mods" class="on" aria-label="Mọi phân hệ"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"></path></svg>Phân hệ</button>
+  </nav>
+  <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+    <div class="toast" role="status" style="z-index: 30; max-width: calc(100% - 32px)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.check}}"></path></svg>{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  state = { dark: null, toast: '', tab: 'set', sheet: false, sel: 'b4', blocks: null, ins: false, review: true, st: 'review', sched: null, pub: false, pubMode: 'now', pubDate: '17/11/2026', pubTime: '08:00', aiOk: false, pubErr: '', pv: false, pvSize: 'phone', token: false, site: 'main', slug: 'chon-chao-gang-cho-bep-tu', metaT: 'Chọn chảo gang cho bếp từ: 3 điều cần kiểm | Bếp Mộc', metaD: 'Bếp từ chỉ nhận chảo hút nam châm. Cách chọn chảo gang đúng cỡ, đáy phẳng và cách tôi dầu để dùng bền nhiều năm.', noindex: false, seoBusy: false, seoSug: false, seoAi: false, tr: 'idle', restored: [], saved: '12 giây trước' };
+
+  say(text) {
+    this.setState({ toast: text });
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.setState({ toast: '' }), 3200);
+  }
+
+  renderVals() {
+    const I = {
+      back: 'M19 12H5M11 6l-6 6 6 6',
+      eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+      send: 'M4 12l16-8-6 16-3-7z',
+      image: 'M4 5h16v14H4zM4 16l5-5 4 4 2.5-2.5L20 17M9 9h.01',
+      up: 'M6 15l6-6 6 6',
+      chev: 'M6 9l6 6 6-6',
+      trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+      clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+      link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+      upload: 'M12 16V4M7 9l5-5 5 5M4 20h16',
+      grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+      rows: 'M4 6h16M4 12h16M4 18h16',
+      video: 'M4 6h12v12H4zM16 10l5-3v10l-5-3',
+      play: 'M8 5v14l11-7z',
+      file: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5',
+      folder: 'M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z',
+      copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+      swap: 'M7 7h13l-4-4M17 17H4l4 4',
+      download: 'M12 4v12M7 11l5 5 5-5M4 20h16',
+      phone: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2',
+      tablet: 'M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2',
+      monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
+      warn: 'M12 3l9.5 17h-19zM12 10v4M12 17h.01',
+      info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01',
+      lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3',
+      redo: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
+      home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+      cart: 'M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01',
+      box: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9',
+      mega: 'M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11',
+      posts: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6',
+      user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+      store: 'M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4',
+      wallet: 'M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01',
+      chart: 'M5 20V11M11 20V5M17 20v-6M3 20h18',
+      org: 'M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4',
+      shield: 'M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5',
+      gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z',
+      map: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14',
+      globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
+      spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
+      page: 'M4 4h16v16H4zM4 9h16M9 9v11',
+      search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6',
+      plus: 'M12 5v14M5 12h14',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      x: 'M6 6l12 12M18 6L6 18',
+      dash: 'M7 12h10',
+      right: 'M9 6l6 6-6 6',
+      updown: 'M8 9l4-4 4 4M8 15l4 4 4-4'
+    };
+    const s = this.state;
+    const dark = s.dark ?? (this.props.dark || (typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches));
+    const RAIL = [['home', 'Tổng quan', I.home, 'Main.dc.html'], ['sales', 'Bán hàng', I.cart, 'Orders.dc.html'], ['catalog', 'Sản phẩm', I.box, 'Main.dc.html'], ['mkt', 'Tiếp thị', I.mega, 'Main.dc.html'], ['content', 'Nội dung', I.posts, 'Content.dc.html'], ['buyers', 'Khách hàng', I.user, 'Main.dc.html'], ['market', 'Sàn', I.store, 'Main.dc.html'], ['finance', 'Tài chính', I.wallet, 'Main.dc.html'], ['reports', 'Báo cáo', I.chart, 'Main.dc.html'], ['org', 'Tổ chức', I.org, 'Org.dc.html'], ['legal', 'Tuân thủ', I.shield, 'Compliance.dc.html'], ['settings', 'Cài đặt', I.gear, 'Main.dc.html']];
+    const rail = RAIL.map(([id, label, icon, href]) => ({ label, icon, href, cls: id === 'content' ? 'on' : '', cur: id === 'content' ? 'page' : 'false' }));
+    const secs = [
+      { label: 'Website', items: [['Bài viết', 'Content.dc.html', '3', 'on'], ['Trang', '#'], ['Trang bắt buộc', '#', '1'], ['Danh mục và thẻ', '#'], ['Menu', 'Menus.dc.html']] },
+      { label: 'Tài nguyên', items: [['Thư viện media', 'MediaLibrary.dc.html', '', ''], ['Bình luận', '#', '2']] }
+    ].map((sec, i) => ({ label: sec.label, sep: i > 0, items: sec.items.map(([label, href, count, cls]) => ({ label, href, count: count || '', cls: cls || '', hot: label === 'Trang bắt buộc' ? 'hot' : '' })) }));
+    const TITLE = 'Chọn chảo gang cho bếp từ';
+    // Thân bài theo khối (node của ProseMirror / Tiptap). Ảnh chỉ giữ ID media; alt theo từng ngôn ngữ nằm ở node ảnh.
+    const BLOCKS0 = [
+      { id: 'b1', t: 'p', text: 'Bếp từ chỉ nóng khi đáy chảo hút được nam châm. Chảo gang hút rất tốt, giữ nhiệt lâu và dùng được nhiều năm, nhưng cần chọn đúng cỡ và đáy phẳng.' },
+      { id: 'b2', t: 'h2', text: 'Ba điều cần kiểm trước khi mua' },
+      { id: 'b3', t: 'ul', items: ['Đáy phẳng, vùng tiếp xúc bằng hoặc lớn hơn vùng nấu của bếp', 'Chảo đã tôi dầu sẵn hay chưa', 'Tay cầm liền khối, chịu được lò nướng'] },
+      { id: 'b4', t: 'img', media: 'chao-gang-26-mat-tren.jpg', cap: 'Chảo gang 26 cm, mặt trên · chao-gang-26-mat-tren.jpg', alt: { vi: 'Chảo gang 26 cm nhìn từ trên, lòng chảo đen bóng', en: '26 cm cast iron skillet seen from above' } },
+      { id: 'b5', t: 'quote', text: 'Lần đầu dùng, làm nóng từ từ ở mức vừa; đừng bật mức cao nhất ngay.' },
+      { id: 'b6', t: 'embed', text: 'Chảo gang 26 cm', cap: '690.000 ₫ · catalog.product · còn hàng ở 3 cửa hàng' },
+      { id: 'b7', t: 'h2', text: 'Tôi dầu và bảo quản' },
+      { id: 'b8', t: 'p', text: 'Sau mỗi lần rửa, lau khô rồi tráng một lớp dầu mỏng. Không ngâm chảo trong nước qua đêm.' }
+    ];
+    const TYPES = { p: 'Đoạn văn', h2: 'Tiêu đề 2', h3: 'Tiêu đề 3', ul: 'Danh sách', quote: 'Trích dẫn', code: 'Khối mã', table: 'Bảng', img: 'Ảnh từ thư viện', video: 'Video nhúng', embed: 'Nhúng sản phẩm' };
+    const NEWB = {
+      p: { text: 'Đoạn văn mới.' }, h2: { text: 'Tiêu đề mới' }, h3: { text: 'Tiêu đề nhỏ mới' }, ul: { items: ['Ý thứ nhất', 'Ý thứ hai'] },
+      quote: { text: 'Lời trích mới.' }, code: { text: 'Đoạn mã' }, table: { items: ['Cỡ chảo · Vùng nấu phù hợp', '26 cm · 18–22 cm', '28 cm · 20–24 cm'] },
+      img: { media: '', cap: 'Chưa chọn ảnh — bấm "Đổi ảnh" để chọn trong thư viện', alt: { vi: '', en: '' } }, video: { text: 'Video từ trang được phép (vd YouTube)' },
+      embed: { text: 'Chọn sản phẩm để nhúng', cap: 'catalog.product · chưa chọn' }
+    };
+    const list = s.blocks || BLOCKS0;
+    const setBlocks = (b) => this.setState({ blocks: b, saved: 'vừa xong' });
+    const TEXT = ['p', 'h2', 'h3', 'quote', 'code'];
+    const blocks = list.map((b, i) => {
+      const on = s.sel === b.id;
+      return {
+        ...b, on, label: TYPES[b.t], aria: 'Khối ' + (i + 1) + ': ' + TYPES[b.t],
+        isP: b.t === 'p', isH2: b.t === 'h2', isH3: b.t === 'h3', isUl: b.t === 'ul', isQuote: b.t === 'quote', isCode: b.t === 'code',
+        isImg: b.t === 'img', isEmbed: b.t === 'embed', isVideo: b.t === 'video', isTable: b.t === 'table', isText: on && TEXT.includes(b.t),
+        items: (b.items || []).map((t) => ({ t })), text: b.text || '', cap: b.cap || '',
+        bgImg: b.media ? 'linear-gradient(135deg, #24262B 0%, #3E3A36 60%, #7A5A40 100%)' : 'var(--hover)',
+        alts: b.t === 'img' ? [['VI', b.alt.vi], ['EN', b.alt.en]].map(([code, t]) => ({ code, miss: t ? '' : 'miss', text: t ? 'Alt: ' + t : 'Thiếu alt ' + code + ' — trình đọc màn hình không mô tả được ảnh' })) : [],
+        bg: on ? 'var(--panel)' : 'transparent', ring: on ? 'inset 0 0 0 1.5px var(--accent)' : 'none',
+        first: i === 0, last: i === list.length - 1,
+        pick: () => { if (s.sel !== b.id) this.setState({ sel: b.id }); },
+        up: () => { if (i === 0) return; const c = [...list]; [c[i - 1], c[i]] = [c[i], c[i - 1]]; setBlocks(c); },
+        down: () => { if (i === list.length - 1) return; const c = [...list]; [c[i + 1], c[i]] = [c[i], c[i + 1]]; setBlocks(c); },
+        del: () => { this.setState({ blocks: list.filter((x) => x.id !== b.id), sel: null, saved: 'vừa xong' }); this.say('Đã xoá khối ' + TYPES[b.t].toLowerCase() + '; khôi phục được từ phiên bản trước'); },
+        setText: (e) => setBlocks(list.map((x) => (x.id === b.id ? { ...x, text: e.target.value } : x)))
+      };
+    });
+    const selIdx = list.findIndex((b) => b.id === s.sel);
+    const insTypes = Object.keys(TYPES).map((t) => ({ label: TYPES[t], add: () => {
+      const id = 'n' + Date.now();
+      const nb = { id, t, ...NEWB[t] };
+      const c = [...list]; c.splice(selIdx >= 0 ? selIdx + 1 : c.length, 0, nb);
+      this.setState({ blocks: c, sel: id, ins: false, saved: 'vừa xong' });
+    } }));
+
+    const ST = { draft: ['Bản nháp', 'b-draft'], review: ['Chờ duyệt', 'b-review'], sched: ['Đã lên lịch', 'b-sched'], pub: ['Đã đăng', 'b-pub'] };
+    const st = s.st;
+    const aiParts = ['mô tả SEO (gợi ý ngày 11/11)', ...(s.seoAi ? ['tiêu đề SEO (vừa áp dụng)'] : []), ...(s.tr === 'done' ? ['bản dịch EN (bản nháp riêng)'] : [])];
+    const TABS = [['set', 'Thiết lập'], ['seo', 'SEO'], ['lang', 'Bản dịch'], ['hist', 'Lịch sử']];
+    const REVS = [
+      { title: 'Bản 5', meta: 'Hôm nay 09:12 · Minh Anh · sửa đoạn mở bài, thêm 2 ảnh' },
+      { title: 'Bản 4', meta: 'Hôm qua 17:40 · Thu Hà · sửa tiêu đề SEO' },
+      { title: 'Bản 3', meta: '10/11 08:05 · Minh Anh · bản đầu gửi duyệt' },
+      { title: 'Bản 2', meta: '09/11 15:30 · Minh Anh · tự lưu' },
+      { title: 'Bản 1', meta: '09/11 14:02 · Minh Anh · tạo bản nháp' }
+    ];
+    const revs = [{ title: 'Bản nháp đang sửa', meta: 'Lưu ' + s.saved + ' · Lan Phạm', cls: 'now', old: false }, ...s.restored.map((t) => ({ title: t, meta: 'Vừa xong · Lan Phạm · chép về bản nháp, chưa đăng', cls: '', old: false })), ...REVS.map((r) => ({ ...r, cls: '', old: true,
+      diff: () => this.say('So sánh ' + r.title + ' với bản nháp: 2 đoạn sửa, 1 khối ảnh thêm'),
+      restore: () => { this.setState({ restored: ['Khôi phục từ ' + r.title.toLowerCase(), ...s.restored], saved: 'vừa xong' }); this.say('Đã chép ' + r.title.toLowerCase() + ' về bản nháp; bản đang công khai (nếu có) không đổi'); } }))];
+    const SITES = { main: ['bepmoc.vn · Trụ sở', 'Hiện trên bepmoc.vn. Người ở Trụ sở sửa được; cửa hàng chỉ sửa bài của nút mình.'], market: ['cho.bepmoc.vn · Chợ Bếp Mộc', 'Hiện trên cho.bepmoc.vn, website của sàn; nhóm vận hành sàn sửa được.'] };
+    const later = s.pubMode === 'later';
+    const metaT = s.metaT, metaD = s.metaD;
+    const PV = { phone: ['Điện thoại', 390, I.phone], tablet: ['Máy tính bảng', 768, I.tablet], desk: ['Máy tính', 1280, I.monitor] };
+    const pvW = PV[s.pvSize][1];
+    const avail = (typeof window !== 'undefined' ? window.innerWidth : 1440) - 104;
+    const zoom = Math.min(1, avail / pvW);
+    const schedText = s.sched ? 'Đăng lúc ' + s.sched + ' · ghim bản nháp lúc đặt' : '';
+    const enNote = { idle: 'Chưa có bản dịch', busy: 'AI đang dịch tiêu đề, tóm tắt và thân bài…', done: 'AI dịch từ bản 5 · bản nháp riêng · cần người duyệt', blank: 'Bản trống · chưa có nội dung' }[s.tr];
+
+    return {
+      theme: dark ? 'dark' : '', themeIcon: dark ? I.sun : I.moon, toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, rail, secs, toast: s.toast,
+      title: TITLE, excerpt: 'Ba điều cần kiểm khi chọn chảo gang cho bếp từ, và cách tôi dầu để chảo bền nhiều năm.',
+      stLabel: ST[st][0], stBadge: ST[st][1], hasAi: true,
+      savedText: 'Đã lưu nháp · ' + s.saved + ' · Minh Anh xin duyệt 10/11',
+      countText: '1.240 chữ · 6 phút đọc',
+      blocks, insOpen: s.ins, toggleIns: () => this.setState({ ins: !s.ins }), insTypes,
+      insWhere: selIdx >= 0 ? 'sau khối đang chọn' : 'ở cuối',
+      sheet: s.sheet, sideCls: s.sheet ? 'pane' : 'only-desktop',
+      openSheet: () => this.setState({ sheet: true }), closeSheet: () => this.setState({ sheet: false }),
+      tabs: TABS.map(([id, label]) => ({ label, on: s.tab === id, cls: s.tab === id ? 'on' : '', n: id === 'hist' ? String(REVS.length + s.restored.length) : '', pick: () => this.setState({ tab: id }) })),
+      tabSet: s.tab === 'set', tabSeo: s.tab === 'seo', tabLang: s.tab === 'lang', tabHist: s.tab === 'hist',
+      facts: [
+        { k: 'Trạng thái', v: ST[st][0] + (st === 'review' ? ' · bản nháp đã xin duyệt' : '') },
+        { k: 'Bản công khai', v: st === 'pub' ? 'Đang hiện trên ' + SITES[s.site][0].split(' · ')[0] : 'Chưa đăng lần nào' },
+        { k: 'Xin duyệt', v: s.review ? 'Minh Anh · 10/11 08:05' : 'Không' },
+        { k: 'Tạo bởi', v: 'Minh Anh · đăng nhập (không qua API key)' }
+      ],
+      aiFacts: [
+        { k: 'Phần có AI', v: aiParts.join('; ') },
+        { k: 'Dấu khi đăng', v: 'ai_assisted · nhãn "Có sự hỗ trợ của AI"' },
+        { k: 'Người duyệt AI', v: st === 'pub' ? 'Lan Phạm · vừa xong' : 'Chưa · xác nhận khi đăng' }
+      ],
+      hasSched: !!s.sched, noSched: !s.sched, schedText,
+      cancelSched: () => { this.setState({ sched: null, st: s.review ? 'review' : 'draft' }); this.say('Đã huỷ lịch đăng; bài về lại bản nháp'); },
+      openSchedule: () => this.setState({ pub: true, pubMode: 'later', pubErr: '' }),
+      sites: Object.keys(SITES).map((id) => ({ label: SITES[id][0], on: s.site === id, cls: s.site === id ? 'on' : '', pick: () => this.setState({ site: id }) })),
+      siteNote: SITES[s.site][1],
+      slug: s.slug, onSlug: (e) => this.setState({ slug: e.target.value }),
+      seoChecks: [
+        { text: 'Tiêu đề SEO dài ' + metaT.length + ' ký tự', icon: metaT.length <= 60 ? I.check : I.warn, color: metaT.length <= 60 ? 'var(--ok)' : 'var(--warn)' },
+        { text: 'Mô tả dài ' + metaD.length + ' ký tự', icon: metaD.length <= 160 ? I.check : I.warn, color: metaD.length <= 160 ? 'var(--ok)' : 'var(--warn)' },
+        { text: 'Đường dẫn ngắn, không dấu', icon: I.check, color: 'var(--ok)' },
+        { text: 'Ảnh đại diện có alt tiếng Việt', icon: I.check, color: 'var(--ok)' },
+        { text: 'Chưa có liên kết tới bài khác trên website', icon: I.warn, color: 'var(--warn)' }
+      ],
+      metaT, metaD, metaTN: String(metaT.length), metaDN: String(metaD.length),
+      onMetaT: (e) => this.setState({ metaT: e.target.value }), onMetaD: (e) => this.setState({ metaD: e.target.value }),
+      snipUrl: (s.site === 'main' ? 'bepmoc.vn' : 'cho.bepmoc.vn') + ' › blog › ' + s.slug,
+      noindex: s.noindex, noindexCls: s.noindex ? 'on' : '', toggleNoindex: () => this.setState({ noindex: !s.noindex }),
+      seoBusy: s.seoBusy, seoSug: s.seoSug,
+      sugT: 'Chảo gang cho bếp từ: chọn cỡ, đáy và cách tôi dầu',
+      sugD: 'Chảo gang chạy tốt trên bếp từ nếu đáy phẳng và đúng cỡ. Ba điều cần kiểm khi mua và cách tôi dầu để chảo bền.',
+      suggestSeo: () => { this.setState({ seoBusy: true, seoSug: false }); setTimeout(() => this.setState({ seoBusy: false, seoSug: true }), 1200); },
+      applySeo: () => { this.setState({ metaT: 'Chảo gang cho bếp từ: chọn cỡ, đáy và cách tôi dầu', metaD: 'Chảo gang chạy tốt trên bếp từ nếu đáy phẳng và đúng cỡ. Ba điều cần kiểm khi mua và cách tôi dầu để chảo bền.', seoSug: false, seoAi: true, saved: 'vừa xong' }); this.say('Đã áp gợi ý vào bản nháp; bài mang dấu có AI hỗ trợ'); },
+      dropSeo: () => this.setState({ seoSug: false }),
+      enCls: s.tr === 'done' || s.tr === 'blank' ? '' : 'miss', enNote,
+      trIdle: s.tr === 'idle', trBusy: s.tr === 'busy', trDone: s.tr === 'done' || s.tr === 'blank',
+      translate: () => { this.setState({ tr: 'busy' }); setTimeout(() => { this.setState({ tr: 'done' }); this.say('Đã tạo bản nháp tiếng Anh do AI dịch; cần người duyệt rồi mới đăng'); }, 1600); },
+      blankTr: () => { this.setState({ tr: 'blank' }); this.say('Đã tạo bản dịch tiếng Anh trống'); },
+      revs,
+      reviewLabel: s.review ? 'Rút yêu cầu duyệt' : 'Gửi duyệt',
+      toggleReview: () => {
+        const r = !s.review;
+        this.setState({ review: r, st: s.st === 'pub' || s.st === 'sched' ? s.st : r ? 'review' : 'draft' });
+        this.say(r ? 'Đã gửi duyệt; người biên tập nhận thông báo (event content.review_requested)' : 'Đã rút yêu cầu duyệt; bài về bản nháp');
+      },
+      pubLabel: st === 'pub' ? 'Đăng lại' : 'Đăng',
+      openPublish: () => this.setState({ pub: true, pubMode: 'now', pubErr: '' }),
+      pubOpen: s.pub, closePublish: () => this.setState({ pub: false, pubErr: '' }),
+      pubTitle: later ? 'Hẹn giờ đăng' : 'Đăng bài viết',
+      checks: [
+        { text: 'Đường dẫn /blog/' + s.slug + ' chưa trùng trên ' + SITES[s.site][0].split(' · ')[0], icon: I.check, color: 'var(--ok)' },
+        { text: 'Ảnh đại diện và ảnh trong bài có alt tiếng Việt', icon: I.check, color: 'var(--ok)' },
+        { text: 'Chưa có bản tiếng Anh. Vẫn đăng được; bản EN đăng riêng sau.', icon: I.warn, color: 'var(--warn)' },
+        { text: 'Khối "Nhúng sản phẩm" chỉ hiện khi sản phẩm còn công khai', icon: I.info, color: 'var(--accent)' }
+      ],
+      nowCls: later ? '' : 'on', laterCls: later ? 'on' : '', isLater: later,
+      pickNow: () => this.setState({ pubMode: 'now', pubErr: '' }), pickLater: () => this.setState({ pubMode: 'later', pubErr: '' }),
+      pubDate: s.pubDate, pubTime: s.pubTime, onPubDate: (e) => this.setState({ pubDate: e.target.value }), onPubTime: (e) => this.setState({ pubTime: e.target.value }),
+      aiOk: s.aiOk, toggleAiOk: () => this.setState({ aiOk: !s.aiOk, pubErr: '' }), aiParts: 'Phần có AI: ' + aiParts.join('; '),
+      pubErr: s.pubErr, pubOk: later ? 'Hẹn giờ' : 'Đăng bài viết',
+      submitPublish: (e) => {
+        e.preventDefault();
+        const errs = [];
+        if (!s.aiOk) errs.push('xác nhận đã duyệt phần do AI gợi ý');
+        if (later && !/^\d{2}\/\d{2}\/\d{4}$/.test(s.pubDate.trim())) errs.push('ngày theo dạng dd/mm/yyyy');
+        if (later && !/^\d{2}:\d{2}$/.test(s.pubTime.trim())) errs.push('giờ theo dạng hh:mm');
+        if (errs.length) { this.setState({ pubErr: 'Hãy ' + errs.join(', ') + '.' }); return; }
+        if (later) { this.setState({ pub: false, sched: s.pubTime + ' ngày ' + s.pubDate, st: 'sched' }); this.say('Đã hẹn đăng lúc ' + s.pubTime + ' ngày ' + s.pubDate + '; lịch ghim bản nháp hiện tại'); return; }
+        this.setState({ pub: false, st: 'pub', review: false, sched: null });
+        this.say('Đã đăng lên ' + SITES[s.site][0].split(' · ')[0] + '/blog/' + s.slug + ' kèm nhãn "Có sự hỗ trợ của AI"');
+      },
+      openPreview: () => this.setState({ pv: true, token: false }), pvOpen: s.pv, closePreview: () => this.setState({ pv: false }),
+      sizes: Object.keys(PV).map((k) => ({ label: PV[k][0], icon: PV[k][2], on: s.pvSize === k, cls: s.pvSize === k ? 'on' : '', pick: () => this.setState({ pvSize: k }) })),
+      pvW: pvW + 'px', pvZoom: String(Math.round(zoom * 1000) / 1000), pvPad: pvW < 500 ? '16px' : pvW < 1000 ? '24px 40px' : '32px 160px', pvH: pvW < 500 ? '24px' : '34px',
+      pvNote: 'Khổ ' + pvW + ' px' + (zoom < 1 ? ' · thu nhỏ còn ' + Math.round(zoom * 100) + '% cho vừa màn của bạn' : '') + '. Luôn là bản nháp mới nhất, không lưu vào bộ đệm.',
+      pvBlocks: list.filter((b) => TEXT.includes(b.t)).slice(0, 5).map((b) => ({ text: b.text, size: b.t === 'h2' ? (pvW < 500 ? '19px' : '22px') : '15px', w: b.t === 'h2' ? '600' : '400' })),
+      hasToken: s.token, makeToken: () => { this.setState({ token: true }); this.say('Đã tạo link xem trước, hết hạn sau 10 phút'); }
+    };
+  }
+}
+</script>
+</body>
+</html>

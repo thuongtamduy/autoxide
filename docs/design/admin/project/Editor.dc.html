@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Soạn bài viết — Autoxide Admin</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ax-r40.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div class="ax v1 {{theme}}" style="min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <header style="position: relative; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; background: var(--sheet); border-bottom: 1px solid var(--line)">
+    <a class="btn ghost sm" href="Entries.dc.html"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.back}}"></path></svg>Bài viết</a>
+    <span style="width: 1px; height: 22px; background: var(--line)"></span>
+    <span class="ell" style="flex: 0 1 380px; min-width: 0; font-weight: 600">Chuyển từ SQLite sang Postgres không gián đoạn</span>
+    <span style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-3)"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ok)"><path d="{{ic.check}}"></path></svg>Đã lưu nháp · 12 giây trước</span>
+    <div style="flex: 1"></div>
+    <sc-if value="{{isDraft}}" hint-placeholder-val="{{true}}"><span class="badge b-draft"><span class="dot"></span>Bản nháp</span></sc-if>
+    <sc-if value="{{isPub}}" hint-placeholder-val="{{false}}"><span class="badge b-pub pop"><span class="dot"></span>Đã đăng</span></sc-if>
+    <button class="btn ghost sq" aria-label="Đổi giao diện sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+    <button class="btn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.eye}}"></path></svg>Xem trước</button>
+    <button class="btn">Gửi duyệt</button>
+    <div style="position: relative">
+      <button class="btn pri" onClick="{{togglePub}}" aria-expanded="{{pubOpen}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.send}}"></path></svg>Đăng<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.down}}"></path></svg></button>
+      <sc-if value="{{pubOpen}}" hint-placeholder-val="{{false}}">
+        <div class="popover" role="dialog" aria-label="Đăng bài viết" style="position: absolute; top: 48px; right: 0; width: 360px; max-width: calc(100vw - 32px); display: flex; flex-direction: column; gap: 14px; padding: 18px">
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <h2 class="h2" style="font-size: 16px">Sẵn sàng đăng?</h2>
+            <span style="font-size: 13px; color: var(--ink-3)">Kiểm tra nhanh trước khi bài viết lên website.</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <span style="display: flex; align-items: flex-start; gap: 10px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ok)"><path d="{{ic.check}}"></path></svg><span>Đã có ảnh đại diện và văn bản thay thế</span></span>
+            <span style="display: flex; align-items: flex-start; gap: 10px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ok)"><path d="{{ic.check}}"></path></svg><span>Đường dẫn <span class="mono" style="font-size: 12.5px">/blog/sqlite-sang-postgres</span> chưa bị trùng</span></span>
+            <span style="display: flex; align-items: flex-start; gap: 10px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ok)"><path d="{{ic.check}}"></path></svg><span>Điểm SEO 82, mô tả dài 148 ký tự</span></span>
+            <span style="display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; margin: 0 -10px; border-radius: 9px; background: var(--warn-bg); color: var(--warn)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.warn}}"></path></svg><span>Chưa có bản dịch tiếng Anh. Vẫn đăng được; bản tiếng Việt sẽ lên trước.</span></span>
+          </div>
+          <div class="seg" role="group" aria-label="Thời điểm đăng" style="align-self: stretch">
+            <button class="{{nowOn}}" onClick="{{pickNow}}" style="flex: 1; justify-content: center">Đăng ngay</button>
+            <button class="{{laterOn}}" onClick="{{pickLater}}" style="flex: 1; justify-content: center">Lên lịch</button>
+          </div>
+          <sc-if value="{{isLater}}" hint-placeholder-val="{{false}}">
+            <div class="pop" style="display: flex; gap: 8px">
+              <label style="flex: 1.4; display: flex; flex-direction: column; gap: 5px"><span class="lab">Ngày</span><input class="inp num" value="13/11/2026" readonly></label>
+              <label style="flex: 1; display: flex; flex-direction: column; gap: 5px"><span class="lab">Giờ (GMT+7)</span><input class="inp num" value="08:00" readonly></label>
+            </div>
+          </sc-if>
+          <div style="display: flex; justify-content: flex-end; gap: 8px">
+            <button class="btn" onClick="{{togglePub}}">Để sau</button>
+            <button class="btn pri" onClick="{{doPublish}}">{{pubLabel}}</button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </header>
+
+  <div style="flex: 1; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; padding: 8px">
+
+    <aside class="rise ed-toc" style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 22px; padding: 22px 12px 12px 16px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span class="cap">Mục lục</span>
+        <nav aria-label="Mục lục bài viết" style="display: flex; flex-direction: column; gap: 2px; border-left: 1.5px solid var(--line)">
+          <a href="#mo-dau" style="padding: 6px 12px; margin-left: -1.5px; border-left: 1.5px solid transparent; text-decoration: none; color: var(--ink-3)">Mở đầu</a>
+          <a href="#chuan-bi" style="padding: 6px 12px; margin-left: -1.5px; border-left: 1.5px solid transparent; text-decoration: none; color: var(--ink-3)">Chuẩn bị</a>
+          <a href="#sao-chep" style="padding: 6px 12px; margin-left: -1.5px; border-left: 1.5px solid var(--accent); text-decoration: none; color: var(--ink); font-weight: 600">Sao chép dữ liệu</a>
+        </nav>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span class="cap">Bài viết</span>
+        <span style="display: flex; justify-content: space-between; color: var(--ink-2)"><span>Số từ</span><span class="num" style="font-weight: 600; color: var(--ink)">1.240</span></span>
+        <span style="display: flex; justify-content: space-between; color: var(--ink-2)"><span>Thời gian đọc</span><span class="num" style="font-weight: 600; color: var(--ink)">6 phút</span></span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span class="cap">Phím tắt</span>
+        <span style="display: flex; align-items: center; gap: 8px; color: var(--ink-2)"><span class="kbd">/</span>Chèn khối</span>
+        <span style="display: flex; align-items: center; gap: 8px; color: var(--ink-2)"><span class="kbd">Ctrl</span><span class="kbd">S</span>Lưu nháp</span>
+        <span style="display: flex; align-items: center; gap: 8px; color: var(--ink-2)"><span class="kbd">Ctrl</span><span class="kbd">K</span>Bảng lệnh</span>
+      </div>
+    </aside>
+
+    <main class="rise d1" style="flex: 999 1 560px; min-width: 0; background: var(--sheet); border: 1px solid var(--line); border-radius: 16px">
+      <article style="max-width: 760px; margin: 0 auto; padding: 44px 44px 340px; display: flex; flex-direction: column; gap: 22px">
+
+        <figure style="position: relative; margin: 0; border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px var(--line)">
+          <img src="/_blob/71315ceee2aa018ed565193153fa2962" alt="Hai khối database nối với nhau bằng một mũi tên" style="display: block; width: 100%; aspect-ratio: 21 / 9; object-fit: cover">
+          <div style="position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px">
+            <button class="btn sm"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.image}}"></path></svg>Đổi ảnh</button>
+          </div>
+        </figure>
+
+        <div id="mo-dau" style="display: flex; flex-direction: column; gap: 14px">
+          <span style="display: flex; align-items: center; gap: 8px"><span class="badge b-draft" style="height: 22px">Hướng dẫn</span><span style="font-size: 12.5px; color: var(--ink-3)">Tiếng Việt · bản gốc</span></span>
+          <h1 class="dsp" style="margin: 0; font-size: 38px; font-weight: 700; line-height: 1.18; letter-spacing: -0.025em; text-wrap: balance">Chuyển từ SQLite sang Postgres không gián đoạn</h1>
+          <p style="margin: 0; font-size: 19px; line-height: 1.6; color: var(--ink-2); text-wrap: pretty">SQLite đủ cho phần lớn website mới. Khi lượng ghi tăng lên, bạn có thể chuyển sang Postgres mà không phải viết lại gì: cùng một bản Autoxide chạy được trên cả hai.</p>
+        </div>
+
+        <div class="prose" style="display: flex; flex-direction: column; gap: 20px">
+          <div class="blk">
+            <button class="grip" aria-label="Kéo để đổi vị trí khối"><svg class="ic s dots" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.grip}}"></path></svg></button>
+            <p>Bài này đi qua từng bước: sao lưu, dựng database mới, sao chép dữ liệu của mọi module rồi đổi cấu hình. Toàn bộ quá trình làm được trong một buổi tối.</p>
+          </div>
+
+          <h2 id="chuan-bi" class="dsp" style="margin: 10px 0 -4px; font-size: 25px; font-weight: 600; line-height: 1.3; letter-spacing: -0.015em">Chuẩn bị</h2>
+
+          <div class="blk">
+            <button class="grip" aria-label="Kéo để đổi vị trí khối"><svg class="ic s dots" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.grip}}"></path></svg></button>
+            <div class="popover fmtbar" role="toolbar" aria-label="Định dạng chữ" style="position: absolute; top: -50px; left: 132px; z-index: 4; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 11px">
+              <button class="btn ghost sm sq" aria-label="Đậm" style="font-weight: 700; color: var(--ink)">B</button>
+              <button class="btn ghost sm sq" aria-label="Nghiêng" style="font-style: italic; font-family: Georgia, serif; color: var(--ink)">I</button>
+              <button class="btn ghost sm sq" aria-label="Mã" style="font-size: 11px; color: var(--ink)"><span class="mono">{ }</span></button>
+              <button class="btn ghost sm sq" aria-label="Chèn liên kết"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.link}}"></path></svg></button>
+              <span style="width: 1px; height: 18px; margin: 0 3px; background: var(--line)"></span>
+              <button class="btn ghost sm" style="color: var(--ink)">Tiêu đề 2</button>
+              <button class="btn ghost sm" style="color: var(--ink)">Trích dẫn</button>
+            </div>
+            <p>Trước khi bắt đầu, hãy <span class="marked">tạo một bản sao lưu đầy đủ</span> và thử khôi phục nó vào một database trống. Một bản sao lưu chưa từng được khôi phục thử thì chưa đáng tin.</p>
+          </div>
+
+          <div style="display: flex; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); font-size: 15.5px; line-height: 1.6">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-top: 3px; color: var(--accent)"><path d="{{ic.warn}}"></path></svg>
+            <span><strong style="font-weight: 600">Lưu ý.</strong> Migration không bao giờ tự chạy. Bạn cần chạy nó trên database mới trước khi sao chép dữ liệu.</span>
+          </div>
+
+          <h2 id="sao-chep" class="dsp" style="margin: 10px 0 -4px; font-size: 25px; font-weight: 600; line-height: 1.3; letter-spacing: -0.015em">Sao chép dữ liệu</h2>
+
+          <div class="blk">
+            <button class="grip" aria-label="Kéo để đổi vị trí khối"><svg class="ic s dots" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.grip}}"></path></svg></button>
+            <p>Trỏ cấu hình sang database Postgres còn trống, áp dụng migration, rồi sao chép dữ liệu của mọi module sang.</p>
+          </div>
+
+          <pre class="mono" style="margin: 0; padding: 16px 18px; border-radius: 12px; background: #14171F; color: #E4E6EB; font-size: 13.5px; line-height: 1.7; overflow-x: auto; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08)"><span style="color: #8A91A0"># 1. Áp dụng migration trên database mới</span>
+autoxide migrate up
+<span style="color: #8A91A0"># 2. Sao chép dữ liệu của mọi module</span>
+autoxide copy <span style="color: #FFA27A">…</span></pre>
+
+          <div style="position: relative">
+            <p style="color: var(--ink)">/<span class="caret"></span></p>
+            <div class="popover" role="listbox" aria-label="Chèn khối" style="position: absolute; top: 38px; left: 0; z-index: 4; width: 300px; display: flex; flex-direction: column; padding: 6px; font-size: 14px; line-height: 1.4">
+              <span class="cap" style="padding: 6px 10px">Khối cơ bản</span>
+              <sc-for list="{{blocks}}" as="b" hint-placeholder-count="6">
+                <button class="item {{b.cls}}" role="option" style="display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 8px; border: 0; background: {{b.bg}}; text-align: left; cursor: pointer">
+                  <span class="mono" style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--line-2); font-size: 11.5px; font-weight: 500; color: var(--ink-2)">{{b.glyph}}</span>
+                  <span style="flex: 1; display: flex; flex-direction: column; line-height: 1.25"><span style="font-weight: 500">{{b.label}}</span><span style="font-size: 12px; color: var(--ink-3)">{{b.hint}}</span></span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+
+    <aside class="card rise d2" style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; border-radius: 16px">
+      <div role="tablist" aria-label="Thuộc tính bài viết" style="display: flex; gap: 0 20px; padding: 0 18px; border-bottom: 1px solid var(--line)">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+          <button class="tab {{t.cls}}" role="tab" onClick="{{t.pick}}">{{t.label}}</button>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{tabDoc}}" hint-placeholder-val="{{true}}">
+        <div class="pop" style="display: flex; flex-direction: column; gap: 18px; padding: 18px">
+          <label style="display: flex; flex-direction: column; gap: 6px">
+            <span class="lab">Đường dẫn</span>
+            <span style="display: flex; align-items: stretch">
+              <span class="mono" style="display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--line-2); border-right: 0; border-radius: 10px 0 0 10px; background: var(--panel); font-size: 12.5px; color: var(--ink-3)">/blog/</span>
+              <input class="inp mono" value="sqlite-sang-postgres" readonly style="border-radius: 0 10px 10px 0; font-size: 12.5px">
+            </span>
+            <span style="font-size: 12px; color: var(--ink-3)">Đổi đường dẫn sau khi đăng, đường dẫn cũ tự chuyển hướng sang mới.</span>
+          </label>
+
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span class="lab">Tác giả</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <span style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 4px; border-radius: 999px; background: var(--hover); font-weight: 500"><span class="av a4" style="width: 24px; height: 24px; font-size: 10px">AD</span>Admin</span>
+              <button class="chip" style="height: 32px; border-radius: 999px"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.plus}}"></path></svg>Thêm</button>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span class="lab">Danh mục</span>
+            <button class="inp" style="display: flex; align-items: center; text-align: left; cursor: pointer"><span style="flex: 1">Hướng dẫn</span><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ink-3)"><path d="{{ic.down}}"></path></svg></button>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span class="lab">Thẻ</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border: 1px solid var(--line-2); border-radius: 10px">
+              <span class="loc" style="height: 26px; padding: 0 9px; font-size: 12px; font-weight: 500; letter-spacing: 0">sqlite</span>
+              <span class="loc" style="height: 26px; padding: 0 9px; font-size: 12px; font-weight: 500; letter-spacing: 0">postgres</span>
+              <span class="loc" style="height: 26px; padding: 0 9px; font-size: 12px; font-weight: 500; letter-spacing: 0">migration</span>
+              <input placeholder="Thêm thẻ…" aria-label="Thêm thẻ" style="flex: 1; min-width: 80px; height: 26px; border: 0; outline: none; background: transparent; color: var(--ink); font-size: 13px">
+            </div>
+          </div>
+
+          <label style="display: flex; flex-direction: column; gap: 6px">
+            <span style="display: flex; justify-content: space-between"><span class="lab">Trích đoạn</span><span class="num" style="font-size: 12px; color: var(--ink-3)">148 / 160</span></span>
+            <textarea class="inp" rows="4" readonly>Hướng dẫn từng bước chuyển một website Autoxide từ SQLite sang Postgres: sao lưu, áp dụng migration, sao chép dữ liệu và đổi cấu hình.</textarea>
+          </label>
+
+          <div style="display: flex; align-items: center; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line)">
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500">Cho phép bình luận</span><span style="font-size: 12px; color: var(--ink-3)">Bình luận mới vẫn qua hàng chờ duyệt.</span></span>
+            <button class="sw {{cmtOn}}" role="switch" aria-checked="{{cmt}}" aria-label="Cho phép bình luận" onClick="{{toggleCmt}}"></button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{tabSeo}}" hint-placeholder-val="{{false}}">
+        <div class="pop" style="display: flex; flex-direction: column; gap: 18px; padding: 18px">
+          <div style="display: flex; align-items: center; gap: 16px">
+            <span style="position: relative; width: 84px; height: 84px; flex: none">
+              <svg viewBox="0 0 100 100" role="img" aria-label="Điểm SEO 82 trên 100" style="width: 84px; height: 84px; transform: rotate(-90deg)">
+                <circle class="ring-bg" cx="50" cy="50" r="42" style="stroke-width: 9"></circle>
+                <circle class="ring-fg" cx="50" cy="50" r="42" style="stroke-width: 9; stroke-dasharray: 264; stroke-dashoffset: 47.5"></circle>
+              </svg>
+              <span class="dsp num" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700">82</span>
+            </span>
+            <span style="display: flex; flex-direction: column; gap: 3px">
+              <span class="dsp" style="font-size: 16px; font-weight: 600">Tốt, còn 1 việc nên sửa</span>
+              <span style="font-size: 12.5px; color: var(--ink-3)">Kiểm tra lại mỗi lần lưu nháp.</span>
+            </span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <sc-for list="{{seoChecks}}" as="c" hint-placeholder-count="5">
+              <span style="display: flex; align-items: flex-start; gap: 10px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: {{c.color}}"><path d="{{c.icon}}"></path></svg><span style="flex: 1">{{c.text}}</span></span>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span class="lab">Xem thử trên trang tìm kiếm</span>
+            <div style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line)">
+              <span class="mono" style="font-size: 11.5px; color: var(--ink-3)">example.com › blog › sqlite-sang-postgres</span>
+              <span style="font-size: 16px; font-weight: 500; line-height: 1.35; color: var(--st-sched)">Chuyển từ SQLite sang Postgres không gián đoạn</span>
+              <span style="font-size: 13px; color: var(--ink-2); text-wrap: pretty">Hướng dẫn từng bước chuyển một website Autoxide từ SQLite sang Postgres: sao lưu, áp dụng migration, sao chép dữ liệu và đổi cấu hình.</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <button class="btn" style="align-self: stretch"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--accent)"><path d="{{ic.spark}}"></path></svg>Gợi ý tiêu đề và mô tả bằng AI</button>
+            <span style="font-size: 12px; color: var(--ink-3)">AI chỉ đưa gợi ý. Bạn xem rồi mới áp dụng, không có gì tự đăng.</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{tabI18n}}" hint-placeholder-val="{{false}}">
+        <div class="pop" style="display: flex; flex-direction: column; gap: 12px; padding: 18px">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line)">
+            <span class="loc" style="height: 28px; min-width: 34px; font-size: 12px">VI</span>
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500">Tiếng Việt</span><span style="font-size: 12px; color: var(--ink-3)">Bản gốc · đang mở</span></span>
+            <span class="badge b-draft"><span class="dot"></span>Bản nháp</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line)">
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span class="loc {{enCls}}" style="height: 28px; min-width: 34px; font-size: 12px">EN</span>
+              <span style="flex: 1; display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500">Tiếng Anh</span><span class="{{enShim}}" style="font-size: 12px; color: var(--ink-3)">{{enNote}}</span></span>
+              <sc-if value="{{trDone}}" hint-placeholder-val="{{false}}"><span class="badge b-draft pop"><span class="dot"></span>Bản nháp</span></sc-if>
+            </div>
+            <sc-if value="{{trIdle}}" hint-placeholder-val="{{true}}">
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <button class="btn sm" style="flex: 1 1 120px">Tạo bản trống</button>
+                <button class="btn sm" style="flex: 1 1 120px" onClick="{{translate}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--accent)"><path d="{{ic.spark}}"></path></svg>Dịch bằng AI</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{trBusy}}" hint-placeholder-val="{{false}}">
+              <div style="display: flex; flex-direction: column; gap: 7px">
+                <span class="shim" style="height: 12px; width: 92%"></span>
+                <span class="shim" style="height: 12px; width: 78%"></span>
+                <span class="shim" style="height: 12px; width: 60%"></span>
+              </div>
+            </sc-if>
+            <sc-if value="{{trDone}}" hint-placeholder-val="{{false}}">
+              <button class="btn sm pop" style="align-self: flex-start">Mở bản tiếng Anh để duyệt<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.arrow}}"></path></svg></button>
+            </sc-if>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-3)">Mỗi ngôn ngữ có đường dẫn, trạng thái và lịch đăng riêng.</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{tabHist}}" hint-placeholder-val="{{false}}">
+        <div class="pop" style="display: flex; flex-direction: column; gap: 16px; padding: 20px 18px">
+          <sc-for list="{{revisions}}" as="r" hint-placeholder-count="4">
+            <div class="tl {{r.cls}} row" style="display: flex; align-items: flex-start; gap: 10px; border-radius: 8px">
+              <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+                <span style="font-weight: 500">{{r.title}}</span>
+                <span style="font-size: 12.5px; color: var(--ink-3)">{{r.meta}}</span>
+              </span>
+              <sc-if value="{{r.old}}" hint-placeholder-val="{{true}}"><span class="acts"><button class="btn sm">Khôi phục</button></span></sc-if>
+            </div>
+          </sc-for>
+          <span style="font-size: 12px; color: var(--ink-3)">Khôi phục tạo một phiên bản mới, không xoá lịch sử.</span>
+        </div>
+      </sc-if>
+    </aside>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+    <div class="toast" role="status" style="z-index: 30"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.check}}"></path></svg>{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1420}}'>
+class Component extends DCLogic {
+  state = { tab: 'doc', pub: false, mode: 'now', published: false, cmt: true, tr: 'idle', dark: null, toast: '' };
+
+  say(text) {
+    this.setState({ toast: text });
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.setState({ toast: '' }), 2800);
+  }
+
+  renderVals() {
+    const I = {
+      back: 'M19 12H5M11 6l-6 6 6 6',
+      arrow: 'M5 12h14M13 6l6 6-6 6',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+      send: 'M4 12l16-8-6 16-3-7z',
+      down: 'M6 9l6 6 6-6',
+      plus: 'M12 5v14M5 12h14',
+      image: 'M4 5h16v14H4zM4 16l5-5 4 4 2.5-2.5L20 17M9 9h.01',
+      link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+      warn: 'M12 4l9 16H3zM12 10v4M12 17h.01',
+      grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
+      spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'
+    };
+    const s = this.state;
+    const dark = s.dark ?? this.props.dark ?? false;
+
+    const tabs = [['doc', 'Tài liệu'], ['seo', 'SEO'], ['i18n', 'Bản dịch'], ['hist', 'Lịch sử']].map(([id, label]) => ({
+      label, cls: s.tab === id ? 'on' : '', pick: () => this.setState({ tab: id })
+    }));
+
+    const blocks = [
+      { glyph: 'H2', label: 'Tiêu đề 2', hint: 'Đề mục của một phần', cls: '', bg: 'var(--panel)' },
+      { glyph: 'IMG', label: 'Ảnh từ thư viện', hint: 'Chọn hoặc tải ảnh lên', cls: '', bg: 'transparent' },
+      { glyph: '“ ”', label: 'Trích dẫn', hint: 'Lời trích nổi bật', cls: '', bg: 'transparent' },
+      { glyph: '{ }', label: 'Khối mã', hint: 'Mã có tô màu cú pháp', cls: '', bg: 'transparent' },
+      { glyph: 'TBL', label: 'Bảng', hint: 'Hàng và cột', cls: '', bg: 'transparent' },
+      { glyph: '!', label: 'Ghi chú', hint: 'Khung lưu ý cho người đọc', cls: '', bg: 'transparent' }
+    ];
+
+    const seoChecks = [
+      { text: 'Tiêu đề dài 46 ký tự, hiện đủ trên trang tìm kiếm', icon: I.check, color: 'var(--ok)' },
+      { text: 'Mô tả dài 148 ký tự', icon: I.check, color: 'var(--ok)' },
+      { text: 'Đường dẫn ngắn, không dấu', icon: I.check, color: 'var(--ok)' },
+      { text: 'Ảnh đại diện có văn bản thay thế', icon: I.check, color: 'var(--ok)' },
+      { text: 'Bài chưa có liên kết tới bài viết khác trên website', icon: I.warn, color: 'var(--warn)' }
+    ];
+
+    const revisions = [
+      { title: 'Bản đang sửa', meta: '12 giây trước · Admin', cls: 'now', old: false },
+      { title: 'Thêm phần «Sao chép dữ liệu»', meta: 'Hôm nay, 09:10 · Admin', cls: '', old: true },
+      { title: 'Sửa tiêu đề và trích đoạn', meta: 'Hôm qua, 16:45 · Thu Hà', cls: '', old: true },
+      { title: 'Tạo bản nháp', meta: '10/11, 14:02 · Admin', cls: '', old: true }
+    ];
+
+    const later = s.mode === 'later';
+    const trNote = { idle: 'Chưa có bản dịch', busy: 'Đang dịch tiêu đề, trích đoạn và nội dung…', done: 'AI vừa tạo · cần bạn duyệt' };
+
+    return {
+      theme: dark ? 'dark' : '',
+      themeIcon: dark ? I.sun : I.moon,
+      ic: I, tabs, blocks, seoChecks, revisions,
+      tabDoc: s.tab === 'doc', tabSeo: s.tab === 'seo', tabI18n: s.tab === 'i18n', tabHist: s.tab === 'hist',
+      isDraft: !s.published, isPub: s.published,
+      pubOpen: s.pub,
+      togglePub: () => this.setState({ pub: !s.pub }),
+      nowOn: later ? '' : 'on', laterOn: later ? 'on' : '', isLater: later,
+      pickNow: () => this.setState({ mode: 'now' }),
+      pickLater: () => this.setState({ mode: 'later' }),
+      pubLabel: later ? 'Lên lịch đăng' : 'Đăng bài viết',
+      doPublish: () => {
+        this.setState({ pub: false, published: !later });
+        this.say(later ? 'Đã lên lịch đăng lúc 08:00 ngày 13/11' : 'Đã đăng. Bài viết đang hiển thị trên website');
+      },
+      cmt: s.cmt, cmtOn: s.cmt ? 'on' : '',
+      toggleCmt: () => this.setState({ cmt: !s.cmt }),
+      trIdle: s.tr === 'idle', trBusy: s.tr === 'busy', trDone: s.tr === 'done',
+      enCls: s.tr === 'done' ? '' : 'miss',
+      enShim: '',
+      enNote: trNote[s.tr],
+      translate: () => {
+        this.setState({ tr: 'busy' });
+        setTimeout(() => { this.setState({ tr: 'done' }); this.say('Đã tạo bản nháp tiếng Anh để bạn duyệt'); }, 1800);
+      },
+      toast: s.toast,
+      toggleTheme: () => this.setState({ dark: !dark })
+    };
+  }
+}
+</script>
+</body>
+</html>

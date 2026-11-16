@@ -72,7 +72,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 ]),
             ],
         ),
-        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-301).
+        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-302).
         autoxide_kernel::tenancy::migration::list_index(
             "m0012_tenant_list_index",
             vec!["media_item", "media_folder", "media_tag"],

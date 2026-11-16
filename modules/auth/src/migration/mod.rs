@@ -74,7 +74,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         // Secret TOTP đã mã hoá dài hơn cột cũ (Postgres). Ngay sau đó upgrade `u0001_seal_totp`
         // mã hoá secret đã có.
         Box::new(m0027_widen_totp_secret::Migration),
-        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-301).
+        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-302).
         autoxide_kernel::tenancy::migration::list_index(
             "m0028_tenant_list_index",
             vec!["auth_user", "auth_role"],

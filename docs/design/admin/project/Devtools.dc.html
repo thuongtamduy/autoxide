@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Nhà phát triển — Autoxide Admin</title>
+<script src="./support.js"></script>
+<script src="./ax-shell.js"></script>
+<link rel="stylesheet" href="./ax-r40.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>
+/* ===== Devtools: CSS riêng của màn (R4), mọi luật dưới .pg-dev ===== */
+/* Request: bảng từ 901px; tới 900px là nhật ký 2 dòng có nhãn (R4 N1) */
+.pg-dev .dv-log { display: none; flex-direction: column; }
+@media (max-width: 900px) { .pg-dev .dv-log { display: flex; } .pg-dev .dv-tbl { display: none; } }
+.pg-dev .dv-row { display: flex; flex-direction: column; gap: 4px; width: 100%; min-height: 56px; padding: 10px 16px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.pg-dev .dv-row:hover { background: var(--panel); }
+.pg-dev .dv-row.sel { background: var(--accent-tint); }
+.pg-dev .dv-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.pg-dev .dv-l1 > b { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; color: var(--ink); }
+.pg-dev .dv-l1 > .dv-key { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: right; color: var(--ink-3); font-size: 12.5px; }
+.pg-dev .dv-l2 { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; overflow-wrap: anywhere; }
+.pg-dev .dv-err { font-size: 12.5px; color: var(--bad); overflow-wrap: anywhere; }
+@media (max-width: 420px) { .pg-dev .dv-l1 > .dv-key { display: none; } }
+</style>
+</helmet>
+<div class="ax pg-dev {{theme}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <nav class="rail" aria-label="Phân hệ" style="flex: 0 0 88px">
+    <a href="Main.dc.html" aria-label="Autoxide, về Tổng quan" style="display: flex; justify-content: center; padding: 4px 0 14px">
+      <span style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: #1F2430; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14)">
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+      </span><span class="rail-name">Autoxide</span>
+    </a>
+    <div class="rail-mid">
+      <a class="ri" href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span class="ri-l">Tổng quan</span></a>
+      <a class="ri" href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span class="ri-l">Bán hàng</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Catalog.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span class="ri-l">Sản phẩm</span></a>
+      <a class="ri" href="Promotions.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span class="ri-l">Tiếp thị</span></a>
+      <a class="ri" href="Content.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span class="ri-l">Nội dung</span></a>
+      <a class="ri" href="Customers.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span class="ri-l">Khách hàng</span></a>
+      <a class="ri" href="Market.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span class="ri-l">Sàn</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Finance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span class="ri-l">Tài chính</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri" href="Main.dc.html#g=reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span class="ri-l">Báo cáo</span></a>
+      <a class="ri" href="Org.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span class="ri-l">Tổ chức</span></a>
+      <a class="ri" href="Compliance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span class="ri-l">Tuân thủ</span><span class="pip" aria-label="Có việc cần xử lý"></span></a>
+      <a class="ri on" aria-current="page" href="Settings.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span class="ri-l">Cài đặt</span></a>
+    </div>
+    <a class="ri" href="Map.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"></path></svg><span class="ri-l">Bản đồ</span></a>
+    <button type="button" class="ri" popovertarget="help"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6M12 16.8h.01"></path></svg><span class="ri-l">Trợ giúp</span></button>
+    <label class="ri rail-toggle"><input type="checkbox" class="railmini" aria-label="Thu gọn thanh phân hệ"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"></path></svg><span class="t-full">Thu gọn</span><span class="t-mini">Mở rộng</span></label>
+  </nav>
+
+
+  <div style="flex: 999 1 560px; min-width: 0; margin: 8px; display: flex; flex-direction: column; background: var(--sheet); border: 1px solid var(--line); border-radius: 16px; overflow: hidden">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; border-bottom: 1px solid var(--line)">
+      <a class="ctx" href="Main.dc.html" aria-label="Đổi khách hàng hoặc nút tổ chức" style="text-decoration: none">
+        <span class="tav">BM</span>
+        <span style="display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.2">
+          <span class="ell" style="font-weight: 600">Bếp Mộc</span>
+          <span class="ell" style="font-size: 12px; color: var(--ink-3)">Bếp Mộc — toàn chuỗi</span>
+        </span>
+        <svg class="ic s" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--ink-3)"><path d="{{ic.updown}}"></path></svg>
+      </a>
+      <div style="flex: 1"></div>
+      <button type="button" class="btn" popovertarget="qs" data-cmdk="data-cmdk" aria-label="Tìm trong mọi phân hệ" style="flex: 0 1 300px; justify-content: flex-start; color: var(--ink-3); font-weight: 400; background: var(--panel)">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><span class="hide-mobile" style="flex: 1; text-align: left">Tìm trong mọi phân hệ…</span><span class="kbd hide-mobile">Ctrl</span><span class="kbd hide-mobile">K</span>
+      </button>
+      <button type="button" class="btn ghost sq" popovertarget="help" aria-label="Trợ giúp cho trang này" data-tip="Trợ giúp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6M12 16.8h.01"></path></svg></button><span class="helppanel" id="help" popover="auto" role="dialog" aria-label="Trợ giúp: Nhà phát triển"><span class="hp-head"><b>Trợ giúp · Nhà phát triển</b><button type="button" class="btn ghost sm sq" popovertarget="help" popovertargetaction="hide" aria-label="Đóng trợ giúp"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span><label class="hp-search"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><input class="inp" type="search" placeholder="Tìm trong hướng dẫn…" aria-label="Tìm trong hướng dẫn"></label><span class="cap">Trên trang này</span><a class="hp-art" href="#"><b>Đọc nhật ký request</b><span>Lọc theo status, mã lỗi, API key</span></a><a class="hp-art" href="#"><b>Webhook: kiểm tra và gửi lại</b><span>Vì sao giao thất bại, gửi lại an toàn</span></a><a class="hp-art" href="#"><b>Job lỗi và dead-letter queue</b><span>Khi nào job dừng thử lại, chạy lại thế nào</span></a><a class="hp-art" href="#"><b>Idempotency-Key</b><span>Gửi lại lệnh mà không tạo trùng</span></a><span class="hp-hint"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg><span>Bấm biểu tượng ⓘ cạnh một mục để xem giải thích ngắn ngay tại chỗ.</span></span><span class="cap hide-mobile">Phím tắt</span><span class="hp-keys hide-mobile"><span><span class="kbd">Ctrl</span><span class="kbd">K</span></span><span>Tìm và chạy lệnh</span><span><span class="kbd">?</span></span><span>Mở trợ giúp này</span><span><span class="kbd">Esc</span></span><span>Đóng hộp đang mở</span></span><span class="cap">Cần thêm trợ giúp</span><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg><span><b>Hỏi trợ lý AI về trang này</b><span>Trả lời theo dữ liệu bạn được xem; không tự chạy lệnh ghi</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-1.5-3-5-3-5-1s3 1 5 1zM12 7c1.5-3 5-3 5-1s-3 1-5 1z"></path></svg><span><b>Có gì mới</b><span>2 cập nhật trong tháng này</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"></path></svg><span><b>Liên hệ hỗ trợ</b><span>Kèm sẵn trang đang xem và mã khách</span></span></a><a class="hp-link" href="#"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span><b>Tài liệu API</b><span>OpenAPI và MCP cho lập trình viên</span></span></a></span>
+      <button class="btn ghost sq" aria-label="Đổi giao diện sáng / tối" data-tip="Sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+      <a class="av a1" href="Org.dc.html" aria-label="Tài khoản của Lan Phạm" style="width: 34px; height: 34px; text-decoration: none">LP</a>
+    </header>
+    <nav class="subnav" aria-label="Menu của phân hệ Cài đặt">
+      <span class="gname">Cài đặt</span>
+      <a class="stab" href="Settings.dc.html">Cài đặt chung</a>
+      <a class="stab" href="Agent.dc.html">API key và AI agent<span class="cnt" title="3 việc đang chờ">3<span class="vh"> việc đang chờ</span></span></a>
+      <a class="stab on" href="Devtools.dc.html" aria-current="page">Nhà phát triển<span class="cnt" title="3 việc đang chờ">3<span class="vh"> việc đang chờ</span></span></a>
+    </nav>
+
+    <main style="width: 100%; padding: 24px 24px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+      <section style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px">
+        <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 13px; color: var(--ink-3)">Chỉ người có quyền kernel.devtools.read · dữ liệu của khách Bếp Mộc</span>
+          <h1 class="h1">Nhà phát triển</h1>
+          <span class="pdesc {{descCls}}" style="color: var(--ink-2); max-width: 760px">Nhật ký request, lần giao webhook, job lỗi và event theo bản ghi. Không lưu thân request, token hay mật khẩu; nhật ký giữ 14 ngày.</span>
+          <button type="button" class="pdesc-more" aria-expanded="{{descOpen}}" onClick="{{toggleDesc}}">{{descMore}}</button>
+        </div>
+        <div class="headacts" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button class="btn sec" onClick="{{dlOpenapi}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"></path></svg>Tải OpenAPI</button>
+          <button type="button" class="btn sq only-mobile" popovertarget="hmore" aria-label="Thao tác khác" style="anchor-name: --hmore; font-size: 18px; letter-spacing: 1px">⋯</button><span class="moremenu" id="hmore" popover="auto" role="menu" aria-label="Thao tác khác" style="position-anchor: --hmore"><button class="btn" role="menuitem" popovertarget="hmore" popovertargetaction="hide" onClick="{{dlOpenapi}}">Tải OpenAPI</button></span>
+          <a class="btn pri" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.code}}"></path></svg>Tài liệu API</a>
+        </div>
+      </section>
+
+      <nav class="ptabs" role="tablist" aria-label="Công cụ của nhà phát triển">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4"><button class="stab {{t.cls}}" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}">{{t.label}}<sc-if value="{{t.n}}" hint-placeholder-val="{{false}}"><span class="cnt {{t.hot}}">{{t.n}}</span></sc-if></button></sc-for>
+      </nav>
+
+      <sc-if value="{{isReq}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+          <sc-for list="{{stOpts}}" as="o" hint-placeholder-count="3"><button class="chip {{o.cls}}" aria-pressed="{{o.on}}" onClick="{{o.pick}}">{{o.label}}</button></sc-for>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2)">API key
+            <select class="inp" value="{{key}}" onChange="{{onKey}}" style="width: auto; height: 34px"><option value="all">Mọi API key</option><option value="storefront">website-bepmoc</option><option value="agent">cskh-bot (agent)</option><option value="sync">dong-bo-kho</option></select>
+          </label>
+        </div>
+        <section class="card" style="overflow: hidden">
+          <div class="dv-log" role="list" aria-label="Nhật ký request">
+            <sc-for list="{{reqs}}" as="r" hint-placeholder-count="6">
+              <button class="dv-row {{r.sel}}" role="listitem" onClick="{{r.open}}" aria-expanded="{{r.isOpen}}" aria-label="{{r.aria}}">
+                <span class="dv-l1"><b>{{r.method}}</b><span class="badge {{r.badge}}" style="height: 22px">{{r.status}}</span><span>· {{r.ms}} ms · {{r.at}}</span><span class="dv-key">{{r.keyName}}</span></span>
+                <span class="dv-l2">{{r.path}}</span>
+                <sc-if value="{{r.hasCode}}" hint-placeholder-val="{{false}}"><span class="dv-err">Mã lỗi <span class="mono">{{r.code}}</span></span></sc-if>
+              </button>
+              <sc-if value="{{r.isOpen}}" hint-placeholder-val="{{false}}">
+                <div class="pop" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 20px; padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 13px">
+                  <span><span style="color: var(--ink-3)">API key</span><br>{{r.keyName}}</span>
+                  <span><span style="color: var(--ink-3)">Request ID</span><br><span class="mono" style="overflow-wrap: anywhere">{{r.rid}}</span></span>
+                  <span><span style="color: var(--ink-3)">Idempotency-Key</span><br><span class="mono">{{r.idem}}</span></span>
+                  <span><span style="color: var(--ink-3)">Trace</span><br><span class="mono" style="overflow-wrap: anywhere">{{r.trace}}</span></span>
+                  <span><span style="color: var(--ink-3)">Thân request</span><br>Không lưu, theo luật dữ liệu cá nhân</span>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div>
+          <div class="tbox dv-tbl"><div style="min-width: 836px">
+            <div class="thead" style="grid-template-columns: 80px 64px minmax(200px, 2fr) 64px minmax(130px, 1fr) 64px minmax(110px, 1fr)"><span>Lúc</span><span>Lệnh</span><span>Đường dẫn mẫu</span><span>Mã</span><span>Mã lỗi</span><span class="r">ms</span><span>API key</span></div>
+            <sc-for list="{{reqs}}" as="r" hint-placeholder-count="8">
+              <button class="trow {{r.sel}}" onClick="{{r.open}}" aria-expanded="{{r.isOpen}}" style="grid-template-columns: 80px 64px minmax(200px, 2fr) 64px minmax(130px, 1fr) 64px minmax(110px, 1fr); min-height: 46px">
+                <span class="num mono" style="font-size: 12.5px">{{r.at}}</span><span class="mono" style="font-size: 12.5px; font-weight: 600">{{r.method}}</span><span class="mono ell" style="font-size: 12.5px">{{r.path}}</span>
+                <span><span class="badge {{r.badge}}" style="height: 22px">{{r.status}}</span></span><span class="mono ell" style="font-size: 12px; color: var(--ink-2)">{{r.codeCell}}</span><span class="r num">{{r.ms}}</span><span class="ell" style="font-size: 12.5px; color: var(--ink-2)">{{r.keyName}}</span>
+              </button>
+              <sc-if value="{{r.isOpen}}" hint-placeholder-val="{{false}}">
+                <div class="pop" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 20px; padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 13px">
+                  <span><span style="color: var(--ink-3)">Request ID</span><br><span class="mono">{{r.rid}}</span></span>
+                  <span><span style="color: var(--ink-3)">Idempotency-Key <button type="button" class="qi" popovertarget="tip-idem" aria-label="Giải thích: Idempotency-Key" style="anchor-name: --tip-idem"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-idem" popover="auto" role="dialog" aria-label="Idempotency-Key" style="position-anchor: --tip-idem"><b class="tip-t">Idempotency-Key</b><span class="tip-b">Khoá chống trùng mà client gửi kèm lệnh ghi. Gửi lại cùng khoá thì máy chủ trả kết quả lần trước, không tạo đơn hay trừ tiền lần hai. Agent hay thử lại nên luôn cần khoá này.</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-idem" popovertargetaction="hide">Đã hiểu</button></span></span></span><br><span class="mono">{{r.idem}}</span></span>
+                  <span><span style="color: var(--ink-3)">Trace</span><br><span class="mono">{{r.trace}}</span></span>
+                  <span><span style="color: var(--ink-3)">Thân request</span><br>Không lưu, theo luật dữ liệu cá nhân</span>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div></div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{isHooks}}" hint-placeholder-val="{{false}}">
+        <section class="card" style="display: flex; flex-direction: column; padding: 6px 8px">
+          <sc-for list="{{hookRows}}" as="h" hint-placeholder-count="4">
+            <div class="item" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 10px">
+              <span class="sq-ic {{h.tone}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.hook}}"></path></svg></span>
+              <span style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span class="mono ell" style="font-size: 13px">{{h.event}} → {{h.target}}</span><span style="font-size: 12.5px; color: var(--ink-3)">{{h.meta}}</span></span>
+              <span class="badge {{h.badge}}"><span class="dot"></span>{{h.state}}</span>
+              <sc-if value="{{h.canRetry}}" hint-placeholder-val="{{false}}"><button class="btn sm" onClick="{{h.retry}}"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.redo}}"></path></svg>Gửi lại</button></sc-if>
+            </div>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{isJobs}}" hint-placeholder-val="{{false}}">
+        <section class="card" style="display: flex; flex-direction: column; padding: 6px 8px">
+          <span style="padding: 10px 10px 4px; font-size: 13px; color: var(--ink-3)">Dead-letter queue: job đã thử hết số lần retry với backoff <button type="button" class="qi" popovertarget="tip-dlq" aria-label="Giải thích: Dead-letter queue" style="anchor-name: --tip-dlq"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.6h.01"></path></svg></button><span class="tip" id="tip-dlq" popover="auto" role="dialog" aria-label="Dead-letter queue" style="position-anchor: --tip-dlq"><b class="tip-t">Job lỗi và dead-letter queue</b><span class="tip-b">Job là việc chạy nền như gửi email hay lập hoá đơn. Job lỗi được thử lại, mỗi lần chờ lâu hơn lần trước; hết số lần thì vào dead-letter queue chờ người xem. Mỗi lần chạy lại đều ghi audit.</span><span class="tip-f"><a class="tip-more" href="#">Tìm hiểu thêm<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><button type="button" class="tip-ok" popovertarget="tip-dlq" popovertargetaction="hide">Đã hiểu</button></span></span></span>
+          <sc-for list="{{jobRows}}" as="j" hint-placeholder-count="3">
+            <div class="item" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 10px">
+              <span style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span class="mono" style="font-size: 13px; font-weight: 600">{{j.type}}</span><span style="font-size: 12.5px; color: var(--ink-3)">{{j.meta}}</span><span class="mono" style="font-size: 12px; color: var(--bad)">{{j.error}}</span></span>
+              <span class="badge {{j.badge}}"><span class="dot"></span>{{j.state}}</span>
+              <sc-if value="{{j.canRun}}" hint-placeholder-val="{{false}}"><button class="btn sm" onClick="{{j.run}}">Chạy lại</button></sc-if>
+            </div>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{isRec}}" hint-placeholder-val="{{false}}">
+        <form onSubmit="{{findRec}}" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px">
+          <label style="display: flex; flex-direction: column; gap: 6px"><span class="lab">Loại bản ghi</span><select class="inp" value="{{recKind}}" onChange="{{onRecKind}}" style="width: auto"><option value="orders.order">orders.order</option><option value="content.entry">content.entry</option><option value="catalog.product">catalog.product</option></select></label>
+          <label style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><span class="lab">Mã hoặc ID</span><input class="inp mono" value="{{recId}}" onChange="{{onRecId}}"></label>
+          <button class="btn pri" type="submit">Xem event</button>
+        </form>
+        <sc-if value="{{recShown}}" hint-placeholder-val="{{true}}">
+          <section class="card" style="display: flex; flex-direction: column; gap: 14px; padding: 16px 18px">
+            <sc-for list="{{events}}" as="e" hint-placeholder-count="5">
+              <div class="tl {{e.cls}}" style="display: flex; flex-direction: column; gap: 2px"><span class="mono" style="font-size: 13px; font-weight: 600">{{e.name}}</span><span style="font-size: 12.5px; color: var(--ink-2)">{{e.detail}}</span><span class="num" style="font-size: 12px; color: var(--ink-3)">{{e.at}} · {{e.delivered}}</span></div>
+            </sc-for>
+          </section>
+        </sc-if>
+      </sc-if>
+    </main>
+  </div>
+
+
+<ax-sheets>
+  <div class="axsheet" id="qs" popover="auto" role="dialog" aria-label="Tìm và chạy lệnh">
+    <label class="qs-in"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg><input class="inp" type="search" autofocus="autofocus" placeholder="Tìm màn, phân hệ hay lệnh…" aria-label="Tìm màn, phân hệ hay lệnh"><span class="kbd hide-mobile">Esc</span></label>
+    <span class="cap">Đi tới</span>
+    <div class="qs-list">
+      <a class="qs-it" href="Main.dc.html" data-k="tong quan"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span>Tổng quan</span></a>
+      <a class="qs-it sub" href="Main.dc.html" data-k="tong quan bang dieu khien"><span class="qs-dim">Tổng quan ›</span><span>Bảng điều khiển</span></a>
+      <a class="qs-it sub" href="Work.dc.html" data-k="tong quan viec va hoat dong"><span class="qs-dim">Tổng quan ›</span><span>Việc và hoạt động</span></a>
+      <a class="qs-it" href="Orders.dc.html" data-k="ban hang"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span>Bán hàng</span></a>
+      <a class="qs-it sub" href="Orders.dc.html" data-k="ban hang don hang"><span class="qs-dim">Bán hàng ›</span><span>Đơn hàng</span></a>
+      <a class="qs-it sub" href="Shipping.dc.html" data-k="ban hang van chuyen"><span class="qs-dim">Bán hàng ›</span><span>Vận chuyển</span></a>
+      <a class="qs-it sub" href="StoreOps.dc.html" data-k="ban hang cua hang"><span class="qs-dim">Bán hàng ›</span><span>Cửa hàng</span></a>
+      <a class="qs-it sub" href="Channels.dc.html" data-k="ban hang kenh ban"><span class="qs-dim">Bán hàng ›</span><span>Kênh bán</span></a>
+      <a class="qs-it" href="Catalog.dc.html" data-k="san pham"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span>Sản phẩm</span></a>
+      <a class="qs-it sub" href="Catalog.dc.html" data-k="san pham san pham va gia"><span class="qs-dim">Sản phẩm ›</span><span>Sản phẩm và giá</span></a>
+      <a class="qs-it sub" href="Inventory.dc.html" data-k="san pham ton kho"><span class="qs-dim">Sản phẩm ›</span><span>Tồn kho</span></a>
+      <a class="qs-it" href="Promotions.dc.html" data-k="tiep thi"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span>Tiếp thị</span></a>
+      <a class="qs-it sub" href="Promotions.dc.html" data-k="tiep thi khuyen mai"><span class="qs-dim">Tiếp thị ›</span><span>Khuyến mại</span></a>
+      <a class="qs-it sub" href="Engage.dc.html" data-k="tiep thi bieu mau, ban tin, binh luan"><span class="qs-dim">Tiếp thị ›</span><span>Biểu mẫu, bản tin, bình luận</span></a>
+      <a class="qs-it sub" href="Affiliate.dc.html" data-k="tiep thi tiep thi lien ket"><span class="qs-dim">Tiếp thị ›</span><span>Tiếp thị liên kết</span></a>
+      <a class="qs-it" href="Content.dc.html" data-k="noi dung"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span>Nội dung</span></a>
+      <a class="qs-it sub" href="Content.dc.html" data-k="noi dung bai viet"><span class="qs-dim">Nội dung ›</span><span>Bài viết</span></a>
+      <a class="qs-it sub" href="ContentMore.dc.html" data-k="noi dung trang va cau truc"><span class="qs-dim">Nội dung ›</span><span>Trang và cấu trúc</span></a>
+      <a class="qs-it sub" href="Menus.dc.html" data-k="noi dung menu"><span class="qs-dim">Nội dung ›</span><span>Menu</span></a>
+      <a class="qs-it sub" href="MediaLibrary.dc.html" data-k="noi dung thu vien media"><span class="qs-dim">Nội dung ›</span><span>Thư viện media</span></a>
+      <a class="qs-it" href="Customers.dc.html" data-k="khach hang"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Khách hàng</span></a>
+      <a class="qs-it" href="Market.dc.html" data-k="san"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span>Sàn</span></a>
+      <a class="qs-it" href="Finance.dc.html" data-k="tai chinh"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span>Tài chính</span></a>
+      <a class="qs-it" href="Main.dc.html#g=reports" data-k="bao cao"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span>Báo cáo</span></a>
+      <a class="qs-it" href="Org.dc.html" data-k="to chuc"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span>Tổ chức</span></a>
+      <a class="qs-it sub" href="Org.dc.html" data-k="to chuc cay to chuc"><span class="qs-dim">Tổ chức ›</span><span>Cây tổ chức</span></a>
+      <a class="qs-it sub" href="Access.dc.html" data-k="to chuc phan quyen"><span class="qs-dim">Tổ chức ›</span><span>Phân quyền</span></a>
+      <a class="qs-it" href="Compliance.dc.html" data-k="tuan thu"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span>Tuân thủ</span></a>
+      <a class="qs-it sub" href="Compliance.dc.html" data-k="tuan thu tinh trang tuan thu"><span class="qs-dim">Tuân thủ ›</span><span>Tình trạng tuân thủ</span></a>
+      <a class="qs-it sub" href="LegalOps.dc.html" data-k="tuan thu ho so va du lieu ca nhan"><span class="qs-dim">Tuân thủ ›</span><span>Hồ sơ và dữ liệu cá nhân</span></a>
+      <a class="qs-it" href="Settings.dc.html" data-k="cai dat"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span>Cài đặt</span></a>
+      <a class="qs-it sub" href="Settings.dc.html" data-k="cai dat cai dat chung"><span class="qs-dim">Cài đặt ›</span><span>Cài đặt chung</span></a>
+      <a class="qs-it sub" href="Agent.dc.html" data-k="cai dat api key va ai agent"><span class="qs-dim">Cài đặt ›</span><span>API key và AI agent</span></a>
+      <a class="qs-it sub" href="Devtools.dc.html" data-k="cai dat nha phat trien"><span class="qs-dim">Cài đặt ›</span><span>Nhà phát triển</span></a>
+      <a class="qs-it" href="Account.dc.html" data-k="tai khoan cua toi"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Tài khoản của tôi</span></a>
+      <span class="qs-none">Không thấy màn nào khớp. Thử gõ tên phân hệ, ví dụ "đơn hàng" hay "thuế".</span>
+    </div>
+  </div>
+  <div class="axsheet" id="mods" popover="auto" role="dialog" aria-label="Mọi phân hệ">
+    <span class="hp-head"><b>Phân hệ</b><button type="button" class="btn ghost sm sq" popovertarget="mods" popovertargetaction="hide" aria-label="Đóng"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span>
+    <div class="mods-grid">
+      <a class="mod" href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg><span>Tổng quan</span></a>
+      <a class="mod" href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg><span>Bán hàng</span><span class="pip"></span></a>
+      <a class="mod" href="Catalog.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><span>Sản phẩm</span></a>
+      <a class="mod" href="Promotions.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"></path></svg><span>Tiếp thị</span></a>
+      <a class="mod" href="Content.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"></path></svg><span>Nội dung</span></a>
+      <a class="mod" href="Customers.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Khách hàng</span></a>
+      <a class="mod" href="Market.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4"></path></svg><span>Sàn</span><span class="pip"></span></a>
+      <a class="mod" href="Finance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01"></path></svg><span>Tài chính</span><span class="pip"></span></a>
+      <a class="mod" href="Main.dc.html#g=reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-6M3 20h18"></path></svg><span>Báo cáo</span></a>
+      <a class="mod" href="Org.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4"></path></svg><span>Tổ chức</span></a>
+      <a class="mod" href="Compliance.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"></path></svg><span>Tuân thủ</span><span class="pip"></span></a>
+      <a class="mod on" href="Settings.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z"></path></svg><span>Cài đặt</span></a>
+      <a class="mod" href="Account.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"></path></svg><span>Tài khoản của tôi</span></a>
+    </div>
+    <div class="mods-foot">
+      <button type="button" class="btn" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18zM12 3a9 9 0 0 1 0 18"></path></svg>Sáng / tối</button>
+      <a class="btn ghost" href="Map.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"></path></svg>Bản đồ thiết kế</a>
+    </div>
+  </div>
+</ax-sheets>
+  <nav class="bottombar only-mobile" aria-label="Điều hướng nhanh">
+    <a href="Main.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Tổng quan</a>
+    <a href="Orders.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01"></path></svg>Đơn</a>
+    <a href="Work.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"></path></svg>Việc</a>
+    <button type="button" popovertarget="qs" aria-label="Tìm và chạy lệnh"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6"></path></svg>Tìm</button>
+    <button type="button" popovertarget="mods" class="on" aria-label="Mọi phân hệ"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"></path></svg>Phân hệ</button>
+  </nav>
+  <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+    <div class="toast" role="status" style="z-index: 30; max-width: calc(100% - 32px)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.check}}"></path></svg>{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1250}}'>
+class Component extends DCLogic {
+  state = { dark: null, toast: '', descOpen: false, tab: 'req', st: 'all', key: 'all', openReq: null, hooks: {}, jobs: {}, recKind: 'orders.order', recId: 'BM-2611-0412', recShown: true };
+
+  say(text) {
+    this.setState({ toast: text });
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.setState({ toast: '' }), 2800);
+  }
+
+  renderVals() {
+    const I = {
+      key: 'M14 10a4 4 0 1 0-3.5 4L9 15.5V18H6.5v2H4v-2.5L10.5 11A4 4 0 0 0 14 10zM15 7h.01',
+      spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
+      hook: 'M10 14a4 4 0 1 1 4-4M14 10l4 7M10 14l-5 3',
+      code: 'M8 7l-5 5 5 5M16 7l5 5-5 5',
+      redo: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
+      x: 'M6 6l12 12M18 6L6 18',
+      home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+      cart: 'M3 4h2.5l2.2 11h10.6l2-8H6.3M9 20h.01M17 20h.01',
+      box: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9',
+      mega: 'M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11',
+      posts: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6',
+      user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+      store: 'M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11zM5 13v7h14v-7M10 20v-4h4v4',
+      wallet: 'M4 7h15a1 1 0 0 1 1 1v11H5a1 1 0 0 1-1-1V6a2 2 0 0 1 2-2h11v3M16 13.5h.01',
+      chart: 'M5 20V11M11 20V5M17 20v-6M3 20h18',
+      org: 'M9 3h6v5H9zM4 16h6v5H4zM14 16h6v5h-6zM12 8v4M7 16v-4h10v4',
+      shield: 'M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5',
+      gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4z',
+      map: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14',
+      plus: 'M12 5v14M5 12h14',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      right: 'M9 6l6 6-6 6',
+      updown: 'M8 9l4-4 4 4M8 15l4 4 4-4'
+    };
+    const s = this.state;
+    const dark = s.dark ?? (this.props.dark || (typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches));
+    const RAIL = [['home', 'Tổng quan', I.home, 'Main.dc.html'], ['sales', 'Bán hàng', I.cart, 'Orders.dc.html'], ['catalog', 'Sản phẩm', I.box, 'Main.dc.html'], ['mkt', 'Tiếp thị', I.mega, 'Main.dc.html'], ['content', 'Nội dung', I.posts, 'Content.dc.html'], ['buyers', 'Khách hàng', I.user, 'Main.dc.html'], ['market', 'Sàn', I.store, 'Main.dc.html'], ['finance', 'Tài chính', I.wallet, 'Main.dc.html'], ['reports', 'Báo cáo', I.chart, 'Main.dc.html'], ['org', 'Tổ chức', I.org, 'Org.dc.html'], ['legal', 'Tuân thủ', I.shield, 'Compliance.dc.html'], ['settings', 'Cài đặt', I.gear, 'Main.dc.html']];
+    const rail = RAIL.map(([id, label, icon, href]) => ({ label, icon, href, cls: id === 'settings' ? 'on' : '', cur: id === 'settings' ? 'page' : 'false' }));
+    const TABS = [['req', 'Request', '', ''], ['hooks', 'Webhook', '1', 'hot'], ['jobs', 'Job lỗi', '2', 'hot'], ['rec', 'Event theo bản ghi', '', '']];
+    const KEYS = { storefront: 'website-bepmoc', agent: 'cskh-bot (agent)', sync: 'dong-bo-kho' };
+    const REQ = [
+      ['14:05:12', 'POST', '/api/v1/orders/checkout', 201, '', 182, 'storefront'],
+      ['14:05:09', 'GET', '/api/v1/catalog/public/products', 200, '', 24, 'storefront'],
+      ['14:04:51', 'POST', '/api/v1/orders/{id}/refunds', 202, 'approval_required', 41, 'agent'],
+      ['14:04:40', 'PATCH', '/api/v1/inventory/levels/{id}', 409, 'inventory.version_conflict', 12, 'sync'],
+      ['14:04:22', 'POST', '/api/v1/orders/checkout', 422, 'orders.quote_expired', 35, 'storefront'],
+      ['14:03:58', 'GET', '/api/v1/kernel/work', 200, '', 88, 'agent'],
+      ['14:03:30', 'POST', '/api/v1/webhooks/{id}/deliveries', 502, 'webhooks.target_unreachable', 5003, 'sync'],
+      ['14:02:11', 'GET', '/api/v1/content/public/entries', 304, '', 6, 'storefront']
+    ];
+    const reqs = REQ.map(([at, method, path, status, code, ms, key], i) => ({ at, method, path, status: String(status), code: code || '', codeCell: code || '—', hasCode: !!code, ms: String(ms), key, keyName: KEYS[key] }))
+      .filter((r, i) => (s.key === 'all' || r.key === s.key) && (s.st === 'all' || (s.st === '4xx' ? r.status[0] === '4' : r.status[0] === '5')))
+      .map((r, i) => ({ ...r, badge: r.status[0] === '2' || r.status[0] === '3' ? 'b-ok' : r.status[0] === '4' ? 'b-warn' : 'b-bad', aria: r.method + ' ' + r.path + ', mã ' + r.status + ', ' + r.ms + ' ms, lúc ' + r.at, isOpen: s.openReq === r.at, sel: s.openReq === r.at ? 'sel' : '', rid: 'req_' + r.at.replace(/:/g, '') + 'a91f', idem: r.method === 'GET' ? '—' : 'idem-' + r.at.replace(/:/g, ''), trace: '4bf92f3577b34da6a3ce929d0e0e' + r.at.slice(-2), open: () => this.setState({ openReq: s.openReq === r.at ? null : r.at }) }));
+    const HOOKS = [
+      ['h1', 'orders.order_confirmed', 'ke-toan.example/hooks', 'Lỗi 14 lần · lần tới 14:58 · 502 từ máy nhận', 'fail'],
+      ['h2', 'inventory.level_changed', 'dong-bo-kho.example/in', 'Giao lúc 14:04 · 120 ms', 'ok'],
+      ['h3', 'content.entry_published', 'cache.example/purge', 'Giao lúc 10:42 · 48 ms', 'ok']
+    ];
+    const hookRows = HOOKS.map(([id, event, target, meta, st]) => {
+      const done = s.hooks[id] || st === 'ok';
+      return { event, target, meta: s.hooks[id] ? 'Gửi lại lúc 14:06 · 200 trong 96 ms' : meta, state: done ? 'Đã giao' : 'Đang thử lại', badge: done ? 'b-ok' : 'b-bad', tone: done ? 'ok' : 'bad', canRetry: !done, retry: () => { this.setState({ hooks: { ...s.hooks, [id]: true } }); this.say('Đã gửi lại; máy nhận trả 200'); } };
+    });
+    const JOBS = [
+      ['j1', 'invoices.issue', 'Đơn BM-2611-0398 · 5 lần thử', 'einvoice.buyer_tax_code_invalid: mã số thuế người mua sai'],
+      ['j2', 'media.make_variants', 'Ảnh chao-gang-26.png · 5 lần thử', 'media.decode_failed: file hỏng'],
+    ];
+    const jobRows = JOBS.map(([id, type, meta, error]) => {
+      const st = s.jobs[id];
+      return { type, meta, error, state: st === 'done' ? 'Đã chạy lại, xong' : 'Trong dead-letter queue', badge: st === 'done' ? 'b-ok' : 'b-bad', canRun: !st, run: () => { this.setState({ jobs: { ...s.jobs, [id]: 'done' } }); this.say('Đã chạy lại ' + type + '; ghi vào nhật ký audit'); } };
+    });
+    const EVENTS = { 'orders.order': [['orders.order_placed', 'Đặt qua website, 2 dòng hàng', '09:21:03'], ['ledger.payment_captured', 'Đối tác báo thanh toán 1.240.000 ₫', '09:21:40'], ['orders.order_confirmed', 'CN Quận 3 xác nhận', '10:48:12'], ['orders.fulfillment_requested', 'Yêu cầu giao từ CN Quận 3', '10:48:12']], 'content.entry': [['content.entry_created', 'Bản nháp', '08:10:00'], ['content.entry_published', 'Đăng lên bepmoc.vn', '10:42:00']], 'catalog.product': [['catalog.price_changed', 'Giá 26 cm: 720.000 → 690.000 ₫', '01/11 08:00'], ['catalog.product_updated', 'Thêm ảnh', '02/11 09:15']] };
+    const page = {
+      tabs: TABS.map(([id, label, n, hot]) => ({ label, n, hot, on: s.tab === id, cls: s.tab === id ? 'on' : '', pick: () => this.setState({ tab: id }) })),
+      isReq: s.tab === 'req', isHooks: s.tab === 'hooks', isJobs: s.tab === 'jobs', isRec: s.tab === 'rec',
+      stOpts: [['all', 'Mọi mã trạng thái'], ['4xx', 'Lỗi 4xx'], ['5xx', 'Lỗi 5xx']].map(([id, label]) => ({ label, on: s.st === id, cls: s.st === id ? 'on' : '', pick: () => this.setState({ st: id }) })),
+      key: s.key, onKey: (e) => this.setState({ key: e.target.value }),
+      reqs, hookRows, jobRows,
+      recKind: s.recKind, recId: s.recId, recShown: s.recShown,
+      onRecKind: (e) => this.setState({ recKind: e.target.value, recShown: false }), onRecId: (e) => this.setState({ recId: e.target.value, recShown: false }),
+      findRec: (e) => { e.preventDefault(); this.setState({ recShown: true }); },
+      events: (EVENTS[s.recKind] || []).slice().reverse().map(([name, detail, at], i) => ({ name, detail, at, delivered: 'đã giao cho mọi bên nhận', cls: i === 0 ? 'now' : '' })),
+      dlOpenapi: () => this.say('Đang tải openapi.json của phiên bản đang chạy'),
+      // Mô tả đầu trang: điện thoại gập còn 2 dòng, bấm "Xem thêm" để mở
+      descCls: s.descOpen ? 'open' : '', descOpen: String(s.descOpen), descMore: s.descOpen ? 'Thu gọn' : 'Xem thêm', toggleDesc: () => this.setState({ descOpen: !s.descOpen })
+    };
+    return {
+      theme: dark ? 'dark' : '', themeIcon: dark ? I.sun : I.moon, toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, rail, toast: s.toast, ...page
+    };
+  }
+}
+</script>
+</body>
+</html>

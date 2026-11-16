@@ -43,7 +43,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Secret đã mã hoá dài hơn cột cũ (Postgres).
         Box::new(m0007_widen_secret::Migration),
-        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-301).
+        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-302).
         autoxide_kernel::tenancy::migration::list_index(
             "m0008_tenant_list_index",
             vec!["webhooks_endpoint"],

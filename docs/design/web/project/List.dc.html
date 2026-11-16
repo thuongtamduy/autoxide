@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Bài viết — Autoxide Blog</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div class="px {{theme}}" style="min-height: 100vh; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; font-size: 16px; line-height: 1.5">
+
+  <header class="hdr" style="position: sticky; top: 0; z-index: 20">
+    <div class="wrap" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 28px; min-height: 68px; padding-top: 6px; padding-bottom: 6px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink)">
+        <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16)">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 21px; height: 21px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+        </span>
+        <span class="dsp" style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em">Autoxide</span>
+        <span class="kick" style="padding: 5px 7px; border-radius: 5px; background: var(--accent-tint)">Blog</span>
+      </a>
+      <nav aria-label="Menu chính" style="display: flex; flex-wrap: wrap; gap: 0 26px">
+        <sc-for list="{{menu}}" as="m" hint-placeholder-count="5">
+          <a class="nav-a {{m.cls}}" href="{{m.href}}">{{m.label}}</a>
+        </sc-for>
+      </nav>
+      <div style="flex: 1"></div>
+      <div style="display: flex; align-items: center; gap: 6px">
+        <a class="btn quiet sm sq" href="Search.dc.html" aria-label="Tìm kiếm"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.search}}"></path></svg></a>
+        <div class="seg" role="group" aria-label="Ngôn ngữ">
+          <button class="on">VI</button>
+          <button>EN</button>
+        </div>
+        <button class="btn quiet sm sq" aria-label="Đổi giao diện sáng / tối" onClick="{{toggleTheme}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{themeIcon}}"></path></svg></button>
+        <a class="btn pri sm" href="Main.dc.html">Đăng ký</a>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex: 1">
+    <div class="wrap" style="padding-top: 56px; padding-bottom: 88px; display: flex; flex-direction: column; gap: 40px">
+
+      <section class="rise" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px 56px">
+        <div style="flex: 1 1 420px; display: flex; flex-direction: column; gap: 14px">
+          <span class="kick">{{headKick}}</span>
+          <h1 class="dsp" style="margin: 0; font-size: clamp(44px, 6vw, 84px); font-weight: 800; line-height: 1; letter-spacing: -0.045em">{{headTitle}}</h1>
+        </div>
+        <p style="flex: 1 1 320px; max-width: 440px; margin: 0 0 6px; font-size: 18px; line-height: 1.55; color: var(--ink-2); text-wrap: pretty">{{headText}}</p>
+      </section>
+
+      <section class="rule rise d1" style="display: flex; flex-direction: column; gap: 16px; padding-top: 20px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px">
+          <div role="group" aria-label="Lọc theo danh mục" style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{cats}}" as="c" hint-placeholder-count="4">
+              <button class="chip {{c.cls}}" aria-pressed="{{c.on}}" onClick="{{c.pick}}">{{c.label}}</button>
+            </sc-for>
+          </div>
+          <div style="flex: 1"></div>
+          <label style="position: relative; flex: 1 1 260px; max-width: 360px; display: flex; align-items: center">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="position: absolute; left: 16px; color: var(--ink-3)"><path d="{{ic.search}}"></path></svg>
+            <input class="inp" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Tìm trong tiêu đề và nội dung…" aria-label="Tìm trong bài viết" style="height: 46px; padding-left: 46px; border-radius: 999px">
+          </label>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+          <span class="kick" style="color: var(--ink-3); margin-right: 6px">Thẻ</span>
+          <sc-for list="{{tags}}" as="t" hint-placeholder-count="5">
+            <button class="tag" aria-pressed="{{t.on}}" onClick="{{t.pick}}" style="border: 0; cursor: pointer; background: {{t.bg}}; color: {{t.fg}}">{{t.label}}</button>
+          </sc-for>
+        </div>
+      </section>
+
+      <sc-if value="{{hasPosts}}" hint-placeholder-val="{{true}}">
+        <section style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 52px 36px">
+          <sc-for list="{{posts}}" as="p" hint-placeholder-count="6">
+            <a class="card pop" href="Post.dc.html">
+              <span class="ph" style="aspect-ratio: 16 / 10"><img src="{{p.img}}" alt="{{p.alt}}"></span>
+              <span style="display: flex; flex-direction: column; gap: 10px">
+                <span class="kick">{{p.term}}</span>
+                <span class="dsp" style="font-size: 23px; font-weight: 600; line-height: 1.28; letter-spacing: -0.018em; text-wrap: balance"><span class="tl">{{p.title}}</span></span>
+                <span style="font-size: 15.5px; line-height: 1.55; color: var(--ink-2); text-wrap: pretty">{{p.excerpt}}</span>
+                <span class="meta" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px">
+                  <span>{{p.meta}}</span>
+                  <sc-if value="{{p.hasComments}}" hint-placeholder-val="{{true}}"><span class="num" style="display: inline-flex; align-items: center; gap: 5px"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.chat}}"></path></svg>{{p.comments}}</span></sc-if>
+                </span>
+              </span>
+            </a>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+        <section class="pop" style="display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 48px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair)">
+          <span class="dsp" style="font-size: 30px; font-weight: 700; letter-spacing: -0.025em">Không có bài viết nào khớp</span>
+          <span style="max-width: 520px; color: var(--ink-2)">Thử một từ khoá khác, hoặc bỏ bộ lọc để xem mọi bài viết. Tìm kiếm không phân biệt chữ hoa và dấu.</span>
+          <button class="btn" onClick="{{reset}}">Bỏ bộ lọc</button>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{hasPosts}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px">
+          <sc-if value="{{more}}" hint-placeholder-val="{{true}}">
+            <button class="btn" onClick="{{loadMore}}">Tải thêm bài viết<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ic.down}}"></path></svg></button>
+          </sc-if>
+          <sc-if value="{{end}}" hint-placeholder-val="{{false}}">
+            <span class="idx pop" style="letter-spacing: .08em; text-transform: uppercase; font-size: 11.5px">Bạn đã xem hết</span>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+
+  <footer class="band">
+    <div class="wrap" style="padding-top: 52px; padding-bottom: 28px; display: flex; flex-direction: column; gap: 40px">
+      <div style="display: flex; flex-wrap: wrap; gap: 36px 64px">
+        <div style="flex: 2 1 300px; display: flex; flex-direction: column; gap: 14px">
+          <span style="display: flex; align-items: center; gap: 10px">
+            <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: #14171F; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 21px; height: 21px"><circle cx="11" cy="13" r="6" style="fill: none; stroke: #F2F3F6; stroke-width: 2.4"></circle><circle cx="18" cy="6" r="2.8" style="fill: #F0703A"></circle></svg>
+            </span>
+            <span class="dsp" style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em">Autoxide</span>
+          </span>
+          <p style="margin: 0; max-width: 380px; font-size: 15px; line-height: 1.6; color: var(--band-ink-2)">Lõi backend mã nguồn mở viết bằng Rust, chạy trên cả SQLite và Postgres. Blog này được dựng bằng chính nó.</p>
+        </div>
+        <sc-for list="{{footer}}" as="col" hint-placeholder-count="3">
+          <div style="flex: 1 1 150px; display: flex; flex-direction: column; gap: 12px">
+            <span class="kick" style="color: #FF9A6E">{{col.label}}</span>
+            <sc-for list="{{col.items}}" as="f" hint-placeholder-count="3">
+              <a class="fl" href="{{f.href}}" style="font-size: 15px">{{f.label}}</a>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; padding-top: 22px; border-top: 1px solid var(--band-hair); font-size: 13px; color: var(--band-ink-2)">
+        <span>© 2026 Autoxide. Mã nguồn mở, giấy phép MIT hoặc Apache-2.0.</span>
+        <div style="flex: 1"></div>
+        <span>Tiếng Việt · English</span>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":2500}}'>
+class Component extends DCLogic {
+  state = { dark: null, term: 'all', q: '', shown: 6 };
+
+  renderVals() {
+    const I = {
+      search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.6-3.6',
+      sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+      down: 'M6 9l6 6 6-6',
+      chat: 'M4 5h16v11H9l-5 4z'
+    };
+    const s = this.state;
+    const dark = s.dark ?? this.props.dark ?? false;
+    const B = '/_blob/';
+
+    const menu = [
+      { label: 'Bài viết', href: 'List.dc.html', cls: 'on' },
+      { label: 'Hướng dẫn', href: 'List.dc.html' },
+      { label: 'Kỹ thuật', href: 'List.dc.html' },
+      { label: 'Thông báo', href: 'List.dc.html' },
+      { label: 'Liên hệ', href: 'Page.dc.html' }
+    ];
+
+    const TERMS = {
+      all: { kick: 'Kho bài viết', title: 'Bài viết', text: 'Mọi bài đã đăng, mới nhất ở trên. Lọc theo một danh mục hoặc một thẻ, hay tìm theo từ khoá.' },
+      guide: { kick: 'Danh mục', title: 'Hướng dẫn', text: 'Từng bước cài đặt, cấu hình và vận hành một máy chủ Autoxide.' },
+      tech: { kick: 'Danh mục', title: 'Kỹ thuật', text: 'Vì sao lõi được dựng như vậy: các lựa chọn thiết kế và điều phải đánh đổi.' },
+      news: { kick: 'Danh mục', title: 'Thông báo', text: 'Bản phát hành mới và những gì sắp làm tiếp.' },
+      sqlite: { kick: 'Thẻ', title: '#sqlite', text: 'Các bài viết có gắn thẻ sqlite.' },
+      postgres: { kick: 'Thẻ', title: '#postgres', text: 'Các bài viết có gắn thẻ postgres.' },
+      rust: { kick: 'Thẻ', title: '#rust', text: 'Các bài viết có gắn thẻ rust.' },
+      ai: { kick: 'Thẻ', title: '#ai', text: 'Các bài viết có gắn thẻ ai.' },
+      backup: { kick: 'Thẻ', title: '#backup', text: 'Các bài viết có gắn thẻ backup.' }
+    };
+    const CAT = { guide: 'Hướng dẫn', tech: 'Kỹ thuật', news: 'Thông báo' };
+
+    const data = [
+      { cat: 'news', tags: [], title: 'Ra mắt Autoxide 0.5: quản lý module ngay trong trang quản trị', excerpt: 'Một màn hình cho biết máy chủ đang chạy những module nào và migration nào còn chờ.', meta: 'Minh Anh · 12 thg 11 · 5 phút đọc', img: 'de6d352a7d48d408ac4b664f5c430b5c', alt: 'Vòng tròn trắng và chấm cam trên nền tối', comments: 4 },
+      { cat: 'tech', tags: ['rust'], title: 'Vì sao chúng tôi chọn Rust cho lõi backend', excerpt: 'Trình biên dịch bắt lỗi trước khi chạy, và một file thực thi duy nhất là đủ để triển khai.', meta: 'Minh Anh · 10 thg 11 · 8 phút đọc', img: '671768cd4a21fb3b34212c9431efb1ad', alt: 'Bánh răng màu gỉ sắt trên nền kem', comments: 9 },
+      { cat: 'guide', tags: ['sqlite', 'postgres'], title: 'Chuyển từ SQLite sang Postgres không gián đoạn', excerpt: 'Sao lưu, áp dụng migration, sao chép dữ liệu của mọi module rồi đổi cấu hình.', meta: 'Hoàng Nam · 9 thg 11 · 6 phút đọc', img: '7d2adf4ea39d2632aed54359f2e22cd0', alt: 'Hai khối database nối với nhau bằng một mũi tên', comments: 6 },
+      { cat: 'guide', tags: ['backup'], title: 'Sao lưu và khôi phục: những điều cần biết', excerpt: 'Một bản sao lưu gồm dữ liệu của mọi module và mọi tệp đã tải lên. Đây là cách kiểm tra nó dùng được.', meta: 'Thu Hà · 7 thg 11 · 7 phút đọc', img: '7d7d0b8853cbaf6d7c931bff0aee3b97', alt: 'Bốn lớp xếp chồng màu xanh lá, lớp trên cùng có dấu tích', comments: 2 },
+      { cat: 'tech', tags: ['ai'], title: 'Thiết kế API thân thiện với AI agent', excerpt: 'Mã lỗi ổn định, lệnh ghi gọi lại an toàn, một kiểu phân trang cho mọi danh sách.', meta: 'Quốc Bảo · 6 thg 11 · 9 phút đọc', img: '63c6fbd5e7ba7aa1c1dbaaaea84ecd0b', alt: 'Sơ đồ bốn nút tròn nối vào một nút trung tâm', comments: 11 },
+      { cat: 'news', tags: [], title: 'Lộ trình quý tới', excerpt: 'Những gì sẽ làm tiếp sau bản 0.5, và thứ tự của chúng.', meta: 'Hoàng Nam · 4 thg 11 · 3 phút đọc', img: 'cbe66a7d085f53f549889a1a9ae0e42e', alt: 'Một con đường uốn lượn với ba cột mốc', comments: 0 },
+      { cat: 'guide', tags: ['sqlite'], title: 'Hướng dẫn cài Autoxide trên SQLite trong 5 phút', excerpt: 'Một bản clone mới chạy được ngay: mọi biến cấu hình đều có giá trị mặc định dùng được.', meta: 'Thu Hà · 3 thg 11 · 4 phút đọc', img: 'bf8a142cadb8f1f03430e81c0a41bdf7', alt: 'Cửa sổ dòng lệnh bên cạnh một chiếc đồng hồ', comments: 7 },
+      { cat: 'guide', tags: [], title: 'Gửi newsletter có xác nhận hai bước', excerpt: 'Người đăng ký bấm xác nhận trong thư trước khi vào danh sách.', meta: 'Minh Anh · 1 thg 11 · 4 phút đọc', img: '8a994113235fc2aa49a55c00b9c226fa', alt: 'Phong bì thư có con dấu tròn màu cam', comments: 1 },
+      { cat: 'tech', tags: ['rust'], title: 'Viết module đầu tiên của bạn', excerpt: 'Một module là một crate: khai bảng, permission và route của riêng nó, không sửa dòng nào trong lõi.', meta: 'Quốc Bảo · 28 thg 10 · 10 phút đọc', img: '0e554cb31ec28e49e44e5fa026e88464', alt: 'Ba khối vuông ghép trên một khối nền', comments: 3 },
+      { cat: 'guide', tags: [], title: 'Kiểm duyệt bình luận: cấu hình khuyến nghị', excerpt: 'Hàng chờ duyệt, từ cấm, giới hạn số liên kết và thư báo trả lời: nên bật gì cho một website mới.', meta: 'Thu Hà · 25 thg 10 · 5 phút đọc', img: '260b4c0726d230b03cc956d6416383d8', alt: 'Hai bong bóng hội thoại và một dấu tích', comments: 5 }
+    ];
+
+    // Như core: tìm không phân biệt chữ hoa và dấu.
+    const fold = (text) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+    const q = fold(s.q.trim());
+    const term = s.term;
+    const matches = data.filter((p) =>
+      (term === 'all' || p.cat === term || p.tags.includes(term)) &&
+      (!q || fold(p.title).includes(q) || fold(p.excerpt).includes(q)));
+    const posts = matches.slice(0, s.shown).map((p) => ({
+      ...p, term: CAT[p.cat], img: B + p.img,
+      hasComments: p.comments > 0, comments: String(p.comments)
+    }));
+
+    const pick = (id) => () => this.setState({ term: id, shown: 6 });
+    const cats = [['all', 'Tất cả'], ['guide', 'Hướng dẫn'], ['tech', 'Kỹ thuật'], ['news', 'Thông báo']].map(([id, label]) => ({
+      label, on: term === id, cls: term === id ? 'on' : '', pick: pick(id)
+    }));
+    const tags = ['sqlite', 'postgres', 'rust', 'ai', 'backup'].map((id) => ({
+      label: '#' + id, on: term === id,
+      bg: term === id ? 'var(--ink)' : 'transparent',
+      fg: term === id ? 'var(--paper)' : 'var(--ink-2)',
+      pick: pick(term === id ? 'all' : id)
+    }));
+    const head = TERMS[term];
+
+    const footer = [
+      { label: 'Chủ đề', items: [{ label: 'Hướng dẫn', href: 'List.dc.html' }, { label: 'Kỹ thuật', href: 'List.dc.html' }, { label: 'Thông báo', href: 'List.dc.html' }] },
+      { label: 'Dự án', items: [{ label: 'Liên hệ', href: 'Page.dc.html' }, { label: 'Mã nguồn trên GitHub', href: 'https://github.com/thuongtamduy/autoxide' }] },
+      { label: 'Theo dõi', items: [{ label: 'Newsletter', href: 'Main.dc.html' }, { label: 'Nguồn RSS', href: '#' }, { label: 'Tìm kiếm', href: 'Search.dc.html' }] }
+    ];
+
+    return {
+      theme: dark ? 'dark' : '',
+      themeIcon: dark ? I.sun : I.moon,
+      toggleTheme: () => this.setState({ dark: !dark }),
+      ic: I, menu, cats, tags, posts, footer,
+      headKick: head.kick, headTitle: head.title, headText: head.text,
+      q: s.q,
+      onQ: (e) => this.setState({ q: e.target.value, shown: 6 }),
+      hasPosts: posts.length > 0,
+      empty: posts.length === 0,
+      more: matches.length > posts.length,
+      end: posts.length > 6 && matches.length === posts.length,
+      loadMore: () => this.setState({ shown: s.shown + 3 }),
+      reset: () => this.setState({ term: 'all', q: '', shown: 6 })
+    };
+  }
+}
+</script>
+</body>
+</html>

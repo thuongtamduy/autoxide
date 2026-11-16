@@ -292,7 +292,7 @@ Dòng ERROR trong log máy chủ: 0
 ## Sau bước 33 (đa khách) — 16/11/2026
 
 Đo lại để so với mốc ở trên (đặc tả 33, mục C4). Máy khác mốc cũ nên **đo lại cả bản trước** trên cùng máy: bản
-`b5435c7` (trước phần A) và bản sau phần C kèm index `(tenant_id, id)` (D-301), cùng máy 4 CPU, máy tạo tải chạy chung,
+`b5435c7` (trước phần A) và bản sau phần C kèm index `(tenant_id, id)` (D-302), cùng máy 4 CPU, máy tạo tải chạy chung,
 6 giây mỗi bài, **mỗi bài 3 lần, lấy trung vị** (D-179: dao động ±20%). `scripts/loadtest.sh`, chế độ `single`.
 
 
@@ -343,7 +343,7 @@ Dòng ERROR trong log máy chủ: 0
 - Phần chung mọi request (giải khách ở chế độ `single`, lọc `tenant_id`) nằm trong dao động: kiểm sức khoẻ −12 / −18%,
   tải file −8 / −14%, ghi (`PATCH`, `POST /files`, lượt ghi tăng dần) −0 đến −11%, danh sách audit −7 / −11%.
 - Trước khi thêm index `(tenant_id, id)`, danh sách audit trên SQLite chậm −47%: danh sách của một khách sắp theo `id`
-  không có index nào khớp nên SQLite đọc hết dòng của khách rồi sắp xếp tạm (chậm dần theo cỡ bảng). D-301 thêm
+  không có index nào khớp nên SQLite đọc hết dòng của khách rồi sắp xếp tạm (chậm dần theo cỡ bảng). D-302 thêm
   index cho 20 bảng có danh sách như vậy.
 - `GET /auth/me`, `auth.whoami` và `GET /auth/users` chậm 35–46%: các endpoint này giờ trả thêm `has_password`,
   `mfa_enabled`, `pending_email`, `last_sign_in_at` (đề bài giao diện, không phải đa khách) — thêm 2–3 câu SQL mỗi

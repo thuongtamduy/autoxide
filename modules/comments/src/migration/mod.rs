@@ -90,7 +90,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                     .unique("comments_profiles_name_unique", ["tenant_id", "name_key"]),
             ],
         ),
-        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-301).
+        // Danh sách theo khách sắp theo `id` cần index `(tenant_id, id)` (đo ở bước 33 C, D-302).
         autoxide_kernel::tenancy::migration::list_index(
             "m0014_tenant_list_index",
             vec!["comments_comments", "comments_bans", "comments_reports"],

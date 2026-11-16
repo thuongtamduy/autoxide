@@ -1,0 +1,489 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Access.dc.html": {
+      "expand": "fill",
+      "h": 1571,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "25 · Người dùng và quyền",
+      "w": 1440,
+      "x": 1520,
+      "y": 12058
+    },
+    "Account.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "28 · Tài khoản của tôi",
+      "w": 1440,
+      "x": 6080,
+      "y": 12058
+    },
+    "Affiliate.dc.html": {
+      "expand": "fill",
+      "h": 1024,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "19 · Tiếp thị liên kết",
+      "w": 1440,
+      "x": 0,
+      "y": 8767
+    },
+    "Agent.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "8 · Cài đặt › API key và AI agent",
+      "w": 1440,
+      "x": 6080,
+      "y": 2455
+    },
+    "Catalog.dc.html": {
+      "expand": "fill",
+      "h": 1533,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "15 · Sản phẩm",
+      "w": 1440,
+      "x": 1520,
+      "y": 6625
+    },
+    "Channels.dc.html": {
+      "expand": "fill",
+      "h": 1025,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "18 · Kênh bán",
+      "w": 1440,
+      "x": 6080,
+      "y": 6625
+    },
+    "Compliance.dc.html": {
+      "expand": "fill",
+      "h": 961,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "5 · Tuân thủ",
+      "w": 1440,
+      "x": 1520,
+      "y": 2455
+    },
+    "Content.dc.html": {
+      "expand": "fill",
+      "h": 1052,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "3 · Nội dung › Bài viết",
+      "w": 1440,
+      "x": 4560,
+      "y": 0
+    },
+    "ContentMore.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "21 · Nội dung › Trang, menu, media",
+      "w": 1440,
+      "x": 3040,
+      "y": 8767
+    },
+    "Customers.dc.html": {
+      "expand": "fill",
+      "h": 952,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "17 · Khách hàng › Điểm, hạng, CRM",
+      "w": 1440,
+      "x": 4560,
+      "y": 6625
+    },
+    "Devtools.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "7 · Cài đặt › Nhà phát triển",
+      "w": 1440,
+      "x": 4560,
+      "y": 2455
+    },
+    "Editor.dc.html": {
+      "expand": "fill",
+      "h": 1420,
+      "is_interactive": true,
+      "page": "v1",
+      "title": "v1 · Soạn bài viết",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Engage.dc.html": {
+      "expand": "fill",
+      "h": 1136,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "20 · Tương tác › Form, bản tin, bình luận",
+      "w": 1440,
+      "x": 1520,
+      "y": 8767
+    },
+    "Entries.dc.html": {
+      "expand": "fill",
+      "h": 1160,
+      "is_interactive": true,
+      "page": "v1",
+      "title": "v1 · Danh sách bài viết",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "Finance.dc.html": {
+      "expand": "fill",
+      "h": 1948,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "11 · Tài chính › Sổ cái, thuế, hoá đơn",
+      "w": 1440,
+      "x": 3040,
+      "y": 4177
+    },
+    "Inventory.dc.html": {
+      "expand": "fill",
+      "h": 1480,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "14 · Kho",
+      "w": 1440,
+      "x": 0,
+      "y": 6625
+    },
+    "LegalOps.dc.html": {
+      "expand": "fill",
+      "h": 1358,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "27 · Pháp lý › Văn bản, sự cố, cơ quan",
+      "w": 1440,
+      "x": 4560,
+      "y": 12058
+    },
+    "Login.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "29 · Đăng nhập",
+      "w": 1440,
+      "x": 7600,
+      "y": 12058
+    },
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 1955,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "1 · Khung quản trị + Tổng quan",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Map.dc.html": {
+      "expand": "fill",
+      "h": 1900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "0 · Bản đồ phân hệ",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "Market.dc.html": {
+      "expand": "fill",
+      "h": 977,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "9 · Sàn › Người bán, phí, đợt chi",
+      "w": 1440,
+      "x": 0,
+      "y": 4177
+    },
+    "Media.dc.html": {
+      "expand": "fill",
+      "h": 1160,
+      "is_interactive": true,
+      "page": "v1",
+      "title": "v1 · Thư viện media",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "Orders.dc.html": {
+      "expand": "fill",
+      "h": 1384,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "2 · Bán hàng › Đơn hàng",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "Org.dc.html": {
+      "expand": "fill",
+      "h": 1222,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "4 · Tổ chức › Cây và quyền",
+      "w": 1440,
+      "x": 0,
+      "y": 2455
+    },
+    "Platform.dc.html": {
+      "expand": "fill",
+      "h": 1177,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "6 · Nền tảng (mặt điều khiển)",
+      "w": 1440,
+      "x": 3040,
+      "y": 2455
+    },
+    "PlatformOps.dc.html": {
+      "expand": "fill",
+      "h": 1281,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "26 · Nền tảng › Vận hành",
+      "w": 1440,
+      "x": 3040,
+      "y": 12058
+    },
+    "Promotions.dc.html": {
+      "expand": "fill",
+      "h": 1642,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "16 · Khuyến mại",
+      "w": 1440,
+      "x": 3040,
+      "y": 6625
+    },
+    "SellerCenter.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "10 · Trung tâm người bán",
+      "w": 1440,
+      "x": 1520,
+      "y": 4177
+    },
+    "Settings.dc.html": {
+      "expand": "fill",
+      "h": 1928,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "24 · Cài đặt khách",
+      "w": 1440,
+      "x": 0,
+      "y": 12058
+    },
+    "Shipping.dc.html": {
+      "expand": "fill",
+      "h": 1045,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "13 · Vận chuyển",
+      "w": 1440,
+      "x": 6080,
+      "y": 4177
+    },
+    "States.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "23 · Trạng thái chung (rỗng, lỗi, tải, không quyền)",
+      "w": 1440,
+      "x": 6080,
+      "y": 8767
+    },
+    "StoreOps.dc.html": {
+      "expand": "fill",
+      "h": 957,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "12 · Cửa hàng › POS, ca, nhận tại quầy",
+      "w": 1440,
+      "x": 4560,
+      "y": 4177
+    },
+    "Work.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "22 · Hộp việc và thông báo",
+      "w": 1440,
+      "x": 4560,
+      "y": 8767
+    },
+    "ContentEditor.dc.html": {
+      "expand": "fill",
+      "h": 1960,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "21b · Nội dung › Soạn bài (khung 2)",
+      "w": 1440,
+      "x": 7600,
+      "y": 8767
+    },
+    "MediaLibrary.dc.html": {
+      "expand": "fill",
+      "h": 2006,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "21c · Nội dung › Thư viện media (khung 2)",
+      "w": 1440,
+      "x": 9120,
+      "y": 8767
+    },
+    "Menus.dc.html": {
+      "expand": "fill",
+      "h": 2791,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "21d · Website › Menu (module menus)",
+      "w": 1440,
+      "x": 10640,
+      "y": 8767
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-11-12T16:30:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "page": "v2",
+    "view": "canvas"
+  },
+  "notes": {
+    "heading": {
+      "kind": "title1",
+      "maxW": 6000,
+      "page": "v2",
+      "text": "Autoxide Admin — mọi phân hệ trong một khung",
+      "w": 240,
+      "x": 0,
+      "y": -320
+    },
+    "heading-v1": {
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "v1",
+      "text": "Thiết kế 1 (12/11) — CMS đứng riêng",
+      "w": 240,
+      "x": 0,
+      "y": -320
+    },
+    "row2": {
+      "kind": "title1",
+      "maxW": 7520,
+      "page": "v2",
+      "text": "Nền chung: tổ chức, tuân thủ, mặt điều khiển, nhà phát triển, AI agent",
+      "w": 240,
+      "x": 0,
+      "y": 2135
+    },
+    "row3": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "v2",
+      "text": "Thương mại: sàn, người bán, tài chính, cửa hàng, vận chuyển",
+      "w": 240,
+      "x": 0,
+      "y": 3857
+    },
+    "row4": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "v2",
+      "text": "Hàng hoá và khách: kho, sản phẩm, khuyến mại, khách hàng, kênh bán",
+      "w": 240,
+      "x": 0,
+      "y": 6305
+    },
+    "row5": {
+      "kind": "title1",
+      "maxW": 12100,
+      "page": "v2",
+      "text": "Tăng trưởng và nội dung: tiếp thị liên kết, tương tác, nội dung mở rộng, hộp việc, trạng thái, soạn bài, media, menu website",
+      "w": 240,
+      "x": 0,
+      "y": 8447
+    },
+    "row6": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "v2",
+      "text": "Cài đặt, quyền, vận hành nền tảng, pháp lý, tài khoản",
+      "w": 240,
+      "x": 0,
+      "y": 11738
+    }
+  },
+  "order": [
+    "Map.dc.html",
+    "Main.dc.html",
+    "Orders.dc.html",
+    "Content.dc.html",
+    "Org.dc.html",
+    "Compliance.dc.html",
+    "Platform.dc.html",
+    "Devtools.dc.html",
+    "Agent.dc.html",
+    "Market.dc.html",
+    "SellerCenter.dc.html",
+    "Finance.dc.html",
+    "StoreOps.dc.html",
+    "Shipping.dc.html",
+    "Inventory.dc.html",
+    "Catalog.dc.html",
+    "Promotions.dc.html",
+    "Customers.dc.html",
+    "Channels.dc.html",
+    "Affiliate.dc.html",
+    "Engage.dc.html",
+    "ContentMore.dc.html",
+    "MediaLibrary.dc.html",
+    "ContentEditor.dc.html",
+    "Menus.dc.html",
+    "Work.dc.html",
+    "States.dc.html",
+    "Settings.dc.html",
+    "Access.dc.html",
+    "PlatformOps.dc.html",
+    "LegalOps.dc.html",
+    "Account.dc.html",
+    "Login.dc.html",
+    "Entries.dc.html",
+    "Editor.dc.html",
+    "Media.dc.html"
+  ],
+  "pages": [
+    {
+      "id": "v2",
+      "name": "Thiết kế 2 — đa phân hệ"
+    },
+    {
+      "id": "v1",
+      "name": "Thiết kế 1 — CMS (lưu để đối chiếu)"
+    }
+  ],
+  "title": "Autoxide Admin — thiết kế quản trị"
+}
