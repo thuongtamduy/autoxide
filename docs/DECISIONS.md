@@ -7393,3 +7393,46 @@ Quyết định:
 hai chỗ chậm của mục 3 — là tối ưu tính năng của bước khác, cần đo riêng, để bước 39 (vận hành, hiệu năng) làm cùng
 các việc đo khác; index `(tenant_id, id)` cho mọi bảng cấp khách hàng (75 bảng) — phần lớn chỉ tra theo khoá khác hay
 theo bản ghi cha, thêm index chỉ tốn chỗ và chậm ghi.
+
+## D-303 · Cây tổ chức và quyền theo độ sâu ở kernel (bước 34 mục 1) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Cấu trúc cây là của kernel** (đặc tả 34 "Agent tự quyết" #2): `kernel_org_units` (nút cha, độ sâu, cờ `writable`) và
+   `kernel_org_closure` (bảng tổ tiên – con cháu), cấp khách hàng, có ở mọi database. `autoxide_kernel::tenancy::OrgTree`
+   là công cụ duy nhất đổi và tra cây; module lọc theo nhánh bằng subquery `OrgTree::subtree_condition`. Phần nghĩa (tên,
+   loại, trạng thái, địa chỉ, cài đặt) thuộc module `organizations`.
+2. **Nút gốc có ID = ID của khách** (`tenancy::root_of`): dữ liệu cấp khách mang `org_id = tenant_id`; nâng cấp dữ liệu cũ
+   chỉ gán như vậy; bước 38 tách nhánh thành khách mới giữ được ID.
+3. **Độ sâu** `Scope { Own, Unit, Subtree, Tenant }` (rộng dần) theo bảng nghĩa của đặc tả 34. Permission khai
+   `.scoped()` mới cấp được với độ sâu hẹp hơn `tenant`; permission không scoped có grant ở nút nào cũng thành grant toàn
+   khách. `Principal::require` giữ nghĩa cũ (có ở bất kỳ độ sâu nào); dữ liệu theo nút kiểm thêm bằng `scope_condition`
+   (danh sách) và `require_at` / `require_write_at` (một bản ghi). Bản ghi không có cột người sở hữu: `own` hiểu như `unit`
+   (đặc tả #7, cách đơn giản). `Principal::new` / `with_all_permissions` cho độ sâu `tenant` — mọi code cũ giữ nghĩa.
+4. **API key gắn nút** là một hàng rào (`Principal::with_fence`): mọi điều kiện thêm "trong nhánh của nút đó"; rào ở gốc
+   = không rào.
+5. **Đóng băng** kiểm trong transaction ghi: `OrgTree::ensure_writable` khoá chia sẻ (`FOR SHARE` trên Postgres) dòng gốc
+   rồi chuỗi tổ tiên; lệnh đổi cây khoá dòng gốc `FOR UPDATE` trước mọi dòng khác — cùng thứ tự khoá nên không deadlock,
+   và lệnh ghi bắt đầu sau khi lệnh khoá nút commit luôn thấy cờ mới (test đồng thời trên cả hai database). Nút không có
+   trong cây coi như ghi được: khách chưa cài `organizations` không bị chặn.
+6. **Mã lỗi của cây là mã kernel** (module dùng qua hàm của kernel, vd `tenancy::root_immutable()`): `org_not_found` (404), `org_cycle`, `org_depth_exceeded` (422), `org_root_immutable`
+   (409), cùng `org_out_of_scope`, `org_frozen` (403). Đặc tả ghi `organizations.cycle`, `organizations.depth_exceeded`,
+   `organizations.root_immutable` — kernel không sinh được mã mang tiền tố module, và một lỗi có hai mã thì client phải
+   học hai; module `organizations` dùng thẳng mã kernel.
+7. **Dời nhánh** chạy bằng ba câu không đệ quy trên cả hai database: xoá cặp (tổ tiên ngoài nhánh, con cháu trong nhánh)
+   bằng subquery, chèn tích chéo tổ tiên của cha mới × nhánh (`INSERT … SELECT`), cộng độ sâu cả nhánh một lượng. Test so
+   bảng tổ tiên với cây tính lại từ `parent_id` sau 200 lần dời ngẫu nhiên.
+
+8. **Module `organizations`** giữ phần nghĩa của nút: loại nút do khách tự đặt (`tenant` dành cho gốc), trạng thái
+   `pending` / `active` / `suspended` / `archived` (đổi trạng thái đặt cờ `writable` của kernel), mã nội bộ duy nhất
+   trong khách. Nút gốc tạo lười (`ensure_root`, chạy lại được) và qua `seed_tenant` khi tạo khách — không cần
+   migration duyệt mọi khách trên mỗi database. Đăng ký trước `auth` (đặc tả #1). Địa chỉ của nút chờ module
+   `address` (cột thêm bằng migration sau).
+
+Để sau, ghi vào mục tương ứng của lộ trình: `Actor.access` + cột `actor_access` của outbox làm cùng mục uỷ quyền / quyền
+vào hỗ trợ (mục 10, 13 — chỉ hai mục đó sinh đường vào khác `direct`; thêm cột vào outbox của mọi module một lần khi cần);
+`Module::org_settings` + `OrgSettingCatalog` làm cùng module `organizations` (mục 4, cài đặt kế thừa).
+
+Đã cân nhắc: cây ở `organizations` (`organizations_closure`) — module khác không được đọc bảng của nó nên không lọc theo
+nhánh trong SQL được; `WITH RECURSIVE` — mỗi lần kiểm quyền một câu đệ quy, khó có index; khoá theo thứ tự nút khi dời —
+hai lệnh dời chéo nhau dễ deadlock.

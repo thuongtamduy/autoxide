@@ -154,6 +154,24 @@ endpoints are marked deprecated with a sunset date first.
   writes of a user of each kind. Results before and after tenancy are in `docs/BENCHMARKS.md`.
 - Module guide (`docs/MODULE_GUIDE.md`): a section on tenants — how to classify tables, filter every query with
   `.scoped`, seed a new tenant, read per-tenant settings and write the leak test.
+- Organization tree of each tenant (new module `organizations`): unit types the tenant names itself
+  (`GET`, `POST /api/v1/organizations/unit-types`, `PUT`, `DELETE /api/v1/organizations/unit-types/{code}`) and units
+  under a root that has the id of the tenant (`GET`, `POST /api/v1/organizations/units`, `GET`, `PATCH
+  /api/v1/organizations/units/{id}`, `GET …/{id}/ancestors`, `POST …/{id}/move`, `POST …/{id}/status`). A unit is
+  `pending`, `active`, `suspended` or `archived`; while a unit is not active, nothing can be written to it or to any
+  unit below it. The tree is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (default 8). New permissions
+  `organizations.units.read`, `organizations.units.write`, `organizations.units.manage` (scoped) and
+  `organizations.types.manage`; MCP tools `organizations.list_units`, `get_unit`, `create_unit`, `update_unit`,
+  `move_unit`, `change_unit_status`; events `organizations.unit_created`, `unit_updated`, `unit_moved`,
+  `unit_status_changed`, `unit_type_changed`. Other modules read units through `autoxide_organizations::api::OrgDirectory`.
+- For module authors: permissions with a depth. `Permission::scoped()` marks a permission on data that belongs to a
+  unit; a role grants it with a scope `own`, `unit`, `subtree` or `tenant` (`autoxide_kernel::access::Scope`).
+  `Principal::scope_condition(&permission, org_column, owner_column)` limits a list, `require_at` checks one record
+  and `require_write_at` also refuses a unit that is not active (`org_frozen`). `Principal::with_grants`,
+  `with_fence` (an API key bound to a unit), `customer` (an account without permissions), `realm`, `access`. The
+  structure of the tree is in the kernel: `autoxide_kernel::tenancy::{OrgTree, nearest, root_of}`. New error codes
+  `org_out_of_scope`, `org_frozen`, `org_not_found`, `org_cycle`, `org_depth_exceeded`, `org_root_immutable`. Testkit:
+  `TestApp::builder(…).member(token, user, org, &[(permission, scope)])`.
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 

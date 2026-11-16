@@ -380,6 +380,7 @@ dependencies = [
  "autoxide-menus",
  "autoxide-newsletter",
  "autoxide-notes",
+ "autoxide-organizations",
  "autoxide-testkit",
  "autoxide-webhooks",
  "axum",
@@ -742,6 +743,27 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-organizations"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
  "tracing",
  "utoipa",
  "utoipa-axum",

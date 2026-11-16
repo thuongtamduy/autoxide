@@ -15,18 +15,23 @@
 //! Nhờ vậy module nghiệp vụ kiểm quyền mà không phụ thuộc module `auth`, và module
 //! `auth` có thể thay bằng cách xác thực khác mà không module nào phải sửa.
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::header;
 use axum::http::request::Parts;
+use sea_orm::sea_query::Condition;
+use sea_orm::{ColumnTrait, ConnectionTrait};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::error::Error;
 use crate::module::is_identifier;
 use crate::tenancy::TenantContext;
-use crate::tenancy::{DEFAULT_TENANT, TenantHint, TenantId};
+use crate::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantHint, TenantId, root_of};
 
 /// Một permission do module khai.
 ///
@@ -41,6 +46,122 @@ pub struct Permission {
     name: &'static str,
     description: &'static str,
     risk: Risk,
+    /// Áp lên dữ liệu có `org_id` (bước 34): role cấp được với độ sâu hẹp hơn `tenant`.
+    scoped: bool,
+}
+
+/// Độ sâu của một quyền trong cây tổ chức (bước 34, như "access level" của Dynamics 365). Thứ tự
+/// khai báo là thứ tự rộng dần: `own < unit < subtree < tenant`.
+///
+/// Với membership tại nút N: `own` — bản ghi mình sở hữu; `unit` — bản ghi của đúng nút N;
+/// `subtree` — bản ghi của N và mọi nút dưới N; `tenant` — mọi bản ghi của khách.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum Scope {
+    /// Only records the person owns.
+    Own,
+    /// Records of the unit of the membership.
+    Unit,
+    /// Records of the unit of the membership and of every unit below it.
+    Subtree,
+    /// Every record of the tenant.
+    Tenant,
+}
+
+impl Scope {
+    /// Tên ổn định trong API và database: `own`, `unit`, `subtree`, `tenant`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Scope::Own => "own",
+            Scope::Unit => "unit",
+            Scope::Subtree => "subtree",
+            Scope::Tenant => "tenant",
+        }
+    }
+
+    /// Đọc từ tên ổn định; tên lạ → `None`.
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "own" => Some(Scope::Own),
+            "unit" => Some(Scope::Unit),
+            "subtree" => Some(Scope::Subtree),
+            "tenant" => Some(Scope::Tenant),
+            _ => None,
+        }
+    }
+}
+
+/// Một quyền cụ thể: ở nút `org`, độ sâu `scope`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Grant {
+    pub org: OrgId,
+    pub scope: Scope,
+}
+
+impl Grant {
+    pub const fn new(org: OrgId, scope: Scope) -> Self {
+        Grant { org, scope }
+    }
+}
+
+/// Đích của một lần kiểm quyền trên một bản ghi: nút sở hữu bản ghi và người sở hữu (nếu bản ghi
+/// có khái niệm người sở hữu — độ sâu `own` cần nó; không có thì `own` hiểu như `unit`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OrgTarget {
+    pub org: OrgId,
+    pub owner: Option<Uuid>,
+}
+
+impl OrgTarget {
+    pub const fn new(org: OrgId, owner: Option<Uuid>) -> Self {
+        OrgTarget { org, owner }
+    }
+}
+
+/// Loại tài khoản (bước 34): nhân sự (`staff`) có permission; người mua (`customer`) là tài khoản
+/// của một khách, không có permission nào.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Realm {
+    /// Staff of a tenant: has the permissions of their roles.
+    #[default]
+    Staff,
+    /// A customer account of one tenant: signs in, has no permission.
+    Customer,
+}
+
+/// Đường bên gọi vào khách hiện tại (bước 34): membership trực tiếp, uỷ quyền từ khách cha, hay
+/// quyền vào hỗ trợ của nhân sự nền tảng. Ghi vào event (`Actor::access`) để audit thấy.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "id", rename_all = "snake_case")]
+pub enum AccessPath {
+    #[default]
+    Direct,
+    /// Qua uỷ quyền có ID này.
+    Delegation(Uuid),
+    /// Qua lần cấp quyền vào hỗ trợ có ID này.
+    Support(Uuid),
+}
+
+impl AccessPath {
+    /// Tên ổn định: `direct`, `delegation`, `support`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            AccessPath::Direct => "direct",
+            AccessPath::Delegation(_) => "delegation",
+            AccessPath::Support(_) => "support",
+        }
+    }
+
+    /// ID của uỷ quyền / lần cấp hỗ trợ; `None` khi trực tiếp.
+    pub const fn id(self) -> Option<Uuid> {
+        match self {
+            AccessPath::Direct => None,
+            AccessPath::Delegation(id) | AccessPath::Support(id) => Some(id),
+        }
+    }
 }
 
 /// Mức rủi ro của một permission, đọc được bằng máy (D-205, đặc tả 54 P1): giao diện và AI agent
@@ -99,7 +220,20 @@ impl Permission {
     /// [`with_risk`](Self::with_risk).
     pub const fn new(name: &'static str, description: &'static str) -> Self {
         let risk = if ends_with(name, ".read") { Risk::Read } else { Risk::Write };
-        Permission { name, description, risk }
+        Permission { name, description, risk, scoped: false }
+    }
+
+    /// Permission áp lên dữ liệu có `org_id` (bước 34): role cấp được với độ sâu `own`, `unit`,
+    /// `subtree`. Permission không `scoped` chỉ cấp ở độ sâu `tenant` và có hiệu lực toàn khách
+    /// dù membership ở nút nào.
+    pub const fn scoped(mut self) -> Self {
+        self.scoped = true;
+        self
+    }
+
+    /// Có [`scoped`](Self::scoped) không.
+    pub const fn is_scoped(&self) -> bool {
+        self.scoped
     }
 
     /// Đặt mức rủi ro, vd `Permission::new("notes.purge", "…").with_risk(Risk::Destructive)`.
@@ -193,36 +327,199 @@ pub struct Principal {
     tenant: TenantId,
     /// Khách nền tảng của nhân sự đang vào khách khác qua header `Autoxide-Tenant`.
     operator_from: Option<TenantId>,
+    /// Nhân sự hay người mua (bước 34).
+    realm: Realm,
+    /// Hàng rào của API key gắn nút: mọi quyền chỉ có hiệu lực trong nhánh này.
+    fence: Option<OrgId>,
+    /// Đường vào khách hiện tại.
+    access: AccessPath,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Grants {
-    /// Mọi permission, kể cả permission thêm sau (role `admin`).
+    /// Mọi permission ở độ sâu `tenant`, kể cả permission thêm sau (role `admin`).
     All,
-    Only(Arc<BTreeSet<String>>),
+    /// Permission → các grant (nút, độ sâu). Tên có mặt nghĩa là có permission ở ít nhất một nút.
+    Only(Arc<BTreeMap<String, Vec<Grant>>>),
 }
 
 impl Principal {
-    /// Người dùng `user_id` với đúng các permission `permissions`.
+    /// Người dùng `user_id` với đúng các permission `permissions`, ở độ sâu `tenant`.
     pub fn new(user_id: Uuid, permissions: impl IntoIterator<Item = String>) -> Self {
-        Principal {
+        let root = root_of(DEFAULT_TENANT);
+        Principal::with_grants(
             user_id,
-            grants: Grants::Only(Arc::new(permissions.into_iter().collect())),
-            api_key: None,
-            tenant: DEFAULT_TENANT,
-            operator_from: None,
+            permissions.into_iter().map(|permission| (permission, Grant::new(root, Scope::Tenant))),
+        )
+    }
+
+    /// Người dùng `user_id` với các grant `(permission, grant)` — một permission có thể có nhiều
+    /// grant ở nhiều nút; quyền là hợp của chúng.
+    pub fn with_grants(user_id: Uuid, grants: impl IntoIterator<Item = (String, Grant)>) -> Self {
+        let mut map: BTreeMap<String, Vec<Grant>> = BTreeMap::new();
+        for (permission, grant) in grants {
+            let list = map.entry(permission).or_default();
+            if !list.contains(&grant) {
+                list.push(grant);
+            }
         }
+        Principal::with(user_id, Grants::Only(Arc::new(map)))
     }
 
     /// Người dùng `user_id` có mọi permission.
     pub fn with_all_permissions(user_id: Uuid) -> Self {
+        Principal::with(user_id, Grants::All)
+    }
+
+    fn with(user_id: Uuid, grants: Grants) -> Self {
         Principal {
             user_id,
-            grants: Grants::All,
+            grants,
             api_key: None,
             tenant: DEFAULT_TENANT,
             operator_from: None,
+            realm: Realm::Staff,
+            fence: None,
+            access: AccessPath::Direct,
         }
+    }
+
+    /// Người mua `user_id` (bước 34): đăng nhập được, không có permission nào.
+    pub fn customer(user_id: Uuid) -> Self {
+        let mut principal = Principal::with(user_id, Grants::Only(Arc::default()));
+        principal.realm = Realm::Customer;
+        principal
+    }
+
+    /// Nhân sự hay người mua.
+    pub fn realm(&self) -> Realm {
+        self.realm
+    }
+
+    /// Mọi quyền chỉ có hiệu lực trong nhánh của nút `org` (API key gắn nút). Nút gốc của khách
+    /// nghĩa là không rào.
+    pub fn with_fence(mut self, org: OrgId) -> Self {
+        self.fence = Some(org);
+        self
+    }
+
+    /// Hàng rào đang có hiệu lực; `None` khi không rào (kể cả khi rào ở nút gốc).
+    pub fn fence(&self) -> Option<OrgId> {
+        self.fence.filter(|org| *org != root_of(self.tenant))
+    }
+
+    /// Đánh dấu đường vào khách hiện tại (uỷ quyền, hỗ trợ).
+    pub fn with_access(mut self, access: AccessPath) -> Self {
+        self.access = access;
+        self
+    }
+
+    /// Đường vào khách hiện tại.
+    pub fn access(&self) -> AccessPath {
+        self.access
+    }
+
+    /// Các grant của `permission`; rỗng khi không có. Permission không `scoped` có grant ở đâu
+    /// cũng thành một grant `tenant` (có hiệu lực toàn khách).
+    pub fn grants(&self, permission: &Permission) -> Vec<Grant> {
+        let tenant_wide = vec![Grant::new(root_of(self.tenant), Scope::Tenant)];
+        match &self.grants {
+            Grants::All => tenant_wide,
+            Grants::Only(map) => match map.get(permission.name) {
+                None => Vec::new(),
+                Some(_) if !permission.is_scoped() => tenant_wide,
+                Some(list) => list.clone(),
+            },
+        }
+    }
+
+    /// Điều kiện SeaORM giới hạn một danh sách vào phần `permission` cho phép: cột `org` là nút
+    /// của bản ghi, `owner` là cột người sở hữu (nếu có; không có thì `own` hiểu như `unit`).
+    /// `Condition::all()` (không giới hạn) khi có độ sâu `tenant` và không có hàng rào; lỗi
+    /// `permission_denied` khi không có grant nào. Dùng cùng `.scoped(&tenant)`.
+    pub fn scope_condition<C: ColumnTrait>(
+        &self,
+        permission: &Permission,
+        org: C,
+        owner: Option<C>,
+    ) -> Result<Condition, Error> {
+        let grants = self.grants(permission);
+        if grants.is_empty() {
+            return Err(permission_denied(permission));
+        }
+        let mut condition = Condition::all();
+        if !grants.iter().any(|grant| grant.scope == Scope::Tenant) {
+            let pick = |scope: Scope| -> Vec<OrgId> {
+                grants.iter().filter(|grant| grant.scope == scope).map(|grant| grant.org).collect()
+            };
+            let (subtrees, mut units) = (pick(Scope::Subtree), pick(Scope::Unit));
+            let mut any = Condition::any();
+            if !subtrees.is_empty() {
+                any = any.add(OrgTree::subtree_condition(self.tenant, &subtrees, org));
+            }
+            let owns = pick(Scope::Own);
+            match owner {
+                Some(owner) if !owns.is_empty() => any = any.add(owner.eq(self.user_id)),
+                _ => units.extend(owns),
+            }
+            if !units.is_empty() {
+                any = any.add(org.is_in(units.iter().map(OrgId::as_uuid)));
+            }
+            condition = condition.add(any);
+        }
+        if let Some(fence) = self.fence() {
+            condition = condition.add(OrgTree::subtree_condition(self.tenant, &[fence], org));
+        }
+        Ok(condition)
+    }
+
+    /// Kiểm `permission` trên một bản ghi (đọc / sửa / xoá) hay nút đích của lệnh tạo / dời:
+    /// thiếu permission → `permission_denied`; ngoài phạm vi → `org_out_of_scope`. Đọc ngoài phạm
+    /// vi thì service trả 404 thay vì lỗi này (không lộ bản ghi tồn tại).
+    pub async fn require_at<D: ConnectionTrait>(
+        &self,
+        db: &D,
+        permission: &Permission,
+        target: OrgTarget,
+    ) -> Result<(), Error> {
+        let grants = self.grants(permission);
+        if grants.is_empty() {
+            return Err(permission_denied(permission));
+        }
+        let mut allowed = false;
+        let mut subtrees = Vec::new();
+        for grant in &grants {
+            match grant.scope {
+                Scope::Tenant => allowed = true,
+                Scope::Unit => allowed |= grant.org == target.org,
+                Scope::Own => {
+                    allowed |= match target.owner {
+                        Some(owner) => owner == self.user_id,
+                        None => grant.org == target.org,
+                    }
+                }
+                Scope::Subtree => subtrees.push(grant.org),
+            }
+        }
+        if !allowed && !subtrees.is_empty() {
+            allowed = OrgTree::is_within(db, self.tenant, target.org, &subtrees).await?;
+        }
+        if allowed && let Some(fence) = self.fence() {
+            allowed = OrgTree::is_within(db, self.tenant, target.org, &[fence]).await?;
+        }
+        if allowed { Ok(()) } else { Err(org_out_of_scope(target.org, permission)) }
+    }
+
+    /// Như [`require_at`](Self::require_at), thêm: nút đích và mọi tổ tiên đang hoạt động (không
+    /// thì `org_frozen`). Gọi TRONG transaction ghi của module.
+    pub async fn require_write_at<D: ConnectionTrait>(
+        &self,
+        transaction: &D,
+        permission: &Permission,
+        target: OrgTarget,
+    ) -> Result<(), Error> {
+        self.require_at(transaction, permission, target).await?;
+        OrgTree::ensure_writable(transaction, self.tenant, target.org).await
     }
 
     /// Bên gọi thuộc khách `tenant` (bộ xác thực đặt theo khách trong credential).
@@ -271,12 +568,12 @@ impl Principal {
         self.grants == Grants::All
     }
 
-    /// Các permission được cấp rõ ràng, theo thứ tự tên. Rỗng khi
+    /// Các permission được cấp rõ ràng (ở bất kỳ độ sâu nào), theo thứ tự tên. Rỗng khi
     /// [`has_all_permissions`](Self::has_all_permissions).
     pub fn permissions(&self) -> Vec<String> {
         match &self.grants {
             Grants::All => Vec::new(),
-            Grants::Only(set) => set.iter().cloned().collect(),
+            Grants::Only(map) => map.keys().cloned().collect(),
         }
     }
 
@@ -284,26 +581,43 @@ impl Principal {
         self.allows(permission.name)
     }
 
-    /// Như [`has`](Self::has), theo tên permission (vd tên do client gửi lên).
+    /// Như [`has`](Self::has), theo tên permission (vd tên do client gửi lên). Có ở bất kỳ độ
+    /// sâu nào là có.
     pub fn allows(&self, permission: &str) -> bool {
         match &self.grants {
             Grants::All => true,
-            Grants::Only(set) => set.contains(permission),
+            Grants::Only(map) => map.contains_key(permission),
         }
     }
 
-    /// `Ok` nếu có `permission`; không thì lỗi 403 `permission_denied` nêu tên nó.
+    /// `Ok` nếu có `permission` (ở bất kỳ độ sâu nào); không thì lỗi 403 `permission_denied` nêu
+    /// tên nó. Dữ liệu theo nút kiểm thêm bằng [`require_at`](Self::require_at) hay
+    /// [`scope_condition`](Self::scope_condition).
     pub fn require(&self, permission: &Permission) -> Result<(), Error> {
         if self.has(permission) {
             return Ok(());
         }
-        Err(Error::forbidden(
-            "permission_denied",
-            "This action needs the permission `{permission}`. Ask an administrator for a role \
-             that has it.",
-        )
-        .with_param("permission", permission.name))
+        Err(permission_denied(permission))
     }
+}
+
+fn permission_denied(permission: &Permission) -> Error {
+    Error::forbidden(
+        "permission_denied",
+        "This action needs the permission `{permission}`. Ask an administrator for a role that \
+         has it.",
+    )
+    .with_param("permission", permission.name)
+}
+
+fn org_out_of_scope(org: OrgId, permission: &Permission) -> Error {
+    Error::forbidden(
+        "org_out_of_scope",
+        "The organization unit `{org}` is outside the scope of your permission `{permission}`. \
+         Choose a unit you work in, or ask an administrator for a wider scope.",
+    )
+    .with_param("org", org.as_uuid())
+    .with_param("permission", permission.name)
 }
 
 /// Xác thực request: đọc giá trị header `Authorization` và trả về bên đang gọi.

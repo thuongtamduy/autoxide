@@ -149,5 +149,11 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `newsletter.list_lists` | `newsletter.read` | read-only |
 | `newsletter.schedule_campaign` | `newsletter.send` | writes |
 | `newsletter.send_campaign` | `newsletter.send` | writes |
+| `organizations.change_unit_status` | `organizations.units.manage` | destructive |
+| `organizations.create_unit` | `organizations.units.write` | writes |
+| `organizations.get_unit` | `organizations.units.read` | read-only |
+| `organizations.list_units` | `organizations.units.read` | read-only |
+| `organizations.move_unit` | `organizations.units.write` | writes |
+| `organizations.update_unit` | `organizations.units.write` | writes |
 
 <!-- tools:end -->

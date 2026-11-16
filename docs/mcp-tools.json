@@ -3618,6 +3618,281 @@
       "permissions": [
         "newsletter.send"
       ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Approve, suspend, archive or reactivate an organization unit. While a unit is not active, nothing can be written to it or to the units below it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new status for a unit.",
+        "properties": {
+          "id": {
+            "description": "Id of the unit.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why, up to 500 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`active`, `suspended` or `archived`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.change_unit_status",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create an organization unit under a parent you can write to. It is active when you can also manage units there, otherwise pending until approved.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new unit.",
+        "properties": {
+          "code": {
+            "description": "Internal code, 1 to 64 characters, unique in the tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 200 characters.",
+            "example": "Store District 1",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "The unit to place it under; you need `organizations.units.write` there.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "unit_type": {
+            "description": "Code of an existing unit type (not `tenant`).",
+            "example": "store",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent_id",
+          "unit_type",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.create_unit",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get one organization unit in your scope.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A unit to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the unit.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.get_unit",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the organization units in your scope (head office, regions, stores…), newest first; filter by parent, type, status or name; follow `pagination.next_cursor`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which units to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_id": {
+            "description": "Only the units directly below this unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words in the name; accents and case are ignored.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `active`, `suspended` or `archived`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_type": {
+            "description": "Only units of this type (code).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "organizations.list_units",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move an organization unit, with everything below it, under another parent.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Where to move a unit.",
+        "properties": {
+          "id": {
+            "description": "Id of the unit to move, with everything below it.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "The new parent.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "parent_id"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.move_unit",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Rename an organization unit or change its internal code.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to a unit; omitted fields stay as they are.",
+        "properties": {
+          "code": {
+            "description": "New internal code, 1 to 64 characters; an empty string removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the unit.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "description": "New name, 1 to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.update_unit",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.write"
+      ]
     }
   ]
 }

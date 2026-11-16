@@ -16,6 +16,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_ai::module()),
         // Lưu file: các module lưu file cần nó, nên đứng trước chúng.
         Box::new(autoxide_files::module()),
+        // Cây tổ chức của mỗi khách (bước 34): `auth` cần `dyn OrgDirectory` để kiểm nút khi cấp
+        // membership, nên đứng trước `auth`; không cần gì của `auth`.
+        Box::new(autoxide_organizations::module()),
         // Người dùng, mật khẩu (và sau này đăng nhập, role, permission): mọi module
         // khác có thể cần, nên đứng đầu.
         Box::new(autoxide_auth::module()),

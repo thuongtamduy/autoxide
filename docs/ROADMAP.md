@@ -4,8 +4,9 @@ Mỗi bước xong khi `./gate.sh --quick` xanh; agent đánh dấu `[x]`, commi
 và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–33 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 34 là bước kế
-tiếp**; bước 50 chờ chủ dự án công khai repo (D-199); bản
+Trạng thái: **bước 0–33 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 34 đang
+làm: mục 1 (cây tổ chức) xong; kế tiếp mục 2 (membership theo nút, `org_id` cho `notes`); mục 5–6 (`address`) chờ
+nguồn dữ liệu chính thức — trang danh mục hành chính của cơ quan thống kê không truy cập được từ máy làm việc**; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
@@ -70,7 +71,7 @@ Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một ngư�
 
 Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 
-- [ ] Cây tổ chức trong khách hàng: loại nút tự đặt, độ sâu có giới hạn, bảng tổ tiên – con cháu, dời nút (khoá
+- [x] Cây tổ chức trong khách hàng: loại nút tự đặt, độ sâu có giới hạn, bảng tổ tiên – con cháu, dời nút (khoá
       dòng), vòng đời nút (chờ duyệt, hoạt động, tạm khoá, lưu trữ — khoá một nút thì cả nhánh ngừng ghi)
 - [ ] Thành viên và quyền có độ sâu `own` / `unit` / `subtree` / `tenant`: `Principal` mang quyền theo nút, công
       cụ lọc theo nhánh cho service, dữ liệu nghiệp vụ mang `org_id` (`notes` làm ví dụ), membership kể cả kế

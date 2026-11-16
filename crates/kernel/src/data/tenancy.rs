@@ -26,6 +26,7 @@ pub(crate) mod domains;
 mod link_token;
 pub mod migration;
 pub(crate) mod moves;
+pub(crate) mod org_tree;
 mod placements;
 mod registry;
 pub(crate) mod request;
@@ -56,6 +57,7 @@ pub use link_token::{OptionalTenant, link_token, resolve_link_token, split_link_
 pub use moves::{
     TENANTS_MOVE, TenantMove, TenantMoveBlocker, TenantMovePlan, TenantMoves, TenantTableRows,
 };
+pub use org_tree::{OrgTree, nearest, root_immutable, root_of};
 pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
 pub use registry::{
     DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,

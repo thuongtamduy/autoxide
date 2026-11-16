@@ -851,6 +851,28 @@ export type CreateTermRequest = TermFields & {
   taxonomy: Taxonomy;
 };
 
+/** A new unit. */
+export type CreateUnitRequest = {
+  /** Internal code, 1 to 64 characters, unique in the tenant. */
+  code?: string | null;
+  /** 1 to 200 characters. */
+  name: string;
+  /** The unit to place it under; you need `organizations.units.write` there. */
+  parent_id: string;
+  /** Code of an existing unit type (not `tenant`). */
+  unit_type: string;
+};
+
+/** A new unit type. */
+export type CreateUnitTypeRequest = {
+  /** A lower-case letter, then up to 31 lower-case letters, digits or `_`. `tenant` is reserved. */
+  code: string;
+  /** Up to 1000 characters. */
+  description?: string;
+  /** 1 to 100 characters. */
+  name: string;
+};
+
 /** A new account. */
 export type CreateUserRequest = {
   /** Email; also the sign-in name. Case and surrounding spaces do not matter. */
@@ -2723,6 +2745,39 @@ export type Data_TranslationRequestResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_UnitResponse = {
+  /** A unit of the organization tree of the tenant (head office, region, store, warehouse…). */
+  data: {
+    /** Internal code, unique in the tenant when set. */
+    code?: string | null;
+    created_at: string;
+    /** Id of the unit. The root unit has the id of the tenant. */
+    id: string;
+    name: string;
+    /** The unit above; `null` only for the root. */
+    parent_id?: string | null;
+    status: UnitStatusValue;
+    /** Why the status was last changed, when given. */
+    status_reason?: string | null;
+    /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
+    unit_type: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_UnitTypeResponse = {
+  /** A kind of unit the tenant uses, e.g. `store` or `warehouse`. */
+  data: {
+    code: string;
+    created_at: string;
+    description: string;
+    name: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_UnsubscribeResponse = {
   /** The answer to an unsubscription: always the same. */
   data: {
@@ -3013,6 +3068,37 @@ export type Data_Vec_TenantSettingState = {
     updated_at?: string | null;
     /** The value, for settings that are not secret and are set. */
     value?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_UnitResponse = {
+  data: {
+    /** Internal code, unique in the tenant when set. */
+    code?: string | null;
+    created_at: string;
+    /** Id of the unit. The root unit has the id of the tenant. */
+    id: string;
+    name: string;
+    /** The unit above; `null` only for the root. */
+    parent_id?: string | null;
+    status: UnitStatusValue;
+    /** Why the status was last changed, when given. */
+    status_reason?: string | null;
+    /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
+    unit_type: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_UnitTypeResponse = {
+  data: {
+    code: string;
+    created_at: string;
+    description: string;
+    name: string;
+    updated_at: string;
   }[];
 };
 
@@ -3905,6 +3991,12 @@ export type ModuleToolDeprecation = {
 export type MoveRequest = {
   /** The new parent page; `null` moves it to the top level. */
   parent_id?: string | null;
+};
+
+/** Where to move a unit. */
+export type MoveUnitRequest = {
+  /** The new parent; you need `organizations.units.write` there too. */
+  parent_id: string;
 };
 
 /** A permission the caller holds. */
@@ -5155,6 +5247,28 @@ export type Page_TranslationRequestResponse = {
      */
     target_entry_id?: string | null;
     target_locale: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_UnitResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Internal code, unique in the tenant when set. */
+    code?: string | null;
+    created_at: string;
+    /** Id of the unit. The root unit has the id of the tenant. */
+    id: string;
+    name: string;
+    /** The unit above; `null` only for the root. */
+    parent_id?: string | null;
+    status: UnitStatusValue;
+    /** Why the status was last changed, when given. */
+    status_reason?: string | null;
+    /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
+    unit_type: string;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -6737,6 +6851,43 @@ export type TranslationRequestResponse = {
 /** Where an AI translation is. */
 export type TranslationStatus = "queued" | "running" | "succeeded" | "failed";
 
+/** A unit of the organization tree of the tenant (head office, region, store, warehouse…). */
+export type UnitResponse = {
+  /** Internal code, unique in the tenant when set. */
+  code?: string | null;
+  created_at: string;
+  /** Id of the unit. The root unit has the id of the tenant. */
+  id: string;
+  name: string;
+  /** The unit above; `null` only for the root. */
+  parent_id?: string | null;
+  status: UnitStatusValue;
+  /** Why the status was last changed, when given. */
+  status_reason?: string | null;
+  /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
+  unit_type: string;
+  updated_at: string;
+};
+
+/** A new status for a unit. */
+export type UnitStatusRequest = {
+  /** Why, up to 500 characters; kept with the unit and in the audit log. */
+  reason?: string | null;
+  status: UnitStatusValue;
+};
+
+/** Status of a unit. Only an `active` unit whose units above are all `active` can be written to. */
+export type UnitStatusValue = "pending" | "active" | "suspended" | "archived";
+
+/** A kind of unit the tenant uses, e.g. `store` or `warehouse`. */
+export type UnitTypeResponse = {
+  code: string;
+  created_at: string;
+  description: string;
+  name: string;
+  updated_at: string;
+};
+
 /** Stop reply mails. */
 export type UnsubscribeRequest = {
   /** Stop mails about every comment followed with this address, not just this one. */
@@ -6873,6 +7024,22 @@ export type UpdateSubscriberRequest = {
    * the import with a consent source).
    */
   unsubscribe_list_ids?: string[];
+};
+
+/** Changes to a unit; omitted fields stay as they are. */
+export type UpdateUnitRequest = {
+  /** New internal code, 1 to 64 characters; an empty string removes the code. */
+  code?: string | null;
+  /** New name, 1 to 200 characters. */
+  name?: string | null;
+};
+
+/** Changes to a unit type; omitted fields stay as they are. */
+export type UpdateUnitTypeRequest = {
+  /** Up to 1000 characters. */
+  description?: string | null;
+  /** 1 to 100 characters. */
+  name?: string | null;
 };
 
 /** Changes to an account. Omitted fields stay as they are. */
@@ -10386,6 +10553,159 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/unit-types": {
+    /** List the unit types of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_UnitTypeResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a unit type. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateUnitTypeRequest;
+      responses: {
+        201: Data_UnitTypeResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/unit-types/{code}": {
+    /** Rename a unit type or change its description. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { code: string }; };
+      requestBody: UpdateUnitTypeRequest;
+      responses: {
+        200: Data_UnitTypeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a unit type. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { code: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units": {
+    /** List the organization units in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { parent_id?: string; type?: string; status?: "pending" | "active" | "suspended" | "archived"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_UnitResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create an organization unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateUnitRequest;
+      responses: {
+        201: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}": {
+    /** Get an organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename an organization unit or change its code. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateUnitRequest;
+      responses: {
+        200: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/ancestors": {
+    /** List the units above an organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/move": {
+    /** Move an organization unit, with everything below it, under another parent. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MoveUnitRequest;
+      responses: {
+        200: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/status": {
+    /** Approve, suspend, archive or reactivate an organization unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UnitStatusRequest;
+      responses: {
+        200: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

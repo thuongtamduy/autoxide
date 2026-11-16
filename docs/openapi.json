@@ -2272,6 +2272,65 @@
         ],
         "description": "A new category or tag."
       },
+      "CreateUnitRequest": {
+        "additionalProperties": false,
+        "description": "A new unit.",
+        "properties": {
+          "code": {
+            "description": "Internal code, 1 to 64 characters, unique in the tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 200 characters.",
+            "example": "Store District 1",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "The unit to place it under; you need `organizations.units.write` there.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "unit_type": {
+            "description": "Code of an existing unit type (not `tenant`).",
+            "example": "store",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent_id",
+          "unit_type",
+          "name"
+        ],
+        "type": "object"
+      },
+      "CreateUnitTypeRequest": {
+        "additionalProperties": false,
+        "description": "A new unit type.",
+        "properties": {
+          "code": {
+            "description": "A lower-case letter, then up to 31 lower-case letters, digits or `_`. `tenant` is reserved.",
+            "example": "store",
+            "type": "string"
+          },
+          "description": {
+            "description": "Up to 1000 characters.",
+            "type": "string"
+          },
+          "name": {
+            "description": "1 to 100 characters.",
+            "example": "Store",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object"
+      },
       "CreateUserRequest": {
         "description": "A new account.",
         "properties": {
@@ -7475,6 +7534,118 @@
         ],
         "type": "object"
       },
+      "Data_UnitResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A unit of the organization tree of the tenant (head office, region, store, warehouse…).",
+            "properties": {
+              "code": {
+                "description": "Internal code, unique in the tenant when set.",
+                "example": "HCM-001",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "description": "Id of the unit. The root unit has the id of the tenant.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "example": "Store District 1",
+                "type": "string"
+              },
+              "parent_id": {
+                "description": "The unit above; `null` only for the root.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "$ref": "#/components/schemas/UnitStatusValue"
+              },
+              "status_reason": {
+                "description": "Why the status was last changed, when given.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "unit_type": {
+                "description": "Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root.",
+                "example": "store",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "unit_type",
+              "name",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_UnitTypeResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A kind of unit the tenant uses, e.g. `store` or `warehouse`.",
+            "properties": {
+              "code": {
+                "example": "store",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "name": {
+                "example": "Store",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "name",
+              "description",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_UnsubscribeResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -8346,6 +8517,124 @@
                 "description",
                 "secret",
                 "is_set"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_UnitResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A unit of the organization tree of the tenant (head office, region, store, warehouse…).",
+              "properties": {
+                "code": {
+                  "description": "Internal code, unique in the tenant when set.",
+                  "example": "HCM-001",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "Id of the unit. The root unit has the id of the tenant.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "example": "Store District 1",
+                  "type": "string"
+                },
+                "parent_id": {
+                  "description": "The unit above; `null` only for the root.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "$ref": "#/components/schemas/UnitStatusValue"
+                },
+                "status_reason": {
+                  "description": "Why the status was last changed, when given.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit_type": {
+                  "description": "Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root.",
+                  "example": "store",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "unit_type",
+                "name",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_UnitTypeResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A kind of unit the tenant uses, e.g. `store` or `warehouse`.",
+              "properties": {
+                "code": {
+                  "example": "store",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "name": {
+                  "example": "Store",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "name",
+                "description",
+                "created_at",
+                "updated_at"
               ],
               "type": "object"
             },
@@ -10874,6 +11163,21 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "MoveUnitRequest": {
+        "additionalProperties": false,
+        "description": "Where to move a unit.",
+        "properties": {
+          "parent_id": {
+            "description": "The new parent; you need `organizations.units.write` there too.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent_id"
+        ],
         "type": "object"
       },
       "MyPermission": {
@@ -14570,6 +14874,85 @@
                 "source_entry_id",
                 "source_revision_id",
                 "target_locale",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_UnitResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A unit of the organization tree of the tenant (head office, region, store, warehouse…).",
+              "properties": {
+                "code": {
+                  "description": "Internal code, unique in the tenant when set.",
+                  "example": "HCM-001",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "Id of the unit. The root unit has the id of the tenant.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "example": "Store District 1",
+                  "type": "string"
+                },
+                "parent_id": {
+                  "description": "The unit above; `null` only for the root.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "$ref": "#/components/schemas/UnitStatusValue"
+                },
+                "status_reason": {
+                  "description": "Why the status was last changed, when given.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit_type": {
+                  "description": "Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root.",
+                  "example": "store",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "unit_type",
+                "name",
                 "status",
                 "created_at",
                 "updated_at"
@@ -18994,6 +19377,130 @@
         ],
         "type": "string"
       },
+      "UnitResponse": {
+        "description": "A unit of the organization tree of the tenant (head office, region, store, warehouse…).",
+        "properties": {
+          "code": {
+            "description": "Internal code, unique in the tenant when set.",
+            "example": "HCM-001",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the unit. The root unit has the id of the tenant.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "example": "Store District 1",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "The unit above; `null` only for the root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/UnitStatusValue"
+          },
+          "status_reason": {
+            "description": "Why the status was last changed, when given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_type": {
+            "description": "Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root.",
+            "example": "store",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "unit_type",
+          "name",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "UnitStatusRequest": {
+        "additionalProperties": false,
+        "description": "A new status for a unit.",
+        "properties": {
+          "reason": {
+            "description": "Why, up to 500 characters; kept with the unit and in the audit log.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/UnitStatusValue"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "UnitStatusValue": {
+        "description": "Status of a unit. Only an `active` unit whose units above are all `active` can be written to.",
+        "enum": [
+          "pending",
+          "active",
+          "suspended",
+          "archived"
+        ],
+        "type": "string"
+      },
+      "UnitTypeResponse": {
+        "description": "A kind of unit the tenant uses, e.g. `store` or `warehouse`.",
+        "properties": {
+          "code": {
+            "example": "store",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "example": "Store",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "description",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "UnsubscribeRequest": {
         "additionalProperties": false,
         "description": "Stop reply mails.",
@@ -19473,6 +19980,48 @@
               "type": "string"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateUnitRequest": {
+        "additionalProperties": false,
+        "description": "Changes to a unit; omitted fields stay as they are.",
+        "properties": {
+          "code": {
+            "description": "New internal code, 1 to 64 characters; an empty string removes the code.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "New name, 1 to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateUnitTypeRequest": {
+        "additionalProperties": false,
+        "description": "Changes to a unit type; omitted fields stay as they are.",
+        "properties": {
+          "description": {
+            "description": "Up to 1000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 100 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -50061,6 +50610,1378 @@
         ],
         "x-permissions": [
           "newsletter.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/unit-types": {
+      "get": {
+        "description": "Requires `organizations.units.read`. Sorted by code; a small fixed set, so not paged.",
+        "operationId": "organizations_list_unit_types",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_UnitTypeResponse"
+                }
+              }
+            },
+            "description": "Every unit type of the tenant."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the unit types of the tenant.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `organizations.types.manage`.",
+        "operationId": "organizations_create_unit_type",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUnitTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitTypeResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.types.manage`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A unit type with this code exists; code `organizations.unit_type_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a unit type.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.types.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/unit-types/{code}": {
+      "delete": {
+        "description": "Requires `organizations.types.manage`. A type still used by a unit cannot be deleted.",
+        "operationId": "organizations_delete_unit_type",
+        "parameters": [
+          {
+            "description": "Code of the unit type.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.types.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit type; code `organizations.unit_type_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Units still use this type (`organizations.unit_type_in_use`), or it is the type of the root (`organizations.unit_type_reserved`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a unit type.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.types.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `organizations.types.manage`.",
+        "operationId": "organizations_update_unit_type",
+        "parameters": [
+          {
+            "description": "Code of the unit type.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUnitTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitTypeResponse"
+                }
+              }
+            },
+            "description": "The unit type after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.types.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit type; code `organizations.unit_type_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rename a unit type or change its description.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.types.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/units": {
+      "get": {
+        "description": "Requires `organizations.units.read`; you see the units your scope covers (your unit, the units\nbelow it, or the whole tenant). Newest first unless `order=asc`.",
+        "operationId": "organizations_list_units",
+        "parameters": [
+          {
+            "description": "Only the units directly below this unit.",
+            "in": "query",
+            "name": "parent_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only units of this type (code).",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only units with this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "description": "Status of a unit. Only an `active` unit whose units above are all `active` can be written to.",
+              "enum": [
+                "pending",
+                "active",
+                "suspended",
+                "archived"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Words in the name; accents and case are ignored (`cafe` also finds `Café`).",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_UnitResponse"
+                }
+              }
+            },
+            "description": "One page of units."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter has the wrong type, e.g. `parent_id` is not a UUID."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the organization units in your scope.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `organizations.units.write` at the parent. The unit is `active` when you also have\n`organizations.units.manage` at the parent; otherwise it is `pending` until someone who has\napproves it (`POST /units/{id}/status`).",
+        "operationId": "organizations_create_unit",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUnitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.write` (`permission_denied`), the parent is outside your scope (`org_out_of_scope`), or the parent is not active (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The parent does not exist (`org_not_found`) or the unit type does not exist (`organizations.unit_type_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another unit has this code; code `organizations.unit_code_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), or the tree would be too deep (`org_depth_exceeded`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an organization unit.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.write"
+        ]
+      }
+    },
+    "/api/v1/organizations/units/{id}": {
+      "get": {
+        "description": "Requires `organizations.units.read` covering the unit; a unit outside your scope answers 404.",
+        "operationId": "organizations_get_unit",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitResponse"
+                }
+              }
+            },
+            "description": "The unit.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope; code `organizations.unit_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an organization unit.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `organizations.units.write` covering the unit; the unit and every unit above it must\nbe active.",
+        "operationId": "organizations_update_unit",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUnitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitResponse"
+                }
+              }
+            },
+            "description": "The unit after the change.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.write` (`permission_denied`), or the unit is not active (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope; code `organizations.unit_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another unit has this code; code `organizations.unit_code_taken`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rename an organization unit or change its code.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.write"
+        ]
+      }
+    },
+    "/api/v1/organizations/units/{id}/ancestors": {
+      "get": {
+        "description": "Requires `organizations.units.read` covering the unit. Nearest first, ending with the root.",
+        "operationId": "organizations_list_unit_ancestors",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_UnitResponse"
+                }
+              }
+            },
+            "description": "The units above, nearest first; empty for the root."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope; code `organizations.unit_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the units above an organization unit.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      }
+    },
+    "/api/v1/organizations/units/{id}/move": {
+      "post": {
+        "description": "Requires `organizations.units.write` covering the unit and the new parent; both must be active.",
+        "operationId": "organizations_move_unit",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveUnitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitResponse"
+                }
+              }
+            },
+            "description": "The unit after the move."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`), the new parent is outside your scope (`org_out_of_scope`), or a unit is not active (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope (`organizations.unit_not_found`), or the new parent does not exist (`org_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The root cannot move; code `org_root_immutable`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The new parent is the unit itself or below it (`org_cycle`), or the tree would be too deep (`org_depth_exceeded`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Move an organization unit, with everything below it, under another parent.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.write"
+        ]
+      }
+    },
+    "/api/v1/organizations/units/{id}/status": {
+      "post": {
+        "description": "Requires `organizations.units.manage` covering the unit. Allowed: `pending → active`,\n`active ↔ suspended`, `active` or `suspended → archived`, `archived → active`. While a unit is\nnot active, nothing can be written to it or to any unit below it.",
+        "operationId": "organizations_change_unit_status",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UnitResponse"
+                }
+              }
+            },
+            "description": "The unit after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.manage` (`permission_denied`), or it does not cover this unit (`org_out_of_scope`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope; code `organizations.unit_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The change is not allowed from the current status (`organizations.invalid_transition`), or the unit is the root (`org_root_immutable`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve, suspend, archive or reactivate an organization unit.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.manage"
         ]
       }
     },

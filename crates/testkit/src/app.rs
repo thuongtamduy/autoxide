@@ -38,7 +38,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
-use autoxide_kernel::access::{Authenticator, Principal};
+use autoxide_kernel::access::{Authenticator, Grant, Principal};
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
@@ -46,7 +46,7 @@ use autoxide_kernel::http::{self, Extras};
 use autoxide_kernel::idempotency::IdempotencyStore;
 use autoxide_kernel::module::{Module, Modules, StartContext};
 use autoxide_kernel::tenancy::{
-    DatabaseRegistry, NewPlacement, NewTenant, PlacementKind, TenancyConfig, TenancyMode,
+    DatabaseRegistry, NewPlacement, NewTenant, OrgId, PlacementKind, TenancyConfig, TenancyMode,
     TenantAdmin, TenantContext, TenantDomains,
 };
 use axum::Router;
@@ -282,6 +282,22 @@ impl<'a> TestAppBuilder<'a> {
     pub fn user(self, token: &str, user_id: u128, permissions: &[&str]) -> Self {
         let permissions = permissions.iter().map(|p| (*p).to_owned());
         self.principal(token, Principal::new(Uuid::from_u128(user_id), permissions))
+    }
+
+    /// Người dùng giả có quyền theo nút (bước 34): mỗi cặp `(permission, độ sâu)` là một grant ở
+    /// nút `org` của khách mặc định, vd `.member("ann", 1, shop, &[("notes.read", Scope::Unit)])`.
+    /// Cây (nút, nhánh) dựng bằng `autoxide_kernel::tenancy::OrgTree` trong bài test.
+    pub fn member(
+        self,
+        token: &str,
+        user_id: u128,
+        org: OrgId,
+        grants: &[(&str, autoxide_kernel::access::Scope)],
+    ) -> Self {
+        let grants = grants
+            .iter()
+            .map(|(permission, scope)| ((*permission).to_owned(), Grant::new(org, *scope)));
+        self.principal(token, Principal::with_grants(Uuid::from_u128(user_id), grants))
     }
 
     /// Như [`TestAppBuilder::user`], với `Principal` dựng sẵn — cho bên gọi mà `user` không tả
