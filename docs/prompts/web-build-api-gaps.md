@@ -105,7 +105,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 |---|---|---|---|---|
 | [ ] | Gói và thuê bao | `GET /plans/subscription`, `/entitlements` (hạn mức kèm `used`, `over_limit`), `/catalog`, `/billing-periods`, `GET/PUT /billing-profile`, `POST /subscription/change`, `/cancel`, `/resume`; trả kèm tên gói và giá | 35 | Dữ liệu mẫu (`src/sample/settings.ts`) |
 | [ ] | Gói và thuê bao | `POST /billing-periods/{id}/pay` (trả tiền qua cổng của nhà vận hành) | 35 | Chưa có nút "Trả tiền" |
-| [ ] | Tên miền | `GET/POST/DELETE /kernel/domains`, `POST /{id}/verify` | 33 | Dữ liệu mẫu (`src/sample/settings.ts`) |
+| [x] | Tên miền | `GET/POST/DELETE /kernel/domains`, `POST /{id}/verify` | 33 | **Đã nối** (16/11, W-032): danh sách, thêm, bản ghi TXT, kiểm tra ngay, gỡ; chế độ một khách hiện lời giải thích |
 | [ ] | Tên miền | Gắn tên miền với nút: `PATCH /kernel/domains/{id} {org_id}` | 33, 34 | Chỉ hiện nút, chưa đổi được |
 | [ ] | Kết nối đối tác | `GET /kernel/settings`, `PUT/DELETE /settings/{name}`; tên setting theo nhà cung cấp (SMS, cổng thanh toán, hoá đơn điện tử) | 33 (tên setting: 36, 39) | Đã nối `GET/PUT/DELETE /kernel/settings` (W-027 của web); tên setting theo nhà cung cấp chờ bước 36, 39 |
 | [ ] | Kết nối đối tác | `POST /kernel/settings/{name}/test`, `last_used_at`, `last_error` | mới (đề xuất ở `ui-trace-roadmap.md`, chưa vào lộ trình) | Dữ liệu mẫu |
@@ -253,7 +253,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 | [ ] | Khách hàng | Trường của khách `business_model`, `primary_domain`; của placement `pending_migrations`, `location` | mới |
 | [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới |
 | [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) — `PATCH {status}` đã nối (W-027 của web); `reason` để ghi audit vẫn thiếu |
-| [ ] | Chi tiết khách | Dời khách chung ↔ riêng qua API: `POST /kernel/tenants/{id}/move` `{to, dry_run}` | mới (33 mới có CLI) |
+| [x] | Chi tiết khách | Dời khách chung ↔ riêng qua API: `POST /kernel/tenants/{id}/move` `{to, dry_run}` | mới (33 mới có CLI) — **đã nối** (16/11, W-032): chạy thử, dời ngay khi `ready`, theo dõi `GET …/moves/{id}` |
 | [ ] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Quyền dùng của một khách bất kỳ: `GET /plans/tenants/{id}/entitlements` | mới |
 | [ ] | Chi tiết khách, Thuê bao | Lịch sử thuê bao; đặt / bỏ chỉ đọc; kỳ thanh toán theo khách cho nhà vận hành | mới |
@@ -450,6 +450,7 @@ Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc gi�
 | [x] | `POST /kernel/tenants`, header `Location` | đường dẫn đầy đủ | `/kernel/tenants/{id}`, thiếu tiền tố `/api/v1` — **core trả `/api/v1/kernel/tenants/{id}`** (16/11, test `tenant_admin.rs` giữ hành vi này; mọi 201 dùng chung một chỗ ghép tiền tố). Thấy thiếu tiền tố thì kiểm lớp giữa (proxy của web) có cắt `/api/v1` không |
 | [x] | `GET /kernel/client-config`, `content.post_path_prefix` | ví dụ `/blog/` | `blog` (không có dấu `/`) — **đã sửa mô tả** (16/11): giá trị là đoạn đầu của đường dẫn, không có `/`; `blog` cho `/blog/<slug>` |
 | [x] | `CommentDetail.target_title` | — | chỉ có khi đích đang công khai; bình luận trên bài nháp chỉ có id (nên ghi rõ trong mô tả) — **đã ghi rõ** (16/11) |
+| [ ] | `TenantMovePlan.files` | `0` khi hai placement dùng chung nơi lưu | `0` cả khi khách không có file nào — nên ghi cả hai trường hợp trong mô tả |
 
 ## Website bán hàng (`apps/storefront`, W-026 của web)
 
