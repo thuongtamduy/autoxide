@@ -7258,3 +7258,11 @@ lọc mới cho tool `list_tenants`; `kernel.public_url` theo khách trong clien
    tên mới không được đọc. Alias chưa có ngày hết hạn — bỏ tên cũ cần một quyết định riêng.
 
 Chưa làm: `POST /kernel/settings/{name}/test` (thuộc bước 51); bản giả `OrgNodes` trong testkit (bước 34 có bản thật).
+
+## D-298 · Merge D-296 và D-297 vào `main` trước gate đầy đủ (lần hai) — 2026-11-16 — chủ dự án quyết
+
+Chủ dự án bảo đẩy lên `main` ngay để mở phiên làm việc mới trên máy sạch (máy của phiên này gần hết đĩa, chỉ chạy được
+một subagent mỗi lúc). Ngoại lệ lần hai cho luật "chỉ merge khi gate đầy đủ xanh" (CLAUDE.md), như D-295: hai phần việc
+được merge (D-296, D-297) đã qua `./gate.sh --quick`, và test của các crate bị sửa đã chạy trên Postgres; gate đầy đủ
+gần nhất xanh ở `11bbef0`. Bước 33 chưa đóng: phiên kế tiếp chạy `./gate.sh` đầy đủ trên `main` mới trước khi làm tiếp
+(đo đường nóng, hướng dẫn viết module, changelog); đỏ thì sửa trước mọi việc khác. Không phát hành.
