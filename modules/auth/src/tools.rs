@@ -380,6 +380,14 @@ mod tests {
             passkeys: services.passkeys.clone(),
             reauth: services.reauth.clone(),
             orgs: None,
+            support: Arc::new(crate::support::SupportService {
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                orgs: None,
+                max_hours: 8,
+            }),
             invitations: Arc::new(crate::invitation::Invitations {
                 users: services.users.clone(),
                 sessions: services.sessions.clone(),

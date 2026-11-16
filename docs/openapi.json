@@ -7317,6 +7317,105 @@
         ],
         "type": "object"
       },
+      "Data_SupportGrantResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A time-limited access of platform staff to a tenant's data.",
+            "properties": {
+              "basis": {
+                "description": "`support`, or `legal_request` (a request of a competent authority; the tenant cannot\nrevoke it).",
+                "example": "support",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "first_used_at": {
+                "description": "When the staff first entered under it; `null`: not used.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "granted_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "legal_reference": {
+                "description": "Number of the authority's document, for `legal_request`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "revoked_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "revoked_by_tenant": {
+                "description": "`true` when the tenant revoked it.",
+                "type": "boolean"
+              },
+              "role_id": {
+                "description": "The role of the platform tenant whose permissions they get.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "staff_user_id": {
+                "description": "The platform staff account.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "starts_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "tenant_id": {
+                "description": "The tenant the staff may enter.",
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tenant_id",
+              "staff_user_id",
+              "role_id",
+              "basis",
+              "reason",
+              "starts_at",
+              "expires_at",
+              "revoked_by_tenant",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_SuppressionResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -9204,6 +9303,108 @@
               "required": [
                 "key",
                 "description"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_SupportGrantResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A time-limited access of platform staff to a tenant's data.",
+              "properties": {
+                "basis": {
+                  "description": "`support`, or `legal_request` (a request of a competent authority; the tenant cannot\nrevoke it).",
+                  "example": "support",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "expires_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "first_used_at": {
+                  "description": "When the staff first entered under it; `null`: not used.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "granted_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "legal_reference": {
+                  "description": "Number of the authority's document, for `legal_request`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "revoked_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "revoked_by_tenant": {
+                  "description": "`true` when the tenant revoked it.",
+                  "type": "boolean"
+                },
+                "role_id": {
+                  "description": "The role of the platform tenant whose permissions they get.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "staff_user_id": {
+                  "description": "The platform staff account.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "starts_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "tenant_id": {
+                  "description": "The tenant the staff may enter.",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "tenant_id",
+                "staff_user_id",
+                "role_id",
+                "basis",
+                "reason",
+                "starts_at",
+                "expires_at",
+                "revoked_by_tenant",
+                "created_at"
               ],
               "type": "object"
             },
@@ -20091,6 +20292,149 @@
         ],
         "type": "string"
       },
+      "SupportGrantRequest": {
+        "additionalProperties": false,
+        "description": "A new support access grant.",
+        "properties": {
+          "basis": {
+            "description": "`support` (the tenant must allow it with the setting `auth.support_access`) or\n`legal_request` (a request of a competent authority; needs `legal_reference`).",
+            "example": "support",
+            "type": "string"
+          },
+          "hours": {
+            "description": "How long, 1 to `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` hours.",
+            "example": 4,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "legal_reference": {
+            "description": "For `legal_request`: number of the authority's document.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why, 10 to 500 characters; the tenant sees it.",
+            "type": "string"
+          },
+          "role_id": {
+            "description": "A role of the platform tenant: its permissions apply in the tenant, at its root unit.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "staff_user_id": {
+            "description": "A staff account of the platform tenant.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "The tenant to enter.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "staff_user_id",
+          "role_id",
+          "basis",
+          "reason",
+          "hours"
+        ],
+        "type": "object"
+      },
+      "SupportGrantResponse": {
+        "description": "A time-limited access of platform staff to a tenant's data.",
+        "properties": {
+          "basis": {
+            "description": "`support`, or `legal_request` (a request of a competent authority; the tenant cannot\nrevoke it).",
+            "example": "support",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "first_used_at": {
+            "description": "When the staff first entered under it; `null`: not used.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "granted_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legal_reference": {
+            "description": "Number of the authority's document, for `legal_request`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revoked_by_tenant": {
+            "description": "`true` when the tenant revoked it.",
+            "type": "boolean"
+          },
+          "role_id": {
+            "description": "The role of the platform tenant whose permissions they get.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "staff_user_id": {
+            "description": "The platform staff account.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "The tenant the staff may enter.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "staff_user_id",
+          "role_id",
+          "basis",
+          "reason",
+          "starts_at",
+          "expires_at",
+          "revoked_by_tenant",
+          "created_at"
+        ],
+        "type": "object"
+      },
       "SuppressionResponse": {
         "description": "An address that gets no campaign mail.",
         "properties": {
@@ -28666,6 +29010,501 @@
         ],
         "x-permissions": [
           "auth.roles.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/support-access": {
+      "get": {
+        "description": "Requires `auth.support_access.read`. Every grant, newest first, with when it was first used\nand whether it was revoked. Changes made under a grant are in the audit log with\n`access.kind = support`.",
+        "operationId": "auth_list_support_access",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_SupportGrantResponse"
+                }
+              }
+            },
+            "description": "The grants."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.support_access.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List platform staff access to this tenant's data.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.support_access.read"
+        ]
+      }
+    },
+    "/api/v1/auth/support-access/{id}": {
+      "delete": {
+        "description": "Requires `auth.support_access.revoke`. Takes effect at their next request. Access granted\nfor a request of a competent authority cannot be revoked here.",
+        "operationId": "auth_revoke_support_access",
+        "parameters": [
+          {
+            "description": "Id of the grant.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportGrantResponse"
+                }
+              }
+            },
+            "description": "The grant, revoked."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`), or it was granted for a request of a competent authority (`auth.support_grant_legal_request`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No grant with this id for this tenant; code `auth.support_grant_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a platform staff access to this tenant.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.support_access.revoke"
+        ]
+      }
+    },
+    "/api/v1/auth/support-grants": {
+      "get": {
+        "description": "Requires `auth.support.grant`, in the platform tenant.",
+        "operationId": "auth_list_support_grants",
+        "parameters": [
+          {
+            "description": "The tenant the grants are for.",
+            "in": "query",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_SupportGrantResponse"
+                }
+              }
+            },
+            "description": "The grants, newest first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.support.grant`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the support access grants for a tenant (platform).",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.support.grant"
+        ]
+      },
+      "post": {
+        "description": "Requires `auth.support.grant`, in the platform tenant. The staff member then calls the API\nwith their own credentials and the header `Autoxide-Tenant: <tenant id>`, with the role's\npermissions, until it expires or is revoked. The tenant sees the grant, each first use, and\nevery change made, in its audit log.",
+        "operationId": "auth_grant_support_access",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportGrantResponse"
+                }
+              }
+            },
+            "description": "The grant is in force.",
+            "headers": {
+              "Location": {
+                "description": "Address of the grant.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`), not called in the platform tenant (`auth.support_platform_only`), or the tenant turned support access off and the basis is not `legal_request` (`auth.support_access_disabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), or the duration is too long (`auth.support_duration_exceeded`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Grant platform staff time-limited access to a tenant's data (platform).",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.support.grant"
+        ]
+      }
+    },
+    "/api/v1/auth/support-grants/{id}": {
+      "delete": {
+        "description": "Requires `auth.support.grant`, in the platform tenant. Takes effect at the staff member's\nnext request.",
+        "operationId": "auth_revoke_support_grant",
+        "parameters": [
+          {
+            "description": "Id of the grant.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The tenant the grants are for.",
+            "in": "query",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportGrantResponse"
+                }
+              }
+            },
+            "description": "The grant, revoked."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.support.grant`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No grant with this id for this tenant; code `auth.support_grant_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a support access grant (platform).",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.support.grant"
         ]
       }
     },

@@ -496,6 +496,15 @@ signs in). **Signing in with a link** (no password) is off by default; turn it o
 Both need working mail (`AUTOXIDE_MAIL_SMTP_URL`) and a running worker. The organization tree of
 a tenant is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (8 by default).
 
+**Platform staff and a tenant's data.** Platform staff (accounts of the platform tenant) never
+enter a tenant's data just because of their role: someone with `auth.support.grant` grants one
+staff member time-limited access with `POST /api/v1/auth/support-grants` (`tenant_id`,
+`staff_user_id`, a platform `role_id`, `basis` `support` or `legal_request` with its document
+number, a `reason`, at most `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` hours, 8 by default). The
+tenant sees every grant, its first use and every change made (`GET /api/v1/auth/support-access`),
+can revoke a running `support` grant (`DELETE /api/v1/auth/support-access/{id}`), and can turn
+support access off with the setting `auth.support_access` (then only `legal_request` grants work).
+
 In a chain of tenants (a tenant with `parent_id`), the parent can let holders of one of its roles
 work in a child: `POST /api/v1/auth/delegations` with `child_tenant_id`, `role_id`, optional
 `org_id` (a unit of the child) and `expires_at`, and a `reason` (permission

@@ -110,9 +110,9 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       định, bật bằng cấu hình
 - [x] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu (hay passkey)
       qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh CLI tương ứng
-- [ ] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý do; mọi lần
+- [x] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý do; mọi lần
       vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được quyền vào hỗ trợ và tự thu
-      hồi lần cấp còn hạn (D-211), trừ yêu cầu của cơ quan có thẩm quyền (có audit)
+      hồi lần cấp còn hạn (D-211), trừ yêu cầu của cơ quan có thẩm quyền (có audit) — D-313
 - [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202; làm cùng bước 45 khi `orders` có
       token xem đơn): `POST /api/v1/auth/phone-signups`, đăng nhập bằng passkey hay OTP, không bắt buộc mật khẩu
 

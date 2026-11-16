@@ -267,6 +267,23 @@ async fn my_tenants(
                 access_id: Some(delegation.id),
             });
         }
+        // Nhân sự nền tảng: khách có lần cấp quyền vào hỗ trợ còn hạn (D-313).
+        if home.is_platform() {
+            for grant in state.support.live_for(principal.user_id(), None).await? {
+                let target = TenantId::from_uuid(grant.target_tenant_id);
+                if data.iter().any(|known| known.id == grant.target_tenant_id) {
+                    continue;
+                }
+                let Ok(found) = state.delegations.databases.tenant(target).await else { continue };
+                data.push(MyTenantResponse {
+                    id: found.id().as_uuid(),
+                    slug: found.slug().to_owned(),
+                    name: found.name().to_owned(),
+                    access: "support".to_owned(),
+                    access_id: Some(grant.id),
+                });
+            }
+        }
     }
     Ok(Data { data })
 }

@@ -7651,3 +7651,25 @@ Quyết định:
    vào ngoại lệ của test hợp đồng tool (như `kernel.list_domains`, D-245).
 6. Lệnh `autoxide user invite` qua trait `api::Invitations` (không kiểm permission — quyền người vận hành), cũng dùng
    cho cấp phát khách ở bước 35. Job dọn xoá lời mời hết hạn quá 90 ngày; event audit giữ.
+
+## D-313 · Quyền vào hỗ trợ của nhân sự nền tảng (bước 34 mục 13) — 2026-11-16 — agent quyết
+
+Căn cứ: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (hiệu lực 01/01/2026) và NĐ 356/2025/NĐ-CP — xử lý dữ liệu cá nhân
+có căn cứ, mục đích, để lại vết; cung cấp cho cơ quan có thẩm quyền theo văn bản (lưu số văn bản) — cần đối chiếu điều
+khoản cụ thể với văn bản gốc / người có chuyên môn pháp lý (D-190, D-211).
+
+Quyết định:
+
+1. Nhân sự nền tảng chỉ vào dữ liệu khách bằng **lần cấp có thời hạn** (`auth_support_grant`): staff, role của khách
+   nền tảng, căn cứ `support` / `legal_request` (bắt buộc số văn bản), lý do 10–500 ký tự, tối đa
+   `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` giờ (1–72, mặc định 8). Vào bằng header `Autoxide-Tenant` qua
+   `Authenticator::enter`; `Authenticator::decides_entry` (mới ở kernel) khiến luật "`kernel.tenants.operate` vào
+   mọi khách" của bước 33 không còn áp khi module `auth` có mặt.
+2. Dòng giữ ở database của **khách nền tảng** (`target_tenant_id`): một chỗ tra cho mọi request vào và cho
+   `/me/tenants`. Event `granted` / `started` (lần vào đầu, đánh dấu `first_used_at`) / `revoked` ghi vào outbox của
+   khách được vào (transaction riêng sau khi dòng đã commit — database có thể khác) và của nền tảng (cấp, thu hồi).
+3. Khách tắt cài đặt `auth.support_access` (theo cây, mặc định `true`) thì chỉ lần cấp `legal_request` cấp được và
+   còn hiệu lực; khách tự thu hồi lần cấp `support` còn hạn, không thu hồi được `legal_request` (D-211). Bước 54 thay
+   cài đặt bằng chế độ `disabled` / `per_request` / `standing` (D-232).
+4. Quyền khi vào: permission của role ở nút gốc của khách; API key và người mua không vào. Lần cấp hết hạn giữ lại
+   (bằng chứng cho audit), không có job xoá.

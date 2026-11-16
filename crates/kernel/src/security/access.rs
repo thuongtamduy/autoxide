@@ -713,6 +713,13 @@ pub trait Authenticator: Send + Sync {
         let _ = (principal, target);
         Ok(None)
     }
+
+    /// `true`: chỉ [`enter`](Self::enter) quyết ai vào khách khác — nhân sự nền tảng có
+    /// `kernel.tenants.operate` cũng phải có lần cấp quyền vào hỗ trợ (D-190, D-313). Mặc định
+    /// `false`: luật nhân sự nền tảng của kernel (bước 33) còn áp.
+    fn decides_entry(&self) -> bool {
+        false
+    }
 }
 
 /// Hỏi "tài khoản này đã xác thực (số điện thoại / định danh) để đăng nội dung chưa" — điểm nối

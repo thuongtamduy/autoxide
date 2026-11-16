@@ -155,7 +155,7 @@ async fn check(
             return Ok(entered);
         }
         let home = registry.tenant(principal.tenant_id()).await?;
-        if home.is_platform() && principal.allows(OPERATE) {
+        if !authenticator.decides_entry() && home.is_platform() && principal.allows(OPERATE) {
             tracing::info!(
                 user_id = %principal.user_id(),
                 tenant_id = %target.id(),

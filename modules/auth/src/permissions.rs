@@ -55,6 +55,24 @@ pub(crate) const INVITATIONS_MANAGE: Permission = Permission::new(
 )
 .scoped();
 
+pub(crate) const SUPPORT_ACCESS_READ: Permission = Permission::new(
+    "auth.support_access.read",
+    "See every time platform staff were granted access to this tenant's data, and when they used it.",
+);
+
+pub(crate) const SUPPORT_ACCESS_REVOKE: Permission = Permission::new(
+    "auth.support_access.revoke",
+    "Revoke a platform staff support access to this tenant that is still running (not one \
+     granted for a request of a competent authority).",
+);
+
+pub(crate) const SUPPORT_GRANT: Permission = Permission::new(
+    "auth.support.grant",
+    "Platform tenant only: grant platform staff time-limited access to a tenant's data for \
+     support, with a reason; see and revoke those grants.",
+)
+.with_risk(Risk::Destructive);
+
 pub(crate) const DELEGATIONS_READ: Permission = Permission::new(
     "auth.delegations.read",
     "See the delegations of this tenant: given to child tenants, and received from parents.",
@@ -81,5 +99,8 @@ pub(crate) fn all() -> Vec<Permission> {
         DELEGATIONS_READ,
         DELEGATIONS_MANAGE,
         INVITATIONS_MANAGE,
+        SUPPORT_ACCESS_READ,
+        SUPPORT_ACCESS_REVOKE,
+        SUPPORT_GRANT,
     ]
 }

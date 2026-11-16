@@ -76,6 +76,13 @@ pub(crate) const INVITATION_DAYS: Setting = Setting::new(
 )
 .with_default("7");
 
+pub(crate) const SUPPORT_ACCESS_MAX_HOURS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS",
+    "Longest support access to a tenant's data that can be granted to platform staff (1 to 72 \
+     hours).",
+)
+.with_default("8");
+
 pub(crate) const REAUTH_MINUTES: Setting = Setting::new(
     "AUTOXIDE_AUTH_REAUTH_MINUTES",
     "How long a confirmation token from `POST /api/v1/auth/me/reauth` stays usable (1 to 60 \
@@ -186,6 +193,8 @@ pub(crate) struct AuthConfig {
     /// Lời mời (D-312): trang của giao diện, hạn (ngày).
     pub invitation_url: Option<String>,
     pub invitation_days: i64,
+    /// Trần giờ của quyền vào hỗ trợ (D-211, D-313).
+    pub support_max_hours: u32,
 }
 
 /// Cấu hình passkey (WebAuthn).
@@ -223,6 +232,8 @@ impl AuthConfig {
         });
         let login_link_url = reader.optional_with(&LOGIN_LINK_URL, token_url);
         let invitation_url = reader.optional_with(&INVITATION_URL, token_url);
+        let support_max_hours =
+            reader.get_with(&SUPPORT_ACCESS_MAX_HOURS, |raw| parse_in_range(raw, 1u32, 72));
         let invitation_days =
             reader.get_with(&INVITATION_DAYS, |raw| parse_in_range(raw, 1i64, 30));
         let login_link_minutes =
@@ -301,6 +312,7 @@ impl AuthConfig {
             login_link_minutes: login_link_minutes?,
             invitation_url: invitation_url?,
             invitation_days: invitation_days?,
+            support_max_hours: support_max_hours?,
         })
     }
 }

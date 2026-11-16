@@ -37,6 +37,9 @@ mod resource;
 mod role;
 mod session;
 mod settings;
+mod support;
+#[cfg(test)]
+mod support_tests;
 #[cfg(test)]
 mod tenancy_tests;
 mod token;
@@ -196,7 +199,14 @@ impl Module for AuthModule {
             databases: databases.clone(),
             outbox: outbox.clone(),
         });
+        let support = Arc::new(support::SupportService {
+            databases: databases.clone(),
+            outbox: outbox.clone(),
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            max_hours: config.support_max_hours,
+        });
         let authenticator = RequestAuthenticator {
+            support: support.clone(),
             sessions: sessions.clone(),
             roles: roles.clone(),
             api_keys: api_keys.clone(),
@@ -258,6 +268,7 @@ impl Module for AuthModule {
         context.provide::<dyn api::Invitations>(invitations.clone())?;
         self.invitations = Some(invitations.clone());
         self.state = Some(http::HttpState {
+            support,
             invitations,
             login_links,
             delegations,

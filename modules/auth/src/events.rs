@@ -63,6 +63,9 @@ events! {
     INVITATION_CREATED, InvitationCreated, "auth.invitation_created", "Someone was invited by email to work at a unit with given roles (`after`: email, unit, roles, expiry).";
     INVITATION_ACCEPTED, InvitationAccepted, "auth.invitation_accepted", "An invitation was accepted: the person (`after.user_id`, created when new) got its roles at its unit.";
     INVITATION_REVOKED, InvitationRevoked, "auth.invitation_revoked", "An invitation was revoked; its link stopped working.";
+    SUPPORT_ACCESS_GRANTED, SupportAccessGranted, "auth.support_access_granted", "Platform staff were granted time-limited access to this tenant's data (`after`: staff account, role, basis, reason, legal reference, expiry).";
+    SUPPORT_ACCESS_STARTED, SupportAccessStarted, "auth.support_access_started", "Platform staff entered this tenant's data for the first time under a support access grant.";
+    SUPPORT_ACCESS_REVOKED, SupportAccessRevoked, "auth.support_access_revoked", "A support access grant was revoked (`after.revoked_by_tenant` is `true` when the tenant revoked it).";
     DELEGATION_GRANTED, DelegationGranted, "auth.delegation_granted", "This tenant let holders of one of its roles work in a child tenant (`after`: child tenant, role, unit, expiry, reason).";
     DELEGATION_REVOKED, DelegationRevoked, "auth.delegation_revoked", "A delegation to a child tenant was revoked; holders of the role lose access at their next request.";
 }

@@ -32,6 +32,8 @@ pub(crate) struct RequestAuthenticator {
     pub databases: DatabaseRegistry,
     /// Uỷ quyền theo cây khách hàng: vào khách con (D-310).
     pub delegations: Arc<crate::delegation::DelegationService>,
+    /// Quyền vào hỗ trợ của nhân sự nền tảng (D-313).
+    pub support: Arc<crate::support::SupportService>,
 }
 
 #[async_trait::async_trait]
@@ -65,7 +67,15 @@ impl Authenticator for RequestAuthenticator {
         principal: &Principal,
         target: &TenantContext,
     ) -> Result<Option<Principal>, Error> {
-        self.delegations.enter(principal, target).await
+        if let Some(entered) = self.delegations.enter(principal, target).await? {
+            return Ok(Some(entered));
+        }
+        self.support.enter(principal, target).await
+    }
+
+    // Nhân sự nền tảng chỉ vào dữ liệu khách bằng lần cấp có thời hạn (D-190, D-313).
+    fn decides_entry(&self) -> bool {
+        true
     }
 }
 

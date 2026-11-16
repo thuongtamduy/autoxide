@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `auth`: platform staff enter a tenant's data only with a time-limited support access grant
+  (D-190): `POST`/`GET /api/v1/auth/support-grants`, `DELETE /api/v1/auth/support-grants/{id}`
+  (`auth.support.grant`, platform tenant), `GET /api/v1/auth/support-access`,
+  `DELETE /api/v1/auth/support-access/{id}` for the tenant (`auth.support_access.read`,
+  `auth.support_access.revoke`), setting `auth.support_access`, `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS`;
+  events `auth.support_access_granted`, `started`, `revoked` in the tenant's audit log.
+
 - `auth`: invite people by email with roles at a unit — `GET`/`POST /api/v1/auth/invitations`,
   `DELETE /api/v1/auth/invitations/{id}`, `POST /api/v1/auth/invitations/{id}/resend`,
   `POST /api/v1/auth/invitations/accept` (permission `auth.invitations.manage`; settings

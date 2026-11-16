@@ -175,6 +175,10 @@ impl Authenticator for ApiKeyLimited {
     ) -> Result<Option<Principal>, Error> {
         self.inner.enter(principal, target).await
     }
+
+    fn decides_entry(&self) -> bool {
+        self.inner.decides_entry()
+    }
 }
 
 /// Lớp HTTP: từ chối bằng 429 `rate_limited` kèm `Retry-After`.

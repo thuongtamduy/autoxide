@@ -2677,6 +2677,37 @@ export type Data_SubscriberResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportGrantResponse = {
+  /** A time-limited access of platform staff to a tenant's data. */
+  data: {
+    /**
+     * `support`, or `legal_request` (a request of a competent authority; the tenant cannot
+     * revoke it).
+     */
+    basis: string;
+    created_at: string;
+    expires_at: string;
+    /** When the staff first entered under it; `null`: not used. */
+    first_used_at?: string | null;
+    granted_by?: string | null;
+    id: string;
+    /** Number of the authority's document, for `legal_request`. */
+    legal_reference?: string | null;
+    reason: string;
+    revoked_at?: string | null;
+    /** `true` when the tenant revoked it. */
+    revoked_by_tenant: boolean;
+    /** The role of the platform tenant whose permissions they get. */
+    role_id: string;
+    /** The platform staff account. */
+    staff_user_id: string;
+    starts_at: string;
+    /** The tenant the staff may enter. */
+    tenant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SuppressionResponse = {
   /** An address that gets no campaign mail. */
   data: {
@@ -3334,6 +3365,36 @@ export type Data_Vec_SettingResponse = {
     description: string;
     /** `<module>.<name>`, e.g. `organizations.timezone`. */
     key: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportGrantResponse = {
+  data: {
+    /**
+     * `support`, or `legal_request` (a request of a competent authority; the tenant cannot
+     * revoke it).
+     */
+    basis: string;
+    created_at: string;
+    expires_at: string;
+    /** When the staff first entered under it; `null`: not used. */
+    first_used_at?: string | null;
+    granted_by?: string | null;
+    id: string;
+    /** Number of the authority's document, for `legal_request`. */
+    legal_reference?: string | null;
+    reason: string;
+    revoked_at?: string | null;
+    /** `true` when the tenant revoked it. */
+    revoked_by_tenant: boolean;
+    /** The role of the platform tenant whose permissions they get. */
+    role_id: string;
+    /** The platform staff account. */
+    staff_user_id: string;
+    starts_at: string;
+    /** The tenant the staff may enter. */
+    tenant_id: string;
   }[];
 };
 
@@ -7154,6 +7215,55 @@ export type SubscriptionResponse = {
 /** Where a subscriber stands on one list. */
 export type SubscriptionStatus = "unconfirmed" | "confirmed" | "unsubscribed";
 
+/** A new support access grant. */
+export type SupportGrantRequest = {
+  /**
+   * `support` (the tenant must allow it with the setting `auth.support_access`) or
+   * `legal_request` (a request of a competent authority; needs `legal_reference`).
+   */
+  basis: string;
+  /** How long, 1 to `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` hours. */
+  hours: number;
+  /** For `legal_request`: number of the authority's document. */
+  legal_reference?: string | null;
+  /** Why, 10 to 500 characters; the tenant sees it. */
+  reason: string;
+  /** A role of the platform tenant: its permissions apply in the tenant, at its root unit. */
+  role_id: string;
+  /** A staff account of the platform tenant. */
+  staff_user_id: string;
+  /** The tenant to enter. */
+  tenant_id: string;
+};
+
+/** A time-limited access of platform staff to a tenant's data. */
+export type SupportGrantResponse = {
+  /**
+   * `support`, or `legal_request` (a request of a competent authority; the tenant cannot
+   * revoke it).
+   */
+  basis: string;
+  created_at: string;
+  expires_at: string;
+  /** When the staff first entered under it; `null`: not used. */
+  first_used_at?: string | null;
+  granted_by?: string | null;
+  id: string;
+  /** Number of the authority's document, for `legal_request`. */
+  legal_reference?: string | null;
+  reason: string;
+  revoked_at?: string | null;
+  /** `true` when the tenant revoked it. */
+  revoked_by_tenant: boolean;
+  /** The role of the platform tenant whose permissions they get. */
+  role_id: string;
+  /** The platform staff account. */
+  staff_user_id: string;
+  starts_at: string;
+  /** The tenant the staff may enter. */
+  tenant_id: string;
+};
+
 /** An address that gets no campaign mail. */
 export type SuppressionResponse = {
   created_at: string;
@@ -8710,6 +8820,68 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-access": {
+    /** List platform staff access to this tenant's data. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-access/{id}": {
+    /** Revoke a platform staff access to this tenant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-grants": {
+    /** List the support access grants for a tenant (platform). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id: string }; };
+      responses: {
+        200: Data_Vec_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Grant platform staff time-limited access to a tenant's data (platform). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SupportGrantRequest;
+      responses: {
+        201: Data_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-grants/{id}": {
+    /** Revoke a support access grant (platform). */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; query: { tenant_id: string }; };
+      responses: {
+        200: Data_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

@@ -485,6 +485,15 @@ nhập bằng link** (không mật khẩu) tắt mặc định; bật bằng `AU
 (`AUTOXIDE_MAIL_SMTP_URL`) và worker đang chạy. Cây tổ chức của một khách sâu tối đa
 `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` cấp (mặc định 8).
 
+**Nhân sự nền tảng và dữ liệu của khách.** Nhân sự nền tảng (tài khoản của khách nền tảng) không bao
+giờ vào dữ liệu của khách chỉ nhờ role: người có `auth.support.grant` cấp cho một nhân sự quyền vào có
+thời hạn bằng `POST /api/v1/auth/support-grants` (`tenant_id`, `staff_user_id`, một `role_id` của nền
+tảng, `basis` là `support` hay `legal_request` kèm số văn bản, `reason`, tối đa
+`AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` giờ, mặc định 8). Khách thấy mọi lần cấp, lần vào đầu và mọi
+thay đổi đã làm (`GET /api/v1/auth/support-access`), tự thu hồi lần cấp `support` còn hạn
+(`DELETE /api/v1/auth/support-access/{id}`), và tắt được quyền vào hỗ trợ bằng cài đặt
+`auth.support_access` (khi đó chỉ lần cấp `legal_request` còn hiệu lực).
+
 Trong chuỗi khách (khách có `parent_id`), khách cha cho người giữ một role của mình làm việc ở khách
 con: `POST /api/v1/auth/delegations` với `child_tenant_id`, `role_id`, `org_id` tuỳ chọn (một nút của
 khách con), `expires_at` tuỳ chọn và `reason` (permission `auth.delegations.manage`). Những người đó
