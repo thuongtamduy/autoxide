@@ -48,8 +48,8 @@ hứng, đừng nhảy cóc.
 ## 4. Chạy gate
 
 ```bash
-./gate.sh --quick   # mỗi mục, trước khi commit: crate bị sửa, chỉ SQLite
-./gate.sh           # mục cuối của bước, trước khi phát hành: đầy đủ, cả hai database
+./gate.sh --quick   # mỗi nhóm việc, trước khi commit và trước khi merge: crate bị sửa, chỉ SQLite
+./gate.sh           # chỉ trước khi phát hành: đầy đủ, cả hai database (D-300)
 ```
 
 - **Không ngồi chờ gate** (D-299): chạy nó ở chế độ nền. Trong lúc chờ chỉ đọc và chuẩn bị mục kế (đặc tả, code
@@ -60,7 +60,9 @@ hứng, đừng nhảy cóc.
 - `gate.sh` chưa tồn tại (đang ở bước 0): tạo nó là một mục của bước 0; trước đó
   chạy tay `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
   `cargo test --workspace`.
-- Bước chỉ xong khi gate **đầy đủ** xanh trên **cả SQLite và Postgres** (D-173).
+- Bước xong khi mọi mục `[x]` và gate nhanh xanh; gate **đầy đủ** (cả SQLite và Postgres) chỉ bắt buộc
+  trước khi phát hành (D-300). Code chạm database vẫn phải đúng trên cả hai: chạy riêng bài test đó trên
+  Postgres lúc viết (`TEST_DATABASE_URL=postgres://… cargo test -p <crate> <tên>`).
 
 ## 5. Đánh dấu và commit
 
@@ -76,8 +78,8 @@ hứng, đừng nhảy cóc.
    ```
 
    Kết thúc thông điệp bằng dòng ghi công mà phiên làm việc yêu cầu.
-4. Mục vừa xong là mục cuối của bước (mọi mục của bước đã `[x]`): chạy gate đầy đủ rồi
-   **merge vào `main`**, không phát hành. Chỉ phát hành (theo `docs/RELEASING.md`, không hỏi) khi
+4. Mục vừa xong là mục cuối của bước (mọi mục của bước đã `[x]`): gate nhanh xanh thì
+   **merge vào `main`**, không phát hành, không chờ gate đầy đủ (D-300). Chỉ phát hành (theo `docs/RELEASING.md`, không hỏi) khi
    bước đó là bước cuối của một giai đoạn của lộ trình, hay khi chủ dự án bảo (D-248).
 
 ## 6. Đi tiếp hay dừng

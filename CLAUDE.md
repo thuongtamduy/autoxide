@@ -75,7 +75,8 @@ cho mọi thứ chạm tới database: migration, entity, query, transaction, in
 queue, test, lệnh CLI, tài liệu hướng dẫn.
 
 - Một tính năng chỉ chạy trên một database là **chưa xong**, kể cả khi gate của
-  database kia xanh.
+  database kia xanh. Gate đầy đủ trước khi phát hành là chốt chặn cuối (D-300): đỏ trên
+  Postgres thì sửa trước khi phát hành, không phát hành kèm lỗi.
 - Không dùng kiểu dữ liệu, hàm hay cú pháp chỉ một bên có. Buộc phải rẽ nhánh (vd claim
   job) thì giấu sau một trait và viết test cho cả hai nhánh.
 - Test mới phải chạy trên cả hai. Không đánh dấu bỏ qua test cho một database.
@@ -159,10 +160,11 @@ Dùng API chưa từng dùng trong repo thì tra đúng phiên bản đang ghim 
 
 Hai mức (D-173), các bước và biến môi trường ghi ở đầu `gate.sh`:
 
-- **`./gate.sh --quick`** — trước mỗi commit lúc đang làm một bước: test của crate bị sửa và
-  crate phụ thuộc vào chúng, chỉ trên SQLite.
-- **`./gate.sh`** — gate đầy đủ, cả SQLite và Postgres. Một bước chỉ xong, và chỉ được merge
-  vào `main` hay phát hành, khi gate này xanh.
+- **`./gate.sh --quick`** — trước mỗi commit, và đủ để đánh dấu một bước xong và merge vào
+  `main`: test của crate bị sửa và crate phụ thuộc vào chúng, chỉ trên SQLite (D-300).
+- **`./gate.sh`** — gate đầy đủ, cả SQLite và Postgres. **Bắt buộc xanh trước khi phát hành**
+  (D-300, chủ dự án quyết); không chạy ở mỗi lần merge. Viết hay sửa code chạm database thì
+  chạy riêng bài test đó trên Postgres trong lúc làm (D-263) — rẻ, và bắt lỗi sớm.
 
 Trong các test đó có ba bài giữ tài liệu khớp code: `.env.example` (cấu hình),
 `docs/openapi.json` (hợp đồng API, kèm kiểm mỗi endpoint đủ mô tả) và luật sở hữu
@@ -182,7 +184,7 @@ sẵn lệnh.
   miễn) hoặc trong `tests/` với dòng `#![allow(…)]` đầu file như các file sẵn có.
   Trong `src/` không được tắt các lint này — `cargo xtask check` chặn.
 - Xong một mục: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Xong trọn một
-  bước (mọi mục `[x]`, gate đầy đủ xanh) thì merge vào `main`, **không** phát hành: gom nhiều
+  bước (mọi mục `[x]`, gate nhanh xanh) thì merge vào `main`, **không** phát hành: gom nhiều
   bước thành một bản lớn, phát hành khi xong một giai đoạn của lộ trình hay khi chủ dự án bảo
   (D-248, thay D-171). Theo `docs/RELEASING.md`.
 
