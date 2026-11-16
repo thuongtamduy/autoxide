@@ -73,6 +73,11 @@ language; English (`en`) by default and for unsupported languages. Responses car
 `Content-Language`. Codes never change with the language.
 - **Rate limits**: too many requests from one address are answered with `429` (code \
 `rate_limited`) and a `Retry-After` header giving the seconds to wait.
+- **Tenant state**: any endpoint of a tenant may answer `403` with code `tenant_suspended` (the \
+tenant is suspended: nothing works, reads included), `403` with code `tenant_read_only` (the \
+tenant can only read for now: `GET` works, as do sign-in, exports and links from mails; other \
+changes are refused; MCP tools that are not read-only too) or `503` with code \
+`tenant_maintenance` and a `Retry-After` header.
 - **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote \
 it when reporting a problem.
 - **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount \

@@ -53,7 +53,7 @@ pub use s3::{
 };
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 pub use storage::{MemoryStorage, MemoryStorageOpener};
-pub use tenancy::schema_tenancy_violations;
+pub use tenancy::{FakeTenantSettings, schema_tenancy_violations};
 
 use std::fmt;
 use std::path::PathBuf;

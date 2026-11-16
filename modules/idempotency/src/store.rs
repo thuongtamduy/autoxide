@@ -567,4 +567,61 @@ mod tests {
         .await
         .unwrap();
     }
+
+    /// Create a memo in the tenant of the caller.
+    #[utoipa::path(post, path = "/", responses((status = 201, description = "Created.")))]
+    async fn create_memo(
+        _tenant: autoxide_kernel::tenancy::TenantContext,
+        State(counter): State<Arc<Counter>>,
+    ) -> StatusCode {
+        counter.runs.fetch_add(1, Ordering::SeqCst);
+        StatusCode::CREATED
+    }
+
+    /// Module giả `memos`: lệnh ghi cần khách của request (bị chặn khi khách chỉ đọc).
+    struct Memos(Arc<Counter>);
+
+    impl Module for Memos {
+        fn name(&self) -> &'static str {
+            "memos"
+        }
+
+        fn routes(&self) -> OpenApiRouter {
+            OpenApiRouter::new().routes(routes!(create_memo)).with_state(self.0.clone())
+        }
+    }
+
+    /// Khách chỉ đọc: lệnh ghi bị từ chối và câu từ chối không được lưu theo key — gửi lại cùng key
+    /// sau khi khách ghi được lại thì lệnh chạy thật (đối chiếu thiết kế 2, A-3.11).
+    #[tokio::test]
+    async fn khach_chi_doc_khong_luu_cau_tu_choi() {
+        use autoxide_kernel::tenancy::{TenantAdmin, TenantChanges};
+        TestDatabase::run(async |test| {
+            let counter = Arc::new(Counter::default());
+            let app = TestApp::builder(test)
+                .tenant("acme")
+                .user_in("acme", "cara", 3, &[])
+                .module(crate::module())
+                .module(Memos(counter.clone()))
+                .build()
+                .await
+                .unwrap();
+            let admin = app.api::<TenantAdmin>().unwrap();
+            let id = app.tenant("acme").await.unwrap().id().as_uuid();
+            let set = |read_only: bool| {
+                let changes = TenantChanges { read_only: Some(read_only), ..Default::default() };
+                admin.update(autoxide_kernel::event::Actor::system(), id, changes, None)
+            };
+            set(true).await.unwrap();
+            let refused = post_as(&app, Some("Bearer cara"), "/api/v1/memos", Some("k"), "").await;
+            assert_eq!(refused.0, StatusCode::FORBIDDEN, "{}", refused.2);
+            assert!(refused.2.contains("tenant_read_only"), "{}", refused.2);
+            set(false).await.unwrap();
+            let done = post_as(&app, Some("Bearer cara"), "/api/v1/memos", Some("k"), "").await;
+            assert_eq!((done.0, done.1), (StatusCode::CREATED, None));
+            assert_eq!(counter.runs.load(Ordering::SeqCst), 1);
+        })
+        .await
+        .unwrap();
+    }
 }

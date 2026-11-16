@@ -338,6 +338,56 @@ database mới.
 Kiểm cấu hình mà không khởi động gì: `autoxide config`. Lệnh liệt kê mọi biến kèm giá
 trị (secret được giấu) và báo mọi vấn đề cùng một lượt.
 
+## Cấu hình và trạng thái của từng khách
+
+Khi chạy nhiều khách hàng (`AUTOXIDE_TENANCY_MODE=multi`), các biến trên áp cho mọi khách. Một số
+hành vi của module còn đặt được theo từng khách, thay giá trị của máy chủ cho riêng khách đó:
+
+| Cấu hình của khách | Thay cho |
+| --- | --- |
+| `kernel.public_url` | `AUTOXIDE_HTTP_PUBLIC_URL` trong link gửi qua mail |
+| `mail.connection.smtp.url`, `mail.connection.smtp.from` | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` |
+| `ai.connection.text.api_key`, `ai.connection.text.model` | khoá và mô hình của nhà cung cấp AI của máy chủ (`AUTOXIDE_AI_API_KEY`, `AUTOXIDE_AI_MODEL`) |
+| `comments.banned_words`, `comments.suspect_words`, `comments.max_links`, `comments.guest_moderation`, `comments.user_moderation` | các biến `AUTOXIDE_COMMENTS_…` tương ứng ([bình luận](COMMENTS.vi.md#theo-từng-khách)) |
+| `forms.retention_days` | `AUTOXIDE_FORMS_RETENTION_DAYS` ([form](FORMS.vi.md)) |
+| `content.locales`, `content.default_locale` | `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CONTENT_DEFAULT_LOCALE` ([nội dung](CONTENT.vi.md#ngôn-ngữ)) |
+| `media.alt_locales` | `AUTOXIDE_MEDIA_ALT_LOCALES` ([media](MEDIA.vi.md)) |
+
+`GET /api/v1/kernel/settings` liệt kê chúng kèm giá trị khách hiện tại đã đặt. Quản trị của khách
+(permission `kernel.settings.manage`) đặt một cấu hình bằng `PUT /api/v1/kernel/settings/{name}` với
+`{"value": "…"}`, và bỏ (về giá trị của máy chủ) bằng `DELETE`. Nhân sự nền tảng làm như vậy cho khách
+bất kỳ dưới `/api/v1/kernel/tenants/{id}/settings` (`kernel.tenants.read` để xem,
+`kernel.tenants.manage` để đổi). Giá trị được kiểm ngay lúc đặt; giá trị secret lưu mã hoá và không
+bao giờ hiện lại. Máy chủ khác dùng giá trị mới trong vòng `AUTOXIDE_TENANCY_CACHE_SECONDS`.
+
+Cấu hình nối khách với một dịch vụ của đối tác (máy chủ mail của khách, tài khoản nhà cung cấp AI
+của khách…) thuộc nhóm `connection` và mang tên dạng `<module>.connection.<loại>.<trường>`:
+`GET /api/v1/kernel/settings?group=connection` chỉ liệt kê các cấu hình đó — đúng thứ màn "Kết nối
+đối tác" cần. Mỗi cấu hình trong danh sách mang `group` của nó (`null` khi không thuộc nhóm nào).
+
+Cấu hình kết nối của mail và AI đã đổi tên theo dạng này. Tên cũ (`mail.smtp_url`, `mail.from`,
+`ai.api_key`, `ai.model`) vẫn dùng được: giá trị khách đã đặt dưới tên cũ tiếp tục có hiệu lực, và
+`PUT` / `DELETE` vẫn nhận tên cũ. Danh sách chỉ hiện tên hiện tại.
+
+Có hai cách dừng một khách, độc lập với nhau:
+
+- **Tạm khoá** — `autoxide tenant suspend <khách>` (mở lại bằng `resume`), hoặc `PATCH
+  /api/v1/kernel/tenants/{id}` với `{"status": "suspended"}`: mọi request tới khách, kể cả đọc, nhận
+  `403 tenant_suspended`, và tên miền của khách không được cấp chứng chỉ mới.
+- **Chỉ đọc** — `autoxide tenant read-only <khách>` (gỡ bằng `writable`), hoặc `{"read_only":
+  true}`: đọc được, người dùng của khách vẫn đăng nhập, đặt lại mật khẩu, xuất dữ liệu và dùng link
+  trong mail (xác nhận địa chỉ, huỷ đăng ký); mọi thay đổi khác nhận `403 tenant_read_only`, tool MCP
+  không chỉ đọc cũng vậy. Dùng khi, ví dụ, khách chưa thanh toán.
+
+Job nền và event của khách ở cả hai trạng thái vẫn chạy: chúng làm nốt việc đã nhận trước đó, và
+việc xoá theo thời hạn giữ vẫn diễn ra. Khách nền tảng không tạm khoá được, cũng không đặt chỉ đọc
+được.
+
+`GET /api/v1/kernel/tenants` (nhân sự nền tảng) có bộ lọc cho mặt điều khiển — `status`,
+`read_only`, `placement_kind`, `schema_state`, và `subscription_status` / `near_limit` (chưa khớp
+khách nào tới khi cài module gói dịch vụ: thuê bao và hạn mức) — và `expand=placement` để lấy luôn
+placement của từng khách trong cùng câu trả lời.
+
 ## Tên miền riêng của khách hàng
 
 Khi chạy nhiều khách hàng (`AUTOXIDE_TENANCY_MODE=multi`), mỗi khách có thể phục vụ trang của mình ở
@@ -369,6 +419,13 @@ miền của nền tảng.
 Tên miền của chính nền tảng (tên máy trong `AUTOXIDE_HTTP_PUBLIC_URL`), địa chỉ IP và `localhost`
 bị từ chối. Mỗi lúc một tên miền chỉ thuộc một khách: khách khác chỉ nhận được sau khi nó bị gỡ hay
 xác minh hỏng.
+
+Một tên miền có thể thuộc về một nút trong cây tổ chức của khách — vd một cửa hàng có trang riêng:
+`PATCH /api/v1/kernel/domains/{id}` với `{"org_id": "<id của nút>"}` gắn tên miền với nút đó,
+`{"org_id": null}` gỡ ra (tên miền khi đó là của cả khách). Nút phải là nút của chính khách; khi
+chưa module nào đã cài giữ cây tổ chức thì chỉ nhận `null`. Gắn nút không đổi trạng thái hay bản ghi
+DNS của tên miền; tên miền đã gỡ trả `409 tenant_domain_revoked`. Mỗi lần đổi ghi event
+`kernel.domain_updated`.
 
 **Chứng chỉ TLS.** Để Caddy lấy chứng chỉ khi người xem đầu tiên của một tên miền tới (on-demand
 TLS), sau khi hỏi Autoxide tên miền đó có được phép không:

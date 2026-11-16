@@ -2,6 +2,8 @@
 //! chung của chương trình (module `files`, `AUTOXIDE_FILES_…`).
 
 use autoxide_kernel::config::{ConfigReader, Invalid, Setting, parse_in_range};
+use autoxide_kernel::error::FieldError;
+use autoxide_kernel::tenancy::TenantSetting;
 
 /// Loại được tải lên khi không cấu hình: ảnh raster, SVG, video MP4 / WebM, âm thanh, PDF.
 pub(crate) const DEFAULT_TYPES: &str = "image/jpeg,image/png,image/gif,image/webp,image/avif,\
@@ -172,6 +174,36 @@ impl MediaConfig {
 }
 
 /// Mã ngôn ngữ BCP 47 dạng thường gặp: 2–3 chữ, rồi các đoạn 2–8 chữ / số nối bằng `-`.
+/// Ngôn ngữ dịch `alt` theo khách (đối chiếu thiết kế 2, A-b7).
+pub(crate) const TENANT_ALT_LOCALES: TenantSetting = TenantSetting::new(
+    "media.alt_locales",
+    "Languages this tenant's text alternatives (`alt`) may be translated into, comma-separated \
+     BCP 47 codes (e.g. `en,vi`), instead of the server's AUTOXIDE_MEDIA_ALT_LOCALES. \
+     Translations already made in a language left out are kept but no longer shown.",
+)
+.checked(|raw| tenant_alt_locales(raw).map(|_| ()));
+
+/// Giá trị của `media.alt_locales`: ít nhất một mã, bỏ trùng (không phân biệt hoa thường).
+pub(crate) fn tenant_alt_locales(raw: &str) -> Result<Vec<String>, FieldError> {
+    let invalid = || {
+        FieldError::new(
+            "value",
+            "invalid",
+            "must be comma-separated language codes like `en` or `pt-BR`",
+        )
+    };
+    let mut locales: Vec<String> = Vec::new();
+    for locale in raw.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+        if !is_locale(locale) {
+            return Err(invalid());
+        }
+        if !locales.iter().any(|known| known.eq_ignore_ascii_case(locale)) {
+            locales.push(locale.to_owned());
+        }
+    }
+    if locales.is_empty() { Err(invalid()) } else { Ok(locales) }
+}
+
 pub(crate) fn is_locale(raw: &str) -> bool {
     let mut parts = raw.split('-');
     let first = parts.next().unwrap_or_default();

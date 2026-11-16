@@ -285,19 +285,19 @@ impl CommentsService {
             return Err(banned());
         }
 
-        // Từ cấm: từ chối. Từ nghi ngờ, quá nhiều link: giữ lại.
-        if text::contains_word(&body, &self.config.banned_words)
-            || name
-                .as_deref()
-                .is_some_and(|name| text::contains_word(name, &self.config.banned_words))
+        // Từ cấm: từ chối. Từ nghi ngờ, quá nhiều link: giữ lại. Luật của khách, thiếu thì của
+        // máy chủ.
+        let rules = self.rules(tenant).await?;
+        if text::contains_word(&body, &rules.banned_words)
+            || name.as_deref().is_some_and(|name| text::contains_word(name, &rules.banned_words))
         {
             return Err(banned_word());
         }
         let mut holds = Vec::new();
-        if text::contains_word(&body, &self.config.suspect_words) {
+        if text::contains_word(&body, &rules.suspect_words) {
             holds.push("suspect_word");
         }
-        if text::links(&body, format) > self.config.max_links {
+        if text::links(&body, format) > rules.max_links {
             holds.push("too_many_links");
         }
 
@@ -561,7 +561,8 @@ impl CommentsService {
         if moderator {
             return Ok(None);
         }
-        Ok(match (self.config.mode(kind, principal.is_none()), principal) {
+        let mode = self.rules(tenant).await?.mode(&self.config, kind, principal.is_none());
+        Ok(match (mode, principal) {
             (Mode::Post, _) => None,
             (Mode::Pre, _) => Some("moderation"),
             // Khách không có tài khoản để nhớ: email tự khai không bao giờ được tính.

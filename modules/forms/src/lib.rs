@@ -86,6 +86,10 @@ impl Module for FormsModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![config::TENANT_RETENTION_DAYS]
+    }
+
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         let config = self
             .config
@@ -100,6 +104,7 @@ impl Module for FormsModule {
             storage: context.require::<dyn Storage>()?,
             jobs: context.jobs(),
             public_url: context.require::<PublicUrl>()?,
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
         };
         let service = Arc::new(FormsService::new(parts, config));
         context.personal_data(service.clone())?;
@@ -238,6 +243,17 @@ pub(crate) mod testing {
         config: FormsConfig,
         antispam: AntispamConfig,
     ) -> (Arc<FormsService>, Arc<FakeMailer>, Database, Arc<MemoryStorage>) {
+        let settings = Arc::new(autoxide_testkit::FakeTenantSettings::default());
+        service_with_settings(test, config, antispam, settings).await
+    }
+
+    /// Như [`service_with_storage`], đọc cấu hình theo khách từ `settings` (vd của một `TestApp`).
+    pub async fn service_with_settings(
+        test: &TestDatabase,
+        config: FormsConfig,
+        antispam: AntispamConfig,
+        settings: Arc<dyn autoxide_kernel::tenancy::TenantSettings>,
+    ) -> (Arc<FormsService>, Arc<FakeMailer>, Database, Arc<MemoryStorage>) {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
         let kernel = Config::read(&mut reader);
@@ -265,6 +281,7 @@ pub(crate) mod testing {
             storage: storage.clone(),
             jobs: JobQueue::new("forms"),
             public_url: Arc::new(PublicUrl::default()),
+            settings,
         };
         (Arc::new(FormsService::new(parts, config)), mailer, database, storage)
     }

@@ -90,6 +90,10 @@ impl Module for CommentsModule {
         Ok(())
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        config::tenant_settings()
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
@@ -112,6 +116,7 @@ impl Module for CommentsModule {
             translations: context.translations().clone(),
             resources: context.resources(),
             verification: context.posting_verification(),
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
         };
         let service = Arc::new(CommentsService::new(parts, config));
         context.personal_data(service.clone())?;
@@ -178,7 +183,7 @@ impl Module for CommentsModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
-    use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
+    use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, TenantSettings};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
@@ -193,7 +198,7 @@ pub(crate) mod testing {
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
     use autoxide_kernel::resource::{Resource, ResourceDirectory, ResourceResolver};
     use autoxide_kernel::secret::SecretKey;
-    use autoxide_testkit::TestDatabase;
+    use autoxide_testkit::{TestApp, TestDatabase};
     use uuid::Uuid;
 
     use crate::config::CommentsConfig;
@@ -276,21 +281,19 @@ pub(crate) mod testing {
         build(test, config, antispam, None).await
     }
 
-    /// Như [`service`], tra khách qua sổ `registry` (vd sổ nhiều khách của một `TestApp`).
-    pub async fn service_in(
-        test: &TestDatabase,
-        config: CommentsConfig,
-        registry: DatabaseRegistry,
-    ) -> Harness {
+    /// Như [`service`], tra khách qua sổ và đọc cấu hình theo khách của `app` (một `TestApp`
+    /// nhiều khách): cấu hình đặt qua REST của `app` có hiệu lực ở service này.
+    pub async fn service_in(test: &TestDatabase, config: CommentsConfig, app: &TestApp) -> Harness {
         let antispam = AntispamConfig::default().min_fill(Duration::ZERO);
-        build(test, config, antispam, Some(registry)).await
+        let settings = app.api::<dyn TenantSettings>().unwrap();
+        build(test, config, antispam, Some((app.registry().clone(), settings))).await
     }
 
     async fn build(
         test: &TestDatabase,
         config: CommentsConfig,
         antispam: AntispamConfig,
-        registry: Option<DatabaseRegistry>,
+        tenancy: Option<(DatabaseRegistry, Arc<dyn TenantSettings>)>,
     ) -> Harness {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
@@ -311,6 +314,9 @@ pub(crate) mod testing {
                 .unwrap();
         let resources = ResourceDirectory::default();
         resources.register("content", "content.entry", Arc::new(Entries)).unwrap();
+        let (registry, settings) = tenancy.unzip();
+        let settings =
+            settings.unwrap_or_else(|| Arc::new(autoxide_testkit::FakeTenantSettings::default()));
         let parts = Parts {
             databases: registry.unwrap_or_else(|| DatabaseRegistry::single(database.clone())),
             outbox: Outbox::standalone("comments"),
@@ -320,6 +326,7 @@ pub(crate) mod testing {
             translations,
             resources,
             verification: PostingVerification::default(),
+            settings,
         };
         let tenant = TenantContext::default_on(database.clone());
         let service = Arc::new(CommentsService::new(parts, config));

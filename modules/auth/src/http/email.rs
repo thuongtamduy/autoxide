@@ -23,8 +23,13 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(resend_verification))
         .routes(routes!(change_email, cancel_email_change))
-        .routes(routes!(confirm_email))
-        .routes(routes!(report_email_change))
+        .merge(
+            // Link trong thư vẫn dùng được khi khách chỉ đọc (A-3.11).
+            OpenApiRouter::new()
+                .routes(routes!(confirm_email))
+                .routes(routes!(report_email_change))
+                .layer(autoxide_kernel::tenancy::allowed_while_read_only()),
+        )
 }
 
 /// A new email address for the signed-in account.

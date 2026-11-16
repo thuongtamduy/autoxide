@@ -57,10 +57,17 @@ pub(crate) fn routes(service: Arc<NewsletterService>) -> OpenApiRouter {
         .routes(routes!(suppressions::report_bounce))
         .routes(routes!(public::public_lists))
         .routes(routes!(public::subscribe))
-        .routes(routes!(public::confirm))
-        .routes(routes!(public::unsubscribe))
-        .routes(routes!(public::get_preferences, public::update_preferences))
-        .with_state(service)
+        .with_state(service.clone())
+        .merge(
+            // Link trong thư vẫn dùng được khi khách chỉ đọc: xác nhận việc đã bắt đầu trước đó,
+            // rút lại đồng ý (huỷ đăng ký) luôn phải làm được.
+            OpenApiRouter::new()
+                .routes(routes!(public::confirm))
+                .routes(routes!(public::unsubscribe))
+                .routes(routes!(public::get_preferences, public::update_preferences))
+                .layer(autoxide_kernel::tenancy::allowed_while_read_only())
+                .with_state(service),
+        )
 }
 
 /// Yêu cầu trang, gộp lỗi của nó với lỗi của bộ lọc để báo một lần.

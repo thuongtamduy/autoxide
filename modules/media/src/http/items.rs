@@ -474,8 +474,9 @@ pub(crate) struct AltRequest {
 /// Set the text alternative of a media item in one language.
 ///
 /// Requires `media.write`. The item's `alt` stays the default; readers in `locale` get this
-/// text instead (e.g. a bilingual storefront). `locale` must be one of the languages the server
-/// lists in `AUTOXIDE_MEDIA_ALT_LOCALES`. `If-Match` is required. To draft the text with AI,
+/// text instead (e.g. a bilingual storefront). `locale` must be one of the tenant's languages
+/// for alt texts (its `media.alt_locales` setting, otherwise the server's
+/// `AUTOXIDE_MEDIA_ALT_LOCALES`; see `GET /api/v1/kernel/client-config`). `If-Match` is required. To draft the text with AI,
 /// use `POST /api/v1/media/{id}/alt-suggestions` with the same `locale`, then send it here.
 #[utoipa::path(
     put,

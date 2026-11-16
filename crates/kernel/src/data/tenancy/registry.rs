@@ -516,9 +516,11 @@ impl DatabaseRegistry {
         // Database điều khiển luôn đủ migration (`serve` đòi trước khi khởi động).
         let ready = placement == MAIN_PLACEMENT || schema_state.as_deref() == Some("ready");
         let storage_sealed: Option<String> = row.try_get("", "storage_sealed")?;
+        let read_only: bool = row.try_get("", "read_only")?;
         let database = self.placement_database(placement).await?;
         let mut tenant = TenantContext::new(id, slug.clone(), name, status, placement, database)
-            .with_schema_ready(ready);
+            .with_schema_ready(ready)
+            .with_read_only(read_only);
         if let Some(sealed) = storage_sealed
             && placement != MAIN_PLACEMENT
         {
@@ -552,7 +554,7 @@ fn tenant_select() -> SelectStatement {
     let placements = Alias::new("kernel_placements");
     Query::select()
         .columns(
-            ["id", "slug", "name", "status", "placement_id"]
+            ["id", "slug", "name", "status", "placement_id", "read_only"]
                 .map(|column| (tenants.clone(), Alias::new(column))),
         )
         .column((placements.clone(), Alias::new("schema_state")))

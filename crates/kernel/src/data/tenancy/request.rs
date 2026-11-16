@@ -11,6 +11,10 @@
 //!    `tenant_mismatch`.
 //! 5. Không xác định được → handler cần [`TenantContext`] nhận `tenant_required`.
 //!
+//! Khách đã giải: tạm khoá / bảo trì → lỗi ([`ensure_serving`]); chỉ đọc mà request ghi (không phải
+//! `GET` / `HEAD` / `OPTIONS`, route không đánh dấu `AllowedWhileReadOnly`) → `tenant_read_only`
+//! ([`ensure_writable`]). Một chỗ kiểm cả hai cờ cho mọi handler chạm dữ liệu của khách.
+//!
 //! Kết quả xác thực giữ trong extensions của request: handler nhận cả `Principal` lẫn
 //! `TenantContext` chỉ xác thực một lần.
 
@@ -21,7 +25,9 @@ use axum::http::request::Parts;
 use axum::http::{Extensions, HeaderMap, HeaderName, header};
 use uuid::Uuid;
 
-use super::{DatabaseRegistry, TenancyMode, TenantContext, ensure_serving, errors};
+use super::{
+    DatabaseRegistry, TenancyMode, TenantContext, ensure_serving, ensure_writable, errors,
+};
 use crate::access::{Authenticator, Principal};
 use crate::error::Error;
 
@@ -193,6 +199,7 @@ pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
         by_hint(&registry, parts).await?
     };
     ensure_serving(&tenant)?;
+    ensure_writable(&tenant, &parts.method, &parts.extensions)?;
     parts.extensions.insert(tenant.clone());
     Ok(tenant)
 }
@@ -225,6 +232,7 @@ pub(crate) async fn tenant_ignoring_bad_credential(
             })?;
             let tenant = by_hint(&registry, parts).await?;
             ensure_serving(&tenant)?;
+            ensure_writable(&tenant, &parts.method, &parts.extensions)?;
             Ok(tenant)
         }
         other => other,

@@ -1,34 +1,51 @@
 //! Cấu hình và secret theo khách (đặc tả 33 "Cấu hình và secret theo khách", D-258).
 //!
 //! - Module khai cấu hình nó nhận theo khách qua `Module::tenant_settings` ([`TenantSetting`],
-//!   tên `<module>.<khoá>`, vd `mail.smtp_url`); kernel khai `kernel.public_url`.
+//!   tên `<module>.<khoá>`, vd `comments.max_links`); kernel khai `kernel.public_url`.
+//! - Cấu hình xếp được vào một nhóm ([`TenantSetting::group`]). Nhóm [`CONNECTION_GROUP`] là kết
+//!   nối tới đối tác (máy chủ SMTP, nhà cung cấp AI, cổng thanh toán…): tên bắt buộc theo dạng
+//!   `<module>.connection.<loại>.<trường>` (vd `mail.connection.smtp.url`), trường bí mật khai
+//!   `.secret()`. `GET /api/v1/kernel/settings?group=connection` là nguồn của màn "Kết nối đối tác".
+//! - Đổi tên một cấu hình: khai tên cũ bằng [`TenantSetting::formerly`]. Giá trị khách đã đặt dưới
+//!   tên cũ vẫn được đọc (secret mở bằng đúng tên nó được mã hoá cùng), API vẫn nhận tên cũ; lần
+//!   đặt kế tiếp ghi dưới tên mới và bỏ dòng tên cũ. Không cần upgrade dữ liệu.
 //! - Module đọc bằng trait [`TenantSettings`] (`context.require::<dyn TenantSettings>()`). Khách
 //!   chưa đặt thì module dùng cấu hình chung (biến môi trường) như trước.
 //! - Lưu ở bảng `kernel_tenant_settings` (cấp khách hàng, database của khách); secret mã hoá bằng
 //!   [`Sealer`](crate::secret::Sealer) và **không bao giờ** trả ra API, log hay event: event
 //!   `kernel.setting_changed` chỉ mang tên.
 //! - Quản lý qua `GET /api/v1/kernel/settings`, `PUT` / `DELETE /api/v1/kernel/settings/{name}`
-//!   (permission `kernel.settings.manage`) và tool `kernel.settings.list`.
+//!   (permission `kernel.settings.manage`) và tool `kernel.list_settings`. Nhân sự nền tảng đặt
+//!   cho một khách bất kỳ qua `…/kernel/tenants/{id}/settings…` (D-210, đối chiếu thiết kế 2).
+//! - Cấu hình có thể khai bộ kiểm ([`TenantSetting::checked`]): giá trị sai bị từ chối lúc đặt
+//!   (422). Module đọc bằng [`parsed_setting`]: giá trị đã lưu mà nay không còn hợp lệ (bộ kiểm
+//!   chặt hơn ở bản mới) thì ghi cảnh báo và dùng cấu hình chung — không làm hỏng request.
+//! - Đọc qua cache theo khách (một câu truy vấn lấy mọi cấu hình của khách, giữ
+//!   `AUTOXIDE_TENANCY_CACHE_SECONDS`): module đọc ở đường nóng (ngôn ngữ của `content` mỗi
+//!   request) không thêm truy vấn. Đặt / bỏ trên máy chủ này xoá cache ngay; máy chủ khác thấy
+//!   trong TTL.
 
-use std::sync::{Arc, OnceLock};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::time::{Duration, Instant};
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use validator::Validate;
 use zeroize::Zeroizing;
 
-use super::{ScopeExt, TenantContext, TenantScoped};
+use super::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, TenantScoped, TenantStatus};
 use crate::access::{Permission, Principal, Risk};
 use crate::error::{Error, FieldError};
 use crate::event::{Actor, Event, EventInfo, Outbox};
-use crate::mcp::{NoInput, Tool};
+use crate::mcp::Tool;
 use crate::migration::prelude::*;
 use crate::response::{Data, Problem};
 use crate::secret::SecretKey;
@@ -57,18 +74,46 @@ pub(crate) const SETTING_CHANGED: EventInfo = EventInfo::new(
 /// Độ dài tối đa của một giá trị.
 const VALUE_MAX: usize = 4000;
 
+/// Bộ kiểm giá trị của một cấu hình: `Err` với lỗi của ô `value` (câu mẫu có bản dịch như mọi
+/// `FieldError`).
+pub type SettingCheck = fn(&str) -> Result<(), FieldError>;
+
+/// Nhóm của cấu hình kết nối tới đối tác (đối chiếu thiết kế đợt 2): tên phải theo dạng
+/// `<module>.connection.<loại>.<trường>`.
+pub const CONNECTION_GROUP: &str = "connection";
+
 /// Một cấu hình module nhận theo khách.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub struct TenantSetting {
     name: &'static str,
     description: &'static str,
     secret: bool,
+    check: Option<SettingCheck>,
+    group: Option<&'static str>,
+    former_name: Option<&'static str>,
 }
 
+// So theo tên (tên là duy nhất trong sổ); không so con trỏ hàm của bộ kiểm.
+impl PartialEq for TenantSetting {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.secret == other.secret
+    }
+}
+
+impl Eq for TenantSetting {}
+
 impl TenantSetting {
-    /// Cấu hình `name` (`<module>.<khoá>`: chữ thường, số, `_`), mô tả tiếng Anh cho người quản trị.
+    /// Cấu hình `name` (`<module>.<khoá>`; khoá là một hay nhiều đoạn chữ thường, số, `_` nối bằng
+    /// dấu chấm), mô tả tiếng Anh cho người quản trị.
     pub const fn new(name: &'static str, description: &'static str) -> Self {
-        TenantSetting { name, description, secret: false }
+        TenantSetting {
+            name,
+            description,
+            secret: false,
+            check: None,
+            group: None,
+            former_name: None,
+        }
     }
 
     /// Giá trị là secret: lưu mã hoá, không bao giờ trả ra.
@@ -77,8 +122,51 @@ impl TenantSetting {
         self
     }
 
+    /// Giá trị phải qua `check` khi đặt (422 `validation_failed`, lỗi ở ô `value`). Module dùng
+    /// cùng hàm dịch giá trị cho bộ kiểm và cho [`parsed_setting`].
+    pub const fn checked(mut self, check: SettingCheck) -> Self {
+        self.check = Some(check);
+        self
+    }
+
+    /// Xếp cấu hình vào nhóm `group` (chữ thường, số, `_`): danh sách lọc được theo nhóm
+    /// (`?group=`). Nhóm [`CONNECTION_GROUP`] buộc tên dạng `<module>.connection.<loại>.<trường>`.
+    pub const fn group(mut self, group: &'static str) -> Self {
+        self.group = Some(group);
+        self
+    }
+
+    /// Cấu hình này trước đây tên là `name`: giá trị khách đã đặt dưới tên cũ vẫn được đọc, API vẫn
+    /// nhận tên cũ; lần đặt kế tiếp ghi dưới tên mới.
+    pub const fn formerly(mut self, name: &'static str) -> Self {
+        self.former_name = Some(name);
+        self
+    }
+
     pub fn name(&self) -> &'static str {
         self.name
+    }
+
+    /// Nhóm của cấu hình, nếu có.
+    pub fn group_name(&self) -> Option<&'static str> {
+        self.group
+    }
+
+    /// Tên cũ của cấu hình, nếu nó từng đổi tên.
+    pub fn former_name(&self) -> Option<&'static str> {
+        self.former_name
+    }
+
+    /// `name` là tên (hiện tại hay cũ) của cấu hình này.
+    fn answers_to(&self, name: &str) -> bool {
+        self.name == name || self.former_name == Some(name)
+    }
+
+    /// Dòng đã lưu của cấu hình này trong `rows`: dòng tên hiện tại trước, không có thì dòng tên cũ.
+    fn row_in<'a>(&self, rows: &'a [entity::Model]) -> Option<&'a entity::Model> {
+        rows.iter()
+            .find(|row| row.name == self.name)
+            .or_else(|| rows.iter().find(|row| Some(row.name.as_str()) == self.former_name))
     }
 
     pub fn description(&self) -> &'static str {
@@ -98,6 +186,11 @@ pub struct SettingValue {
 }
 
 impl SettingValue {
+    /// Giá trị không phải secret (cho bản giả trong test; module đọc qua [`TenantSettings`]).
+    pub fn new(value: impl Into<String>) -> Self {
+        SettingValue { value: Zeroizing::new(value.into()), secret: false }
+    }
+
     pub fn as_str(&self) -> &str {
         &self.value
     }
@@ -106,6 +199,32 @@ impl SettingValue {
 impl std::fmt::Debug for SettingValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.secret { f.write_str("SettingValue(<secret>)") } else { self.value.fmt(f) }
+    }
+}
+
+/// Giá trị `setting` của `tenant`, dịch bằng `parse`; `None` khi khách chưa đặt. Giá trị đã lưu mà
+/// `parse` từ chối (vd bộ kiểm của bản mới chặt hơn) → cảnh báo trong log và `None`: module dùng
+/// cấu hình chung thay vì làm hỏng request của khách.
+pub async fn parsed_setting<T>(
+    settings: &dyn TenantSettings,
+    tenant: &TenantContext,
+    setting: &TenantSetting,
+    parse: impl FnOnce(&str) -> Result<T, FieldError>,
+) -> Result<Option<T>, Error> {
+    let Some(value) = settings.get(tenant, setting).await? else {
+        return Ok(None);
+    };
+    match parse(value.as_str()) {
+        Ok(parsed) => Ok(Some(parsed)),
+        Err(problem) => {
+            tracing::warn!(
+                setting = setting.name,
+                tenant_id = %tenant.id(),
+                problem = %problem.message,
+                "a tenant setting is not valid any more; the server-wide value is used"
+            );
+            Ok(None)
+        }
     }
 }
 
@@ -135,16 +254,27 @@ impl Catalog {
         self.0.get().map_or(&[], Vec::as_slice)
     }
 
+    /// Cấu hình tên `name` — tên hiện tại hay tên cũ ([`TenantSetting::formerly`]).
     fn find(&self, name: &str) -> Result<TenantSetting, Error> {
         self.all()
             .iter()
-            .find(|setting| setting.name == name)
+            .find(|setting| setting.answers_to(name))
             .copied()
             .ok_or_else(|| super::errors::tenant_setting_unknown(name))
     }
 }
 
-/// Kiểm khai báo của module `module`: tên `<module>.<khoá>`, không trùng.
+/// `name` có dạng `<module>.<khoá>`; khoá là một hay nhiều đoạn (chữ thường, số, `_`) nối bằng `.`.
+fn well_named(module: &str, name: &str) -> bool {
+    name.len() <= 100
+        && name
+            .strip_prefix(module)
+            .and_then(|rest| rest.strip_prefix('.'))
+            .is_some_and(|key| key.split('.').all(crate::module::is_identifier))
+}
+
+/// Kiểm khai báo của module `module`: tên `<module>.<khoá>`, không trùng (kể cả với tên cũ); cấu
+/// hình nhóm `connection` — và chỉ chúng — mang tên `<module>.connection.<loại>.<trường>`.
 pub(crate) fn declaration_problems(
     module: &str,
     settings: &[TenantSetting],
@@ -152,26 +282,58 @@ pub(crate) fn declaration_problems(
 ) -> Vec<String> {
     let mut problems = Vec::new();
     for setting in settings {
-        let valid = setting
-            .name
-            .strip_prefix(module)
-            .and_then(|rest| rest.strip_prefix('.'))
-            .is_some_and(crate::module::is_identifier)
-            && setting.name.len() <= 100;
-        if !valid {
+        if !well_named(module, setting.name) {
             problems.push(format!(
                 "tenant setting `{}` of module `{module}` must be named `{module}.<key>` (lower \
-                 case letters, digits and `_`, at most 100 characters)",
+                 case letters, digits and `_`; several parts are joined with `.`; at most 100 \
+                 characters)",
                 setting.name
             ));
         }
         if setting.description.trim().is_empty() {
             problems.push(format!("tenant setting `{}` has no description", setting.name));
         }
-        if seen.contains(&setting.name) {
-            problems.push(format!("tenant setting `{}` is declared twice", setting.name));
+        if let Some(group) = setting.group
+            && !crate::module::is_identifier(group)
+        {
+            problems.push(format!(
+                "tenant setting `{}` is in group `{group}`: a group is lower case letters, digits \
+                 and `_`",
+                setting.name
+            ));
         }
-        seen.push(setting.name);
+        // `<module>.connection.<loại>.<trường>`: ít nhất hai đoạn sau `connection`.
+        let mut parts = setting.name.split('.').skip(1);
+        let connection_name = parts.next() == Some(CONNECTION_GROUP);
+        let in_group = setting.group == Some(CONNECTION_GROUP);
+        if in_group && !(connection_name && parts.count() >= 2) {
+            problems.push(format!(
+                "tenant setting `{}` is in group `connection`, so it must be named \
+                 `{module}.connection.<kind>.<field>`",
+                setting.name
+            ));
+        } else if connection_name && !in_group {
+            problems.push(format!(
+                "tenant setting `{}` is named like a partner connection: declare it with \
+                 `.group(CONNECTION_GROUP)`",
+                setting.name
+            ));
+        }
+        if let Some(former) = setting.former_name
+            && !well_named(module, former)
+        {
+            problems.push(format!(
+                "tenant setting `{}` has the former name `{former}`, which is not a name of \
+                 module `{module}`",
+                setting.name
+            ));
+        }
+        for name in std::iter::once(setting.name).chain(setting.former_name) {
+            if seen.contains(&name) {
+                problems.push(format!("tenant setting `{name}` is declared twice"));
+            }
+            seen.push(name);
+        }
     }
     problems
 }
@@ -211,10 +373,15 @@ impl TenantScoped for Entity {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[schema(as = TenantSettingState)]
 pub(crate) struct SettingState {
-    /// `<module>.<key>`, e.g. `mail.smtp_url`.
+    /// `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
+    /// `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
     #[schema(example = "kernel.public_url")]
     name: String,
     description: String,
+    /// Group of the setting, to filter the list by (`?group=`); `connection`: a connection to a
+    /// partner service (mail server, AI provider, payment gateway…). `null`: no group.
+    #[schema(example = "connection")]
+    group: Option<String>,
     /// Secret settings are stored encrypted and never returned: `value` is always `null`.
     secret: bool,
     /// Whether this tenant has set it; otherwise the server-wide configuration applies.
@@ -236,45 +403,92 @@ impl Event for SettingChanged {
     const NAME: &'static str = "kernel.setting_changed";
 }
 
+/// Cấu hình đã lưu của một khách (giá trị secret vẫn mã hoá), giữ trong cache.
+type Stored = Arc<Vec<entity::Model>>;
+
+/// Số khách trong cache quá mức này thì bỏ các mục đã hết hạn khi thêm mục mới.
+const CACHE_PRUNE_AT: usize = 10_000;
+
 /// Dịch vụ cấu hình theo khách.
 pub(crate) struct SettingsService {
     catalog: Catalog,
     secret: SecretKey,
     outbox: Outbox,
+    /// Thời gian giữ cache (`AUTOXIDE_TENANCY_CACHE_SECONDS`).
+    ttl: Duration,
+    cache: Mutex<HashMap<TenantId, (Instant, Stored)>>,
 }
 
-/// Mục đích (AAD) khi mã hoá giá trị secret.
+/// Mục đích (AAD) khi mã hoá giá trị secret. Tên của dòng cũng nằm trong AAD: secret đặt dưới tên
+/// cũ của một cấu hình chỉ mở được bằng tên cũ đó — luôn mở bằng `row.name`.
 const PURPOSE: &str = "kernel.tenant_setting";
 
+/// Trạng thái của `setting` ở một khách, từ dòng đã lưu `row` (nếu khách đã đặt).
+fn state(setting: &TenantSetting, row: Option<&entity::Model>) -> SettingState {
+    SettingState {
+        name: setting.name.to_owned(),
+        description: setting.description.to_owned(),
+        group: setting.group.map(str::to_owned),
+        secret: setting.secret,
+        is_set: row.is_some(),
+        value: row.filter(|_| !setting.secret).map(|row| row.value.clone()),
+        updated_at: row.map(|row| row.updated_at),
+    }
+}
+
 impl SettingsService {
-    pub(crate) fn new(catalog: Catalog, secret: SecretKey, outbox: Outbox) -> Self {
-        SettingsService { catalog, secret, outbox }
+    pub(crate) fn new(catalog: Catalog, secret: SecretKey, outbox: Outbox, ttl: Duration) -> Self {
+        SettingsService { catalog, secret, outbox, ttl, cache: Mutex::default() }
     }
 
-    /// Mọi cấu hình đã khai, theo tên, với trạng thái ở khách `tenant`.
-    pub(crate) async fn list(&self, tenant: &TenantContext) -> Result<Vec<SettingState>, Error> {
+    /// Mọi cấu hình đã lưu của khách `tenant`, qua cache. Khoá `mutex` chỉ giữ trong từng câu,
+    /// không qua `await`.
+    async fn stored(&self, tenant: &TenantContext) -> Result<Stored, Error> {
+        let cached =
+            self.cache.lock().unwrap_or_else(PoisonError::into_inner).get(&tenant.id()).cloned();
+        if let Some((at, rows)) = cached
+            && at.elapsed() < self.ttl
+        {
+            return Ok(rows);
+        }
+        let rows: Stored =
+            Arc::new(Entity::find().scoped(tenant).all(tenant.database().read()).await?);
+        let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+        if cache.len() >= CACHE_PRUNE_AT {
+            let ttl = self.ttl;
+            cache.retain(|_, (at, _)| at.elapsed() < ttl);
+        }
+        cache.insert(tenant.id(), (Instant::now(), rows.clone()));
+        Ok(rows)
+    }
+
+    /// Bỏ cấu hình của khách `tenant` khỏi cache (sau khi đặt / bỏ trên máy chủ này).
+    fn forget(&self, tenant: TenantId) {
+        self.cache.lock().unwrap_or_else(PoisonError::into_inner).remove(&tenant);
+    }
+
+    /// Mọi cấu hình đã khai, theo tên, với trạng thái ở khách `tenant`; `group`: chỉ cấu hình của
+    /// nhóm đó (nhóm không ai khai: danh sách rỗng).
+    pub(crate) async fn list(
+        &self,
+        tenant: &TenantContext,
+        group: Option<&str>,
+    ) -> Result<Vec<SettingState>, Error> {
+        // Trang quản trị đọc thẳng database: thấy ngay giá trị vừa đặt ở máy chủ khác.
         let rows = Entity::find().scoped(tenant).all(tenant.database().read()).await?;
         let mut states: Vec<SettingState> = self
             .catalog
             .all()
             .iter()
-            .map(|setting| {
-                let row = rows.iter().find(|row| row.name == setting.name);
-                SettingState {
-                    name: setting.name.to_owned(),
-                    description: setting.description.to_owned(),
-                    secret: setting.secret,
-                    is_set: row.is_some(),
-                    value: row.filter(|_| !setting.secret).map(|row| row.value.clone()),
-                    updated_at: row.map(|row| row.updated_at),
-                }
-            })
+            .filter(|setting| group.is_none_or(|group| setting.group == Some(group)))
+            .map(|setting| state(setting, setting.row_in(&rows)))
             .collect();
         states.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(states)
     }
 
-    /// Đặt cấu hình `name` của khách `tenant` (ghi đè nếu có).
+    /// Đặt cấu hình `name` của khách `tenant` (ghi đè nếu có). `name` là tên cũ của một cấu hình
+    /// thì đặt chính cấu hình đó, dưới tên hiện tại.
     pub(crate) async fn put(
         &self,
         tenant: &TenantContext,
@@ -283,6 +497,7 @@ impl SettingsService {
         value: &str,
     ) -> Result<SettingState, Error> {
         let setting = self.catalog.find(name)?;
+        let name = setting.name;
         let value = value.trim();
         if value.is_empty() || value.chars().count() > VALUE_MAX {
             return Err(Error::validation(vec![
@@ -294,6 +509,12 @@ impl SettingsService {
                 )
                 .with_param("value_max", VALUE_MAX),
             ]));
+        }
+        if let Some(check) = setting.check
+            && let Err(mut problem) = check(value)
+        {
+            problem.field = "value".to_owned();
+            return Err(Error::validation(vec![problem]));
         }
         let stored = if setting.secret {
             // Mã hoá TRƯỚC transaction: dẫn khoá có thể đọc database (khoá gốc giữ trong đó).
@@ -325,33 +546,42 @@ impl SettingsService {
             )
             .exec_without_returning(&transaction)
             .await?;
+        if let Some(former) = setting.former_name {
+            // Giá trị đặt dưới tên cũ đã được thay: bỏ dòng cũ để không còn hai dòng cho một cấu hình.
+            Entity::delete_many()
+                .filter(Column::Name.eq(former))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+        }
         let event = SettingChanged { name: name.to_owned(), set: true };
         self.outbox
             .record(&transaction, tenant, Actor::from(principal), Some(subject(name)), &event)
             .await?;
         transaction.commit().await?;
+        self.forget(tenant.id());
         tracing::info!(setting = name, tenant_id = %tenant.id(), "tenant setting changed");
         Ok(SettingState {
-            name: name.to_owned(),
-            description: setting.description.to_owned(),
-            secret: setting.secret,
             is_set: true,
             value: (!setting.secret).then(|| value.to_owned()),
             updated_at: Some(now),
+            ..state(&setting, None)
         })
     }
 
-    /// Bỏ cấu hình `name` của khách `tenant` (về cấu hình chung). Không có thì không đổi gì.
+    /// Bỏ cấu hình `name` của khách `tenant` (về cấu hình chung), kể cả giá trị đặt dưới tên cũ.
+    /// Không có thì không đổi gì.
     pub(crate) async fn delete(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         name: &str,
     ) -> Result<(), Error> {
-        self.catalog.find(name)?;
+        let setting = self.catalog.find(name)?;
+        let name = setting.name;
         let transaction = tenant.database().begin_write().await?;
         let deleted = Entity::delete_many()
-            .filter(Column::Name.eq(name))
+            .filter(Column::Name.is_in(std::iter::once(name).chain(setting.former_name)))
             .scoped(tenant)
             .exec(&transaction)
             .await?;
@@ -362,6 +592,7 @@ impl SettingsService {
                 .await?;
         }
         transaction.commit().await?;
+        self.forget(tenant.id());
         Ok(())
     }
 }
@@ -377,18 +608,17 @@ impl TenantSettings for SettingsService {
         tenant: &TenantContext,
         setting: &TenantSetting,
     ) -> Result<Option<SettingValue>, Error> {
-        let row = Entity::find()
-            .filter(Column::Name.eq(setting.name))
-            .scoped(tenant)
-            .one(tenant.database().read())
-            .await?;
-        let Some(row) = row else { return Ok(None) };
+        let rows = self.stored(tenant).await?;
+        // Dòng tên hiện tại, không có thì dòng tên cũ (khách đặt trước khi cấu hình đổi tên).
+        let Some(row) = setting.row_in(&rows) else {
+            return Ok(None);
+        };
         let value = if row.secret {
             let sealer = self.secret.sealer().await?;
             let plain = sealer.open(tenant.id(), PURPOSE, &row.name, &row.value)?;
             Zeroizing::new(String::from_utf8_lossy(&plain).into_owned())
         } else {
-            Zeroizing::new(row.value)
+            Zeroizing::new(row.value.clone())
         };
         Ok(Some(SettingValue { value, secret: row.secret }))
     }
@@ -406,19 +636,32 @@ pub(crate) struct SettingInput {
     value: String,
 }
 
+/// Which settings to list.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct SettingFilter {
+    /// Only settings of this group, e.g. `connection` (connections to partner services: mail
+    /// server, AI provider…). Omit for every setting; a group no setting is in gives an empty
+    /// list.
+    #[param(example = "connection")]
+    group: Option<String>,
+}
+
 /// List this tenant's settings.
 ///
 /// Requires `kernel.settings.manage`. Every setting the installed modules take per tenant, with
 /// whether this tenant has set it; unset ones use the server-wide configuration. Values of
-/// secret settings are never returned.
+/// secret settings are never returned. `?group=connection` lists only the connections to partner
+/// services, named `<module>.connection.<kind>.<field>`.
 #[utoipa::path(
     get,
     path = "/settings",
     extensions(("x-permissions" = json!(["kernel.settings.manage"]))),
     operation_id = "list_tenant_settings",
     security(("bearer" = [])),
+    params(SettingFilter),
     responses(
-        (status = 200, description = "Every setting, sorted by name.", body = Data<Vec<SettingState>>),
+        (status = 200, description = "Every setting (of the group, when one is given), sorted by name.", body = Data<Vec<SettingState>>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing permission `kernel.settings.manage`; code `permission_denied`.", body = Problem),
     )
@@ -427,15 +670,17 @@ async fn list_settings(
     State(service): State<Arc<SettingsService>>,
     tenant: TenantContext,
     principal: Principal,
+    Query(filter): Query<SettingFilter>,
 ) -> Result<Data<Vec<SettingState>>, Error> {
     principal.require(&SETTINGS_MANAGE)?;
-    Ok(Data { data: service.list(&tenant).await? })
+    Ok(Data { data: service.list(&tenant, filter.group.as_deref()).await? })
 }
 
 /// Set one of this tenant's settings.
 ///
 /// Requires `kernel.settings.manage`. Creates or replaces the value; sending it again is safe.
-/// A secret value is stored encrypted and the answer does not contain it.
+/// A secret value is stored encrypted and the answer does not contain it. The former name of a
+/// renamed setting is still accepted; the answer carries the current name.
 #[utoipa::path(
     put,
     path = "/settings/{name}",
@@ -491,12 +736,159 @@ async fn delete_setting(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// --- REST cho nhân sự nền tảng: cấu hình của một khách bất kỳ ------------------------------
+
+/// Thứ handler của nhân sự nền tảng cần: service và sổ database (tìm khách theo ID / slug).
+#[derive(Clone)]
+pub(crate) struct PlatformSettings {
+    service: Arc<SettingsService>,
+    registry: DatabaseRegistry,
+}
+
+impl PlatformSettings {
+    /// Khách `id_or_slug`. Đang dời: ghi lúc này sẽ vào database cũ → `tenant_moving`.
+    async fn tenant(&self, id_or_slug: &str, writing: bool) -> Result<TenantContext, Error> {
+        let tenant = match id_or_slug.parse::<uuid::Uuid>() {
+            Ok(id) => self.registry.tenant(TenantId::from_uuid(id)).await?,
+            Err(_) => self.registry.tenant_by_slug(id_or_slug).await?,
+        };
+        if writing && tenant.status() == TenantStatus::Moving {
+            return Err(super::errors::tenant_moving());
+        }
+        Ok(tenant)
+    }
+}
+
+/// List a tenant's settings (platform staff).
+///
+/// Requires `kernel.tenants.read` and an account of the platform tenant. Like
+/// `GET /api/v1/kernel/settings`, for the tenant in the path: every setting the installed modules
+/// take per tenant and whether that tenant has set it. Values of secret settings are never
+/// returned. `?group=connection` lists only the connections to partner services.
+#[utoipa::path(
+    get,
+    path = "/tenants/{id}/settings",
+    extensions(("x-permissions" = json!(["kernel.tenants.read"]))),
+    operation_id = "list_settings_of_tenant",
+    security(("bearer" = [])),
+    params(("id" = String, Path, description = "Id or slug of the tenant."), SettingFilter),
+    responses(
+        (status = 200, description = "Every setting (of the group, when one is given), sorted by name.", body = Data<Vec<SettingState>>),
+        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.tenants.read` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
+        (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
+    )
+)]
+async fn list_tenant_settings(
+    State(platform): State<PlatformSettings>,
+    principal: Principal,
+    Path(id): Path<String>,
+    Query(filter): Query<SettingFilter>,
+) -> Result<Data<Vec<SettingState>>, Error> {
+    principal.require(&super::TENANTS_READ)?;
+    super::require_platform(&principal)?;
+    let tenant = platform.tenant(&id, false).await?;
+    Ok(Data { data: platform.service.list(&tenant, filter.group.as_deref()).await? })
+}
+
+/// Set a setting of a tenant (platform staff).
+///
+/// Requires `kernel.tenants.manage` and an account of the platform tenant. Like
+/// `PUT /api/v1/kernel/settings/{name}`, for the tenant in the path: creates or replaces the
+/// value; sending it again is safe. The tenant's servers use the new value within
+/// `AUTOXIDE_TENANCY_CACHE_SECONDS`.
+#[utoipa::path(
+    put,
+    path = "/tenants/{id}/settings/{name}",
+    extensions(("x-permissions" = json!(["kernel.tenants.manage"]))),
+    operation_id = "set_setting_of_tenant",
+    security(("bearer" = [])),
+    params(
+        ("id" = String, Path, description = "Id or slug of the tenant."),
+        ("name" = String, Path, description = "Name of the setting, `<module>.<key>`, e.g. `comments.max_links`."),
+    ),
+    request_body = SettingInput,
+    responses(
+        (status = 200, description = "The setting as stored (without a secret value).", body = Data<SettingState>),
+        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.tenants.manage` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
+        (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
+        (status = 409, description = "The tenant is being moved to another placement; code `tenant_moving`.", body = Problem),
+        (status = 422, description = "No module takes this setting (code `tenant_setting_unknown`) or the value is not valid for it; see `errors`.", body = Problem),
+    )
+)]
+async fn set_tenant_setting(
+    State(platform): State<PlatformSettings>,
+    principal: Principal,
+    Path((id, name)): Path<(String, String)>,
+    crate::http::ValidJson(input): crate::http::ValidJson<SettingInput>,
+) -> Result<Data<SettingState>, Error> {
+    principal.require(&super::TENANTS_MANAGE)?;
+    super::require_platform(&principal)?;
+    let tenant = platform.tenant(&id, true).await?;
+    Ok(Data { data: platform.service.put(&tenant, &principal, &name, &input.value).await? })
+}
+
+/// Remove a setting of a tenant (platform staff).
+///
+/// Requires `kernel.tenants.manage` and an account of the platform tenant. The server-wide
+/// configuration applies to that tenant again. Removing a setting the tenant never set changes
+/// nothing.
+#[utoipa::path(
+    delete,
+    path = "/tenants/{id}/settings/{name}",
+    extensions(("x-permissions" = json!(["kernel.tenants.manage"]))),
+    operation_id = "delete_setting_of_tenant",
+    security(("bearer" = [])),
+    params(
+        ("id" = String, Path, description = "Id or slug of the tenant."),
+        ("name" = String, Path, description = "Name of the setting."),
+    ),
+    responses(
+        (status = 204, description = "The setting is unset (or never was)."),
+        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.tenants.manage` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
+        (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
+        (status = 409, description = "The tenant is being moved to another placement; code `tenant_moving`.", body = Problem),
+        (status = 422, description = "No module takes this setting; code `tenant_setting_unknown`.", body = Problem),
+    )
+)]
+async fn delete_tenant_setting(
+    State(platform): State<PlatformSettings>,
+    principal: Principal,
+    Path((id, name)): Path<(String, String)>,
+) -> Result<StatusCode, Error> {
+    principal.require(&super::TENANTS_MANAGE)?;
+    super::require_platform(&principal)?;
+    let tenant = platform.tenant(&id, true).await?;
+    platform.service.delete(&tenant, &principal, &name).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Route dưới `/api/v1/kernel`.
-pub(crate) fn routes(service: Arc<SettingsService>) -> OpenApiRouter {
+pub(crate) fn routes(service: Arc<SettingsService>, registry: DatabaseRegistry) -> OpenApiRouter {
+    let platform = PlatformSettings { service: service.clone(), registry };
     OpenApiRouter::new()
         .routes(routes!(list_settings))
         .routes(routes!(set_setting, delete_setting))
         .with_state(service)
+        .merge(
+            OpenApiRouter::new()
+                .routes(routes!(list_tenant_settings))
+                .routes(routes!(set_tenant_setting, delete_tenant_setting))
+                .with_state(platform),
+        )
+}
+
+// Đầu vào của tool `list_settings`: cùng bộ lọc với REST.
+/// Which settings to list.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListSettings {
+    /// Only settings of this group, e.g. `connection` (connections to partner services). Omit
+    /// for every setting.
+    #[schema(example = "connection")]
+    group: Option<String>,
 }
 
 /// Tool MCP — chỉ đọc; không có tool ghi secret (đặc tả 33).
@@ -505,10 +897,12 @@ pub(crate) fn tools(service: Arc<SettingsService>) -> Vec<Tool> {
         Tool::new(
             "list_settings",
             "List the settings of the current tenant: every setting the installed modules take \
-             per tenant, whether it is set, and its value unless it is secret.",
-            move |tenant: TenantContext, _principal: Principal, _: NoInput| {
+             per tenant, whether it is set, and its value unless it is secret. `group: \
+             \"connection\"` lists only the connections to partner services (mail server, AI \
+             provider…).",
+            move |tenant: TenantContext, _principal: Principal, filter: ListSettings| {
                 let service = service.clone();
-                async move { service.list(&tenant).await }
+                async move { service.list(&tenant, filter.group.as_deref()).await }
             },
         )
         .requires(SETTINGS_MANAGE)

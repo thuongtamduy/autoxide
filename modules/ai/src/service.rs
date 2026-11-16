@@ -1,9 +1,10 @@
 //! Lớp bọc chung quanh mọi nhà cung cấp — mỗi adapter không tự làm những việc này: tắt / bật,
 //! hạn mức, kiểm kết quả theo schema (thử lại một lần), cộng token, log, metrics.
 //!
-//! Theo khách (bước 33, D-275): hạn mức đếm theo khách; khách đặt khoá (`ai.api_key`) hay mô hình
-//! (`ai.model`) riêng thì lời gọi của khách đi bằng khoá / mô hình đó, cùng nhà cung cấp và địa chỉ
-//! máy chủ đã cấu hình.
+//! Theo khách (bước 33, D-275): hạn mức đếm theo khách; khách đặt khoá
+//! (`ai.connection.text.api_key`) hay mô hình (`ai.connection.text.model`) riêng thì lời gọi sinh
+//! chữ của khách đi bằng khoá / mô hình đó, cùng nhà cung cấp và địa chỉ máy chủ đã cấu hình. Tên
+//! theo quy ước kết nối đối tác; tên cũ `ai.api_key` / `ai.model` vẫn được nhận.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -13,7 +14,7 @@ use autoxide_kernel::ai::{
     Capabilities, EmbedKind, Embedder, Generation, Part, Prompt, TextModel, Usage, schema,
 };
 use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::{TenantContext, TenantSetting, TenantSettings};
+use autoxide_kernel::tenancy::{CONNECTION_GROUP, TenantContext, TenantSetting, TenantSettings};
 
 use crate::config::{Provider as ProviderKind, TextConfig};
 use crate::embedding::OpenAiEmbeddings;
@@ -22,19 +23,25 @@ use crate::providers::Provider;
 use crate::usage::UsageBook;
 
 /// Khoá API riêng của khách (lưu mã hoá, không bao giờ trả ra).
+// Loại kết nối `text`: khoá này chỉ dùng cho sinh chữ; embedding có cấu hình riêng
+// (`AUTOXIDE_EMBEDDING_…`), sau này cần theo khách thì thành `ai.connection.embedding.…`.
 pub(crate) const TENANT_API_KEY: TenantSetting = TenantSetting::new(
-    "ai.api_key",
+    "ai.connection.text.api_key",
     "API key this tenant's AI requests use (its own account with the provider the server is \
      set up for); unset: the server's key.",
 )
-.secret();
+.secret()
+.group(CONNECTION_GROUP)
+.formerly("ai.api_key");
 
-/// Mô hình riêng của khách.
+/// Mô hình riêng của khách. Cùng nhóm kết nối: mô hình là thứ chọn ở tài khoản của nhà cung cấp.
 pub(crate) const TENANT_MODEL: TenantSetting = TenantSetting::new(
-    "ai.model",
+    "ai.connection.text.model",
     "Model this tenant's AI requests use, from the provider the server is set up for; unset: the \
      server's model.",
-);
+)
+.group(CONNECTION_GROUP)
+.formerly("ai.model");
 
 /// Khoá / mô hình riêng của khách đè lên cấu hình chung.
 pub(crate) struct TenantOverride {

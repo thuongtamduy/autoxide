@@ -686,6 +686,10 @@ mặc định trên placement riêng — phủ chế độ `multi` cho mọi tes
 - **Gắn tên miền với nút.** `PATCH /api/v1/kernel/domains/{id} {org_id | null}` (`kernel.domains.manage`); `org_id`
   phải là nút của khách hiện tại (hỏi `OrgDirectory` của bước 34, chưa cài thì chỉ nhận `null`); event
   `kernel.domain_updated`. Tên miền đã `revoked` → 409 `kernel.domain_revoked`.
+  *Đã làm:* kernel hỏi qua trait hẹp `autoxide_kernel::tenancy::OrgNodes` (`has_node`) — module
+  `organizations` của bước 34 công bố nó cạnh `OrgDirectory` của mình; mã lỗi là `tenant_domain_revoked`
+  (mã lỗi của kernel không mang tiền tố, cùng họ `tenant_domain_*`; `kernel.domain_revoked` đã là tên event);
+  tool MCP `kernel.update_domain`.
 - **Tên setting của kết nối đối tác.** `TenantSetting` thêm `group: Option<&'static str>`; mọi cấu hình kết nối
   đối tác khai `group = "connection"` và đặt tên `<module>.connection.<loại>.<trường>` (trường bí mật đánh dấu
   secret, vào kho secret, không bao giờ trả lại). `GET /api/v1/kernel/settings?group=connection` là nguồn của màn
@@ -699,3 +703,9 @@ mặc định trên placement riêng — phủ chế độ `multi` cho mọi tes
   | Chi trả (payout) | 36 | `ledger.connection.payout.<mã>.credentials` (secret) |
   | Hoá đơn điện tử | 36 | `tax.connection.einvoice.provider`, `….einvoice.credentials` (secret), `….einvoice.serial` |
   | Hãng vận chuyển | 44 | không dùng setting: nhiều tài khoản mỗi hãng nên giữ bảng `shipping_carrier_accounts`; màn liệt kê thêm từ `GET /api/v1/shipping/carrier-accounts` |
+  | Máy chủ mail (SMTP) | 33 | `mail.connection.smtp.url` (secret), `….smtp.from` — tên cũ `mail.smtp_url`, `mail.from` vẫn nhận |
+  | Nhà cung cấp AI (sinh chữ) | 33 | `ai.connection.text.api_key` (secret), `….text.model` — tên cũ `ai.api_key`, `ai.model` vẫn nhận |
+
+  *Đã làm:* `TenantSetting::group(CONNECTION_GROUP)`; đổi tên bằng `TenantSetting::formerly(<tên cũ>)` (giá trị
+  đặt dưới tên cũ vẫn đọc được, không cần upgrade dữ liệu). `POST /kernel/settings/{name}/test` **chưa có** ở
+  bước này — thuộc bước 51.

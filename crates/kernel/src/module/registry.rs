@@ -71,6 +71,8 @@ pub struct Modules {
     /// Bộ tra DNS cho tên miền riêng của khách: bản một module công bố (`dyn DnsTxtLookup`), không
     /// thì bộ tra của hệ điều hành; điền sau khi mọi module khởi động.
     dns: crate::tenancy::domains::DnsSlot,
+    /// Cây tổ chức một module công bố (bước 34), điền sau khi mọi module khởi động.
+    orgs: crate::tenancy::domains::OrgSlot,
     /// Thứ việc dời khách cần (module, bảng mặt điều khiển, migration); điền sau khi mọi module
     /// khởi động.
     moves: crate::tenancy::moves::MoveSetup,
@@ -101,6 +103,7 @@ impl Modules {
         let settings = crate::tenancy::settings::Catalog::default();
         let seeds = crate::tenancy::admin::Seeds::default();
         let dns = crate::tenancy::domains::DnsSlot::default();
+        let orgs = crate::tenancy::domains::OrgSlot::default();
         let moves = crate::tenancy::moves::MoveSetup::default();
         let mut all: Vec<Box<dyn Module>> = vec![
             Box::new(crate::builtin::KernelModule::new(
@@ -112,6 +115,7 @@ impl Modules {
                 crate::tenancy::Slots {
                     seeds: seeds.clone(),
                     dns: dns.clone(),
+                    orgs: orgs.clone(),
                     moves: moves.clone(),
                 },
             )),
@@ -173,6 +177,7 @@ impl Modules {
                 keys,
                 seeds,
                 dns,
+                orgs,
                 moves,
                 tenancy: None,
             })
@@ -238,6 +243,7 @@ impl Modules {
             })?;
         }
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
+        self.orgs.fill(apis.get::<dyn crate::tenancy::OrgNodes>());
         // Nơi lưu chung và bộ mở nơi lưu riêng của placement (module `files` công bố).
         registry.use_storage(
             apis.get::<dyn crate::storage::Storage>(),

@@ -3,7 +3,9 @@
 //! người cài tự đối chiếu văn bản gốc cho trường hợp của mình.
 
 use autoxide_kernel::config::{ConfigReader, Invalid, Setting, parse_in_range};
+use autoxide_kernel::error::FieldError;
 use autoxide_kernel::i18n::Language;
+use autoxide_kernel::tenancy::TenantSetting;
 
 pub(crate) const MAX_SUBMISSION_BYTES: Setting = Setting::new(
     "AUTOXIDE_FORMS_MAX_SUBMISSION_BYTES",
@@ -43,6 +45,25 @@ pub(crate) const RETENTION_DAYS: Setting = Setting::new(
      deleted by hand). A form may set its own. Check what the law that applies to you asks.",
 )
 .with_default("0");
+
+/// Thời hạn giữ bài theo khách (đối chiếu thiết kế 2, A-b7): thay `AUTOXIDE_FORMS_RETENTION_DAYS`
+/// cho riêng khách; `retention_days` của từng form vẫn thắng.
+pub(crate) const TENANT_RETENTION_DAYS: TenantSetting = TenantSetting::new(
+    "forms.retention_days",
+    "Days a submission is kept before the daily job deletes it (0 to 36500; 0 keeps them until \
+     deleted by hand), instead of the server's AUTOXIDE_FORMS_RETENTION_DAYS. A form's own \
+     `retention_days` still wins.",
+)
+.checked(|raw| tenant_retention_days(raw).map(|_| ()));
+
+/// Giá trị của `forms.retention_days`.
+pub(crate) fn tenant_retention_days(raw: &str) -> Result<u32, FieldError> {
+    raw.trim().parse::<u32>().ok().filter(|days| *days <= 36_500).ok_or_else(|| {
+        FieldError::new("value", "range", "must be a whole number from {min} to {max}")
+            .with_param("min", 0)
+            .with_param("max", 36_500)
+    })
+}
 
 pub(crate) const SPAM_RETENTION_DAYS: Setting = Setting::new(
     "AUTOXIDE_FORMS_SPAM_RETENTION_DAYS",

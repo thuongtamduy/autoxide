@@ -92,6 +92,9 @@ async fn authenticate(
     next: Next,
 ) -> Response {
     let (mut parts, body) = request.into_parts();
+    // Mọi lệnh MCP là `POST`: khách chỉ đọc không bị chặn ở đây mà ở `call_tool`, theo cờ
+    // `read_only` của từng tool.
+    parts.extensions.insert(crate::tenancy::AllowedWhileReadOnly);
     let authenticated =
         Box::pin(crate::tenancy::request::authenticate(&authenticator, &mut parts)).await;
     // Khách của request (đặt vào extensions của request): tool nhận nó cùng người gọi.
@@ -287,6 +290,11 @@ impl ServerHandler for McpServer {
         }
         let arguments = request.arguments.map_or(Value::Null, Value::Object);
         metrics::counter!("mcp_tool_calls_total").increment(1);
+        // Khách chỉ đọc: tool đọc vẫn chạy, tool ghi nhận cùng lỗi như REST.
+        if tenant.read_only() && !tool.is_read_only() {
+            let error = crate::tenancy::errors::tenant_read_only();
+            return Ok(self.failure(tool.name(), &error, language).into());
+        }
         let mut result = match tool.call(tenant, principal, arguments).await {
             Ok(value) => CallToolResult::structured(envelope(value)),
             Err(error) => self.failure(tool.name(), &error, language),

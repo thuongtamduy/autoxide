@@ -15,7 +15,7 @@
 //! job, tool MCP) thêm một hàm vào [`Module`], luôn kèm cài đặt mặc định "không
 //! có gì" — module cũ không phải sửa khi hợp đồng thêm hàm mới.
 
-pub use crate::ops::client_config::ClientSection;
+pub use crate::ops::client_config::{ClientSection, TenantClientSection};
 use std::any::{Any, TypeId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -88,7 +88,9 @@ pub trait Module: Send + Sync {
 
     /// Cấu hình module nhận theo khách (D-258): tên `<module>.<khoá>`, đọc bằng
     /// `context.require::<dyn TenantSettings>()` (`autoxide_kernel::tenancy`). Khách chưa đặt thì
-    /// module dùng cấu hình chung. Mặc định rỗng.
+    /// module dùng cấu hình chung. Kết nối tới đối tác (máy chủ SMTP, cổng thanh toán…) khai
+    /// `.group(CONNECTION_GROUP)` và đặt tên `<module>.connection.<loại>.<trường>`; đổi tên một cấu
+    /// hình thì khai tên cũ bằng `.formerly(…)`. Mặc định rỗng.
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
         Vec::new()
     }
