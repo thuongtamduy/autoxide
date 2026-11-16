@@ -1,10 +1,11 @@
 # Lộ trình
 
-Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết
+Mỗi bước xong khi `./gate.sh --quick` xanh; agent đánh dấu `[x]`, commit, merge vào `main`. Gate đầy đủ (**cả SQLite
+và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–32 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 33 đang
-làm: nhóm A (nền kernel) và nhóm B (13 module theo khách) xong, nhóm C còn: đo đường nóng trước và sau, hướng dẫn viết module (EN + VI), changelog, gate đầy đủ rồi merge**; bước 50 chờ
+làm: nhóm A (nền kernel) và nhóm B (13 module theo khách) xong, nhóm C còn: đo đường nóng trước và sau, hướng dẫn viết module (EN + VI), changelog rồi merge**; bước 50 chờ
 chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai
 (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 

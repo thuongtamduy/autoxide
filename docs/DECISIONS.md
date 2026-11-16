@@ -7322,3 +7322,24 @@ tốn thêm một bộ `target/` (hơn 20 GB) và tranh CPU, lợi không rõ kh
 và Postgres của gate đầy đủ cùng lúc — máy 4 nhân đã chạy kín CPU, chưa đo được lợi.
 
 Bổ sung: D-173 (gate hai mức), D-263 (nhịp gate), D-172 (profile dev).
+
+## D-300 · Gate đầy đủ chỉ bắt buộc trước khi phát hành — 2026-11-16 — chủ dự án quyết
+
+Bối cảnh: chủ dự án thấy chờ gate đầy đủ (cả SQLite và Postgres) trước mỗi lần merge làm chậm việc, hỏi "khi nào phát
+triển xong hoặc khi phát hành một version mới thì mới gate full được không?". Agent nêu ba lựa chọn: giữ như cũ; merge
+trước rồi chạy gate đầy đủ ở nền, bắt buộc xanh khi đóng bước và khi phát hành; chỉ bắt buộc khi phát hành. Chủ dự án
+chọn **chỉ khi phát hành**.
+
+Quyết định:
+
+- Mỗi commit và mỗi lần merge vào `main` (kể cả khi đóng một bước): `./gate.sh --quick` xanh là đủ.
+- `./gate.sh` đầy đủ **bắt buộc xanh trước khi phát hành** (`docs/RELEASING.md`). Đỏ thì sửa, merge bản sửa, rồi mới
+  phát hành; không phát hành kèm lỗi. Agent vẫn được chạy gate đầy đủ bất cứ lúc nào máy rảnh.
+- Luật số một không đổi: tính năng chỉ đúng trên một database là chưa xong. Để lỗi Postgres không dồn tới lúc phát
+  hành: code chạm database thì chạy riêng bài test đó trên Postgres lúc viết (D-263 mục 1).
+
+Đánh đổi chủ dự án chấp nhận: `main` có thể có lỗi chỉ lộ trên Postgres giữa hai lần phát hành; lỗi dồn lại thì khó
+tìm commit gây ra hơn. Bản phát hành vẫn luôn xanh trên cả hai database.
+
+Thay: phần "chỉ merge vào `main` khi gate đầy đủ xanh" của D-173, D-248, D-263 (mục 3). Các ngoại lệ một lần D-273,
+D-295, D-298 không còn cần.

@@ -1,8 +1,9 @@
 # Phát hành một phiên bản
 
 Quy trình cho agent và chủ dự án (D-078). **Phát hành gom nhiều bước thành một bản lớn**
-(D-248, thay D-171): xong một bước thì chỉ merge vào `main` (gate đầy đủ xanh, PR merge kiểu
-rebase), không phát hành. Agent tự phát hành, không hỏi, khi xong trọn một **giai đoạn** của
+(D-248, thay D-171): xong một bước thì chỉ merge vào `main` (gate nhanh xanh, PR merge kiểu
+rebase), không phát hành. Gate đầy đủ (SQLite và Postgres) chỉ bắt buộc ở bước phát hành bên dưới
+(D-300): đỏ thì sửa trên nhánh làm việc, merge bản sửa, rồi mới phát hành. Agent tự phát hành, không hỏi, khi xong trọn một **giai đoạn** của
 `docs/ROADMAP.md` (A, B, C…: mọi bước của giai đoạn đã `[x]`). Ngoài lúc đó chỉ phát hành khi chủ
 dự án giao. Không phát hành giữa bước, không phát hành khi mục `[Unreleased]` của `CHANGELOG.md`
 trống.
