@@ -7192,3 +7192,10 @@ Chưa làm: `autoxide doctor` kiểm nơi lưu riêng của từng placement; `a
 - Bốn chỗ "core trả khác mô tả OpenAPI": sửa mô tả cho khớp giá trị (`LastDelivery.status` = `succeeded`,
   `post_path_prefix` không có `/`, `target_title` chỉ khi đích công khai) — giá trị không đổi nên không phá client;
   `Location` của `POST /kernel/tenants` vốn có `/api/v1`, thêm test giữ hành vi.
+
+## D-295 · Merge vào `main` trước khi gate đầy đủ chạy xong (một lần) — 2026-11-16 — chủ dự án quyết
+
+Chủ dự án bảo "merge luôn" để team giao diện dùng ngay các sửa của đợt yêu cầu web (D-294) và phần đa khách đã xong của
+bước 33, trong lúc `./gate.sh` đầy đủ còn đang chạy. Ngoại lệ một lần cho luật "chỉ merge khi gate đầy đủ xanh"
+(CLAUDE.md): mọi commit đã qua `./gate.sh --quick`; gate đầy đủ lần trước (sau phần B) xanh; test Postgres của kernel và
+app đã chạy cho C1, C2. Gate đầy đủ vẫn chạy tiếp; đỏ thì sửa ngay trên nhánh làm việc và merge bản sửa. Không phát hành.
