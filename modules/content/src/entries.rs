@@ -1110,6 +1110,14 @@ pub(crate) async fn subtree_height<C: ConnectionTrait>(
     }
 }
 
+/// Cùng nút (website) với `candidate`: mỗi website một bộ slug, một bộ đường dẫn (D-307).
+fn same_site(candidate: &Entry) -> sea_orm::Condition {
+    match candidate.org_id {
+        Some(org) => sea_orm::Condition::all().add(Column::OrgId.eq(org)),
+        None => sea_orm::Condition::all().add(Column::OrgId.is_null()),
+    }
+}
+
 /// Slug của `candidate` đã có mục khác dùng trong cùng phạm vi (ngôn ngữ, loại, cha).
 async fn slug_taken<C: ConnectionTrait>(
     connection: &C,
@@ -1121,6 +1129,7 @@ async fn slug_taken<C: ConnectionTrait>(
         .filter(Column::Locale.eq(candidate.locale.as_str()))
         .filter(Column::Kind.eq(candidate.kind.as_str()))
         .filter(Column::ParentKey.eq(candidate.parent_key))
+        .filter(same_site(candidate))
         .filter(Column::Slug.eq(candidate.slug.as_str()))
         .filter(Column::Id.ne(candidate.id))
         .one(connection)
@@ -1142,6 +1151,7 @@ async fn free_slug<C: ConnectionTrait>(
         .filter(Column::Locale.eq(candidate.locale.as_str()))
         .filter(Column::Kind.eq(candidate.kind.as_str()))
         .filter(Column::ParentKey.eq(candidate.parent_key))
+        .filter(same_site(candidate))
         .filter(Column::Id.ne(candidate.id))
         .filter(Column::Slug.eq(base).or(Column::Slug.starts_with(format!("{base}-"))))
         .into_tuple::<String>()

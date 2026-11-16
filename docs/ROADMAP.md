@@ -84,7 +84,7 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 - [x] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu để module áp
       cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè) — D-306; hồ sơ thuế, chính sách là cài
       đặt do module thuế / thương mại khai khi có
-- [ ] Ngôn ngữ bật theo website (D-305, cần cài đặt kế thừa ở mục trên): `content`, `menus` lấy danh sách ngôn ngữ của
+- [x] Ngôn ngữ bật theo website (D-305, D-307; cần cài đặt kế thừa ở mục trên): `content`, `menus` lấy danh sách ngôn ngữ của
       nút website thay cho cấu hình chung; đường dẫn công khai duy nhất theo website (hai cửa hàng cùng có `/about`);
       tìm theo ý nghĩa công khai lọc theo website
 - [ ] Đơn vị hành chính VN (module nền `address`, D-193) sau sáp nhập: tỉnh → xã / phường / đặc khu, 34 tỉnh,

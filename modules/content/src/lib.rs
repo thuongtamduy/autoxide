@@ -156,7 +156,9 @@ impl Module for ContentModule {
                 dependencies,
                 config,
             )
-            .with_translations(context.translations().clone()),
+            .with_translations(context.translations().clone())
+            // Tuỳ chọn: app đăng ký `organizations` trước `content`; test riêng của module thì không.
+            .with_orgs(context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok()),
         );
         context.personal_data(service.clone())?;
         context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;

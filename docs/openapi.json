@@ -35660,6 +35660,16 @@
             }
           },
           {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -35681,7 +35691,7 @@
                 }
               }
             },
-            "description": "The best results, best first."
+            "description": "The best results shown on the website, best first."
           },
           "404": {
             "content": {
@@ -35691,7 +35701,7 @@
                 }
               }
             },
-            "description": "Public search is off on this server; code `content.semantic_search_disabled`."
+            "description": "Public search is off on this server (`content.semantic_search_disabled`), or no such website (`site_not_found`)."
           },
           "422": {
             "content": {

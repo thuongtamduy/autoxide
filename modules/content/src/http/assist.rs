@@ -488,7 +488,7 @@ pub(crate) async fn search(
     Query(params): Query<SearchParams>,
 ) -> Result<Page<SearchHit>, Error> {
     let limit = params.limit;
-    let hits = service.search(&tenant, Some(&principal), &params.query()?, false).await?;
+    let hits = service.search(&tenant, Some(&principal), &params.query()?, None).await?;
     Ok(page_of(hits, limit))
 }
 
@@ -504,20 +504,21 @@ pub(crate) async fn search(
     extensions(("x-public" = json!(true))),
     operation_id = "search_public_content",
     security((), ("bearer" = [])),
-    params(SearchParams),
+    params(SearchParams, autoxide_kernel::tenancy::SiteQuery),
     responses(
-        (status = 200, description = "The best results, best first.", body = Page<SearchHit>),
-        (status = 404, description = "Public search is off on this server; code `content.semantic_search_disabled`.", body = Problem),
+        (status = 200, description = "The best results shown on the website, best first.", body = Page<SearchHit>),
+        (status = 404, description = "Public search is off on this server (`content.semantic_search_disabled`), or no such website (`site_not_found`).", body = Problem),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn public_search(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
+    site: autoxide_kernel::tenancy::Site,
     principal: Option<Principal>,
     Query(params): Query<SearchParams>,
 ) -> Result<Page<SearchHit>, Error> {
     let limit = params.limit;
-    let hits = service.search(&tenant, principal.as_ref(), &params.query()?, true).await?;
+    let hits = service.search(&tenant, principal.as_ref(), &params.query()?, Some(&site)).await?;
     Ok(page_of(hits, limit))
 }

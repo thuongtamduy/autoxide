@@ -389,7 +389,7 @@ pub(crate) async fn list_posts(
 ) -> Result<Response, Error> {
     let mut problems = Vec::new();
     let locale = service.check_locale(
-        &service.languages(&tenant).await?,
+        &service.site_languages(&tenant, &site).await?,
         Some(&query.locale),
         "locale",
         &mut problems,
@@ -719,13 +719,18 @@ pub(crate) async fn sitemap(
     Query(paging): Query<PageQuery>,
 ) -> Result<Response, Error> {
     let mut problems = Vec::new();
-    let languages = service.languages(&tenant).await?;
+    let languages = service.site_languages(&tenant, &site).await?;
     let locale = query
         .locale
         .as_deref()
         .map(|locale| service.check_locale(&languages, Some(locale), "locale", &mut problems));
     let page = page_request(paging, problems)?;
-    let found = service.sitemap(&tenant, &site, locale.as_deref(), &page).await?;
+    // Không nêu ngôn ngữ: mọi ngôn ngữ website này đưa ra (D-307).
+    let locales = match locale {
+        Some(locale) => vec![locale],
+        None => languages.locales.clone(),
+    };
+    let found = service.sitemap(&tenant, &site, Some(&locales), &page).await?;
     let mut translations = service.translations_of(&tenant, &found.data).await?;
     let page = found.map(|row| SitemapItem {
         translations: translations
@@ -780,7 +785,7 @@ pub(crate) async fn feed(
 ) -> Result<Response, Error> {
     let mut problems = Vec::new();
     let locale = service.check_locale(
-        &service.languages(&tenant).await?,
+        &service.site_languages(&tenant, &site).await?,
         Some(&query.locale),
         "locale",
         &mut problems,

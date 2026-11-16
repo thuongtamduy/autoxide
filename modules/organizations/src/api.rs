@@ -68,6 +68,18 @@ pub struct EffectiveSetting {
     pub inherited: bool,
 }
 
+impl EffectiveSetting {
+    /// Giá trị hiệu lực (cho cài đặt `OrgDirectory` giả trong test của module khác).
+    pub fn new(
+        key: impl Into<String>,
+        value: Option<serde_json::Value>,
+        source_unit_id: Option<OrgId>,
+        inherited: bool,
+    ) -> Self {
+        EffectiveSetting { key: key.into(), value, source_unit_id, inherited }
+    }
+}
+
 /// Tra nút của cây tổ chức.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.

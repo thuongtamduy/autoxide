@@ -408,7 +408,8 @@ impl ContentService {
                 paths::path_of(&transaction, tenant, &moved_entry, &self.config.post_path_prefix)
                     .await?
                     .map_err(|()| parent_not_published())?;
-            if paths::path_used(&transaction, tenant, &after.locale, &new, id).await? {
+            if paths::path_used(&transaction, tenant, after.org_id, &after.locale, &new, id).await?
+            {
                 return Err(path_taken(&new));
             }
             let mut row = old.clone().into_active_model();
@@ -463,7 +464,9 @@ impl ContentService {
         let path = paths::path_of(transaction, tenant, version, &self.config.post_path_prefix)
             .await?
             .map_err(|()| parent_not_published())?;
-        if paths::path_used(transaction, tenant, &version.locale, &path, version.id).await? {
+        if paths::path_used(transaction, tenant, version.org_id, &version.locale, &path, version.id)
+            .await?
+        {
             return Err(path_taken(&path));
         }
         let old = published::Entity::find()

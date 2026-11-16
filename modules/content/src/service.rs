@@ -13,6 +13,7 @@ use autoxide_kernel::event::Outbox;
 use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, TenantSettings, parsed_setting};
 use autoxide_media::api::Media;
+use autoxide_organizations::api::OrgDirectory;
 use chrono::{DateTime, SubsecRound, Utc};
 
 use crate::config::{self, ContentConfig, Languages};
@@ -36,6 +37,9 @@ pub(crate) struct ContentService {
     pub(crate) search_cache: crate::ai::semantic::SearchCache,
     /// Bản dịch của chương trình: câu kết quả kiểm SEO theo `Accept-Language` (D-264).
     pub(crate) translations: autoxide_kernel::i18n::Translations,
+    /// Cây tổ chức (module `organizations`): ngôn ngữ của từng website (D-307). `None` khi app
+    /// không đăng ký `organizations` (test của riêng module): mọi website dùng ngôn ngữ của khách.
+    pub(crate) orgs: Option<Arc<dyn OrgDirectory>>,
 }
 
 /// Những gì service dùng từ module khác.
@@ -45,6 +49,9 @@ pub(crate) struct Dependencies {
     pub embedder: Arc<dyn Embedder>,
     pub settings: Arc<dyn TenantSettings>,
 }
+
+/// Cài đặt ngôn ngữ của website, do module `organizations` khai.
+const SITE_LANGUAGES: &str = "organizations.languages";
 
 impl ContentService {
     pub(crate) fn new(
@@ -67,10 +74,39 @@ impl ContentService {
             settings,
             search_cache,
             translations: Default::default(),
+            orgs: None,
         }
     }
 
     /// Dịch câu kết quả kiểm SEO bằng `translations`.
+    pub(crate) fn with_orgs(mut self, orgs: Option<Arc<dyn OrgDirectory>>) -> Self {
+        self.orgs = orgs;
+        self
+    }
+
+    /// Ngôn ngữ website `site` đưa ra (D-307): cài đặt `organizations.languages` của nút website
+    /// (kế thừa theo cây), chỉ giữ ngôn ngữ khách viết được, ngôn ngữ đầu là mặc định. Không đặt,
+    /// hay website của cả khách: ngôn ngữ của khách.
+    pub(crate) async fn site_languages(
+        &self,
+        tenant: &TenantContext,
+        site: &autoxide_kernel::tenancy::Site,
+    ) -> Result<Languages, Error> {
+        let languages = self.languages(tenant).await?;
+        let Some(orgs) = self.orgs.as_ref() else { return Ok(languages) };
+        let setting = orgs.setting(tenant, site.org(), SITE_LANGUAGES).await?;
+        let wanted: Vec<String> = setting
+            .and_then(|setting| setting.value)
+            .and_then(|value| serde_json::from_value(value).ok())
+            .unwrap_or_default();
+        let locales: Vec<String> =
+            wanted.into_iter().filter(|locale| languages.locales.contains(locale)).collect();
+        Ok(match locales.first().cloned() {
+            Some(default) => Languages { locales, default },
+            None => languages,
+        })
+    }
+
     pub(crate) fn with_translations(
         mut self,
         translations: autoxide_kernel::i18n::Translations,

@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Websites of organization units have their own addresses and languages: two units can both
+  publish `/about` (the website shows the one of the nearest unit; slugs and addresses are unique
+  per unit), and the new setting `organizations.languages` (list, first is the default) sets the
+  languages a unit's website offers — used by the public endpoints of `content` (posts, resolve,
+  sitemap, feed, search) and `menus`. Public search (`GET /api/v1/content/public/search`) takes
+  `site` and shows only what that website shows.
+
 - `organizations`: settings that units inherit down the tree. `GET /api/v1/organizations/settings`
   lists them; `GET /api/v1/organizations/units/{id}/settings` gives the value in force at a unit and
   where it comes from (the unit, a unit above, or the default); `PUT` and `DELETE

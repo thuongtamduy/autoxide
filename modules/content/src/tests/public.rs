@@ -110,7 +110,7 @@ async fn bai_cong_khai_sitemap_feed() {
                 .sitemap(
                     &tenant,
                     &autoxide_kernel::tenancy::Site::whole(&tenant),
-                    Some("vi"),
+                    Some(&["vi".to_owned()]),
                     &PageRequest::first(50, Order::Asc)
                 )
                 .await
@@ -301,6 +301,121 @@ async fn bai_cua_cua_hang_a_khong_hien_tren_website_cua_cua_hang_b() {
         // Không nêu nút: nút duy nhất của người viết.
         let own = content.create(&tenant, &writer_b, post("Mine")).await.unwrap();
         assert_eq!(own.org_id, Some(shop_b.as_uuid()));
+    })
+    .await
+    .unwrap();
+}
+
+/// `OrgDirectory` giả: chỉ trả ngôn ngữ của website đã khai cho từng nút (D-307).
+struct SiteLanguages(std::collections::HashMap<autoxide_kernel::tenancy::OrgId, Vec<&'static str>>);
+
+#[async_trait::async_trait]
+impl autoxide_organizations::api::OrgDirectory for SiteLanguages {
+    async fn unit(
+        &self,
+        _: &TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<Option<autoxide_organizations::api::Unit>, autoxide_kernel::error::Error> {
+        Ok(None)
+    }
+    async fn root(
+        &self,
+        _: &TenantContext,
+    ) -> Result<autoxide_organizations::api::Unit, autoxide_kernel::error::Error> {
+        Err(autoxide_kernel::error::Error::internal("not used"))
+    }
+    async fn ancestors(
+        &self,
+        _: &TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<Vec<autoxide_organizations::api::Unit>, autoxide_kernel::error::Error> {
+        Ok(Vec::new())
+    }
+    async fn is_within(
+        &self,
+        _: &TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<bool, autoxide_kernel::error::Error> {
+        Ok(false)
+    }
+    async fn setting(
+        &self,
+        _: &TenantContext,
+        id: autoxide_kernel::tenancy::OrgId,
+        key: &str,
+    ) -> Result<Option<autoxide_organizations::api::EffectiveSetting>, autoxide_kernel::error::Error>
+    {
+        assert_eq!(key, "organizations.languages");
+        let value = self.0.get(&id).map(|locales| json!(locales));
+        Ok(Some(autoxide_organizations::api::EffectiveSetting::new(key, value, Some(id), false)))
+    }
+}
+
+/// Đường dẫn và ngôn ngữ theo website (D-307): cửa hàng A và cả chuỗi cùng có `/about` — website
+/// A thấy trang của A, website B thấy trang của chuỗi, sitemap không lặp đường dẫn; website A chỉ
+/// đưa tiếng Việt thì tiếng Anh bị từ chối trên A nhưng vẫn chạy trên B.
+#[tokio::test]
+async fn duong_dan_va_ngon_ngu_theo_website() {
+    use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, Site};
+
+    TestDatabase::run(async |test| {
+        let (content, _, database) = service(test, config(&[])).await;
+        let org = || OrgId::from_uuid(Uuid::now_v7());
+        let (shop_a, shop_b) = (org(), org());
+        let content = std::sync::Arc::new(std::sync::Arc::into_inner(content).unwrap().with_orgs(
+            Some(std::sync::Arc::new(SiteLanguages(
+                [(shop_a, vec!["vi", "fr"])].into_iter().collect(),
+            ))),
+        ));
+        let tenant = TenantContext::default_on(database.clone());
+        let write = database.begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, shop_a, root, 8).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, shop_b, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+        let ada = editor();
+        let about = async |org: Option<OrgId>, locale: &str| {
+            let mut new = page("About", None);
+            new.org_id = org.map(|org| org.as_uuid());
+            new.locale = Some(locale.to_owned());
+            let entry = content.create(&tenant, &ada, new).await.unwrap();
+            content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
+            entry
+        };
+        let chain = about(None, "vi").await;
+        let of_a = about(Some(shop_a), "vi").await;
+        assert_eq!(of_a.slug, "about", "website khác: cùng slug được");
+        // Cùng website (cả chuỗi) thì slug tự sinh tránh trùng.
+        let mut again = page("About", None);
+        again.locale = Some("vi".to_owned());
+        assert_eq!(content.create(&tenant, &ada, again).await.unwrap().slug, "about-2");
+
+        let site_a = Site::of(&tenant, shop_a).await.unwrap();
+        let site_b = Site::of(&tenant, shop_b).await.unwrap();
+        let shown = |resolved: crate::publishing::redirects::Resolved| match resolved {
+            crate::publishing::redirects::Resolved::Entry(row) => row.entry_id,
+            _ => panic!("không phải bài"),
+        };
+        let on_a = content.resolve(&tenant, &site_a, "vi", "/about").await.unwrap();
+        assert_eq!(shown(on_a), of_a.id, "nút gần website nhất thắng");
+        let on_b = content.resolve(&tenant, &site_b, "vi", "/about").await.unwrap();
+        assert_eq!(shown(on_b), chain.id);
+        let page_of = PageRequest::first(10, Order::Asc);
+        let map = content.sitemap(&tenant, &site_a, None, &page_of).await.unwrap().data;
+        let ids: Vec<Uuid> = map.iter().map(|row| row.entry_id).collect();
+        assert_eq!(ids, [of_a.id], "trang của chuỗi bị che trên website A");
+
+        // Ngôn ngữ: A đưa `vi`, `fr` (máy chủ chỉ bật `en`, `vi`) → còn `vi`, mặc định `vi`.
+        let languages = content.site_languages(&tenant, &site_a).await.unwrap();
+        assert_eq!(
+            (languages.locales.clone(), languages.default.clone()),
+            (vec!["vi".to_owned()], "vi".to_owned())
+        );
+        let refused = content.resolve(&tenant, &site_a, "en", "/about").await.unwrap_err();
+        assert_eq!(refused.code(), "validation_failed");
+        let b_languages = content.site_languages(&tenant, &site_b).await.unwrap();
+        assert_eq!(b_languages.locales, ["en", "vi"], "B không đặt: ngôn ngữ của khách");
     })
     .await
     .unwrap();

@@ -287,7 +287,9 @@ impl ContentService {
         let Some(from) = from.filter(|_| problems.is_empty()) else {
             return Err(invalid(problems));
         };
-        if paths::path_used(tenant.database().read(), tenant, &locale, &from, Uuid::nil()).await? {
+        if paths::path_used(tenant.database().read(), tenant, None, &locale, &from, Uuid::nil())
+            .await?
+        {
             return Err(Error::conflict(
                 "content.path_taken",
                 "A published entry is at `{path}`; a redirect there would never be used.",
@@ -375,7 +377,7 @@ impl ContentService {
         };
         let mut problems = Vec::new();
         let locale = self.check_locale(
-            &self.languages(tenant).await?,
+            &self.site_languages(tenant, site).await?,
             Some(locale),
             "locale",
             &mut problems,
@@ -389,13 +391,18 @@ impl ContentService {
         };
         let read = tenant.database().read();
         // Website (bước 34): chỉ bài của nút của website và của các nút cấp trên.
-        if let Some(found) = published::Entity::find()
+        // Nhiều nút trên chuỗi cùng có đường dẫn này (D-307): nút gần website nhất thắng.
+        let lineage = site.lineage_ids();
+        let found = published::Entity::find()
             .scoped(tenant)
             .filter(published::Column::Locale.eq(locale.as_str()))
             .filter(published::Column::Path.eq(path.as_str()))
-            .filter(published::Column::OrgId.is_in(site.lineage_ids()))
-            .one(read)
-            .await?
+            .filter(published::Column::OrgId.is_in(lineage.clone()))
+            .all(read)
+            .await?;
+        if let Some(found) = lineage
+            .iter()
+            .find_map(|org| found.iter().find(|row| row.org_id == Some(*org)).cloned())
         {
             return Ok(Resolved::Entry(Box::new(found)));
         }

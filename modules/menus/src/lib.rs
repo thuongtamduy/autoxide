@@ -99,6 +99,8 @@ impl Module for MenusModule {
             // Không có `content` thì không có menu cũ để nhập: module vẫn chạy, chỉ lệnh nhập báo
             // không có nguồn.
             legacy: context.require::<dyn LegacyMenus>().ok(),
+            // Tuỳ chọn như `legacy`: không có `organizations` thì mọi website dùng cấu hình chung.
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
         };
         let service = Arc::new(MenuService::new(context.outbox()?, dependencies, config));
         self.service = Some(service);

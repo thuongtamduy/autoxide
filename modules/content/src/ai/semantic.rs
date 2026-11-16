@@ -384,8 +384,10 @@ impl ContentService {
         tenant: &TenantContext,
         principal: Option<&Principal>,
         query: &SearchQuery,
-        public: bool,
+        site: Option<&autoxide_kernel::tenancy::Site>,
     ) -> Result<Vec<Hit>, Error> {
+        // `site`: tìm công khai trên website đó (chỉ bài hiện trên website, D-307); `None`: bản nháp.
+        let public = site.is_some();
         if public {
             if !self.config.public_semantic_search {
                 return Err(Error::not_found(
@@ -414,12 +416,12 @@ impl ContentService {
                     .with_param("limit_max", LIMIT_MAX),
             );
         }
-        let locale = self.check_locale(
-            &self.languages(tenant).await?,
-            query.locale.as_deref(),
-            "locale",
-            &mut problems,
-        );
+        let languages = match site {
+            Some(site) => self.site_languages(tenant, site).await?,
+            None => self.languages(tenant).await?,
+        };
+        let locale =
+            self.check_locale(&languages, query.locale.as_deref(), "locale", &mut problems);
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
@@ -473,6 +475,18 @@ impl ContentService {
                 .map(|row| row.id)
                 .collect();
             hits.retain(|hit| permitted.contains(&hit.entry_id));
+        }
+        if let Some(site) = site {
+            let shown: std::collections::HashSet<Uuid> = published::Entity::find()
+                .filter(crate::publishing::reading::on_site(&site.lineage_ids()))
+                .filter(published::Column::EntryId.is_in(hits.iter().map(|hit| hit.entry_id)))
+                .scoped(tenant)
+                .all(tenant.database().read())
+                .await?
+                .into_iter()
+                .map(|row| row.entry_id)
+                .collect();
+            hits.retain(|hit| shown.contains(&hit.entry_id));
         }
         hits.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.entry_id.cmp(&b.entry_id)));
         hits.truncate(limit as usize);

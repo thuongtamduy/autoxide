@@ -69,7 +69,9 @@ creating it (omitted: the website of the whole tenant). `menus.read` and `menus.
 scope of the role, so a store manages only its own menus. The public endpoint picks the website
 from the domain (a domain bound to a unit) or `?site=<unit id>`, and returns that website's menu —
 or, when it has none with this key, the menu of the nearest website above (the whole tenant's
-menu is the default for every store).
+menu is the default for every store). The languages of a website's menus are the setting
+`organizations.languages` of its unit (the first is its default), kept to the server's
+`AUTOXIDE_MENUS_LOCALES`; unset, the server's.
 
 ## On the website
 

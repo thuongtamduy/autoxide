@@ -8,7 +8,7 @@ use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
 use super::*;
 use crate::ai::semantic::SearchQuery;
 use crate::testing::service_with;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{Site, TenantContext};
 
 async fn rows_of(database: &Database, entry_id: Uuid) -> u64 {
     use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
@@ -60,22 +60,31 @@ async fn tim_theo_y_nghia_va_theo_chu() {
         assert_eq!(embedder.calls(), calls);
 
         // Khớp cả ý nghĩa lẫn chữ.
-        let hits = content.search(&tenant, Some(&ada), &query("đà lạt"), false).await.unwrap();
+        let hits = content.search(&tenant, Some(&ada), &query("đà lạt"), None).await.unwrap();
         assert_eq!(hits[0].entry_id, dalat.id);
         assert_eq!(hits[0].matched_by, ["meaning", "text"]);
         assert!(hits[0].similarity.unwrap() > 0.0);
         assert_eq!(hits[0].status.as_deref(), Some("draft"));
         // Không chứa nguyên cụm chữ, nhưng gần về ý nghĩa.
         let hits =
-            content.search(&tenant, Some(&ada), &query("hoa nở ở đà lạt"), false).await.unwrap();
+            content.search(&tenant, Some(&ada), &query("hoa nở ở đà lạt"), None).await.unwrap();
         assert_eq!((hits[0].entry_id, hits[0].matched_by.clone()), (dalat.id, vec!["meaning"]));
         assert!(hits[0].snippet.contains("dã quỳ"));
 
         // Công khai: chỉ bản đã đăng, kèm đường dẫn.
-        assert!(content.search(&tenant, None, &query("đà lạt"), true).await.unwrap().is_empty());
+        assert!(
+            content
+                .search(&tenant, None, &query("đà lạt"), Some(&Site::whole(&tenant)))
+                .await
+                .unwrap()
+                .is_empty()
+        );
         content.publish(&tenant, &ada, dalat.id, None, None, false).await.unwrap();
         content.index_entry(&tenant, dalat.id).await.unwrap();
-        let public = content.search(&tenant, None, &query("đà lạt"), true).await.unwrap();
+        let public = content
+            .search(&tenant, None, &query("đà lạt"), Some(&Site::whole(&tenant)))
+            .await
+            .unwrap();
         assert_eq!(public.len(), 1);
         assert_eq!(
             (public[0].path.as_deref(), public[0].status.clone()),
@@ -84,14 +93,14 @@ async fn tim_theo_y_nghia_va_theo_chu() {
 
         // Kiểm đầu vào; cần quyền đọc.
         let bad = SearchQuery { q: " ".into(), limit: Some(51), ..Default::default() };
-        let error = content.search(&tenant, Some(&ada), &bad, false).await.unwrap_err();
+        let error = content.search(&tenant, Some(&ada), &bad, None).await.unwrap_err();
         assert_eq!(
             error.fields().iter().map(|f| f.field.as_str()).collect::<Vec<_>>(),
             ["q", "limit"]
         );
         assert_eq!(
             content
-                .search(&tenant, Some(&user(&["write"])), &query("x"), false)
+                .search(&tenant, Some(&user(&["write"])), &query("x"), None)
                 .await
                 .unwrap_err()
                 .code(),
@@ -121,17 +130,14 @@ async fn nhieu_may_chu_va_doi_mo_hinh() {
         let a =
             first.create(&tenant, &ada, vi_post("Phở Hà Nội", "Nước dùng trong.")).await.unwrap();
         first.index_entry(&tenant, a.id).await.unwrap();
-        assert_eq!(
-            second.search(&tenant, Some(&ada), &query("phở"), false).await.unwrap().len(),
-            1
-        );
+        assert_eq!(second.search(&tenant, Some(&ada), &query("phở"), None).await.unwrap().len(), 1);
         // Máy chủ thứ nhất thêm mục: máy thứ hai (đã nạp vào bộ nhớ) thấy nhờ `version`.
         let b = first
             .create(&tenant, &ada, vi_post("Bún chả", "Phở và bún chả là món Hà Nội."))
             .await
             .unwrap();
         first.index_entry(&tenant, b.id).await.unwrap();
-        let hits = second.search(&tenant, Some(&ada), &query("phở hà nội"), false).await.unwrap();
+        let hits = second.search(&tenant, Some(&ada), &query("phở hà nội"), None).await.unwrap();
         assert_eq!(hits.iter().filter(|hit| hit.matched_by.contains(&"meaning")).count(), 2);
 
         // Hai job lập index cùng mục chạy cùng lúc: cuối cùng mỗi đoạn một dòng.
@@ -163,13 +169,17 @@ async fn embedding_tat_chi_tim_theo_chu() {
         let dalat = content.create(&tenant, &ada, vi_post("Đà Lạt mùa hoa", "Hoa.")).await.unwrap();
         content.index_entry(&tenant, dalat.id).await.unwrap();
         assert_eq!(content.catch_up_embeddings(&database).await.unwrap(), 0);
-        let hits = content.search(&tenant, Some(&ada), &query("da lat"), false).await.unwrap();
+        let hits = content.search(&tenant, Some(&ada), &query("da lat"), None).await.unwrap();
         assert_eq!(
             (hits.len(), hits[0].matched_by.clone(), hits[0].similarity),
             (1, vec!["text"], None)
         );
         assert_eq!(
-            content.search(&tenant, None, &query("da lat"), true).await.unwrap_err().code(),
+            content
+                .search(&tenant, None, &query("da lat"), Some(&Site::whole(&tenant)))
+                .await
+                .unwrap_err()
+                .code(),
             "content.semantic_search_disabled"
         );
     })

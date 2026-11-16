@@ -38,7 +38,12 @@ async fn cai_dat_ke_thua_theo_cay() {
             .collect();
         assert_eq!(
             keys,
-            ["organizations.currency", "organizations.language", "organizations.timezone"]
+            [
+                "organizations.currency",
+                "organizations.language",
+                "organizations.languages",
+                "organizations.timezone"
+            ]
         );
 
         // Chưa ai đặt: mặc định, không có nút nguồn.

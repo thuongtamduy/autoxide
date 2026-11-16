@@ -160,7 +160,7 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
             .await
             .unwrap();
         content.index_entry(&b, in_b.id).await.unwrap();
-        let hits = content.search(&b, Some(&ada), &query("hoa đà lạt"), false).await.unwrap();
+        let hits = content.search(&b, Some(&ada), &query("hoa đà lạt"), None).await.unwrap();
         assert_eq!(hits[0].entry_id, in_b.id);
         assert_eq!(content.search_cache.cached_version(b.id(), Scope::Draft, "vi"), Some(1));
 
@@ -168,10 +168,10 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
         let in_a =
             content.create(&a, &ada, vi_post("Học Rust", "Ownership và lifetime.")).await.unwrap();
         content.index_entry(&a, in_a.id).await.unwrap();
-        let hits = content.search(&a, Some(&ada), &query("hoa đà lạt"), false).await.unwrap();
+        let hits = content.search(&a, Some(&ada), &query("hoa đà lạt"), None).await.unwrap();
         assert!(hits.iter().all(|hit| hit.entry_id == in_a.id), "{hits:?}");
         assert!(hits.iter().all(|hit| hit.entry_id != in_b.id));
-        let hits = content.search(&a, Some(&ada), &query("ownership"), false).await.unwrap();
+        let hits = content.search(&a, Some(&ada), &query("ownership"), None).await.unwrap();
         assert_eq!(hits[0].entry_id, in_a.id);
         assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));
 
@@ -182,7 +182,7 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
         };
         content.update(&b, &ada, in_b.id, changes, false, None).await.unwrap();
         content.index_entry(&b, in_b.id).await.unwrap();
-        let hits = content.search(&b, Some(&ada), &query("mùa mưa"), false).await.unwrap();
+        let hits = content.search(&b, Some(&ada), &query("mùa mưa"), None).await.unwrap();
         assert_eq!(hits[0].entry_id, in_b.id);
         assert_eq!(content.search_cache.cached_version(b.id(), Scope::Draft, "vi"), Some(2));
         assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));

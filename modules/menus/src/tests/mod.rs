@@ -213,6 +213,7 @@ pub(crate) async fn harness(test: &TestDatabase) -> Harness {
         resources: directory(),
         media: Arc::new(FakeMedia),
         legacy: Some(legacy.clone()),
+        orgs: None,
     };
     let service =
         MenuService::new(Outbox::standalone("menus"), dependencies, MenusConfig::default());

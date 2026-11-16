@@ -175,7 +175,8 @@ impl MenuService {
         now: DateTime<Utc>,
     ) -> Result<Arc<Ready>, Error> {
         let mut problems = Vec::new();
-        let locale = self.check_locale(locale, &mut problems);
+        let (locales, default) = self.site_locales(tenant, site).await?;
+        let locale = crate::service::check_locale(&locales, &default, locale, &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -188,7 +189,7 @@ impl MenuService {
         let found = match self.find_by_key(tenant, site, key, &locale).await? {
             Some(found) => found,
             None => self
-                .find_by_key(tenant, site, key, &self.config.default_locale)
+                .find_by_key(tenant, site, key, &default)
                 .await?
                 .ok_or_else(|| public_not_found(key, &locale))?,
         };

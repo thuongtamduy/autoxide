@@ -541,3 +541,81 @@ async fn lenh_nhap_theo_khach() {
     .await
     .unwrap();
 }
+
+/// `OrgDirectory` giả: ngôn ngữ của website đã khai cho từng nút (D-307).
+struct SiteLanguages(autoxide_kernel::tenancy::OrgId, Vec<&'static str>);
+
+#[async_trait::async_trait]
+impl autoxide_organizations::api::OrgDirectory for SiteLanguages {
+    async fn unit(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<Option<autoxide_organizations::api::Unit>, autoxide_kernel::error::Error> {
+        Ok(None)
+    }
+    async fn root(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+    ) -> Result<autoxide_organizations::api::Unit, autoxide_kernel::error::Error> {
+        Err(autoxide_kernel::error::Error::internal("not used"))
+    }
+    async fn ancestors(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<Vec<autoxide_organizations::api::Unit>, autoxide_kernel::error::Error> {
+        Ok(Vec::new())
+    }
+    async fn is_within(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<bool, autoxide_kernel::error::Error> {
+        Ok(false)
+    }
+    async fn setting(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        id: autoxide_kernel::tenancy::OrgId,
+        key: &str,
+    ) -> Result<Option<autoxide_organizations::api::EffectiveSetting>, autoxide_kernel::error::Error>
+    {
+        let value = (id == self.0).then(|| serde_json::json!(self.1));
+        Ok(Some(autoxide_organizations::api::EffectiveSetting::new(key, value, Some(id), false)))
+    }
+}
+
+/// Website chỉ đưa tiếng Việt (D-307): menu công khai mặc định tiếng Việt, tiếng Anh bị từ chối
+/// trên website đó; website của cả khách vẫn theo cấu hình máy chủ.
+#[tokio::test]
+async fn ngon_ngu_cua_menu_theo_website() {
+    use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, Site};
+    TestDatabase::run(async |test| {
+        let harness = harness(test).await;
+        let shop = OrgId::from_uuid(Uuid::now_v7());
+        let mut service = std::sync::Arc::try_unwrap(harness.service).ok().unwrap();
+        service.orgs = Some(std::sync::Arc::new(SiteLanguages(shop, vec!["vi"])));
+        let t = &harness.tenant;
+        let write = harness.database.begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, shop, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+        for locale in ["en", "vi"] {
+            service
+                .create(t, &admin(), menu("main", locale, vec![link(locale, "/")]))
+                .await
+                .unwrap();
+        }
+        let site = Site::of(t, shop).await.unwrap();
+        let ready = service.public_menu(t, &site, "main", None, Utc::now()).await.unwrap();
+        assert_eq!(ready.menu.locale, "vi", "mặc định của website");
+        let refused = service.public_menu(t, &site, "main", Some("en"), Utc::now()).await;
+        assert_eq!(refused.unwrap_err().kind(), ErrorKind::Validation);
+        let whole = service.public_menu(t, &Site::whole(t), "main", None, Utc::now()).await;
+        assert_eq!(whole.unwrap().menu.locale, "en");
+    })
+    .await
+    .unwrap();
+}

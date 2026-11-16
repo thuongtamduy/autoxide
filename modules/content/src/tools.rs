@@ -553,7 +553,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                         kind: None,
                         limit: input.limit,
                     };
-                    let hits = service.search(&tenant, Some(&principal), &query, false).await?;
+                    let hits = service.search(&tenant, Some(&principal), &query, None).await?;
                     Ok::<Vec<SearchHit>, Error>(hits.into_iter().map(SearchHit::from).collect())
                 }
             },

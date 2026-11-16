@@ -9107,7 +9107,7 @@ export interface paths {
   "/api/v1/content/public/search": {
     /** Search published posts and pages by meaning and words (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page"; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page"; limit?: number; site?: string }; };
       responses: {
         200: Page_SearchHit;
         404: Problem;

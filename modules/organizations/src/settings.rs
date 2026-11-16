@@ -44,8 +44,33 @@ pub(crate) const LANGUAGE: OrgSetting = OrgSetting::new(
 .with_default("\"en\"")
 .checked(language);
 
+/// Ngôn ngữ website của nút đưa ra (D-307): `content`, `menus` đọc qua `OrgDirectory::setting`.
+pub(crate) const LANGUAGES: OrgSetting = OrgSetting::new(
+    "organizations.languages",
+    "Languages the unit's website offers, the first being its default, as a list of BCP 47 codes \
+     (e.g. `[\"vi\", \"en\"]`). Unset: the tenant's languages. Content written in other languages \
+     is not shown on that website.",
+)
+.checked(languages);
+
 pub(crate) fn all() -> Vec<OrgSetting> {
-    vec![TIMEZONE, CURRENCY, LANGUAGE]
+    vec![TIMEZONE, CURRENCY, LANGUAGE, LANGUAGES]
+}
+
+fn languages(value: &Value) -> Result<Value, String> {
+    let wrong = || "must be a non-empty list of language codes like `vi` or `pt-BR`".to_owned();
+    let items = value.as_array().filter(|items| !items.is_empty()).ok_or_else(wrong)?;
+    let mut found: Vec<String> = Vec::new();
+    for item in items {
+        let code = item
+            .as_str()
+            .and_then(|raw| autoxide_kernel::i18n::canonical_locale(raw.trim()))
+            .ok_or_else(wrong)?;
+        if !found.contains(&code) {
+            found.push(code);
+        }
+    }
+    Ok(Value::from(found))
 }
 
 fn text(value: &Value) -> Result<&str, String> {

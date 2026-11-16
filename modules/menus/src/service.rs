@@ -51,6 +51,8 @@ pub(crate) struct Dependencies {
     pub media: Arc<dyn Media>,
     /// Menu cũ của `content`, khi có module đó (lệnh nhập, D-238).
     pub legacy: Option<Arc<dyn LegacyMenus>>,
+    /// Cây tổ chức: ngôn ngữ của từng website (D-307). `None`: app không có `organizations`.
+    pub orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
 }
 
 pub(crate) struct MenuService {
@@ -58,6 +60,7 @@ pub(crate) struct MenuService {
     pub(crate) resources: ResourceDirectory,
     pub(crate) media: Arc<dyn Media>,
     pub(crate) legacy: Option<Arc<dyn LegacyMenus>>,
+    pub(crate) orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
     pub(crate) config: MenusConfig,
     pub(crate) cache: PublicCache,
 }
@@ -69,6 +72,7 @@ impl MenuService {
             resources: dependencies.resources,
             media: dependencies.media,
             legacy: dependencies.legacy,
+            orgs: dependencies.orgs,
             config,
             cache: PublicCache::default(),
         }
@@ -392,19 +396,31 @@ impl MenuService {
 
     /// Ngôn ngữ đã chuẩn hoá; không gửi thì ngôn ngữ mặc định.
     pub(crate) fn check_locale(&self, raw: Option<&str>, problems: &mut Vec<FieldError>) -> String {
-        let Some(raw) = raw else {
-            return self.config.default_locale.clone();
-        };
-        match canonical_locale(raw.trim()).filter(|locale| self.config.locales.contains(locale)) {
-            Some(locale) => locale,
-            None => {
-                problems.push(
-                    FieldError::new("locale", "locale_not_supported", "must be one of: {allowed}")
-                        .with_param("allowed", self.config.locales.join(", ")),
-                );
-                self.config.default_locale.clone()
-            }
-        }
+        check_locale(&self.config.locales, &self.config.default_locale, raw, problems)
+    }
+
+    /// Ngôn ngữ website `site` đưa ra và ngôn ngữ mặc định của nó (D-307): cài đặt
+    /// `organizations.languages` của nút website, chỉ giữ ngôn ngữ máy chủ bật; không đặt, hay
+    /// không còn ngôn ngữ nào: cấu hình của máy chủ.
+    pub(crate) async fn site_locales(
+        &self,
+        tenant: &TenantContext,
+        site: &Site,
+    ) -> Result<(Vec<String>, String), Error> {
+        let fallback = (self.config.locales.clone(), self.config.default_locale.clone());
+        let Some(orgs) = self.orgs.as_ref() else { return Ok(fallback) };
+        let wanted: Vec<String> = orgs
+            .setting(tenant, site.org(), "organizations.languages")
+            .await?
+            .and_then(|setting| setting.value)
+            .and_then(|value| serde_json::from_value(value).ok())
+            .unwrap_or_default();
+        let locales: Vec<String> =
+            wanted.into_iter().filter(|locale| self.config.locales.contains(locale)).collect();
+        Ok(match locales.first().cloned() {
+            Some(default) => (locales, default),
+            None => fallback,
+        })
     }
 
     /// Đích và ô gợi ý của mọi mục: loại đã đăng ký, đối tượng có thật (khi `check_exists`),
@@ -570,4 +586,26 @@ fn menu_exists(key: &str, locale: &str) -> Error {
     )
     .with_param("key", key)
     .with_param("locale", locale)
+}
+
+/// `raw` đã chuẩn hoá nếu nằm trong `locales`; không gửi thì `default`; sai thì thêm lỗi.
+pub(crate) fn check_locale(
+    locales: &[String],
+    default: &str,
+    raw: Option<&str>,
+    problems: &mut Vec<FieldError>,
+) -> String {
+    let Some(raw) = raw else {
+        return default.to_owned();
+    };
+    match canonical_locale(raw.trim()).filter(|locale| locales.contains(locale)) {
+        Some(locale) => locale,
+        None => {
+            problems.push(
+                FieldError::new("locale", "locale_not_supported", "must be one of: {allowed}")
+                    .with_param("allowed", locales.join(", ")),
+            );
+            default.to_owned()
+        }
+    }
 }

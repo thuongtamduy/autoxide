@@ -7528,3 +7528,29 @@ Quyết định:
 Đã cân nhắc: một cột JSON "settings" trên bảng nút — không kiểm được từng key, không biết ai đổi gì; bảng cài đặt
 riêng ở mỗi module — lặp lại cách kế thừa ở mọi module; tính sẵn giá trị hiệu lực cho mọi nút con — phải tính lại
 khi dời nút hay đổi ở nút cha, trong khi đọc chuỗi tổ tiên đã có index.
+
+## D-307 · Đường dẫn và ngôn ngữ riêng theo website (bước 34) — 2026-11-16 — agent quyết
+
+Bối cảnh: D-305 để lại ba việc: ngôn ngữ bật theo website, đường dẫn công khai duy nhất theo website, tìm theo ý
+nghĩa công khai lọc theo website.
+
+Quyết định:
+
+1. **Ngôn ngữ của website là cài đặt kế thừa theo cây** `organizations.languages` (danh sách mã BCP 47, ngôn ngữ đầu là
+   mặc định; D-306). `organizations` khai vì nhiều module dùng chung (`content`, `menus`, sau này `storefront`);
+   mỗi module chỉ giữ ngôn ngữ nó hỗ trợ (`content`: ngôn ngữ của khách; `menus`: `AUTOXIDE_MENUS_LOCALES`), không
+   còn thì dùng cấu hình chung. Chỉ áp cho đọc công khai; viết bài vẫn theo ngôn ngữ của khách (bài của trụ sở
+   hiện ở nhiều website, mỗi website lấy phần ngôn ngữ của mình).
+2. **`content` và `menus` lấy `dyn OrgDirectory` tuỳ chọn** (`require(...).ok()`, như `LegacyMenus`): app luôn có
+   `organizations`; test riêng của module không cần. Hàm chuẩn hoá mã ngôn ngữ chuyển vào kernel
+   (`i18n::canonical_locale`), ba module dùng chung.
+3. **Đường dẫn và slug duy nhất theo nút**: unique của `content_published` thành `(tenant_id, org_id, locale, path)`,
+   của `content_entries` thành `(tenant_id, org_id, locale, kind, parent_key, slug)` (migration `m0013_site_paths`).
+   Chuyển hướng giữ cấp khách (một chuyển hướng áp cho mọi website).
+4. **Nút gần website nhất thắng**: giải đường dẫn lấy bài của nút gần nhất trên chuỗi; danh sách bài, sitemap,
+   feed, tìm công khai bỏ bài bị một bài cùng ngôn ngữ, cùng đường dẫn ở nút gần hơn che — một điều kiện SQL
+   (`NOT EXISTS` theo từng nút trên chuỗi, chuỗi ≤ độ sâu tối đa của cây), chạy như nhau trên hai database.
+5. Tìm công khai (`/public/search`) nhận `site` như các endpoint công khai khác.
+
+Đã cân nhắc: cài đặt ngôn ngữ riêng của từng module (`content.locales` theo nút) — hai module phải đặt hai lần
+cho một website; giữ đường dẫn duy nhất cả khách — hai cửa hàng không cùng có `/about`, trái mô hình nhiều cửa hàng.

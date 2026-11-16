@@ -179,7 +179,16 @@ shows).
 Each unit can have a website: its domain bound to the unit (`PATCH /api/v1/kernel/domains/{id}`
 with `org_id`), or `?site=<unit id>` on the public endpoints. A website shows the entries of its
 unit and of every unit above it — head-office posts appear on every store's website, a store's
-posts never on another store's. Addresses stay unique in the whole tenant.
+posts never on another store's.
+
+Each website has its own addresses and slugs: two stores can both have `/about`. When a unit and
+a unit above it both publish the same address, the website shows the one nearest to it (the
+store's `/about` hides the head office's on the store's website; the sitemap lists it once). The
+languages a website offers are the setting `organizations.languages` of its unit
+(`PUT /api/v1/organizations/units/{id}/settings/organizations.languages` with `["vi", "en"]`; the
+first is its default), kept to the tenant's languages; unset, the tenant's languages. Public
+reads, the sitemap, the feed and public search follow the website's languages and show only what
+the website shows.
 
 ## The website: public endpoints
 
