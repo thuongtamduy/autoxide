@@ -60,6 +60,16 @@ có mã riêng: `menus.ref_unknown_kind` (không module nào cung cấp loại �
 AI agent làm cùng các việc đó qua MCP: `menus.list_menus`, `menus.get_menu` (trả `version`), `menus.create_menu`,
 `menus.replace_menu_items` (cần `version`), `menus.delete_menu`.
 
+## Menu của từng website
+
+Ở khách có cây tổ chức (module `organizations`), menu thuộc một website: `org_id` khi tạo (bỏ trống:
+website của cả khách). `menus.read` và `menus.manage` áp theo độ sâu của role, nên mỗi cửa hàng chỉ
+quản lý menu của mình. Endpoint công khai chọn website theo tên miền (tên miền gắn với một nút) hay
+`?site=<id của nút>`, và trả menu của website đó — không có menu cùng khoá thì lấy menu của website
+cấp trên gần nhất (menu của cả khách là mặc định cho mọi cửa hàng). Ngôn ngữ menu của một website
+là cài đặt `organizations.languages` của nút đó (ngôn ngữ đầu là mặc định), chỉ giữ ngôn ngữ máy chủ
+bật ở `AUTOXIDE_MENUS_LOCALES`; không đặt thì theo máy chủ.
+
 ## Trên website
 
 ```

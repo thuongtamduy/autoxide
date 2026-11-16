@@ -29,7 +29,9 @@ use crate::module::is_identifier;
 use crate::tenancy::TenantContext;
 
 pub use dispatcher::{Dispatcher, MAX_ATTEMPTS};
-pub use migration::{outbox_actor_migration, outbox_migration, tenant_table};
+pub use migration::{
+    outbox_access_migration, outbox_actor_migration, outbox_migration, tenant_table,
+};
 pub use outbox::Outbox;
 
 /// Một loại event, khai bởi module phát nó.
@@ -92,6 +94,9 @@ pub struct Actor {
     /// Người lạ chưa đăng nhập (gửi form, đăng ký bản tin, bình luận của khách) — khác hệ
     /// thống, dù cả hai đều không có `user_id`.
     pub public: bool,
+    /// Đường người làm vào khách (bước 34): trực tiếp, uỷ quyền từ khách cha, hay quyền vào hỗ
+    /// trợ của nhân sự nền tảng — audit của khách thấy ai vào bằng đường nào.
+    pub access: crate::access::AccessPath,
 }
 
 impl Actor {
@@ -107,7 +112,12 @@ impl Actor {
 
     /// User `user_id` acting through API key `api_key_id`.
     pub const fn api_key(user_id: Uuid, api_key_id: Uuid) -> Self {
-        Actor { user_id: Some(user_id), api_key_id: Some(api_key_id), public: false }
+        Actor {
+            user_id: Some(user_id),
+            api_key_id: Some(api_key_id),
+            public: false,
+            access: crate::access::AccessPath::Direct,
+        }
     }
 
     /// Người lạ chưa đăng nhập.
@@ -133,6 +143,7 @@ impl From<&crate::access::Principal> for Actor {
             user_id: Some(principal.user_id()),
             api_key_id: principal.api_key_id(),
             public: false,
+            access: principal.access(),
         }
     }
 }
@@ -338,10 +349,7 @@ mod tests {
         let key = Uuid::now_v7();
         let principal = crate::access::Principal::new(user, []).via_api_key(key);
 
-        assert_eq!(
-            Actor::from(&principal),
-            Actor { user_id: Some(user), api_key_id: Some(key), public: false }
-        );
+        assert_eq!(Actor::from(&principal), Actor::api_key(user, key));
         assert_eq!(Actor::system().user_id, None);
     }
 }

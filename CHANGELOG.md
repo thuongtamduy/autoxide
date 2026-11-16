@@ -11,6 +11,78 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `address`: the official list of administrative units shared by every tenant
+  (Vietnam after the 2025 merger: provinces and communes, no districts), imported from the
+  official source with `autoxide task address.import path=<dir>` (a new list closes and opens
+  units by date; importing again changes nothing); public `GET /api/v1/address/provinces`,
+  `/provinces/{code}/communes`, `/units`, `/units/{code}` (search without accents, `ETag`, one-day
+  cache), `POST /api/v1/address/validate`; MCP tools; `autoxide doctor` shows the list in use. See
+  `docs/ADDRESS.md`. Ships the Vietnamese list in force from 2025-07-01 (34 provinces, 3,321 communes):
+  import it with `autoxide task address.import`.
+- `organizations`: public profile of a unit — `GET`/`PATCH /api/v1/organizations/units/{id}/public-profile`
+  (`organizations.profile.manage`): shown or not, display name, checked address, opening hours,
+  special days, pickup, cover image; public `GET /api/v1/organizations/public/stores` (`ETag`);
+  object type `organizations.store` for website menus; event `organizations.public_profile_updated`.
+
+- `auth`: platform staff enter a tenant's data only with a time-limited support access grant
+  (D-190): `POST`/`GET /api/v1/auth/support-grants`, `DELETE /api/v1/auth/support-grants/{id}`
+  (`auth.support.grant`, platform tenant), `GET /api/v1/auth/support-access`,
+  `DELETE /api/v1/auth/support-access/{id}` for the tenant (`auth.support_access.read`,
+  `auth.support_access.revoke`), setting `auth.support_access`, `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS`;
+  events `auth.support_access_granted`, `started`, `revoked` in the tenant's audit log.
+
+- `auth`: invite people by email with roles at a unit — `GET`/`POST /api/v1/auth/invitations`,
+  `DELETE /api/v1/auth/invitations/{id}`, `POST /api/v1/auth/invitations/{id}/resend`,
+  `POST /api/v1/auth/invitations/accept` (permission `auth.invitations.manage`; settings
+  `AUTOXIDE_AUTH_INVITATION_URL`, `AUTOXIDE_AUTH_INVITATION_DAYS`), MCP tools
+  `auth.create_invitation`, `auth.list_invitations`, `auth.revoke_invitation`, and the command
+  `autoxide user invite --email … --role … [--org …] [--tenant …]`. Events
+  `auth.invitation_created`, `auth.invitation_accepted`, `auth.invitation_revoked`.
+
+- `auth`: sign in with a link sent by email (off by default: `AUTOXIDE_AUTH_LOGIN_LINK`,
+  `AUTOXIDE_AUTH_LOGIN_LINK_URL`, `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES`) — `POST /api/v1/auth/login/link`
+  (same answer whether or not the email exists; optional `bind_device`) and
+  `POST /api/v1/auth/login/link/confirm` (two-step sign-in still applies). Event
+  `auth.login_link_used`; sessions show `sign_in_method: email_link`.
+
+- `auth`: customer accounts (`realm: customer`) separate from staff in each tenant — register and
+  sign in with `"realm": "customer"` (setting `auth.customer_registration` per tenant), no
+  permission; `GET /api/v1/auth/customers`, `GET`/`PATCH /api/v1/auth/customers/{id}`
+  (`auth.customers.read`, `auth.customers.manage`). Password reset takes `realm`.
+- `auth`: delegation down a chain of tenants — `GET`/`POST /api/v1/auth/delegations`,
+  `DELETE /api/v1/auth/delegations/{id}` (`auth.delegations.read`, `auth.delegations.manage`): holders
+  of a parent's role work in a child with the header `Autoxide-Tenant`; `GET /api/v1/auth/me/tenants`
+  lists where you can work. Events and the audit log record how the person came in
+  (`actor_access`: `direct`, `delegation`, `support`). For module authors: every module's events
+  table gets the migration `outbox_access_migration`; `Authenticator::enter` decides who may enter
+  another tenant.
+
+- `auth`: `POST /api/v1/auth/me/reauth` gives a short-lived, single-use confirmation token (by
+  password, authenticator code, passkey or a mail) that sensitive changes accept as `reauth_token`
+  instead of `current_password` — creating an API key, changing the email, turning on two-step
+  sign-in, adding a passkey, deleting the account (new setting `AUTOXIDE_AUTH_REAUTH_MINUTES`).
+  `PATCH /api/v1/auth/me` changes your name, preferred language and time zone; `GET /api/v1/auth/me`
+  gives `locale`, `time_zone` and `mfa_required`. Roles take `requires_mfa` (also the built-in
+  `admin` role): their permissions apply only once the account has two-step sign-in. Mails sent
+  later use the preferred language.
+
+- Websites of organization units have their own addresses and languages: two units can both
+  publish `/about` (the website shows the one of the nearest unit; slugs and addresses are unique
+  per unit), and the new setting `organizations.languages` (list, first is the default) sets the
+  languages a unit's website offers — used by the public endpoints of `content` (posts, resolve,
+  sitemap, feed, search) and `menus`. Public search (`GET /api/v1/content/public/search`) takes
+  `site` and shows only what that website shows.
+
+- `organizations`: settings that units inherit down the tree. `GET /api/v1/organizations/settings`
+  lists them; `GET /api/v1/organizations/units/{id}/settings` gives the value in force at a unit and
+  where it comes from (the unit, a unit above, or the default); `PUT` and `DELETE
+  /api/v1/organizations/units/{id}/settings/{key}` set and clear one (new permission
+  `organizations.settings.write`, new event `organizations.setting_changed`; MCP tools
+  `organizations.get_settings`, `organizations.set_setting`). Three settings to start:
+  `organizations.timezone` (IANA, default `UTC`), `organizations.currency` (ISO 4217) and
+  `organizations.language` (`en`, `vi`; default `en`). For module authors: `Module::org_settings`
+  declares more, `OrgDirectory::setting` reads the value in force.
+
 - `auth`: `GET /api/v1/auth/users` takes `status` (`active`, `disabled`) and `include=roles` (each user's roles in
   the same answer); every user carries `has_password`, `mfa_enabled` and `last_sign_in_at`. `GET /api/v1/auth/me`
   gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);
@@ -154,11 +226,54 @@ endpoints are marked deprecated with a sunset date first.
   writes of a user of each kind. Results before and after tenancy are in `docs/BENCHMARKS.md`.
 - Module guide (`docs/MODULE_GUIDE.md`): a section on tenants — how to classify tables, filter every query with
   `.scoped`, seed a new tenant, read per-tenant settings and write the leak test.
+- Organization tree of each tenant (new module `organizations`): unit types the tenant names itself
+  (`GET`, `POST /api/v1/organizations/unit-types`, `PUT`, `DELETE /api/v1/organizations/unit-types/{code}`) and units
+  under a root that has the id of the tenant (`GET`, `POST /api/v1/organizations/units`, `GET`, `PATCH
+  /api/v1/organizations/units/{id}`, `GET …/{id}/ancestors`, `POST …/{id}/move`, `POST …/{id}/status`). A unit is
+  `pending`, `active`, `suspended` or `archived`; while a unit is not active, nothing can be written to it or to any
+  unit below it. The tree is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (default 8). New permissions
+  `organizations.units.read`, `organizations.units.write`, `organizations.units.manage` (scoped) and
+  `organizations.types.manage`; MCP tools `organizations.list_units`, `get_unit`, `create_unit`, `update_unit`,
+  `move_unit`, `change_unit_status`; events `organizations.unit_created`, `unit_updated`, `unit_moved`,
+  `unit_status_changed`, `unit_type_changed`. Other modules read units through `autoxide_organizations::api::OrgDirectory`.
+- For module authors: permissions with a depth. `Permission::scoped()` marks a permission on data that belongs to a
+  unit; a role grants it with a scope `own`, `unit`, `subtree` or `tenant` (`autoxide_kernel::access::Scope`).
+  `Principal::scope_condition(&permission, org_column, owner_column)` limits a list, `require_at` checks one record
+  and `require_write_at` also refuses a unit that is not active (`org_frozen`). `Principal::with_grants`,
+  `with_fence` (an API key bound to a unit), `customer` (an account without permissions), `realm`, `access`. The
+  structure of the tree is in the kernel: `autoxide_kernel::tenancy::{OrgTree, nearest, root_of}`. New error codes
+  `org_out_of_scope`, `org_frozen`, `org_not_found`, `org_cycle`, `org_depth_exceeded`, `org_root_immutable`. Testkit:
+  `TestApp::builder(…).member(token, user, org, &[(permission, scope)])`.
+- `auth`: people work in organization units. `GET`, `PUT /api/v1/auth/users/{id}/memberships` (the units a user works
+  in and the roles there), `GET /api/v1/auth/memberships` (filter by `org_id`, `role_id`, `user_id`; `inherited=true`
+  also counts memberships on the units above), `GET /api/v1/auth/me/memberships`; MCP tools `auth.list_memberships`,
+  `auth.set_memberships`; event `auth.memberships_changed`. Roles take `grants: [{permission, scope}]` next to
+  `permissions` (scope `own`, `unit`, `subtree` or `tenant`) and return both; `GET /api/v1/auth/permissions` gives
+  `scoped`. An API key can be bound to a unit (`org_id`): it then acts only on that unit and the units below it.
+  Existing roles, role assignments and keys keep their meaning (the whole tenant); `PUT /users/{id}/roles` sets the
+  roles at the root unit.
+- Content, media, forms and menus per organization unit and website. Entries, media items and menus belong to a unit
+  (`org_id` when creating; existing data belongs to the root), forms may (`null`: the whole tenant). Their permissions
+  follow the scope of the role; data outside the scope answers 404. Admin lists filter by `owner_org` (and entries by
+  `site`). Public endpoints (`/api/v1/content/public/resolve`, `/posts`, `/sitemap`, `/feed`,
+  `/api/v1/menus/public/{key}`) serve the website of the request: a domain bound to a unit, or `?site=<unit id>`;
+  a website shows the content of its unit and of the units above it, and the menu of the nearest website that has one.
+  New error codes `site_not_found`, `invalid_site`. For module authors: `autoxide_kernel::tenancy::{Site, SiteQuery}`,
+  `Principal::home_org`, `OrgTree::ensure_writable_unlocked`.
+- For module authors (testkit): `branch_leak_check(&app, token, marker, ids)` — the leak test between two sibling
+  units of one tenant: a person of one branch calls every `GET` and read-only MCP tool and must see nothing of the
+  other. Module guide: a section "Data of organization units" (`org_id`, `.scoped()`, `scope_condition`,
+  `require_write_at`, inherited settings, the branch leak test).
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 
 ### Changed
 
+- `notes` (the example module) keeps its notes per organization unit: each note has `org_id` (existing notes belong to
+  the root unit), `notes.read` and `notes.write` follow the scope of the role (`own`: only your own notes — what they
+  meant before; `unit`, `subtree`; `tenant`: every note), and creating a note takes `org_id` (`notes.org_required`
+  when you work in several units and give none). A role that grants `notes.read` for the whole tenant now sees every
+  note of the tenant: give it with scope `own` to keep personal notes.
 - The `detail` of some errors no longer names an endpoint: it says what the user can do (`auth.wrong_password`,
   `auth.password_already_set`, the token errors of `auth`, `media.item_in_trash`…). Which endpoint to call is in the
   description of the response in `docs/openapi.json`. Codes are unchanged.

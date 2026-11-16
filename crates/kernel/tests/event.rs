@@ -49,6 +49,8 @@ impl Module for Notes {
                 "m0003_tenancy",
                 vec![autoxide_kernel::event::tenant_table("notes")],
             ),
+            // Đường người làm vào khách (bước 34, D-310).
+            autoxide_kernel::event::outbox_access_migration("k0001_event_access", "notes"),
         ]
     }
 

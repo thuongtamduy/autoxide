@@ -133,9 +133,43 @@ use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 #[derive(Debug, Clone, Default)]
 pub(crate) struct PostFilter {
     pub locale: String,
+    /// Website (bước 34): nút của website và các nút cấp trên — chỉ bài của các nút này.
+    pub site: Vec<Uuid>,
     pub term_id: Option<Uuid>,
     pub author_id: Option<Uuid>,
     pub search: Option<String>,
+}
+
+/// Bản công khai hiện trên website có chuỗi nút `lineage` (gần nhất trước, D-307): của một nút
+/// trên chuỗi, và không bị một bài cùng ngôn ngữ, cùng đường dẫn ở nút GẦN website hơn che (hai
+/// nút cùng có `/about` thì website chỉ thấy một). Một điều kiện SQL, không đổ dòng ra bộ nhớ.
+pub(crate) fn on_site(lineage: &[Uuid]) -> sea_orm::Condition {
+    use sea_orm::sea_query::{Alias, Expr, ExprTrait, Query};
+    let mut any = sea_orm::Condition::any();
+    for (at, org) in lineage.iter().enumerate() {
+        let mut here = sea_orm::Condition::all().add(published::Column::OrgId.eq(*org));
+        let nearer = &lineage[..at];
+        if !nearer.is_empty() {
+            let shadow = Alias::new("shadow");
+            let same = |column: published::Column| {
+                Expr::col((shadow.clone(), column)).equals((published::Entity, column))
+            };
+            let mut covered = Query::select();
+            covered
+                .expr(Expr::val(1))
+                .from_as(published::Entity, shadow.clone())
+                .and_where(same(published::Column::TenantId))
+                .and_where(same(published::Column::Locale))
+                .and_where(same(published::Column::Path))
+                .and_where(
+                    Expr::col((shadow.clone(), published::Column::OrgId))
+                        .is_in(nearer.iter().copied()),
+                );
+            here = here.add(Expr::exists(covered).not());
+        }
+        any = any.add(here);
+    }
+    any
 }
 
 impl ContentService {
@@ -149,7 +183,8 @@ impl ContentService {
         let mut select = published::Entity::find()
             .scoped(tenant)
             .filter(published::Column::Kind.eq("post"))
-            .filter(published::Column::Locale.eq(filter.locale.as_str()));
+            .filter(published::Column::Locale.eq(filter.locale.as_str()))
+            .filter(on_site(&filter.site));
         if let Some(term) = filter.term_id {
             select = select.filter(crate::taxonomy::terms::published_has_term(tenant, term));
         }
@@ -178,12 +213,14 @@ impl ContentService {
     pub(crate) async fn sitemap(
         &self,
         tenant: &TenantContext,
-        locale: Option<&str>,
+        site: &autoxide_kernel::tenancy::Site,
+        locales: Option<&[String]>,
         page: &PageRequest,
     ) -> Result<Page<Published>, Error> {
-        let mut select = published::Entity::find().scoped(tenant);
-        if let Some(locale) = locale {
-            select = select.filter(published::Column::Locale.eq(locale));
+        let mut select =
+            published::Entity::find().scoped(tenant).filter(on_site(&site.lineage_ids()));
+        if let Some(locales) = locales {
+            select = select.filter(published::Column::Locale.is_in(locales.iter().cloned()));
         }
         fetch_page(
             select,
@@ -199,10 +236,15 @@ impl ContentService {
     pub(crate) async fn feed(
         &self,
         tenant: &TenantContext,
+        site: &autoxide_kernel::tenancy::Site,
         locale: &str,
         limit: u32,
     ) -> Result<Vec<Published>, Error> {
-        let filter = PostFilter { locale: locale.to_owned(), ..Default::default() };
+        let filter = PostFilter {
+            locale: locale.to_owned(),
+            site: site.lineage_ids(),
+            ..Default::default()
+        };
         let page = PageRequest::first(limit, autoxide_kernel::pagination::Order::Desc);
         Ok(self.public_posts(tenant, &filter, &page).await?.data)
     }

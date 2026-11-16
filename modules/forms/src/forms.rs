@@ -3,11 +3,11 @@
 
 pub(crate) mod fields;
 
-use autoxide_kernel::access::Principal;
+use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -102,6 +102,8 @@ pub(crate) fn scope(key: &str) -> String {
 /// Các trường sửa được; `None` giữ nguyên (khi tạo: giá trị mặc định).
 #[derive(Debug, Clone, Default)]
 pub(crate) struct FormInput {
+    /// Nút sở hữu form (chỉ khi tạo); `None`: form của cả khách.
+    pub org_id: Option<Uuid>,
     pub key: Option<String>,
     pub name: Option<String>,
     pub status: Option<FormStatus>,
@@ -137,9 +139,11 @@ impl FormsService {
             }
         }
         let now = now();
+        let org_id = input.org_id;
         let blank = form::Model {
             id: Uuid::now_v7(),
             tenant_id: tenant.id().as_uuid(),
+            org_id,
             key: String::new(),
             name: String::new(),
             status: FormStatus::Open.as_str().to_owned(),
@@ -166,6 +170,10 @@ impl FormsService {
             return Err(Error::validation(problems));
         }
         let transaction = tenant.database().begin_write().await?;
+        // Form của nút: cần `forms.manage` ở nút đó (nút đang khoá thì từ chối); form của cả khách:
+        // cần nó cho cả khách.
+        let at = OrgTarget::new(org_id.map_or(root_of(tenant.id()), OrgId::from_uuid), None);
+        principal.require_write_at(&transaction, &FORMS_MANAGE, at).await?;
         if key_taken(&transaction, tenant, &candidate.row.key, None).await? {
             return Err(key_conflict(&candidate.row.key));
         }
@@ -202,7 +210,53 @@ impl FormsService {
         id: Uuid,
     ) -> Result<Form, Error> {
         principal.require(&FORMS_READ)?;
-        self.find_form(tenant, id).await
+        let form = self.find_form(tenant, id).await?;
+        self.check_form(tenant, principal, &FORMS_READ, &form.row).await?;
+        Ok(form)
+    }
+
+    /// `permission` phủ form `form_id` (bài gửi, bản xuất của form đó); không có hay không phủ →
+    /// 404 `forms.not_found`.
+    pub(crate) async fn check_form_id(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        permission: &autoxide_kernel::access::Permission,
+        form_id: Uuid,
+    ) -> Result<(), Error> {
+        let row = form::Entity::find_by_id(form_id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(form_not_found)?;
+        self.check_form(tenant, principal, permission, &row).await
+    }
+
+    /// Việc trên dữ liệu của cả khách (vd mọi bài gửi của một email): cần `permission` cho cả
+    /// khách, không chỉ một nhánh.
+    pub(crate) async fn require_whole_tenant(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        permission: &autoxide_kernel::access::Permission,
+    ) -> Result<(), Error> {
+        let at = OrgTarget::new(root_of(tenant.id()), None);
+        principal.require_at(tenant.database().read(), permission, at).await
+    }
+
+    /// `permission` phủ form `row`; không phủ → như không có form (404, không lộ form tồn tại).
+    pub(crate) async fn check_form(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        permission: &autoxide_kernel::access::Permission,
+        row: &form::Model,
+    ) -> Result<(), Error> {
+        let read = tenant.database().read();
+        match principal.require_at(read, permission, form_target(tenant, row)).await {
+            Err(error) if error.code() == "org_out_of_scope" => Err(form_not_found()),
+            other => other,
+        }
     }
 
     pub(crate) async fn find_form(&self, tenant: &TenantContext, id: Uuid) -> Result<Form, Error> {
@@ -235,10 +289,16 @@ impl FormsService {
         tenant: &TenantContext,
         principal: &Principal,
         status: Option<FormStatus>,
+        owner_org: Option<Uuid>,
         page: &PageRequest,
     ) -> Result<Page<Form>, Error> {
         principal.require(&FORMS_READ)?;
-        let mut select = form::Entity::find().scoped(tenant);
+        // Form của cả khách (`org_id` NULL) chỉ hiện với người có quyền cho cả khách.
+        let scope = principal.scope_condition(&FORMS_READ, form::Column::OrgId, None)?;
+        let mut select = form::Entity::find().filter(scope).scoped(tenant);
+        if let Some(org) = owner_org {
+            select = select.filter(form::Column::OrgId.eq(org));
+        }
         if let Some(status) = status {
             select = select.filter(form::Column::Status.eq(status.as_str()));
         }
@@ -263,6 +323,7 @@ impl FormsService {
     ) -> Result<Form, Error> {
         principal.require(&FORMS_MANAGE)?;
         let before = self.find_form(tenant, id).await?;
+        self.check_form(tenant, principal, &FORMS_MANAGE, &before.row).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -287,6 +348,9 @@ impl FormsService {
         }
         candidate.row.updated_at = now;
         let transaction = tenant.database().begin_write().await?;
+        principal
+            .require_write_at(&transaction, &FORMS_MANAGE, form_target(tenant, &before.row))
+            .await?;
         if candidate.row.key != before.row.key
             && key_taken(&transaction, tenant, &candidate.row.key, Some(id)).await?
         {
@@ -349,10 +413,14 @@ impl FormsService {
     ) -> Result<(), Error> {
         principal.require(&FORMS_MANAGE)?;
         let before = self.find_form(tenant, id).await?;
+        self.check_form(tenant, principal, &FORMS_MANAGE, &before.row).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
         let transaction = tenant.database().begin_write().await?;
+        principal
+            .require_write_at(&transaction, &FORMS_MANAGE, form_target(tenant, &before.row))
+            .await?;
         let deleted = form::Entity::delete_many()
             .scoped(tenant)
             .filter(form::Column::Id.eq(id))
@@ -601,6 +669,11 @@ pub(crate) fn normalize_origin(raw: &str) -> Option<String> {
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '[' | ']'));
     valid.then_some(lower)
+}
+
+/// Đích kiểm quyền của form: nút của nó, form của cả khách là nút gốc.
+pub(crate) fn form_target(tenant: &TenantContext, row: &form::Model) -> OrgTarget {
+    OrgTarget::new(row.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid), None)
 }
 
 #[cfg(test)]

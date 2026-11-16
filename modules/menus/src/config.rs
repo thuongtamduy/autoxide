@@ -77,30 +77,7 @@ impl MenusConfig {
 /// Mã ngôn ngữ BCP 47 dạng chuẩn (`vi`, `pt-BR`, `zh-Hant-TW`); `None` nếu sai dạng. Cùng luật
 /// với `content`, để menu nhập từ `content` giữ nguyên mã.
 pub(crate) fn canonical_locale(raw: &str) -> Option<String> {
-    let mut parts = raw.split(['-', '_']);
-    let language = parts.next()?.to_ascii_lowercase();
-    if !(2..=3).contains(&language.len()) || !language.chars().all(|c| c.is_ascii_alphabetic()) {
-        return None;
-    }
-    let mut out = vec![language];
-    for part in parts {
-        let part = if part.len() == 4 && part.chars().all(|c| c.is_ascii_alphabetic()) {
-            let mut chars = part.chars();
-            let first = chars.next()?.to_ascii_uppercase();
-            format!("{first}{}", chars.as_str().to_ascii_lowercase())
-        } else if part.len() == 2 && part.chars().all(|c| c.is_ascii_alphabetic()) {
-            part.to_ascii_uppercase()
-        } else if part.len() == 3 && part.chars().all(|c| c.is_ascii_digit()) {
-            part.to_owned()
-        } else {
-            return None;
-        };
-        out.push(part);
-    }
-    if out.len() > 3 {
-        return None;
-    }
-    Some(out.join("-"))
+    autoxide_kernel::i18n::canonical_locale(raw)
 }
 
 #[cfg(test)]

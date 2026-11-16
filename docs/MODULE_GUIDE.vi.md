@@ -165,6 +165,56 @@ assert_eq!(leaks, Vec::<String>::new());
 
 `cursor_leak_check` làm như vậy với con trỏ pagination. Xem `modules/comments/src/http/tests.rs`.
 
+### Dữ liệu theo nút
+
+Trong một khách, người làm việc ở các nút của cây tổ chức (trụ sở → vùng → cửa hàng, kho, người
+bán). Dữ liệu nghiệp vụ thuộc một nút — ghi chú, sản phẩm, đơn hàng — mang ID của nút, và
+permission chạm tới nó theo độ sâu: `own` (bản ghi người đó sở hữu), `unit` (bản ghi của nút của
+họ), `subtree` (nút của họ và mọi nút bên dưới) hay `tenant` (mọi thứ). Cây nằm ở kernel
+(`autoxide_kernel::tenancy::OrgTree`); nút gốc có ID là ID của khách. `modules/notes` là ví dụ đầy đủ.
+
+- **Cột.** Thêm `org_id` (UUID) vào bảng, kèm index `(tenant_id, org_id, id)`; dòng có sẵn thuộc nút
+  gốc: `UPDATE … SET org_id = tenant_id` trong migration.
+- **Permission.** Khai permission bằng `.scoped()`:
+  `Permission::new("notes.read", "…").scoped()`. Chỉ permission theo nút mới cấp được hẹp hơn toàn
+  khách; permission không theo nút (cài đặt, danh mục) luôn có hiệu lực toàn khách.
+- **Danh sách.** Giới hạn truy vấn theo phạm vi của người gọi, cạnh `.scoped(&tenant)`:
+
+  ```rust
+  let scope = principal.scope_condition(&NOTES_READ, Column::OrgId, Some(Column::OwnerId))?;
+  let select = Entity::find().filter(scope).scoped(tenant);
+  ```
+
+  Truyền `None` cho cột người sở hữu khi bản ghi không có người sở hữu; `own` khi đó hiểu như `unit`.
+- **Một bản ghi.** Đọc bằng `principal.require_at(read, &NOTES_READ, OrgTarget::new(org, owner))` và
+  trả 404 khi nó báo `org_out_of_scope` — không bao giờ lộ bản ghi tồn tại. Ghi bằng
+  `principal.require_write_at(&transaction, &NOTES_WRITE, target)` **trong** transaction ghi: nó còn
+  từ chối nút đang chờ duyệt, tạm khoá, lưu trữ hay nằm dưới một nút như vậy (`org_frozen`). Job và
+  bộ nhận event, vốn không có `Principal`, gọi `OrgTree::ensure_writable(&transaction, tenant.id(),
+  org)`.
+- **Tạo mới.** Người gọi nêu nút (`org_id`); ngoài phạm vi là `403 org_out_of_scope`. Không nêu thì
+  lấy nút duy nhất của họ (hay gốc khi phạm vi là toàn khách), và bắt họ chọn khi họ làm ở nhiều nút.
+- **Cài đặt kế thừa theo cây** (múi giờ, tiền tệ, ngôn ngữ, chính sách của module): khai trong
+  `Module::org_settings` — `OrgSetting::new("shop.return_days", "…").with_default("30")
+  .checked(check)`, key mang tiền tố của module, mặc định và hàm kiểm theo JSON. Module
+  `organizations` lưu giá trị (`PUT /api/v1/organizations/units/{id}/settings/{key}`, permission
+  `organizations.settings.write`) và trả giá trị hiệu lực ở một nút — nút gần nhất trên chuỗi có
+  đặt, không có thì mặc định — qua `OrgDirectory::setting(tenant, unit, key)`. Không chép các giá
+  trị này vào bảng của mình.
+- **Dữ liệu riêng mà nút ghi đè** (giá do chuỗi đặt, một cửa hàng đổi): giữ một dòng cho mỗi nút có
+  đặt, đọc chuỗi tổ tiên của nút bằng `OrgTree::ancestors` (gần nhất trước) và lấy giá trị gần nhất
+  bằng `tenancy::nearest` — một câu đọc chuỗi, một câu đọc các dòng.
+- **Bài rò rỉ giữa hai nhánh.** Cho hai người độ sâu `subtree` ở hai nút anh em bằng
+  `TestApp::builder(…).member(token, user, org, &[("notes.read", Scope::Subtree)])`, dựng cây bằng
+  `OrgTree`, ghi dữ liệu ở một nhánh, và kiểm nhánh kia không thấy gì:
+
+  ```rust
+  let leaks = autoxide_testkit::branch_leak_check(&app, "south", marker, &[("id", id)]).await.unwrap();
+  assert_eq!(leaks, Vec::<String>::new());
+  ```
+
+  Xem `modules/notes/src/branch_tests.rs`.
+
 ### 3. Permission
 
 Khai trong `src/permissions.rs` dạng `<module>.<việc>` và trả từ `Module::permissions`.
@@ -477,5 +527,7 @@ Luật core tự giữ:
       hậu quả lâu dài chống trùng bằng `reference`
 - [ ] Bảng cấp khách hàng có `tenant_id` đứng đầu mọi khoá và index; mọi truy vấn `.scoped`;
       `seed_tenant` chạy lại được; có bài rò rỉ (`leak_check`)
+- [ ] Dữ liệu theo nút: `org_id`, permission `.scoped()`, danh sách bằng `scope_condition`, ghi bằng
+      `require_write_at` trong transaction; có bài rò rỉ giữa hai nhánh (`branch_leak_check`)
 - [ ] Test trên cả hai database, kể cả ghi đồng thời
 - [ ] Đã sinh lại `docs/openapi.json` và `.env.example`; gate xanh

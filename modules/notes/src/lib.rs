@@ -15,6 +15,8 @@ mod service;
 mod tools;
 
 #[cfg(test)]
+mod branch_tests;
+#[cfg(test)]
 mod tenancy_tests;
 #[cfg(test)]
 mod tests;

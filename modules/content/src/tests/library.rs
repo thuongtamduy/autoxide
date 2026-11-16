@@ -54,16 +54,33 @@ async fn ban_dich() {
 
         content.publish(&tenant, &ada, about.id, None, None, false).await.unwrap();
         assert_eq!(
-            content.resolve(&tenant, "vi", "/gioi-thieu").await.unwrap_err().code(),
+            content
+                .resolve(
+                    &tenant,
+                    &autoxide_kernel::tenancy::Site::whole(&tenant),
+                    "vi",
+                    "/gioi-thieu"
+                )
+                .await
+                .unwrap_err()
+                .code(),
             "content.not_found"
         );
         assert_eq!(
-            content.resolve(&tenant, "vi", "/about").await.unwrap_err().code(),
+            content
+                .resolve(&tenant, &autoxide_kernel::tenancy::Site::whole(&tenant), "vi", "/about")
+                .await
+                .unwrap_err()
+                .code(),
             "content.not_found",
             "no fallback"
         );
         content.publish(&tenant, &ada, gioi_thieu.id, None, None, false).await.unwrap();
-        let Resolved::Entry(row) = content.resolve(&tenant, "en", "/about").await.unwrap() else {
+        let Resolved::Entry(row) = content
+            .resolve(&tenant, &autoxide_kernel::tenancy::Site::whole(&tenant), "en", "/about")
+            .await
+            .unwrap()
+        else {
             panic!()
         };
         let view = content.public_views(&tenant, vec![*row]).await.unwrap().remove(0);
@@ -155,8 +172,15 @@ async fn danh_muc_va_the() {
             1
         );
         content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
-        let Resolved::Entry(row) =
-            content.resolve(&tenant, "vi", "/blog/pho-ha-noi").await.unwrap()
+        let Resolved::Entry(row) = content
+            .resolve(
+                &tenant,
+                &autoxide_kernel::tenancy::Site::whole(&tenant),
+                "vi",
+                "/blog/pho-ha-noi",
+            )
+            .await
+            .unwrap()
         else {
             panic!()
         };

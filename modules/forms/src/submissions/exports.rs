@@ -133,6 +133,7 @@ impl FormsService {
         status: Option<SubmissionStatus>,
     ) -> Result<ExportView, Error> {
         principal.require(&FORMS_EXPORT)?;
+        self.check_form_id(tenant, principal, &FORMS_EXPORT, form_id).await?;
         let transaction = tenant.database().begin_write().await?;
         // Khoá dòng form tới hết transaction: hai yêu cầu cùng lúc cho một form xét lần lượt,
         // bên sau thấy bản của bên trước (Postgres chờ khoá; SQLite chỉ một bên ghi).
@@ -196,6 +197,11 @@ impl FormsService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(export_not_found)?;
+        self.check_form_id(tenant, principal, &FORMS_EXPORT, row.form_id).await.map_err(
+            |error| {
+                if error.code() == "forms.not_found" { export_not_found() } else { error }
+            },
+        )?;
         self.view(tenant, row).await
     }
 

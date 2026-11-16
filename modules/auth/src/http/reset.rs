@@ -31,6 +31,10 @@ pub(crate) struct ResetRequest {
     #[validate(length(min = 1, max = 254))]
     #[schema(example = "ada@example.com")]
     email: String,
+    /// `staff` (default) or `customer`: a customer account of this tenant's shop is separate
+    /// from a staff account with the same email.
+    #[serde(default)]
+    realm: autoxide_kernel::access::Realm,
 }
 
 /// A new password, with the token from the reset mail.
@@ -66,7 +70,7 @@ async fn request_reset(
     language: Language,
     ValidJson(input): ValidJson<ResetRequest>,
 ) -> Result<StatusCode, Error> {
-    state.resets.request(&tenant, &input.email, language).await?;
+    state.resets.request(&tenant, &input.email, input.realm, language).await?;
     Ok(StatusCode::ACCEPTED)
 }
 

@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::Actor;
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::TenantContext;
@@ -46,12 +45,11 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
     vec![
         Tool::new(
             "list_notes",
-            "List your notes, newest first; follow `pagination.next_cursor` for more.",
+            "List the notes in your scope, newest first; follow `pagination.next_cursor` for more.",
             move |tenant: TenantContext, principal: Principal, input: PageInput| {
                 let service = list.clone();
                 async move {
-                    let page =
-                        service.list(&tenant, Actor::from(&principal), &input.page()?).await?;
+                    let page = service.list(&tenant, &principal, &input.page()?).await?;
                     Ok::<Page<NoteResponse>, Error>(page.map(NoteResponse::from))
                 }
             },
@@ -60,11 +58,11 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "get_note",
-            "Get one of your notes.",
+            "Get a note in your scope.",
             move |tenant: TenantContext, principal: Principal, input: NoteId| {
                 let service = get.clone();
                 async move {
-                    let note = service.get(&tenant, Actor::from(&principal), input.id).await?;
+                    let note = service.get(&tenant, &principal, input.id).await?;
                     Ok::<_, Error>(NoteResponse::from(note))
                 }
             },
@@ -77,8 +75,7 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: CreateNoteRequest| {
                 let service = create.clone();
                 async move {
-                    let note =
-                        service.create(&tenant, Actor::from(&principal), input.into()).await?;
+                    let note = service.create(&tenant, &principal, input.into()).await?;
                     Ok::<_, Error>(NoteResponse::from(note))
                 }
             },
@@ -86,14 +83,12 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
         .requires(NOTES_WRITE),
         Tool::new(
             "update_note",
-            "Change the title or text of one of your notes.",
+            "Change the title or text of a note in your scope.",
             move |tenant: TenantContext, principal: Principal, input: UpdateNoteInput| {
                 let service = update.clone();
                 async move {
                     let changes = NoteChanges { title: input.title, body: input.body };
-                    let note = service
-                        .update(&tenant, Actor::from(&principal), input.id, changes, None)
-                        .await?;
+                    let note = service.update(&tenant, &principal, input.id, changes, None).await?;
                     Ok::<_, Error>(NoteResponse::from(note))
                 }
             },
@@ -101,11 +96,11 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
         .requires(NOTES_WRITE),
         Tool::new(
             "delete_note",
-            "Delete one of your notes. It cannot be restored.",
+            "Delete a note in your scope. It cannot be restored.",
             move |tenant: TenantContext, principal: Principal, input: NoteId| {
                 let service = delete.clone();
                 async move {
-                    service.delete(&tenant, Actor::from(&principal), input.id).await?;
+                    service.delete(&tenant, &principal, input.id).await?;
                     Ok::<_, Error>(serde_json::json!({ "deleted": input.id }))
                 }
             },

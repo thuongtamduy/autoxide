@@ -41,7 +41,17 @@ async fn revision_xem_khoi_phuc_don_bot() {
             ("Version 1", true)
         );
         assert_eq!(
-            title(content.resolve(&tenant, "en", "/blog/version-0").await.unwrap()),
+            title(
+                content
+                    .resolve(
+                        &tenant,
+                        &autoxide_kernel::tenancy::Site::whole(&tenant),
+                        "en",
+                        "/blog/version-0"
+                    )
+                    .await
+                    .unwrap()
+            ),
             "Version 0"
         );
         assert!(events(&database).await.contains(&"content.entry_restored".to_owned()));
@@ -107,7 +117,17 @@ async fn hen_gio_dang_va_go() {
         content.run_schedule(&tenant, schedule.id, Utc::now()).await.unwrap();
         content.run_schedule(&tenant, schedule.id, Utc::now()).await.unwrap();
         assert_eq!(
-            title(content.resolve(&tenant, "en", "/blog/planned").await.unwrap()),
+            title(
+                content
+                    .resolve(
+                        &tenant,
+                        &autoxide_kernel::tenancy::Site::whole(&tenant),
+                        "en",
+                        "/blog/planned"
+                    )
+                    .await
+                    .unwrap()
+            ),
             "Planned"
         );
         let after = content.get(&tenant, &ada, entry.id).await.unwrap();
@@ -137,7 +157,16 @@ async fn hen_gio_dang_va_go() {
             .unwrap();
         content.run_schedule(&tenant, take_down.id, Utc::now()).await.unwrap();
         assert_eq!(
-            content.resolve(&tenant, "en", "/blog/planned").await.unwrap_err().code(),
+            content
+                .resolve(
+                    &tenant,
+                    &autoxide_kernel::tenancy::Site::whole(&tenant),
+                    "en",
+                    "/blog/planned"
+                )
+                .await
+                .unwrap_err()
+                .code(),
             "content.not_found"
         );
     })
@@ -169,7 +198,17 @@ async fn lich_loi_thoi_va_chay_dong_thoi() {
             ("failed", Some("content.schedule_outdated"))
         );
         assert_eq!(
-            title(content.resolve(&tenant, "en", "/blog/original").await.unwrap()),
+            title(
+                content
+                    .resolve(
+                        &tenant,
+                        &autoxide_kernel::tenancy::Site::whole(&tenant),
+                        "en",
+                        "/blog/original"
+                    )
+                    .await
+                    .unwrap()
+            ),
             "Manual"
         );
 

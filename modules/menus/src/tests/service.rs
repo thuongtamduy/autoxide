@@ -26,7 +26,7 @@ fn object(kind: &str, id: &str) -> ItemInput {
 }
 
 fn menu(key: &str, locale: &str, items: Vec<ItemInput>) -> NewMenu {
-    NewMenu { key: key.into(), locale: Some(locale.into()), items }
+    NewMenu { key: key.into(), locale: Some(locale.into()), org_id: None, items }
 }
 
 fn labels(items: &[PublicSiteMenuItem]) -> Vec<&str> {
@@ -63,7 +63,16 @@ async fn giai_doi_tuong_va_bo_doi_tuong_khong_cong_khai() {
             },
         ];
         service.create(t, &admin(), menu("main", "vi", items)).await.unwrap();
-        let ready = service.public_menu(t, "main", Some("vi"), Utc::now()).await.unwrap();
+        let ready = service
+            .public_menu(
+                t,
+                &autoxide_kernel::tenancy::Site::whole(t),
+                "main",
+                Some("vi"),
+                Utc::now(),
+            )
+            .await
+            .unwrap();
         let shown = &ready.menu.items;
         assert_eq!(labels(shown), ["p1@vi", "Named", "Column", "Sale"]);
         assert_eq!(shown[0].href.as_deref(), Some("/items/p1"));
@@ -154,7 +163,10 @@ async fn nhom_con_tu_lay_co_gioi_han() {
             ..object("shop.category", "c")
         }];
         service.create(t, &admin(), menu("main", "en", items)).await.unwrap();
-        let ready = service.public_menu(t, "main", None, Utc::now()).await.unwrap();
+        let ready = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", None, Utc::now())
+            .await
+            .unwrap();
         let shop = &ready.menu.items[0];
         assert_eq!(labels(&shop.children), ["All", "Category c1", "Category c2"]);
         assert_eq!(shop.children[1].href.as_deref(), Some("/c/c1"));
@@ -186,7 +198,10 @@ async fn nhan_het_han_tu_an() {
             ItemInput { badge: badge(Some(-1), Some(1)), ..link("Now", "/d") },
         ];
         service.create(t, &admin(), menu("main", "en", items)).await.unwrap();
-        let ready = service.public_menu(t, "main", None, now).await.unwrap();
+        let ready = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", None, now)
+            .await
+            .unwrap();
         let shown: Vec<bool> = ready.menu.items.iter().map(|item| item.badge.is_some()).collect();
         assert_eq!(shown, [true, false, false, true]);
         assert_eq!(ready.expires_at, now + Duration::seconds(60), "the next change is 1 hour away");
@@ -194,9 +209,21 @@ async fn nhan_het_han_tu_an() {
         // Một giờ sau: "Now" tắt, nên bản đã giải chỉ dùng được tới đúng lúc đó.
         service.cache.clear(t.id());
         let later = now + Duration::minutes(59) + Duration::seconds(30);
-        let ready = service.public_menu(t, "main", None, later).await.unwrap();
+        let ready = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", None, later)
+            .await
+            .unwrap();
         assert_eq!(ready.expires_at, now + Duration::hours(1));
-        let after = service.public_menu(t, "main", None, now + Duration::hours(1)).await.unwrap();
+        let after = service
+            .public_menu(
+                t,
+                &autoxide_kernel::tenancy::Site::whole(t),
+                "main",
+                None,
+                now + Duration::hours(1),
+            )
+            .await
+            .unwrap();
         let shown: Vec<bool> = after.menu.items.iter().map(|item| item.badge.is_some()).collect();
         assert_eq!(shown, [true, false, false, false], "expired badges hide by themselves");
         assert_ne!(after.etag, ready.etag);
@@ -253,19 +280,34 @@ async fn ngon_ngu_mac_dinh_va_cache() {
         let (saved, _) =
             service.create(t, &admin(), menu("main", "en", vec![link("Home", "/")])).await.unwrap();
         let now = Utc::now();
-        let ready = service.public_menu(t, "main", Some("VI"), now).await.unwrap();
+        let ready = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", Some("VI"), now)
+            .await
+            .unwrap();
         assert_eq!(ready.menu.locale, "en", "falls back to the default language");
-        let error = service.public_menu(t, "main", Some("fr"), now).await.unwrap_err();
+        let error = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", Some("fr"), now)
+            .await
+            .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Validation);
-        let error = service.public_menu(t, "nope", None, now).await.unwrap_err();
+        let error = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "nope", None, now)
+            .await
+            .unwrap_err();
         assert_eq!(error.code(), "menus.public_menu_not_found");
 
-        let again = service.public_menu(t, "main", None, now).await.unwrap();
+        let again = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", None, now)
+            .await
+            .unwrap();
         service
             .replace(t, &admin(), saved.id, vec![link("Start", "/")], Some(saved.updated_at))
             .await
             .unwrap();
-        let changed = service.public_menu(t, "main", None, now).await.unwrap();
+        let changed = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", None, now)
+            .await
+            .unwrap();
         assert_eq!(labels(&changed.menu.items), ["Start"]);
         assert_ne!(changed.etag, again.etag);
 
@@ -273,7 +315,10 @@ async fn ngon_ngu_mac_dinh_va_cache() {
             .create(t, &admin(), menu("main", "vi", vec![link("Trang chủ", "/")]))
             .await
             .unwrap();
-        let vietnamese = service.public_menu(t, "main", Some("vi"), now).await.unwrap();
+        let vietnamese = service
+            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", Some("vi"), now)
+            .await
+            .unwrap();
         assert_eq!(vietnamese.menu.locale, "vi");
     })
     .await
@@ -315,7 +360,11 @@ async fn nhap_menu_cu_hai_lan_khong_nhan_doi() {
         let report = service.import_content_menus(t).await.unwrap();
         assert_eq!(report.imported.len(), 2);
         assert_eq!(report.failed.len(), 1, "`fr` is not a menus language");
-        let first = service.find_by_key(t, "main", "en").await.unwrap().unwrap();
+        let first = service
+            .find_by_key(t, &autoxide_kernel::tenancy::Site::whole(t), "main", "en")
+            .await
+            .unwrap()
+            .unwrap();
         let (_, nodes) = service.get(t, &admin(), first.id).await.unwrap();
         let about = &nodes[0].item;
         assert_eq!(
@@ -333,7 +382,7 @@ async fn nhap_menu_cu_hai_lan_khong_nhan_doi() {
             autoxide_kernel::pagination::PageQuery::default(),
         )
         .unwrap();
-        assert_eq!(service.list(t, &admin(), &page).await.unwrap().data.len(), 2);
+        assert_eq!(service.list(t, &admin(), None, &page).await.unwrap().data.len(), 2);
         let (_, nodes) = service.get(t, &admin(), first.id).await.unwrap();
         assert_eq!(nodes[0].item.label, "Mine");
     })
@@ -371,20 +420,35 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
         let now = Utc::now();
 
         // Khách A đọc trước (vào cache), rồi khách B: mỗi khách menu của mình.
-        let cached_a = service.public_menu(a, "main", None, now).await.unwrap();
+        let cached_a = service
+            .public_menu(a, &autoxide_kernel::tenancy::Site::whole(a), "main", None, now)
+            .await
+            .unwrap();
         assert_eq!(labels(&cached_a.menu.items), ["Home A"]);
-        let cached_b = service.public_menu(b, "main", None, now).await.unwrap();
+        let cached_b = service
+            .public_menu(b, &autoxide_kernel::tenancy::Site::whole(b), "main", None, now)
+            .await
+            .unwrap();
         assert_eq!(labels(&cached_b.menu.items), ["Home B"]);
         assert_ne!(cached_a.etag, cached_b.etag);
-        let again_b = service.public_menu(b, "main", None, now).await.unwrap();
+        let again_b = service
+            .public_menu(b, &autoxide_kernel::tenancy::Site::whole(b), "main", None, now)
+            .await
+            .unwrap();
         assert!(std::sync::Arc::ptr_eq(&cached_b, &again_b), "served from the cache of B");
 
         // Khách B sửa menu: bản của B đổi, bản đã cache của A giữ nguyên (không bị xoá).
         let items = vec![link("New B", "/new")];
         service.replace(b, &admin(), theirs.id, items, Some(theirs.updated_at)).await.unwrap();
-        let changed_b = service.public_menu(b, "main", None, now).await.unwrap();
+        let changed_b = service
+            .public_menu(b, &autoxide_kernel::tenancy::Site::whole(b), "main", None, now)
+            .await
+            .unwrap();
         assert_eq!(labels(&changed_b.menu.items), ["New B"]);
-        let still_a = service.public_menu(a, "main", None, now).await.unwrap();
+        let still_a = service
+            .public_menu(a, &autoxide_kernel::tenancy::Site::whole(a), "main", None, now)
+            .await
+            .unwrap();
         assert!(std::sync::Arc::ptr_eq(&cached_a, &still_a), "A's cached copy is kept");
         assert_eq!(labels(&still_a.menu.items), ["Home A"]);
 
@@ -395,8 +459,14 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
                 .await
                 .unwrap();
         }
-        let footer_a = service.public_menu(a, "footer", None, now).await.unwrap();
-        let footer_b = service.public_menu(b, "footer", None, now).await.unwrap();
+        let footer_a = service
+            .public_menu(a, &autoxide_kernel::tenancy::Site::whole(a), "footer", None, now)
+            .await
+            .unwrap();
+        let footer_b = service
+            .public_menu(b, &autoxide_kernel::tenancy::Site::whole(b), "footer", None, now)
+            .await
+            .unwrap();
         assert_eq!(footer_a.menu, footer_b.menu);
         assert_ne!(footer_a.etag, footer_b.etag);
 
@@ -405,7 +475,7 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
             autoxide_kernel::pagination::PageQuery::default(),
         )
         .unwrap();
-        let listed = service.list(b, &admin(), &page).await.unwrap();
+        let listed = service.list(b, &admin(), None, &page).await.unwrap();
         assert!(listed.data.iter().all(|(menu, _)| menu.tenant_id == b.id().as_uuid()));
         assert_eq!(listed.data.len(), 2);
         let missing = "menus.menu_not_found";
@@ -431,7 +501,11 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
         }
         let report = service.import_content_menus(a).await.unwrap();
         assert_eq!((report.imported.len(), report.skipped.len()), (0, 1));
-        let old_b = service.find_by_key(b, "old", "en").await.unwrap().unwrap();
+        let old_b = service
+            .find_by_key(b, &autoxide_kernel::tenancy::Site::whole(b), "old", "en")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(old_b.tenant_id, b.id().as_uuid());
     })
     .await
@@ -452,8 +526,95 @@ async fn lenh_nhap_theo_khach() {
         assert_eq!(task.run(&unknown).await.unwrap_err().code(), "tenant_not_found");
         let report = task.run(&task.parse(&[]).unwrap()).await.unwrap();
         assert!(report.starts_with("Tenant `default`: imported 1 menu(s)"), "{report}");
-        let found = harness.service.find_by_key(&harness.tenant, "old", "en").await.unwrap();
+        let found = harness
+            .service
+            .find_by_key(
+                &harness.tenant,
+                &autoxide_kernel::tenancy::Site::whole(&harness.tenant),
+                "old",
+                "en",
+            )
+            .await
+            .unwrap();
         assert!(found.is_some());
+    })
+    .await
+    .unwrap();
+}
+
+/// `OrgDirectory` giả: ngôn ngữ của website đã khai cho từng nút (D-307).
+struct SiteLanguages(autoxide_kernel::tenancy::OrgId, Vec<&'static str>);
+
+#[async_trait::async_trait]
+impl autoxide_organizations::api::OrgDirectory for SiteLanguages {
+    async fn unit(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<Option<autoxide_organizations::api::Unit>, autoxide_kernel::error::Error> {
+        Ok(None)
+    }
+    async fn root(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+    ) -> Result<autoxide_organizations::api::Unit, autoxide_kernel::error::Error> {
+        Err(autoxide_kernel::error::Error::internal("not used"))
+    }
+    async fn ancestors(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<Vec<autoxide_organizations::api::Unit>, autoxide_kernel::error::Error> {
+        Ok(Vec::new())
+    }
+    async fn is_within(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: autoxide_kernel::tenancy::OrgId,
+        _: autoxide_kernel::tenancy::OrgId,
+    ) -> Result<bool, autoxide_kernel::error::Error> {
+        Ok(false)
+    }
+    async fn setting(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        id: autoxide_kernel::tenancy::OrgId,
+        key: &str,
+    ) -> Result<Option<autoxide_organizations::api::EffectiveSetting>, autoxide_kernel::error::Error>
+    {
+        let value = (id == self.0).then(|| serde_json::json!(self.1));
+        Ok(Some(autoxide_organizations::api::EffectiveSetting::new(key, value, Some(id), false)))
+    }
+}
+
+/// Website chỉ đưa tiếng Việt (D-307): menu công khai mặc định tiếng Việt, tiếng Anh bị từ chối
+/// trên website đó; website của cả khách vẫn theo cấu hình máy chủ.
+#[tokio::test]
+async fn ngon_ngu_cua_menu_theo_website() {
+    use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, Site};
+    TestDatabase::run(async |test| {
+        let harness = harness(test).await;
+        let shop = OrgId::from_uuid(Uuid::now_v7());
+        let mut service = std::sync::Arc::try_unwrap(harness.service).ok().unwrap();
+        service.orgs = Some(std::sync::Arc::new(SiteLanguages(shop, vec!["vi"])));
+        let t = &harness.tenant;
+        let write = harness.database.begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, shop, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+        for locale in ["en", "vi"] {
+            service
+                .create(t, &admin(), menu("main", locale, vec![link(locale, "/")]))
+                .await
+                .unwrap();
+        }
+        let site = Site::of(t, shop).await.unwrap();
+        let ready = service.public_menu(t, &site, "main", None, Utc::now()).await.unwrap();
+        assert_eq!(ready.menu.locale, "vi", "mặc định của website");
+        let refused = service.public_menu(t, &site, "main", Some("en"), Utc::now()).await;
+        assert_eq!(refused.unwrap_err().kind(), ErrorKind::Validation);
+        let whole = service.public_menu(t, &Site::whole(t), "main", None, Utc::now()).await;
+        assert_eq!(whole.unwrap().menu.locale, "en");
     })
     .await
     .unwrap();

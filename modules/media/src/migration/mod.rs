@@ -7,6 +7,7 @@ mod m0005_fold_search_keys;
 mod m0007_variant_formats;
 mod m0008_alt_translations;
 mod m0010_add_decorative;
+mod m0013_org;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -77,5 +78,9 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0012_tenant_list_index",
             vec!["media_item", "media_folder", "media_tag"],
         ),
+        // Item thuộc một nút của cây tổ chức (bước 34, D-208).
+        Box::new(m0013_org::Migration),
+        // Đường người làm vào khách (bước 34, D-310).
+        autoxide_kernel::event::outbox_access_migration("k0001_event_access", "media"),
     ]
 }

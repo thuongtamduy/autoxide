@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::resource::{Resource, ResourceRef};
 use autoxide_kernel::response::Data;
-use autoxide_kernel::tenancy::{TenantContext, TenantId};
+use autoxide_kernel::tenancy::{Site, TenantContext, TenantId};
 use autoxide_media::api::{MediaRef, MediaVisibility};
 use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
@@ -115,8 +115,8 @@ pub(crate) struct Ready {
     pub expires_at: DateTime<Utc>,
 }
 
-/// Khoá cache: (khách, khoá menu, ngôn ngữ hỏi).
-type CacheKey = (TenantId, String, String);
+/// Khoá cache: (khách, website, khoá menu, ngôn ngữ hỏi).
+type CacheKey = (TenantId, Uuid, String, String);
 
 /// Cache trong bộ nhớ của tiến trình: (khách, khoá, ngôn ngữ hỏi) → menu đã giải. Khoá chỉ gồm menu
 /// có thật và ngôn ngữ được phép; bản hết hạn bị dọn mỗi lần cất bản mới.
@@ -139,7 +139,7 @@ impl PublicCache {
         if let Ok(mut state) = self.inner.lock() {
             let generation = state.generations.entry(tenant).or_default();
             *generation = generation.wrapping_add(1);
-            state.entries.retain(|(owner, _, _), _| *owner != tenant);
+            state.entries.retain(|(owner, _, _, _), _| *owner != tenant);
         }
     }
 
@@ -169,25 +169,27 @@ impl MenuService {
     pub(crate) async fn public_menu(
         &self,
         tenant: &TenantContext,
+        site: &Site,
         key: &str,
         locale: Option<&str>,
         now: DateTime<Utc>,
     ) -> Result<Arc<Ready>, Error> {
         let mut problems = Vec::new();
-        let locale = self.check_locale(locale, &mut problems);
+        let (locales, default) = self.site_locales(tenant, site).await?;
+        let locale = crate::service::check_locale(&locales, &default, locale, &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let cache_key = (tenant.id(), key.to_owned(), locale.clone());
+        let cache_key = (tenant.id(), site.org().as_uuid(), key.to_owned(), locale.clone());
         let ttl = i64::from(self.config.public_cache_seconds);
         let (generation, hit) = self.cache.get(&cache_key, now);
         if let Some(hit) = hit {
             return Ok(hit);
         }
-        let found = match self.find_by_key(tenant, key, &locale).await? {
+        let found = match self.find_by_key(tenant, site, key, &locale).await? {
             Some(found) => found,
             None => self
-                .find_by_key(tenant, key, &self.config.default_locale)
+                .find_by_key(tenant, site, key, &default)
                 .await?
                 .ok_or_else(|| public_not_found(key, &locale))?,
         };

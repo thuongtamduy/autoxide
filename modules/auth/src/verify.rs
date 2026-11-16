@@ -104,6 +104,7 @@ impl EmailVerifications {
 
     /// Người dùng `user_id` xin đổi email sang `new_email`: kiểm mật khẩu hiện tại, rồi
     /// gửi mail xác minh tới địa chỉ mới. Email chỉ đổi khi địa chỉ mới được xác nhận.
+    #[cfg(test)]
     pub(crate) async fn change_email(
         &self,
         tenant: &TenantContext,
@@ -112,19 +113,38 @@ impl EmailVerifications {
         new_email: &str,
         language: Language,
     ) -> Result<(), Error> {
+        self.change_email_confirmed(tenant, user_id, current_password, None, new_email, language)
+            .await
+    }
+
+    /// Như [`change_email`](Self::change_email), xác nhận bằng mật khẩu hay token xác nhận lại
+    /// (`reauth_token`, D-308) — đúng một trong hai.
+    pub(crate) async fn change_email_confirmed(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        current_password: &str,
+        reauth_token: Option<&str>,
+        new_email: &str,
+        language: Language,
+    ) -> Result<(), Error> {
         let email = autoxide_kernel::email::normalize(new_email);
+        let confirm = crate::reauth::Confirm::from_request(current_password, reauth_token);
         let problems: Vec<FieldError> = user::check_email_field("new_email", &email)
             .into_iter()
-            .chain(FieldError::blank("current_password", current_password))
+            .chain(confirm.as_ref().err().cloned())
             .collect();
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let (user, _) = self.sessions.check_password(tenant, user_id, current_password).await?;
+        let confirm = confirm.map_err(|problem| Error::validation(vec![problem]))?;
+        let (user, _) = confirm.check(&self.sessions, tenant, user_id).await?;
         if email == user.email && user.email_verified_at.is_some() {
             return Err(already_verified());
         }
-        if email != user.email && self.users.find_by_email(tenant, &email).await?.is_some() {
+        if email != user.email
+            && self.users.find_by_email_in(tenant, user.realm, &email).await?.is_some()
+        {
             return Err(user::email_taken(&email));
         }
         self.send(tenant, Actor::user(user_id), &user, &email, language).await

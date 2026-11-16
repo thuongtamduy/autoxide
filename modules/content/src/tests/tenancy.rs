@@ -96,7 +96,16 @@ async fn trung_ten_o_hai_khach_duoc_phep() {
             content.create_redirect(tenant, &ada, redirect()).await.unwrap();
         }
         for (tenant, id) in [(&a, published[0]), (&b, published[1])] {
-            match content.resolve(tenant, "en", "/blog/hello").await.unwrap() {
+            match content
+                .resolve(
+                    tenant,
+                    &autoxide_kernel::tenancy::Site::whole(tenant),
+                    "en",
+                    "/blog/hello",
+                )
+                .await
+                .unwrap()
+            {
                 Resolved::Entry(row) => assert_eq!(row.entry_id, id),
                 other => panic!("expected an entry, got {other:?}"),
             }
@@ -151,7 +160,7 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
             .await
             .unwrap();
         content.index_entry(&b, in_b.id).await.unwrap();
-        let hits = content.search(&b, Some(&ada), &query("hoa đà lạt"), false).await.unwrap();
+        let hits = content.search(&b, Some(&ada), &query("hoa đà lạt"), None).await.unwrap();
         assert_eq!(hits[0].entry_id, in_b.id);
         assert_eq!(content.search_cache.cached_version(b.id(), Scope::Draft, "vi"), Some(1));
 
@@ -159,10 +168,10 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
         let in_a =
             content.create(&a, &ada, vi_post("Học Rust", "Ownership và lifetime.")).await.unwrap();
         content.index_entry(&a, in_a.id).await.unwrap();
-        let hits = content.search(&a, Some(&ada), &query("hoa đà lạt"), false).await.unwrap();
+        let hits = content.search(&a, Some(&ada), &query("hoa đà lạt"), None).await.unwrap();
         assert!(hits.iter().all(|hit| hit.entry_id == in_a.id), "{hits:?}");
         assert!(hits.iter().all(|hit| hit.entry_id != in_b.id));
-        let hits = content.search(&a, Some(&ada), &query("ownership"), false).await.unwrap();
+        let hits = content.search(&a, Some(&ada), &query("ownership"), None).await.unwrap();
         assert_eq!(hits[0].entry_id, in_a.id);
         assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));
 
@@ -173,7 +182,7 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
         };
         content.update(&b, &ada, in_b.id, changes, false, None).await.unwrap();
         content.index_entry(&b, in_b.id).await.unwrap();
-        let hits = content.search(&b, Some(&ada), &query("mùa mưa"), false).await.unwrap();
+        let hits = content.search(&b, Some(&ada), &query("mùa mưa"), None).await.unwrap();
         assert_eq!(hits[0].entry_id, in_b.id);
         assert_eq!(content.search_cache.cached_version(b.id(), Scope::Draft, "vi"), Some(2));
         assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));
@@ -200,10 +209,18 @@ async fn lich_dang_chay_dung_khach() {
 
         assert_eq!(content.get(&b, &ada, entry.id).await.unwrap().status, "published");
         assert!(matches!(
-            content.resolve(&b, "en", "/blog/later").await.unwrap(),
+            content
+                .resolve(&b, &autoxide_kernel::tenancy::Site::whole(&b), "en", "/blog/later")
+                .await
+                .unwrap(),
             Resolved::Entry(_)
         ));
-        assert!(content.resolve(&a, "en", "/blog/later").await.is_err());
+        assert!(
+            content
+                .resolve(&a, &autoxide_kernel::tenancy::Site::whole(&a), "en", "/blog/later")
+                .await
+                .is_err()
+        );
         let events = events_of(&b).await;
         assert!(events.contains(&"content.entry_published".to_owned()), "{events:?}");
         assert!(events_of(&a).await.is_empty());

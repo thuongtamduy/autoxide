@@ -156,7 +156,9 @@ impl Module for ContentModule {
                 dependencies,
                 config,
             )
-            .with_translations(context.translations().clone()),
+            .with_translations(context.translations().clone())
+            // Tuỳ chọn: app đăng ký `organizations` trước `content`; test riêng của module thì không.
+            .with_orgs(context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok()),
         );
         context.personal_data(service.clone())?;
         context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;
@@ -341,6 +343,14 @@ pub(crate) mod testing {
         let kernel = Config::read(&mut reader);
         let (kernel, _) = reader.finish(kernel).unwrap();
         let database = Database::connect(&kernel.database).await.unwrap();
+        // Bảng của kernel: cây tổ chức (bước 34) mà kiểm quyền theo nút đọc tới.
+        autoxide_kernel::module::Modules::new(Vec::new())
+            .unwrap()
+            .migrator()
+            .unwrap()
+            .up(&database)
+            .await
+            .unwrap();
         Migrator::new(vec![ModuleMigrations::new("content", crate::migration::all())])
             .unwrap()
             .up(&database)

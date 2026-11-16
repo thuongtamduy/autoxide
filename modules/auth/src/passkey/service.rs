@@ -75,14 +75,14 @@ impl PasskeyService {
     /// Bắt đầu đăng ký một passkey cho người dùng `user_id` (đã đăng nhập).
     /// Đòi mật khẩu hiện tại: access token bị lộ không đủ để gắn passkey của kẻ gian vào
     /// tài khoản (D-079).
-    pub(crate) async fn start_registration(
+    pub(crate) async fn start_registration<'a>(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
-        current_password: &str,
+        confirm: impl Into<crate::reauth::Confirm<'a>>,
     ) -> Result<Ceremony, Error> {
         let engine = self.engine()?;
-        self.sessions.check_password(tenant, user_id, current_password).await?;
+        confirm.into().check(&self.sessions, tenant, user_id).await?;
         let user = self
             .users
             .get(tenant, user_id)

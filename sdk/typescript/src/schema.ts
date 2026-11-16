@@ -2,6 +2,26 @@
 // Types of every schema, and of every operation under `paths` (parameters, request body,
 // responses by status). Used by `client.ts`.
 
+/** Accept an invitation. */
+export type AcceptInvitationRequest = {
+  /** For a new account: display name (default: the one in the invitation). */
+  name?: string | null;
+  /**
+   * For a new account: a password (12 to 128 characters). Omit to sign in later with a link
+   * or add a passkey with the tokens returned here.
+   */
+  password?: string | null;
+  /** The token from the invitation mail. */
+  token: string;
+};
+
+/** The result of accepting. */
+export type AcceptedResponse = {
+  tokens?: TokenResponse | null;
+  /** The account that now has the roles. */
+  user_id: string;
+};
+
 /** What a schedule does: `publish` or `unpublish`. */
 export type Action = "publish" | "unpublish";
 
@@ -13,6 +33,52 @@ export type AddPasskeyRequest = {
   credential: Record<string, unknown>;
   /** A name to recognize the passkey by, 1 to 100 characters. */
   name: string;
+};
+
+/** A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01). */
+export type Address = {
+  /** Code of the commune, ward or special zone (5 digits for Vietnam). */
+  commune_code: string;
+  /** Name of the commune when the address was written. */
+  commune_name: string;
+  /** ISO 3166-1 alpha-2 country code. */
+  country: string;
+  /** House number, street, village… */
+  line: string;
+  /** Code of the province (2 digits for Vietnam). */
+  province_code: string;
+  /** Name of the province when the address was written. */
+  province_name: string;
+};
+
+/** An address to check: codes only; names are filled in. */
+export type AddressInput = {
+  commune_code: string;
+  country: string;
+  /** House number, street, village… (1 to 300 characters). */
+  line: string;
+  province_code: string;
+};
+
+/** An administrative unit. */
+export type AdministrativeUnit = {
+  code: string;
+  /** `province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`. */
+  kind: string;
+  /** 1: province level; 2: commune level. */
+  level: number;
+  name: string;
+  /** Code of the province, for a commune. */
+  parent_code?: string | null;
+  /** First day in force (`YYYY-MM-DD`). */
+  valid_from: string;
+  /** First day no longer in force; `null` while in force. */
+  valid_to?: string | null;
+};
+
+/** An administrative unit with the unit above it. */
+export type AdministrativeUnitDetail = AdministrativeUnit & {
+  parent?: AdministrativeUnit | null;
 };
 
 /** What the AI features of this server can do now. */
@@ -89,6 +155,11 @@ export type ApiKeyResponse = {
   last_used_at?: string | null;
   /** What the key is for. */
   name: string;
+  /**
+   * The organization unit the key is bound to: it acts only on data of this unit and the
+   * units below it. The root unit (the id of the tenant) means no limit.
+   */
+  org_id: string;
   /**
    * Permissions the key may use, sorted by name. The key never has more than its
    * owner has at the moment of the request.
@@ -310,9 +381,15 @@ export type CeremonyResponse = {
 
 /** A new email address for the signed-in account. */
 export type ChangeEmailRequest = {
-  current_password: string;
+  /** Your current password. */
+  current_password?: string;
   /** The new address. Case and surrounding spaces do not matter. */
   new_email: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
 };
 
 /** The current password and the new one. */
@@ -661,7 +738,7 @@ export type CreateApiKeyRequest = {
   /**
    * Your current password: a stolen access token alone must not create a key that
    * outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
-   * `passkey_credential`) instead — exactly one of the three.
+   * `passkey_credential`) or a `reauth_token` instead — exactly one of them.
    */
   current_password?: string;
   /**
@@ -671,6 +748,11 @@ export type CreateApiKeyRequest = {
   expires_at?: string | null;
   /** What the key is for, 1 to 100 characters. */
   name: string;
+  /**
+   * Bind the key to an organization unit you work in: it then acts only on data of that unit
+   * and the units below it. Omit for the whole tenant.
+   */
+  org_id?: string | null;
   /**
    * One of your passkeys, instead of the password: start with
    * `POST /api/v1/auth/login/passkey/options`, let the browser sign its `options`, and send the
@@ -687,6 +769,8 @@ export type CreateApiKeyRequest = {
    * `GET /api/v1/auth/me`). Give a key only what its job needs.
    */
   permissions: string[];
+  /** A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password. */
+  reauth_token?: string | null;
   /**
    * A code from your authenticator app, instead of the password (two-step sign-in must be
    * on). Wrong codes count towards the same limit as at sign-in.
@@ -768,6 +852,11 @@ export type CreateEntryRequest = EntryFieldsInput & {
   kind: Kind;
   /** Language; omitted: the default language. */
   locale?: string | null;
+  /**
+   * The organization unit (store, seller) that owns the entry; you need `content.write` there.
+   * Omit when you work in one unit only (or for the whole tenant).
+   */
+  org_id?: string | null;
   /** Parent page (pages only). */
   parent_id?: string | null;
 };
@@ -804,6 +893,11 @@ export type CreateFormRequest = {
    * Setting them also needs the permission `forms.read`.
    */
   notify_emails?: string[] | null;
+  /**
+   * The organization unit (store, seller) that owns the form; you need `forms.manage` there.
+   * Omitted: a form of the whole tenant.
+   */
+  org_id?: string | null;
   /** Key of an `email` field. */
   reply_to_field?: string | null;
   /** 0 (keep) to 36500. */
@@ -837,6 +931,11 @@ export type CreateSiteMenuRequest = {
   key: string;
   /** The menu's language; omitted: the default language. */
   locale?: string | null;
+  /**
+   * The website (organization unit) the menu is for; you need `menus.manage` there. Omitted:
+   * the website of the whole tenant, used by every website without a menu of its own.
+   */
+  org_id?: string | null;
 };
 
 /** An address to suppress by hand. */
@@ -849,6 +948,28 @@ export type CreateSuppressionRequest = {
 /** A new category or tag. */
 export type CreateTermRequest = TermFields & {
   taxonomy: Taxonomy;
+};
+
+/** A new unit. */
+export type CreateUnitRequest = {
+  /** Internal code, 1 to 64 characters, unique in the tenant. */
+  code?: string | null;
+  /** 1 to 200 characters. */
+  name: string;
+  /** The unit to place it under; you need `organizations.units.write` there. */
+  parent_id: string;
+  /** Code of an existing unit type (not `tenant`). */
+  unit_type: string;
+};
+
+/** A new unit type. */
+export type CreateUnitTypeRequest = {
+  /** A lower-case letter, then up to 31 lower-case letters, digits or `_`. `tenant` is reserved. */
+  code: string;
+  /** Up to 1000 characters. */
+  description?: string;
+  /** 1 to 100 characters. */
+  name: string;
 };
 
 /** A new account. */
@@ -896,6 +1017,56 @@ export type CurrentTenant = {
   read_only?: boolean;
   slug: string;
   status: string;
+};
+
+/** A customer account of the tenant's shop. */
+export type CustomerResponse = {
+  created_at: string;
+  /** When the account was disabled; `null` while active. */
+  disabled_at?: string | null;
+  email: string;
+  /** When the email was confirmed; `null` while not verified. */
+  email_verified_at?: string | null;
+  id: string;
+  name: string;
+  updated_at: string;
+};
+
+/** Envelope of a single result. */
+export type Data_AcceptedResponse = {
+  /** The result of accepting. */
+  data: {
+    tokens?: TokenResponse | null;
+    /** The account that now has the roles. */
+    user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Address = {
+  /** A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01). */
+  data: {
+    /** Code of the commune, ward or special zone (5 digits for Vietnam). */
+    commune_code: string;
+    /** Name of the commune when the address was written. */
+    commune_name: string;
+    /** ISO 3166-1 alpha-2 country code. */
+    country: string;
+    /** House number, street, village… */
+    line: string;
+    /** Code of the province (2 digits for Vietnam). */
+    province_code: string;
+    /** Name of the province when the address was written. */
+    province_name: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AdministrativeUnitDetail = {
+  /** An administrative unit with the unit above it. */
+  data: AdministrativeUnit & {
+    parent?: AdministrativeUnit | null;
+  };
 };
 
 /** Envelope of a single result. */
@@ -1360,6 +1531,47 @@ export type Data_CurrentTenant = {
 };
 
 /** Envelope of a single result. */
+export type Data_CustomerResponse = {
+  /** A customer account of the tenant's shop. */
+  data: {
+    created_at: string;
+    /** When the account was disabled; `null` while active. */
+    disabled_at?: string | null;
+    email: string;
+    /** When the email was confirmed; `null` while not verified. */
+    email_verified_at?: string | null;
+    id: string;
+    name: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_DelegationResponse = {
+  /** A delegation: holders of a role of the parent tenant work in a child tenant with it. */
+  data: {
+    /** The tenant they may enter, with the header `Autoxide-Tenant`. */
+    child_tenant_id: string;
+    created_at: string;
+    /** When it stops working by itself; `null`: until revoked. */
+    expires_at?: string | null;
+    id: string;
+    /** The unit of the child tenant the permissions apply at. */
+    org_id: string;
+    /** The tenant that granted it (owner of the role). */
+    parent_tenant_id: string;
+    reason: string;
+    /** When it was revoked; `null` while in force. */
+    revoked_at?: string | null;
+    /**
+     * The role of the parent tenant; its holders (at the parent's root unit) get its
+     * permissions in the child.
+     */
+    role_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_EditedComment = {
   /** A comment just changed, for its author. */
   data: PublicComment & {
@@ -1608,6 +1820,8 @@ export type Data_FormResponse = {
     name: string;
     /** Addresses mailed for each new submission. Never shown by the public endpoint. */
     notify_emails: string[];
+    /** The organization unit that owns the form; `null`: a form of the whole tenant. */
+    org_id?: string | null;
     /**
      * Key of the `email` field used as `Reply-To` of the notification and to find
      * submissions by email; `null`: the first `email` field.
@@ -1672,6 +1886,32 @@ export type Data_ImportReport = {
 };
 
 /** Envelope of a single result. */
+export type Data_InvitationResponse = {
+  /** An invitation to work in this tenant. */
+  data: {
+    /** The account that accepted it. */
+    accepted_user_id?: string | null;
+    created_at: string;
+    email: string;
+    expires_at: string;
+    id: string;
+    invited_by?: string | null;
+    name: string;
+    /** The unit the roles apply at. */
+    org_id: string;
+    /** Your own reference, e.g. an HR ticket. */
+    reference?: string | null;
+    /** The roles given on acceptance. */
+    role_ids: string[];
+    /**
+     * `pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be
+     * accepted; resend it.
+     */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LibrarySummaryResponse = {
   /** Totals of the media library. */
   data: {
@@ -1716,6 +1956,18 @@ export type Data_ListResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_LoginLinkResponse = {
+  /** What to keep while waiting for the mail. */
+  data: {
+    /**
+     * With `bind_device`: send it back with the token. `null` otherwise. Returned even when no
+     * account has this email, so the answer reveals nothing.
+     */
+    device_secret?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_MeResponse = {
   /** The signed-in user and what they may do. */
   data: {
@@ -1738,11 +1990,24 @@ export type Data_MeResponse = {
      */
     has_password: boolean;
     id: string;
+    /**
+     * Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
+     * request. Change it with `PATCH /api/v1/auth/me`.
+     */
+    locale?: string | null;
+    /**
+     * `true` when a role of yours needs two-step sign-in and it is off: that role's permissions
+     * are left out of `permissions` until you turn on an authenticator app
+     * (`POST /api/v1/auth/me/mfa/totp`) or add a passkey.
+     */
+    mfa_required: boolean;
     /** Display name. */
     name: string;
     pending_email?: PendingEmail | null;
     /** Permissions granted by the user's roles, sorted by name. */
     permissions: string[];
+    /** Preferred IANA time zone; `null`: not set. */
+    time_zone?: string | null;
   };
 };
 
@@ -2185,6 +2450,47 @@ export type Data_PublicMenu = {
 };
 
 /** Envelope of a single result. */
+export type Data_PublicProfileResponse = {
+  /** The public profile of an organization unit, as websites show it. */
+  data: {
+    address?: Address | null;
+    /** Cover image (id in the `media` library). */
+    cover_media_id?: string | null;
+    /** Name shown to visitors; defaults to the unit's name. */
+    display_name: string;
+    opening_hours: {
+      /** Local time `HH:MM`, after `opens`. */
+      closes: string;
+      /** ISO day of the week: 1 Monday … 7 Sunday. */
+      day: number;
+      /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+      opens: string;
+    }[];
+    /** Customers can pick up orders here. */
+    pickup: boolean;
+    /** Order among the public units (smaller first). */
+    position: number;
+    /** Shown on websites (`GET /api/v1/organizations/public/stores`). */
+    public: boolean;
+    special_days: {
+      /** Closed all day. */
+      closed?: boolean;
+      closes?: string | null;
+      /** `YYYY-MM-DD`. */
+      date: string;
+      /** Shown to visitors, up to 200 characters. */
+      note?: string | null;
+      /** When open: local time `HH:MM`. */
+      opens?: string | null;
+    }[];
+    unit_id: string;
+    unit_type: string;
+    /** `null` until the profile is first saved. */
+    updated_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PublicSiteMenu = {
   /** A website menu ready to show: links worked out, hidden targets left out. */
   data: {
@@ -2206,6 +2512,21 @@ export type Data_PublicTermPage = {
     parent_id?: string | null;
     /** The slug in every language, for `hreflang`. */
     translations: PublicTranslation[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ReauthResponse = {
+  /** A confirmation token. */
+  data: {
+    /** When the token stops working (`AUTOXIDE_AUTH_REAUTH_MINUTES`). */
+    expires_at: string;
+    /**
+     * Send it as `reauth_token` with the sensitive change (creating an API key, changing your
+     * email, turning on two-step sign-in, adding a passkey, deleting your account). Used once.
+     * `null` with `email_link`: the token is in the mail.
+     */
+    reauth_token?: string | null;
   };
 };
 
@@ -2287,15 +2608,23 @@ export type Data_RoleResponse = {
   data: {
     /**
      * `true` only for the built-in `admin` role: it grants every permission,
-     * including permissions added later, and cannot be changed or deleted.
+     * including permissions added later, and cannot be changed (except `requires_mfa`) or
+     * deleted.
      */
     all_permissions: boolean;
     created_at: string;
     description: string;
+    /**
+     * The same permissions with their scope in the organization tree. Empty when
+     * `all_permissions`.
+     */
+    grants: RoleGrant[];
     id: string;
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
     permissions: string[];
+    /** `true`: the role's permissions work only for accounts with two-step sign-in. */
+    requires_mfa: boolean;
     updated_at: string;
   };
 };
@@ -2365,6 +2694,8 @@ export type Data_SiteMenu = {
     items: SiteMenuItem[];
     key: string;
     locale: string;
+    /** The website (organization unit) of the menu; the id of the tenant for the whole tenant. */
+    org_id: string;
     updated_at: string;
   };
 };
@@ -2456,6 +2787,37 @@ export type Data_SubscriberResponse = {
      */
     suppressed?: string | null;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportGrantResponse = {
+  /** A time-limited access of platform staff to a tenant's data. */
+  data: {
+    /**
+     * `support`, or `legal_request` (a request of a competent authority; the tenant cannot
+     * revoke it).
+     */
+    basis: string;
+    created_at: string;
+    expires_at: string;
+    /** When the staff first entered under it; `null`: not used. */
+    first_used_at?: string | null;
+    granted_by?: string | null;
+    id: string;
+    /** Number of the authority's document, for `legal_request`. */
+    legal_reference?: string | null;
+    reason: string;
+    revoked_at?: string | null;
+    /** `true` when the tenant revoked it. */
+    revoked_by_tenant: boolean;
+    /** The role of the platform tenant whose permissions they get. */
+    role_id: string;
+    /** The platform staff account. */
+    staff_user_id: string;
+    starts_at: string;
+    /** The tenant the staff may enter. */
+    tenant_id: string;
   };
 };
 
@@ -2723,6 +3085,54 @@ export type Data_TranslationRequestResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_UnitResponse = {
+  /** A unit of the organization tree of the tenant (head office, region, store, warehouse…). */
+  data: {
+    /** Internal code, unique in the tenant when set. */
+    code?: string | null;
+    created_at: string;
+    /** Id of the unit. The root unit has the id of the tenant. */
+    id: string;
+    name: string;
+    /** The unit above; `null` only for the root. */
+    parent_id?: string | null;
+    status: UnitStatusValue;
+    /** Why the status was last changed, when given. */
+    status_reason?: string | null;
+    /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
+    unit_type: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_UnitSettingResponse = {
+  /** The value of a setting at a unit. */
+  data: {
+    /** `true` when the value comes from a unit above or the default, not from this unit. */
+    inherited: boolean;
+    /** Key of the setting. */
+    key: string;
+    /** The unit that set this value (this unit or one above it); `null`: the default. */
+    source_unit_id?: string | null;
+    /** The value in force; `null` when nothing sets it and it has no default. */
+    value?: unknown;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_UnitTypeResponse = {
+  /** A kind of unit the tenant uses, e.g. `store` or `warehouse`. */
+  data: {
+    code: string;
+    created_at: string;
+    description: string;
+    name: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_UnsubscribeResponse = {
   /** The answer to an unsubscription: always the same. */
   data: {
@@ -2799,6 +3209,24 @@ export type Data_UserResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_AdministrativeUnit = {
+  data: {
+    code: string;
+    /** `province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`. */
+    kind: string;
+    /** 1: province level; 2: commune level. */
+    level: number;
+    name: string;
+    /** Code of the province, for a commune. */
+    parent_code?: string | null;
+    /** First day in force (`YYYY-MM-DD`). */
+    valid_from: string;
+    /** First day no longer in force; `null` while in force. */
+    valid_to?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CommentCount = {
   data: {
     /** Shown comments (top-level and replies). */
@@ -2810,10 +3238,47 @@ export type Data_Vec_CommentCount = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_DelegationResponse = {
+  data: {
+    /** The tenant they may enter, with the header `Autoxide-Tenant`. */
+    child_tenant_id: string;
+    created_at: string;
+    /** When it stops working by itself; `null`: until revoked. */
+    expires_at?: string | null;
+    id: string;
+    /** The unit of the child tenant the permissions apply at. */
+    org_id: string;
+    /** The tenant that granted it (owner of the role). */
+    parent_tenant_id: string;
+    reason: string;
+    /** When it was revoked; `null` while in force. */
+    revoked_at?: string | null;
+    /**
+     * The role of the parent tenant; its holders (at the parent's root unit) get its
+     * permissions in the child.
+     */
+    role_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_EventTypeResponse = {
   data: {
     description: string;
     name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_MembershipResponse = {
+  data: {
+    /** The unit; the root unit has the id of the tenant. */
+    org_id: string;
+    /**
+     * The roles there, sorted by name. A role grants each permission at its scope from this
+     * unit (`unit`: this unit, `subtree`: this unit and the units below it).
+     */
+    roles: RoleResponse[];
   }[];
 };
 
@@ -2872,6 +3337,23 @@ export type Data_Vec_MyPermission = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_MyTenantResponse = {
+  data: {
+    /**
+     * `direct` (your own tenant), `delegation` (a parent tenant let your role in) or
+     * `support` (time-limited platform support access).
+     */
+    access: string;
+    /** The delegation or support grant; `null` for `direct`. */
+    access_id?: string | null;
+    /** Send it in the header `Autoxide-Tenant` to work there. */
+    id: string;
+    name: string;
+    slug: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PermissionResponse = {
   data: {
     /** What the permission allows, in the language of `Accept-Language`. */
@@ -2883,6 +3365,12 @@ export type Data_Vec_PermissionResponse = {
      * `money`.
      */
     risk: string;
+    /**
+     * `true` when the permission applies to data of an organization unit: a role can grant it
+     * for one unit (`unit`), a unit and everything below it (`subtree`), or only the records
+     * a person owns (`own`). `false`: it can only be granted for the whole tenant.
+     */
+    scoped: boolean;
   }[];
 };
 
@@ -2954,19 +3442,67 @@ export type Data_Vec_PublicEntryResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PublicProfileResponse = {
+  data: {
+    address?: Address | null;
+    /** Cover image (id in the `media` library). */
+    cover_media_id?: string | null;
+    /** Name shown to visitors; defaults to the unit's name. */
+    display_name: string;
+    opening_hours: {
+      /** Local time `HH:MM`, after `opens`. */
+      closes: string;
+      /** ISO day of the week: 1 Monday … 7 Sunday. */
+      day: number;
+      /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+      opens: string;
+    }[];
+    /** Customers can pick up orders here. */
+    pickup: boolean;
+    /** Order among the public units (smaller first). */
+    position: number;
+    /** Shown on websites (`GET /api/v1/organizations/public/stores`). */
+    public: boolean;
+    special_days: {
+      /** Closed all day. */
+      closed?: boolean;
+      closes?: string | null;
+      /** `YYYY-MM-DD`. */
+      date: string;
+      /** Shown to visitors, up to 200 characters. */
+      note?: string | null;
+      /** When open: local time `HH:MM`. */
+      opens?: string | null;
+    }[];
+    unit_id: string;
+    unit_type: string;
+    /** `null` until the profile is first saved. */
+    updated_at?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_RoleResponse = {
   data: {
     /**
      * `true` only for the built-in `admin` role: it grants every permission,
-     * including permissions added later, and cannot be changed or deleted.
+     * including permissions added later, and cannot be changed (except `requires_mfa`) or
+     * deleted.
      */
     all_permissions: boolean;
     created_at: string;
     description: string;
+    /**
+     * The same permissions with their scope in the organization tree. Empty when
+     * `all_permissions`.
+     */
+    grants: RoleGrant[];
     id: string;
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
     permissions: string[];
+    /** `true`: the role's permissions work only for accounts with two-step sign-in. */
+    requires_mfa: boolean;
     updated_at: string;
   }[];
 };
@@ -2989,6 +3525,48 @@ export type Data_Vec_ScheduleResponse = {
     /** `scheduled`, `succeeded`, `failed` or `canceled`. */
     status: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SettingResponse = {
+  data: {
+    /** The value when no unit sets it; `null`: none. */
+    default?: unknown;
+    /** What it is for and which values it takes. */
+    description: string;
+    /** `<module>.<name>`, e.g. `organizations.timezone`. */
+    key: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportGrantResponse = {
+  data: {
+    /**
+     * `support`, or `legal_request` (a request of a competent authority; the tenant cannot
+     * revoke it).
+     */
+    basis: string;
+    created_at: string;
+    expires_at: string;
+    /** When the staff first entered under it; `null`: not used. */
+    first_used_at?: string | null;
+    granted_by?: string | null;
+    id: string;
+    /** Number of the authority's document, for `legal_request`. */
+    legal_reference?: string | null;
+    reason: string;
+    revoked_at?: string | null;
+    /** `true` when the tenant revoked it. */
+    revoked_by_tenant: boolean;
+    /** The role of the platform tenant whose permissions they get. */
+    role_id: string;
+    /** The platform staff account. */
+    staff_user_id: string;
+    starts_at: string;
+    /** The tenant the staff may enter. */
+    tenant_id: string;
   }[];
 };
 
@@ -3017,6 +3595,51 @@ export type Data_Vec_TenantSettingState = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_UnitResponse = {
+  data: {
+    /** Internal code, unique in the tenant when set. */
+    code?: string | null;
+    created_at: string;
+    /** Id of the unit. The root unit has the id of the tenant. */
+    id: string;
+    name: string;
+    /** The unit above; `null` only for the root. */
+    parent_id?: string | null;
+    status: UnitStatusValue;
+    /** Why the status was last changed, when given. */
+    status_reason?: string | null;
+    /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
+    unit_type: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_UnitSettingResponse = {
+  data: {
+    /** `true` when the value comes from a unit above or the default, not from this unit. */
+    inherited: boolean;
+    /** Key of the setting. */
+    key: string;
+    /** The unit that set this value (this unit or one above it); `null`: the default. */
+    source_unit_id?: string | null;
+    /** The value in force; `null` when nothing sets it and it has no default. */
+    value?: unknown;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_UnitTypeResponse = {
+  data: {
+    code: string;
+    created_at: string;
+    description: string;
+    name: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_UserFlag = {
   data: {
     /**
@@ -3038,10 +3661,54 @@ export type Data_VerifiedResponse = {
   };
 };
 
+/** A new delegation to a child tenant. */
+export type DelegationRequest = {
+  /** A tenant below this one (its child, or a child of a child). */
+  child_tenant_id: string;
+  /** When it stops working by itself; omit for "until revoked". */
+  expires_at?: string | null;
+  /** The unit of the child tenant the permissions apply at; omit for its root unit. */
+  org_id?: string | null;
+  /** Why, 1 to 500 characters; kept in both audit logs. */
+  reason: string;
+  /**
+   * A role of this tenant. A role with every permission can only be delegated at the root
+   * unit of the child.
+   */
+  role_id: string;
+};
+
+/** A delegation: holders of a role of the parent tenant work in a child tenant with it. */
+export type DelegationResponse = {
+  /** The tenant they may enter, with the header `Autoxide-Tenant`. */
+  child_tenant_id: string;
+  created_at: string;
+  /** When it stops working by itself; `null`: until revoked. */
+  expires_at?: string | null;
+  id: string;
+  /** The unit of the child tenant the permissions apply at. */
+  org_id: string;
+  /** The tenant that granted it (owner of the role). */
+  parent_tenant_id: string;
+  reason: string;
+  /** When it was revoked; `null` while in force. */
+  revoked_at?: string | null;
+  /**
+   * The role of the parent tenant; its holders (at the parent's root unit) get its
+   * permissions in the child.
+   */
+  role_id: string;
+};
+
 /** Confirms deleting your own account. */
 export type DeleteAccountRequest = {
   /** Your current password. */
-  current_password: string;
+  current_password?: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
 };
 
 /** Proof of authorship. */
@@ -3422,6 +4089,8 @@ export type FormResponse = {
   name: string;
   /** Addresses mailed for each new submission. Never shown by the public endpoint. */
   notify_emails: string[];
+  /** The organization unit that owns the form; `null`: a form of the whole tenant. */
+  org_id?: string | null;
   /**
    * Key of the `email` field used as `Reply-To` of the notification and to find
    * submissions by email; `null`: the first `email` field.
@@ -3508,6 +4177,42 @@ export type ImportRequest = {
   subscribers: ImportPersonRequest[];
 };
 
+/** A new invitation. */
+export type InvitationRequest = {
+  email: string;
+  /** Display name for the new account (they can change it). */
+  name?: string | null;
+  /** The unit they will work at; omit for the root unit. It must be in your scope. */
+  org_id?: string | null;
+  /** Your own reference, up to 200 characters. */
+  reference?: string | null;
+  /** Roles given at that unit when they accept; you must have every permission of each role. */
+  role_ids: string[];
+};
+
+/** An invitation to work in this tenant. */
+export type InvitationResponse = {
+  /** The account that accepted it. */
+  accepted_user_id?: string | null;
+  created_at: string;
+  email: string;
+  expires_at: string;
+  id: string;
+  invited_by?: string | null;
+  name: string;
+  /** The unit the roles apply at. */
+  org_id: string;
+  /** Your own reference, e.g. an HR ticket. */
+  reference?: string | null;
+  /** The roles given on acceptance. */
+  role_ids: string[];
+  /**
+   * `pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be
+   * accepted; resend it.
+   */
+  status: string;
+};
+
 /** What an entry is. */
 export type Kind = "post" | "page";
 
@@ -3584,6 +4289,34 @@ export type Localized = {
   vi?: string | null;
 };
 
+/** Finish signing in with the token from the mail. */
+export type LoginLinkConfirmation = {
+  /** The `device_secret` from `POST /api/v1/auth/login/link`, when it asked to bind the device. */
+  device_secret?: string | null;
+  token: string;
+};
+
+/** Ask for a sign-in link. */
+export type LoginLinkRequest = {
+  /**
+   * `true`: the link works only together with the `device_secret` returned here, so a link
+   * opened on another device (or intercepted) is useless. Keep the secret on this device.
+   */
+  bind_device?: boolean;
+  email: string;
+  /** `staff` (default) or `customer`. */
+  realm?: Realm;
+};
+
+/** What to keep while waiting for the mail. */
+export type LoginLinkResponse = {
+  /**
+   * With `bind_device`: send it back with the token. `null` otherwise. Returned even when no
+   * account has this email, so the answer reveals nothing.
+   */
+  device_secret?: string | null;
+};
+
 /** The second step of signing in. */
 export type LoginMfaRequest = {
   /** The current 6-digit code from the authenticator app, or an unused recovery code. */
@@ -3597,6 +4330,11 @@ export type LoginRequest = {
   /** Email of the account. Case and surrounding spaces do not matter. */
   email: string;
   password: string;
+  /**
+   * `staff` (default) or `customer`: a customer account of this tenant's shop is separate
+   * from a staff account with the same email.
+   */
+  realm?: Realm;
 };
 
 /** An API key of any user, for administrators. */
@@ -3633,11 +4371,24 @@ export type MeResponse = {
    */
   has_password: boolean;
   id: string;
+  /**
+   * Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
+   * request. Change it with `PATCH /api/v1/auth/me`.
+   */
+  locale?: string | null;
+  /**
+   * `true` when a role of yours needs two-step sign-in and it is off: that role's permissions
+   * are left out of `permissions` until you turn on an authenticator app
+   * (`POST /api/v1/auth/me/mfa/totp`) or add a passkey.
+   */
+  mfa_required: boolean;
   /** Display name. */
   name: string;
   pending_email?: PendingEmail | null;
   /** Permissions granted by the user's roles, sorted by name. */
   permissions: string[];
+  /** Preferred IANA time zone; `null`: not set. */
+  time_zone?: string | null;
 };
 
 /** A translation of an item's text alternative. */
@@ -3711,6 +4462,47 @@ export type MediaItemResponse = {
   visibility: Visibility;
   /** Width in pixels; only for raster images (JPEG, PNG, GIF, WebP, AVIF). */
   width?: number | null;
+};
+
+/** The roles to give in one unit. */
+export type MembershipRequest = {
+  /** The unit (see `GET /api/v1/organizations/units`); the id of the tenant is the root. */
+  org_id: string;
+  /** Ids of the roles in this unit. */
+  role_ids: string[];
+};
+
+/** The roles a user has in one organization unit. */
+export type MembershipResponse = {
+  /** The unit; the root unit has the id of the tenant. */
+  org_id: string;
+  /**
+   * The roles there, sorted by name. A role grants each permission at its scope from this
+   * unit (`unit`: this unit, `subtree`: this unit and the units below it).
+   */
+  roles: RoleResponse[];
+};
+
+/** One role a user has in one unit. */
+export type MembershipRowResponse = {
+  created_at: string;
+  id: string;
+  /**
+   * `true` when the membership is on a unit above the one asked for with `org_id`: the user
+   * works there through it.
+   */
+  inherited: boolean;
+  /** The unit of the membership. */
+  org_id: string;
+  role_id: string;
+  role_name: string;
+  user_id: string;
+};
+
+/** Every unit a user should work in, with the roles there. */
+export type MembershipsRequest = {
+  /** Replaces every membership the user had; `[]` removes all. */
+  memberships: MembershipRequest[];
 };
 
 /** A small label on an item, e.g. "-50%" or "New". */
@@ -3907,6 +4699,12 @@ export type MoveRequest = {
   parent_id?: string | null;
 };
 
+/** Where to move a unit. */
+export type MoveUnitRequest = {
+  /** The new parent; you need `organizations.units.write` there too. */
+  parent_id: string;
+};
+
 /** A permission the caller holds. */
 export type MyPermission = {
   /** What it allows, in the language of `Accept-Language`. */
@@ -3914,6 +4712,21 @@ export type MyPermission = {
   name: string;
   /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
   risk: string;
+};
+
+/** A tenant you can work in. */
+export type MyTenantResponse = {
+  /**
+   * `direct` (your own tenant), `delegation` (a parent tenant let your role in) or
+   * `support` (time-limited platform support access).
+   */
+  access: string;
+  /** The delegation or support grant; `null` for `direct`. */
+  access_id?: string | null;
+  /** Send it in the header `Autoxide-Tenant` to work there. */
+  id: string;
+  name: string;
+  slug: string;
 };
 
 /** What happens when a post is published (by the `content` module). */
@@ -4028,6 +4841,26 @@ export type NewsletterText = {
 };
 
 /** One page of a list. */
+export type Page_AdministrativeUnit = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    /** `province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`. */
+    kind: string;
+    /** 1: province level; 2: commune level. */
+    level: number;
+    name: string;
+    /** Code of the province, for a commune. */
+    parent_code?: string | null;
+    /** First day in force (`YYYY-MM-DD`). */
+    valid_from: string;
+    /** First day no longer in force; `null` while in force. */
+    valid_to?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ApiKeyResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -4039,6 +4872,11 @@ export type Page_ApiKeyResponse = {
     last_used_at?: string | null;
     /** What the key is for. */
     name: string;
+    /**
+     * The organization unit the key is bound to: it acts only on data of this unit and the
+     * units below it. The root unit (the id of the tenant) means no limit.
+     */
+    org_id: string;
     /**
      * Permissions the key may use, sorted by name. The key never has more than its
      * owner has at the moment of the request.
@@ -4285,6 +5123,23 @@ export type Page_CommentTarget = {
 };
 
 /** One page of a list. */
+export type Page_CustomerResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** When the account was disabled; `null` while active. */
+    disabled_at?: string | null;
+    email: string;
+    /** When the email was confirmed; `null` while not verified. */
+    email_verified_at?: string | null;
+    id: string;
+    name: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_DeliveryResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -4477,6 +5332,8 @@ export type Page_FormResponse = {
     name: string;
     /** Addresses mailed for each new submission. Never shown by the public endpoint. */
     notify_emails: string[];
+    /** The organization unit that owns the form; `null`: a form of the whole tenant. */
+    org_id?: string | null;
     /**
      * Key of the `email` field used as `Reply-To` of the notification and to find
      * submissions by email; `null`: the first `email` field.
@@ -4496,6 +5353,33 @@ export type Page_FormResponse = {
      * the version it was sent with, and is shown with that version's labels.
      */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InvitationResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The account that accepted it. */
+    accepted_user_id?: string | null;
+    created_at: string;
+    email: string;
+    expires_at: string;
+    id: string;
+    invited_by?: string | null;
+    name: string;
+    /** The unit the roles apply at. */
+    org_id: string;
+    /** Your own reference, e.g. an HR ticket. */
+    reference?: string | null;
+    /** The roles given on acceptance. */
+    role_ids: string[];
+    /**
+     * `pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be
+     * accepted; resend it.
+     */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -4605,6 +5489,26 @@ export type Page_MediaItemResponse = {
     visibility: Visibility;
     /** Width in pixels; only for raster images (JPEG, PNG, GIF, WebP, AVIF). */
     width?: number | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_MembershipRowResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    /**
+     * `true` when the membership is on a unit above the one asked for with `org_id`: the user
+     * works there through it.
+     */
+    inherited: boolean;
+    /** The unit of the membership. */
+    org_id: string;
+    role_id: string;
+    role_name: string;
+    user_id: string;
   }[];
   pagination: Pagination;
 };
@@ -4791,15 +5695,23 @@ export type Page_RoleResponse = {
   data: {
     /**
      * `true` only for the built-in `admin` role: it grants every permission,
-     * including permissions added later, and cannot be changed or deleted.
+     * including permissions added later, and cannot be changed (except `requires_mfa`) or
+     * deleted.
      */
     all_permissions: boolean;
     created_at: string;
     description: string;
+    /**
+     * The same permissions with their scope in the organization tree. Empty when
+     * `all_permissions`.
+     */
+    grants: RoleGrant[];
     id: string;
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
     permissions: string[];
+    /** `true`: the role's permissions work only for accounts with two-step sign-in. */
+    requires_mfa: boolean;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -4875,8 +5787,8 @@ export type Page_SessionResponse = {
     last_active_at: string;
     /**
      * How the session was signed in: `password`, `password_and_mfa` (password and a code),
-     * `passkey`, or `password_change` (a new session after changing the password); `null` for
-     * sessions older than this information.
+     * `passkey`, `email_link` (a link sent by email), or `password_change` (a new session after
+     * changing the password); `null` for sessions older than this information.
      */
     sign_in_method?: string | null;
     /** When the session was signed in. */
@@ -4900,6 +5812,8 @@ export type Page_SiteMenuSummary = {
     item_count: number;
     key: string;
     locale: string;
+    /** The website (organization unit) of the menu. */
+    org_id: string;
     updated_at: string;
     /**
      * Who created the menu or last replaced its items; `null` when unknown (menus saved
@@ -5161,6 +6075,28 @@ export type Page_TranslationRequestResponse = {
 };
 
 /** One page of a list. */
+export type Page_UnitResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Internal code, unique in the tenant when set. */
+    code?: string | null;
+    created_at: string;
+    /** Id of the unit. The root unit has the id of the tenant. */
+    id: string;
+    name: string;
+    /** The unit above; `null` only for the root. */
+    parent_id?: string | null;
+    status: UnitStatusValue;
+    /** Why the status was last changed, when given. */
+    status_reason?: string | null;
+    /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
+    unit_type: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_UserResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -5257,6 +6193,12 @@ export type PermissionResponse = {
    * `money`.
    */
   risk: string;
+  /**
+   * `true` when the permission applies to data of an organization unit: a role can grant it
+   * for one unit (`unit`), a unit and everything below it (`subtree`), or only the records
+   * a person owns (`own`). `false`: it can only be granted for the whole tenant.
+   */
+  scoped: boolean;
 };
 
 /**
@@ -5684,6 +6626,76 @@ export type PublicOption = {
   value: string;
 };
 
+/** Changes to a public profile. Omitted fields stay as they are; `null` clears. */
+export type PublicProfileRequest = {
+  address?: AddressInput | null;
+  cover_media_id?: string | null;
+  /** 1 to 200 characters; `null` goes back to the unit's name. */
+  display_name?: string | null;
+  /** Replaces every range. */
+  opening_hours?: {
+    /** Local time `HH:MM`, after `opens`. */
+    closes: string;
+    /** ISO day of the week: 1 Monday … 7 Sunday. */
+    day: number;
+    /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+    opens: string;
+  }[] | null;
+  pickup?: boolean | null;
+  position?: number | null;
+  public?: boolean | null;
+  /** Replaces every special day. */
+  special_days?: {
+    /** Closed all day. */
+    closed?: boolean;
+    closes?: string | null;
+    /** `YYYY-MM-DD`. */
+    date: string;
+    /** Shown to visitors, up to 200 characters. */
+    note?: string | null;
+    /** When open: local time `HH:MM`. */
+    opens?: string | null;
+  }[] | null;
+};
+
+/** The public profile of an organization unit, as websites show it. */
+export type PublicProfileResponse = {
+  address?: Address | null;
+  /** Cover image (id in the `media` library). */
+  cover_media_id?: string | null;
+  /** Name shown to visitors; defaults to the unit's name. */
+  display_name: string;
+  opening_hours: {
+    /** Local time `HH:MM`, after `opens`. */
+    closes: string;
+    /** ISO day of the week: 1 Monday … 7 Sunday. */
+    day: number;
+    /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+    opens: string;
+  }[];
+  /** Customers can pick up orders here. */
+  pickup: boolean;
+  /** Order among the public units (smaller first). */
+  position: number;
+  /** Shown on websites (`GET /api/v1/organizations/public/stores`). */
+  public: boolean;
+  special_days: {
+    /** Closed all day. */
+    closed?: boolean;
+    closes?: string | null;
+    /** `YYYY-MM-DD`. */
+    date: string;
+    /** Shown to visitors, up to 200 characters. */
+    note?: string | null;
+    /** When open: local time `HH:MM`. */
+    opens?: string | null;
+  }[];
+  unit_id: string;
+  unit_type: string;
+  /** `null` until the profile is first saved. */
+  updated_at?: string | null;
+};
+
 /** Search engine and sharing data. */
 export type PublicSeo = {
   /** Canonical address; empty when the entry's own address is canonical. */
@@ -5792,6 +6804,38 @@ export type PutMenuRequest = {
   items: MenuItemInput[];
 };
 
+/**
+ * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
+ * one tenant's shop, without permissions).
+ */
+export type Realm = "staff" | "customer";
+
+/** Proof that you are the account owner, for one sensitive change. */
+export type ReauthRequest = {
+  /** How you prove it is you. */
+  method: "password" | "totp" | "passkey" | "email_link";
+  /** With `passkey`. */
+  passkey_ceremony_id?: string | null;
+  /** With `passkey`: the browser's `AuthenticationResponseJSON`. */
+  passkey_credential?: Record<string, unknown> | null;
+  /** With `password`. */
+  password?: string | null;
+  /** With `totp`. */
+  totp_code?: string | null;
+};
+
+/** A confirmation token. */
+export type ReauthResponse = {
+  /** When the token stops working (`AUTOXIDE_AUTH_REAUTH_MINUTES`). */
+  expires_at: string;
+  /**
+   * Send it as `reauth_token` with the sensitive change (creating an API key, changing your
+   * email, turning on two-step sign-in, adding a passkey, deleting your account). Used once.
+   * `null` with `email_link`: the token is in the mail.
+   */
+  reauth_token?: string | null;
+};
+
 /** One-time recovery codes. Shown only once. */
 export type RecoveryCodesResponse = {
   /**
@@ -5849,6 +6893,12 @@ export type RegisterRequest = {
   name: string;
   /** 12 to 128 characters. */
   password: string;
+  /**
+   * `staff` (default; needs self-registration on the server) or `customer`: a customer
+   * account of this tenant's shop, without any permission (open unless the tenant turns off
+   * the setting `auth.customer_registration`).
+   */
+  realm?: Realm;
 };
 
 /** A new name for a tag. */
@@ -5880,6 +6930,11 @@ export type ResetConfirmation = {
 /** The account whose password to reset. */
 export type ResetRequest = {
   email: string;
+  /**
+   * `staff` (default) or `customer`: a customer account of this tenant's shop is separate
+   * from a staff account with the same email.
+   */
+  realm?: Realm;
 };
 
 /** What lives at an address. */
@@ -5912,10 +6967,34 @@ export type RevisionResponse = {
   snapshot?: Record<string, unknown> | null;
 };
 
+/** A permission a role grants, with how far it reaches in the organization tree. */
+export type RoleGrant = {
+  permission: string;
+  /**
+   * How far a permission reaches in the organization tree, from the unit of the membership:
+   * `own` (records the person owns), `unit` (that unit), `subtree` (that unit and every unit below
+   * it), `tenant` (the whole tenant).
+   */
+  scope: "own" | "unit" | "subtree" | "tenant";
+};
+
 /** The full content of a role. */
 export type RoleRequest = {
   /** What the role is for. Optional. */
   description?: string;
+  /**
+   * Permissions to grant with a scope in the organization tree (`own`, `unit`, `subtree`,
+   * `tenant`). A permission is listed once, in `permissions` (whole tenant) or here.
+   */
+  grants?: {
+    permission: string;
+    /**
+     * How far a permission reaches in the organization tree, from the unit of the membership:
+     * `own` (records the person owns), `unit` (that unit), `subtree` (that unit and every unit below
+     * it), `tenant` (the whole tenant).
+     */
+    scope: "own" | "unit" | "subtree" | "tenant";
+  }[];
   /** Unique. Lowercase letters, digits, `_` and `-`, starting with a letter. */
   name: string;
   /**
@@ -5923,21 +7002,35 @@ export type RoleRequest = {
    * Duplicates are ignored.
    */
   permissions?: string[];
+  /**
+   * When `true`, the role's permissions work only for accounts with two-step sign-in
+   * (an authenticator app or a passkey); others see `mfa_required` in `GET /api/v1/auth/me`
+   * until they turn it on. The only change the built-in `admin` role accepts.
+   */
+  requires_mfa?: boolean;
 };
 
 /** A role: a named set of permissions given to users. */
 export type RoleResponse = {
   /**
    * `true` only for the built-in `admin` role: it grants every permission,
-   * including permissions added later, and cannot be changed or deleted.
+   * including permissions added later, and cannot be changed (except `requires_mfa`) or
+   * deleted.
    */
   all_permissions: boolean;
   created_at: string;
   description: string;
+  /**
+   * The same permissions with their scope in the organization tree. Empty when
+   * `all_permissions`.
+   */
+  grants: RoleGrant[];
   id: string;
   name: string;
   /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
   permissions: string[];
+  /** `true`: the role's permissions work only for accounts with two-step sign-in. */
+  requires_mfa: boolean;
   updated_at: string;
 };
 
@@ -6055,8 +7148,8 @@ export type SessionResponse = {
   last_active_at: string;
   /**
    * How the session was signed in: `password`, `password_and_mfa` (password and a code),
-   * `passkey`, or `password_change` (a new session after changing the password); `null` for
-   * sessions older than this information.
+   * `passkey`, `email_link` (a link sent by email), or `password_change` (a new session after
+   * changing the password); `null` for sessions older than this information.
    */
   sign_in_method?: string | null;
   /** When the session was signed in. */
@@ -6074,6 +7167,22 @@ export type SetPasswordRequest = {
   password: string;
 };
 
+/** A setting that units can set and the units below them inherit. */
+export type SettingResponse = {
+  /** The value when no unit sets it; `null`: none. */
+  default?: unknown;
+  /** What it is for and which values it takes. */
+  description: string;
+  /** `<module>.<name>`, e.g. `organizations.timezone`. */
+  key: string;
+};
+
+/** A new value for a setting. */
+export type SettingValueRequest = {
+  /** The value, checked by the setting (see its description). */
+  value: unknown;
+};
+
 /** A website menu as saved. */
 export type SiteMenu = {
   created_at: string;
@@ -6081,6 +7190,8 @@ export type SiteMenu = {
   items: SiteMenuItem[];
   key: string;
   locale: string;
+  /** The website (organization unit) of the menu; the id of the tenant for the whole tenant. */
+  org_id: string;
   updated_at: string;
 };
 
@@ -6147,6 +7258,8 @@ export type SiteMenuSummary = {
   item_count: number;
   key: string;
   locale: string;
+  /** The website (organization unit) of the menu. */
+  org_id: string;
   updated_at: string;
   /**
    * Who created the menu or last replaced its items; `null` when unknown (menus saved
@@ -6172,13 +7285,23 @@ export type SitemapItem = {
 /** Proof that you are the account owner. */
 export type StartPasskeyRegistrationRequest = {
   /** Your current password: a stolen access token alone must not add a passkey. */
-  current_password: string;
+  current_password?: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
 };
 
 /** Confirms starting two-step sign-in. */
 export type StartTotpRequest = {
   /** Your current password. */
-  current_password: string;
+  current_password?: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
 };
 
 /** Where an entry is in its life. */
@@ -6353,6 +7476,55 @@ export type SubscriptionResponse = {
 
 /** Where a subscriber stands on one list. */
 export type SubscriptionStatus = "unconfirmed" | "confirmed" | "unsubscribed";
+
+/** A new support access grant. */
+export type SupportGrantRequest = {
+  /**
+   * `support` (the tenant must allow it with the setting `auth.support_access`) or
+   * `legal_request` (a request of a competent authority; needs `legal_reference`).
+   */
+  basis: string;
+  /** How long, 1 to `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` hours. */
+  hours: number;
+  /** For `legal_request`: number of the authority's document. */
+  legal_reference?: string | null;
+  /** Why, 10 to 500 characters; the tenant sees it. */
+  reason: string;
+  /** A role of the platform tenant: its permissions apply in the tenant, at its root unit. */
+  role_id: string;
+  /** A staff account of the platform tenant. */
+  staff_user_id: string;
+  /** The tenant to enter. */
+  tenant_id: string;
+};
+
+/** A time-limited access of platform staff to a tenant's data. */
+export type SupportGrantResponse = {
+  /**
+   * `support`, or `legal_request` (a request of a competent authority; the tenant cannot
+   * revoke it).
+   */
+  basis: string;
+  created_at: string;
+  expires_at: string;
+  /** When the staff first entered under it; `null`: not used. */
+  first_used_at?: string | null;
+  granted_by?: string | null;
+  id: string;
+  /** Number of the authority's document, for `legal_request`. */
+  legal_reference?: string | null;
+  reason: string;
+  revoked_at?: string | null;
+  /** `true` when the tenant revoked it. */
+  revoked_by_tenant: boolean;
+  /** The role of the platform tenant whose permissions they get. */
+  role_id: string;
+  /** The platform staff account. */
+  staff_user_id: string;
+  starts_at: string;
+  /** The tenant the staff may enter. */
+  tenant_id: string;
+};
 
 /** An address that gets no campaign mail. */
 export type SuppressionResponse = {
@@ -6737,6 +7909,55 @@ export type TranslationRequestResponse = {
 /** Where an AI translation is. */
 export type TranslationStatus = "queued" | "running" | "succeeded" | "failed";
 
+/** A unit of the organization tree of the tenant (head office, region, store, warehouse…). */
+export type UnitResponse = {
+  /** Internal code, unique in the tenant when set. */
+  code?: string | null;
+  created_at: string;
+  /** Id of the unit. The root unit has the id of the tenant. */
+  id: string;
+  name: string;
+  /** The unit above; `null` only for the root. */
+  parent_id?: string | null;
+  status: UnitStatusValue;
+  /** Why the status was last changed, when given. */
+  status_reason?: string | null;
+  /** Code of the unit type (see `GET /api/v1/organizations/unit-types`); `tenant` for the root. */
+  unit_type: string;
+  updated_at: string;
+};
+
+/** The value of a setting at a unit. */
+export type UnitSettingResponse = {
+  /** `true` when the value comes from a unit above or the default, not from this unit. */
+  inherited: boolean;
+  /** Key of the setting. */
+  key: string;
+  /** The unit that set this value (this unit or one above it); `null`: the default. */
+  source_unit_id?: string | null;
+  /** The value in force; `null` when nothing sets it and it has no default. */
+  value?: unknown;
+};
+
+/** A new status for a unit. */
+export type UnitStatusRequest = {
+  /** Why, up to 500 characters; kept with the unit and in the audit log. */
+  reason?: string | null;
+  status: UnitStatusValue;
+};
+
+/** Status of a unit. Only an `active` unit whose units above are all `active` can be written to. */
+export type UnitStatusValue = "pending" | "active" | "suspended" | "archived";
+
+/** A kind of unit the tenant uses, e.g. `store` or `warehouse`. */
+export type UnitTypeResponse = {
+  code: string;
+  created_at: string;
+  description: string;
+  name: string;
+  updated_at: string;
+};
+
 /** Stop reply mails. */
 export type UnsubscribeRequest = {
   /** Stop mails about every comment followed with this address, not just this one. */
@@ -6770,6 +7991,14 @@ export type UpdateCampaignRequest = {
 export type UpdateCommentRequest = {
   /** `published` (approve, or restore), `rejected`, `spam`, or `pending` (hold again). */
   status: CommentStatus;
+};
+
+/** Changes to a customer account. Omitted fields stay as they are. */
+export type UpdateCustomerRequest = {
+  /** `true` disables the account and signs it out everywhere; `false` enables it. */
+  disabled?: boolean | null;
+  /** New display name, 1 to 200 characters. */
+  name?: string | null;
 };
 
 /** Changes to an endpoint. Omitted fields stay as they are. */
@@ -6854,6 +8083,16 @@ export type UpdateListRequest = {
   public?: boolean | null;
 };
 
+/** Your own changes: display name, preferred language and time zone. */
+export type UpdateMeRequest = {
+  /** Preferred language for mails sent later (`en` or `vi`); `null` clears it. */
+  locale?: string | null;
+  /** New display name, 1 to 100 characters (spaces around are removed). */
+  name?: string | null;
+  /** Preferred IANA time zone, e.g. `Asia/Ho_Chi_Minh`; `null` clears it. */
+  time_zone?: string | null;
+};
+
 /** A new status for a submission. */
 export type UpdateSubmissionRequest = {
   /** `read`, `archived`, `spam`, or `new` (e.g. not spam after all). */
@@ -6873,6 +8112,22 @@ export type UpdateSubscriberRequest = {
    * the import with a consent source).
    */
   unsubscribe_list_ids?: string[];
+};
+
+/** Changes to a unit; omitted fields stay as they are. */
+export type UpdateUnitRequest = {
+  /** New internal code, 1 to 64 characters; an empty string removes the code. */
+  code?: string | null;
+  /** New name, 1 to 200 characters. */
+  name?: string | null;
+};
+
+/** Changes to a unit type; omitted fields stay as they are. */
+export type UpdateUnitTypeRequest = {
+  /** Up to 1000 characters. */
+  description?: string | null;
+  /** 1 to 100 characters. */
+  name?: string | null;
 };
 
 /** Changes to an account. Omitted fields stay as they are. */
@@ -6994,6 +8249,66 @@ export type VerifiedResponse = {
 export type Visibility = "private" | "public";
 
 export interface paths {
+  "/api/v1/address/provinces": {
+    /** List the provinces. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { country?: string; as_of?: string }; };
+      responses: {
+        200: Data_Vec_AdministrativeUnit;
+        304: void;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/address/provinces/{code}/communes": {
+    /** List the communes, wards and special zones of a province. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { code: string }; query: { country?: string; as_of?: string }; };
+      responses: {
+        200: Data_Vec_AdministrativeUnit;
+        304: void;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/address/units": {
+    /** Search administrative units by name. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { country?: string; q?: string; province?: string; level?: number; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_AdministrativeUnit;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/address/units/{code}": {
+    /** Get an administrative unit by code. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { code: string }; query: { country?: string }; };
+      responses: {
+        200: Data_AdministrativeUnitDetail;
+        304: void;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/address/validate": {
+    /** Check an address and fill in the names. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: AddressInput;
+      responses: {
+        200: Data_Address;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ai/status": {
     /** See what the AI features can do. */
     get: {
@@ -7110,6 +8425,83 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/customers": {
+    /** List or search the customer accounts of the shop. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; status?: "active" | "disabled"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_CustomerResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/customers/{id}": {
+    /** Get a customer account. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename, disable or enable a customer account. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateCustomerRequest;
+      responses: {
+        200: Data_CustomerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/delegations": {
+    /** List the delegations of this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { direction?: "outgoing" | "incoming" }; };
+      responses: {
+        200: Data_Vec_DelegationResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Let holders of a role work in a child tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: DelegationRequest;
+      responses: {
+        201: Data_DelegationResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/delegations/{id}": {
+    /** Revoke a delegation. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_DelegationResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/email-change/report": {
     /** Report an email change you did not make. */
     post: {
@@ -7137,6 +8529,74 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/invitations": {
+    /** List invitations. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_InvitationResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Invite someone by email. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InvitationRequest;
+      responses: {
+        201: Data_InvitationResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/invitations/accept": {
+    /** Accept an invitation with the token from its mail. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: AcceptInvitationRequest;
+      responses: {
+        200: Data_AcceptedResponse;
+        400: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/invitations/{id}": {
+    /** Revoke an invitation. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvitationResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/invitations/{id}/resend": {
+    /** Send an invitation again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvitationResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/login": {
     /** Sign in with email and password. */
     post: {
@@ -7149,6 +8609,35 @@ export interface paths {
         403: Problem;
         422: Problem;
         429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/login/link": {
+    /** Send a sign-in link by email. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: LoginLinkRequest;
+      responses: {
+        202: Data_LoginLinkResponse;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/login/link/confirm": {
+    /** Sign in with the token from a sign-in link. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: LoginLinkConfirmation;
+      responses: {
+        200: Data_TokenResponse;
+        202: Data_MfaChallengeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -7217,6 +8706,17 @@ export interface paths {
         default: Problem;
       };
     };
+    /** Change your display name, preferred language or time zone. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: UpdateMeRequest;
+      responses: {
+        200: Data_MeResponse;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
     /** Delete your own account and everything it owns. */
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
@@ -7280,6 +8780,17 @@ export interface paths {
         200: Data_PersonalDataResponse;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/me/memberships": {
+    /** List the organization units you work in, with your roles there. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_MembershipResponse;
+        401: Problem;
         default: Problem;
       };
     };
@@ -7425,6 +8936,23 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/me/reauth": {
+    /** Confirm it is you, for a sensitive change. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ReauthRequest;
+      responses: {
+        200: Data_ReauthResponse;
+        202: Data_ReauthResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/me/sessions": {
     /** List your signed-in sessions. */
     get: {
@@ -7458,6 +8986,31 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/me/tenants": {
+    /** List the tenants you can work in. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_MyTenantResponse;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/memberships": {
+    /** List who works in which organization unit, with which role. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; role_id?: string; user_id?: string; inherited?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_MembershipRowResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -7593,6 +9146,68 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/support-access": {
+    /** List platform staff access to this tenant's data. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-access/{id}": {
+    /** Revoke a platform staff access to this tenant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-grants": {
+    /** List the support access grants for a tenant (platform). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id: string }; };
+      responses: {
+        200: Data_Vec_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Grant platform staff time-limited access to a tenant's data (platform). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SupportGrantRequest;
+      responses: {
+        201: Data_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-grants/{id}": {
+    /** Revoke a support access grant (platform). */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; query: { tenant_id: string }; };
+      responses: {
+        200: Data_SupportGrantResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/users": {
     /** List or search user accounts. */
     get: {
@@ -7655,6 +9270,33 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/users/{id}/memberships": {
+    /** List the organization units a user works in, with the roles there. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_MembershipResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace every organization unit a user works in, and the roles there. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MembershipsRequest;
+      responses: {
+        200: Data_Vec_MembershipResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -8182,7 +9824,7 @@ export interface paths {
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_EntryResponse;
         401: Problem;
@@ -8587,7 +10229,7 @@ export interface paths {
   "/api/v1/content/public/feed": {
     /** The newest posts of a language, for RSS, Atom or JSON Feed (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; limit?: number; site?: string }; };
       responses: {
         200: Data_Vec_PublicEntryResponse;
         422: Problem;
@@ -8610,7 +10252,7 @@ export interface paths {
   "/api/v1/content/public/posts": {
     /** List published posts (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; term_id?: string; author_id?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; term_id?: string; author_id?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
       responses: {
         200: Page_PublicEntryResponse;
         422: Problem;
@@ -8633,7 +10275,7 @@ export interface paths {
   "/api/v1/content/public/resolve": {
     /** Look up an address (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; path: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; path: string; site?: string }; };
       responses: {
         200: Data_Resolution;
         404: Problem;
@@ -8645,7 +10287,7 @@ export interface paths {
   "/api/v1/content/public/search": {
     /** Search published posts and pages by meaning and words (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page"; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale?: string; kind?: "post" | "page"; limit?: number; site?: string }; };
       responses: {
         200: Page_SearchHit;
         404: Problem;
@@ -8657,7 +10299,7 @@ export interface paths {
   "/api/v1/content/public/sitemap": {
     /** List every published address, for a sitemap (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
       responses: {
         200: Page_SitemapItem;
         422: Problem;
@@ -8942,7 +10584,7 @@ export interface paths {
   "/api/v1/forms": {
     /** List forms. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: "open" | "closed"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: "open" | "closed"; owner_org?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_FormResponse;
         401: Problem;
@@ -9525,7 +11167,7 @@ export interface paths {
   "/api/v1/media": {
     /** List media items. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; alt_missing?: boolean; include?: "uploader"; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; owner_org?: string; alt_missing?: boolean; include?: "uploader"; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_MediaItemResponse;
         401: Problem;
@@ -9536,7 +11178,7 @@ export interface paths {
     };
     /** Upload a media item. */
     post: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { name: string; folder_id?: string; tags?: string }; };
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { name: string; folder_id?: string; org_id?: string; tags?: string }; };
       requestBody: Blob;
       responses: {
         201: Data_UploadedResponse;
@@ -9840,7 +11482,7 @@ export interface paths {
   "/api/v1/menus": {
     /** List website menus. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { owner_org?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_SiteMenuSummary;
         401: Problem;
@@ -9866,7 +11508,7 @@ export interface paths {
   "/api/v1/menus/public/{key}": {
     /** Get a website menu, ready to show (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: string; site?: string }; };
       responses: {
         200: Data_PublicSiteMenu;
         304: void;
@@ -10386,6 +12028,246 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/public/stores": {
+    /** List the stores of this tenant shown on its websites. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PublicProfileResponse;
+        304: void;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/settings": {
+    /** List the settings units can set. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_SettingResponse;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/unit-types": {
+    /** List the unit types of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_UnitTypeResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a unit type. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateUnitTypeRequest;
+      responses: {
+        201: Data_UnitTypeResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/unit-types/{code}": {
+    /** Rename a unit type or change its description. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { code: string }; };
+      requestBody: UpdateUnitTypeRequest;
+      responses: {
+        200: Data_UnitTypeResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a unit type. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { code: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units": {
+    /** List the organization units in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { parent_id?: string; type?: string; status?: "pending" | "active" | "suspended" | "archived"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_UnitResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create an organization unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateUnitRequest;
+      responses: {
+        201: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}": {
+    /** Get an organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename an organization unit or change its code. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateUnitRequest;
+      responses: {
+        200: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/ancestors": {
+    /** List the units above an organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/move": {
+    /** Move an organization unit, with everything below it, under another parent. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MoveUnitRequest;
+      responses: {
+        200: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/public-profile": {
+    /** Get the public profile of an organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PublicProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the public profile of an organization unit. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PublicProfileRequest;
+      responses: {
+        200: Data_PublicProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/settings": {
+    /** Get the settings in force at an organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_UnitSettingResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/settings/{key}": {
+    /** Set a setting of an organization unit. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; key: string }; };
+      requestBody: SettingValueRequest;
+      responses: {
+        200: Data_UnitSettingResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Clear a setting of an organization unit, so it inherits again. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; key: string }; };
+      responses: {
+        200: Data_UnitSettingResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/status": {
+    /** Approve, suspend, archive or reactivate an organization unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UnitStatusRequest;
+      responses: {
+        200: Data_UnitResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

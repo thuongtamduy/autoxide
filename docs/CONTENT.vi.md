@@ -161,6 +161,28 @@ Permission `content.manage`.
   trỏ được tới đối tượng của module bất kỳ; chép menu sang bằng
   `autoxide task menus.import_content_menus` ([`MENUS.vi.md`](MENUS.vi.md)).
 
+## Cửa hàng và website
+
+Ở khách có cây tổ chức (module `organizations`), mỗi mục thuộc một nút: `org_id` khi tạo (bỏ
+trống: nút duy nhất của bạn, hay nút gốc khi role của bạn phủ cả khách). Các permission trên áp
+theo độ sâu của role: người có `content.write` ở một cửa hàng (`subtree`) chỉ viết mục của cửa hàng
+đó và các nút bên dưới; mục ngoài phạm vi trả 404. Lọc danh sách quản trị bằng `owner_org` (một
+nút) hay `site` (những gì một website hiện).
+
+Mỗi nút có thể có website: tên miền gắn với nút (`PATCH /api/v1/kernel/domains/{id}` với
+`org_id`), hay `?site=<id của nút>` ở các endpoint công khai. Website hiện mục của nút đó và của mọi
+nút cấp trên — bài của trụ sở hiện trên website của mọi cửa hàng, bài của một cửa hàng không bao
+giờ hiện trên website của cửa hàng khác.
+
+Mỗi website có bộ đường dẫn và slug riêng: hai cửa hàng cùng có `/about` được. Khi một nút và một nút
+cấp trên cùng đăng một đường dẫn, website hiện bài của nút gần nó nhất (`/about` của cửa hàng che
+`/about` của trụ sở trên website của cửa hàng; sitemap chỉ liệt kê một lần). Ngôn ngữ một website
+đưa ra là cài đặt `organizations.languages` của nút đó
+(`PUT /api/v1/organizations/units/{id}/settings/organizations.languages` với `["vi", "en"]`; ngôn
+ngữ đầu là mặc định), chỉ giữ ngôn ngữ của khách; không đặt thì dùng ngôn ngữ của khách. Đọc công
+khai, sitemap, feed và tìm kiếm công khai theo ngôn ngữ của website và chỉ hiện những gì website đó
+hiện.
+
 ## Website: endpoint công khai
 
 Không cần đăng nhập. Chỉ trả bản đã đăng — không bao giờ trả bản nháp.

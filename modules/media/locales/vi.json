@@ -16,6 +16,7 @@
   "field:must be one of {allowed}": "phải là một trong {allowed}",
   "field:no media folder has this id": "không có thư mục media nào mang id này",
   "field:the body is empty; send the content of the file": "thân request trống; hãy gửi nội dung tệp",
+  "field:you work in several organization units: choose the unit of the item": "bạn làm ở nhiều nút tổ chức: hãy chọn nút của tệp",
   "media.ai_private_not_allowed": "Ảnh này đang riêng tư, và máy chủ không gửi ảnh riêng tư cho nhà cung cấp AI (AUTOXIDE_MEDIA_AI_SEND_PRIVATE). Hãy chuyển ảnh sang công khai trước, hoặc hỏi người vận hành.",
   "media.ai_unsupported_image": "Chỉ gợi ý được alt text cho ảnh JPEG, PNG, GIF và WebP đọc được.",
   "media.content_mismatch": "Nội dung không phải file `{declared}` (trông như `{detected}`). Hãy khai đúng loại trong `Content-Type`.",

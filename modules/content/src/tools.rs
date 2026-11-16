@@ -106,6 +106,8 @@ pub(crate) struct CreateDraftInput {
     locale: Option<String>,
     /// Parent page (pages only).
     parent_id: Option<Uuid>,
+    /// The organization unit that owns the entry; omit when you work in one unit only.
+    org_id: Option<Uuid>,
     /// 1 to 300 characters.
     title: String,
     /// Omitted: made from the title.
@@ -243,6 +245,8 @@ pub(crate) struct ResolveInput {
     locale: String,
     /// The address, without domain or language prefix, e.g. `/blog/my-post`.
     path: String,
+    /// The website (organization unit) to look on; omitted: the website of the whole tenant.
+    site: Option<Uuid>,
 }
 
 pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
@@ -326,8 +330,13 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                         ai_generated: input.ai_generated,
                         ..Default::default()
                     };
-                    let new =
-                        NewEntry { kind, locale: input.locale, parent_id: input.parent_id, fields };
+                    let new = NewEntry {
+                        kind,
+                        locale: input.locale,
+                        parent_id: input.parent_id,
+                        org_id: input.org_id,
+                        fields,
+                    };
                     versioned(&service, &tenant, service.create(&tenant, &principal, new).await?)
                         .await
                 }
@@ -544,7 +553,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                         kind: None,
                         limit: input.limit,
                     };
-                    let hits = service.search(&tenant, Some(&principal), &query, false).await?;
+                    let hits = service.search(&tenant, Some(&principal), &query, None).await?;
                     Ok::<Vec<SearchHit>, Error>(hits.into_iter().map(SearchHit::from).collect())
                 }
             },
@@ -558,8 +567,15 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             move |tenant: TenantContext, _principal: Principal, input: ResolveInput| {
                 let service = resolve.clone();
                 async move {
+                    let site = match input.site {
+                        Some(org) => {
+                            let org = autoxide_kernel::tenancy::OrgId::from_uuid(org);
+                            autoxide_kernel::tenancy::Site::of(&tenant, org).await?
+                        }
+                        None => autoxide_kernel::tenancy::Site::whole(&tenant),
+                    };
                     let (found, _) =
-                        resolution(&service, &tenant, &input.locale, &input.path).await?;
+                        resolution(&service, &tenant, &site, &input.locale, &input.path).await?;
                     Ok::<Resolution, Error>(found)
                 }
             },

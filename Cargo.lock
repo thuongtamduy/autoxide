@@ -366,6 +366,7 @@ name = "autoxide"
 version = "0.14.0"
 dependencies = [
  "async-trait",
+ "autoxide-address",
  "autoxide-ai",
  "autoxide-audit",
  "autoxide-auth",
@@ -380,6 +381,7 @@ dependencies = [
  "autoxide-menus",
  "autoxide-newsletter",
  "autoxide-notes",
+ "autoxide-organizations",
  "autoxide-testkit",
  "autoxide-webhooks",
  "axum",
@@ -398,6 +400,26 @@ dependencies = [
  "tower",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "autoxide-address"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
@@ -449,10 +471,12 @@ dependencies = [
  "argon2",
  "async-trait",
  "autoxide-kernel",
+ "autoxide-organizations",
  "autoxide-testkit",
  "axum",
  "base64 0.23.1",
  "chrono",
+ "chrono-tz",
  "getrandom 0.4.3",
  "hmac 0.13.0",
  "metrics",
@@ -500,6 +524,7 @@ dependencies = [
  "async-trait",
  "autoxide-kernel",
  "autoxide-media",
+ "autoxide-organizations",
  "autoxide-testkit",
  "axum",
  "base64 0.23.1",
@@ -690,6 +715,7 @@ dependencies = [
  "autoxide-content",
  "autoxide-kernel",
  "autoxide-media",
+ "autoxide-organizations",
  "autoxide-testkit",
  "axum",
  "base64 0.23.1",
@@ -742,6 +768,29 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-organizations"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-address",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "chrono-tz",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
  "tracing",
  "utoipa",
  "utoipa-axum",
@@ -1026,6 +1075,16 @@ dependencies = [
  "num-traits",
  "serde",
  "windows-link 0.2.1",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6139a8597ed92cf816dfb33f5dd6cf0bb93a6adc938f11039f371bc5bcd26c3"
+dependencies = [
+ "chrono",
+ "phf",
 ]
 
 [[package]]
@@ -3230,6 +3289,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7"
+dependencies = [
+ "phf_shared",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4386,6 +4463,12 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "siphasher"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "sketches-ddsketch"

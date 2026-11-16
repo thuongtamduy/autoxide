@@ -154,6 +154,8 @@ impl Dispatcher {
                 "actor_user_id",
                 "actor_api_key_id",
                 "actor_kind",
+                "actor_access",
+                "actor_access_id",
                 "subject",
                 "payload",
                 "occurred_at",
@@ -258,11 +260,24 @@ impl Dispatcher {
                 api_key_id: row.try_get("", "actor_api_key_id")?,
                 public: row.try_get::<Option<String>>("", "actor_kind")?.as_deref()
                     == Some("public"),
+                access: access_of(
+                    row.try_get::<Option<String>>("", "actor_access")?.as_deref(),
+                    row.try_get("", "actor_access_id")?,
+                ),
             },
             subject: row.try_get("", "subject")?,
             payload: serde_json::from_str(&payload).map_err(Error::internal)?,
             occurred_at: row.try_get("", "occurred_at")?,
         })
+    }
+}
+
+/// Đường vào đọc từ hai cột của outbox; dòng cũ (không có giá trị) là trực tiếp.
+fn access_of(kind: Option<&str>, id: Option<Uuid>) -> crate::access::AccessPath {
+    match (kind, id) {
+        (Some("delegation"), Some(id)) => crate::access::AccessPath::Delegation(id),
+        (Some("support"), Some(id)) => crate::access::AccessPath::Support(id),
+        _ => crate::access::AccessPath::Direct,
     }
 }
 

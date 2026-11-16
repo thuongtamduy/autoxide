@@ -4,8 +4,10 @@
 
 use std::sync::Arc;
 
+use autoxide_kernel::access::{Grant, Principal, Scope};
 use autoxide_kernel::database::Database;
-use autoxide_kernel::event::Actor;
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
+
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
 use rmcp::service::{RoleClient, RunningService};
@@ -20,10 +22,21 @@ use crate::service::{NewNote, NoteChanges};
 const ADA: Uuid = Uuid::from_u128(0xada);
 const BOB: Uuid = Uuid::from_u128(0xb0b);
 
+/// Ghi chú cá nhân: `notes.*` với độ sâu `own` (ở nút gốc) — mỗi người chỉ thấy ghi chú của
+/// mình (bước 34).
+fn own(user: Uuid) -> Principal {
+    let root = root_of(DEFAULT_TENANT);
+    Principal::with_grants(
+        user,
+        ["notes.read", "notes.write"].map(|name| (name.to_owned(), Grant::new(root, Scope::Own))),
+    )
+}
+
 async fn app(test: &TestDatabase) -> TestApp {
+    let root = root_of(DEFAULT_TENANT);
     TestApp::builder(test)
-        .user("ada", 0xada, &["notes.read", "notes.write"])
-        .user("bob", 0xb0b, &["notes.read"])
+        .member("ada", 0xada, root, &[("notes.read", Scope::Own), ("notes.write", Scope::Own)])
+        .member("bob", 0xb0b, root, &[("notes.read", Scope::Own)])
         .module(crate::module())
         .build()
         .await
@@ -196,8 +209,9 @@ async fn tao_trung_ten_dong_thoi_chi_mot_thanh_cong() {
                 let service = service.clone();
                 let tenant = tenant.clone();
                 tokio::spawn(async move {
-                    let input = NewNote { title: "Same".to_owned(), body: String::new() };
-                    service.create(&tenant, Actor::user(ADA), input).await
+                    let input =
+                        NewNote { title: "Same".to_owned(), body: String::new(), org_id: None };
+                    service.create(&tenant, &own(ADA), input).await
                 })
             })
             .collect();
@@ -211,13 +225,12 @@ async fn tao_trung_ten_dong_thoi_chi_mot_thanh_cong() {
         assert_eq!(created, 1);
 
         // Người khác dùng cùng tên được; đổi tên trùng thì bị chặn.
-        let other = NewNote { title: "Same".to_owned(), body: String::new() };
-        service.create(&tenant, Actor::user(BOB), other).await.unwrap();
-        let second = NewNote { title: "Second".to_owned(), body: String::new() };
-        let second = service.create(&tenant, Actor::user(ADA), second).await.unwrap();
+        let other = NewNote { title: "Same".to_owned(), body: String::new(), org_id: None };
+        service.create(&tenant, &own(BOB), other).await.unwrap();
+        let second = NewNote { title: "Second".to_owned(), body: String::new(), org_id: None };
+        let second = service.create(&tenant, &own(ADA), second).await.unwrap();
         let rename = NoteChanges { title: Some("Same".to_owned()), body: None };
-        let taken =
-            service.update(&tenant, Actor::user(ADA), second.id, rename, None).await.unwrap_err();
+        let taken = service.update(&tenant, &own(ADA), second.id, rename, None).await.unwrap_err();
         assert_eq!(taken.code(), "notes.title_taken");
     })
     .await
@@ -272,8 +285,8 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
             if who == "bob" {
                 assert_eq!(status, StatusCode::FORBIDDEN);
                 let service = crate::service::NoteService::new(Outbox::standalone("notes"));
-                let note = NewNote { title: title.to_owned(), body: String::new() };
-                service.create(&tenant, Actor::user(BOB), note).await.unwrap();
+                let note = NewNote { title: title.to_owned(), body: String::new(), org_id: None };
+                service.create(&tenant, &own(BOB), note).await.unwrap();
             } else {
                 assert_eq!(status, StatusCode::CREATED);
             }
@@ -317,8 +330,8 @@ async fn sua_dong_thoi_cung_phien_ban_chi_mot_nguoi_thang() {
         let app = app(test).await;
         let tenant = app.default_tenant();
         let service = Arc::new(crate::service::NoteService::new(Outbox::standalone("notes")));
-        let note = NewNote { title: "Shared".to_owned(), body: String::new() };
-        let note = service.create(&tenant, Actor::user(ADA), note).await.unwrap();
+        let note = NewNote { title: "Shared".to_owned(), body: String::new(), org_id: None };
+        let note = service.create(&tenant, &own(ADA), note).await.unwrap();
 
         let attempts: Vec<_> = (0..8)
             .map(|index| {
@@ -327,7 +340,7 @@ async fn sua_dong_thoi_cung_phien_ban_chi_mot_nguoi_thang() {
                 let changes = NoteChanges { title: None, body: Some(format!("edit {index}")) };
                 let version = Some(note.updated_at);
                 tokio::spawn(async move {
-                    service.update(&tenant, Actor::user(ADA), note.id, changes, version).await
+                    service.update(&tenant, &own(ADA), note.id, changes, version).await
                 })
             })
             .collect();
@@ -356,14 +369,14 @@ async fn permission_cua_toi_kem_mo_ta_va_rui_ro() {
         assert_eq!(answer.status(), StatusCode::OK);
         assert_eq!(
             answer.json()["data"],
-            json!([{"name": "notes.read", "description": "Xem ghi chú của chính bạn.", "risk": "read"}])
+            json!([{"name": "notes.read", "description": "Xem ghi chú trong phạm vi của bạn (độ sâu `own`: chỉ ghi chú của chính bạn).", "risk": "read"}])
         );
         let english = app.get("/api/v1/me/permissions").token("ada").send().await.unwrap();
         let listed = english.json();
         let names: Vec<&str> =
             listed["data"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
         assert_eq!(names, ["notes.read", "notes.write"]);
-        assert_eq!(english.json()["data"][1]["description"], "Create, change and delete your own notes.");
+        assert_eq!(english.json()["data"][1]["description"], "Create, change and delete the notes in your scope (with scope `own`: only your own).");
         let anonymous = app.get("/api/v1/me/permissions").send().await.unwrap();
         assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
     })

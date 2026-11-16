@@ -10,6 +10,8 @@ pub struct Model {
     pub id: Uuid,
     /// Khách sở hữu dòng (bước 33).
     pub tenant_id: Uuid,
+    /// Nút sở hữu form (bước 34); `None`: form của cả khách.
+    pub org_id: Option<Uuid>,
     /// Slug, unique, nằm trong URL công khai.
     pub key: String,
     pub name: String,

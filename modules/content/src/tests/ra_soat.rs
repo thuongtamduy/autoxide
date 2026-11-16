@@ -35,13 +35,34 @@ async fn chuyen_trang_dung_slug_da_dang() {
         let draft = EntryFields { slug: Some("secret-draft".into()), ..Default::default() };
         content.update(&tenant, &ada, about.id, draft, false, None).await.unwrap();
         content.move_page(&tenant, &ada, about.id, Some(parent.id), None).await.unwrap();
-        assert!(content.resolve(&tenant, "en", "/parent/secret-draft").await.is_err());
+        assert!(
+            content
+                .resolve(
+                    &tenant,
+                    &autoxide_kernel::tenancy::Site::whole(&tenant),
+                    "en",
+                    "/parent/secret-draft"
+                )
+                .await
+                .is_err()
+        );
         assert!(matches!(
-            content.resolve(&tenant, "en", "/parent/about").await.unwrap(),
+            content
+                .resolve(
+                    &tenant,
+                    &autoxide_kernel::tenancy::Site::whole(&tenant),
+                    "en",
+                    "/parent/about"
+                )
+                .await
+                .unwrap(),
             Resolved::Entry(_)
         ));
         assert!(matches!(
-            content.resolve(&tenant, "en", "/about").await.unwrap(),
+            content
+                .resolve(&tenant, &autoxide_kernel::tenancy::Site::whole(&tenant), "en", "/about")
+                .await
+                .unwrap(),
             Resolved::Redirect { .. }
         ));
     })
@@ -68,7 +89,15 @@ async fn trang_con_trung_duong_dan() {
         let error = content.publish(&tenant, &ada, news.id, None, None, false).await.unwrap_err();
         assert_eq!(error.code(), "content.path_taken", "{error:?}");
         assert!(matches!(
-            content.resolve(&tenant, "en", "/news/hello").await.unwrap(),
+            content
+                .resolve(
+                    &tenant,
+                    &autoxide_kernel::tenancy::Site::whole(&tenant),
+                    "en",
+                    "/news/hello"
+                )
+                .await
+                .unwrap(),
             Resolved::Entry(_)
         ));
 
@@ -169,7 +198,18 @@ async fn chuyen_huong_cung_ngon_ngu_va_luu_tru() {
         content.archive(&tenant, &ada, english.id, None).await.unwrap();
         for old in ["/old", "/blog/english", "/blog/renamed"] {
             assert!(
-                matches!(content.resolve(&tenant, "en", old).await.unwrap(), Resolved::Gone),
+                matches!(
+                    content
+                        .resolve(
+                            &tenant,
+                            &autoxide_kernel::tenancy::Site::whole(&tenant),
+                            "en",
+                            old
+                        )
+                        .await
+                        .unwrap(),
+                    Resolved::Gone
+                ),
                 "{old}"
             );
         }
@@ -293,7 +333,11 @@ async fn anh_tac_gia_rieng_tu_khong_lo() {
         let entry = content.create(&tenant, &ada, post("By Ada")).await.unwrap();
         content.set_entry_authors(&tenant, &ada, entry.id, vec![author.id]).await.unwrap();
         content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
-        let filter = PostFilter { locale: "en".into(), ..Default::default() };
+        let filter = PostFilter {
+            locale: "en".into(),
+            site: autoxide_kernel::tenancy::Site::whole(&tenant).lineage_ids(),
+            ..Default::default()
+        };
         let page =
             content.public_posts(&tenant, &filter, &PageRequest::first(10, Order::Desc)).await;
         let mut views = content.public_views(&tenant, page.unwrap().data).await.unwrap();

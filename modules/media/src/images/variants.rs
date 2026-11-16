@@ -464,6 +464,7 @@ mod tests {
     #[test]
     fn chon_co_can_lam() {
         let mut item = Item {
+            org_id: None,
             id: Uuid::nil(),
             tenant_id: Uuid::nil(),
             folder_id: Uuid::nil(),

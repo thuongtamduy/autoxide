@@ -2,7 +2,8 @@
 //! trên database riêng), trùng tên ở hai khách được phép, dữ liệu cũ thuộc khách mặc định, event
 //! ghi và giao đúng khách. Chạy trên cả SQLite và Postgres.
 
-use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
+use autoxide_kernel::access::Principal;
+use autoxide_kernel::event::{Delivered, EventHandler, Outbox};
 use autoxide_kernel::migration::Migrator;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext};
 use autoxide_testkit::{TestApp, TestDatabase, leak_check};
@@ -143,8 +144,9 @@ async fn nang_cap_gan_du_lieu_cu_cho_khach_mac_dinh() {
             .await
             .unwrap();
         let migrator: Migrator = app.modules().migrator().unwrap();
-        // Về schema trước bước 33 (bỏ `m0005_tenancy`), ghi một ghi chú kiểu cũ, rồi nâng lại.
-        migrator.down(app.database(), "notes", 1).await.unwrap();
+        // Về schema trước bước 33 (bỏ `k0001_event_access`, `m0006_org` và `m0005_tenancy`), ghi
+        // một ghi chú kiểu cũ, rồi nâng lại.
+        migrator.down(app.database(), "notes", 3).await.unwrap();
         let database = app.database();
         let backend = database.write().get_database_backend();
         let id = Uuid::now_v7();
@@ -170,6 +172,8 @@ async fn nang_cap_gan_du_lieu_cu_cho_khach_mac_dinh() {
         let answer = app.get(&format!("/api/v1/notes/{id}")).token("ada").send().await.unwrap();
         assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
         assert_eq!(answer.json()["data"]["title"], "Old");
+        // Bước 34: ghi chú cũ thuộc nút gốc (= ID của khách).
+        assert_eq!(answer.json()["data"]["org_id"], DEFAULT_TENANT.as_uuid().to_string());
         let select = "SELECT tenant_id FROM notes_note";
         let rows = database.read().query_all_raw(Statement::from_string(backend, select)).await;
         let owners: Vec<Uuid> =
@@ -217,8 +221,8 @@ async fn event_va_job_chay_dung_khach() {
         let note = service
             .create(
                 &shared,
-                Actor::user(Uuid::from_u128(ADA)),
-                NewNote { title: "Via trait".to_owned(), body: String::new() },
+                &Principal::with_all_permissions(Uuid::from_u128(ADA)).in_tenant(shared.id()),
+                NewNote { title: "Via trait".to_owned(), body: String::new(), org_id: None },
             )
             .await
             .unwrap();

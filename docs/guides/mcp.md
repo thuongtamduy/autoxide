@@ -68,20 +68,29 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 
 | Tool | Permission | Kind |
 |---|---|---|
+| `address.list_communes` | — | read-only |
+| `address.list_provinces` | — | read-only |
+| `address.search_units` | — | read-only |
+| `address.validate_address` | — | read-only |
 | `ai.status` | `ai.view` | read-only |
 | `audit.get_entry` | `audit.read` | read-only |
 | `audit.list_entries` | `audit.read` | read-only |
 | `auth.create_api_key` | — | writes |
+| `auth.create_invitation` | `auth.invitations.manage` | writes |
 | `auth.create_role` | `auth.roles.manage` | writes |
 | `auth.delete_role` | `auth.roles.manage` | destructive |
 | `auth.get_role` | `auth.roles.read` | read-only |
 | `auth.get_user_roles` | `auth.users.read` | read-only |
 | `auth.list_api_keys` | — | read-only |
+| `auth.list_invitations` | `auth.invitations.manage` | read-only |
+| `auth.list_memberships` | `auth.users.read` | read-only |
 | `auth.list_permissions` | `auth.roles.read` | read-only |
 | `auth.list_roles` | `auth.roles.read` | read-only |
 | `auth.list_users` | `auth.users.read` | read-only |
 | `auth.replace_role` | `auth.roles.manage` | writes |
 | `auth.revoke_api_key` | — | destructive |
+| `auth.revoke_invitation` | `auth.invitations.manage` | writes |
+| `auth.set_memberships` | `auth.roles.manage` | writes |
 | `auth.set_user_roles` | `auth.roles.manage` | writes |
 | `auth.update_user` | `auth.users.manage` | writes |
 | `auth.whoami` | — | read-only |
@@ -149,5 +158,13 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `newsletter.list_lists` | `newsletter.read` | read-only |
 | `newsletter.schedule_campaign` | `newsletter.send` | writes |
 | `newsletter.send_campaign` | `newsletter.send` | writes |
+| `organizations.change_unit_status` | `organizations.units.manage` | destructive |
+| `organizations.create_unit` | `organizations.units.write` | writes |
+| `organizations.get_settings` | `organizations.units.read` | read-only |
+| `organizations.get_unit` | `organizations.units.read` | read-only |
+| `organizations.list_units` | `organizations.units.read` | read-only |
+| `organizations.move_unit` | `organizations.units.write` | writes |
+| `organizations.set_setting` | `organizations.settings.write` | writes |
+| `organizations.update_unit` | `organizations.units.write` | writes |
 
 <!-- tools:end -->

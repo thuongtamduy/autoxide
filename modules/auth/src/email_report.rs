@@ -118,6 +118,7 @@ impl EmailVerifications {
         job: &EmailChangedJob,
     ) -> Result<(), Error> {
         let language = if job.language == Language::Vi.tag() { Language::Vi } else { Language::En };
+        let language = self.users.mail_language(tenant, job.user_id, language).await?;
         let ttl = chrono::Duration::days(REPORT_DAYS);
         let subject = job.user_id.to_string();
         let transaction = tenant.database().begin_write().await?;
@@ -192,6 +193,7 @@ impl EmailVerifications {
         // cả transaction trên Postgres).
         let taken = user_row::Entity::find()
             .filter(user_row::Column::Email.eq(old_email.as_str()))
+            .filter(user_row::Column::Realm.eq(row.realm.as_str()))
             .filter(user_row::Column::Id.ne(user_id))
             .scoped(tenant)
             .one(&transaction)
@@ -216,7 +218,11 @@ impl EmailVerifications {
             .record(&transaction, tenant, actor, events::user_subject(user_id), &event)
             .await?;
         if restored {
-            let job = ResetJob { email: old_email, language: language.tag().to_owned() };
+            let job = ResetJob {
+                email: old_email,
+                realm: crate::user::realm_of(&row.realm),
+                language: language.tag().to_owned(),
+            };
             self.jobs.enqueue(&transaction, tenant, &job, EnqueueOptions::default()).await?;
         }
         transaction.commit().await?;
@@ -361,6 +367,7 @@ mod tests {
                 .await
                 .unwrap();
             let key = crate::api_key::NewApiKey {
+                org_id: None,
                 name: "agent".to_owned(),
                 permissions: vec!["auth.users.read".to_owned()],
                 expires_at: None,

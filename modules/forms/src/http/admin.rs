@@ -27,6 +27,8 @@ use crate::submissions::inbox::SubmissionCounts;
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct FormResponse {
     pub id: Uuid,
+    /// The organization unit that owns the form; `null`: a form of the whole tenant.
+    pub org_id: Option<Uuid>,
     /// Unique; part of the public address `/api/v1/forms/public/{key}`.
     #[schema(example = "contact")]
     pub key: String,
@@ -71,6 +73,7 @@ impl From<Form> for FormResponse {
             token_scope: form.scope(),
             status: form.status(),
             id: form.row.id,
+            org_id: form.row.org_id,
             key: form.row.key,
             name: form.row.name,
             version: form.row.version,
@@ -93,6 +96,9 @@ impl From<Form> for FormResponse {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CreateFormRequest {
+    /// The organization unit (store, seller) that owns the form; you need `forms.manage` there.
+    /// Omitted: a form of the whole tenant.
+    org_id: Option<Uuid>,
     /// Lower-case letters and digits in groups joined by `-`, at most 50 characters; unique.
     #[schema(example = "contact")]
     key: String,
@@ -123,6 +129,7 @@ pub(crate) struct CreateFormRequest {
 impl From<CreateFormRequest> for FormInput {
     fn from(input: CreateFormRequest) -> Self {
         FormInput {
+            org_id: input.org_id,
             key: Some(input.key),
             name: Some(input.name),
             status: input.status,
@@ -170,6 +177,7 @@ pub(crate) struct UpdateFormRequest {
 impl From<UpdateFormRequest> for FormInput {
     fn from(input: UpdateFormRequest) -> Self {
         FormInput {
+            org_id: None,
             key: input.key,
             name: input.name,
             status: input.status,
@@ -192,11 +200,14 @@ pub(crate) struct FormsQuery {
     /// `open` or `closed`; omitted: both.
     #[param(value_type = Option<FormStatus>, inline)]
     pub status: Option<String>,
+    /// Only the forms of this organization unit.
+    pub owner_org: Option<Uuid>,
 }
 
 /// List forms.
 ///
-/// Requires `forms.read`. Newest first; follow `pagination.next_cursor` for more.
+/// Requires `forms.read`; you see the forms its scope covers (forms of the whole tenant only with
+/// a tenant-wide scope). Newest first; follow `pagination.next_cursor` for more.
 #[utoipa::path(
     get,
     path = "/",
@@ -221,7 +232,8 @@ pub(crate) async fn list_forms(
     let mut problems = Vec::new();
     let status = choice(query.status.as_deref(), "status", "`open`, `closed`", &mut problems);
     let page = page_request(paging, problems)?;
-    counted(&service, &tenant, service.list_forms(&tenant, &principal, status, &page).await?).await
+    let found = service.list_forms(&tenant, &principal, status, query.owner_org, &page).await?;
+    counted(&service, &tenant, found).await
 }
 
 /// Một trang form như API trả về, kèm số bài gửi theo trạng thái (một câu đếm cho cả trang).

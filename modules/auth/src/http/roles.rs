@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use autoxide_kernel::access::Principal;
+use autoxide_kernel::access::{Principal, Scope};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
@@ -44,6 +44,22 @@ pub(crate) struct PermissionResponse {
     /// `money`.
     #[schema(example = "read")]
     risk: String,
+    /// `true` when the permission applies to data of an organization unit: a role can grant it
+    /// for one unit (`unit`), a unit and everything below it (`subtree`), or only the records
+    /// a person owns (`own`). `false`: it can only be granted for the whole tenant.
+    scoped: bool,
+}
+
+/// A permission a role grants, with how far it reaches in the organization tree.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RoleGrant {
+    #[schema(example = "notes.read")]
+    pub permission: String,
+    // Mô tả lấy từ chính `Scope` (doc ở đây sẽ biến trường thành `allOf` sai kiểu). Permission
+    // không `scoped` chỉ nhận `tenant`.
+    #[schema(inline)]
+    pub scope: Scope,
 }
 
 impl PermissionResponse {
@@ -59,6 +75,7 @@ impl PermissionResponse {
                 name: permission.name().to_owned(),
                 description: roles.describe(permission.description(), language),
                 risk: permission.risk().as_str().to_owned(),
+                scoped: permission.is_scoped(),
             })
             .collect()
     }
@@ -72,11 +89,17 @@ pub(crate) struct RoleResponse {
     name: String,
     description: String,
     /// `true` only for the built-in `admin` role: it grants every permission,
-    /// including permissions added later, and cannot be changed or deleted.
+    /// including permissions added later, and cannot be changed (except `requires_mfa`) or
+    /// deleted.
     all_permissions: bool,
+    /// `true`: the role's permissions work only for accounts with two-step sign-in.
+    requires_mfa: bool,
     /// Permissions the role grants, sorted by name. Empty when `all_permissions`.
     #[schema(example = json!(["auth.roles.read"]))]
     permissions: Vec<String>,
+    /// The same permissions with their scope in the organization tree. Empty when
+    /// `all_permissions`.
+    grants: Vec<RoleGrant>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -88,7 +111,13 @@ impl From<Role> for RoleResponse {
             name: role.name,
             description: role.description,
             all_permissions: role.all_permissions,
+            requires_mfa: role.requires_mfa,
             permissions: role.permissions,
+            grants: role
+                .grants
+                .into_iter()
+                .map(|(permission, scope)| RoleGrant { permission, scope })
+                .collect(),
             created_at: role.created_at,
             updated_at: role.updated_at,
         }
@@ -109,14 +138,30 @@ pub(crate) struct RoleRequest {
     #[serde(default)]
     #[schema(example = json!(["auth.roles.read"]))]
     permissions: Vec<String>,
+    /// Permissions to grant with a scope in the organization tree (`own`, `unit`, `subtree`,
+    /// `tenant`). A permission is listed once, in `permissions` (whole tenant) or here.
+    #[serde(default)]
+    #[schema(inline)]
+    grants: Vec<RoleGrant>,
+    /// When `true`, the role's permissions work only for accounts with two-step sign-in
+    /// (an authenticator app or a passkey); others see `mfa_required` in `GET /api/v1/auth/me`
+    /// until they turn it on. The only change the built-in `admin` role accepts.
+    #[serde(default)]
+    requires_mfa: bool,
 }
 
 impl From<RoleRequest> for RoleInput {
     fn from(request: RoleRequest) -> Self {
         RoleInput {
+            requires_mfa: request.requires_mfa,
             name: request.name,
             description: request.description,
             permissions: request.permissions,
+            grants: request
+                .grants
+                .into_iter()
+                .map(|grant| (grant.permission, grant.scope))
+                .collect(),
         }
     }
 }
@@ -465,6 +510,8 @@ mod tests {
                     &tenant,
                     Actor::system(),
                     crate::role::RoleInput {
+                        requires_mfa: false,
+                        grants: Vec::new(),
                         name: "reader".to_owned(),
                         description: String::new(),
                         permissions: vec!["auth.roles.read".to_owned()],

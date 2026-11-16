@@ -29,6 +29,8 @@ pub struct Model {
     pub visibility: String,
     pub version_id: Uuid,
     pub uploaded_by: Option<Uuid>,
+    /// Nút sở hữu item (bước 34); gốc = ID của khách. Luôn có giá trị.
+    pub org_id: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub trashed_at: Option<DateTimeUtc>,

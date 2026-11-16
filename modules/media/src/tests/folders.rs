@@ -56,6 +56,7 @@ async fn thu_muc_long_nhau() {
         let busy = media.delete_folder(&tenant, &ada, photos.id).await.unwrap_err();
         assert_eq!((busy.kind(), busy.code()), (ErrorKind::Conflict, "media.folder_not_empty"));
         let input = NewUpload {
+            org_id: None,
             name: "a.png".into(),
             folder_id: Some(summer.id),
             content_type: Some("image/png".into()),

@@ -5,6 +5,7 @@ mod entity;
 mod service;
 
 pub(crate) use service::{
-    AdminRoleSeed, Role, RoleInput, RoleService, count_active_admins, count_active_admins_unlocked,
-    grant_admin, last_admin,
+    AdminRoleSeed, Membership, MembershipFilter, MembershipRow, Role, RoleInput, RoleService,
+    add_roles, count_active_admins, count_active_admins_unlocked, grant_admin, grant_problems,
+    last_admin, mfa_pending, role_by_name, role_grants, root_roles,
 };

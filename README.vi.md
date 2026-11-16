@@ -78,6 +78,11 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 21. Menu của website: thanh menu chính, bảng xổ lớn, chân trang; mục trỏ tới địa chỉ hay tới đối
     tượng của module bất kỳ, tự lấy mục con, nhãn có hạn, endpoint công khai có cache
     ([`docs/MENUS.vi.md`](docs/MENUS.vi.md))
+22. Tổ chức và danh tính: cây tổ chức trong mỗi khách (trụ sở, vùng, cửa hàng…) với quyền theo một
+    nút hay một nhánh, cài đặt kế thừa theo cây, website riêng của từng nút, hồ sơ công khai của cửa
+    hàng; tài khoản người mua tách khỏi nhân sự, lời mời, đăng nhập bằng link, uỷ quyền theo chuỗi
+    khách, quyền vào hỗ trợ có thời hạn; danh mục đơn vị hành chính Việt Nam cho địa chỉ
+    ([`docs/ADDRESS.vi.md`](docs/ADDRESS.vi.md))
 
 ## Yêu cầu
 
@@ -365,6 +370,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   luận của website, kiểm duyệt, báo cáo và cấm, mail báo trả lời, lưu ý pháp lý
 - [`docs/MENUS.vi.md`](docs/MENUS.vi.md) — dùng module menu: mục, đối tượng của module khác, nhãn,
   endpoint công khai và cache, chuyển từ menu của module nội dung
+- [`docs/ADDRESS.vi.md`](docs/ADDRESS.vi.md) — đơn vị hành chính và địa chỉ: đọc danh mục, nhập
+  danh mục chính thức
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

@@ -52,7 +52,16 @@ async fn go_va_luu_tru_huy_lich_dang() {
         content.run_schedule(&tenant, planned.id, Utc::now()).await.unwrap();
         assert_eq!(content.get(&tenant, &ada, entry.id).await.unwrap().status, "draft");
         assert_eq!(
-            content.resolve(&tenant, "en", "/blog/taken-down").await.unwrap_err().code(),
+            content
+                .resolve(
+                    &tenant,
+                    &autoxide_kernel::tenancy::Site::whole(&tenant),
+                    "en",
+                    "/blog/taken-down"
+                )
+                .await
+                .unwrap_err()
+                .code(),
             "content.not_found"
         );
         let rows = content.list_schedules(&tenant, &ada, entry.id).await.unwrap();
@@ -74,7 +83,15 @@ async fn go_va_luu_tru_huy_lich_dang() {
         }
         assert_eq!(content.get(&tenant, &ada, archived.id).await.unwrap().status, "archived");
         assert!(matches!(
-            content.resolve(&tenant, "en", "/blog/archived").await.unwrap(),
+            content
+                .resolve(
+                    &tenant,
+                    &autoxide_kernel::tenancy::Site::whole(&tenant),
+                    "en",
+                    "/blog/archived"
+                )
+                .await
+                .unwrap(),
             Resolved::Gone
         ));
         let statuses: Vec<String> = content

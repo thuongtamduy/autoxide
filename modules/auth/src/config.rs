@@ -43,6 +43,53 @@ pub(crate) const LOGIN_LOCK_MINUTES: Setting = Setting::new(
 )
 .with_default("15");
 
+pub(crate) const LOGIN_LINK: Setting = Setting::new(
+    "AUTOXIDE_AUTH_LOGIN_LINK",
+    "Let people sign in with a link sent by email, without a password (`true` or `false`). \
+     Two-step sign-in still applies.",
+)
+.with_default("false");
+
+pub(crate) const LOGIN_LINK_URL: Setting = Setting::new(
+    "AUTOXIDE_AUTH_LOGIN_LINK_URL",
+    "Address of the interface's page that signs in with a link, with `{token}` where the token \
+     goes, e.g. `https://app.example.com/sign-in/link?token={token}`. Unset: the mail carries the \
+     token for `POST /api/v1/auth/login/link/confirm`.",
+);
+
+pub(crate) const LOGIN_LINK_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_AUTH_LOGIN_LINK_MINUTES",
+    "How long a sign-in link works (5 to 60 minutes). It works once.",
+)
+.with_default("15");
+
+pub(crate) const INVITATION_URL: Setting = Setting::new(
+    "AUTOXIDE_AUTH_INVITATION_URL",
+    "Address of the interface's page that accepts an invitation, with `{token}` where the token \
+     goes, e.g. `https://app.example.com/invitation?token={token}`. Unset: the mail carries the \
+     token for `POST /api/v1/auth/invitations/accept`.",
+);
+
+pub(crate) const INVITATION_DAYS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_INVITATION_DAYS",
+    "How long an invitation can be accepted (1 to 30 days); resending starts it again.",
+)
+.with_default("7");
+
+pub(crate) const SUPPORT_ACCESS_MAX_HOURS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS",
+    "Longest support access to a tenant's data that can be granted to platform staff (1 to 72 \
+     hours).",
+)
+.with_default("8");
+
+pub(crate) const REAUTH_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_AUTH_REAUTH_MINUTES",
+    "How long a confirmation token from `POST /api/v1/auth/me/reauth` stays usable (1 to 60 \
+     minutes). It is used once, for one sensitive change.",
+)
+.with_default("10");
+
 pub(crate) const SELF_REGISTRATION: Setting = Setting::new(
     "AUTOXIDE_AUTH_SELF_REGISTRATION",
     "Let anyone create an account with `POST /api/v1/auth/register` (`true` or `false`). New \
@@ -137,6 +184,17 @@ pub(crate) struct AuthConfig {
     pub country_header: Option<axum::http::HeaderName>,
     /// `None`: passkey tắt.
     pub passkey: Option<PasskeyConfig>,
+    /// Hạn của token xác nhận lại (D-308).
+    pub reauth_ttl: Duration,
+    /// Đăng nhập bằng link qua email (D-311): bật không, trang của giao diện, hạn (phút).
+    pub login_link: bool,
+    pub login_link_url: Option<String>,
+    pub login_link_minutes: i64,
+    /// Lời mời (D-312): trang của giao diện, hạn (ngày).
+    pub invitation_url: Option<String>,
+    pub invitation_days: i64,
+    /// Trần giờ của quyền vào hỗ trợ (D-211, D-313).
+    pub support_max_hours: u32,
 }
 
 /// Cấu hình passkey (WebAuthn).
@@ -166,6 +224,20 @@ impl AuthConfig {
         let max_failures =
             reader.get_with(&LOGIN_MAX_FAILURES, |raw| parse_in_range(raw, 1u32, 100));
         let lock = reader.get_with(&LOGIN_LOCK_MINUTES, |raw| parse_in_range(raw, 1u64, 1440));
+        let reauth = reader.get_with(&REAUTH_MINUTES, |raw| parse_in_range(raw, 1u64, 60));
+        let login_link = reader.get_with(&LOGIN_LINK, |raw| match raw {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err("must be `true` or `false`".to_owned()),
+        });
+        let login_link_url = reader.optional_with(&LOGIN_LINK_URL, token_url);
+        let invitation_url = reader.optional_with(&INVITATION_URL, token_url);
+        let support_max_hours =
+            reader.get_with(&SUPPORT_ACCESS_MAX_HOURS, |raw| parse_in_range(raw, 1u32, 72));
+        let invitation_days =
+            reader.get_with(&INVITATION_DAYS, |raw| parse_in_range(raw, 1i64, 30));
+        let login_link_minutes =
+            reader.get_with(&LOGIN_LINK_MINUTES, |raw| parse_in_range(raw, 5i64, 60));
         let self_registration = reader.get_with(&SELF_REGISTRATION, |raw| match raw {
             "true" => Ok(true),
             "false" => Ok(false),
@@ -234,6 +306,13 @@ impl AuthConfig {
             email_change_report_url: email_change_report_url?,
             country_header: country_header?,
             passkey: passkey_config(reader, rp_id?, origins?)?,
+            reauth_ttl: Duration::from_secs(reauth? * 60),
+            login_link: login_link?,
+            login_link_url: login_link_url?,
+            login_link_minutes: login_link_minutes?,
+            invitation_url: invitation_url?,
+            invitation_days: invitation_days?,
+            support_max_hours: support_max_hours?,
         })
     }
 }

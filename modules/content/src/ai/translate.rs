@@ -82,6 +82,7 @@ impl ContentService {
             .await?
             .ok_or_else(|| entry_not_found(source_id))?;
         permissions::require_write(principal, &source)?;
+        permissions::require_org(principal, tenant, &source, permissions::Need::Write).await?;
         let mut problems = Vec::new();
         let target_locale = self.check_locale(
             &self.languages(tenant).await?,
@@ -106,7 +107,11 @@ impl ContentService {
             .one(read)
             .await?;
         match &target {
-            Some(target) => permissions::require_write(principal, target)?,
+            Some(target) => {
+                permissions::require_write(principal, target)?;
+                permissions::require_org(principal, tenant, target, permissions::Need::Write)
+                    .await?;
+            }
             None => self.check_parent_translated(tenant, &source, &target_locale).await?,
         }
         let latest = revision::Entity::find()
@@ -241,6 +246,7 @@ impl ContentService {
         page: &PageRequest,
     ) -> Result<Page<TranslationRequest>, Error> {
         principal.require(&CONTENT_READ)?;
+        self.get(tenant, principal, entry_id).await?;
         let select = translation_request::Entity::find()
             .scoped(tenant)
             .filter(translation_request::Column::SourceEntryId.eq(entry_id));

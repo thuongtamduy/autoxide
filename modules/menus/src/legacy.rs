@@ -13,9 +13,8 @@ use std::sync::Arc;
 
 use autoxide_content::api::{LegacyMenuItem, LegacyTarget};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::Actor;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
-use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
+use autoxide_kernel::tenancy::{DatabaseRegistry, Site, TenantContext};
 
 use crate::config::canonical_locale;
 use crate::items::{ItemInput, RefInput};
@@ -58,16 +57,17 @@ impl MenuService {
                 report.failed.push((pair.0, pair.1, reason));
                 continue;
             };
-            if self.find_by_key(tenant, &old.key, &locale).await?.is_some() {
+            if self.find_by_key(tenant, &Site::whole(tenant), &old.key, &locale).await?.is_some() {
                 report.skipped.push(pair);
                 continue;
             }
             let input = NewMenu {
                 key: old.key.clone(),
                 locale: Some(locale),
+                org_id: None,
                 items: old.items.iter().map(convert).collect(),
             };
-            match self.create_checked(tenant, Actor::system(), input, false).await {
+            match self.create_checked(tenant, None, input, false).await {
                 Ok(_) => report.imported.push(pair),
                 // Hai lần nhập chạy cùng lúc: bên kia vừa tạo xong menu này.
                 Err(error) if error.code() == "menus.menu_exists" => report.skipped.push(pair),

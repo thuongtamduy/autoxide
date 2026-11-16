@@ -74,6 +74,7 @@ impl ContentService {
         // Quyền trước, phiên bản sau: người không có quyền không biết được mục có đổi hay không.
         let entry = self.load_checked(tenant, id, None).await?;
         permissions::require_publish(principal, &entry)?;
+        permissions::require_org(principal, tenant, &entry, permissions::Need::Publish).await?;
         let own_only = permissions::publish_own_only(principal);
         if own_only {
             if Status::of(&entry) == Status::Archived {
@@ -194,6 +195,7 @@ impl ContentService {
         let entry = self.load_checked(tenant, id, None).await?;
         if to == Status::Draft {
             permissions::require_publish(principal, &entry)?;
+            permissions::require_org(principal, tenant, &entry, permissions::Need::Publish).await?;
         }
         check_version(&entry, expected)?;
         if to == Status::Draft && Status::of(&entry) != Status::Published {
@@ -258,6 +260,7 @@ impl ContentService {
     ) -> Result<(), Error> {
         principal.require(&CONTENT_DELETE)?;
         let entry = self.load_checked(tenant, id, expected).await?;
+        permissions::require_org(principal, tenant, &entry, permissions::Need::Delete).await?;
         let now = now();
         let by = Some(principal.user_id());
         let transaction = tenant.database().begin_write().await?;
@@ -346,6 +349,7 @@ impl ContentService {
         permissions::require_create(principal)?;
         let entry = self.load_checked(tenant, id, None).await?;
         permissions::require_write(principal, &entry)?;
+        permissions::require_org(principal, tenant, &entry, permissions::Need::Write).await?;
         check_version(&entry, expected)?;
         if entry.kind != Kind::Page.as_str() {
             return Err(invalid(vec![FieldError::new(
@@ -404,7 +408,8 @@ impl ContentService {
                 paths::path_of(&transaction, tenant, &moved_entry, &self.config.post_path_prefix)
                     .await?
                     .map_err(|()| parent_not_published())?;
-            if paths::path_used(&transaction, tenant, &after.locale, &new, id).await? {
+            if paths::path_used(&transaction, tenant, after.org_id, &after.locale, &new, id).await?
+            {
                 return Err(path_taken(&new));
             }
             let mut row = old.clone().into_active_model();
@@ -459,7 +464,9 @@ impl ContentService {
         let path = paths::path_of(transaction, tenant, version, &self.config.post_path_prefix)
             .await?
             .map_err(|()| parent_not_published())?;
-        if paths::path_used(transaction, tenant, &version.locale, &path, version.id).await? {
+        if paths::path_used(transaction, tenant, version.org_id, &version.locale, &path, version.id)
+            .await?
+        {
             return Err(path_taken(&path));
         }
         let old = published::Entity::find()
@@ -470,6 +477,7 @@ impl ContentService {
         let row = published::Model {
             entry_id: version.id,
             tenant_id: tenant.id().as_uuid(),
+            org_id: version.org_id,
             kind: version.kind.clone(),
             locale: version.locale.clone(),
             translation_group_id: version.translation_group_id,

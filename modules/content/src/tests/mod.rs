@@ -16,11 +16,23 @@ pub(crate) fn fields(title: &str) -> EntryFields {
 }
 
 pub(crate) fn post(title: &str) -> NewEntry {
-    NewEntry { kind: Kind::Post, locale: None, parent_id: None, fields: fields(title) }
+    NewEntry {
+        kind: Kind::Post,
+        locale: None,
+        parent_id: None,
+        org_id: None,
+        fields: fields(title),
+    }
 }
 
 pub(crate) fn page(title: &str, parent: Option<Uuid>) -> NewEntry {
-    NewEntry { kind: Kind::Page, locale: None, parent_id: parent, fields: fields(title) }
+    NewEntry {
+        kind: Kind::Page,
+        locale: None,
+        parent_id: parent,
+        org_id: None,
+        fields: fields(title),
+    }
 }
 
 pub(crate) fn paragraph(text: &str) -> Value {

@@ -137,3 +137,51 @@ pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
         )
         .drop_index(format!("{table}_pending_idx"))
 }
+
+/// Migration thêm `actor_access` (`direct` / `delegation` / `support`) và `actor_access_id` vào
+/// bảng `<module>_events` (bước 34, D-310): đường người làm vào khách. Mọi module phát event thêm
+/// nó vào CUỐI danh sách migration của mình. Dòng cũ không có giá trị: đọc ra là `direct`.
+pub fn outbox_access_migration(
+    name: &'static str,
+    module: &'static str,
+) -> Box<dyn MigrationTrait> {
+    Box::new(AccessMigration { name, module })
+}
+
+struct AccessMigration {
+    name: &'static str,
+    module: &'static str,
+}
+
+impl MigrationName for AccessMigration {
+    fn name(&self) -> &str {
+        self.name
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AccessMigration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let table = super::table_name(self.module);
+        for column in
+            [schema::string_len_null("actor_access", 16), schema::uuid_null("actor_access_id")]
+        {
+            manager
+                .alter_table(Table::alter().table(Alias::new(&table)).add_column(column).to_owned())
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let table = super::table_name(self.module);
+        for column in ["actor_access", "actor_access_id"] {
+            manager
+                .alter_table(
+                    Table::alter().table(Alias::new(&table)).drop_column(column).to_owned(),
+                )
+                .await?;
+        }
+        Ok(())
+    }
+}

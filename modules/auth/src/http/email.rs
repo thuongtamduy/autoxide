@@ -38,7 +38,12 @@ pub(crate) struct ChangeEmailRequest {
     /// The new address. Case and surrounding spaces do not matter.
     #[schema(example = "ada@example.org")]
     new_email: String,
+    /// Your current password.
+    #[serde(default)]
     current_password: String,
+    /// A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+    /// (accounts without a password use this). Exactly one of the two.
+    reauth_token: Option<String>,
 }
 
 /// The token from a verification mail.
@@ -118,10 +123,11 @@ async fn change_email(
     super::require_session(&principal)?;
     state
         .verifications
-        .change_email(
+        .change_email_confirmed(
             &tenant,
             principal.user_id(),
             &input.current_password,
+            input.reauth_token.as_deref(),
             &input.new_email,
             language,
         )

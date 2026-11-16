@@ -211,7 +211,7 @@ async fn nhieu_passkey_xoa_va_tai_khoan_bi_khoa() {
         assert_eq!(removed.code(), "auth.passkey_sign_in_failed");
 
         // Tài khoản bị khoá: passkey còn đó nhưng không đăng nhập được.
-        let disable = UserChanges { name: None, disabled: Some(true) };
+        let disable = UserChanges { name: None, disabled: Some(true), ..Default::default() };
         services.users.update(&tenant, Actor::system(), ada, disable, None).await.unwrap();
         let (ceremony, response) = sign_in(&services.passkeys, &tenant, &mut key).await;
         let disabled =
@@ -244,6 +244,7 @@ async fn can_mat_khau_va_dat_lai_mat_khau_thu_hoi_passkey() {
         let mut attacker = SoftAuthenticator::new(9);
         register(&services, ada, &mut attacker).await;
         let key = crate::api_key::NewApiKey {
+            org_id: None,
             name: "agent".to_owned(),
             permissions: vec!["auth.users.read".to_owned()],
             expires_at: None,
@@ -441,6 +442,7 @@ fn agent_key(
     second_factor: Option<crate::api_key::Reauth>,
 ) -> crate::api_key::NewApiKey {
     crate::api_key::NewApiKey {
+        org_id: None,
         name: "agent".to_owned(),
         permissions: vec!["auth.users.read".to_owned()],
         expires_at: None,

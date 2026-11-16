@@ -6,6 +6,8 @@ mod m0004_agent_fields;
 mod m0005_translation_requests;
 mod m0006_embeddings;
 mod m0009_schedule_ai_review;
+mod m0012_org;
+mod m0013_site_paths;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -129,5 +131,11 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0011_tenant_list_index",
             vec!["content_entries", "content_redirects", "content_terms", "content_authors"],
         ),
+        // Bài, trang thuộc một nút của cây tổ chức (bước 34, D-208).
+        Box::new(m0012_org::Migration),
+        // Đường dẫn công khai riêng theo website (bước 34, D-307).
+        Box::new(m0013_site_paths::Migration),
+        // Đường người làm vào khách (bước 34, D-310).
+        autoxide_kernel::event::outbox_access_migration("k0001_event_access", "content"),
     ]
 }

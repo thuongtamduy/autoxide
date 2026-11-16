@@ -259,6 +259,14 @@ pub(crate) mod testing {
         let kernel = Config::read(&mut reader);
         let (kernel, _) = reader.finish(kernel).unwrap();
         let database = Database::connect(&kernel.database).await.unwrap();
+        // Bảng của kernel: cây tổ chức (bước 34) mà kiểm quyền theo nút đọc tới.
+        autoxide_kernel::module::Modules::new(Vec::new())
+            .unwrap()
+            .migrator()
+            .unwrap()
+            .up(&database)
+            .await
+            .unwrap();
         Migrator::new(vec![ModuleMigrations::new("forms", crate::migration::all())])
             .unwrap()
             .up(&database)

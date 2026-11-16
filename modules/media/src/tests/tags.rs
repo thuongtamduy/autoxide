@@ -13,6 +13,7 @@ async fn nhan_gan_loc_doi_ten_xoa() {
         let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
         let ada = editor();
         let tagged = |name: &str, tags: &[&str]| NewUpload {
+            org_id: None,
             name: name.into(),
             folder_id: None,
             content_type: Some("image/png".into()),
@@ -130,6 +131,7 @@ async fn gan_nhan_moi_dong_thoi() {
                 let (media, tenant) = (media.clone(), tenant.clone());
                 tokio::spawn(async move {
                     let input = NewUpload {
+                        org_id: None,
                         name: format!("{size}.png"),
                         folder_id: None,
                         content_type: Some("image/png".into()),

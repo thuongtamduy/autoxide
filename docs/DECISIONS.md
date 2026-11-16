@@ -7393,3 +7393,348 @@ Quyết định:
 hai chỗ chậm của mục 3 — là tối ưu tính năng của bước khác, cần đo riêng, để bước 39 (vận hành, hiệu năng) làm cùng
 các việc đo khác; index `(tenant_id, id)` cho mọi bảng cấp khách hàng (75 bảng) — phần lớn chỉ tra theo khoá khác hay
 theo bản ghi cha, thêm index chỉ tốn chỗ và chậm ghi.
+
+## D-303 · Cây tổ chức và quyền theo độ sâu ở kernel (bước 34 mục 1) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Cấu trúc cây là của kernel** (đặc tả 34 "Agent tự quyết" #2): `kernel_org_units` (nút cha, độ sâu, cờ `writable`) và
+   `kernel_org_closure` (bảng tổ tiên – con cháu), cấp khách hàng, có ở mọi database. `autoxide_kernel::tenancy::OrgTree`
+   là công cụ duy nhất đổi và tra cây; module lọc theo nhánh bằng subquery `OrgTree::subtree_condition`. Phần nghĩa (tên,
+   loại, trạng thái, địa chỉ, cài đặt) thuộc module `organizations`.
+2. **Nút gốc có ID = ID của khách** (`tenancy::root_of`): dữ liệu cấp khách mang `org_id = tenant_id`; nâng cấp dữ liệu cũ
+   chỉ gán như vậy; bước 38 tách nhánh thành khách mới giữ được ID.
+3. **Độ sâu** `Scope { Own, Unit, Subtree, Tenant }` (rộng dần) theo bảng nghĩa của đặc tả 34. Permission khai
+   `.scoped()` mới cấp được với độ sâu hẹp hơn `tenant`; permission không scoped có grant ở nút nào cũng thành grant toàn
+   khách. `Principal::require` giữ nghĩa cũ (có ở bất kỳ độ sâu nào); dữ liệu theo nút kiểm thêm bằng `scope_condition`
+   (danh sách) và `require_at` / `require_write_at` (một bản ghi). Bản ghi không có cột người sở hữu: `own` hiểu như `unit`
+   (đặc tả #7, cách đơn giản). `Principal::new` / `with_all_permissions` cho độ sâu `tenant` — mọi code cũ giữ nghĩa.
+4. **API key gắn nút** là một hàng rào (`Principal::with_fence`): mọi điều kiện thêm "trong nhánh của nút đó"; rào ở gốc
+   = không rào.
+5. **Đóng băng** kiểm trong transaction ghi: `OrgTree::ensure_writable` khoá chia sẻ (`FOR SHARE` trên Postgres) dòng gốc
+   rồi chuỗi tổ tiên; lệnh đổi cây khoá dòng gốc `FOR UPDATE` trước mọi dòng khác — cùng thứ tự khoá nên không deadlock,
+   và lệnh ghi bắt đầu sau khi lệnh khoá nút commit luôn thấy cờ mới (test đồng thời trên cả hai database). Nút không có
+   trong cây coi như ghi được: khách chưa cài `organizations` không bị chặn.
+6. **Mã lỗi của cây là mã kernel** (module dùng qua hàm của kernel, vd `tenancy::root_immutable()`): `org_not_found` (404), `org_cycle`, `org_depth_exceeded` (422), `org_root_immutable`
+   (409), cùng `org_out_of_scope`, `org_frozen` (403). Đặc tả ghi `organizations.cycle`, `organizations.depth_exceeded`,
+   `organizations.root_immutable` — kernel không sinh được mã mang tiền tố module, và một lỗi có hai mã thì client phải
+   học hai; module `organizations` dùng thẳng mã kernel.
+7. **Dời nhánh** chạy bằng ba câu không đệ quy trên cả hai database: xoá cặp (tổ tiên ngoài nhánh, con cháu trong nhánh)
+   bằng subquery, chèn tích chéo tổ tiên của cha mới × nhánh (`INSERT … SELECT`), cộng độ sâu cả nhánh một lượng. Test so
+   bảng tổ tiên với cây tính lại từ `parent_id` sau 200 lần dời ngẫu nhiên.
+
+8. **Module `organizations`** giữ phần nghĩa của nút: loại nút do khách tự đặt (`tenant` dành cho gốc), trạng thái
+   `pending` / `active` / `suspended` / `archived` (đổi trạng thái đặt cờ `writable` của kernel), mã nội bộ duy nhất
+   trong khách. Nút gốc tạo lười (`ensure_root`, chạy lại được) và qua `seed_tenant` khi tạo khách — không cần
+   migration duyệt mọi khách trên mỗi database. Đăng ký trước `auth` (đặc tả #1). Địa chỉ của nút chờ module
+   `address` (cột thêm bằng migration sau).
+
+Để sau, ghi vào mục tương ứng của lộ trình: `Actor.access` + cột `actor_access` của outbox làm cùng mục uỷ quyền / quyền
+vào hỗ trợ (mục 10, 13 — chỉ hai mục đó sinh đường vào khác `direct`; thêm cột vào outbox của mọi module một lần khi cần);
+`Module::org_settings` + `OrgSettingCatalog` làm cùng module `organizations` (mục 4, cài đặt kế thừa).
+
+Đã cân nhắc: cây ở `organizations` (`organizations_closure`) — module khác không được đọc bảng của nó nên không lọc theo
+nhánh trong SQL được; `WITH RECURSIVE` — mỗi lần kiểm quyền một câu đệ quy, khó có index; khoá theo thứ tự nút khi dời —
+hai lệnh dời chéo nhau dễ deadlock.
+
+## D-304 · Membership, role và API key theo nút trong `auth` (bước 34 mục 2) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Membership = (người, nút, role).** `auth_user_role.org_id`, khoá unique `(tenant_id, user_id, org_id, role_id)`. Dòng
+   cũ gắn ở nút gốc (= ID của khách). `PUT /users/{id}/roles` cũ giữ nghĩa: thay membership **ở gốc**, không đụng
+   membership ở nút khác. API mới: `GET` / `PUT /users/{id}/memberships`, `GET /memberships?org_id=&role_id=&user_id=
+   &inherited=`, `GET /me/memberships`; tool MCP `auth.list_memberships`, `auth.set_memberships`; event
+   `auth.memberships_changed`.
+2. **Role cấp permission kèm độ sâu:** `auth_role_permission.scope` (dòng cũ `tenant`). Thân role nhận `permissions`
+   (độ sâu `tenant`, như cũ) và `grants: [{permission, scope}]`; trả cả hai. Permission không `scoped` mà nêu độ sâu
+   hẹp hơn → lỗi của ô (`errors[].code = scope_not_supported`) trong `422 validation_failed`, thay cho mã riêng
+   `auth.scope_not_supported` của đặc tả: lỗi đầu vào của role vẫn báo một lần cho mọi ô (D-083).
+3. **Role `admin` (mọi permission) chỉ gán ở nút gốc** — `Principal` "mọi permission" không mang nút; cho phép ở nút
+   khác thì phải có thêm kiểu "mọi permission trong nhánh", chưa ai cần.
+4. **Người gán membership** (`auth.roles.manage`) phải làm việc ở nút đó (`Principal::reaches`) và có mọi permission
+   của role mình gán (ở bất kỳ độ sâu nào). Nút phải có trong cây của khách (bảng của kernel) — `auth` không phụ
+   thuộc module `organizations`.
+5. **API key gắn nút:** `auth_api_key.org_id` (mặc định gốc = không rào). Quyền của key = permission của key ∩ quyền
+   của chủ key, giữ nút và độ sâu của chủ key (`Principal::only`), cộng hàng rào ở nút của key.
+6. **Cột `org_id` mới là NULL được ở database**, điền ngay trong migration (`= tenant_id`) và service luôn ghi: thêm cột
+   NOT NULL không `DEFAULT` vào bảng có dữ liệu cần dựng lại bảng (như `tenancy::migration::adopt`), không đáng cho một
+   giá trị mà ứng dụng luôn đặt. Đọc ra mà gặp NULL thì hiểu là nút gốc.
+7. `GET /auth/permissions` trả thêm `scoped`.
+
+Đã cân nhắc: membership trong bảng riêng `auth_membership` — trùng nghĩa với `auth_user_role`, phải chép dữ liệu và đổi
+mọi câu truy vấn; giữ `PUT /users/{id}/roles` thay mọi membership — xoá mất membership ở nút khác của người dùng khi
+giao diện cũ gọi.
+
+## D-305 · Nội dung, media, form, menu theo nút và website (bước 34 mục 3) — 2026-11-16 — agent quyết
+
+Quyết định (thực hiện D-208, D-238):
+
+1. **Website của request** là extractor `autoxide_kernel::tenancy::Site`: tên miền đã xác minh gắn với nút N → website
+   của N; tham số `?site=<id nút>` (thắng tên miền) cho client không gọi qua tên miền riêng; còn lại là website của cả
+   khách (nút gốc). Nút lạ → 404 `site_not_found`. Sổ database nhớ (khách, nút) của tên miền trong cùng cache với
+   khách (`DatabaseRegistry::domain_site`). `SiteQuery` chỉ để mô tả tham số trong OpenAPI.
+2. **Website hiện dữ liệu của nút đó và của mọi nút cấp trên** (`Site::lineage`): bài của trụ sở hiện ở mọi cửa hàng,
+   bài của cửa hàng A không bao giờ hiện ở cửa hàng B. Không có cờ "chia sẻ xuống" riêng: một bài muốn hiện ở nhiều
+   cửa hàng thì đặt ở nút cha chung. Menu công khai lấy menu của chính website, không có thì của website cấp trên gần
+   nhất (`tenancy::nearest`).
+3. **`org_id`**: `content_entries` (chép sang `content_published` khi đăng, để đọc công khai lọc không cần nối bảng),
+   `media_item`, `menus_menus` (khoá unique thêm `org_id`: mỗi website một menu `main`), đều điền nút gốc cho dòng cũ;
+   `forms_forms` NULL được — NULL là form của cả khách (chỉ người có phạm vi toàn khách thấy). Thư mục, nhãn media,
+   danh mục, thẻ, tác giả, chuyển hướng của `content` giữ cấp khách.
+4. **Permission theo nút:** `content.read/write/write_own/publish/publish_own/delete`, `media.read/write/purge`,
+   `menus.read/manage`, `forms.read/manage/review/export` thành `scoped()`; `content.manage`, `forms.submit` giữ cấp
+   khách. Độ sâu `own` dùng người tạo (`created_by` của bài, `uploaded_by` của media). Ngoài phạm vi đọc → 404 (không
+   lộ tồn tại); đọc được mà không ghi được, hay tạo ở nút ngoài phạm vi → 403 `org_out_of_scope`. Xuất / xoá mọi bài
+   gửi của một email cần `forms.export` toàn khách.
+5. **Nút mặc định khi tạo** (bài, item, ghi chú): `Principal::home_org(tenant, permission)` — gốc khi có quyền toàn khách,
+   nút duy nhất khi mọi grant ở một nút, còn lại người tạo phải nêu `org_id`.
+6. **Kiểm nút đang khoá ngoài transaction ghi:** `OrgTree::ensure_writable_unlocked` (chỉ đọc, không khoá) cho các lệnh
+   ghi của `content` mà chỗ kiểm quyền nằm trước transaction; lệnh tạo kiểm lại trong transaction. Lý do: SQLite chỉ có
+   một kết nối ghi, kiểm trên kết nối ghi trong lúc chỗ gọi giữ transaction thì treo.
+7. Bộ lọc quản trị: `owner_org` (bài, media, form, menu), `site` (bài hiện trên một website).
+
+Để sau, ghi vào lộ trình: ngôn ngữ bật theo website (cần cài đặt kế thừa theo cây — mục 4); đường dẫn công khai duy nhất
+theo website thay vì cả khách (hiện hai cửa hàng không cùng có `/about`); tìm theo ý nghĩa công khai lọc theo website.
+
+Đã cân nhắc: cờ "chia sẻ xuống" trên từng bài — thêm một khái niệm mà đặt bài ở nút cha đã làm được; kiểm phạm vi trong
+mọi hàm của `content` bằng transaction ghi — đổi thứ tự khoá của hàng chục lệnh; tra website trong handler — handler
+không được truy vấn database (luật kiến trúc 5), extractor của kernel giải một lần cho mọi module.
+
+## D-306 · Cài đặt kế thừa theo cây tổ chức (bước 34 mục 4) — 2026-11-16 — agent quyết
+
+Bối cảnh: chuỗi đặt múi giờ, tiền tệ, ngôn ngữ một lần ở trụ sở; một cửa hàng ở nước khác đổi riêng.
+Module nghiệp vụ sau này (thuế, đổi trả, giờ giao hàng) cần cùng cách mà không mỗi module tự làm.
+
+Quyết định:
+
+1. **Kernel giữ danh mục, `organizations` giữ giá trị.** Module khai cài đặt qua `Module::org_settings`
+   (`OrgSetting`: key `<module>.<tên>`, mô tả tiếng Anh, mặc định JSON tuỳ chọn, hàm kiểm trả giá trị đã chuẩn
+   hoá); kernel gom thành `OrgSettingCatalog` lúc khởi động, báo trùng key hay sai tiền tố một lần. Giá trị lưu ở
+   bảng `organizations_settings` (khách, nút, key → JSON dạng text, chạy giống nhau trên SQLite và Postgres).
+2. **Giá trị hiệu lực** ở nút N = giá trị của nút gần nhất trên chuỗi tổ tiên (gồm N) có đặt, không có thì mặc
+   định; trả kèm `source_unit_id` và `inherited`. Hai câu đọc: chuỗi tổ tiên, các dòng trên chuỗi.
+3. **Ghi** cần `organizations.settings.write` (theo nút) phủ nút, trong transaction ghi (nút khoá → `org_frozen`);
+   đọc cần `organizations.units.read`. Giá trị sai → 422 `organizations.setting_invalid` (kèm lý do), key lạ → 404
+   `organizations.setting_unknown`. Xoá = kế thừa lại. Mỗi lần đổi ghi event `organizations.setting_changed`.
+4. **Module khác đọc** qua `OrgDirectory::setting(tenant, nút, key)`, không chép giá trị vào bảng của mình.
+   Dữ liệu riêng mà nút ghi đè (giá…) giữ ở bảng của module, đọc bằng `OrgTree::ancestors` + `tenancy::nearest`
+   (MODULE_GUIDE).
+5. Ba cài đặt đầu: `organizations.timezone` (IANA, mặc định `UTC`, kiểm bằng `chrono-tz` — thêm thư viện vì danh
+   sách múi giờ đổi theo bản phát hành của IANA, tự giữ là sai dần), `organizations.currency` (ISO 4217, không mặc
+   định), `organizations.language` (`en`, `vi`, mặc định `en`). Hồ sơ thuế và chính sách là cài đặt của module
+   thuế / thương mại khi chúng có (bước 35+), khai cùng cách.
+
+Đã cân nhắc: một cột JSON "settings" trên bảng nút — không kiểm được từng key, không biết ai đổi gì; bảng cài đặt
+riêng ở mỗi module — lặp lại cách kế thừa ở mọi module; tính sẵn giá trị hiệu lực cho mọi nút con — phải tính lại
+khi dời nút hay đổi ở nút cha, trong khi đọc chuỗi tổ tiên đã có index.
+
+## D-307 · Đường dẫn và ngôn ngữ riêng theo website (bước 34) — 2026-11-16 — agent quyết
+
+Bối cảnh: D-305 để lại ba việc: ngôn ngữ bật theo website, đường dẫn công khai duy nhất theo website, tìm theo ý
+nghĩa công khai lọc theo website.
+
+Quyết định:
+
+1. **Ngôn ngữ của website là cài đặt kế thừa theo cây** `organizations.languages` (danh sách mã BCP 47, ngôn ngữ đầu là
+   mặc định; D-306). `organizations` khai vì nhiều module dùng chung (`content`, `menus`, sau này `storefront`);
+   mỗi module chỉ giữ ngôn ngữ nó hỗ trợ (`content`: ngôn ngữ của khách; `menus`: `AUTOXIDE_MENUS_LOCALES`), không
+   còn thì dùng cấu hình chung. Chỉ áp cho đọc công khai; viết bài vẫn theo ngôn ngữ của khách (bài của trụ sở
+   hiện ở nhiều website, mỗi website lấy phần ngôn ngữ của mình).
+2. **`content` và `menus` lấy `dyn OrgDirectory` tuỳ chọn** (`require(...).ok()`, như `LegacyMenus`): app luôn có
+   `organizations`; test riêng của module không cần. Hàm chuẩn hoá mã ngôn ngữ chuyển vào kernel
+   (`i18n::canonical_locale`), ba module dùng chung.
+3. **Đường dẫn và slug duy nhất theo nút**: unique của `content_published` thành `(tenant_id, org_id, locale, path)`,
+   của `content_entries` thành `(tenant_id, org_id, locale, kind, parent_key, slug)` (migration `m0013_site_paths`).
+   Chuyển hướng giữ cấp khách (một chuyển hướng áp cho mọi website).
+4. **Nút gần website nhất thắng**: giải đường dẫn lấy bài của nút gần nhất trên chuỗi; danh sách bài, sitemap,
+   feed, tìm công khai bỏ bài bị một bài cùng ngôn ngữ, cùng đường dẫn ở nút gần hơn che — một điều kiện SQL
+   (`NOT EXISTS` theo từng nút trên chuỗi, chuỗi ≤ độ sâu tối đa của cây), chạy như nhau trên hai database.
+5. Tìm công khai (`/public/search`) nhận `site` như các endpoint công khai khác.
+
+Đã cân nhắc: cài đặt ngôn ngữ riêng của từng module (`content.locales` theo nút) — hai module phải đặt hai lần
+cho một website; giữ đường dẫn duy nhất cả khách — hai cửa hàng không cùng có `/about`, trái mô hình nhiều cửa hàng.
+
+## D-308 · Tài khoản: xác nhận lại danh tính, ưa thích, role bắt buộc MFA (bước 34 mục 9) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Token xác nhận lại** (`POST /api/v1/auth/me/reauth`): chứng minh bằng mật khẩu, mã TOTP, passkey hay mail (token
+   trong mail); nhận token ngắn hạn (`AUTOXIDE_AUTH_REAUTH_MINUTES`, mặc định 10, 1–60), dùng một lần, lưu ở
+   `auth_tokens` (mục đích `reauth`, chủ là người dùng). Lệnh nhạy cảm nhận đúng MỘT trong `current_password` /
+   `reauth_token`: tạo API key, đổi email, bật TOTP, thêm passkey, xoá tài khoản. Token không đổi được lấy token mới
+   (không kéo dài hạn mãi). Bước 54 (step-up) dùng chính token này. Thêm `password` vào các cách xác nhận (đặc tả chỉ
+   nêu passkey / totp / email_link) vì tài khoản có mật khẩu là đa số. Đổi mật khẩu vẫn cần mật khẩu hiện tại.
+2. **Ngôn ngữ, múi giờ ưa thích** ở `auth_user.locale` (ngôn ngữ có bản dịch: `en`, `vi`) và `auth_user.time_zone`
+   (IANA, kiểm bằng `chrono-tz`), đổi qua `PATCH /api/v1/auth/me` cùng tên hiển thị (event `auth.user_updated`). Job
+   gửi mail (đặt lại mật khẩu, báo đổi email) dùng ngôn ngữ ưa thích thay ngôn ngữ của request gốc — thay mục hoãn ở
+   D-062.
+3. **Role bắt buộc MFA** (`auth_role.requires_mfa`): khi tài khoản chưa có TOTP đã xác nhận hay passkey, permission
+   của role đó bị bỏ khỏi `Principal` (người dùng vẫn đăng nhập được để bật MFA); `GET /me` trả `mfa_required`. Đường
+   nóng giữ một câu: chỉ tra MFA khi người dùng có role như vậy. Role `admin` dựng sẵn nhận thay đổi duy nhất là
+   `requires_mfa`.
+4. `last_login_at` của đặc tả đã có sẵn là `last_sign_in_at` (bước 33 đợt 2) — không thêm cột trùng.
+
+Đã cân nhắc: chặn đăng nhập khi role bắt buộc MFA mà chưa bật — người dùng không vào được để bật; giữ token trong
+bộ nhớ — không chạy khi nhiều máy chủ.
+
+## D-309 · Danh tính hai lớp: nhân sự và người mua (bước 34 mục 8) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **`auth_user.realm`** = `staff` (mặc định; mọi tài khoản cũ) hay `customer`. Unique email thành `(tenant_id, realm,
+   email)`: cùng email là hai tài khoản khác nhau. Mọi câu tra theo email lọc cả `realm` (đăng nhập, đặt lại mật
+   khẩu, đổi email, khôi phục). Bộ đếm sai mật khẩu của người mua có tiền tố riêng.
+2. **Người mua không có permission**: bộ xác thực trả `Principal::customer`; không gán role / membership được
+   (như không có người dùng); `/users` chỉ thấy nhân sự, người mua quản lý qua `/customers`
+   (`auth.customers.read` / `.manage`).
+3. **Đăng ký người mua** (`POST /register` với `realm: customer`) mở theo cài đặt theo cây `auth.customer_registration`
+   (mặc định `true`, đọc ở nút gốc qua `OrgDirectory` — `auth` lấy nó tuỳ chọn), độc lập với
+   `AUTOXIDE_AUTH_SELF_REGISTRATION` (nhân sự). Email người mua chưa xác minh không chặn đăng nhập (đặc tả, khuyến nghị 6).
+4. **Giữ tài khoản theo từng khách** (bước 33) thay vì chuyển nhân sự lên mặt điều khiển: một người làm cho nhiều khách
+   bằng uỷ quyền (D-310) hay quyền vào hỗ trợ (bước 34 mục 13) từ khách nhà của mình, không cần bảng tài khoản
+   toàn nền tảng. Đã cân nhắc chuyển `auth_user`, role, membership lên database điều khiển như đặc tả gợi ý — phải
+   dời dữ liệu của mọi khách `dedicated`, đổi đường nóng xác thực sang hai database, trong khi đường vào qua header
+   đã đủ cho "một người nhiều khách". Role `admin` cho mỗi khách mới đã có từ bước 33 (`AdminRoleSeed`).
+
+## D-310 · Uỷ quyền theo cây khách hàng và đường vào trong event (bước 34 mục 10) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Vào khách khác bằng header**, không cấp token mới: người dùng gửi credential của khách nhà kèm
+   `Autoxide-Tenant: <khách đích>`; kernel hỏi `Authenticator::enter(principal, target)` (mặc định: không) trước luật
+   nhân sự nền tảng sẵn có. `POST /me/tenant` của đặc tả không cần (bước 33 đã có header). Tính lại mỗi request: thu
+   hồi / hết hạn có hiệu lực request kế.
+2. **Bảng `auth_delegation` thuộc khách CHA** (tenant_id = cha, `child_tenant_id`, `role_id` của cha, `org_id` của
+   con, `reason`, `expires_at`, `revoked_at`): cấp / thu hồi cùng transaction với event ở cha; khách con đọc
+   `incoming` qua database của các khách cấp trên (`DatabaseRegistry::tenant_ancestors`). Chỉ cấp cho khách con cháu;
+   role toàn quyền chỉ ở nút gốc của con (toàn quyền ở nút con nghĩa là cả permission cấp khách).
+3. **Quyền khi vào** = permission của các role được uỷ quyền mà người đó giữ **ở nút gốc** của khách cha, gắn ở nút
+   của uỷ quyền trong khách con, theo độ sâu của role. API key và người mua không vào bằng uỷ quyền.
+4. **`Actor.access`** (`direct` / `delegation` / `support` + id) ghi vào mọi outbox bằng migration kernel chung
+   `outbox_access_migration` (mỗi module phát event thêm `k0001_event_access` vào cuối danh sách), audit lưu nó trong
+   `details` (đã nằm trong chuỗi băm — không đổi cách băm). Không ghi event "bắt đầu vào" riêng mỗi request: mỗi thay
+   đổi ở khách con đã mang đường vào; khách cha có `auth.delegation_granted` / `revoked`. Đã cân nhắc job
+   `auth.mirror_event` ghi event ở cả hai phía mỗi lần vào — một event cho mỗi request đọc, không thêm thông tin.
+
+## D-311 · Đăng nhập bằng link qua email (bước 34 mục 11) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. Tắt mặc định (`AUTOXIDE_AUTH_LOGIN_LINK=false`); tắt thì hai endpoint trả 404 `auth.login_link_disabled`.
+2. `POST /auth/login/link` không tra tài khoản trong request: chỉ sinh `device_secret` ngẫu nhiên (khi `bind_device`,
+   mọi lần, kể cả email không có) và xếp job `auth.send_login_link` — cùng mã, cùng thân, cùng số câu ghi dù email có
+   hay không (như D-154, D-162). Job phát token một lần (`auth_tokens`, mục đích `login_link`, hạn
+   `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES` 5–60, mặc định 15), giãn cách 60 giây mỗi tài khoản, gửi mail bằng ngôn ngữ ưa
+   thích (D-308).
+3. Gắn thiết bị: `data` của token giữ SHA-256 của `device_secret`; xác nhận phải gửi đúng secret. Token bị dùng ngay
+   cả khi secret sai — không cho thử lại (người chặn được link không đoán mãi).
+4. MFA vẫn áp dụng: tài khoản bật TOTP nhận `mfa_token` như `/login`. Phiên ghi `sign_in_method = email_link`; event
+   `auth.login_link_used`. Không có tool MCP (việc đăng nhập chỉ qua REST, đặc tả).
+
+## D-312 · Mời người dùng qua email (bước 34 mục 12) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. Bảng `auth_invitation` (theo khách): email, tên, nút, **role giữ dạng mảng JSON** trong cùng dòng (thay bảng
+   `auth_invitation_role` của đặc tả — không ai truy vấn theo từng role của lời mời), trạng thái `pending` /
+   `accepted` / `revoked`, hạn (`AUTOXIDE_AUTH_INVITATION_DAYS`, 1–30, mặc định 7). Token không lưu cột `token_id`: token
+   ở `auth_tokens` (mục đích `invitation`, chủ = ID lời mời); gửi lại / thu hồi thu hồi mọi token của lời mời.
+2. Người mời cần `auth.invitations.manage` (theo nút) phủ nút; kiểm role bằng đúng hàm của membership
+   (`grant_problems`: nút trong phạm vi, `admin` chỉ ở gốc, không mời kèm role có permission mình không có).
+3. Mail đi bằng job `auth.send_invitation` (job phát token mới mỗi lần — hạn = hạn còn lại của lời mời).
+4. Chấp nhận: xem token (`OneTimeTokens::peek`, thêm ở kernel) để biết lời mời và kiểm đầu vào TRƯỚC khi tiêu token;
+   rồi `consume` (một request thắng khi gọi đồng thời). Email chưa có tài khoản nhân sự → tạo, email coi là đã xác
+   minh, mở phiên (`sign_in_method = invitation`); đã có → phải đăng nhập đúng tài khoản đó (409
+   `auth.invitation_sign_in_required` / 403 `auth.invitation_email_mismatch`), chỉ thêm role.
+5. Tool chỉ đọc `auth.list_invitations` chỉ đòi `auth.invitations.manage` (đặc tả không có permission xem riêng): thêm
+   vào ngoại lệ của test hợp đồng tool (như `kernel.list_domains`, D-245).
+6. Lệnh `autoxide user invite` qua trait `api::Invitations` (không kiểm permission — quyền người vận hành), cũng dùng
+   cho cấp phát khách ở bước 35. Job dọn xoá lời mời hết hạn quá 90 ngày; event audit giữ.
+
+## D-313 · Quyền vào hỗ trợ của nhân sự nền tảng (bước 34 mục 13) — 2026-11-16 — agent quyết
+
+Căn cứ: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (hiệu lực 01/01/2026) và NĐ 356/2025/NĐ-CP — xử lý dữ liệu cá nhân
+có căn cứ, mục đích, để lại vết; cung cấp cho cơ quan có thẩm quyền theo văn bản (lưu số văn bản) — cần đối chiếu điều
+khoản cụ thể với văn bản gốc / người có chuyên môn pháp lý (D-190, D-211).
+
+Quyết định:
+
+1. Nhân sự nền tảng chỉ vào dữ liệu khách bằng **lần cấp có thời hạn** (`auth_support_grant`): staff, role của khách
+   nền tảng, căn cứ `support` / `legal_request` (bắt buộc số văn bản), lý do 10–500 ký tự, tối đa
+   `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` giờ (1–72, mặc định 8). Vào bằng header `Autoxide-Tenant` qua
+   `Authenticator::enter`; `Authenticator::decides_entry` (mới ở kernel) khiến luật "`kernel.tenants.operate` vào
+   mọi khách" của bước 33 không còn áp khi module `auth` có mặt.
+2. Dòng giữ ở database của **khách nền tảng** (`target_tenant_id`): một chỗ tra cho mọi request vào và cho
+   `/me/tenants`. Event `granted` / `started` (lần vào đầu, đánh dấu `first_used_at`) / `revoked` ghi vào outbox của
+   khách được vào (transaction riêng sau khi dòng đã commit — database có thể khác) và của nền tảng (cấp, thu hồi).
+3. Khách tắt cài đặt `auth.support_access` (theo cây, mặc định `true`) thì chỉ lần cấp `legal_request` cấp được và
+   còn hiệu lực; khách tự thu hồi lần cấp `support` còn hạn, không thu hồi được `legal_request` (D-211). Bước 54 thay
+   cài đặt bằng chế độ `disabled` / `per_request` / `standing` (D-232).
+4. Quyền khi vào: permission của role ở nút gốc của khách; API key và người mua không vào. Lần cấp hết hạn giữ lại
+   (bằng chứng cho audit), không có job xoá.
+
+## D-314 · Module `address`: danh mục hành chính dùng chung, nhập từ nguồn chính thức (bước 34 mục 5–6) — 2026-11-16 — agent quyết
+
+Căn cứ: Nghị quyết 202/2025/QH15, Luật Tổ chức chính quyền địa phương 2025 (chính quyền hai cấp từ 01/7/2025),
+**QĐ 19/2025/QĐ-TTg** (bảng danh mục và mã số đơn vị hành chính, hiệu lực 01/7/2025: 34 tỉnh / thành, 3.321 đơn vị cấp
+xã — số theo các nguồn tổng hợp, **cần đối chiếu văn bản gốc**). Danh mục là văn bản hành chính (Luật SHTT Điều 15 —
+cần đối chiếu, D-193).
+
+Quyết định:
+
+1. Bảng `address_dataset`, `address_unit` là **mặt điều khiển** (không `tenant_id`, chỉ ở database điều khiển). Đơn vị có
+   mã (chuỗi, giữ số 0 đầu), tên, tên không dấu (tìm), loại, mã cấp trên, hiệu lực từ–tới (`YYYY-MM-DD`, so chuỗi).
+2. **Nhập bằng lệnh** `autoxide task address.import path=<thư mục>` (`manifest.json` ghi văn bản, URL, ngày tải, ngày
+   hiệu lực; `units.csv`). Cùng SHA-256 → không đổi gì; bộ mới → đóng đơn vị bỏ / đổi tên / đổi loại / đổi tỉnh (từ
+   ngày hiệu lực của bộ mới) và mở dòng mới; địa chỉ đã ghi giữ tên lúc ghi. Event `address.dataset_imported`.
+3. **Chưa kèm bộ dữ liệu Việt Nam**: trang danh mục của cơ quan thống kê (danhmuchanhchinh.gso.gov.vn /
+   .nso.gov.vn) không truy cập được khi dựng (DNS lỗi / 503), cổng văn bản không tìm được phụ lục; không sinh dữ liệu
+   bằng AI hay chép từ trang không chính thức (đặc tả). Người vận hành nhập theo `docs/ADDRESS.md`; `autoxide doctor`
+   cảnh báo khi chưa nhập. Mục "Đơn vị hành chính VN" của lộ trình chỉ đánh dấu xong khi có bộ dữ liệu chính thức
+   trong `modules/address/data/` — việc của chủ dự án (cung cấp file hay cho phép nguồn).
+4. Trait `api::AdministrativeUnits` (`provinces`, `communes`, `validate`) và kiểu `Address` / `AddressInput`; REST và
+   tool MCP công khai, `ETag` theo bộ dữ liệu, `Cache-Control: public, max-age=86400`. Thứ tự theo mã (khuyến nghị 5).
+   Đăng ký `address` → `organizations` → `auth` (khuyến nghị 1).
+
+## D-315 · Hồ sơ công khai của nút (bước 34 mục 7) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. Bảng riêng `organizations_profile` (một dòng mỗi nút có hồ sơ): công khai, thứ tự, tên hiển thị, địa chỉ (cột theo quy
+   ước của `address`, tên giữ như lúc ghi), giờ mở cửa và ngày đặc biệt (JSON đã kiểm), nhận hàng tại quầy, ảnh bìa
+   (chỉ ID của `media`). Không thêm cột vào bảng nút — vùng, kho không mang cột trống.
+2. `PATCH /units/{id}/public-profile` cần `organizations.profile.manage` (theo nút) trong transaction ghi (nút khoá →
+   `org_frozen`); địa chỉ kiểm qua `AdministrativeUnits` trước transaction; giờ sai → 422
+   `organizations.invalid_opening_hours` kèm từng ô. Giờ là giờ địa phương theo cài đặt `organizations.timezone`.
+3. `GET /public/stores` (công khai, khách từ tên miền / header): nút đang hoạt động có hồ sơ công khai, theo thứ tự khách
+   đặt rồi theo tên; `ETag` theo nội dung, `Cache-Control: public, max-age=300`. Loại đối tượng `organizations.store`
+   cho menu của website.
+
+## D-316 · Mục "tạo tài khoản từ số điện thoại" chuyển sang bước 45 — 2026-11-16 — agent quyết
+
+Đặc tả 34 ghi rõ mục này làm ở bước 45 (cần token xem đơn của `orders`, D-202) nhưng lộ trình liệt kê nó trong bước 34
+nên bước 34 không đóng được. Chuyển mục sang danh sách bước 45 (giữ nguyên nội dung), đánh dấu ở bước 34 là đã chuyển.
+
+## D-317 · Số đo đường nóng sau bước 34 — 2026-11-16 — agent quyết
+
+Đo theo đặc tả 34 (thứ tự làm, mục 14): bản đóng bước 33 (`15a6de4`) và bản cuối bước 34, cùng máy, trung vị 3 lần
+(`docs/BENCHMARKS.md`, "Sau bước 34"). `GET /auth/me` bằng access token 4269 → 3200 req/s (-25%), bằng API key 3286 →
+2664 (-19%); bản đầu của bước 34 là -35% — `GET /me` đọc lại dòng người dùng cho ngôn ngữ / múi giờ và kiểm role bắt
+buộc MFA bằng hai câu; đã gộp: ngôn ngữ, múi giờ nằm trong `api::User` (một lần đọc), kiểm MFA một câu có subquery.
+Xác thực mỗi request (`principal`) vẫn một câu cho người không có role bắt buộc MFA; vào khách khác (uỷ quyền, hỗ trợ)
+chỉ thêm câu khi có header `Autoxide-Tenant` khác khách nhà. Không gộp ba câu tính `Principal` bằng `UNION ALL`
+(khuyến nghị 3): đường vào khác chỉ chạy khi có header, không làm chậm đường thường. Phần tối ưu `GET /me` còn lại để
+mục sẵn có ở bước 39.
+
+## D-318 · Bộ dữ liệu hành chính lấy từ provinces.open-api.vn — 2026-11-16 — chủ dự án cho phép dùng nguồn khác
+
+Bối cảnh: trang danh mục của cơ quan thống kê không truy cập được, cổng văn bản không có phụ lục (D-314); chủ dự án cho
+phép dùng nguồn khác.
+
+Quyết định: lấy `https://provinces.open-api.vn/api/v2/?depth=2` (dự án mở đăng lại danh mục của cơ quan thống kê sau
+sáp nhập), ngày 16/11/2026. Số lượng khớp QĐ 19/2025/QĐ-TTg theo các nguồn tổng hợp: 34 tỉnh / thành (28 tỉnh, 6 thành
+phố), 3.321 đơn vị cấp xã (2.621 xã, 687 phường, 13 đặc khu); mã không trùng. Chuyển sang `units.csv` (mã tỉnh 2 chữ
+số, mã xã 5 chữ số), đóng gói ở `modules/address/data/vn-2025` và nhúng vào binary: `autoxide task address.import`
+không nêu `path` nhập bộ này; `autoxide doctor` cảnh báo khi chưa nhập hay khi bộ đóng gói mới hơn bộ đang dùng.
+Manifest ghi rõ nguồn trung gian. Tên đơn vị cần chắc về pháp lý thì **đối chiếu văn bản gốc**.

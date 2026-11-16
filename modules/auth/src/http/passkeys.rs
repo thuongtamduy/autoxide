@@ -103,8 +103,12 @@ impl From<Passkey> for PasskeyResponse {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct StartPasskeyRegistrationRequest {
     /// Your current password: a stolen access token alone must not add a passkey.
-    #[validate(length(min = 1, max = 1024))]
+    #[serde(default)]
+    #[validate(length(max = 1024))]
     current_password: String,
+    /// A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+    /// (accounts without a password use this). Exactly one of the two.
+    reauth_token: Option<String>,
 }
 
 /// The authenticator's answer to an add-passkey ceremony.
@@ -158,7 +162,11 @@ async fn start_registration(
     require_session(&principal)?;
     let ceremony = state
         .passkeys
-        .start_registration(&tenant, principal.user_id(), &input.current_password)
+        .start_registration(
+            &tenant,
+            principal.user_id(),
+            super::confirm(&input.current_password, input.reauth_token.as_deref())?,
+        )
         .await?;
     Ok(Data { data: ceremony.into() })
 }
@@ -552,6 +560,8 @@ mod tests {
                     .unwrap();
             }
             let helpdesk = crate::role::RoleInput {
+                requires_mfa: false,
+                grants: Vec::new(),
                 name: "helpdesk".to_owned(),
                 description: String::new(),
                 permissions: vec!["auth.passkeys.manage".to_owned()],

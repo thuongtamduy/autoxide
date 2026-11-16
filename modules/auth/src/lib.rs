@@ -13,21 +13,33 @@ pub mod api;
 mod api_key;
 mod cleanup;
 mod config;
+mod delegation;
+#[cfg(test)]
+mod delegation_tests;
 mod doctor;
 mod email_report;
 mod events;
 mod http;
+mod invitation;
+mod login_link;
 mod mfa;
 mod migration;
+#[cfg(test)]
+mod org_tests;
 mod passkey;
 mod password;
 mod permissions;
 mod privacy;
+mod reauth;
 mod recovery;
 mod reset;
 mod resource;
 mod role;
 mod session;
+mod settings;
+mod support;
+#[cfg(test)]
+mod support_tests;
 #[cfg(test)]
 mod tenancy_tests;
 mod token;
@@ -70,6 +82,8 @@ struct AuthModule {
     state: Option<http::HttpState>,
     cleanup: Option<Arc<cleanup::Cleanup>>,
     resets: Option<Arc<reset::PasswordResets>>,
+    login_links: Option<Arc<login_link::LoginLinks>>,
+    invitations: Option<Arc<invitation::Invitations>>,
     verifications: Option<Arc<verify::EmailVerifications>>,
     administrator: Option<Arc<doctor::Administrator>>,
 }
@@ -88,6 +102,10 @@ impl Module for AuthModule {
     }
 
     /// Khách mới có role `admin` (mọi permission) như khách mặc định (bước 33).
+    fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {
+        settings::all()
+    }
+
     fn seed_tenant(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::TenantSeed>> {
         Some(Arc::new(role::AdminRoleSeed))
     }
@@ -177,11 +195,23 @@ impl Module for AuthModule {
             url: config.password_reset_url.clone(),
             databases: databases.clone(),
         });
+        let delegations = Arc::new(delegation::DelegationService {
+            databases: databases.clone(),
+            outbox: outbox.clone(),
+        });
+        let support = Arc::new(support::SupportService {
+            databases: databases.clone(),
+            outbox: outbox.clone(),
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            max_hours: config.support_max_hours,
+        });
         let authenticator = RequestAuthenticator {
+            support: support.clone(),
             sessions: sessions.clone(),
             roles: roles.clone(),
             api_keys: api_keys.clone(),
-            databases,
+            databases: databases.clone(),
+            delegations: delegations.clone(),
         };
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
@@ -202,7 +232,48 @@ impl Module for AuthModule {
             passkeys: passkeys.clone(),
             mfa: mfa.clone(),
         }))?;
+        let reauth = Arc::new(reauth::Reauthentication {
+            sessions: sessions.clone(),
+            mfa: mfa.clone(),
+            passkeys: passkeys.clone(),
+            mailer: mailer.clone(),
+            translations: context.translations().clone(),
+            ttl: chrono::Duration::from_std(config.reauth_ttl)
+                .unwrap_or_else(|_| chrono::Duration::minutes(10)),
+        });
+        let login_links = Arc::new(login_link::LoginLinks {
+            enabled: config.login_link,
+            jobs: context.jobs(),
+            users: users.clone(),
+            sessions: sessions.clone(),
+            mailer: mailer.clone(),
+            translations: context.translations().clone(),
+            outbox: outbox.clone(),
+            url: config.login_link_url.clone(),
+            minutes: config.login_link_minutes,
+            databases: databases.clone(),
+        });
+        self.login_links = Some(login_links.clone());
+        let invitations = Arc::new(invitation::Invitations {
+            users: users.clone(),
+            sessions: sessions.clone(),
+            jobs: context.jobs(),
+            mailer: mailer.clone(),
+            translations: context.translations().clone(),
+            outbox: outbox.clone(),
+            databases: databases.clone(),
+            url: config.invitation_url.clone(),
+            days: config.invitation_days,
+        });
+        context.provide::<dyn api::Invitations>(invitations.clone())?;
+        self.invitations = Some(invitations.clone());
         self.state = Some(http::HttpState {
+            support,
+            invitations,
+            login_links,
+            delegations,
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            reauth,
             personal_data: context.personal_data_export(),
             sessions,
             users,
@@ -240,6 +311,14 @@ impl Module for AuthModule {
         if let Some(resets) = &self.resets {
             let mailer = Arc::new(reset::ResetMailer(resets.clone()));
             jobs.push(JobRegistration::new(reset::SEND_RESET, mailer));
+        }
+        if let Some(invitations) = &self.invitations {
+            let mailer = Arc::new(invitation::InvitationMailer(invitations.clone()));
+            jobs.push(JobRegistration::new(invitation::SEND_INVITATION, mailer));
+        }
+        if let Some(links) = &self.login_links {
+            let mailer = Arc::new(login_link::LoginLinkMailer(links.clone()));
+            jobs.push(JobRegistration::new(login_link::SEND_LOGIN_LINK, mailer));
         }
         if let Some(verifications) = &self.verifications {
             let mailer = Arc::new(email_report::EmailChangedMailer(verifications.clone()));
@@ -332,6 +411,7 @@ pub(crate) mod testing {
         pub resets: Arc<crate::reset::PasswordResets>,
         pub verifications: Arc<crate::verify::EmailVerifications>,
         pub passkeys: Arc<crate::passkey::PasskeyService>,
+        pub reauth: Arc<crate::reauth::Reauthentication>,
         pub mails: Arc<FakeMailer>,
         pub database: Database,
         /// Khách mặc định trên database của test.
@@ -375,7 +455,11 @@ pub(crate) mod testing {
             ("auth", crate::permissions::all()),
             (
                 "notes",
-                vec![autoxide_kernel::access::Permission::new("notes.write", "Write notes.")],
+                vec![
+                    autoxide_kernel::access::Permission::new("notes.write", "Write notes."),
+                    // Permission theo nút (bước 34), cho test độ sâu của role.
+                    autoxide_kernel::access::Permission::new("notes.read", "Read notes.").scoped(),
+                ],
             ),
         ])
         .unwrap();
@@ -442,7 +526,16 @@ pub(crate) mod testing {
                 }),
             )
             .unwrap();
+        let reauth = Arc::new(crate::reauth::Reauthentication {
+            sessions: sessions.clone(),
+            mfa: mfa.clone(),
+            passkeys: passkeys.clone(),
+            mailer: mails.clone(),
+            translations: translations.clone(),
+            ttl: chrono::Duration::minutes(10),
+        });
         Services {
+            reauth,
             personal_data,
             passkeys,
             users,
@@ -465,7 +558,11 @@ pub(crate) mod testing {
         email: &str,
         language: autoxide_kernel::i18n::Language,
     ) {
-        services.resets.request(&services.tenant, email, language).await.unwrap();
+        services
+            .resets
+            .request(&services.tenant, email, Default::default(), language)
+            .await
+            .unwrap();
         send_resets(services).await;
     }
 

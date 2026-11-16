@@ -71,9 +71,17 @@ pub(crate) struct ReplaceRoleInput {
     /// What the role is for.
     #[serde(default)]
     description: String,
-    /// Every permission the role grants (replaces the old list); see `list_permissions`.
+    /// Every permission the role grants for the whole tenant (replaces the old list); see
+    /// `list_permissions`.
     #[serde(default)]
     permissions: Vec<String>,
+    /// Permissions granted with a scope in the organization tree; each permission is listed once.
+    #[serde(default)]
+    #[schema(inline)]
+    grants: Vec<crate::http::roles::RoleGrant>,
+    /// `true`: the role's permissions work only for accounts with two-step sign-in.
+    #[serde(default)]
+    requires_mfa: bool,
 }
 
 /// The complete list of roles a user should have.
@@ -89,8 +97,10 @@ pub(crate) struct SetUserRolesInput {
 
 pub(crate) fn all(state: &Arc<HttpState>) -> Vec<Tool> {
     let mut tools = users(state);
+    tools.extend(memberships(state));
     tools.extend(roles(state));
     tools.extend(api_keys(state));
+    tools.extend(invitations(state));
     tools
 }
 
@@ -153,9 +163,15 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
                 let state = replace.clone();
                 async move {
                     let role = RoleInput {
+                        requires_mfa: input.requires_mfa,
                         name: input.name,
                         description: input.description,
                         permissions: input.permissions,
+                        grants: input
+                            .grants
+                            .into_iter()
+                            .map(|grant| (grant.permission, grant.scope))
+                            .collect(),
                     };
                     let role = state
                         .roles
@@ -327,7 +343,11 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
                 async move {
                     // Như REST: không tác động lên người có permission mà mình không có.
                     state.roles.require_covers(&tenant, &principal, input.id).await?;
-                    let changes = UserChanges { name: input.name, disabled: input.disabled };
+                    let changes = UserChanges {
+                        name: input.name,
+                        disabled: input.disabled,
+                        ..Default::default()
+                    };
                     let user = state
                         .users
                         .update(&tenant, Actor::from(&principal), input.id, changes, None)
@@ -358,6 +378,49 @@ mod tests {
             resets: services.resets.clone(),
             verifications: services.verifications.clone(),
             passkeys: services.passkeys.clone(),
+            reauth: services.reauth.clone(),
+            orgs: None,
+            support: Arc::new(crate::support::SupportService {
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                orgs: None,
+                max_hours: 8,
+            }),
+            invitations: Arc::new(crate::invitation::Invitations {
+                users: services.users.clone(),
+                sessions: services.sessions.clone(),
+                jobs: autoxide_kernel::job::JobQueue::new("auth"),
+                mailer: services.mails.clone(),
+                translations: autoxide_kernel::i18n::Translations::default(),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+                url: None,
+                days: 7,
+            }),
+            login_links: Arc::new(crate::login_link::LoginLinks {
+                enabled: false,
+                jobs: autoxide_kernel::job::JobQueue::new("auth"),
+                users: services.users.clone(),
+                sessions: services.sessions.clone(),
+                mailer: services.mails.clone(),
+                translations: autoxide_kernel::i18n::Translations::default(),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                url: None,
+                minutes: 15,
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+            }),
+            delegations: Arc::new(crate::delegation::DelegationService {
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+            }),
             personal_data: services.personal_data.clone(),
             self_registration: false,
             country_header: None,
@@ -498,4 +561,192 @@ mod tests {
         .await
         .unwrap();
     }
+}
+
+/// The units a user should work in, with the roles there.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SetMembershipsInput {
+    /// Id of the user.
+    user_id: Uuid,
+    /// Replaces every membership; `[]` removes all.
+    #[schema(inline)]
+    memberships: Vec<MembershipInput>,
+}
+
+/// The roles to give in one unit.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MembershipInput {
+    /// The unit; the id of the tenant is the root.
+    org_id: Uuid,
+    /// Ids of the roles in this unit.
+    role_ids: Vec<Uuid>,
+}
+
+/// Which memberships to list.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListMembershipsInput {
+    /// Only memberships on this unit (with `inherited`: also on the units above it).
+    org_id: Option<Uuid>,
+    /// Only memberships with this role.
+    role_id: Option<Uuid>,
+    /// Only the memberships of this user.
+    user_id: Option<Uuid>,
+    /// With `org_id`: also memberships on the units above it.
+    #[serde(default)]
+    inherited: bool,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc`.
+    order: Option<String>,
+}
+
+/// A new invitation.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CreateInvitationInput {
+    /// Email to invite.
+    email: String,
+    /// Display name for the new account.
+    name: Option<String>,
+    /// Unit the roles apply at; omit for the root unit. It must be in your scope.
+    org_id: Option<Uuid>,
+    /// Roles given on acceptance; you must have every permission of each.
+    role_ids: Vec<Uuid>,
+    /// Your own reference, up to 200 characters.
+    reference: Option<String>,
+}
+
+/// Which invitations to list.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListInvitationsInput {
+    /// Only `pending`, `accepted` or `revoked`.
+    status: Option<String>,
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc`.
+    order: Option<String>,
+}
+
+/// Tool về lời mời (D-312): cùng service với `/api/v1/auth/invitations`.
+fn invitations(state: &Arc<HttpState>) -> Vec<Tool> {
+    use crate::http::invitations::InvitationResponse;
+    use crate::permissions::INVITATIONS_MANAGE;
+    let (create, list, revoke) = (state.clone(), state.clone(), state.clone());
+    vec![
+        Tool::new(
+            "create_invitation",
+            "Invite someone by email to work at an organization unit with given roles; the mail \
+             goes out shortly and the link can be used once.",
+            move |tenant: TenantContext, principal: Principal, input: CreateInvitationInput| {
+                let state = create.clone();
+                async move {
+                    let input = crate::invitation::NewInvitation {
+                        email: input.email,
+                        name: input.name,
+                        org_id: input.org_id,
+                        role_ids: input.role_ids,
+                        reference: input.reference,
+                    };
+                    let language = autoxide_kernel::i18n::Language::En;
+                    let row = state
+                        .invitations
+                        .create(&tenant, Some(&principal), input, language)
+                        .await?;
+                    Ok::<_, Error>(InvitationResponse::from(row))
+                }
+            },
+        )
+        .requires(INVITATIONS_MANAGE),
+        Tool::new(
+            "list_invitations",
+            "List the invitations at units in your scope, newest first; filter by status.",
+            move |tenant: TenantContext, principal: Principal, input: ListInvitationsInput| {
+                let state = list.clone();
+                async move {
+                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let status = input.status.as_deref();
+                    let page = state.invitations.list(&tenant, &principal, status, &page).await?;
+                    Ok::<_, Error>(page.map(InvitationResponse::from))
+                }
+            },
+        )
+        .requires(INVITATIONS_MANAGE)
+        .read_only(),
+        Tool::new(
+            "revoke_invitation",
+            "Revoke an invitation: its link stops working.",
+            move |tenant: TenantContext, principal: Principal, input: IdInput| {
+                let state = revoke.clone();
+                async move {
+                    let row = state.invitations.revoke(&tenant, &principal, input.id).await?;
+                    Ok::<_, Error>(InvitationResponse::from(row))
+                }
+            },
+        )
+        .requires(INVITATIONS_MANAGE),
+    ]
+}
+
+/// Tool về membership theo nút (bước 34): cùng service với `/api/v1/auth/memberships`.
+fn memberships(state: &Arc<HttpState>) -> Vec<Tool> {
+    let (list, set) = (state.clone(), state.clone());
+    vec![
+        Tool::new(
+            "list_memberships",
+            "List who works in which organization unit with which role; filter by unit, role or \
+             user, and with `inherited` also count memberships on the units above.",
+            move |tenant: TenantContext, _: Principal, input: ListMembershipsInput| {
+                let state = list.clone();
+                async move {
+                    let filter = crate::role::MembershipFilter {
+                        org_id: input.org_id,
+                        role_id: input.role_id,
+                        user_id: input.user_id,
+                        inherited: input.inherited,
+                    };
+                    let page = autoxide_kernel::mcp::PageInput::new(
+                        input.limit,
+                        input.cursor,
+                        input.order,
+                    )
+                    .page()?;
+                    let page = state.roles.list_memberships(&tenant, &filter, &page).await?;
+                    Ok::<_, Error>(page.map(crate::http::memberships::MembershipRowResponse::from))
+                }
+            },
+        )
+        .requires(USERS_READ)
+        .read_only(),
+        Tool::new(
+            "set_memberships",
+            "Replace every organization unit a user works in and the roles there. You can only \
+             give roles whose permissions you have, in units you work in.",
+            move |tenant: TenantContext, principal: Principal, input: SetMembershipsInput| {
+                let state = set.clone();
+                async move {
+                    let wanted = input
+                        .memberships
+                        .into_iter()
+                        .map(|entry| (entry.org_id, entry.role_ids))
+                        .collect();
+                    let after = state
+                        .roles
+                        .set_memberships(&tenant, &principal, input.user_id, wanted)
+                        .await?;
+                    let after: Vec<crate::http::memberships::MembershipResponse> =
+                        after.into_iter().map(Into::into).collect();
+                    Ok::<_, Error>(serde_json::json!({ "memberships": after }))
+                }
+            },
+        )
+        .requires(ROLES_MANAGE),
+    ]
 }

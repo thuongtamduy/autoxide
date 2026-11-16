@@ -61,6 +61,8 @@ pub(crate) struct CreateMenuInput {
     key: String,
     /// The menu's language, e.g. `vi`; omitted: the default language.
     locale: Option<String>,
+    /// The website (organization unit) the menu is for; omitted: the whole tenant.
+    org_id: Option<Uuid>,
     /// The item tree (see the tool description for the shape of an item).
     #[serde(default)]
     #[schema(value_type = Vec<Object>)]
@@ -104,7 +106,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: PageInput| {
                 let service = list.clone();
                 async move {
-                    let page = service.list(&tenant, &principal, &input.page()?).await?;
+                    let page = service.list(&tenant, &principal, None, &input.page()?).await?;
                     Ok::<Page<SiteMenuSummary>, Error>(page.map(|(menu, items)| SiteMenuSummary::new(menu, items)))
                 }
             },
@@ -134,7 +136,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: CreateMenuInput| {
                 let service = create.clone();
                 async move {
-                    let new = NewMenu { key: input.key, locale: input.locale, items: parse_items(input.items)? };
+                    let new = NewMenu { key: input.key, locale: input.locale, org_id: input.org_id, items: parse_items(input.items)? };
                     let (menu, nodes) = service.create(&tenant, &principal, new).await?;
                     let version = etag(menu.updated_at);
                     Ok::<_, Error>(Versioned { version, menu: menu_response(menu, nodes) })

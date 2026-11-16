@@ -459,6 +459,51 @@ cũng bị tính vào rate limiting theo địa chỉ như mọi endpoint khác;
 chứng chỉ mới. Xác minh, gỡ tên miền hay tạm khoá khách có hiệu lực trên mọi máy chủ sau tối đa
 `AUTOXIDE_TENANCY_CACHE_SECONDS` giây (mặc định `10`).
 
+## Tài khoản của một khách: nhân sự, người mua, uỷ quyền
+
+Mỗi khách có hai loại tài khoản. **Nhân sự** (`realm: staff`, mặc định) làm việc bằng role và
+permission. **Người mua** (`realm: customer`) là tài khoản của cửa hàng: đăng nhập được, không có
+permission nào, tách khỏi nhân sự dù trùng email. Người mua đăng ký bằng
+`POST /api/v1/auth/register` và đăng nhập bằng `POST /api/v1/auth/login`, cùng với
+`"realm": "customer"`; khách đóng đăng ký người mua bằng cài đặt theo cây tổ chức
+`auth.customer_registration` (`false`). Nhân sự quản lý người mua bằng `GET /api/v1/auth/customers`
+và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth.customers.manage`).
+
+**Mời nhân sự.** Thay vì tạo tài khoản kèm mật khẩu, hãy mời: `POST /api/v1/auth/invitations` với
+`email`, các `role_ids` và nút (`org_id`) họ nhận (permission `auth.invitations.manage`; không mời kèm
+role có permission mà bạn không có), hoặc từ dòng lệnh:
+
+```bash
+autoxide user invite --email new.colleague@example.com --role editor
+```
+
+Mail mang link dùng một lần tới `AUTOXIDE_AUTH_INVITATION_URL` (trang của giao diện có `{token}`;
+không đặt thì mail chứa token), sống `AUTOXIDE_AUTH_INVITATION_DAYS` ngày (7). Chấp nhận thì tài
+khoản được tạo (hay, khi email đã có tài khoản, role được thêm sau khi người đó đăng nhập). **Đăng
+nhập bằng link** (không mật khẩu) tắt mặc định; bật bằng `AUTOXIDE_AUTH_LOGIN_LINK=true` và đặt
+`AUTOXIDE_AUTH_LOGIN_LINK_URL` là trang của giao diện. Cả hai cần mail chạy được
+(`AUTOXIDE_MAIL_SMTP_URL`) và worker đang chạy. Cây tổ chức của một khách sâu tối đa
+`AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` cấp (mặc định 8). Nhập danh mục đơn vị hành chính một lần để kiểm
+địa chỉ: `autoxide task address.import` ([`docs/ADDRESS.vi.md`](ADDRESS.vi.md)).
+
+**Nhân sự nền tảng và dữ liệu của khách.** Nhân sự nền tảng (tài khoản của khách nền tảng) không bao
+giờ vào dữ liệu của khách chỉ nhờ role: người có `auth.support.grant` cấp cho một nhân sự quyền vào có
+thời hạn bằng `POST /api/v1/auth/support-grants` (`tenant_id`, `staff_user_id`, một `role_id` của nền
+tảng, `basis` là `support` hay `legal_request` kèm số văn bản, `reason`, tối đa
+`AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` giờ, mặc định 8). Khách thấy mọi lần cấp, lần vào đầu và mọi
+thay đổi đã làm (`GET /api/v1/auth/support-access`), tự thu hồi lần cấp `support` còn hạn
+(`DELETE /api/v1/auth/support-access/{id}`), và tắt được quyền vào hỗ trợ bằng cài đặt
+`auth.support_access` (khi đó chỉ lần cấp `legal_request` còn hiệu lực).
+
+Trong chuỗi khách (khách có `parent_id`), khách cha cho người giữ một role của mình làm việc ở khách
+con: `POST /api/v1/auth/delegations` với `child_tenant_id`, `role_id`, `org_id` tuỳ chọn (một nút của
+khách con), `expires_at` tuỳ chọn và `reason` (permission `auth.delegations.manage`). Những người đó
+giữ cách đăng nhập của mình và thêm header `Autoxide-Tenant: <id khách con>`;
+`GET /api/v1/auth/me/tenants` liệt kê những nơi họ vào được. Mọi thay đổi họ làm ở khách con ghi kèm
+đường vào là uỷ quyền (`actor_access` trong event và audit log của khách con); thu hồi
+(`DELETE /api/v1/auth/delegations/{id}`) có hiệu lực từ request kế. Khách con xem những gì nhận được
+bằng `GET /api/v1/auth/delegations?direction=incoming`.
+
 ## Dời khách hàng sang database khác
 
 Khi chạy nhiều khách hàng, dữ liệu của mỗi khách nằm ở một *placement* (vị trí dữ liệu): `main`

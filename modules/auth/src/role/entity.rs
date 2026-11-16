@@ -15,6 +15,8 @@ pub(crate) mod role {
         pub name: String,
         pub description: String,
         pub all_permissions: bool,
+        /// Quyền của role chỉ có hiệu lực khi tài khoản đã bật MFA (TOTP hay passkey, D-308).
+        pub requires_mfa: bool,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
     }
@@ -41,6 +43,8 @@ pub(crate) mod role_permission {
         pub tenant_id: Uuid,
         pub role_id: Uuid,
         pub permission: String,
+        /// Độ sâu: `own`, `unit`, `subtree`, `tenant` (bước 34).
+        pub scope: String,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -65,6 +69,8 @@ pub(crate) mod user_role {
         pub tenant_id: Uuid,
         pub user_id: Uuid,
         pub role_id: Uuid,
+        /// Nút của membership (bước 34); nút gốc = ID của khách. Luôn có giá trị.
+        pub org_id: Option<Uuid>,
         pub created_at: DateTimeUtc,
     }
 

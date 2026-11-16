@@ -129,6 +129,8 @@ pub(crate) struct UploadMediaInput {
     content_type: Option<String>,
     /// Folder to put the item in. Omit for the root.
     folder_id: Option<Uuid>,
+    /// The organization unit that owns the item; omit when you work in one unit only.
+    org_id: Option<Uuid>,
     /// Tags for the item.
     tags: Option<Vec<String>>,
 }
@@ -163,6 +165,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                 async move {
                     let query = ItemsQuery {
                         folder_id: input.folder_id,
+                        owner_org: None,
                         content_type: input.content_type,
                         visibility: input.visibility,
                         trashed: input.trashed.map(|trashed| trashed.to_string()),
@@ -294,6 +297,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                     let upload = NewUpload {
                         name: input.name,
                         folder_id: input.folder_id,
+                        org_id: input.org_id,
                         content_type: input.content_type,
                         tags: input.tags.unwrap_or_default(),
                     };

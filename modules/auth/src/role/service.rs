@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use autoxide_kernel::access::{PermissionCatalog, Principal};
+use autoxide_kernel::access::{Grant, PermissionCatalog, Principal, Scope};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
@@ -18,8 +18,11 @@ use super::entity::{role, role_permission, user_role};
 use crate::events;
 use crate::user::entity as user;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_of};
 use serde_json::json;
+
+/// Role đã kiểm: tên, mô tả, permission kèm độ sâu.
+type CheckedRole = (String, String, Vec<(String, Scope)>);
 
 const NAME_MAX_LENGTH: usize = 64;
 const DESCRIPTION_MAX_LENGTH: usize = 500;
@@ -36,8 +39,12 @@ pub(crate) struct Role {
     pub description: String,
     /// Có mọi permission (role `admin`); khi đó `permissions` rỗng.
     pub all_permissions: bool,
-    /// Theo thứ tự tên.
+    /// Quyền của role chỉ có hiệu lực khi tài khoản đã bật MFA (D-308).
+    pub requires_mfa: bool,
+    /// Theo thứ tự tên, mọi độ sâu.
     pub permissions: Vec<String>,
+    /// Permission kèm độ sâu (bước 34), theo thứ tự tên.
+    pub grants: Vec<(String, Scope)>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -47,7 +54,42 @@ pub(crate) struct Role {
 pub(crate) struct RoleInput {
     pub name: String,
     pub description: String,
+    /// Permission ở độ sâu `tenant`.
     pub permissions: Vec<String>,
+    /// Permission kèm độ sâu (bước 34); một permission chỉ được nêu một lần trong cả hai danh sách.
+    pub grants: Vec<(String, Scope)>,
+    /// Xem [`Role::requires_mfa`].
+    pub requires_mfa: bool,
+}
+
+/// Bộ lọc danh sách membership.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct MembershipFilter {
+    pub org_id: Option<Uuid>,
+    pub role_id: Option<Uuid>,
+    pub user_id: Option<Uuid>,
+    pub inherited: bool,
+}
+
+/// Một dòng membership (người, nút, role).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MembershipRow {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub org_id: Uuid,
+    pub role_id: Uuid,
+    pub role_name: String,
+    /// Membership ở một nút trên nút đang hỏi.
+    pub inherited: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Một membership: người làm ở nút `org_id` với các role này.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Membership {
+    pub user_id: Uuid,
+    pub org_id: Uuid,
+    pub roles: Vec<Role>,
 }
 
 pub(crate) struct RoleService {
@@ -119,6 +161,7 @@ impl RoleService {
         actor: Actor,
         input: RoleInput,
     ) -> Result<Role, Error> {
+        let requires_mfa = input.requires_mfa;
         let (name, description, permissions) = self.check(input)?;
         let now = now();
         let id = Uuid::now_v7();
@@ -129,6 +172,7 @@ impl RoleService {
             name: Set(name.clone()),
             description: Set(description.clone()),
             all_permissions: Set(false),
+            requires_mfa: Set(requires_mfa),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -136,8 +180,9 @@ impl RoleService {
         .await
         .map_err(|error| name_taken_or(error, &name))?;
         insert_permissions(&transaction, tenant, id, &permissions).await?;
-        let after =
-            Some(json!({"name": name, "description": description, "permissions": permissions}));
+        let mut after = role_json(&name, &description, &permissions);
+        after["requires_mfa"] = json!(requires_mfa);
+        let after = Some(after);
         let event = events::RoleCreated { before: None, after };
         self.outbox.record(&transaction, tenant, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
@@ -154,6 +199,7 @@ impl RoleService {
         input: RoleInput,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Role, Error> {
+        let requires_mfa = input.requires_mfa;
         let (name, description, permissions) = self.check(input)?;
         let transaction = tenant.database().begin_write().await?;
         let current = role::Entity::find_by_id(id)
@@ -161,11 +207,18 @@ impl RoleService {
             .one(&transaction)
             .await?
             .ok_or_else(|| role_not_found(id))?;
-        if current.all_permissions {
+        // Role `admin` dựng sẵn: chỉ đổi được `requires_mfa` (tên, mô tả giữ nguyên, không
+        // permission nào) — bảo vệ tài khoản quyền cao nhất là chỗ cần MFA nhất (D-308).
+        let only_mfa = current.all_permissions
+            && name == current.name
+            && description == current.description
+            && permissions.is_empty();
+        if current.all_permissions && !only_mfa {
             return Err(builtin_role());
         }
         let before = role_snapshot(&transaction, tenant, &current).await?;
         let mut update = role::Entity::update_many()
+            .col_expr(role::Column::RequiresMfa, Expr::value(requires_mfa))
             .col_expr(role::Column::Name, Expr::value(name.clone()))
             .col_expr(role::Column::Description, Expr::value(description.clone()))
             .col_expr(role::Column::UpdatedAt, Expr::value(now()))
@@ -187,7 +240,8 @@ impl RoleService {
             .exec(&transaction)
             .await?;
         insert_permissions(&transaction, tenant, id, &permissions).await?;
-        let after = json!({"name": name, "description": description, "permissions": permissions});
+        let mut after = role_json(&name, &description, &permissions);
+        after["requires_mfa"] = json!(requires_mfa);
         let event = events::RoleUpdated { before: Some(before), after: Some(after) };
         self.outbox.record(&transaction, tenant, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
@@ -299,6 +353,8 @@ impl RoleService {
         let touched = user::Entity::update_many()
             .col_expr(user::Column::UpdatedAt, Expr::value(now()))
             .filter(user::Column::Id.eq(user_id))
+            // Người mua không có role (D-309): như không có người dùng này.
+            .filter(user::Column::Realm.eq("staff"))
             .scoped(tenant)
             .exec(&transaction)
             .await?;
@@ -319,8 +375,11 @@ impl RoleService {
         }
         let admins_before = count_active_admins(&transaction, tenant).await?;
         let before = role_names(&roles_of_user(&transaction, tenant, user_id).await?);
+        // Đường cũ (trước bước 34): role ở nút gốc. Membership ở nút khác giữ nguyên.
+        let root = root_of(tenant.id()).as_uuid();
         user_role::Entity::delete_many()
             .filter(user_role::Column::UserId.eq(user_id))
+            .filter(user_role::Column::OrgId.eq(root))
             .scoped(tenant)
             .exec(&transaction)
             .await?;
@@ -331,6 +390,7 @@ impl RoleService {
                 tenant_id: Set(tenant.id().as_uuid()),
                 user_id: Set(user_id),
                 role_id: Set(*role_id),
+                org_id: Set(Some(root)),
                 created_at: Set(now),
             }
             .insert(&transaction)
@@ -353,6 +413,178 @@ impl RoleService {
         Ok(after)
     }
 
+    /// Mọi membership của người dùng `user_id`: mỗi nút một dòng, kèm role ở nút đó; nút theo ID.
+    pub(crate) async fn memberships(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<Vec<Membership>, Error> {
+        let connection = tenant.database().read();
+        if user::Entity::find_by_id(user_id).scoped(tenant).one(connection).await?.is_none() {
+            return Err(crate::user::user_not_found(user_id));
+        }
+        memberships_of(connection, tenant, user_id).await
+    }
+
+    /// Thay mọi membership của người dùng `user_id` bằng `memberships` (nút → role). Người gán
+    /// phải làm việc ở từng nút và có mọi permission của role mình gán; role `admin` chỉ gán ở
+    /// nút gốc.
+    pub(crate) async fn set_memberships(
+        &self,
+        tenant: &TenantContext,
+        actor: &Principal,
+        user_id: Uuid,
+        memberships: Vec<(Uuid, Vec<Uuid>)>,
+    ) -> Result<Vec<Membership>, Error> {
+        let mut problems = Vec::new();
+        let mut wanted: Vec<(Uuid, BTreeSet<Uuid>)> = Vec::new();
+        for (index, (org_id, role_ids)) in memberships.into_iter().enumerate() {
+            if wanted.iter().any(|(org, _)| *org == org_id) {
+                problems.push(FieldError::new(
+                    format!("memberships[{index}].org_id"),
+                    "duplicate",
+                    "each unit may appear once; list all its roles together",
+                ));
+            }
+            let roles: BTreeSet<Uuid> = role_ids.into_iter().collect();
+            if roles.len() > MAX_ROLES_PER_USER {
+                problems.push(
+                    FieldError::new(
+                        format!("memberships[{index}].role_ids"),
+                        "length",
+                        "must list at most {max_roles_per_user} roles",
+                    )
+                    .with_param("max_roles_per_user", MAX_ROLES_PER_USER),
+                );
+            }
+            wanted.push((org_id, roles));
+        }
+        if wanted.len() > MAX_ROLES_PER_USER {
+            problems.push(
+                FieldError::new("memberships", "length", "must list at most {max} units")
+                    .with_param("max", MAX_ROLES_PER_USER),
+            );
+        }
+        // Lỗi ở trên chưa trả ngay: kiểm tiếp nút và role để báo mọi lỗi một lần (D-083).
+        let transaction = tenant.database().begin_write().await?;
+        // Khoá dòng người dùng (như `set_user_roles`): hai lần gán cho cùng người nối đuôi nhau.
+        let touched = user::Entity::update_many()
+            .col_expr(user::Column::UpdatedAt, Expr::value(now()))
+            .filter(user::Column::Id.eq(user_id))
+            // Người mua không có role (D-309): như không có người dùng này.
+            .filter(user::Column::Realm.eq("staff"))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
+        if touched.rows_affected == 0 {
+            return Err(crate::user::user_not_found(user_id));
+        }
+        for (index, (org_id, roles)) in wanted.iter().enumerate() {
+            let field = format!("memberships[{index}].");
+            problems
+                .extend(grant_problems(&transaction, tenant, actor, &field, *org_id, roles).await?);
+        }
+        if !problems.is_empty() {
+            transaction.rollback().await?;
+            return Err(Error::validation(problems));
+        }
+        let admins_before = count_active_admins(&transaction, tenant).await?;
+        let before = memberships_json(&memberships_of(&transaction, tenant, user_id).await?);
+        user_role::Entity::delete_many()
+            .filter(user_role::Column::UserId.eq(user_id))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
+        let now = now();
+        for (org_id, roles) in &wanted {
+            for role_id in roles {
+                user_role::ActiveModel {
+                    id: Set(Uuid::now_v7()),
+                    tenant_id: Set(tenant.id().as_uuid()),
+                    user_id: Set(user_id),
+                    role_id: Set(*role_id),
+                    org_id: Set(Some(*org_id)),
+                    created_at: Set(now),
+                }
+                .insert(&transaction)
+                .await?;
+            }
+        }
+        if admins_before > 0 && count_active_admins(&transaction, tenant).await? == 0 {
+            transaction.rollback().await?;
+            return Err(last_admin());
+        }
+        let after = memberships_of(&transaction, tenant, user_id).await?;
+        let event = events::MembershipsChanged {
+            before: Some(before),
+            after: Some(memberships_json(&after)),
+        };
+        self.outbox
+            .record(&transaction, tenant, Actor::from(actor), events::user_subject(user_id), &event)
+            .await?;
+        transaction.commit().await?;
+        tracing::info!(user_id = %user_id, units = after.len(), "memberships changed");
+        Ok(after)
+    }
+
+    /// Một trang membership (người, nút, role) của khách, lọc theo nút / role. `inherited`: kể
+    /// cả membership ở các nút TRÊN `org_id` (người có quyền ở nút đó nhờ nút cha).
+    pub(crate) async fn list_memberships(
+        &self,
+        tenant: &TenantContext,
+        filter: &MembershipFilter,
+        page: &PageRequest,
+    ) -> Result<Page<MembershipRow>, Error> {
+        let connection = tenant.database().read();
+        let root = root_of(tenant.id()).as_uuid();
+        let mut select = user_role::Entity::find().scoped(tenant);
+        if let Some(org_id) = filter.org_id {
+            let orgs: Vec<Uuid> = if filter.inherited {
+                let lineage =
+                    OrgTree::ancestors(connection, tenant.id(), OrgId::from_uuid(org_id)).await?;
+                let mut orgs: Vec<Uuid> = lineage.iter().map(OrgId::as_uuid).collect();
+                if !orgs.contains(&root) {
+                    orgs.push(root);
+                }
+                if !orgs.contains(&org_id) {
+                    orgs.push(org_id);
+                }
+                orgs
+            } else {
+                vec![org_id]
+            };
+            select = select.filter(user_role::Column::OrgId.is_in(orgs));
+        }
+        if let Some(role_id) = filter.role_id {
+            select = select.filter(user_role::Column::RoleId.eq(role_id));
+        }
+        if let Some(user_id) = filter.user_id {
+            select = select.filter(user_role::Column::UserId.eq(user_id));
+        }
+        let page =
+            fetch_page(select, user_role::Column::Id, |row| row.id, page, connection).await?;
+        let names: HashMap<Uuid, String> = role::Entity::find()
+            .filter(role::Column::Id.is_in(page.data.iter().map(|row| row.role_id)))
+            .scoped(tenant)
+            .all(connection)
+            .await?
+            .into_iter()
+            .map(|row| (row.id, row.name))
+            .collect();
+        Ok(page.map(|row| {
+            let org_id = row.org_id.unwrap_or(root);
+            MembershipRow {
+                id: row.id,
+                user_id: row.user_id,
+                org_id,
+                role_id: row.role_id,
+                role_name: names.get(&row.role_id).cloned().unwrap_or_default(),
+                inherited: filter.org_id.is_some_and(|wanted| wanted != org_id),
+                created_at: row.created_at,
+            }
+        }))
+    }
+
     /// Bên gọi là người dùng `user_id`: permission của họ là hợp các permission của
     /// mọi role của họ. Hai câu truy vấn, không phụ thuộc số role. Bên gọi thuộc khách `tenant`.
     pub(crate) async fn principal(
@@ -367,7 +599,10 @@ impl RoleService {
         let mut select = Query::select();
         select
             .column((role::Entity, role::Column::AllPermissions))
+            .column((role::Entity, role::Column::RequiresMfa))
+            .column((user_role::Entity, user_role::Column::OrgId))
             .column((role_permission::Entity, role_permission::Column::Permission))
+            .column((role_permission::Entity, role_permission::Column::Scope))
             .from(user_role::Entity)
             .inner_join(
                 role::Entity,
@@ -385,16 +620,36 @@ impl RoleService {
                     .eq(tenant.id().as_uuid()),
             );
         let rows = tenant.database().read().query_all(&select).await?;
-        let mut permissions = Vec::with_capacity(rows.len());
+        // Role bắt buộc MFA (D-308): chỉ khi có role như vậy mới tra MFA của tài khoản — đường
+        // nóng của mọi người khác giữ một câu.
+        let mut has_mfa = None;
+        for row in &rows {
+            if row.try_get::<bool>("", "requires_mfa")? {
+                has_mfa = Some(has_second_factor(tenant, user_id).await?);
+                break;
+            }
+        }
+        let root = root_of(tenant.id());
+        let mut grants = Vec::with_capacity(rows.len());
         for row in rows {
+            if row.try_get::<bool>("", "requires_mfa")? && has_mfa == Some(false) {
+                continue;
+            }
+            // Role `admin` chỉ gán được ở nút gốc (`set_memberships` chặn chỗ khác).
             if row.try_get::<bool>("", "all_permissions")? {
                 return Ok(Principal::with_all_permissions(user_id).in_tenant(tenant.id()));
             }
-            if let Some(permission) = row.try_get::<Option<String>>("", "permission")? {
-                permissions.push(permission);
-            }
+            let Some(permission) = row.try_get::<Option<String>>("", "permission")? else {
+                continue;
+            };
+            let org = row.try_get::<Option<Uuid>>("", "org_id")?.map_or(root, OrgId::from_uuid);
+            let scope = row
+                .try_get::<Option<String>>("", "scope")?
+                .and_then(|scope| Scope::parse(&scope))
+                .unwrap_or(Scope::Tenant);
+            grants.push((permission, Grant::new(org, scope)));
         }
-        Ok(Principal::new(user_id, permissions).in_tenant(tenant.id()))
+        Ok(Principal::with_grants(user_id, grants).in_tenant(tenant.id()))
     }
 
     /// `Ok` nếu `actor` có mọi permission người dùng `target` có. Dùng trước khi một
@@ -407,6 +662,15 @@ impl RoleService {
         actor: &Principal,
         target: Uuid,
     ) -> Result<(), Error> {
+        // Người mua không quản lý qua đây (D-309): `GET /customers`, `PATCH /customers/{id}`.
+        let staff = user::Entity::find_by_id(target)
+            .filter(user::Column::Realm.eq("staff"))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
+        if staff.is_none() {
+            return Err(crate::user::user_not_found(target));
+        }
         let target = self.principal(tenant, target).await?;
         let covered = if target.has_all_permissions() {
             actor.has_all_permissions()
@@ -424,7 +688,7 @@ impl RoleService {
     }
 
     /// Kiểm và chuẩn hoá dữ liệu vào; báo mọi trường sai cùng lúc.
-    fn check(&self, input: RoleInput) -> Result<(String, String, Vec<String>), Error> {
+    fn check(&self, input: RoleInput) -> Result<CheckedRole, Error> {
         let name = input.name.trim().to_owned();
         let description = input.description.trim().to_owned();
         let mut problems = Vec::new();
@@ -449,7 +713,7 @@ impl RoleService {
                 .with_param("description_max_length", DESCRIPTION_MAX_LENGTH),
             );
         }
-        if input.permissions.len() > MAX_PERMISSIONS {
+        if input.permissions.len() + input.grants.len() > MAX_PERMISSIONS {
             problems.push(
                 FieldError::new(
                     "permissions",
@@ -468,11 +732,45 @@ impl RoleService {
                 ));
             }
         }
+        let mut seen = BTreeSet::new();
+        for (index, (permission, scope)) in input.grants.iter().enumerate() {
+            match self.catalog.iter().find(|known| known.name() == permission) {
+                None => problems.push(FieldError::new(
+                    format!("grants[{index}].permission"),
+                    "unknown",
+                    "is not a permission of this system",
+                )),
+                // Permission không theo nút chỉ cấp được cho cả khách (D-303 mục 3).
+                Some(known) if !known.is_scoped() && *scope != Scope::Tenant => {
+                    problems.push(
+                        FieldError::new(
+                            format!("grants[{index}].scope"),
+                            "scope_not_supported",
+                            "`{permission}` can only be granted for the whole tenant (`tenant`)",
+                        )
+                        .with_param("permission", permission),
+                    );
+                }
+                Some(_) => {}
+            }
+            if input.permissions.contains(permission) || !seen.insert(permission.as_str()) {
+                problems.push(
+                    FieldError::new(
+                        format!("grants[{index}].permission"),
+                        "duplicate",
+                        "`{permission}` is listed more than once; give each permission one scope",
+                    )
+                    .with_param("permission", permission),
+                );
+            }
+        }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let permissions: BTreeSet<String> = input.permissions.into_iter().collect();
-        Ok((name, description, permissions.into_iter().collect()))
+        let mut granted: std::collections::BTreeMap<String, Scope> =
+            input.permissions.into_iter().map(|permission| (permission, Scope::Tenant)).collect();
+        granted.extend(input.grants);
+        Ok((name, description, granted.into_iter().collect()))
     }
 }
 
@@ -499,6 +797,7 @@ pub(crate) async fn grant_admin<C: ConnectionTrait>(
         tenant_id: Set(tenant.id().as_uuid()),
         user_id: Set(user_id),
         role_id: Set(admin.id),
+        org_id: Set(Some(root_of(tenant.id()).as_uuid())),
         created_at: Set(now()),
     }
     .insert(connection)
@@ -534,6 +833,7 @@ impl autoxide_kernel::tenancy::TenantSeed for AdminRoleSeed {
             name: Set("admin".to_owned()),
             description: Set(ADMIN_DESCRIPTION.to_owned()),
             all_permissions: Set(true),
+            requires_mfa: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -565,7 +865,19 @@ async fn role_snapshot<C: ConnectionTrait>(
 ) -> Result<serde_json::Value, Error> {
     let mut permissions = permissions_of(connection, tenant, [row.id]).await?;
     let granted = permissions.remove(&row.id).unwrap_or_default();
-    Ok(json!({"name": row.name, "description": row.description, "permissions": granted}))
+    let mut snapshot = role_json(&row.name, &row.description, &granted);
+    snapshot["requires_mfa"] = json!(row.requires_mfa);
+    Ok(snapshot)
+}
+
+/// Role cho audit: tên, mô tả, permission (tên) và độ sâu của từng permission.
+fn role_json(name: &str, description: &str, grants: &[(String, Scope)]) -> serde_json::Value {
+    let names: Vec<&str> = grants.iter().map(|(permission, _)| permission.as_str()).collect();
+    let scopes: serde_json::Map<String, serde_json::Value> = grants
+        .iter()
+        .map(|(permission, scope)| (permission.clone(), json!(scope.as_str())))
+        .collect();
+    json!({"name": name, "description": description, "permissions": names, "scopes": scopes})
 }
 
 /// Tên các role, cho audit.
@@ -585,14 +897,15 @@ async fn insert_permissions(
     transaction: &DatabaseTransaction,
     tenant: &TenantContext,
     role_id: Uuid,
-    permissions: &[String],
+    permissions: &[(String, Scope)],
 ) -> Result<(), Error> {
-    for permission in permissions {
+    for (permission, scope) in permissions {
         role_permission::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),
             role_id: Set(role_id),
             permission: Set(permission.clone()),
+            scope: Set(scope.as_str().to_owned()),
         }
         .insert(transaction)
         .await?;
@@ -600,21 +913,22 @@ async fn insert_permissions(
     Ok(())
 }
 
-/// Permission của từng role trong `role_ids`, một câu truy vấn cho cả danh sách.
+/// Permission (kèm độ sâu) của từng role trong `role_ids`, một câu truy vấn cho cả danh sách.
 async fn permissions_of<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     role_ids: impl IntoIterator<Item = Uuid>,
-) -> Result<HashMap<Uuid, Vec<String>>, Error> {
+) -> Result<HashMap<Uuid, Vec<(String, Scope)>>, Error> {
     let rows = role_permission::Entity::find()
         .filter(role_permission::Column::RoleId.is_in(role_ids))
         .scoped(tenant)
         .order_by_asc(role_permission::Column::Permission)
         .all(connection)
         .await?;
-    let mut by_role: HashMap<Uuid, Vec<String>> = HashMap::new();
+    let mut by_role: HashMap<Uuid, Vec<(String, Scope)>> = HashMap::new();
     for row in rows {
-        by_role.entry(row.role_id).or_default().push(row.permission);
+        let scope = Scope::parse(&row.scope).unwrap_or(Scope::Tenant);
+        by_role.entry(row.role_id).or_default().push((row.permission, scope));
     }
     Ok(by_role)
 }
@@ -710,13 +1024,59 @@ pub(crate) fn last_admin() -> Error {
     )
 }
 
-fn to_role(row: role::Model, permissions: Vec<String>) -> Role {
+/// Membership của người `user_id`, gom theo nút (nút theo ID; role theo tên).
+async fn memberships_of<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    user_id: Uuid,
+) -> Result<Vec<Membership>, Error> {
+    let root = root_of(tenant.id()).as_uuid();
+    let rows = user_role::Entity::find()
+        .filter(user_role::Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .all(connection)
+        .await?;
+    let roles = role::Entity::find()
+        .filter(role::Column::Id.is_in(rows.iter().map(|row| row.role_id)))
+        .scoped(tenant)
+        .order_by_asc(role::Column::Name)
+        .all(connection)
+        .await?;
+    let mut grants = permissions_of(connection, tenant, roles.iter().map(|row| row.id)).await?;
+    let roles: Vec<Role> = roles
+        .into_iter()
+        .map(|row| {
+            let granted = grants.remove(&row.id).unwrap_or_default();
+            to_role(row, granted)
+        })
+        .collect();
+    let mut by_org: std::collections::BTreeMap<Uuid, Vec<Role>> = std::collections::BTreeMap::new();
+    for role in &roles {
+        for row in rows.iter().filter(|row| row.role_id == role.id) {
+            by_org.entry(row.org_id.unwrap_or(root)).or_default().push(role.clone());
+        }
+    }
+    Ok(by_org.into_iter().map(|(org_id, roles)| Membership { user_id, org_id, roles }).collect())
+}
+
+/// Membership cho audit: nút → tên role.
+fn memberships_json(memberships: &[Membership]) -> serde_json::Value {
+    let map: serde_json::Map<String, serde_json::Value> = memberships
+        .iter()
+        .map(|membership| (membership.org_id.to_string(), role_names(&membership.roles)))
+        .collect();
+    serde_json::Value::Object(map)
+}
+
+fn to_role(row: role::Model, grants: Vec<(String, Scope)>) -> Role {
     Role {
         id: row.id,
         name: row.name,
         description: row.description,
         all_permissions: row.all_permissions,
-        permissions,
+        requires_mfa: row.requires_mfa,
+        permissions: grants.iter().map(|(permission, _)| permission.clone()).collect(),
+        grants,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -748,6 +1108,210 @@ fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
 
+/// ID của role tên `name` của khách `tenant` (lệnh CLI nêu role bằng tên).
+pub(crate) async fn role_by_name(
+    tenant: &TenantContext,
+    name: &str,
+) -> Result<Option<Uuid>, Error> {
+    Ok(role::Entity::find()
+        .filter(role::Column::Name.eq(name.trim()))
+        .scoped(tenant)
+        .one(tenant.database().read())
+        .await?
+        .map(|row| row.id))
+}
+
+/// Vì sao `actor` không gán được các role `roles` ở nút `org_id` (rỗng: gán được): nút phải có
+/// trong khách và trong phạm vi của người gán, role phải có, `admin` chỉ ở gốc, và người gán phải
+/// có mọi permission của role (không tự nâng quyền). `field`: tiền tố tên ô (`memberships[0].`).
+/// Dùng cho membership và lời mời.
+pub(crate) async fn grant_problems<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    actor: &Principal,
+    field: &str,
+    org_id: Uuid,
+    roles: &BTreeSet<Uuid>,
+) -> Result<Vec<FieldError>, Error> {
+    let mut problems = Vec::new();
+    let root = root_of(tenant.id()).as_uuid();
+    let org = OrgId::from_uuid(org_id);
+    if org_id != root && OrgTree::ancestors(connection, tenant.id(), org).await?.is_empty() {
+        problems.push(FieldError::new(
+            format!("{field}org_id"),
+            "unknown",
+            "is not an organization unit of this tenant",
+        ));
+        return Ok(problems);
+    }
+    if !actor.reaches(connection, org).await? {
+        problems.push(FieldError::new(
+            format!("{field}org_id"),
+            "out_of_scope",
+            "must be a unit you work in (one of your roles covers it)",
+        ));
+    }
+    let found = role::Entity::find()
+        .filter(role::Column::Id.is_in(roles.iter().copied()))
+        .scoped(tenant)
+        .all(connection)
+        .await?;
+    let mut grants = permissions_of(connection, tenant, found.iter().map(|row| row.id)).await?;
+    for role_id in roles {
+        let Some(row) = found.iter().find(|row| row.id == *role_id) else {
+            problems.push(FieldError::new(
+                format!("{field}role_ids"),
+                "unknown",
+                "every entry must be the id of an existing role",
+            ));
+            continue;
+        };
+        if row.all_permissions && org_id != root {
+            problems.push(FieldError::new(
+                format!("{field}role_ids"),
+                "root_only",
+                "the `admin` role can only be given at the root unit",
+            ));
+        }
+        let covers = if row.all_permissions {
+            actor.has_all_permissions()
+        } else {
+            grants
+                .remove(&row.id)
+                .unwrap_or_default()
+                .iter()
+                .all(|(permission, _)| actor.allows(permission))
+        };
+        if !covers {
+            problems.push(
+                FieldError::new(
+                    format!("{field}role_ids"),
+                    "more_than_you_have",
+                    "role `{role}` has permissions you do not have; you cannot give it",
+                )
+                .with_param("role", &row.name),
+            );
+        }
+    }
+    Ok(problems)
+}
+
+/// Thêm các role `roles` ở nút `org_id` cho người dùng `user_id` (bỏ qua role đã có ở nút đó),
+/// trong `transaction` của bên gọi (chấp nhận lời mời).
+pub(crate) async fn add_roles<C: ConnectionTrait>(
+    transaction: &C,
+    tenant: &TenantContext,
+    user_id: Uuid,
+    org_id: Uuid,
+    roles: &BTreeSet<Uuid>,
+) -> Result<(), Error> {
+    let held: BTreeSet<Uuid> = user_role::Entity::find()
+        .filter(user_role::Column::UserId.eq(user_id))
+        .filter(user_role::Column::OrgId.eq(org_id))
+        .scoped(tenant)
+        .all(transaction)
+        .await?
+        .into_iter()
+        .map(|row| row.role_id)
+        .collect();
+    let now = now();
+    for role_id in roles.difference(&held) {
+        user_role::ActiveModel {
+            id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
+            user_id: Set(user_id),
+            role_id: Set(*role_id),
+            org_id: Set(Some(org_id)),
+            created_at: Set(now),
+        }
+        .insert(transaction)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Role người dùng `user_id` giữ ở nút gốc của khách `tenant` (uỷ quyền theo cây khách hàng,
+/// D-310).
+pub(crate) async fn root_roles(tenant: &TenantContext, user_id: Uuid) -> Result<Vec<Uuid>, Error> {
+    let root = root_of(tenant.id()).as_uuid();
+    Ok(user_role::Entity::find()
+        .filter(user_role::Column::UserId.eq(user_id))
+        .filter(user_role::Column::OrgId.eq(root))
+        .scoped(tenant)
+        .all(tenant.database().read())
+        .await?
+        .into_iter()
+        .map(|row| row.role_id)
+        .collect())
+}
+
+/// Role có `all_permissions` không và permission (kèm độ sâu) của từng role trong `ids` của khách
+/// `tenant`. Role không có: vắng.
+pub(crate) async fn role_grants(
+    tenant: &TenantContext,
+    ids: &[Uuid],
+) -> Result<std::collections::HashMap<Uuid, (bool, Vec<(String, Scope)>)>, Error> {
+    if ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let read = tenant.database().read();
+    let rows = role::Entity::find()
+        .filter(role::Column::Id.is_in(ids.iter().copied()))
+        .scoped(tenant)
+        .all(read)
+        .await?;
+    let mut permissions = permissions_of(read, tenant, rows.iter().map(|row| row.id)).await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let granted = permissions.remove(&row.id).unwrap_or_default();
+            (row.id, (row.all_permissions, granted))
+        })
+        .collect())
+}
+
+/// Tài khoản `user_id` đã bật MFA: TOTP đã xác nhận, hay có ít nhất một passkey.
+pub(crate) async fn has_second_factor(
+    tenant: &TenantContext,
+    user_id: Uuid,
+) -> Result<bool, Error> {
+    let read = tenant.database().read();
+    let totp = crate::mfa::entity::totp::Entity::find()
+        .filter(crate::mfa::entity::totp::Column::UserId.eq(user_id))
+        .filter(crate::mfa::entity::totp::Column::ConfirmedAt.is_not_null())
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    if totp.is_some() {
+        return Ok(true);
+    }
+    let passkey = crate::passkey::entity::passkey::Entity::find()
+        .filter(crate::passkey::entity::passkey::Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .one(read)
+        .await?;
+    Ok(passkey.is_some())
+}
+
+/// Tài khoản `user_id` có role bắt buộc MFA mà chưa bật MFA: quyền của các role đó đang bị giữ.
+pub(crate) async fn mfa_pending(tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
+    // Một câu (đường nóng của `GET /me`, đo ở D-317): role bắt buộc MFA trong các role người
+    // dùng giữ; chỉ khi có mới tra MFA của tài khoản.
+    let held = Query::select()
+        .column(user_role::Column::RoleId)
+        .from(user_role::Entity)
+        .and_where(user_role::Column::UserId.eq(user_id))
+        .and_where(user_role::Column::TenantId.eq(tenant.id().as_uuid()))
+        .to_owned();
+    let flagged = role::Entity::find()
+        .filter(role::Column::RequiresMfa.eq(true))
+        .filter(role::Column::Id.in_subquery(held))
+        .scoped(tenant)
+        .one(tenant.database().read())
+        .await?;
+    Ok(flagged.is_some() && !has_second_factor(tenant, user_id).await?)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -765,6 +1329,8 @@ mod tests {
 
     fn input(name: &str, permissions: &[&str]) -> RoleInput {
         RoleInput {
+            requires_mfa: false,
+            grants: Vec::new(),
             name: name.to_owned(),
             description: String::new(),
             permissions: permissions.iter().map(|p| (*p).to_owned()).collect(),

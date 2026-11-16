@@ -469,6 +469,54 @@ tenant. When another proxy in front rewrites `Host`, it must send the visitor's 
 certificate. Verifying, removing a domain or suspending its tenant reaches every server within
 `AUTOXIDE_TENANCY_CACHE_SECONDS` (default `10`).
 
+## Accounts of a tenant: staff, customers, delegation
+
+Each tenant has two kinds of accounts. **Staff** (`realm: staff`, the default) work with roles and
+permissions. **Customers** (`realm: customer`) are the accounts of the tenant's shop: they sign in,
+have no permission, and are separate from staff even with the same email. Customers register with
+`POST /api/v1/auth/register` and sign in with `POST /api/v1/auth/login`, both with
+`"realm": "customer"`; a tenant closes customer sign-up with the organization setting
+`auth.customer_registration` (`false`). Staff manage them with `GET /api/v1/auth/customers` and
+`PATCH /api/v1/auth/customers/{id}` (permissions `auth.customers.read`, `auth.customers.manage`).
+
+**Inviting staff.** Instead of creating accounts with passwords, invite people:
+`POST /api/v1/auth/invitations` with an `email`, the `role_ids` and the unit (`org_id`) they get
+(permission `auth.invitations.manage`; you cannot invite with roles whose permissions you lack),
+or from the command line:
+
+```bash
+autoxide user invite --email new.colleague@example.com --role editor
+```
+
+The mail carries a one-time link to `AUTOXIDE_AUTH_INVITATION_URL` (a page of your interface with
+`{token}`; unset: the mail carries the token), valid `AUTOXIDE_AUTH_INVITATION_DAYS` days (7).
+Accepting creates the account (or, when the email already has one, adds the roles after the person
+signs in). **Signing in with a link** (no password) is off by default; turn it on with
+`AUTOXIDE_AUTH_LOGIN_LINK=true` and set `AUTOXIDE_AUTH_LOGIN_LINK_URL` to your interface's page.
+Both need working mail (`AUTOXIDE_MAIL_SMTP_URL`) and a running worker. The organization tree of
+a tenant is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (8 by default). Import the list of
+administrative units once, for checking addresses: `autoxide task address.import`
+([`docs/ADDRESS.md`](ADDRESS.md)).
+
+**Platform staff and a tenant's data.** Platform staff (accounts of the platform tenant) never
+enter a tenant's data just because of their role: someone with `auth.support.grant` grants one
+staff member time-limited access with `POST /api/v1/auth/support-grants` (`tenant_id`,
+`staff_user_id`, a platform `role_id`, `basis` `support` or `legal_request` with its document
+number, a `reason`, at most `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` hours, 8 by default). The
+tenant sees every grant, its first use and every change made (`GET /api/v1/auth/support-access`),
+can revoke a running `support` grant (`DELETE /api/v1/auth/support-access/{id}`), and can turn
+support access off with the setting `auth.support_access` (then only `legal_request` grants work).
+
+In a chain of tenants (a tenant with `parent_id`), the parent can let holders of one of its roles
+work in a child: `POST /api/v1/auth/delegations` with `child_tenant_id`, `role_id`, optional
+`org_id` (a unit of the child) and `expires_at`, and a `reason` (permission
+`auth.delegations.manage`). Those people keep their own sign-in and add the header
+`Autoxide-Tenant: <child id>`; `GET /api/v1/auth/me/tenants` lists where they can go. Every change
+they make in the child is recorded with the delegation as the way in (`actor_access` in the
+child's events and audit log); revoking (`DELETE /api/v1/auth/delegations/{id}`) takes effect at
+their next request. The child sees what it received with
+`GET /api/v1/auth/delegations?direction=incoming`.
+
 ## Moving a tenant to another database
 
 With several tenants, each tenant's data lives on a *placement*: `main` (the database of

@@ -120,6 +120,8 @@ pub(crate) struct ListFormsInput {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CreateFormInput {
+    /// The organization unit that owns the form; omitted: the whole tenant.
+    org_id: Option<Uuid>,
     /// Lower-case letters and digits in groups joined by `-`, at most 50 characters; unique.
     key: String,
     /// Name for admins, 1 to 200 characters.
@@ -259,7 +261,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         None,
                     );
                     let page = page_request(paging, problems)?;
-                    let found = service.list_forms(&tenant, &principal, state, &page).await?;
+                    let found = service.list_forms(&tenant, &principal, state, None, &page).await?;
                     crate::http::counted_forms(&service, &tenant, found).await
                 }
             },
@@ -305,6 +307,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         return Err(Error::validation(problems));
                     }
                     let form = FormInput {
+                        org_id: input.org_id,
                         key: Some(input.key),
                         name: Some(input.name),
                         status,
@@ -347,6 +350,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                     }
                     let expected = IfMatch::from_value(&input.etag).expected()?;
                     let form = FormInput {
+                        org_id: None,
                         key: input.key,
                         name: input.name,
                         status,

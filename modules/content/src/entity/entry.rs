@@ -10,6 +10,8 @@ pub struct Model {
     pub id: Uuid,
     /// Khách sở hữu dòng (bước 33).
     pub tenant_id: Uuid,
+    /// Nút sở hữu (bước 34); gốc = ID của khách. Luôn có giá trị.
+    pub org_id: Option<Uuid>,
     /// `post` hoặc `page`.
     pub kind: String,
     pub locale: String,

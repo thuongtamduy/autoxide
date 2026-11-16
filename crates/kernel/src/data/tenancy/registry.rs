@@ -27,7 +27,7 @@ use sea_orm::{ConnectionTrait, QueryResult};
 use uuid::Uuid;
 
 use super::{
-    DEFAULT_TENANT, MAIN_PLACEMENT, NO_TENANT, PlacementId, TenancyConfig, TenancyMode,
+    DEFAULT_TENANT, MAIN_PLACEMENT, NO_TENANT, OrgId, PlacementId, TenancyConfig, TenancyMode,
     TenantContext, TenantId, TenantStatus, errors,
 };
 use crate::config::{DatabaseConfig, DatabaseUrl};
@@ -82,7 +82,8 @@ struct Inner {
     default: TenantContext,
     tenants: Mutex<HashMap<TenantId, (Instant, TenantContext)>>,
     slugs: Mutex<HashMap<String, (Instant, TenantId)>>,
-    domains: Mutex<HashMap<String, (Instant, Option<TenantId>)>>,
+    /// Tên miền → (khách, nút gắn với tên miền) đã xác minh; `None`: không có.
+    domains: Mutex<HashMap<String, (Instant, Option<DomainSite>)>>,
     pools: Mutex<Pools>,
     /// Khoá gốc để mở URL placement đã mã hoá; module `kernel` đặt lúc khởi động.
     secret: OnceLock<SecretKey>,
@@ -106,6 +107,9 @@ impl std::fmt::Debug for DatabaseRegistry {
         f.debug_struct("DatabaseRegistry").field("mode", &self.0.mode).finish_non_exhaustive()
     }
 }
+
+/// Khách và nút (website) của một tên miền đã xác minh.
+type DomainSite = (TenantId, Option<OrgId>);
 
 /// Khoá `mutex` dù một thread khác đã panic lúc giữ nó: dữ liệu bên trong chỉ là cache.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -153,6 +157,27 @@ impl DatabaseRegistry {
     /// Database điều khiển (placement `main`): bảng mặt điều khiển và dữ liệu của khách mặc định.
     pub fn control(&self) -> &Database {
         &self.0.control
+    }
+
+    /// Các khách cấp trên của khách `id` (chuỗi khách cha – con, bước 34): khách cha trước, tới
+    /// khách gốc của chuỗi. Rỗng khi không có cha hay không có khách này. Đọc ở database điều
+    /// khiển, mỗi cấp một câu (chuỗi ngắn); dừng ở 16 cấp để dữ liệu hỏng không lặp mãi.
+    pub async fn tenant_ancestors(&self, id: TenantId) -> Result<Vec<TenantId>, Error> {
+        use sea_orm::EntityTrait;
+        let mut found = Vec::new();
+        let mut current = id.as_uuid();
+        for _ in 0..16 {
+            let row = super::admin::tenant::Entity::find_by_id(current)
+                .one(self.control().read())
+                .await?;
+            let Some(parent) = row.and_then(|row| row.parent_id) else { break };
+            if parent == id.as_uuid() || found.contains(&TenantId::from_uuid(parent)) {
+                break;
+            }
+            found.push(TenantId::from_uuid(parent));
+            current = parent;
+        }
+        Ok(found)
     }
 
     /// Khách mặc định (khách nền tảng) trên database điều khiển.
@@ -210,35 +235,45 @@ impl DatabaseRegistry {
     /// Khách sở hữu tên miền `host` (đã xác minh), nếu có. Chế độ `single`: luôn `None` (không đọc
     /// tên miền).
     pub async fn tenant_by_domain(&self, host: &str) -> Result<Option<TenantContext>, Error> {
+        match self.domain_site(host).await? {
+            Some((id, _)) => self.tenant(id).await.map(Some),
+            None => Ok(None),
+        }
+    }
+
+    /// Khách và nút (website) của tên miền đã xác minh `host` (bước 34): tên miền gắn với một
+    /// nút thì là website của nút đó; không gắn → `None` (website của cả khách). Chế độ `single`:
+    /// luôn `None`.
+    pub async fn domain_site(
+        &self,
+        host: &str,
+    ) -> Result<Option<(TenantId, Option<OrgId>)>, Error> {
         if self.0.mode == TenancyMode::Single {
             return Ok(None);
         }
         let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
         let cached = lock(&self.0.domains).get(&host).cloned();
-        if let Some((at, id)) = cached
+        if let Some((at, found)) = cached
             && at.elapsed() < self.ttl()
         {
-            return match id {
-                Some(id) => self.tenant(id).await.map(Some),
-                None => Ok(None),
-            };
+            return Ok(found);
         }
         let select = Query::select()
             .column(Alias::new("tenant_id"))
+            .column(Alias::new("org_id"))
             .from(Alias::new("kernel_tenant_domains"))
             .and_where(Expr::col(Alias::new("domain")).eq(host.as_str()))
             .and_where(Expr::col(Alias::new("status")).eq("verified"))
             .to_owned();
-        let found = self.0.control.read().query_one(&select).await?;
-        let id = match found {
-            Some(row) => Some(TenantId::from_uuid(row.try_get::<Uuid>("", "tenant_id")?)),
+        let found = match self.0.control.read().query_one(&select).await? {
+            Some(row) => Some((
+                TenantId::from_uuid(row.try_get::<Uuid>("", "tenant_id")?),
+                row.try_get::<Option<Uuid>>("", "org_id")?.map(OrgId::from_uuid),
+            )),
             None => None,
         };
-        lock(&self.0.domains).insert(host, (Instant::now(), id));
-        match id {
-            Some(id) => self.tenant(id).await.map(Some),
-            None => Ok(None),
-        }
+        lock(&self.0.domains).insert(host, (Instant::now(), found));
+        Ok(found)
     }
 
     /// Khoá gốc dùng mở URL placement đã mã hoá. Đặt một lần (module `kernel` đặt lúc khởi động);
@@ -372,7 +407,7 @@ impl DatabaseRegistry {
     pub fn invalidate(&self, id: TenantId) {
         lock(&self.0.tenants).remove(&id);
         lock(&self.0.slugs).retain(|_, (_, known)| *known != id);
-        lock(&self.0.domains).retain(|_, (_, known)| *known != Some(id));
+        lock(&self.0.domains).retain(|_, (_, known)| known.map(|(tenant, _)| tenant) != Some(id));
     }
 
     /// Mọi database máy chủ này chạy job và event cho: `(placement, tên, database)` — chỉ placement

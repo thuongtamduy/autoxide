@@ -25,6 +25,12 @@ pub struct Model {
     pub last_sign_in_at: Option<DateTimeUtc>,
     /// Email và tên viết thường, để tìm (`user::service::search_text`).
     pub search_text: String,
+    /// Ngôn ngữ ưa thích (mã BCP 47 máy chủ có bản dịch); `None`: theo request.
+    pub locale: Option<String>,
+    /// Múi giờ IANA ưa thích; `None`: chưa đặt.
+    pub time_zone: Option<String>,
+    /// `staff` hay `customer` (D-309).
+    pub realm: String,
 }
 
 impl ActiveModelBehavior for ActiveModel {}
@@ -45,6 +51,26 @@ impl From<Model> for User {
             email_verified_at: model.email_verified_at,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            realm: realm_of(&model.realm),
+            locale: model.locale,
+            time_zone: model.time_zone,
         }
+    }
+}
+
+/// `realm` lưu trong database → kiểu của kernel; giá trị lạ coi như nhân sự (mặc định của cột).
+pub(crate) fn realm_of(raw: &str) -> autoxide_kernel::access::Realm {
+    if raw == "customer" {
+        autoxide_kernel::access::Realm::Customer
+    } else {
+        autoxide_kernel::access::Realm::Staff
+    }
+}
+
+/// Giá trị cột `realm` của `realm`.
+pub(crate) fn realm_str(realm: autoxide_kernel::access::Realm) -> &'static str {
+    match realm {
+        autoxide_kernel::access::Realm::Customer => "customer",
+        autoxide_kernel::access::Realm::Staff => "staff",
     }
 }

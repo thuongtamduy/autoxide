@@ -62,6 +62,17 @@ problems are of one kind the error has its own code: `menus.ref_unknown_kind` (n
 AI agents use the same operations through MCP: `menus.list_menus`, `menus.get_menu` (returns `version`),
 `menus.create_menu`, `menus.replace_menu_items` (needs `version`), `menus.delete_menu`.
 
+## Menus of each website
+
+With an organization tree (module `organizations`), a menu belongs to a website: `org_id` when
+creating it (omitted: the website of the whole tenant). `menus.read` and `menus.manage` follow the
+scope of the role, so a store manages only its own menus. The public endpoint picks the website
+from the domain (a domain bound to a unit) or `?site=<unit id>`, and returns that website's menu —
+or, when it has none with this key, the menu of the nearest website above (the whole tenant's
+menu is the default for every store). The languages of a website's menus are the setting
+`organizations.languages` of its unit (the first is its default), kept to the server's
+`AUTOXIDE_MENUS_LOCALES`; unset, the server's.
+
 ## On the website
 
 ```

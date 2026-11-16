@@ -53,6 +53,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | Validate đầu vào   | `validator`                     | 0.21      |                                                     |
 | ID                 | `uuid` (v7)                     | 1.29      |                                                     |
 | Thời gian          | `chrono`                        | 0.4       | Lưu UTC                                             |
+| Múi giờ IANA       | `chrono-tz` (chỉ `std`)         | 0.10      | Kiểm tên múi giờ của nút (`organizations.timezone`, D-306) |
 | CLI                | `clap`                          | 4.6       | `serve`, `migrate`, `user`, `db copy`…              |
 | Đọc file `.env`    | `dotenvy`                       | 0.15      | Chỉ đọc thành cặp tên / giá trị; biến môi trường thật thắng |
 | Trait `async` qua `dyn` | `async-trait`                | 0.1       | Hợp đồng giữa các module (`api`); đã có sẵn trong cây phụ thuộc qua SeaORM |

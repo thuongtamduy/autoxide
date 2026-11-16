@@ -167,7 +167,7 @@ impl FormsService {
         page: &PageRequest,
     ) -> Result<Page<Submission>, Error> {
         principal.require(&FORMS_READ)?;
-        self.find_form(tenant, form_id).await?;
+        self.check_form_id(tenant, principal, &FORMS_READ, form_id).await?;
         let mut select = submission::Entity::find()
             .scoped(tenant)
             .filter(submission::Column::FormId.eq(form_id));
@@ -198,7 +198,25 @@ impl FormsService {
         id: Uuid,
     ) -> Result<Submission, Error> {
         principal.require(&FORMS_READ)?;
-        self.find_submission(tenant, id).await
+        let found = self.find_submission(tenant, id).await?;
+        self.check_submission(tenant, principal, &FORMS_READ, &found).await?;
+        Ok(found)
+    }
+
+    /// `permission` phủ form của bài gửi; không phủ → như không có bài (404).
+    async fn check_submission(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        permission: &autoxide_kernel::access::Permission,
+        found: &Submission,
+    ) -> Result<(), Error> {
+        let id = found.row.id;
+        self.check_form_id(tenant, principal, permission, found.row.form_id).await.map_err(
+            |error| {
+                if error.code() == "forms.not_found" { submission_not_found(id) } else { error }
+            },
+        )
     }
 
     pub(crate) async fn find_submission(
@@ -230,6 +248,7 @@ impl FormsService {
     ) -> Result<Submission, Error> {
         principal.require(&FORMS_REVIEW)?;
         let before = self.find_submission(tenant, id).await?;
+        self.check_submission(tenant, principal, &FORMS_REVIEW, &before).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -289,6 +308,7 @@ impl FormsService {
     ) -> Result<(), Error> {
         principal.require(&FORMS_REVIEW)?;
         let before = self.find_submission(tenant, id).await?;
+        self.check_submission(tenant, principal, &FORMS_REVIEW, &before).await?;
         let transaction = tenant.database().begin_write().await?;
         let deleted =
             submission::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
@@ -318,6 +338,7 @@ impl FormsService {
         email: &str,
     ) -> Result<Vec<Submission>, Error> {
         principal.require(&FORMS_EXPORT)?;
+        self.require_whole_tenant(tenant, principal, &FORMS_EXPORT).await?;
         let email = checked_email(email)?;
         let mut rows = rows_of_email(tenant.database().read(), tenant, &email).await?;
         rows.sort_by_key(|row| row.id);
@@ -333,6 +354,7 @@ impl FormsService {
         email: &str,
     ) -> Result<u64, Error> {
         principal.require(&FORMS_EXPORT)?;
+        self.require_whole_tenant(tenant, principal, &FORMS_EXPORT).await?;
         let email = checked_email(email)?;
         let transaction = tenant.database().begin_write().await?;
         let rows = rows_of_email(&transaction, tenant, &email).await?;
@@ -381,6 +403,7 @@ impl FormsService {
     ) -> Result<(String, String), Error> {
         principal.require(&FORMS_EXPORT)?;
         let form = self.find_form(tenant, form_id).await?;
+        self.check_form(tenant, principal, &FORMS_EXPORT, &form.row).await?;
         let columns = self.export_columns(tenant, &form).await?;
         let mut text = String::from(csv::BOM);
         text.push_str(&csv::line(&columns.header));

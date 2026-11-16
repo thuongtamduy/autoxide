@@ -19,6 +19,7 @@
 //! chính không header: khách lấy từ chính token ([`token::resolve`]). Database chỉ giữ bản băm
 //! của phần thô.
 
+use autoxide_kernel::access::Realm;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
@@ -155,6 +156,7 @@ impl SessionService {
     /// Email đang bị khoá vì sai quá nhiều lần thì trả 429 ngay, KHÔNG kiểm mật khẩu
     /// — kẻ đoán không biết được lần đoán nào đúng.
     /// `user_agent`: header `User-Agent` của client, để người dùng nhận ra phiên này.
+    #[cfg(test)]
     pub(crate) async fn login(
         &self,
         tenant: &TenantContext,
@@ -162,9 +164,26 @@ impl SessionService {
         password: &str,
         user_agent: Option<&str>,
     ) -> Result<LoginOutcome, Error> {
+        self.login_in(tenant, Realm::Staff, email, password, user_agent).await
+    }
+
+    /// Như [`login`](Self::login), cho tài khoản `realm` (D-309). Bộ đếm lần sai của người mua
+    /// tách khỏi của nhân sự cùng email.
+    pub(crate) async fn login_in(
+        &self,
+        tenant: &TenantContext,
+        realm: Realm,
+        email: &str,
+        password: &str,
+        user_agent: Option<&str>,
+    ) -> Result<LoginOutcome, Error> {
+        let throttled = throttle_key(realm, email);
+        let email_for_check = email;
+        let email = throttled.as_str();
         // Lượt thử được đếm TRƯỚC khi kiểm mật khẩu; đúng thì xoá bộ đếm bên dưới.
         self.throttle.reserve(tenant, email).await?;
-        let (user, hash) = self.users.verify_credentials(tenant, email, password).await?;
+        let (user, hash) =
+            self.users.verify_credentials_in(tenant, realm, email_for_check, password).await?;
         if self.mfa.status(tenant, user.id).await?.totp_enabled {
             // Mật khẩu đúng: trả lại lượt vừa xin, nhưng chưa xoá các lần sai trước — đúng
             // mật khẩu mới là nửa đường.
@@ -219,6 +238,43 @@ impl SessionService {
         self.start_session(tenant, user_id, "password_change", user_agent, Proof::Active).await
     }
 
+    /// Mở phiên cho người dùng `user_id` vừa chứng minh qua kênh khác (vd chấp nhận lời mời bằng
+    /// link trong mail tới chính email đó, D-312). Tài khoản bị khoá thì từ chối.
+    pub(crate) async fn open_session(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        method: &str,
+        user_agent: Option<&str>,
+    ) -> Result<Tokens, Error> {
+        self.start_session(tenant, user_id, method, user_agent, Proof::Active).await
+    }
+
+    /// Người dùng `user_id` vừa chứng minh bằng link qua email (D-311): bật MFA thì vẫn cần mã
+    /// (như `/login`), không thì mở phiên. Tài khoản bị khoá thì từ chối.
+    pub(crate) async fn login_with_link(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        user_agent: Option<&str>,
+    ) -> Result<LoginOutcome, Error> {
+        let user = self.users.get(tenant, user_id).await?.ok_or_else(token::invalid_token)?;
+        if !user.is_active() {
+            return Err(crate::user::user_disabled());
+        }
+        if self.mfa.status(tenant, user.id).await?.totp_enabled {
+            let write = tenant.database().write();
+            let raw = challenge::open(write, tenant, user.id, now()).await?;
+            return Ok(LoginOutcome::MfaRequired {
+                mfa_token: link_token(tenant, &raw),
+                expires_in: challenge::CHALLENGE_TTL_SECONDS.unsigned_abs(),
+            });
+        }
+        let tokens =
+            self.start_session(tenant, user.id, "email_link", user_agent, Proof::Active).await?;
+        Ok(LoginOutcome::Tokens(tokens))
+    }
+
     /// Mở phiên cho người dùng `user_id` vừa chứng minh bằng passkey (đã kiểm ở
     /// `PasskeyService`). Tài khoản bị khoá thì từ chối.
     pub(crate) async fn login_with_passkey(
@@ -245,6 +301,11 @@ impl SessionService {
     ///
     /// Trả kèm hash mật khẩu vừa kiểm: bên cấp quyền mới (API key) đưa nó vào
     /// [`lock_grant`] trong transaction ghi của mình.
+    /// Dịch vụ tài khoản phiên dùng chung.
+    pub(crate) fn users(&self) -> &Arc<UserService> {
+        &self.users
+    }
+
     pub(crate) async fn check_password(
         &self,
         tenant: &TenantContext,
@@ -273,25 +334,25 @@ impl SessionService {
     /// Bắt đầu bật TOTP cho người dùng `user_id`, kèm mật khẩu hiện tại (sai thì tính vào login
     /// throttling như [`check_password`](Self::check_password)): access token bị lộ không đủ để
     /// gắn ứng dụng authenticator của kẻ gian vào tài khoản rồi khoá chủ thật ở ngoài (D-156).
-    pub(crate) async fn start_totp(
+    pub(crate) async fn start_totp<'a>(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
-        current_password: &str,
+        confirm: impl Into<crate::reauth::Confirm<'a>>,
     ) -> Result<crate::mfa::TotpSetup, Error> {
-        let (user, _) = self.check_password(tenant, user_id, current_password).await?;
+        let (user, _) = confirm.into().check(self, tenant, user_id).await?;
         self.mfa.start_totp(tenant, user.id, &user.email).await
     }
 
     /// Người dùng `user_id` tự xoá tài khoản của mình, kèm mật khẩu hiện tại (sai thì
     /// tính vào login throttling như [`check_password`](Self::check_password)).
-    pub(crate) async fn delete_own_account(
+    pub(crate) async fn delete_own_account<'a>(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
-        current_password: &str,
+        confirm: impl Into<crate::reauth::Confirm<'a>>,
     ) -> Result<(), Error> {
-        self.check_password(tenant, user_id, current_password).await?;
+        confirm.into().check(self, tenant, user_id).await?;
         self.users.delete(tenant, Actor::user(user_id), user_id).await
     }
 
@@ -906,6 +967,15 @@ fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
 
+/// Khoá của login throttling: email của nhân sự giữ nguyên (bộ đếm cũ còn hiệu lực), của người
+/// mua có tiền tố — sai mật khẩu ở cửa hàng không khoá đăng nhập của nhân sự cùng email.
+fn throttle_key(realm: Realm, email: &str) -> String {
+    match realm {
+        Realm::Staff => email.to_owned(),
+        Realm::Customer => format!("customer:{email}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1207,7 +1277,8 @@ mod tests {
             assert!(!lock_grant(write, &tenant, user.id, Some(&verified)).await.unwrap());
             assert!(lock_grant(write, &tenant, user.id, None).await.unwrap());
 
-            let disable = crate::user::UserChanges { name: None, disabled: Some(true) };
+            let disable =
+                crate::user::UserChanges { name: None, disabled: Some(true), ..Default::default() };
             users.update(&tenant, Actor::system(), user.id, disable, None).await.unwrap();
             assert!(!lock_grant(write, &tenant, user.id, None).await.unwrap());
         })

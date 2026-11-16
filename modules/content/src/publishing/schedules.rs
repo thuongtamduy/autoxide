@@ -129,6 +129,13 @@ impl ContentService {
             ));
         }
         let entry = self.load_checked(tenant, entry_id, expected).await?;
+        crate::permissions::require_org(
+            principal,
+            tenant,
+            &entry,
+            crate::permissions::Need::Publish,
+        )
+        .await?;
         let now = now();
         if run_at <= now {
             return Err(invalid(vec![FieldError::new(
@@ -216,7 +223,21 @@ impl ContentService {
         page: &autoxide_kernel::pagination::PageRequest,
     ) -> Result<autoxide_kernel::pagination::Page<Schedule>, Error> {
         principal.require(&CONTENT_READ)?;
-        let mut select = schedule::Entity::find().scoped(tenant);
+        // Chỉ lịch của mục trong phạm vi `content.read` (bước 34).
+        let scope = principal.scope_condition(
+            &CONTENT_READ,
+            crate::entity::entry::Column::OrgId,
+            Some(crate::entity::entry::Column::CreatedBy),
+        )?;
+        let permitted = sea_orm::sea_query::Query::select()
+            .column(crate::entity::entry::Column::Id)
+            .from(crate::entity::entry::Entity)
+            .cond_where(scope)
+            .and_where(crate::entity::entry::Column::TenantId.eq(tenant.id().as_uuid()))
+            .to_owned();
+        let mut select = schedule::Entity::find()
+            .filter(schedule::Column::EntryId.in_subquery(permitted))
+            .scoped(tenant);
         if let Some(status) = status {
             select = select.filter(schedule::Column::Status.eq(status));
         }
@@ -241,6 +262,7 @@ impl ContentService {
         entry_id: Uuid,
     ) -> Result<Vec<Schedule>, Error> {
         principal.require(&CONTENT_READ)?;
+        self.get(tenant, principal, entry_id).await?;
         Ok(schedule::Entity::find()
             .scoped(tenant)
             .filter(schedule::Column::EntryId.eq(entry_id))
@@ -262,6 +284,22 @@ impl ContentService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(|| schedule_not_found(id))?;
+        // Lịch của mục ngoài phạm vi theo nút: như không có (bước 34).
+        let entry = crate::entity::entry::Entity::find_by_id(before.entry_id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(|| schedule_not_found(id))?;
+        crate::permissions::require_org(
+            principal,
+            tenant,
+            &entry,
+            crate::permissions::Need::Publish,
+        )
+        .await
+        .map_err(|error| {
+            if error.code() == "content.not_found" { schedule_not_found(id) } else { error }
+        })?;
         let transaction = tenant.database().begin_write().await?;
         let canceled = self.set_schedule_status(tenant, &transaction, id, "canceled", None).await?;
         let Some(after) = canceled else {

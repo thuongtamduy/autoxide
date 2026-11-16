@@ -159,6 +159,11 @@ pub(crate) struct RegisterRequest {
     name: String,
     /// 12 to 128 characters.
     password: String,
+    /// `staff` (default; needs self-registration on the server) or `customer`: a customer
+    /// account of this tenant's shop, without any permission (open unless the tenant turns off
+    /// the setting `auth.customer_registration`).
+    #[serde(default)]
+    realm: autoxide_kernel::access::Realm,
 }
 
 /// Changes to an account. Omitted fields stay as they are.
@@ -305,8 +310,12 @@ async fn get_user(
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<UserResponse>, Error> {
     principal.require(&USERS_READ)?;
-    let user =
-        state.users.get(&tenant, id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
+    let user = state
+        .users
+        .get(&tenant, id)
+        .await?
+        .filter(|user| user.realm == autoxide_kernel::access::Realm::Staff)
+        .ok_or_else(|| crate::user::user_not_found(id))?;
     Ok(Tagged { version: user.updated_at, data: describe(&state.users, &tenant, user).await? })
 }
 
@@ -343,7 +352,7 @@ async fn update_user(
 ) -> Result<Tagged<UserResponse>, Error> {
     principal.require(&USERS_MANAGE)?;
     state.roles.require_covers(&tenant, &principal, id).await?;
-    let changes = UserChanges { name: input.name, disabled: input.disabled };
+    let changes = UserChanges { name: input.name, disabled: input.disabled, ..Default::default() };
     let user =
         state.users.update(&tenant, Actor::from(&principal), id, changes, if_match.expected()?);
     let user = user.await?;
@@ -395,7 +404,7 @@ async fn delete_user(
     request_body = RegisterRequest,
     responses(
         (status = 201, description = "The account was created.", body = Data<UserResponse>),
-        (status = 403, description = "Self-registration is turned off; code `auth.registration_disabled`.", body = Problem),
+        (status = 403, description = "Self-registration of staff is turned off (code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
         (status = 409, description = "An account has this email; code `auth.email_taken`.", body = Problem),
         (status = 422, description = "A value is invalid, e.g. a password shorter than 12 characters; see `errors`.", body = Problem),
     )
@@ -406,7 +415,22 @@ async fn register(
     language: Language,
     ValidJson(input): ValidJson<RegisterRequest>,
 ) -> Result<Created<UserResponse>, Error> {
-    if !state.self_registration {
+    let realm = input.realm;
+    let customer = realm == autoxide_kernel::access::Realm::Customer;
+    if customer {
+        let open = crate::settings::enabled(
+            state.orgs.as_ref(),
+            &tenant,
+            &crate::settings::CUSTOMER_REGISTRATION,
+        )
+        .await?;
+        if !open {
+            return Err(Error::forbidden(
+                "auth.customer_registration_closed",
+                "This shop does not let customers create accounts yet.",
+            ));
+        }
+    } else if !state.self_registration {
         return Err(Error::forbidden(
             "auth.registration_disabled",
             "This server does not let people create their own accounts. Ask an administrator \
@@ -415,7 +439,11 @@ async fn register(
     }
     let input = NewUser { email: input.email, name: input.name, password: Some(input.password) };
     // Chưa đăng nhập, chưa có tài khoản: "hệ thống" tạo thay người đăng ký.
-    let user = state.users.create(&tenant, Actor::system(), input).await?;
+    let user = if customer {
+        state.users.create_customer(&tenant, Actor::system(), input).await?
+    } else {
+        state.users.create(&tenant, Actor::system(), input).await?
+    };
     state.verifications.after_signup(&tenant, Actor::system(), &user, language).await;
     let path = format!("/auth/users/{}", user.id);
     Ok(Created::new(path, describe(&state.users, &tenant, user).await?))
@@ -667,6 +695,8 @@ mod tests {
             let bob =
                 Accounts::create(services.users.as_ref(), &services.tenant, bob).await.unwrap();
             let helpdesk = crate::role::RoleInput {
+                requires_mfa: false,
+                grants: Vec::new(),
                 name: "helpdesk".to_owned(),
                 description: String::new(),
                 permissions: vec!["auth.users.manage".to_owned()],

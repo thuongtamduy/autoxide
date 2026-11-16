@@ -76,8 +76,12 @@ pub(crate) struct TotpSetupResponse {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct StartTotpRequest {
     /// Your current password.
-    #[validate(length(min = 1, max = 1024))]
+    #[serde(default)]
+    #[validate(length(max = 1024))]
     current_password: String,
+    /// A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+    /// (accounts without a password use this). Exactly one of the two.
+    reauth_token: Option<String>,
 }
 
 /// A code from the authenticator app, or (where stated) a recovery code.
@@ -139,8 +143,14 @@ async fn start_totp(
     ValidJson(input): ValidJson<StartTotpRequest>,
 ) -> Result<Data<TotpSetupResponse>, Error> {
     require_session(&principal)?;
-    let setup =
-        state.sessions.start_totp(&tenant, principal.user_id(), &input.current_password).await?;
+    let setup = state
+        .sessions
+        .start_totp(
+            &tenant,
+            principal.user_id(),
+            super::confirm(&input.current_password, input.reauth_token.as_deref())?,
+        )
+        .await?;
     Ok(Data { data: TotpSetupResponse { secret: setup.secret, otpauth_url: setup.otpauth_url } })
 }
 

@@ -118,7 +118,8 @@ pub(crate) async fn repath_descendants<C: ConnectionTrait>(
         // Đường dẫn mới của trang con có thể trùng một bản công khai khác (vd bài viết ở
         // `/blog/x`): báo `content.path_taken` như với chính trang được đổi, không để câu
         // `UPDATE` vấp unique rồi thành lỗi 500.
-        if path_used(connection, tenant, &child.locale, &path, child.entry_id).await? {
+        if path_used(connection, tenant, child.org_id, &child.locale, &path, child.entry_id).await?
+        {
             return Err(crate::publishing::path_taken(&path));
         }
         published::Entity::update_many()
@@ -137,12 +138,18 @@ pub(crate) async fn repath_descendants<C: ConnectionTrait>(
 pub(crate) async fn path_used<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
+    org: Option<Uuid>,
     locale: &str,
     path: &str,
     except: Uuid,
 ) -> Result<bool, Error> {
-    Ok(published::Entity::find()
-        .scoped(tenant)
+    // Mỗi website một bộ đường dẫn (D-307): chỉ bài cùng nút chiếm chỗ. `None`: mọi nút (một
+    // chuyển hướng áp cho mọi website).
+    let mut select = published::Entity::find().scoped(tenant);
+    if let Some(org) = org {
+        select = select.filter(published::Column::OrgId.eq(org));
+    }
+    Ok(select
         .filter(published::Column::Locale.eq(locale))
         .filter(published::Column::Path.eq(path))
         .filter(published::Column::EntryId.ne(except))

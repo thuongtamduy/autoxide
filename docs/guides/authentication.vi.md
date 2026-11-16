@@ -21,6 +21,10 @@ curl -sS "$API/api/v1/auth/login" \
 curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
 ```
 
+## Đăng nhập bằng link
+
+Khi máy chủ bật (`AUTOXIDE_AUTH_LOGIN_LINK=true`), `POST /api/v1/auth/login/link` với `{"email": …}` gửi một link đăng nhập dùng một lần (sống `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES`, mặc định 15 phút). Endpoint luôn trả 202 như nhau dù email có tài khoản hay không. Hoàn tất bằng `POST /api/v1/auth/login/link/confirm` với `token` trong mail; kết quả như `/login` (token, hay `mfa_token` khi bật xác thực hai bước). Gửi `"bind_device": true` để nhận `device_secret` rồi gửi lại nó cùng token: link khi đó chỉ dùng được trên thiết bị này.
+
 ## Làm mới trước khi access token hết hạn
 
 `expires_in` cho biết access token sống bao nhiêu giây. Trước lúc đó một chút, đổi refresh token lấy cặp mới. Mỗi refresh token chỉ dùng được **một lần**: giữ lại cái mới.
@@ -66,7 +70,15 @@ curl -sS "$API/api/v1/auth/logout" --json '{"refresh_token":"'"$REFRESH"'"}'
 
 ## Các phiên của bạn
 
-`GET /api/v1/auth/me/sessions` liệt kê các thiết bị đang đăng nhập tài khoản: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `password_change`) và, khi reverse proxy của máy chủ cho biết (`AUTOXIDE_AUTH_COUNTRY_HEADER`, vd `CF-IPCountry`), quốc gia gần đúng `country`. Địa chỉ IP không bao giờ được lưu. Phiên lạ thì kết thúc bằng `DELETE /api/v1/auth/me/sessions/{id}`.
+`GET /api/v1/auth/me/sessions` liệt kê các thiết bị đang đăng nhập tài khoản: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `email_link`, `password_change`) và, khi reverse proxy của máy chủ cho biết (`AUTOXIDE_AUTH_COUNTRY_HEADER`, vd `CF-IPCountry`), quốc gia gần đúng `country`. Địa chỉ IP không bao giờ được lưu. Phiên lạ thì kết thúc bằng `DELETE /api/v1/auth/me/sessions/{id}`.
+
+## Tài khoản của bạn
+
+`PATCH /api/v1/auth/me` đổi tên hiển thị (`name`), ngôn ngữ ưa thích (`locale`: `en` hay `vi`) và múi giờ (`time_zone`, theo IANA, vd `Asia/Ho_Chi_Minh`); `null` bỏ đặt ngôn ngữ hay múi giờ. Mail gửi sau (đặt lại mật khẩu, báo đổi email) dùng ngôn ngữ ưa thích của bạn.
+
+Thay đổi quan trọng — tạo API key, đổi email, bật xác thực hai bước, thêm passkey, xoá tài khoản — cần chứng minh đó là bạn. Gửi `current_password`, hoặc trước đó lấy token xác nhận ngắn hạn bằng `POST /api/v1/auth/me/reauth` (`{"method": "password" | "totp" | "passkey" | "email_link", …}`) rồi gửi nó trong `reauth_token`. Mỗi token dùng một lần, trong `AUTOXIDE_AUTH_REAUTH_MINUTES` (mặc định 10 phút). Tài khoản không có mật khẩu dùng `passkey`, `totp` hay `email_link`.
+
+Một role có thể bắt buộc xác thực hai bước (`requires_mfa`, cả với role `admin` dựng sẵn). Khi tài khoản chưa bật ứng dụng xác thực hay thêm passkey, permission của role đó bị bỏ ra và `GET /api/v1/auth/me` trả `mfa_required: true`.
 
 ## Với SDK
 

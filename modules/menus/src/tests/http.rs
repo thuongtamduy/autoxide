@@ -310,3 +310,83 @@ async fn hai_khach_cung_menu_khong_ro_ri() {
     .await
     .unwrap();
 }
+
+/// Menu theo website (bước 34, D-238): mỗi nút một menu `main` riêng; website chưa có menu riêng
+/// dùng menu của website cấp trên; người quản lý menu của một nhánh không đụng được nhánh khác.
+#[tokio::test]
+async fn menu_theo_website_va_nhanh() {
+    use autoxide_kernel::access::Scope;
+    use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree};
+
+    TestDatabase::run(async |test| {
+        let org = || OrgId::from_uuid(uuid::Uuid::now_v7());
+        let (a, b) = (org(), org());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia);
+        let manage = [("menus.read", Scope::Subtree), ("menus.manage", Scope::Subtree)];
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["menus.read", "menus.manage"])
+            .member("shop-b", 2, b, &manage)
+            .provide::<dyn Media>(media)
+            .module(Shop)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let write = app.database().begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, a, root, 8).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, b, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+
+        let menu = |label: &str, org_id: Option<OrgId>| {
+            let mut body = json!({"key": "main", "items": [{"label": label, "url": "/x"}]});
+            if let Some(org) = org_id {
+                body["org_id"] = json!(org.as_uuid());
+            }
+            body
+        };
+        let made = send(&app, "POST", "", Some("admin"), &[], Some(menu("Whole", None))).await;
+        assert_eq!(made.status(), StatusCode::CREATED, "{}", made.json());
+        assert_eq!(made.json()["data"]["org_id"], root.as_uuid().to_string());
+        let made = send(&app, "POST", "", Some("admin"), &[], Some(menu("Shop A", Some(a)))).await;
+        assert_eq!(made.status(), StatusCode::CREATED, "{}", made.json());
+        let menu_a = made.json()["data"]["id"].as_str().unwrap().to_owned();
+
+        let public = async |site: Option<OrgId>| {
+            let uri = match site {
+                Some(site) => format!("/public/main?site={}", site.as_uuid()),
+                None => "/public/main".to_owned(),
+            };
+            let answer = send(&app, "GET", &uri, None, &[], None).await;
+            assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+            answer.json()["data"]["items"][0]["label"].as_str().unwrap().to_owned()
+        };
+        assert_eq!(public(Some(a)).await, "Shop A", "website A có menu riêng");
+        assert_eq!(public(Some(b)).await, "Whole", "website B dùng menu của cả khách");
+        assert_eq!(public(None).await, "Whole");
+        let unknown =
+            send(&app, "GET", &format!("/public/main?site={}", org().as_uuid()), None, &[], None)
+                .await;
+        assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+        assert_eq!(unknown.json()["code"], "site_not_found");
+
+        // Người quản lý menu của B: không thấy, không sửa được menu của A; tạo menu cho A bị 403.
+        let listed = send(&app, "GET", "", Some("shop-b"), &[], None).await;
+        assert_eq!(listed.json()["data"], json!([]), "chưa có menu nào ở nhánh B");
+        let hidden = send(&app, "GET", &format!("/{menu_a}"), Some("shop-b"), &[], None).await;
+        assert_eq!(hidden.status(), StatusCode::NOT_FOUND);
+        let refused =
+            send(&app, "POST", "", Some("shop-b"), &[], Some(menu("Mine", Some(a)))).await;
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+        assert_eq!(refused.json()["code"], "org_out_of_scope");
+        let own = send(&app, "POST", "", Some("shop-b"), &[], Some(menu("Shop B", Some(b)))).await;
+        assert_eq!(own.status(), StatusCode::CREATED, "{}", own.json());
+        assert_eq!(public(Some(b)).await, "Shop B", "cache theo website: B thấy menu mới của mình");
+        let by_owner =
+            send(&app, "GET", &format!("?owner_org={}", a.as_uuid()), Some("admin"), &[], None)
+                .await;
+        assert_eq!(by_owner.json()["data"].as_array().unwrap().len(), 1);
+    })
+    .await
+    .unwrap();
+}

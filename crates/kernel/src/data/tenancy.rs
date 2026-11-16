@@ -26,12 +26,15 @@ pub(crate) mod domains;
 mod link_token;
 pub mod migration;
 pub(crate) mod moves;
+pub(crate) mod org_settings;
+pub(crate) mod org_tree;
 mod placements;
 mod registry;
 pub(crate) mod request;
 pub(crate) mod schema;
 mod scope;
 pub(crate) mod settings;
+mod site;
 
 use std::fmt;
 use std::sync::Arc;
@@ -56,6 +59,8 @@ pub use link_token::{OptionalTenant, link_token, resolve_link_token, split_link_
 pub use moves::{
     TENANTS_MOVE, TenantMove, TenantMoveBlocker, TenantMovePlan, TenantMoves, TenantTableRows,
 };
+pub use org_settings::{OrgSetting, OrgSettingCatalog, OrgSettingCheck};
+pub use org_tree::{OrgTree, nearest, root_immutable, root_of};
 pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
 pub use registry::{
     DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
@@ -66,6 +71,7 @@ pub use settings::{
     CONNECTION_GROUP, PUBLIC_URL, SETTINGS_MANAGE, SettingCheck, SettingValue, TenantSetting,
     TenantSettings, parsed_setting,
 };
+pub use site::{SITE_PARAM, Site, SiteQuery};
 
 pub(crate) use config::read_setting;
 

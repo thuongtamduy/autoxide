@@ -40,6 +40,7 @@ impl ContentService {
         let secret = self.preview_secret()?;
         let entry = self.load_checked(tenant, id, None).await?;
         permissions::require_write(principal, &entry)?;
+        permissions::require_org(principal, tenant, &entry, permissions::Need::Write).await?;
         let expires = now() + chrono::Duration::seconds(i64::from(self.config.preview_ttl_seconds));
         Ok((sign(secret, tenant.id(), entry.id, expires)?, expires))
     }

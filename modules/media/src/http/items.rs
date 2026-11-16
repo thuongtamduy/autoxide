@@ -50,6 +50,8 @@ pub(crate) struct ItemsQuery {
     /// Only items with this tag, ignoring case.
     #[param(example = "brand")]
     pub tag: Option<String>,
+    /// Only the items of this organization unit (store, seller).
+    pub owner_org: Option<Uuid>,
     /// `true`: only images missing a text alternative (an image whose default `alt` is empty and
     /// that is not marked `decorative`). `false`: every other item.
     #[param(value_type = Option<bool>)]
@@ -124,6 +126,7 @@ impl ItemsQuery {
         };
         ItemFilter {
             alt_missing,
+            owner_org: self.owner_org,
             folder: folder_filter(self.folder_id.as_deref(), "folder_id", problems),
             content_type,
             visibility,
@@ -144,6 +147,9 @@ pub(crate) struct UploadQuery {
     name: String,
     /// Folder to put the item in. Omit for the root.
     folder_id: Option<Uuid>,
+    /// The organization unit (store, seller) that owns the item; you need `media.write` there.
+    /// Omit when you work in one unit only (or for the whole tenant).
+    org_id: Option<Uuid>,
     /// Tags for the item, comma-separated (each 1 to 50 characters, at most 20).
     #[param(example = "brand,logo")]
     tags: Option<String>,
@@ -371,6 +377,7 @@ pub(crate) async fn upload_item(
     let input = NewUpload {
         name: query.name,
         folder_id: query.folder_id,
+        org_id: query.org_id,
         content_type: content_type(&headers)?.map(str::to_owned),
         tags: query
             .tags

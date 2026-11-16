@@ -1,6 +1,7 @@
 //! Service của tài khoản người dùng: mọi logic về người dùng nằm ở đây. Handler REST,
 //! lệnh CLI và tool MCP (ở các mục sau) chỉ gọi vào đây.
 
+use autoxide_kernel::access::Realm;
 use std::collections::HashMap;
 
 use autoxide_kernel::error::{Error, FieldError};
@@ -55,6 +56,10 @@ pub(crate) struct UserChanges {
     pub name: Option<String>,
     /// `true`: khoá; `false`: mở khoá.
     pub disabled: Option<bool>,
+    /// Ngôn ngữ ưa thích: `Some(None)` bỏ đặt (D-308).
+    pub locale: Option<Option<String>>,
+    /// Múi giờ IANA ưa thích: `Some(None)` bỏ đặt.
+    pub time_zone: Option<Option<String>>,
 }
 
 /// Lọc danh sách người dùng theo trạng thái.
@@ -118,10 +123,22 @@ impl UserService {
         email: &str,
         password: &str,
     ) -> Result<(User, String), Error> {
+        self.verify_credentials_in(tenant, Realm::Staff, email, password).await
+    }
+
+    /// Như [`verify_credentials`](Self::verify_credentials), cho tài khoản `realm` (D-309).
+    pub(crate) async fn verify_credentials_in(
+        &self,
+        tenant: &TenantContext,
+        realm: Realm,
+        email: &str,
+        password: &str,
+    ) -> Result<(User, String), Error> {
         if password.chars().count() > password::MAX_LENGTH {
             return Err(invalid_credentials());
         }
         let row = Entity::find()
+            .filter(Column::Realm.eq(entity::realm_str(realm)))
             .filter(Column::Email.eq(autoxide_kernel::email::normalize(email)))
             .scoped(tenant)
             .one(tenant.database().read())
@@ -198,6 +215,27 @@ impl UserService {
         input: NewUser,
         admin: bool,
     ) -> Result<User, Error> {
+        self.create_in(tenant, actor, input, admin, Realm::Staff).await
+    }
+
+    /// Tạo tài khoản người mua của khách `tenant` (D-309): không role, không permission.
+    pub(crate) async fn create_customer(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        input: NewUser,
+    ) -> Result<User, Error> {
+        self.create_in(tenant, actor, input, false, Realm::Customer).await
+    }
+
+    async fn create_in(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        input: NewUser,
+        admin: bool,
+        realm: Realm,
+    ) -> Result<User, Error> {
         let email = autoxide_kernel::email::normalize(&input.email);
         let name = input.name.trim().to_owned();
         let mut problems = Vec::new();
@@ -229,6 +267,9 @@ impl UserService {
             created_at: Set(now),
             updated_at: Set(now),
             last_sign_in_at: Set(None),
+            locale: Set(None),
+            time_zone: Set(None),
+            realm: Set(entity::realm_str(realm).to_owned()),
         }
         .insert(&transaction)
         .await
@@ -261,9 +302,37 @@ impl UserService {
         changes: UserChanges,
         expected: Option<DateTime<Utc>>,
     ) -> Result<User, Error> {
-        let name = changes.name.map(|name| name.trim().to_owned());
-        if let Some(problem) = name.as_deref().and_then(check_name) {
-            return Err(Error::validation(vec![problem]));
+        let name = changes.name.as_ref().map(|name| name.trim().to_owned());
+        let mut problems: Vec<FieldError> =
+            name.as_deref().and_then(check_name).into_iter().collect();
+        let locale = match &changes.locale {
+            Some(Some(raw)) => match check_locale(raw) {
+                Ok(locale) => Some(Some(locale)),
+                Err(problem) => {
+                    problems.push(problem);
+                    None
+                }
+            },
+            Some(None) => Some(None),
+            None => None,
+        };
+        let time_zone = match &changes.time_zone {
+            Some(Some(raw)) => match raw.trim().parse::<chrono_tz::Tz>() {
+                Ok(zone) => Some(Some(zone.name().to_owned())),
+                Err(_) => {
+                    problems.push(FieldError::new(
+                        "time_zone",
+                        "invalid",
+                        "must be an IANA time zone name, e.g. `Asia/Ho_Chi_Minh` or `UTC`",
+                    ));
+                    None
+                }
+            },
+            Some(None) => Some(None),
+            None => None,
+        };
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
         }
         let transaction = tenant.database().begin_write().await?;
         let before = Entity::find_by_id(id)
@@ -291,6 +360,12 @@ impl UserService {
             update =
                 update.col_expr(Column::SearchText, Expr::value(search_text(&before.email, &name)));
             update = update.col_expr(Column::Name, Expr::value(name));
+        }
+        if let Some(locale) = locale {
+            update = update.col_expr(Column::Locale, Expr::value(locale));
+        }
+        if let Some(time_zone) = time_zone {
+            update = update.col_expr(Column::TimeZone, Expr::value(time_zone));
         }
         match changes.disabled {
             // Đã khoá rồi thì giữ nguyên thời điểm khoá cũ.
@@ -378,13 +453,24 @@ impl UserService {
         Ok(())
     }
 
-    /// Người dùng có email `email` (so sánh sau khi chuẩn hoá).
+    /// Nhân sự có email `email` (so sánh sau khi chuẩn hoá).
     pub(crate) async fn find_by_email(
         &self,
         tenant: &TenantContext,
         email: &str,
     ) -> Result<Option<User>, Error> {
+        self.find_by_email_in(tenant, Realm::Staff, email).await
+    }
+
+    /// Tài khoản `realm` có email `email` (D-309: cùng email có thể là nhân sự và người mua).
+    pub(crate) async fn find_by_email_in(
+        &self,
+        tenant: &TenantContext,
+        realm: Realm,
+        email: &str,
+    ) -> Result<Option<User>, Error> {
         let row = Entity::find()
+            .filter(Column::Realm.eq(entity::realm_str(realm)))
             .filter(Column::Email.eq(autoxide_kernel::email::normalize(email)))
             .scoped(tenant)
             .one(tenant.database().read())
@@ -433,7 +519,20 @@ impl UserService {
         status: Option<UserStatus>,
         page: &PageRequest,
     ) -> Result<Page<User>, Error> {
-        let mut select = Entity::find().scoped(tenant);
+        self.list_in(tenant, Realm::Staff, search, status, page).await
+    }
+
+    /// Như [`list`](Self::list), cho tài khoản `realm` (người mua: `GET /customers`).
+    pub(crate) async fn list_in(
+        &self,
+        tenant: &TenantContext,
+        realm: Realm,
+        search: Option<&str>,
+        status: Option<UserStatus>,
+        page: &PageRequest,
+    ) -> Result<Page<User>, Error> {
+        let mut select =
+            Entity::find().filter(Column::Realm.eq(entity::realm_str(realm))).scoped(tenant);
         if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
             // Không có index nào giúp được tìm "chứa": quét bảng người dùng.
             select = select.filter(autoxide_kernel::search::contains(Column::SearchText, search));
@@ -469,6 +568,21 @@ impl UserService {
     /// Dữ kiện tài khoản của những người `ids` cho trang quản trị (có mật khẩu chưa, đã bật đăng
     /// nhập hai bước chưa, lần đăng nhập cuối) — hai câu truy vấn cho cả trang, không theo từng
     /// người (đề bài giao diện B1).
+    /// Ngôn ngữ cho mail gửi chậm tới người dùng `id`: ngôn ngữ ưa thích nếu đã đặt, không thì
+    /// `fallback` (ngôn ngữ của request gốc) (D-308).
+    pub(crate) async fn mail_language(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        fallback: autoxide_kernel::i18n::Language,
+    ) -> Result<autoxide_kernel::i18n::Language, Error> {
+        let preferred = self.get(tenant, id).await?.and_then(|found| found.locale);
+        Ok(preferred
+            .as_deref()
+            .and_then(autoxide_kernel::i18n::Language::from_tag)
+            .unwrap_or(fallback))
+    }
+
     pub(crate) async fn facts(
         &self,
         tenant: &TenantContext,
@@ -673,7 +787,21 @@ impl Users for UserService {
 
 /// Ảnh chụp những gì audit cần biết về một người dùng (không có hash mật khẩu).
 fn snapshot(row: &entity::Model) -> serde_json::Value {
-    json!({"email": row.email, "name": row.name, "disabled_at": row.disabled_at})
+    json!({
+        "email": row.email,
+        "name": row.name,
+        "disabled_at": row.disabled_at,
+        "locale": row.locale,
+        "time_zone": row.time_zone,
+    })
+}
+
+/// Ngôn ngữ ưa thích: mã BCP 47 mà máy chủ có bản dịch (`en`, `vi`), dạng chuẩn.
+fn check_locale(raw: &str) -> Result<String, FieldError> {
+    autoxide_kernel::i18n::canonical_locale(raw.trim())
+        .and_then(|locale| autoxide_kernel::i18n::Language::from_tag(&locale))
+        .map(|language| language.tag().to_owned())
+        .ok_or_else(|| FieldError::new("locale", "invalid", "must be `en` or `vi`"))
 }
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên.
@@ -1221,7 +1349,7 @@ mod update_tests {
     }
 
     fn disable(disabled: bool) -> UserChanges {
-        UserChanges { name: None, disabled: Some(disabled) }
+        UserChanges { name: None, disabled: Some(disabled), ..Default::default() }
     }
 
     #[tokio::test]
@@ -1248,7 +1376,11 @@ mod update_tests {
                     &tenant,
                     Actor::system(),
                     ada.id,
-                    UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None },
+                    UserChanges {
+                        name: Some("  Ada L. ".to_owned()),
+                        disabled: None,
+                        ..Default::default()
+                    },
                     None,
                 )
                 .await
@@ -1289,7 +1421,8 @@ mod update_tests {
                 .await
                 .unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");
-            let empty = UserChanges { name: Some(" ".to_owned()), disabled: None };
+            let empty =
+                UserChanges { name: Some(" ".to_owned()), disabled: None, ..Default::default() };
             assert_eq!(
                 users
                     .update(&tenant, Actor::system(), ada.id, empty, None)
