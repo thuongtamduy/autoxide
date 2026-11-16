@@ -15,6 +15,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::entity::{role, role_permission, user_role};
+use crate::api::User;
 use crate::events;
 use crate::user::entity as user;
 use autoxide_kernel::event::{Actor, Outbox};
@@ -620,36 +621,57 @@ impl RoleService {
                     .eq(tenant.id().as_uuid()),
             );
         let rows = tenant.database().read().query_all(&select).await?;
-        // Role bắt buộc MFA (D-308): chỉ khi có role như vậy mới tra MFA của tài khoản — đường
-        // nóng của mọi người khác giữ một câu.
-        let mut has_mfa = None;
-        for row in &rows {
-            if row.try_get::<bool>("", "requires_mfa")? {
-                has_mfa = Some(has_second_factor(tenant, user_id).await?);
-                break;
-            }
-        }
-        let root = root_of(tenant.id());
-        let mut grants = Vec::with_capacity(rows.len());
-        for row in rows {
-            if row.try_get::<bool>("", "requires_mfa")? && has_mfa == Some(false) {
-                continue;
-            }
-            // Role `admin` chỉ gán được ở nút gốc (`set_memberships` chặn chỗ khác).
-            if row.try_get::<bool>("", "all_permissions")? {
-                return Ok(Principal::with_all_permissions(user_id).in_tenant(tenant.id()));
-            }
-            let Some(permission) = row.try_get::<Option<String>>("", "permission")? else {
-                continue;
-            };
-            let org = row.try_get::<Option<Uuid>>("", "org_id")?.map_or(root, OrgId::from_uuid);
-            let scope = row
-                .try_get::<Option<String>>("", "scope")?
-                .and_then(|scope| Scope::parse(&scope))
-                .unwrap_or(Scope::Tenant);
-            grants.push((permission, Grant::new(org, scope)));
-        }
-        Ok(Principal::with_grants(user_id, grants).in_tenant(tenant.id()))
+        principal_from_rows(tenant, user_id, &rows).await
+    }
+
+    /// Người dùng `user_id` cùng quyền của họ trong MỘT câu — đường nóng của mọi request đã đăng
+    /// nhập (access token, API key): trước đây là hai câu, đọc dòng người dùng rồi mới đọc role
+    /// (D-319). `None` khi không có người dùng đó ở khách `tenant`. Không kiểm tài khoản có bị
+    /// khoá hay là người mua: bên gọi quyết.
+    pub(crate) async fn user_principal(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<Option<(User, Principal)>, Error> {
+        use sea_orm::FromQueryResult as _;
+        use sea_orm::sea_query::{Asterisk, ExprTrait as _};
+        let tenant_id = tenant.id().as_uuid();
+        // Mỗi dòng: cả dòng người dùng, kèm một role và một permission của role đó. Người dùng
+        // không có role nào vẫn ra một dòng (LEFT JOIN), cột role là NULL.
+        let mut select = Query::select();
+        select
+            .column((user::Entity, Asterisk))
+            .column((role::Entity, role::Column::AllPermissions))
+            .column((role::Entity, role::Column::RequiresMfa))
+            .column((user_role::Entity, user_role::Column::OrgId))
+            .column((role_permission::Entity, role_permission::Column::Permission))
+            .column((role_permission::Entity, role_permission::Column::Scope))
+            .from(user::Entity)
+            .left_join(
+                user_role::Entity,
+                Expr::col((user_role::Entity, user_role::Column::UserId))
+                    .equals((user::Entity, user::Column::Id))
+                    .and(Expr::col((user_role::Entity, user_role::Column::TenantId)).eq(tenant_id)),
+            )
+            .left_join(
+                role::Entity,
+                Expr::col((role::Entity, role::Column::Id))
+                    .equals((user_role::Entity, user_role::Column::RoleId)),
+            )
+            .left_join(
+                role_permission::Entity,
+                Expr::col((role_permission::Entity, role_permission::Column::RoleId))
+                    .equals((role::Entity, role::Column::Id)),
+            )
+            .and_where(Expr::col((user::Entity, user::Column::Id)).eq(user_id))
+            .and_where(Expr::col((user::Entity, user::Column::TenantId)).eq(tenant_id));
+        let rows = tenant.database().read().query_all(&select).await?;
+        let Some(first) = rows.first() else {
+            return Ok(None);
+        };
+        let user = User::from(user::Model::from_query_result(first, "")?);
+        let principal = principal_from_rows(tenant, user_id, &rows).await?;
+        Ok(Some((user, principal)))
     }
 
     /// `Ok` nếu `actor` có mọi permission người dùng `target` có. Dùng trước khi một
@@ -1270,6 +1292,50 @@ pub(crate) async fn role_grants(
         .collect())
 }
 
+/// Quyền của người dùng `user_id` từ các dòng (role, permission) của [`RoleService::principal`]
+/// hay [`RoleService::user_principal`]. Dòng không có role (`all_permissions` NULL, do LEFT JOIN)
+/// được bỏ qua.
+async fn principal_from_rows(
+    tenant: &TenantContext,
+    user_id: Uuid,
+    rows: &[sea_orm::QueryResult],
+) -> Result<Principal, Error> {
+    // Role bắt buộc MFA (D-308): chỉ khi có role như vậy mới tra MFA của tài khoản — đường
+    // nóng của mọi người khác giữ một câu.
+    let mut has_mfa = None;
+    for row in rows {
+        if row.try_get::<Option<bool>>("", "requires_mfa")? == Some(true) {
+            has_mfa = Some(has_second_factor(tenant, user_id).await?);
+            break;
+        }
+    }
+    let root = root_of(tenant.id());
+    let mut grants = Vec::with_capacity(rows.len());
+    for row in rows {
+        let Some(all_permissions) = row.try_get::<Option<bool>>("", "all_permissions")? else {
+            continue;
+        };
+        if row.try_get::<Option<bool>>("", "requires_mfa")? == Some(true) && has_mfa == Some(false)
+        {
+            continue;
+        }
+        // Role `admin` chỉ gán được ở nút gốc (`set_memberships` chặn chỗ khác).
+        if all_permissions {
+            return Ok(Principal::with_all_permissions(user_id).in_tenant(tenant.id()));
+        }
+        let Some(permission) = row.try_get::<Option<String>>("", "permission")? else {
+            continue;
+        };
+        let org = row.try_get::<Option<Uuid>>("", "org_id")?.map_or(root, OrgId::from_uuid);
+        let scope = row
+            .try_get::<Option<String>>("", "scope")?
+            .and_then(|scope| Scope::parse(&scope))
+            .unwrap_or(Scope::Tenant);
+        grants.push((permission, Grant::new(org, scope)));
+    }
+    Ok(Principal::with_grants(user_id, grants).in_tenant(tenant.id()))
+}
+
 /// Tài khoản `user_id` đã bật MFA: TOTP đã xác nhận, hay có ít nhất một passkey.
 pub(crate) async fn has_second_factor(
     tenant: &TenantContext,
@@ -1293,23 +1359,55 @@ pub(crate) async fn has_second_factor(
     Ok(passkey.is_some())
 }
 
-/// Tài khoản `user_id` có role bắt buộc MFA mà chưa bật MFA: quyền của các role đó đang bị giữ.
-pub(crate) async fn mfa_pending(tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
-    // Một câu (đường nóng của `GET /me`, đo ở D-317): role bắt buộc MFA trong các role người
-    // dùng giữ; chỉ khi có mới tra MFA của tài khoản.
+/// Điều kiện SQL đặt trong câu đọc `auth_user`: người dùng của dòng đang đọc giữ ít nhất một
+/// role bắt buộc MFA ở khách `tenant` (dùng cho cờ `mfa_required` của `GET /me`, không tốn câu riêng).
+pub(crate) fn holds_mfa_role(tenant: &TenantContext) -> Expr {
+    let tenant_id = tenant.id().as_uuid();
     let held = Query::select()
-        .column(user_role::Column::RoleId)
+        .expr(Expr::val(1))
         .from(user_role::Entity)
-        .and_where(user_role::Column::UserId.eq(user_id))
-        .and_where(user_role::Column::TenantId.eq(tenant.id().as_uuid()))
+        .inner_join(
+            role::Entity,
+            Expr::col((role::Entity, role::Column::Id))
+                .equals((user_role::Entity, user_role::Column::RoleId)),
+        )
+        .and_where(
+            Expr::col((user_role::Entity, user_role::Column::UserId))
+                .equals((user::Entity, user::Column::Id)),
+        )
+        .and_where(Expr::col((user_role::Entity, user_role::Column::TenantId)).eq(tenant_id))
+        .and_where(Expr::col((role::Entity, role::Column::TenantId)).eq(tenant_id))
+        .and_where(Expr::col((role::Entity, role::Column::RequiresMfa)).eq(true))
         .to_owned();
-    let flagged = role::Entity::find()
-        .filter(role::Column::RequiresMfa.eq(true))
-        .filter(role::Column::Id.in_subquery(held))
-        .scoped(tenant)
-        .one(tenant.database().read())
-        .await?;
-    Ok(flagged.is_some() && !has_second_factor(tenant, user_id).await?)
+    Expr::exists(held)
+}
+
+/// Điều kiện SQL đặt trong câu đọc `auth_user`: người dùng của dòng đang đọc đã bật MFA (TOTP đã
+/// xác nhận, hay có passkey) — cùng nghĩa với [`has_second_factor`].
+pub(crate) fn has_second_factor_condition(tenant: &TenantContext) -> Expr {
+    use crate::mfa::entity::totp;
+    use crate::passkey::entity::passkey;
+    let tenant_id = tenant.id().as_uuid();
+    let totp = Query::select()
+        .expr(Expr::val(1))
+        .from(totp::Entity)
+        .and_where(
+            Expr::col((totp::Entity, totp::Column::UserId))
+                .equals((user::Entity, user::Column::Id)),
+        )
+        .and_where(Expr::col((totp::Entity, totp::Column::TenantId)).eq(tenant_id))
+        .and_where(Expr::col((totp::Entity, totp::Column::ConfirmedAt)).is_not_null())
+        .to_owned();
+    let passkey = Query::select()
+        .expr(Expr::val(1))
+        .from(passkey::Entity)
+        .and_where(
+            Expr::col((passkey::Entity, passkey::Column::UserId))
+                .equals((user::Entity, user::Column::Id)),
+        )
+        .and_where(Expr::col((passkey::Entity, passkey::Column::TenantId)).eq(tenant_id))
+        .to_owned();
+    Expr::exists(totp).or(Expr::exists(passkey))
 }
 
 #[cfg(test)]
@@ -1485,6 +1583,53 @@ mod tests {
             let admin = admin_role(roles, &tenant).await;
             roles.set_user_roles(&tenant, Actor::system(), ada, vec![admin.id]).await.unwrap();
             assert!(roles.principal(&tenant, ada).await.unwrap().has_all_permissions());
+        })
+        .await
+        .unwrap();
+    }
+
+    // Câu gộp của đường nóng (D-319) cho cùng quyền với `principal`, kèm đúng dòng người dùng.
+    #[tokio::test]
+    async fn nguoi_dung_kem_quyen_trong_mot_cau_khop_principal() {
+        TestDatabase::run(async |test| {
+            let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
+            let roles = &services.roles;
+            let ada = user(&services, "ada@example.com").await;
+            assert!(roles.user_principal(&tenant, Uuid::now_v7()).await.unwrap().is_none());
+
+            // Chưa có role: vẫn ra người dùng (LEFT JOIN), không permission nào.
+            let (found, principal) = roles.user_principal(&tenant, ada).await.unwrap().unwrap();
+            assert_eq!((found.id, found.email.as_str()), (ada, "ada@example.com"));
+            assert!(principal.permissions().is_empty());
+            assert!(!principal.has_all_permissions());
+
+            let reader = roles
+                .create(&tenant, Actor::system(), input("reader", &["auth.roles.read"]))
+                .await
+                .unwrap();
+            let writer = roles
+                .create(&tenant, Actor::system(), input("writer", &["notes.write"]))
+                .await
+                .unwrap();
+            let empty = roles.create(&tenant, Actor::system(), input("empty", &[])).await.unwrap();
+            let mut guarded = input("guarded", &["auth.users.read"]);
+            guarded.requires_mfa = true;
+            let guarded = roles.create(&tenant, Actor::system(), guarded).await.unwrap();
+            let held = vec![reader.id, writer.id, empty.id, guarded.id];
+            roles.set_user_roles(&tenant, Actor::system(), ada, held).await.unwrap();
+            let (_, principal) = roles.user_principal(&tenant, ada).await.unwrap().unwrap();
+            // Role bắt buộc MFA mà chưa bật MFA: quyền của role đó bị giữ, như `principal`.
+            assert_eq!(principal.permissions(), ["auth.roles.read", "notes.write"]);
+            assert_eq!(
+                principal.permissions(),
+                roles.principal(&tenant, ada).await.unwrap().permissions()
+            );
+
+            let admin = admin_role(roles, &tenant).await;
+            roles.set_user_roles(&tenant, Actor::system(), ada, vec![admin.id]).await.unwrap();
+            let (_, principal) = roles.user_principal(&tenant, ada).await.unwrap().unwrap();
+            assert!(principal.has_all_permissions());
         })
         .await
         .unwrap();

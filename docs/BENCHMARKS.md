@@ -406,3 +406,28 @@ So bản `15a6de4` (đóng bước 33) với bản cuối bước 34, cùng máy
 `GET /auth/me` (và `auth.whoami`, bài "đọc") thêm một câu: role bắt buộc MFA chưa bật (D-308) — lần đo đầu là -35%
 vì `GET /me` còn đọc lại dòng người dùng và kiểm MFA bằng hai câu; gộp lại còn -25% (D-317). Phần còn lại thuộc mục
 "Rút số câu SQL của `GET /auth/me`" của bước 39. Đường ghi, file, audit trong khoảng dao động.
+
+## Rút số câu SQL của đường đã đăng nhập — 16/11/2026
+
+So bản `e5576e0` (cuối bước 34) với bản sửa (D-319), cùng máy 4 CPU, máy tạo tải chạy chung, SQLite chế độ `single`,
+6 giây mỗi bài, mỗi bản 3 lần xen kẽ, lấy trung vị. `scripts/loadtest.sh` với `LOADTEST_BINARY`, `LOADTEST_RAMP=64`.
+Hôm đo máy ồn hơn các lần trước (bản cũ `GET /auth/me` 2048–2972 req/s, lần trước 3200): so tương đối giữa hai bản
+cùng lúc, không so với bảng cũ.
+
+| Bài đo | Kết nối | Trước (req/s) | Sau (req/s) | Đổi | p50 trước → sau (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| GET /health/ready | 64 | 16914 | 18986 | +12% | 4.04 → 3.83 |
+| GET /auth/me (access token) | 64 | 2110 | 5730 | +172% | 29.74 → 11.02 |
+| GET /auth/me (API key) | 64 | 2049 | 3783 | +85% | 30.77 → 16.74 |
+| GET /auth/users?limit=50 | 64 | 1123 | 1271 | +13% | 56.60 → 50.10 |
+| GET /audit?limit=50 | 64 | 1346 | 1484 | +10% | 47.55 → 43.09 |
+| GET /files/{id}/content (16 KiB) | 64 | 4055 | 5087 | +25% | 15.57 → 12.47 |
+| MCP tools/call auth.whoami | 64 | 2563 | 4715 | +84% | 24.59 → 13.50 |
+| PATCH /auth/users/{id} (ghi + event) | 64 | 1219 | 1240 | +2% | 51.46 → 50.19 |
+| POST /files (4 KiB, ghi) | 64 | 1309 | 1433 | +9% | 49.07 → 44.23 |
+| POST /auth/login (Argon2id) | 16 | 3844 | 3922 | +2% | 3.82 → 3.73 |
+| đọc | 64 | 2249 | 4672 | +108% | 28.20 → 13.59 |
+| ghi | 64 | 1129 | 1138 | +1% | 55.37 → 55.79 |
+
+`GET /auth/me` bằng access token: 7 → 3 câu SQL (xác thực 2 → 1, thân 5 → 2), về lại mức trước bước 33 (5315–5724
+req/s ở hai lần đo mốc). Mọi request đã đăng nhập bớt một câu (file, audit +10–25%); đường ghi và đăng nhập không đổi.

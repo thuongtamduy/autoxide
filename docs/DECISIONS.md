@@ -7738,3 +7738,30 @@ phố), 3.321 đơn vị cấp xã (2.621 xã, 687 phường, 13 đặc khu); m�
 số, mã xã 5 chữ số), đóng gói ở `modules/address/data/vn-2025` và nhúng vào binary: `autoxide task address.import`
 không nêu `path` nhập bộ này; `autoxide doctor` cảnh báo khi chưa nhập hay khi bộ đóng gói mới hơn bộ đang dùng.
 Manifest ghi rõ nguồn trung gian. Tên đơn vị cần chắc về pháp lý thì **đối chiếu văn bản gốc**.
+
+## D-319 · Đường đã đăng nhập đọc người dùng cùng quyền trong một câu; `GET /me` còn ba câu — 2026-11-16 — chủ dự án bảo làm ngay
+
+Bối cảnh: mục "Rút số câu SQL của `GET /auth/me`" của bước 39 (D-302, D-317), chủ dự án bảo làm trước. Đếm bằng log câu
+SQL: một `GET /auth/me` bằng access token chạy 7 câu — xác thực 2 (dòng người dùng, role / permission), thân 5 (đọc lại
+dòng người dùng, `facts` hai câu, role bắt buộc MFA, token đổi email).
+
+Quyết định:
+
+1. **Xác thực một câu** (`RoleService::user_principal`): `auth_user` LEFT JOIN `auth_user_role` / `auth_role` /
+   `auth_role_permission`; người không có role vẫn ra một dòng. Dùng cho access token và API key (bớt một câu ở mọi
+   request đã đăng nhập). Kiểm tài khoản khoá, người mua (D-309), giữ quyền của role bắt buộc MFA (D-308) như cũ;
+   `principal` (dùng khi tính quyền của người khác) dùng chung phần đọc dòng.
+2. **Thân `GET /me` / `auth.whoami` hai câu**: `UserService::own_account` đọc dòng người dùng kèm cờ "có role bắt buộc
+   MFA mà chưa bật MFA" bằng subquery tương quan `EXISTS` (`holds_mfa_role`, `has_second_factor_condition`); có mật
+   khẩu lấy từ chính dòng đó. Token đổi email giữ câu riêng — đi qua `OneTimeTokens` của kernel, không viết lại cấu
+   trúc bảng của nó.
+3. **`facts` (danh sách người dùng) một câu**: cờ TOTP thành subquery `EXISTS` thay vì câu thứ hai.
+4. Cờ trả từ subquery là `'x'` / `NULL` (như cột `has_password` sẵn có) để đọc giống nhau trên SQLite và Postgres.
+
+Kết quả (`docs/BENCHMARKS.md` "Rút số câu SQL của đường đã đăng nhập"): `GET /auth/me` 7 → 3 câu, +172% req/s (p50
+29.7 → 11.0 ms dưới 64 kết nối), về mức trước bước 33 — đạt mục tiêu ±20% của mục lộ trình; API key +85%,
+`auth.whoami` +84%, các đường đọc khác +10–25%. Response không đổi.
+
+Đã cân nhắc: giữ dòng người dùng từ bước xác thực cho handler (bớt thêm một câu) — `Principal` là kiểu của kernel, gắn
+dòng người dùng của module `auth` vào là sai ranh giới; gộp cả token đổi email vào câu chung — phải đọc thẳng bảng của
+`OneTimeTokens`, lợi một câu không đáng phá lớp bọc.

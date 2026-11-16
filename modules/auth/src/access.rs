@@ -54,12 +54,20 @@ impl Authenticator for RequestAuthenticator {
         // dò được khách nào tồn tại.
         let (tenant, user_id) = self.sessions.verify_access(token)?;
         let tenant = self.tenant(tenant, crate::token::invalid_token).await?;
-        let user = self.sessions.token_user(&tenant, user_id).await?;
+        // Dòng người dùng và quyền đọc trong một câu (D-319).
+        let (user, principal) = self
+            .roles
+            .user_principal(&tenant, user_id)
+            .await?
+            .ok_or_else(crate::token::invalid_token)?;
+        if !user.is_active() {
+            return Err(crate::user::user_disabled());
+        }
         // Người mua: chỉ là tài khoản của khách, không permission nào (D-309).
         if user.realm == autoxide_kernel::access::Realm::Customer {
             return Ok(Principal::customer(user.id).in_tenant(tenant.id()));
         }
-        self.roles.principal(&tenant, user.id).await
+        Ok(principal)
     }
 
     async fn enter(

@@ -179,7 +179,6 @@ impl Module for AuthModule {
                 .with_translations(context.translations().clone()),
         );
         let api_keys = Arc::new(ApiKeyService::new(
-            users.clone(),
             roles.clone(),
             sessions.clone(),
             outbox.clone(),
@@ -496,7 +495,6 @@ pub(crate) mod testing {
             .unwrap(),
         );
         let api_keys = Arc::new(crate::api_key::ApiKeyService::new(
-            users.clone(),
             roles.clone(),
             sessions.clone(),
             outbox,

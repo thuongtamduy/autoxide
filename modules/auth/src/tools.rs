@@ -290,11 +290,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
              learn what you may do.",
             move |tenant: TenantContext, principal: Principal, _: NoInput| {
                 let state = me.clone();
-                async move {
-                    let user = state.users.get(&tenant, principal.user_id()).await?;
-                    let user = user.ok_or_else(crate::token::invalid_token)?;
-                    MeResponse::load(&state, &tenant, user, &principal).await
-                }
+                async move { MeResponse::load(&state, &tenant, &principal).await }
             },
         )
         .for_any_signed_in()
