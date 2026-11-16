@@ -31,6 +31,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_idempotency::module()),
         // Webhook: gửi event của mọi module ra ngoài; không module nào cần trait của nó.
         Box::new(autoxide_webhooks::module()),
+        // Gói, thuê bao, quyền dùng (bước 35): sau mọi module nền nó sẽ cần (bước 36 / 37 chèn
+        // `invoices`, `compliance`… TRƯỚC nó). Module đăng ký trước vẫn hỏi quyền dùng được qua tay
+        // cầm của kernel, gắn sau khi mọi module khởi động (D-323).
+        Box::new(autoxide_plans::module()),
         // Thư viện media: cần nơi lưu của `files` (đứng sau nó); module nội dung sau này
         // cần trait `Media` của nó.
         Box::new(autoxide_media::module()),

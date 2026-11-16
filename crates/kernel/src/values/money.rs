@@ -122,7 +122,7 @@ impl PartialSchema for Currency {
 
 impl ToSchema for Currency {}
 
-/// A sum of money: an integer number of the currency's minor units (cents for `USD`, đồng for
+/// A sum of money: an integer number of the currency's minor units (cents for `USD`, dong for
 /// `VND`) plus the currency.
 // `Hash`/`Eq` có, `Ord` thì không: so 1 USD với 1 EUR không có nghĩa — dùng
 // [`Money::compare`], hàm này từ chối hai loại tiền khác nhau.

@@ -7865,3 +7865,34 @@ Quyết định:
 6. Mã lỗi chung của kernel: `module_not_enabled`, `feature_not_enabled`, `limit_exceeded`, `tenant_read_only` (403),
    `quota_exhausted` (429 + `Retry-After`) — 402 chưa có nghĩa chuẩn (đặc tả "tự quyết" 2). Số đo
    `entitlement_denials_total{kind}`, nhãn chỉ trong tập cố định (`module`, `feature`, `limit`, `quota`, `read_only`).
+
+## D-324 · Module `plans`: gói là dữ liệu, quyền dùng gộp có bộ nhớ đệm, hạn mức giữ chỗ nguyên tử (bước 35 phần B và lõi phần D) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Crate `modules/plans`**, mặt điều khiển (mọi bảng `plans_*` khai `control_plane_tables`, dữ liệu chỉ ở database
+   điều khiển); đăng ký ngay sau `webhooks`, trước module nghiệp vụ — bước 36 / 37 chèn `invoices`, `compliance`…
+   TRƯỚC nó (đặc tả "tự quyết" 1). `always_enabled`. Event ghi dưới khách nền tảng, chủ thể
+   `plans.subscription:<tenant_id>`, thân mang `tenant_id`.
+2. **Gói** (`base` / `addon`, `draft` / `active` / `retired`) kiểm module / tính năng / hạn mức với sổ của kernel (lạ →
+   422 `unknown`), gói chính thiếu module mà module khác cần → `plans.module_dependency_missing`. Không xoá gói, chỉ
+   `retire`. **Gói mặc định duy nhất**: khoá dòng cố định `plans_settings` (id 1) rồi bỏ cờ của gói khác, trong cùng
+   transaction (test đồng thời 6 request). Giá không sửa: thêm giá mới, tắt giá cũ.
+3. **Gộp quyền dùng** là hàm thuần (`merge.rs`): gói chính ∪ gói thêm, hạn mức cộng `× quantity`, `None` thắng, ghi đè
+   thay hẳn, ghi đè hết hạn bỏ qua. Không thuê bao → gói mặc định → không có thì không giới hạn. Thuê bao `suspended`,
+   `canceled`, `deleted` → `ReadOnly`. **Bộ nhớ đệm** trong tiến trình theo khách, `AUTOXIDE_PLANS_CACHE_SECONDS`
+   (30; 0–300); đổi ở máy chủ này thì xoá ngay mục của khách (đổi gói thì xoá hết).
+4. **Hạn mức**: `reserve` = một transaction ghi trên mặt điều khiển — thêm `plans_reservation` (`held`, hạn
+   `AUTOXIDE_PLANS_HOLD_MINUTES`, unique `(tenant_id, limit_key, reference)`), `INSERT … ON CONFLICT DO NOTHING` dòng
+   `plans_usage`, `rows::adjust` với trần = hạn mức. Gọi lại cùng `reference` + cùng lượng → `Ok`; khác lượng →
+   `reference_reused` (mã của kernel). `release` khoá dòng giữ chỗ rồi trừ, gọi lại vô hại. `record_usage`: sổ
+   `plans_usage_record` chỉ thêm, trùng `reference` bỏ qua, vượt quota kỳ → `quota_exhausted` (429, `Retry-After` tới
+   đầu tháng sau UTC). Khách không giới hạn thì `reserve` không ghi sổ (đối soát đếm lại khi khách vào gói).
+5. Nhà vận hành gán gói (`PUT /tenants/{id}/subscription`): lần đầu tạo thuê bao (dùng thử nếu gói có và chưa dùng),
+   sau đó đổi ngay; khách nền tảng → `plans.platform_exempt`. Endpoint vận hành kiểm `require_platform` rồi permission.
+6. Tool MCP nhận trường phẳng (client MCP không đọc `$ref`): `update_plan` chép lại các trường của gói;
+   `assign_subscription` nhận `addon_plan_ids` (mỗi gói thêm số lượng 1 — số lượng lớn hơn dùng REST).
+
+Đã cân nhắc: cache phân tán (Redis…) — thêm hạ tầng; độ trễ tối đa 30 giây là chấp nhận được cho bật / tắt module,
+còn hạn mức luôn kiểm trong transaction. Đặt `plans` sau mọi module — module nghiệp vụ không cần trait của `plans`
+(đi qua tay cầm của kernel), đặt sớm để bước sau chèn module nền trước nó.

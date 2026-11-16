@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `plans` (step 35): sell the software by plan without code changes. A plan is data — modules, features,
+  limits and prices — with add-ons and per-tenant overrides; tenants without a subscription get the default plan, and
+  with no default plan nothing changes. `GET /api/v1/plans/entitlements` tells a user interface what the tenant may
+  use; platform staff manage plans and subscriptions under `/api/v1/plans` (`plans.plans.*`,
+  `plans.subscriptions.*`) and over MCP. Modules declare features and limits (`Module::features`, `Module::limits`),
+  and reserve, confirm and release limits through the kernel's `EntitlementsHandle`; reservations are atomic on
+  both databases. The module catalog lists each module's features, limits, `always_enabled` and `requires`.
 - Decimal numbers for calculating with money (tax rates, exchange rates, quantities) in
   `autoxide_kernel::decimal`: `Money::apply_rate`, `Money::convert`, `Money::to_decimal` / `from_decimal`, each with
   an explicit `Rounding`; decimals are strings in JSON (`DecimalString`, error `decimal.invalid`) and text in the

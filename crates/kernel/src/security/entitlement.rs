@@ -508,6 +508,16 @@ pub fn quota_exhausted(limit: &str, retry_after: u64) -> Error {
     .with_retry_after(retry_after)
 }
 
+/// `reference_reused` (409): cùng mã tham chiếu đã giữ chỗ cho một lượng khác.
+pub fn reference_reused(reference: &str, limit: &str) -> Error {
+    Error::conflict(
+        "reference_reused",
+        "The reference `{reference}` was already used for another amount of `{limit}`.",
+    )
+    .with_param("reference", reference.to_owned())
+    .with_param("limit", limit.to_owned())
+}
+
 /// `tenant_read_only` (403): thuê bao tạm khoá hay đã huỷ, chỉ xem được.
 pub fn tenant_read_only() -> Error {
     Error::new(

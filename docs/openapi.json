@@ -87,6 +87,27 @@
         ],
         "type": "object"
       },
+      "AddonItem": {
+        "additionalProperties": false,
+        "description": "An add-on of a subscription.",
+        "properties": {
+          "plan_id": {
+            "description": "An active plan of kind `addon`.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "1 to 1000; the add-on's limits count this many times.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plan_id",
+          "quantity"
+        ],
+        "type": "object"
+      },
       "Address": {
         "description": "A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01).",
         "properties": {
@@ -462,6 +483,43 @@
           "permissions",
           "org_id",
           "created_at"
+        ],
+        "type": "object"
+      },
+      "AssignRequest": {
+        "additionalProperties": false,
+        "description": "Put a tenant on a plan.",
+        "properties": {
+          "addons": {
+            "description": "Replace the add-ons with these; leave out to keep them.",
+            "items": {
+              "$ref": "#/components/schemas/AddonItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "plan_id": {
+            "description": "An active base plan.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_id": {
+            "description": "An active recurring price of that plan; without it, periods last a month and nothing is\ncharged.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trial": {
+            "description": "Start with the plan's free trial when the tenant never had one; default `true`.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plan_id"
         ],
         "type": "object"
       },
@@ -2649,6 +2707,14 @@
         ],
         "description": "A new endpoint and its signing secret, shown only once."
       },
+      "Currency": {
+        "description": "ISO 4217 currency code in upper case, e.g. `USD`, `EUR`, `VND`. Only codes in circulation that have minor units are accepted.",
+        "examples": [
+          "USD"
+        ],
+        "pattern": "^[A-Z]{3}$",
+        "type": "string"
+      },
       "CurrentTenant": {
         "description": "The tenant of the caller.",
         "properties": {
@@ -4373,6 +4439,58 @@
         ],
         "type": "object"
       },
+      "Data_EntitlementsResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What the tenant may use now. User interfaces use it to hide what the plan does not include.",
+            "properties": {
+              "access": {
+                "description": "`full`, or `read_only` while the subscription is suspended or canceled.",
+                "example": "full",
+                "type": "string"
+              },
+              "features": {
+                "description": "Features turned on.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "limits": {
+                "description": "Every limit a module declares, with its use.",
+                "items": {
+                  "$ref": "#/components/schemas/LimitUse"
+                },
+                "type": "array"
+              },
+              "modules": {
+                "description": "Modules turned on, including those always on.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "unrestricted": {
+                "description": "`true` when nothing is limited (no plan applies to this tenant).",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "unrestricted",
+              "access",
+              "modules",
+              "features",
+              "limits"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_EntryAuthors": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -6031,6 +6149,77 @@
         ],
         "type": "object"
       },
+      "Data_OverrideResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An override for one tenant: turn a module or feature on or off, or replace a limit.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "description": "User who set it.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "enabled": {
+                "description": "With `module` / `feature`.",
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "expires_at": {
+                "description": "The override no longer applies from this time.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "kind": {
+                "description": "`module`, `feature` or `limit`.",
+                "type": "string"
+              },
+              "max_value": {
+                "description": "With `limit`: the new maximum; `null` is unlimited.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "key",
+              "reason",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_PasskeyResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -6119,6 +6308,282 @@
               },
               "files": []
             }
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_PlanResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A plan: the modules, features and limits a tenant gets, and its prices.",
+            "properties": {
+              "code": {
+                "example": "pro",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "features": {
+                "description": "Features turned on.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "grace_days": {
+                "description": "Days a tenant keeps full access after a period ends unpaid.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "is_default": {
+                "description": "Tenants without a subscription get this plan. At most one plan is the default; with none,\nsuch tenants are not limited.",
+                "type": "boolean"
+              },
+              "kind": {
+                "description": "`base` (a tenant has one) or `addon` (added on top, with a quantity).",
+                "type": "string"
+              },
+              "limits": {
+                "additionalProperties": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "description": "Limits by key; `null` means unlimited. A limit not listed is 0.",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "modules": {
+                "description": "Modules turned on (modules that are always on are not listed).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "example": "Pro",
+                "type": "string"
+              },
+              "placement": {
+                "description": "Where a new tenant on this plan keeps its data: `shared` or `dedicated`.",
+                "type": "string"
+              },
+              "prices": {
+                "items": {
+                  "$ref": "#/components/schemas/PriceResponse"
+                },
+                "type": "array"
+              },
+              "renewal_lead_days": {
+                "description": "Days before a period ends that the next one is billed and a reminder sent.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "requires_kyc": {
+                "description": "A new tenant on this plan must pass identity checks first.",
+                "type": "boolean"
+              },
+              "retention_days": {
+                "description": "Days the data of a canceled subscription is kept before the tenant is deleted.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "sample_data": {
+                "description": "A new tenant on this plan starts with sample data.",
+                "type": "boolean"
+              },
+              "status": {
+                "description": "`draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it).",
+                "type": "string"
+              },
+              "suspend_days": {
+                "description": "Days a suspended (read-only) subscription waits before it is canceled.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "trial_days": {
+                "description": "Days of free trial for a tenant that never had one; 0 for none.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "description",
+              "kind",
+              "status",
+              "is_default",
+              "trial_days",
+              "grace_days",
+              "suspend_days",
+              "retention_days",
+              "renewal_lead_days",
+              "placement",
+              "requires_kyc",
+              "sample_data",
+              "modules",
+              "features",
+              "limits",
+              "prices",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_PlanSubscription": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The subscription of a tenant.",
+            "properties": {
+              "addons": {
+                "items": {
+                  "$ref": "#/components/schemas/AddonItem"
+                },
+                "type": "array"
+              },
+              "cancel_at_period_end": {
+                "description": "Cancels when the current period ends.",
+                "type": "boolean"
+              },
+              "canceled_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "current_period_end": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "current_period_start": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "delete_after": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "grace_ends_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "plan_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "price_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "scheduled_plan_id": {
+                "description": "Plan the subscription moves to when the period ends (after a downgrade).",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "scheduled_price_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`trialing`, `active`, `past_due` (unpaid, in the grace period), `suspended` (read-only),\n`canceled` (read-only, data kept until `delete_after`) or `deleted`.",
+                "example": "active",
+                "type": "string"
+              },
+              "suspended_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tenant_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "trial_ends_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "trial_used": {
+                "description": "The tenant already had its free trial.",
+                "type": "boolean"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tenant_id",
+              "plan_id",
+              "status",
+              "current_period_start",
+              "current_period_end",
+              "cancel_at_period_end",
+              "trial_used",
+              "addons",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
           }
         },
         "required": [
@@ -9068,6 +9533,55 @@
         ],
         "type": "object"
       },
+      "Data_Vec_LimitUse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "Use of one limit.",
+              "properties": {
+                "key": {
+                  "example": "organizations.units",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`count`, `amount` or `metered`.",
+                  "type": "string"
+                },
+                "max": {
+                  "description": "The most the tenant may use; `null` is unlimited.",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "over_limit": {
+                  "description": "`true` when more is in use than allowed (after moving to a smaller plan): nothing is\nremoved, but nothing new can be added.",
+                  "type": "boolean"
+                },
+                "used": {
+                  "description": "In use now (for `metered`: this month).",
+                  "format": "int64",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "kind",
+                "used",
+                "over_limit"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_MembershipResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -9364,6 +9878,80 @@
         ],
         "type": "object"
       },
+      "Data_Vec_OverrideResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "An override for one tenant: turn a module or feature on or off, or replace a limit.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "created_by": {
+                  "description": "User who set it.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "enabled": {
+                  "description": "With `module` / `feature`.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "expires_at": {
+                  "description": "The override no longer applies from this time.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`module`, `feature` or `limit`.",
+                  "type": "string"
+                },
+                "max_value": {
+                  "description": "With `limit`: the new maximum; `null` is unlimited.",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "key",
+                "reason",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_PermissionResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -9456,6 +10044,153 @@
                 "backend",
                 "schema_state",
                 "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_PlanResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A plan: the modules, features and limits a tenant gets, and its prices.",
+              "properties": {
+                "code": {
+                  "example": "pro",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "features": {
+                  "description": "Features turned on.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "grace_days": {
+                  "description": "Days a tenant keeps full access after a period ends unpaid.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "is_default": {
+                  "description": "Tenants without a subscription get this plan. At most one plan is the default; with none,\nsuch tenants are not limited.",
+                  "type": "boolean"
+                },
+                "kind": {
+                  "description": "`base` (a tenant has one) or `addon` (added on top, with a quantity).",
+                  "type": "string"
+                },
+                "limits": {
+                  "additionalProperties": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "description": "Limits by key; `null` means unlimited. A limit not listed is 0.",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "modules": {
+                  "description": "Modules turned on (modules that are always on are not listed).",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "name": {
+                  "example": "Pro",
+                  "type": "string"
+                },
+                "placement": {
+                  "description": "Where a new tenant on this plan keeps its data: `shared` or `dedicated`.",
+                  "type": "string"
+                },
+                "prices": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceResponse"
+                  },
+                  "type": "array"
+                },
+                "renewal_lead_days": {
+                  "description": "Days before a period ends that the next one is billed and a reminder sent.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "requires_kyc": {
+                  "description": "A new tenant on this plan must pass identity checks first.",
+                  "type": "boolean"
+                },
+                "retention_days": {
+                  "description": "Days the data of a canceled subscription is kept before the tenant is deleted.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "sample_data": {
+                  "description": "A new tenant on this plan starts with sample data.",
+                  "type": "boolean"
+                },
+                "status": {
+                  "description": "`draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it).",
+                  "type": "string"
+                },
+                "suspend_days": {
+                  "description": "Days a suspended (read-only) subscription waits before it is canceled.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "trial_days": {
+                  "description": "Days of free trial for a tenant that never had one; 0 for none.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "description",
+                "kind",
+                "status",
+                "is_default",
+                "trial_days",
+                "grace_days",
+                "suspend_days",
+                "retention_days",
+                "renewal_lead_days",
+                "placement",
+                "requires_kyc",
+                "sample_data",
+                "modules",
+                "features",
+                "limits",
+                "prices",
+                "created_at",
+                "updated_at"
               ],
               "type": "object"
             },
@@ -10801,6 +11536,49 @@
         ],
         "type": "object"
       },
+      "EntitlementsResponse": {
+        "description": "What the tenant may use now. User interfaces use it to hide what the plan does not include.",
+        "properties": {
+          "access": {
+            "description": "`full`, or `read_only` while the subscription is suspended or canceled.",
+            "example": "full",
+            "type": "string"
+          },
+          "features": {
+            "description": "Features turned on.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "limits": {
+            "description": "Every limit a module declares, with its use.",
+            "items": {
+              "$ref": "#/components/schemas/LimitUse"
+            },
+            "type": "array"
+          },
+          "modules": {
+            "description": "Modules turned on, including those always on.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unrestricted": {
+            "description": "`true` when nothing is limited (no plan applies to this tenant).",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "unrestricted",
+          "access",
+          "modules",
+          "features",
+          "limits"
+        ],
+        "type": "object"
+      },
       "EntryAuthors": {
         "additionalProperties": false,
         "description": "The authors of an entry.",
@@ -12022,6 +12800,43 @@
           "bytes",
           "images_missing_alt",
           "trashed_items"
+        ],
+        "type": "object"
+      },
+      "LimitUse": {
+        "description": "Use of one limit.",
+        "properties": {
+          "key": {
+            "example": "organizations.units",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`count`, `amount` or `metered`.",
+            "type": "string"
+          },
+          "max": {
+            "description": "The most the tenant may use; `null` is unlimited.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "over_limit": {
+            "description": "`true` when more is in use than allowed (after moving to a smaller plan): nothing is\nremoved, but nothing new can be added.",
+            "type": "boolean"
+          },
+          "used": {
+            "description": "In use now (for `metered`: this month).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "used",
+          "over_limit"
         ],
         "type": "object"
       },
@@ -13297,6 +14112,25 @@
         ],
         "type": "object"
       },
+      "Money": {
+        "description": "A sum of money: an integer number of the currency's minor units (cents for `USD`, dong for\n`VND`) plus the currency.",
+        "properties": {
+          "amount": {
+            "description": "Amount in minor units of `currency`, as a base-10 integer string (JSON numbers above\n2^53 lose precision in JavaScript). `\"1999\"` with `USD` is 19.99 US dollars; negative\namounts start with `-`.",
+            "example": "1999",
+            "pattern": "^-?[0-9]{1,19}$",
+            "type": "string"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          }
+        },
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "type": "object"
+      },
       "MoveRequest": {
         "additionalProperties": false,
         "description": "Where to move a page.",
@@ -13639,6 +14473,115 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "OverrideRequest": {
+        "additionalProperties": false,
+        "description": "An override to set; it replaces one of the same kind and key.",
+        "properties": {
+          "enabled": {
+            "description": "Required with `module` / `feature`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "description": "When the override stops applying.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "description": "Module name, feature key or limit key.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`module`, `feature` or `limit`.",
+            "type": "string"
+          },
+          "max_value": {
+            "description": "With `limit`: the new maximum; leave out or `null` for unlimited.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why, 1 to 500 characters (kept for the audit trail).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "OverrideResponse": {
+        "description": "An override for one tenant: turn a module or feature on or off, or replace a limit.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "description": "User who set it.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "description": "With `module` / `feature`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "description": "The override no longer applies from this time.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "`module`, `feature` or `limit`.",
+            "type": "string"
+          },
+          "max_value": {
+            "description": "With `limit`: the new maximum; `null` is unlimited.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "key",
+          "reason",
+          "created_at"
+        ],
         "type": "object"
       },
       "Page_AdministrativeUnit": {
@@ -15777,6 +16720,298 @@
         ],
         "type": "object"
       },
+      "Page_PlanResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A plan: the modules, features and limits a tenant gets, and its prices.",
+              "properties": {
+                "code": {
+                  "example": "pro",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "features": {
+                  "description": "Features turned on.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "grace_days": {
+                  "description": "Days a tenant keeps full access after a period ends unpaid.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "is_default": {
+                  "description": "Tenants without a subscription get this plan. At most one plan is the default; with none,\nsuch tenants are not limited.",
+                  "type": "boolean"
+                },
+                "kind": {
+                  "description": "`base` (a tenant has one) or `addon` (added on top, with a quantity).",
+                  "type": "string"
+                },
+                "limits": {
+                  "additionalProperties": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "description": "Limits by key; `null` means unlimited. A limit not listed is 0.",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "modules": {
+                  "description": "Modules turned on (modules that are always on are not listed).",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "name": {
+                  "example": "Pro",
+                  "type": "string"
+                },
+                "placement": {
+                  "description": "Where a new tenant on this plan keeps its data: `shared` or `dedicated`.",
+                  "type": "string"
+                },
+                "prices": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceResponse"
+                  },
+                  "type": "array"
+                },
+                "renewal_lead_days": {
+                  "description": "Days before a period ends that the next one is billed and a reminder sent.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "requires_kyc": {
+                  "description": "A new tenant on this plan must pass identity checks first.",
+                  "type": "boolean"
+                },
+                "retention_days": {
+                  "description": "Days the data of a canceled subscription is kept before the tenant is deleted.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "sample_data": {
+                  "description": "A new tenant on this plan starts with sample data.",
+                  "type": "boolean"
+                },
+                "status": {
+                  "description": "`draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it).",
+                  "type": "string"
+                },
+                "suspend_days": {
+                  "description": "Days a suspended (read-only) subscription waits before it is canceled.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "trial_days": {
+                  "description": "Days of free trial for a tenant that never had one; 0 for none.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "description",
+                "kind",
+                "status",
+                "is_default",
+                "trial_days",
+                "grace_days",
+                "suspend_days",
+                "retention_days",
+                "renewal_lead_days",
+                "placement",
+                "requires_kyc",
+                "sample_data",
+                "modules",
+                "features",
+                "limits",
+                "prices",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_PlanSubscription": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "The subscription of a tenant.",
+              "properties": {
+                "addons": {
+                  "items": {
+                    "$ref": "#/components/schemas/AddonItem"
+                  },
+                  "type": "array"
+                },
+                "cancel_at_period_end": {
+                  "description": "Cancels when the current period ends.",
+                  "type": "boolean"
+                },
+                "canceled_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "current_period_end": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "current_period_start": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "delete_after": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "grace_ends_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "price_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "scheduled_plan_id": {
+                  "description": "Plan the subscription moves to when the period ends (after a downgrade).",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "scheduled_price_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`trialing`, `active`, `past_due` (unpaid, in the grace period), `suspended` (read-only),\n`canceled` (read-only, data kept until `delete_after`) or `deleted`.",
+                  "example": "active",
+                  "type": "string"
+                },
+                "suspended_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tenant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "trial_ends_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "trial_used": {
+                  "description": "The tenant already had its free trial.",
+                  "type": "boolean"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "tenant_id",
+                "plan_id",
+                "status",
+                "current_period_start",
+                "current_period_end",
+                "cancel_at_period_end",
+                "trial_used",
+                "addons",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_PublicComment": {
         "description": "One page of a list.",
         "properties": {
@@ -17842,6 +19077,364 @@
         ],
         "type": "object"
       },
+      "PlanRequest": {
+        "additionalProperties": false,
+        "description": "A plan to create, or the whole new content of a plan.",
+        "properties": {
+          "code": {
+            "description": "Unique code, `[a-z][a-z0-9_-]{0,63}`.",
+            "example": "pro",
+            "type": "string"
+          },
+          "description": {
+            "description": "Up to 5000 characters.",
+            "type": "string"
+          },
+          "features": {
+            "description": "Features to turn on, by key (`features` of the modules).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "grace_days": {
+            "description": "0 to 3650; default 7.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "is_default": {
+            "description": "Make this the default plan (an active base plan); the previous default stops being one.",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "`base` (default) or `addon`.",
+            "type": "string"
+          },
+          "limits": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "description": "Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "modules": {
+            "description": "Modules to turn on, by name (`GET /api/v1/kernel/modules`). A base plan must also turn on\nthe modules they need (`requires`).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "description": "Name shown to customers, 1 to 200 characters.",
+            "example": "Pro",
+            "type": "string"
+          },
+          "placement": {
+            "description": "`shared` (default) or `dedicated`.",
+            "type": "string"
+          },
+          "renewal_lead_days": {
+            "description": "0 to 3650; default 7.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "requires_kyc": {
+            "type": "boolean"
+          },
+          "retention_days": {
+            "description": "0 to 3650; default 90.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "sample_data": {
+            "type": "boolean"
+          },
+          "status": {
+            "description": "`draft` (default) or `active`. Retire a plan with `POST /plans/{id}/retire`.",
+            "type": "string"
+          },
+          "suspend_days": {
+            "description": "0 to 3650; default 30.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "trial_days": {
+            "description": "0 to 3650; default 0.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object"
+      },
+      "PlanResponse": {
+        "description": "A plan: the modules, features and limits a tenant gets, and its prices.",
+        "properties": {
+          "code": {
+            "example": "pro",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "features": {
+            "description": "Features turned on.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "grace_days": {
+            "description": "Days a tenant keeps full access after a period ends unpaid.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "is_default": {
+            "description": "Tenants without a subscription get this plan. At most one plan is the default; with none,\nsuch tenants are not limited.",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "`base` (a tenant has one) or `addon` (added on top, with a quantity).",
+            "type": "string"
+          },
+          "limits": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "description": "Limits by key; `null` means unlimited. A limit not listed is 0.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "modules": {
+            "description": "Modules turned on (modules that are always on are not listed).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "example": "Pro",
+            "type": "string"
+          },
+          "placement": {
+            "description": "Where a new tenant on this plan keeps its data: `shared` or `dedicated`.",
+            "type": "string"
+          },
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/PriceResponse"
+            },
+            "type": "array"
+          },
+          "renewal_lead_days": {
+            "description": "Days before a period ends that the next one is billed and a reminder sent.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "requires_kyc": {
+            "description": "A new tenant on this plan must pass identity checks first.",
+            "type": "boolean"
+          },
+          "retention_days": {
+            "description": "Days the data of a canceled subscription is kept before the tenant is deleted.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "sample_data": {
+            "description": "A new tenant on this plan starts with sample data.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "`draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it).",
+            "type": "string"
+          },
+          "suspend_days": {
+            "description": "Days a suspended (read-only) subscription waits before it is canceled.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "trial_days": {
+            "description": "Days of free trial for a tenant that never had one; 0 for none.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "description",
+          "kind",
+          "status",
+          "is_default",
+          "trial_days",
+          "grace_days",
+          "suspend_days",
+          "retention_days",
+          "renewal_lead_days",
+          "placement",
+          "requires_kyc",
+          "sample_data",
+          "modules",
+          "features",
+          "limits",
+          "prices",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "PlanSubscription": {
+        "description": "The subscription of a tenant.",
+        "properties": {
+          "addons": {
+            "items": {
+              "$ref": "#/components/schemas/AddonItem"
+            },
+            "type": "array"
+          },
+          "cancel_at_period_end": {
+            "description": "Cancels when the current period ends.",
+            "type": "boolean"
+          },
+          "canceled_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "current_period_end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "current_period_start": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "delete_after": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grace_ends_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "plan_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scheduled_plan_id": {
+            "description": "Plan the subscription moves to when the period ends (after a downgrade).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scheduled_price_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`trialing`, `active`, `past_due` (unpaid, in the grace period), `suspended` (read-only),\n`canceled` (read-only, data kept until `delete_after`) or `deleted`.",
+            "example": "active",
+            "type": "string"
+          },
+          "suspended_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "trial_ends_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trial_used": {
+            "description": "The tenant already had its free trial.",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "plan_id",
+          "status",
+          "current_period_start",
+          "current_period_end",
+          "cancel_at_period_end",
+          "trial_used",
+          "addons",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "PostedComment": {
         "allOf": [
           {
@@ -18155,6 +19748,120 @@
         "required": [
           "token",
           "expires_at"
+        ],
+        "type": "object"
+      },
+      "PriceRequest": {
+        "additionalProperties": false,
+        "description": "A new price of a plan.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Amount per period (`recurring`) or per unit above `included` (`metered`); not negative."
+          },
+          "included": {
+            "description": "With `metered`: use included each period; default 0.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "interval": {
+            "description": "`month` or `year`.",
+            "type": "string"
+          },
+          "interval_count": {
+            "description": "1 to 12; default 1.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "`recurring` or `metered`.",
+            "type": "string"
+          },
+          "limit_key": {
+            "description": "With `metered`: the metered limit charged for, e.g. `kernel.api_requests`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_category": {
+            "description": "Tax category, when known.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "interval",
+          "amount"
+        ],
+        "type": "object"
+      },
+      "PriceResponse": {
+        "description": "A price of a plan. Prices never change: a new price is a new row, the old one is deactivated;\nsubscriptions keep their price until they change plan.",
+        "properties": {
+          "active": {
+            "description": "`false`: no longer sold at this price.",
+            "type": "boolean"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Amount per period (`recurring`) or per unit above `included` (`metered`)."
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "included": {
+            "description": "Use included each period before a metered price applies.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "interval": {
+            "description": "`month` or `year`.",
+            "example": "month",
+            "type": "string"
+          },
+          "interval_count": {
+            "description": "How many `interval`s a period lasts, 1 to 12.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "`recurring` (charged each period) or `metered` (charged for use of `limit_key`).",
+            "example": "recurring",
+            "type": "string"
+          },
+          "limit_key": {
+            "description": "The metered limit this price charges for.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_category": {
+            "description": "Tax category of the price, when set.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "interval",
+          "interval_count",
+          "amount",
+          "included",
+          "active",
+          "created_at"
         ],
         "type": "object"
       },
@@ -59218,6 +60925,1891 @@
         ],
         "x-permissions": [
           "organizations.units.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/catalog": {
+      "get": {
+        "description": "No sign-in needed: a sign-up page shows these. Only active plans and active prices.",
+        "operationId": "plans_plans_catalog",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PlanResponse"
+                }
+              }
+            },
+            "description": "Active base plans and add-ons, by code."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List the plans on sale, with their prices.",
+        "tags": [
+          "plans"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/plans/entitlements": {
+      "get": {
+        "description": "Any signed-in user. Modules, features, limits with their use, and whether the data is\nread-only. User interfaces use it to hide what the plan does not include.",
+        "operationId": "plans_get_entitlements",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EntitlementsResponse"
+                }
+              }
+            },
+            "description": "What the tenant may use now."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get what your tenant may use now.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/plans/plans": {
+      "get": {
+        "description": "Platform staff with `plans.plans.read`.",
+        "operationId": "plans_list_plans",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PlanResponse"
+                }
+              }
+            },
+            "description": "One page of plans, newest first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.plans.read` (`permission_denied`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List every plan, including drafts and retired plans.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.plans.read"
+        ]
+      },
+      "post": {
+        "description": "Platform staff with `plans.plans.manage`. Modules, features and limits must be ones the\ninstalled modules declare.",
+        "operationId": "plans_create_plan",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.plans.manage` (`permission_denied`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another plan has this code; code `plans.plan_code_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`; an unknown module, feature or limit is `unknown`), or a module lacks a module it needs (`plans.module_dependency_missing`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a plan.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.plans.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/plans/{id}": {
+      "get": {
+        "description": "Platform staff with `plans.plans.read`.",
+        "operationId": "plans_get_plan",
+        "parameters": [
+          {
+            "description": "Id of the plan.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanResponse"
+                }
+              }
+            },
+            "description": "The plan.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.plans.read` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such plan; code `plans.plan_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a plan.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.plans.read"
+        ]
+      },
+      "put": {
+        "description": "Platform staff with `plans.plans.manage`. The body is the whole plan; tenants on it get the new\nmodules, features and limits within `AUTOXIDE_PLANS_CACHE_SECONDS`.",
+        "operationId": "plans_replace_plan",
+        "parameters": [
+          {
+            "description": "Id of the plan.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the plan since; otherwise `412`.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanResponse"
+                }
+              }
+            },
+            "description": "The plan after the change.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.plans.manage` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such plan; code `plans.plan_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another plan has this code (`plans.plan_code_taken`), the plan is retired (`plans.plan_not_active`), or tenants use it and `kind` would change (`plans.plan_in_use`)."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` does not match: get the plan again and retry; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), or a module lacks a module it needs (`plans.module_dependency_missing`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a plan.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.plans.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/plans/{id}/prices": {
+      "post": {
+        "description": "Platform staff with `plans.plans.manage`. To change a price, add a new one and deactivate the old.",
+        "operationId": "plans_add_plan_price",
+        "parameters": [
+          {
+            "description": "Id of the plan.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanResponse"
+                }
+              }
+            },
+            "description": "The plan with the new price.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.plans.manage` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such plan; code `plans.plan_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a price to a plan.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.plans.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/plans/{id}/retire": {
+      "post": {
+        "description": "Platform staff with `plans.plans.manage`. The plan is no longer sold or the default; tenants on\nit keep it. A plan is never deleted.",
+        "operationId": "plans_retire_plan",
+        "parameters": [
+          {
+            "description": "Id of the plan.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanResponse"
+                }
+              }
+            },
+            "description": "The plan, now `retired`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.plans.manage` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such plan; code `plans.plan_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retire a plan.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.plans.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/prices/{id}/deactivate": {
+      "post": {
+        "description": "Platform staff with `plans.plans.manage`. Subscriptions at this price keep it until they change\nplan.",
+        "operationId": "plans_deactivate_plan_price",
+        "parameters": [
+          {
+            "description": "Id of the price.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanResponse"
+                }
+              }
+            },
+            "description": "The plan of the price."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.plans.manage` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such price; code `plans.price_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deactivate a price.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.plans.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/subscription": {
+      "get": {
+        "description": "Requires `plans.billing.read`.",
+        "operationId": "plans_get_own_subscription",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanSubscription"
+                }
+              }
+            },
+            "description": "The subscription."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `plans.billing.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant has no subscription; code `plans.subscription_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get your tenant's subscription.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.billing.read"
+        ]
+      }
+    },
+    "/api/v1/plans/subscriptions": {
+      "get": {
+        "description": "Platform staff with `plans.subscriptions.read`.",
+        "operationId": "plans_list_subscriptions",
+        "parameters": [
+          {
+            "description": "Only subscriptions with this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only subscriptions on this plan.",
+            "in": "query",
+            "name": "plan_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PlanSubscription"
+                }
+              }
+            },
+            "description": "One page of subscriptions, newest first (without add-ons)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the subscriptions of every tenant.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.subscriptions.read"
+        ]
+      }
+    },
+    "/api/v1/plans/tenants/{tenant_id}/overrides": {
+      "get": {
+        "description": "Platform staff with `plans.subscriptions.read`.",
+        "operationId": "plans_list_overrides",
+        "parameters": [
+          {
+            "description": "Id of the tenant.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OverrideResponse"
+                }
+              }
+            },
+            "description": "The overrides, oldest first (expired ones included)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a tenant's overrides.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.subscriptions.read"
+        ]
+      },
+      "post": {
+        "description": "Platform staff with `plans.subscriptions.manage`. Replaces an override of the same kind and key.",
+        "operationId": "plans_set_override",
+        "parameters": [
+          {
+            "description": "Id of the tenant.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OverrideResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.manage` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tenant; code `tenant_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), or the tenant is the platform (`plans.platform_exempt`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set an override for a tenant.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.subscriptions.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/tenants/{tenant_id}/overrides/{id}": {
+      "delete": {
+        "description": "Platform staff with `plans.subscriptions.manage`.",
+        "operationId": "plans_remove_override",
+        "parameters": [
+          {
+            "description": "Id of the tenant.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the override.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.manage` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such override; code `plans.override_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove an override of a tenant.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.subscriptions.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/tenants/{tenant_id}/subscription": {
+      "get": {
+        "description": "Platform staff with `plans.subscriptions.read`.",
+        "operationId": "plans_get_tenant_subscription",
+        "parameters": [
+          {
+            "description": "Id of the tenant.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanSubscription"
+                }
+              }
+            },
+            "description": "The subscription."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant has no subscription; code `plans.subscription_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a tenant's subscription.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.subscriptions.read"
+        ]
+      },
+      "put": {
+        "description": "Platform staff with `plans.subscriptions.manage`. The first time this creates the\nsubscription (with the plan's trial when the tenant never had one); afterwards it moves the\ntenant to the plan at once. A canceled subscription starts again.",
+        "operationId": "plans_assign_subscription",
+        "parameters": [
+          {
+            "description": "Id of the tenant.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlanSubscription"
+                }
+              }
+            },
+            "description": "The subscription after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.manage` (`permission_denied`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tenant (`tenant_not_found`), plan (`plans.plan_not_found`) or price (`plans.price_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The plan is not sold (`plans.plan_not_active`) or the subscription is deleted (`plans.invalid_transition`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), a plan is of the wrong kind (`plans.addon_not_allowed`), or the tenant is the platform (`plans.platform_exempt`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Put a tenant on a plan.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.subscriptions.manage"
+        ]
+      }
+    },
+    "/api/v1/plans/tenants/{tenant_id}/usage": {
+      "get": {
+        "description": "Platform staff with `plans.subscriptions.read`.",
+        "operationId": "plans_get_tenant_usage",
+        "parameters": [
+          {
+            "description": "Id of the tenant.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_LimitUse"
+                }
+              }
+            },
+            "description": "Use of each limit (metered limits: this month)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a tenant's use of every limit.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.subscriptions.read"
+        ]
+      }
+    },
+    "/api/v1/plans/usage": {
+      "get": {
+        "description": "Requires `plans.billing.read`.",
+        "operationId": "plans_get_own_usage",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_LimitUse"
+                }
+              }
+            },
+            "description": "Use of each limit (metered limits: this month)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `plans.billing.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get your tenant's use of every limit.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.billing.read"
         ]
       }
     },

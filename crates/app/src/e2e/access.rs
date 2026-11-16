@@ -55,6 +55,12 @@ fn sample(document: &Value, schema: &Value, depth: usize) -> Value {
     if let Some(value) = schema.get("const") {
         return value.clone();
     }
+    // Ví dụ trong schema là giá trị hợp lệ (vd `Money.amount` phải là chuỗi số).
+    if let Some(value) = schema.get("example").or_else(|| {
+        schema.get("examples").and_then(Value::as_array).and_then(|values| values.first())
+    }) {
+        return value.clone();
+    }
     if let Some(first) =
         schema.get("enum").and_then(Value::as_array).and_then(|values| values.first())
     {

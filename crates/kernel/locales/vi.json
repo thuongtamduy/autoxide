@@ -106,7 +106,7 @@
   "public_url_missing": "Việc này cần địa chỉ công khai của API: hãy đặt AUTOXIDE_HTTP_PUBLIC_URL (ví dụ `https://api.example.com`) rồi khởi động lại.",
   "quota_exhausted": "Đã dùng hết `{limit}` của kỳ này; kỳ mới bắt đầu sau {retry_after} giây.",
   "rate_limited": "Quá nhiều request từ địa chỉ của bạn. Hãy chờ {seconds} giây rồi thử lại, và gửi chậm hơn để tránh lỗi này.",
-  "reference_reused": "Mã tham chiếu `{reference}` đã được dùng cho một request khác. Hãy dùng mã mới cho lệnh mới, hoặc gửi lại đúng nội dung cũ để nhận kết quả lần trước.",
+  "reference_reused": "Mã tham chiếu `{reference}` đã dùng cho một lượng khác của `{limit}`.",
   "request_timeout": "Máy chủ không xử lý xong request trong {seconds} giây. Hãy thử lại sau.",
   "shutting_down": "Máy chủ đang tắt: hãy gửi request tới một máy chủ khác.",
   "site_not_found": "Khách hàng này không có website (nút tổ chức) `{site}`. Bỏ `site` đi để lấy website của cả khách hàng.",
