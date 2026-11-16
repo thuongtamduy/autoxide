@@ -82,6 +82,11 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 21. Website menus: main bar, mega menus and footer whose items link to addresses or to objects of
     any module, with automatic sub-items, dated badges and a cached public endpoint
     ([`docs/MENUS.md`](docs/MENUS.md))
+22. Organizations and identity: an organization tree in each tenant (head office, regions,
+    stores…) with permissions scoped to a unit or a branch, settings inherited down the tree,
+    a website per unit, public store profiles; customer accounts apart from staff, invitations,
+    sign-in links, delegation down chains of tenants, time-limited support access; the official
+    list of Vietnamese administrative units for addresses ([`docs/ADDRESS.md`](docs/ADDRESS.md))
 
 ## Requirements
 
@@ -371,6 +376,8 @@ never share foreign keys. These rules are checked automatically by the gate.
   website's thread and comment box, moderation, reports and bans, reply mails, legal notes
 - [`docs/MENUS.md`](docs/MENUS.md) — using the menus module: items, objects of other modules,
   badges, the public endpoint and its caching, moving from the content module's menus
+- [`docs/ADDRESS.md`](docs/ADDRESS.md) — administrative units and addresses: reading the list,
+  importing the official list
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 

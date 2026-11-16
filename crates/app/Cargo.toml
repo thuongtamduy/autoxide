@@ -22,6 +22,7 @@ autoxide-forms.workspace = true
 autoxide-newsletter.workspace = true
 autoxide-comments.workspace = true
 autoxide-menus.workspace = true
+autoxide-address.workspace = true
 autoxide-organizations.workspace = true
 base64.workspace = true
 bytes.workspace = true

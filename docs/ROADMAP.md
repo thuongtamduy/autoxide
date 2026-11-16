@@ -4,10 +4,10 @@ Mỗi bước xong khi `./gate.sh --quick` xanh; agent đánh dấu `[x]`, commi
 và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–33 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 34 đang
-làm: mục 1–4 xong (cây tổ chức; quyền theo nút, membership; nội dung, media, form, menu theo nút và website; cài
-đặt kế thừa theo cây); kế tiếp ngôn ngữ bật theo website; mục 5–6 (`address`) chờ
-nguồn dữ liệu chính thức — trang danh mục hành chính của cơ quan thống kê không truy cập được từ máy làm việc**; bước 50 chờ chủ dự án công khai repo (D-199); bản
+Trạng thái: **bước 0–33 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 34: mọi
+mục xong trừ mục "Đơn vị hành chính VN" — module `address` và lệnh nhập đã có, CHỜ bộ dữ liệu chính thức (trang danh
+mục của cơ quan thống kê không truy cập được từ máy làm việc, D-314); chủ dự án cung cấp file hay cho phép nguồn rồi
+mới đóng bước và merge vào `main`**; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
@@ -89,11 +89,12 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       tìm theo ý nghĩa công khai lọc theo website
 - [ ] Đơn vị hành chính VN (module nền `address`, D-193) sau sáp nhập: tỉnh → xã / phường / đặc khu, 34 tỉnh,
       3.321 xã (QĐ 19/2025/QĐ-TTg, từ 01/7/2025), không cấp huyện, không đối chiếu địa chỉ cũ; dữ liệu chung
-      (mặt điều khiển), nguồn chính thức, ghi nguồn, ngày; đơn vị có mã, tên, loại, mã cấp trên, hiệu lực từ–tới
-- [ ] Dùng `address`: cập nhật bằng task khi nhà nước đổi (không sửa code); kiểu `Address` trong `api` (quốc
+      (mặt điều khiển), nguồn chính thức, ghi nguồn, ngày; đơn vị có mã, tên, loại, mã cấp trên, hiệu lực từ–tới — module, lệnh nhập, REST
+      đã có (D-314); CHỜ bộ dữ liệu chính thức: chủ dự án cung cấp file hay cho phép nguồn
+- [x] Dùng `address`: cập nhật bằng task khi nhà nước đổi (không sửa code); kiểu `Address` trong `api` (quốc
       gia, mã tỉnh, mã xã, dòng, kèm tên lúc ghi), kiểm xã thuộc đúng tỉnh, dùng cho nút, KYC, hồ sơ pháp lý
       (37), sổ địa chỉ người mua (44); endpoint công khai tỉnh, xã theo tỉnh, tìm không dấu, ETag / cache
-- [ ] Hồ sơ công khai của nút (D-200): tên hiển thị, `Address`, giờ mở cửa theo ngày và ngày đặc biệt, nhận hàng
+- [x] Hồ sơ công khai của nút (D-200): tên hiển thị, `Address`, giờ mở cửa theo ngày và ngày đặc biệt, nhận hàng
       tại quầy, ảnh, tên miền gắn với nút; ghi qua `PATCH …/public-profile`; endpoint công khai cửa hàng theo
       tên miền (chỉ nút "hiện công khai"), ETag / cache — cho "cửa hàng gần bạn", chọn nơi nhận hàng; loại
       cửa hàng công khai trong sổ đối tượng để menu của website trỏ tới (D-238)
@@ -113,8 +114,7 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 - [x] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý do; mọi lần
       vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được quyền vào hỗ trợ và tự thu
       hồi lần cấp còn hạn (D-211), trừ yêu cầu của cơ quan có thẩm quyền (có audit) — D-313
-- [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202; làm cùng bước 45 khi `orders` có
-      token xem đơn): `POST /api/v1/auth/phone-signups`, đăng nhập bằng passkey hay OTP, không bắt buộc mật khẩu
+- [x] Tạo tài khoản từ số điện thoại đã xác thực: chuyển sang bước 45 (đặc tả 34 ghi "làm ở bước 45", D-316)
 
 ## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
 
@@ -795,6 +795,9 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
 Bắt đầu SAU bước 42, 43, 44. Gọi `catalog`, `inventory`, `promotions`, `shipping` qua `api` của chúng;
 tiền qua `PaymentGateway` và sổ cái của bước 36.
 
+- [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202, chuyển từ bước 34 — D-316):
+      `POST /api/v1/auth/phone-signups` khi `orders` có token xem đơn, đăng nhập bằng passkey hay OTP, không bắt
+      buộc mật khẩu (đặc tả 34 mục "Tạo tài khoản từ số đã xác thực")
 - [ ] Giỏ hàng cho người mua và vãng lai (gộp khi đăng nhập); giá, giảm, thuế, phí giao luôn tính lại ở máy
       chủ, không tin số từ client; `free_shipping_remaining` (D-201); coupon và voucher tách nhau, điền dữ liệu
       điều kiện cho `promotions`, chụp khoản giảm kèm ai trả tiền vào đơn (D-222); danh sách giỏ bỏ dở

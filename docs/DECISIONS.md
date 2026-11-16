@@ -7673,3 +7673,45 @@ Quyết định:
    cài đặt bằng chế độ `disabled` / `per_request` / `standing` (D-232).
 4. Quyền khi vào: permission của role ở nút gốc của khách; API key và người mua không vào. Lần cấp hết hạn giữ lại
    (bằng chứng cho audit), không có job xoá.
+
+## D-314 · Module `address`: danh mục hành chính dùng chung, nhập từ nguồn chính thức (bước 34 mục 5–6) — 2026-11-16 — agent quyết
+
+Căn cứ: Nghị quyết 202/2025/QH15, Luật Tổ chức chính quyền địa phương 2025 (chính quyền hai cấp từ 01/7/2025),
+**QĐ 19/2025/QĐ-TTg** (bảng danh mục và mã số đơn vị hành chính, hiệu lực 01/7/2025: 34 tỉnh / thành, 3.321 đơn vị cấp
+xã — số theo các nguồn tổng hợp, **cần đối chiếu văn bản gốc**). Danh mục là văn bản hành chính (Luật SHTT Điều 15 —
+cần đối chiếu, D-193).
+
+Quyết định:
+
+1. Bảng `address_dataset`, `address_unit` là **mặt điều khiển** (không `tenant_id`, chỉ ở database điều khiển). Đơn vị có
+   mã (chuỗi, giữ số 0 đầu), tên, tên không dấu (tìm), loại, mã cấp trên, hiệu lực từ–tới (`YYYY-MM-DD`, so chuỗi).
+2. **Nhập bằng lệnh** `autoxide task address.import path=<thư mục>` (`manifest.json` ghi văn bản, URL, ngày tải, ngày
+   hiệu lực; `units.csv`). Cùng SHA-256 → không đổi gì; bộ mới → đóng đơn vị bỏ / đổi tên / đổi loại / đổi tỉnh (từ
+   ngày hiệu lực của bộ mới) và mở dòng mới; địa chỉ đã ghi giữ tên lúc ghi. Event `address.dataset_imported`.
+3. **Chưa kèm bộ dữ liệu Việt Nam**: trang danh mục của cơ quan thống kê (danhmuchanhchinh.gso.gov.vn /
+   .nso.gov.vn) không truy cập được khi dựng (DNS lỗi / 503), cổng văn bản không tìm được phụ lục; không sinh dữ liệu
+   bằng AI hay chép từ trang không chính thức (đặc tả). Người vận hành nhập theo `docs/ADDRESS.md`; `autoxide doctor`
+   cảnh báo khi chưa nhập. Mục "Đơn vị hành chính VN" của lộ trình chỉ đánh dấu xong khi có bộ dữ liệu chính thức
+   trong `modules/address/data/` — việc của chủ dự án (cung cấp file hay cho phép nguồn).
+4. Trait `api::AdministrativeUnits` (`provinces`, `communes`, `validate`) và kiểu `Address` / `AddressInput`; REST và
+   tool MCP công khai, `ETag` theo bộ dữ liệu, `Cache-Control: public, max-age=86400`. Thứ tự theo mã (khuyến nghị 5).
+   Đăng ký `address` → `organizations` → `auth` (khuyến nghị 1).
+
+## D-315 · Hồ sơ công khai của nút (bước 34 mục 7) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. Bảng riêng `organizations_profile` (một dòng mỗi nút có hồ sơ): công khai, thứ tự, tên hiển thị, địa chỉ (cột theo quy
+   ước của `address`, tên giữ như lúc ghi), giờ mở cửa và ngày đặc biệt (JSON đã kiểm), nhận hàng tại quầy, ảnh bìa
+   (chỉ ID của `media`). Không thêm cột vào bảng nút — vùng, kho không mang cột trống.
+2. `PATCH /units/{id}/public-profile` cần `organizations.profile.manage` (theo nút) trong transaction ghi (nút khoá →
+   `org_frozen`); địa chỉ kiểm qua `AdministrativeUnits` trước transaction; giờ sai → 422
+   `organizations.invalid_opening_hours` kèm từng ô. Giờ là giờ địa phương theo cài đặt `organizations.timezone`.
+3. `GET /public/stores` (công khai, khách từ tên miền / header): nút đang hoạt động có hồ sơ công khai, theo thứ tự khách
+   đặt rồi theo tên; `ETag` theo nội dung, `Cache-Control: public, max-age=300`. Loại đối tượng `organizations.store`
+   cho menu của website.
+
+## D-316 · Mục "tạo tài khoản từ số điện thoại" chuyển sang bước 45 — 2026-11-16 — agent quyết
+
+Đặc tả 34 ghi rõ mục này làm ở bước 45 (cần token xem đơn của `orders`, D-202) nhưng lộ trình liệt kê nó trong bước 34
+nên bước 34 không đóng được. Chuyển mục sang danh sách bước 45 (giữ nguyên nội dung), đánh dấu ở bước 34 là đã chuyển.

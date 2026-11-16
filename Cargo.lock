@@ -366,6 +366,7 @@ name = "autoxide"
 version = "0.14.0"
 dependencies = [
  "async-trait",
+ "autoxide-address",
  "autoxide-ai",
  "autoxide-audit",
  "autoxide-auth",
@@ -399,6 +400,26 @@ dependencies = [
  "tower",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "autoxide-address"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
@@ -759,6 +780,7 @@ name = "autoxide-organizations"
 version = "0.14.0"
 dependencies = [
  "async-trait",
+ "autoxide-address",
  "autoxide-kernel",
  "autoxide-testkit",
  "axum",

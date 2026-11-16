@@ -1,0 +1,14 @@
+{
+  "address.country_unsupported": "Chưa có danh mục đơn vị hành chính cho quốc gia `{country}`.",
+  "address.import_unreadable": "Không đọc được `{file}`: {reason}.",
+  "address.unit_not_found": "Không có đơn vị hành chính mã `{code}`.",
+  "field:cannot be checked now; retry": "chưa kiểm được lúc này; hãy thử lại",
+  "field:commune `{commune}` is not in province `{province}`": "xã / phường `{commune}` không thuộc tỉnh / thành `{province}`",
+  "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự",
+  "field:must be a date written YYYY-MM-DD": "phải là ngày dạng YYYY-MM-DD",
+  "field:there is no commune `{code}`": "không có xã / phường mã `{code}`",
+  "field:there is no list of administrative units for `{country}`": "chưa có danh mục đơn vị hành chính cho `{country}`",
+  "field:there is no province `{code}`": "không có tỉnh / thành mã `{code}`",
+  "field:{problem}": "{problem}",
+  "text:A new official list of administrative units was imported (`dataset`: source, effective date, counts, units opened and closed).": "Một danh mục đơn vị hành chính chính thức mới được nhập (`dataset`: nguồn, ngày hiệu lực, số đơn vị, đơn vị mở và đóng)."
+}

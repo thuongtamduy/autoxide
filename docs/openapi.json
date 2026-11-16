@@ -87,6 +87,150 @@
         ],
         "type": "object"
       },
+      "Address": {
+        "description": "A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01).",
+        "properties": {
+          "commune_code": {
+            "description": "Code of the commune, ward or special zone (5 digits for Vietnam).",
+            "example": "00004",
+            "type": "string"
+          },
+          "commune_name": {
+            "description": "Name of the commune when the address was written.",
+            "type": "string"
+          },
+          "country": {
+            "description": "ISO 3166-1 alpha-2 country code.",
+            "example": "VN",
+            "type": "string"
+          },
+          "line": {
+            "description": "House number, street, village…",
+            "example": "12 Trang Tien",
+            "type": "string"
+          },
+          "province_code": {
+            "description": "Code of the province (2 digits for Vietnam).",
+            "example": "01",
+            "type": "string"
+          },
+          "province_name": {
+            "description": "Name of the province when the address was written.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "country",
+          "province_code",
+          "province_name",
+          "commune_code",
+          "commune_name",
+          "line"
+        ],
+        "type": "object"
+      },
+      "AddressInput": {
+        "description": "An address to check: codes only; names are filled in.",
+        "properties": {
+          "commune_code": {
+            "example": "00004",
+            "type": "string"
+          },
+          "country": {
+            "example": "VN",
+            "type": "string"
+          },
+          "line": {
+            "description": "House number, street, village… (1 to 300 characters).",
+            "type": "string"
+          },
+          "province_code": {
+            "example": "01",
+            "type": "string"
+          }
+        },
+        "required": [
+          "country",
+          "province_code",
+          "commune_code",
+          "line"
+        ],
+        "type": "object"
+      },
+      "AdministrativeUnit": {
+        "description": "An administrative unit.",
+        "properties": {
+          "code": {
+            "example": "01",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`.",
+            "example": "city",
+            "type": "string"
+          },
+          "level": {
+            "description": "1: province level; 2: commune level.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "name": {
+            "example": "Thanh pho Ha Noi",
+            "type": "string"
+          },
+          "parent_code": {
+            "description": "Code of the province, for a commune.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "valid_from": {
+            "description": "First day in force (`YYYY-MM-DD`).",
+            "example": "2025-07-01",
+            "type": "string"
+          },
+          "valid_to": {
+            "description": "First day no longer in force; `null` while in force.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "kind",
+          "level",
+          "valid_from"
+        ],
+        "type": "object"
+      },
+      "AdministrativeUnitDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AdministrativeUnit"
+          },
+          {
+            "properties": {
+              "parent": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/AdministrativeUnit",
+                    "description": "The province, for a commune."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "description": "An administrative unit with the unit above it."
+      },
       "AiStatus": {
         "description": "What the AI features of this server can do now.",
         "properties": {
@@ -2621,6 +2765,90 @@
               "user_id"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Address": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01).",
+            "properties": {
+              "commune_code": {
+                "description": "Code of the commune, ward or special zone (5 digits for Vietnam).",
+                "example": "00004",
+                "type": "string"
+              },
+              "commune_name": {
+                "description": "Name of the commune when the address was written.",
+                "type": "string"
+              },
+              "country": {
+                "description": "ISO 3166-1 alpha-2 country code.",
+                "example": "VN",
+                "type": "string"
+              },
+              "line": {
+                "description": "House number, street, village…",
+                "example": "12 Trang Tien",
+                "type": "string"
+              },
+              "province_code": {
+                "description": "Code of the province (2 digits for Vietnam).",
+                "example": "01",
+                "type": "string"
+              },
+              "province_name": {
+                "description": "Name of the province when the address was written.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "country",
+              "province_code",
+              "province_name",
+              "commune_code",
+              "commune_name",
+              "line"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_AdministrativeUnitDetail": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AdministrativeUnit"
+              },
+              {
+                "properties": {
+                  "parent": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/AdministrativeUnit",
+                        "description": "The province, for a commune."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "type": "object"
+              }
+            ],
+            "description": "An administrative unit with the unit above it."
           }
         },
         "required": [
@@ -6424,6 +6652,155 @@
         ],
         "type": "object"
       },
+      "Data_PublicProfileResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The public profile of an organization unit, as websites show it.",
+            "properties": {
+              "address": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Address"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cover_media_id": {
+                "description": "Cover image (id in the `media` library).",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "display_name": {
+                "description": "Name shown to visitors; defaults to the unit's name.",
+                "type": "string"
+              },
+              "opening_hours": {
+                "items": {
+                  "description": "Opening hours on one day of the week; a day can have several ranges.",
+                  "properties": {
+                    "closes": {
+                      "description": "Local time `HH:MM`, after `opens`.",
+                      "example": "21:30",
+                      "type": "string"
+                    },
+                    "day": {
+                      "description": "ISO day of the week: 1 Monday … 7 Sunday.",
+                      "example": 1,
+                      "format": "int32",
+                      "maximum": 7,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "opens": {
+                      "description": "Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`).",
+                      "example": "08:00",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "day",
+                    "opens",
+                    "closes"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "pickup": {
+                "description": "Customers can pick up orders here.",
+                "type": "boolean"
+              },
+              "position": {
+                "description": "Order among the public units (smaller first).",
+                "format": "int32",
+                "type": "integer"
+              },
+              "public": {
+                "description": "Shown on websites (`GET /api/v1/organizations/public/stores`).",
+                "type": "boolean"
+              },
+              "special_days": {
+                "items": {
+                  "description": "A day with other hours than usual (holiday, event).",
+                  "properties": {
+                    "closed": {
+                      "description": "Closed all day.",
+                      "type": "boolean"
+                    },
+                    "closes": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "date": {
+                      "description": "`YYYY-MM-DD`.",
+                      "example": "2026-02-17",
+                      "type": "string"
+                    },
+                    "note": {
+                      "description": "Shown to visitors, up to 200 characters.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "opens": {
+                      "description": "When open: local time `HH:MM`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "date"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "unit_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "unit_type": {
+                "example": "store",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "`null` until the profile is first saved.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "unit_id",
+              "unit_type",
+              "public",
+              "position",
+              "display_name",
+              "opening_hours",
+              "special_days",
+              "pickup"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_PublicSiteMenu": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -8461,6 +8838,68 @@
         ],
         "type": "object"
       },
+      "Data_Vec_AdministrativeUnit": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "An administrative unit.",
+              "properties": {
+                "code": {
+                  "example": "01",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`.",
+                  "example": "city",
+                  "type": "string"
+                },
+                "level": {
+                  "description": "1: province level; 2: commune level.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "name": {
+                  "example": "Thanh pho Ha Noi",
+                  "type": "string"
+                },
+                "parent_code": {
+                  "description": "Code of the province, for a commune.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "valid_from": {
+                  "description": "First day in force (`YYYY-MM-DD`).",
+                  "example": "2025-07-01",
+                  "type": "string"
+                },
+                "valid_to": {
+                  "description": "First day no longer in force; `null` while in force.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "code",
+                "name",
+                "kind",
+                "level",
+                "valid_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_CommentCount": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -9115,6 +9554,158 @@
                 "authors",
                 "ai_generated",
                 "ai_reviewed"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_PublicProfileResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "The public profile of an organization unit, as websites show it.",
+              "properties": {
+                "address": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Address"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cover_media_id": {
+                  "description": "Cover image (id in the `media` library).",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "display_name": {
+                  "description": "Name shown to visitors; defaults to the unit's name.",
+                  "type": "string"
+                },
+                "opening_hours": {
+                  "items": {
+                    "description": "Opening hours on one day of the week; a day can have several ranges.",
+                    "properties": {
+                      "closes": {
+                        "description": "Local time `HH:MM`, after `opens`.",
+                        "example": "21:30",
+                        "type": "string"
+                      },
+                      "day": {
+                        "description": "ISO day of the week: 1 Monday … 7 Sunday.",
+                        "example": 1,
+                        "format": "int32",
+                        "maximum": 7,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "opens": {
+                        "description": "Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`).",
+                        "example": "08:00",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "day",
+                      "opens",
+                      "closes"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "pickup": {
+                  "description": "Customers can pick up orders here.",
+                  "type": "boolean"
+                },
+                "position": {
+                  "description": "Order among the public units (smaller first).",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "public": {
+                  "description": "Shown on websites (`GET /api/v1/organizations/public/stores`).",
+                  "type": "boolean"
+                },
+                "special_days": {
+                  "items": {
+                    "description": "A day with other hours than usual (holiday, event).",
+                    "properties": {
+                      "closed": {
+                        "description": "Closed all day.",
+                        "type": "boolean"
+                      },
+                      "closes": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "date": {
+                        "description": "`YYYY-MM-DD`.",
+                        "example": "2026-02-17",
+                        "type": "string"
+                      },
+                      "note": {
+                        "description": "Shown to visitors, up to 200 characters.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "opens": {
+                        "description": "When open: local time `HH:MM`.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "date"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "unit_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "unit_type": {
+                  "example": "store",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "description": "`null` until the profile is first saved.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "unit_id",
+                "unit_type",
+                "public",
+                "position",
+                "display_name",
+                "opening_hours",
+                "special_days",
+                "pickup"
               ],
               "type": "object"
             },
@@ -12907,6 +13498,73 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "Page_AdministrativeUnit": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "An administrative unit.",
+              "properties": {
+                "code": {
+                  "example": "01",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`.",
+                  "example": "city",
+                  "type": "string"
+                },
+                "level": {
+                  "description": "1: province level; 2: commune level.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "name": {
+                  "example": "Thanh pho Ha Noi",
+                  "type": "string"
+                },
+                "parent_code": {
+                  "description": "Code of the province, for a commune.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "valid_from": {
+                  "description": "First day in force (`YYYY-MM-DD`).",
+                  "example": "2025-07-01",
+                  "type": "string"
+                },
+                "valid_to": {
+                  "description": "First day no longer in force; `null` while in force.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "code",
+                "name",
+                "kind",
+                "level",
+                "valid_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
         "type": "object"
       },
       "Page_ApiKeyResponse": {
@@ -18172,6 +18830,278 @@
         ],
         "type": "object"
       },
+      "PublicProfileRequest": {
+        "additionalProperties": false,
+        "description": "Changes to a public profile. Omitted fields stay as they are; `null` clears.",
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AddressInput",
+                "description": "Checked against the official list of administrative units; `null` clears it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cover_media_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "display_name": {
+            "description": "1 to 200 characters; `null` goes back to the unit's name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "opening_hours": {
+            "description": "Replaces every range.",
+            "items": {
+              "description": "Opening hours on one day of the week; a day can have several ranges.",
+              "properties": {
+                "closes": {
+                  "description": "Local time `HH:MM`, after `opens`.",
+                  "example": "21:30",
+                  "type": "string"
+                },
+                "day": {
+                  "description": "ISO day of the week: 1 Monday … 7 Sunday.",
+                  "example": 1,
+                  "format": "int32",
+                  "maximum": 7,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "opens": {
+                  "description": "Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`).",
+                  "example": "08:00",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "day",
+                "opens",
+                "closes"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "pickup": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "position": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "public": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "special_days": {
+            "description": "Replaces every special day.",
+            "items": {
+              "description": "A day with other hours than usual (holiday, event).",
+              "properties": {
+                "closed": {
+                  "description": "Closed all day.",
+                  "type": "boolean"
+                },
+                "closes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "description": "`YYYY-MM-DD`.",
+                  "example": "2026-02-17",
+                  "type": "string"
+                },
+                "note": {
+                  "description": "Shown to visitors, up to 200 characters.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "opens": {
+                  "description": "When open: local time `HH:MM`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "date"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "PublicProfileResponse": {
+        "description": "The public profile of an organization unit, as websites show it.",
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cover_media_id": {
+            "description": "Cover image (id in the `media` library).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "display_name": {
+            "description": "Name shown to visitors; defaults to the unit's name.",
+            "type": "string"
+          },
+          "opening_hours": {
+            "items": {
+              "description": "Opening hours on one day of the week; a day can have several ranges.",
+              "properties": {
+                "closes": {
+                  "description": "Local time `HH:MM`, after `opens`.",
+                  "example": "21:30",
+                  "type": "string"
+                },
+                "day": {
+                  "description": "ISO day of the week: 1 Monday … 7 Sunday.",
+                  "example": 1,
+                  "format": "int32",
+                  "maximum": 7,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "opens": {
+                  "description": "Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`).",
+                  "example": "08:00",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "day",
+                "opens",
+                "closes"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pickup": {
+            "description": "Customers can pick up orders here.",
+            "type": "boolean"
+          },
+          "position": {
+            "description": "Order among the public units (smaller first).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "public": {
+            "description": "Shown on websites (`GET /api/v1/organizations/public/stores`).",
+            "type": "boolean"
+          },
+          "special_days": {
+            "items": {
+              "description": "A day with other hours than usual (holiday, event).",
+              "properties": {
+                "closed": {
+                  "description": "Closed all day.",
+                  "type": "boolean"
+                },
+                "closes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "description": "`YYYY-MM-DD`.",
+                  "example": "2026-02-17",
+                  "type": "string"
+                },
+                "note": {
+                  "description": "Shown to visitors, up to 200 characters.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "opens": {
+                  "description": "When open: local time `HH:MM`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "date"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "unit_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "unit_type": {
+            "example": "store",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "`null` until the profile is first saved.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "unit_id",
+          "unit_type",
+          "public",
+          "position",
+          "display_name",
+          "opening_hours",
+          "special_days",
+          "pickup"
+        ],
+        "type": "object"
+      },
       "PublicSeo": {
         "description": "Search engine and sharing data.",
         "properties": {
@@ -22474,6 +23404,505 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/address/provinces": {
+      "get": {
+        "description": "No sign-in needed. In code order (the order of the official list). Cached for a day; the\n`ETag` changes when a new list is imported.",
+        "operationId": "address_list_provinces",
+        "parameters": [
+          {
+            "description": "ISO country code; only `VN` for now. Defaults to `VN`.",
+            "example": "VN",
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The list in force on this day (`YYYY-MM-DD`); defaults to today.",
+            "example": "2025-07-01",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_AdministrativeUnit"
+                }
+              }
+            },
+            "description": "The provinces in force."
+          },
+          "304": {
+            "description": "Not changed since the `ETag` sent in `If-None-Match`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No list for this country (`address.country_unsupported`), or `as_of` is not a date."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the provinces.",
+        "tags": [
+          "address"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/address/provinces/{code}/communes": {
+      "get": {
+        "description": "No sign-in needed. In code order; cached like the provinces.",
+        "operationId": "address_list_communes",
+        "parameters": [
+          {
+            "description": "Code of the province, e.g. `01`.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO country code; only `VN` for now. Defaults to `VN`.",
+            "example": "VN",
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The list in force on this day (`YYYY-MM-DD`); defaults to today.",
+            "example": "2025-07-01",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_AdministrativeUnit"
+                }
+              }
+            },
+            "description": "The communes in force."
+          },
+          "304": {
+            "description": "Not changed since the `ETag` sent in `If-None-Match`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No province with this code; code `address.unit_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No list for this country, or `as_of` is not a date."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the communes, wards and special zones of a province.",
+        "tags": [
+          "address"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/address/units": {
+      "get": {
+        "description": "No sign-in needed. Units in force today, in code order.",
+        "operationId": "address_search_administrative_units",
+        "parameters": [
+          {
+            "example": "VN",
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Part of the name, with or without accents (`ha noi` also finds the accented name).",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only units of this province (and the province itself).",
+            "in": "query",
+            "name": "province",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1`: provinces; `2`: communes.",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 2,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AdministrativeUnit"
+                }
+              }
+            },
+            "description": "One page of units."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search administrative units by name.",
+        "tags": [
+          "address"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/address/units/{code}": {
+      "get": {
+        "description": "No sign-in needed.",
+        "operationId": "address_get_administrative_unit",
+        "parameters": [
+          {
+            "description": "Code of the unit.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "VN",
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AdministrativeUnitDetail"
+                }
+              }
+            },
+            "description": "The unit and the unit above it."
+          },
+          "304": {
+            "description": "Not changed since the `ETag` sent in `If-None-Match`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No unit in force with this code; code `address.unit_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an administrative unit by code.",
+        "tags": [
+          "address"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/address/validate": {
+      "post": {
+        "description": "No sign-in needed. The commune must be in force and belong to the province.",
+        "operationId": "address_validate_address",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Address"
+                }
+              }
+            },
+            "description": "The address with the names of its units."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The country is not supported, a unit does not exist, or the commune is not in the province (`address.commune_not_in_province`); see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check an address and fill in the names.",
+        "tags": [
+          "address"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/ai/status": {
       "get": {
         "description": "Requires `ai.view`. Tells whether text generation and embeddings are on, the provider and\nmodels, whether images are read, and today's token use against the daily limit. Use it to\nshow or hide AI actions in a user interface. The operator turns AI on with the\n`AUTOXIDE_AI_*` and `AUTOXIDE_EMBEDDING_*` settings.",
@@ -55598,6 +57027,62 @@
         ]
       }
     },
+    "/api/v1/organizations/public/stores": {
+      "get": {
+        "description": "No sign-in needed; the tenant comes from the domain (or the header `Autoxide-Tenant`). Only\nactive units whose profile is public, in the order the tenant set. For \"stores near you\" and\nchoosing where to pick up an order.",
+        "operationId": "organizations_list_public_stores",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PublicProfileResponse"
+                }
+              }
+            },
+            "description": "The public stores."
+          },
+          "304": {
+            "description": "Not changed since the `ETag` sent in `If-None-Match`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the stores of this tenant shown on its websites.",
+        "tags": [
+          "organizations"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/organizations/settings": {
       "get": {
         "description": "Any signed-in user. Modules declare them; each unit inherits the value of the nearest unit\nabove that sets it, or the default.",
@@ -56892,6 +58377,225 @@
         ],
         "x-permissions": [
           "organizations.units.write"
+        ]
+      }
+    },
+    "/api/v1/organizations/units/{id}/public-profile": {
+      "get": {
+        "description": "Requires `organizations.units.read` covering the unit.",
+        "operationId": "organizations_get_unit_public_profile",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PublicProfileResponse"
+                }
+              }
+            },
+            "description": "The profile (defaults when never saved)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope; code `organizations.unit_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the public profile of an organization unit.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `organizations.profile.manage` covering the unit; the unit must be active. Websites\nsee the change at once (`GET /api/v1/organizations/public/stores`).",
+        "operationId": "organizations_update_unit_public_profile",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PublicProfileResponse"
+                }
+              }
+            },
+            "description": "The profile after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or not active (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit in your scope; code `organizations.unit_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Opening hours are invalid (`organizations.invalid_opening_hours`), or another value, e.g. the address, is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change the public profile of an organization unit.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.profile.manage"
         ]
       }
     },

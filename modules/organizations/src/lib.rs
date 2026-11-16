@@ -10,8 +10,10 @@ mod config;
 mod entity;
 mod events;
 mod http;
+mod http_profile;
 mod migration;
 mod permissions;
+mod profile;
 mod service;
 mod settings;
 mod tools;
@@ -79,7 +81,11 @@ impl Module for OrganizationsModule {
         let config = self
             .config
             .ok_or_else(|| Error::internal("module `organizations` started before `configure`"))?;
-        let service = Arc::new(OrgService::new(context.outbox()?, config, context.org_settings()));
+        let units = context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok();
+        let service = Arc::new(
+            OrgService::new(context.outbox()?, config, context.org_settings()).with_units(units),
+        );
+        context.resource_type(profile::STORE, Arc::new(profile::StoreResolver))?;
         self.service = Some(service.clone());
         context.provide::<dyn api::OrgDirectory>(service)
     }

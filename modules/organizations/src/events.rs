@@ -23,6 +23,10 @@ pub(crate) const SETTING_CHANGED: EventInfo = EventInfo::new(
     "organizations.setting_changed",
     "A unit set or cleared a setting; units below that do not set it themselves follow.",
 );
+pub(crate) const PUBLIC_PROFILE_UPDATED: EventInfo = EventInfo::new(
+    "organizations.public_profile_updated",
+    "The public profile of a unit changed (shown on websites: name, address, opening hours, pickup).",
+);
 pub(crate) const UNIT_TYPE_CHANGED: EventInfo = EventInfo::new(
     "organizations.unit_type_changed",
     "A unit type was created, renamed or deleted.",
@@ -55,6 +59,7 @@ event!(UnitMoved, "organizations.unit_moved");
 event!(UnitStatusChanged, "organizations.unit_status_changed");
 event!(UnitTypeChanged, "organizations.unit_type_changed");
 event!(SettingChanged, "organizations.setting_changed");
+event!(PublicProfileUpdated, "organizations.public_profile_updated");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -64,6 +69,7 @@ pub(crate) fn all() -> Vec<EventInfo> {
         UNIT_STATUS_CHANGED,
         UNIT_TYPE_CHANGED,
         SETTING_CHANGED,
+        PUBLIC_PROFILE_UPDATED,
     ]
 }
 

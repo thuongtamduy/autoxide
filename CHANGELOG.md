@@ -11,6 +11,18 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `address`: the official list of administrative units shared by every tenant
+  (Vietnam after the 2025 merger: provinces and communes, no districts), imported from the
+  official source with `autoxide task address.import path=<dir>` (a new list closes and opens
+  units by date; importing again changes nothing); public `GET /api/v1/address/provinces`,
+  `/provinces/{code}/communes`, `/units`, `/units/{code}` (search without accents, `ETag`, one-day
+  cache), `POST /api/v1/address/validate`; MCP tools; `autoxide doctor` shows the list in use. See
+  `docs/ADDRESS.md`. The server ships without the list.
+- `organizations`: public profile of a unit — `GET`/`PATCH /api/v1/organizations/units/{id}/public-profile`
+  (`organizations.profile.manage`): shown or not, display name, checked address, opening hours,
+  special days, pickup, cover image; public `GET /api/v1/organizations/public/stores` (`ETag`);
+  object type `organizations.store` for website menus; event `organizations.public_profile_updated`.
+
 - `auth`: platform staff enter a tenant's data only with a time-limited support access grant
   (D-190): `POST`/`GET /api/v1/auth/support-grants`, `DELETE /api/v1/auth/support-grants/{id}`
   (`auth.support.grant`, platform tenant), `GET /api/v1/auth/support-access`,

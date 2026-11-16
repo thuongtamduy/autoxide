@@ -35,6 +35,52 @@ export type AddPasskeyRequest = {
   name: string;
 };
 
+/** A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01). */
+export type Address = {
+  /** Code of the commune, ward or special zone (5 digits for Vietnam). */
+  commune_code: string;
+  /** Name of the commune when the address was written. */
+  commune_name: string;
+  /** ISO 3166-1 alpha-2 country code. */
+  country: string;
+  /** House number, street, village… */
+  line: string;
+  /** Code of the province (2 digits for Vietnam). */
+  province_code: string;
+  /** Name of the province when the address was written. */
+  province_name: string;
+};
+
+/** An address to check: codes only; names are filled in. */
+export type AddressInput = {
+  commune_code: string;
+  country: string;
+  /** House number, street, village… (1 to 300 characters). */
+  line: string;
+  province_code: string;
+};
+
+/** An administrative unit. */
+export type AdministrativeUnit = {
+  code: string;
+  /** `province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`. */
+  kind: string;
+  /** 1: province level; 2: commune level. */
+  level: number;
+  name: string;
+  /** Code of the province, for a commune. */
+  parent_code?: string | null;
+  /** First day in force (`YYYY-MM-DD`). */
+  valid_from: string;
+  /** First day no longer in force; `null` while in force. */
+  valid_to?: string | null;
+};
+
+/** An administrative unit with the unit above it. */
+export type AdministrativeUnitDetail = AdministrativeUnit & {
+  parent?: AdministrativeUnit | null;
+};
+
 /** What the AI features of this server can do now. */
 export type AiStatus = {
   /** Daily token limit; 0 means no limit. */
@@ -993,6 +1039,33 @@ export type Data_AcceptedResponse = {
     tokens?: TokenResponse | null;
     /** The account that now has the roles. */
     user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Address = {
+  /** A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01). */
+  data: {
+    /** Code of the commune, ward or special zone (5 digits for Vietnam). */
+    commune_code: string;
+    /** Name of the commune when the address was written. */
+    commune_name: string;
+    /** ISO 3166-1 alpha-2 country code. */
+    country: string;
+    /** House number, street, village… */
+    line: string;
+    /** Code of the province (2 digits for Vietnam). */
+    province_code: string;
+    /** Name of the province when the address was written. */
+    province_name: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AdministrativeUnitDetail = {
+  /** An administrative unit with the unit above it. */
+  data: AdministrativeUnit & {
+    parent?: AdministrativeUnit | null;
   };
 };
 
@@ -2377,6 +2450,47 @@ export type Data_PublicMenu = {
 };
 
 /** Envelope of a single result. */
+export type Data_PublicProfileResponse = {
+  /** The public profile of an organization unit, as websites show it. */
+  data: {
+    address?: Address | null;
+    /** Cover image (id in the `media` library). */
+    cover_media_id?: string | null;
+    /** Name shown to visitors; defaults to the unit's name. */
+    display_name: string;
+    opening_hours: {
+      /** Local time `HH:MM`, after `opens`. */
+      closes: string;
+      /** ISO day of the week: 1 Monday … 7 Sunday. */
+      day: number;
+      /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+      opens: string;
+    }[];
+    /** Customers can pick up orders here. */
+    pickup: boolean;
+    /** Order among the public units (smaller first). */
+    position: number;
+    /** Shown on websites (`GET /api/v1/organizations/public/stores`). */
+    public: boolean;
+    special_days: {
+      /** Closed all day. */
+      closed?: boolean;
+      closes?: string | null;
+      /** `YYYY-MM-DD`. */
+      date: string;
+      /** Shown to visitors, up to 200 characters. */
+      note?: string | null;
+      /** When open: local time `HH:MM`. */
+      opens?: string | null;
+    }[];
+    unit_id: string;
+    unit_type: string;
+    /** `null` until the profile is first saved. */
+    updated_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PublicSiteMenu = {
   /** A website menu ready to show: links worked out, hidden targets left out. */
   data: {
@@ -3095,6 +3209,24 @@ export type Data_UserResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_AdministrativeUnit = {
+  data: {
+    code: string;
+    /** `province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`. */
+    kind: string;
+    /** 1: province level; 2: commune level. */
+    level: number;
+    name: string;
+    /** Code of the province, for a commune. */
+    parent_code?: string | null;
+    /** First day in force (`YYYY-MM-DD`). */
+    valid_from: string;
+    /** First day no longer in force; `null` while in force. */
+    valid_to?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CommentCount = {
   data: {
     /** Shown comments (top-level and replies). */
@@ -3306,6 +3438,46 @@ export type Data_Vec_PublicEntryResponse = {
     /** Other published languages of this entry, for `hreflang`. */
     translations: PublicTranslation[];
     word_count: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PublicProfileResponse = {
+  data: {
+    address?: Address | null;
+    /** Cover image (id in the `media` library). */
+    cover_media_id?: string | null;
+    /** Name shown to visitors; defaults to the unit's name. */
+    display_name: string;
+    opening_hours: {
+      /** Local time `HH:MM`, after `opens`. */
+      closes: string;
+      /** ISO day of the week: 1 Monday … 7 Sunday. */
+      day: number;
+      /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+      opens: string;
+    }[];
+    /** Customers can pick up orders here. */
+    pickup: boolean;
+    /** Order among the public units (smaller first). */
+    position: number;
+    /** Shown on websites (`GET /api/v1/organizations/public/stores`). */
+    public: boolean;
+    special_days: {
+      /** Closed all day. */
+      closed?: boolean;
+      closes?: string | null;
+      /** `YYYY-MM-DD`. */
+      date: string;
+      /** Shown to visitors, up to 200 characters. */
+      note?: string | null;
+      /** When open: local time `HH:MM`. */
+      opens?: string | null;
+    }[];
+    unit_id: string;
+    unit_type: string;
+    /** `null` until the profile is first saved. */
+    updated_at?: string | null;
   }[];
 };
 
@@ -4666,6 +4838,26 @@ export type NewsletterSettingsResponse = {
 export type NewsletterText = {
   en?: string | null;
   vi?: string | null;
+};
+
+/** One page of a list. */
+export type Page_AdministrativeUnit = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    /** `province`, `city` (centrally governed city), `commune`, `ward` or `special_zone`. */
+    kind: string;
+    /** 1: province level; 2: commune level. */
+    level: number;
+    name: string;
+    /** Code of the province, for a commune. */
+    parent_code?: string | null;
+    /** First day in force (`YYYY-MM-DD`). */
+    valid_from: string;
+    /** First day no longer in force; `null` while in force. */
+    valid_to?: string | null;
+  }[];
+  pagination: Pagination;
 };
 
 /** One page of a list. */
@@ -6434,6 +6626,76 @@ export type PublicOption = {
   value: string;
 };
 
+/** Changes to a public profile. Omitted fields stay as they are; `null` clears. */
+export type PublicProfileRequest = {
+  address?: AddressInput | null;
+  cover_media_id?: string | null;
+  /** 1 to 200 characters; `null` goes back to the unit's name. */
+  display_name?: string | null;
+  /** Replaces every range. */
+  opening_hours?: {
+    /** Local time `HH:MM`, after `opens`. */
+    closes: string;
+    /** ISO day of the week: 1 Monday … 7 Sunday. */
+    day: number;
+    /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+    opens: string;
+  }[] | null;
+  pickup?: boolean | null;
+  position?: number | null;
+  public?: boolean | null;
+  /** Replaces every special day. */
+  special_days?: {
+    /** Closed all day. */
+    closed?: boolean;
+    closes?: string | null;
+    /** `YYYY-MM-DD`. */
+    date: string;
+    /** Shown to visitors, up to 200 characters. */
+    note?: string | null;
+    /** When open: local time `HH:MM`. */
+    opens?: string | null;
+  }[] | null;
+};
+
+/** The public profile of an organization unit, as websites show it. */
+export type PublicProfileResponse = {
+  address?: Address | null;
+  /** Cover image (id in the `media` library). */
+  cover_media_id?: string | null;
+  /** Name shown to visitors; defaults to the unit's name. */
+  display_name: string;
+  opening_hours: {
+    /** Local time `HH:MM`, after `opens`. */
+    closes: string;
+    /** ISO day of the week: 1 Monday … 7 Sunday. */
+    day: number;
+    /** Local time `HH:MM` (the unit's time zone, setting `organizations.timezone`). */
+    opens: string;
+  }[];
+  /** Customers can pick up orders here. */
+  pickup: boolean;
+  /** Order among the public units (smaller first). */
+  position: number;
+  /** Shown on websites (`GET /api/v1/organizations/public/stores`). */
+  public: boolean;
+  special_days: {
+    /** Closed all day. */
+    closed?: boolean;
+    closes?: string | null;
+    /** `YYYY-MM-DD`. */
+    date: string;
+    /** Shown to visitors, up to 200 characters. */
+    note?: string | null;
+    /** When open: local time `HH:MM`. */
+    opens?: string | null;
+  }[];
+  unit_id: string;
+  unit_type: string;
+  /** `null` until the profile is first saved. */
+  updated_at?: string | null;
+};
+
 /** Search engine and sharing data. */
 export type PublicSeo = {
   /** Canonical address; empty when the entry's own address is canonical. */
@@ -7987,6 +8249,66 @@ export type VerifiedResponse = {
 export type Visibility = "private" | "public";
 
 export interface paths {
+  "/api/v1/address/provinces": {
+    /** List the provinces. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { country?: string; as_of?: string }; };
+      responses: {
+        200: Data_Vec_AdministrativeUnit;
+        304: void;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/address/provinces/{code}/communes": {
+    /** List the communes, wards and special zones of a province. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { code: string }; query: { country?: string; as_of?: string }; };
+      responses: {
+        200: Data_Vec_AdministrativeUnit;
+        304: void;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/address/units": {
+    /** Search administrative units by name. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { country?: string; q?: string; province?: string; level?: number; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_AdministrativeUnit;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/address/units/{code}": {
+    /** Get an administrative unit by code. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { code: string }; query: { country?: string }; };
+      responses: {
+        200: Data_AdministrativeUnitDetail;
+        304: void;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/address/validate": {
+    /** Check an address and fill in the names. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: AddressInput;
+      responses: {
+        200: Data_Address;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ai/status": {
     /** See what the AI features can do. */
     get: {
@@ -11710,6 +12032,17 @@ export interface paths {
       };
     };
   };
+  "/api/v1/organizations/public/stores": {
+    /** List the stores of this tenant shown on its websites. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PublicProfileResponse;
+        304: void;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/organizations/settings": {
     /** List the settings units can set. */
     get: {
@@ -11853,6 +12186,32 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/units/{id}/public-profile": {
+    /** Get the public profile of an organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PublicProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the public profile of an organization unit. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PublicProfileRequest;
+      responses: {
+        200: Data_PublicProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };

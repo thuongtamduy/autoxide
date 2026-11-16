@@ -3,6 +3,7 @@
 
 mod m0001_create_units;
 mod m0005_settings;
+mod m0006_profiles;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -18,6 +19,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Cài đặt kế thừa theo cây (bước 34 mục 4).
         Box::new(m0005_settings::Migration),
+        // Hồ sơ công khai của nút (bước 34 mục 7, D-315).
+        Box::new(m0006_profiles::Migration),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "organizations"),
     ]

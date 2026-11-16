@@ -9,6 +9,172 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the communes, wards and special zones of a province.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The communes of a province.",
+        "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": "string"
+          },
+          "province": {
+            "description": "Code of the province, e.g. `01`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "province"
+        ],
+        "type": "object"
+      },
+      "name": "address.list_communes",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the provinces of a country (Vietnam), in the order of the official list.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which provinces.",
+        "properties": {
+          "as_of": {
+            "description": "The list in force on this day (`YYYY-MM-DD`); defaults to today.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "description": "ISO country code; only `VN` for now. Defaults to `VN`.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "address.list_provinces",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Search administrative units by name, with or without accents (`ha noi` also finds the accented name).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A search by name.",
+        "properties": {
+          "country": {
+            "type": "string"
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "level": {
+            "description": "`1`: provinces; `2`: communes.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "province": {
+            "description": "Only units of this province.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Part of the name, with or without accents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "address.search_units",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Check an address (the commune must belong to the province) and fill in the names of its units.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An address to check.",
+        "properties": {
+          "commune_code": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "line": {
+            "description": "House number, street, village…",
+            "type": "string"
+          },
+          "province_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "province_code",
+          "commune_code",
+          "line"
+        ],
+        "type": "object"
+      },
+      "name": "address.validate_address",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Tell whether the server's AI features are on (text generation, image reading, embeddings), which provider and models they use, and today's token use against the daily limit.",
       "input_schema": {
         "additionalProperties": false,

@@ -36,6 +36,13 @@ pub(crate) const SETTINGS_WRITE: Permission = Permission::new(
 )
 .scoped();
 
+pub(crate) const PROFILE_MANAGE: Permission = Permission::new(
+    "organizations.profile.manage",
+    "Edit the public profile of the organization units in your scope: whether websites show \
+     them, display name, address, opening hours, pickup, cover image.",
+)
+.scoped();
+
 pub(crate) fn all() -> Vec<Permission> {
-    vec![UNITS_READ, UNITS_WRITE, UNITS_MANAGE, TYPES_MANAGE, SETTINGS_WRITE]
+    vec![UNITS_READ, UNITS_WRITE, UNITS_MANAGE, TYPES_MANAGE, SETTINGS_WRITE, PROFILE_MANAGE]
 }

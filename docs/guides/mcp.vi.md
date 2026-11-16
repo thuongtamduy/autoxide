@@ -68,6 +68,10 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 
 | Tool | Permission | Loại |
 |---|---|---|
+| `address.list_communes` | — | read-only |
+| `address.list_provinces` | — | read-only |
+| `address.search_units` | — | read-only |
+| `address.validate_address` | — | read-only |
 | `ai.status` | `ai.view` | read-only |
 | `audit.get_entry` | `audit.read` | read-only |
 | `audit.list_entries` | `audit.read` | read-only |
