@@ -41,7 +41,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Ctrl K | Tìm dữ liệu xuyên phân hệ (đơn, bài viết, người dùng…), tìm không dấu, theo quyền | 51 (`FinderSource`) | Chỉ tìm tên màn để "Đi tới" |
 | [ ] | `/` Tổng quan | Hộp việc, số liệu tóm tắt, hoạt động gần đây | 51 | Hộp việc, số liệu, các bước thiết lập, doanh thu hôm nay, hoạt động (audit thật); phần chưa có API là dữ liệu mẫu (W-020) |
 | [ ] | Góc trên bên trái | Khách hàng và nút tổ chức đang chọn, đổi phạm vi | 33, 34 | Hiện "Autoxide Quản trị", chưa đổi phạm vi được |
-| [ ] | Menu tài khoản: giao diện sáng / tối | Lưu lựa chọn theo tài khoản để theo người dùng sang thiết bị khác. Nên gộp vào `/me/preferences` của bước 37 | mới (gộp vào 37) | Lưu cookie `ax_theme` trên từng trình duyệt; có thể dùng `/me/flags` (v0.14.0) mà không cần API mới |
+| [x] | Menu tài khoản: giao diện sáng / tối | Lưu lựa chọn theo tài khoản để theo người dùng sang thiết bị khác | v0.14.0 (`/me/flags`) | Cờ `ui.theme`, đặt lại cookie khi đăng nhập (W-024 của web) |
 | [ ] | Nút "?" (trợ giúp theo trang) | Bài hướng dẫn theo trang (tiêu đề, tóm tắt, link) do core hay module khai, theo `Accept-Language` | mới | Danh sách viết cứng ở `src/help/pages.ts`, 8 trang |
 | [ ] | Nút "?" › Có gì mới | Nguồn tin "Có gì mới" theo phiên bản core và module đang chạy | mới | Danh sách viết cứng ở `src/help/whats-new.ts`; mốc đã xem lưu ở `/me/flags` (`whatsnew.seen`) |
 | [ ] | Nút ⓘ của số liệu | Trường `definition` của `GET /kernel/summary` (D-207) | 51 (P4) | Chưa có nút ⓘ cho số liệu; câu cách tính hiện dưới khối |
@@ -107,7 +107,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Gói và thuê bao | `POST /billing-periods/{id}/pay` (trả tiền qua cổng của nhà vận hành) | 35 | Chưa có nút "Trả tiền" |
 | [ ] | Tên miền | `GET/POST/DELETE /kernel/domains`, `POST /{id}/verify` | 33 | Dữ liệu mẫu (`src/sample/settings.ts`) |
 | [ ] | Tên miền | Gắn tên miền với nút: `PATCH /kernel/domains/{id} {org_id}` | 33, 34 | Chỉ hiện nút, chưa đổi được |
-| [ ] | Kết nối đối tác | `GET /kernel/settings`, `PUT/DELETE /settings/{name}`; tên setting theo nhà cung cấp (SMS, cổng thanh toán, hoá đơn điện tử) | 33 (tên setting: 36, 39) | Dữ liệu mẫu (`src/sample/settings.ts`) |
+| [ ] | Kết nối đối tác | `GET /kernel/settings`, `PUT/DELETE /settings/{name}`; tên setting theo nhà cung cấp (SMS, cổng thanh toán, hoá đơn điện tử) | 33 (tên setting: 36, 39) | Đã nối `GET/PUT/DELETE /kernel/settings` (W-027 của web); tên setting theo nhà cung cấp chờ bước 36, 39 |
 | [ ] | Kết nối đối tác | `POST /kernel/settings/{name}/test`, `last_used_at`, `last_error` | mới (đề xuất ở `ui-trace-roadmap.md`, chưa vào lộ trình) | Dữ liệu mẫu |
 | [ ] | Kết nối đối tác | "Địa chỉ công khai" dùng trong link email, theo khách | mới | Chưa dựng |
 | [ ] | Job | `GET /kernel/jobs?status=` (theo khách, tóm tắt, tiến độ, người yêu cầu), `POST /jobs/{id}/retry` có audit | 52 | Dữ liệu mẫu (`src/sample/settings.ts`); core hiện chỉ có lệnh CLI `autoxide jobs` |
@@ -159,9 +159,9 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Thư viện media | Tên người tải lên (hiện chỉ có id) | mới | Không hiện |
 | [x] | Thư viện media | Giới hạn tải lên cho giao diện: dung lượng tối đa, loại cho phép | mới (cùng loại "cấu hình cho giao diện") | Để core báo lỗi theo `code` sau khi gửi |
 | [x] | Mọi biểu mẫu | `detail` trong `errors[]` của Problem dịch theo `Accept-Language` (vd lỗi `to_url` của chuyển hướng ra tiếng Anh) | mới | Hiện nguyên câu của core |
-| [ ] | Trang và cấu trúc | Số bài theo danh mục, thẻ, tác giả (`entry_count`) | mới | Ghi "chưa hiện số" |
-| [ ] | Trang và cấu trúc | Đường dẫn đầy đủ của trang (`path`) trong `EntryResponse` | mới | Tự ghép slug theo cây, chưa có tiền tố ngôn ngữ |
-| [ ] | Trang và cấu trúc | ETag (hoặc `version`) của từng dòng trong danh sách | mới | Đọc lại bản ghi trước khi sửa, so `updated_at` |
+| [x] | Trang và cấu trúc | Số bài theo danh mục, thẻ, tác giả (`entry_count`) | mới | Đã nối (W-028 của web): cột số bài, ô tìm `q` |
+| [x] | Trang và cấu trúc | Đường dẫn đầy đủ của trang (`path`) trong `EntryResponse` | mới | Đã nối (W-028 của web) |
+| [x] | Trang và cấu trúc | ETag (hoặc `version`) của từng dòng trong danh sách | mới | Đã nối cho bài và trang (W-028 của web); danh mục, thẻ, tác giả, chuyển hướng chưa có `version` trong danh sách |
 | [ ] | Trang và cấu trúc | Lấy cả cây trang khi hơn 200 trang | mới | Lấy 200 trang đầu, có ghi chú |
 | [ ] | Lịch sử phiên bản | Tên người sửa của phiên bản (hiện chỉ có id) | mới | Hiện lý do giữ phiên bản và thời điểm |
 | [x] | Menu | Module `menus`: `GET/POST /menus`, `GET/PUT/DELETE /menus/{id}`, `GET /menus/public/{key}` | v0.14.0 | API thật (W-022 của web) |
@@ -247,12 +247,12 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 
 | | Màn | Cần | Bước |
 |---|---|---|---|
-| [ ] | Mọi màn | Biết người đăng nhập thuộc khách nền tảng (`GET /kernel/tenant`) để hiện mặt điều khiển; permission của nhân sự vận hành | 33, 34 |
+| [ ] | Mọi màn | Biết người đăng nhập thuộc khách nền tảng (`GET /kernel/tenant`) để hiện mặt điều khiển; permission của nhân sự vận hành | 33, 34 — Đã nối `GET /kernel/tenant` để hiện mặt điều khiển (W-027 của web); permission của nhân sự nền tảng chờ bước 34 |
 | [ ] | Mọi màn | Sổ điều hướng của core có khái niệm không gian (khách / nền tảng) | 51 |
-| [ ] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 |
+| [x] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 — Đã nối (W-027 của web): màn Khách hàng và Đội database đọc API thật, ghép với dữ liệu mẫu cho trường core chưa có |
 | [ ] | Khách hàng | Trường của khách `business_model`, `primary_domain`; của placement `pending_migrations`, `location` | mới |
 | [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới |
-| [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) |
+| [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) — `PATCH {status}` đã nối (W-027 của web); `reason` để ghi audit vẫn thiếu |
 | [ ] | Chi tiết khách | Dời khách chung ↔ riêng qua API: `POST /kernel/tenants/{id}/move` `{to, dry_run}` | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Quyền dùng của một khách bất kỳ: `GET /plans/tenants/{id}/entitlements` | mới |
@@ -433,9 +433,48 @@ thì chỉ thay phần đọc. Ba nguồn đọc API thật (bình luận chờ 
 | [ ] | Ô số liệu Tổng quan | `GET /kernel/summary` (doanh thu hôm nay, đơn chờ, sắp hết hàng, bài chờ duyệt…) | 51 | 3 số thật, 3 số mẫu |
 | [ ] | Các bước thiết lập | `GET /kernel/setup` theo mô hình kinh doanh, bước pháp lý chặn bán đánh dấu | 51 | 8 bước tính ở `setup.ts` |
 | [ ] | Hoạt động | `GET /audit/activity` trả câu đã dịch (ai làm gì với gì), không chỉ bản ghi audit thô | 51 | Tự dựng câu từ `GET /audit` |
-| [ ] | Bài chờ duyệt | Tham số lọc `review_requested=true` cho `GET /content/posts` và tổng số thật | 51 | Lọc trên một trang bản nháp |
+| [ ] | Bài chờ duyệt | Tham số lọc `review_requested=true` cho `GET /content/posts` và tổng số thật | 51 | Lọc `review_requested=true` đã nối (W-028 của web); tổng số thật chờ bước 51 |
 | [ ] | Tổng số | `total` (hay `total_estimate`) trong pagination để ô số liệu không phải đếm từng trang | 51 | Đếm trên một trang, ghi "≥" khi còn trang |
 | [ ] | Thao tác hàng loạt | `dry_run` (GET, không ghi) và `expected_count` → 409 `kernel.bulk_count_changed` | 51 | `src/sample/bulk.ts` |
 | [ ] | Đã ghim | `GET/PUT/DELETE /me/pins` | chưa có trong lộ trình | Tab chỉ hiện khi bật dữ liệu mẫu |
 | [ ] | Tuỳ chọn thông báo | `GET/PUT /me/notification-preferences` theo loại việc và kênh | 37, 52 | Tab chỉ hiện khi bật dữ liệu mẫu |
 | [ ] | Ngôn ngữ ưa dùng | Lưu ngôn ngữ của người dùng ở core (`/me`) để email và thông báo theo đó | 52 | Chỉ nhớ bằng cookie của trình duyệt |
+
+## Core trả khác mô tả OpenAPI (gặp khi nối, 16/11/2026)
+
+Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc giá trị cho khớp nhau.
+
+| [ ] | Chỗ | Mô tả OpenAPI | Core trả |
+|---|---|---|---|
+| [ ] | `LastDelivery.status` (webhook) | `pending` / `delivered` / `failed` | `succeeded` thay cho `delivered` |
+| [ ] | `POST /kernel/tenants`, header `Location` | đường dẫn đầy đủ | `/kernel/tenants/{id}`, thiếu tiền tố `/api/v1` |
+| [ ] | `GET /kernel/client-config`, `content.post_path_prefix` | ví dụ `/blog/` | `blog` (không có dấu `/`) |
+| [ ] | `CommentDetail.target_title` | — | chỉ có khi đích đang công khai; bình luận trên bài nháp chỉ có id (nên ghi rõ trong mô tả) |
+
+## Website bán hàng (`apps/storefront`, W-026 của web)
+
+Website công khai chỉ gọi endpoint công khai, từ máy chủ của nó. Phần thương mại dùng dữ liệu mẫu (cùng sản phẩm,
+giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi các bước 41–46 có.
+
+| [ ] | Màn | Cần | Bước | Website đang làm gì |
+|---|---|---|---|---|
+| [ ] | Chân trang, đầu trang | Hồ sơ công khai của khách: tên, thông tin pháp lý (mã số doanh nghiệp, địa chỉ), logo đã thông báo Bộ Công Thương, cấu hình giao diện (kiểu `market` / `minimal` / `luxe`) | 34 (+ 55) | Ô `[…]`; kiểu giao diện đặt bằng biến `AUTOXIDE_STOREFRONT_THEME` |
+| [ ] | `/blog` | Danh sách danh mục và thẻ công khai của `content` (kèm số bài) | mới | Gom chủ đề từ các bài trên trang đang xem |
+| [ ] | Bài viết | Nhúng bản ghi trong nội dung (khối sản phẩm trong bài) | 51 | Khối "sản phẩm nhắc tới trong bài" là dữ liệu mẫu |
+| [ ] | Menu | Bộ biểu tượng của menu có biểu tượng ngành hàng (chảo, nồi, dao…) | mới (`menus`) | Dùng biểu tượng chung |
+| [ ] | Địa chỉ đã gỡ | `resolve` trả 410 cho địa chỉ đã gỡ; website (App Router) chưa trả được 410 nên đang trả 404 | — (ghi để biết) | 404 |
+| [ ] | Trang chủ, danh mục, sản phẩm, giỏ, đặt hàng, gian hàng | Catalog, giá theo cửa hàng, tồn theo cửa hàng, giá khi áp mã, giỏ, đơn, người bán (công khai) | 41–46 | Dữ liệu mẫu |
+| [ ] | Livestream | Danh sách phiên livestream công khai (lịch phát), không chỉ một phiên theo id | 49 (mới) | Dữ liệu mẫu (`src/sample/live.ts`) |
+| [ ] | Sản phẩm › Đánh giá | Số đếm đánh giá có ảnh và theo biến thể; "chủ đề người mua hay nhắc" kèm bản tóm tắt AI đã duyệt | 45 (mới) | Dữ liệu mẫu |
+| [ ] | Sản phẩm, đánh giá, livestream | Endpoint công khai để báo vi phạm (lý do theo danh sách cố định) | mới | Dữ liệu mẫu |
+| [ ] | Sản phẩm | Thông tin hiển thị theo biến thể trong `by-slug` (số người ăn, trong hộp có gì, cách dùng / chăm sóc theo ngôn ngữ, máy rửa bát) | 41 (mới) | Dữ liệu mẫu |
+| [ ] | Sản phẩm | Phí và ngày giao theo tỉnh khi chưa có giỏ, kèm giờ chốt đơn trong ngày | 44 (mới) | Dữ liệu mẫu, giờ chốt 16:00 |
+| [ ] | Khuyến mại | Số thông báo Sở Công Thương và trần giảm theo luật trong `GET /public/promotions` | 43 (mới) | Dữ liệu mẫu |
+| [ ] | Tài khoản người mua | Đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay passkey | 47 (mới) | Mẫu: số điện thoại + mã cố định, không nhận mật khẩu |
+| [ ] | Đặt hàng | Endpoint công khai cho đơn vị hành chính của module `address` (tỉnh, phường) | D-193 (mới) | Dữ liệu mẫu |
+| [ ] | Giỏ, đặt hàng | Báo giá giỏ trả thêm: số điểm tối đa dùng được, cách trả dùng được cho giỏ (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán | 45 (mới) | Dữ liệu mẫu |
+| [ ] | Đơn của tôi | `return_until`, `buyer_cancel_until` có sẵn trong đơn | 45 (mới) | Tự tính hạn 7 ngày |
+| [ ] | Gian hàng người bán | Catalog công khai lọc theo người bán và đường dẫn trang sản phẩm cho hàng người bán; hồ sơ người bán có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn, trạng thái tạm ngừng | 41, 46 (mới) | Dữ liệu mẫu; hàng người bán mở ở gian hàng |
+| [ ] | Mời người bán | Phí sàn công khai (hiện `/fee-rules/preview` cần `marketplace.sell`); đăng ký bán trước khi có tài khoản | 46 (mới) | Dữ liệu mẫu; form đăng ký dùng `forms/public/ban-tren-cho` nếu cửa hàng đã tạo |
+| [ ] | Quyền riêng tư của người mua | Đối chiếu đủ endpoint tải về / xoá dữ liệu cá nhân từ website | 37 | Dữ liệu mẫu |
+
