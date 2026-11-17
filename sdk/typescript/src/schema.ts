@@ -2083,6 +2083,19 @@ export type Data_Health = {
 };
 
 /** Envelope of a single result. */
+export type Data_ImportContentMenusReport = {
+  /** What the import did (or, with `dry_run`, would do). */
+  data: {
+    dry_run: boolean;
+    failed: FailedMenu[];
+    /** Imported (with `dry_run`: would be imported). */
+    imported: ImportedMenu[];
+    /** Already here with the same key and language: left as they are. */
+    skipped: ImportedMenu[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ImportReport = {
   /** Result of an import. */
   data: {
@@ -3110,6 +3123,11 @@ export type Data_RevisionResponse = {
   data: {
     created_at: string;
     created_by?: string | null;
+    /**
+     * Display name of `created_by`; `null` when nobody is recorded, the account was deleted, or
+     * the server runs without user accounts.
+     */
+    created_by_name?: string | null;
     entry_id: string;
     id: string;
     /**
@@ -5008,6 +5026,14 @@ export type ExportResponse = {
  */
 export type ExportState = "pending" | "running" | "ready" | "failed";
 
+/** A menu that could not be imported, and why. */
+export type FailedMenu = {
+  key: string;
+  locale: string;
+  /** Why, in English (e.g. the language is not one of the menu languages). */
+  reason: string;
+};
+
 /** A field of a form. */
 export type Field = {
   help?: Localized | null;
@@ -5154,6 +5180,22 @@ export type Health = {
   status: string;
 };
 
+/** What the import did (or, with `dry_run`, would do). */
+export type ImportContentMenusReport = {
+  dry_run: boolean;
+  failed: FailedMenu[];
+  /** Imported (with `dry_run`: would be imported). */
+  imported: ImportedMenu[];
+  /** Already here with the same key and language: left as they are. */
+  skipped: ImportedMenu[];
+};
+
+/** What to do when importing the old menus. */
+export type ImportContentMenusRequest = {
+  /** `true`: only say what would be imported; nothing is saved. Defaults to `false`. */
+  dry_run?: boolean;
+};
+
 /** One person to import. */
 export type ImportPersonRequest = {
   /** Up to 16 KiB of JSON; replaces the attributes of a known subscriber. */
@@ -5188,6 +5230,12 @@ export type ImportRequest = {
   list_ids: string[];
   /** 1 to 1000 people. */
   subscribers: ImportPersonRequest[];
+};
+
+/** A menu of the import, by key and language. */
+export type ImportedMenu = {
+  key: string;
+  locale: string;
 };
 
 /** A new invitation. */
@@ -7354,6 +7402,11 @@ export type Page_RevisionResponse = {
   data: {
     created_at: string;
     created_by?: string | null;
+    /**
+     * Display name of `created_by`; `null` when nobody is recorded, the account was deleted, or
+     * the server runs without user accounts.
+     */
+    created_by_name?: string | null;
     entry_id: string;
     id: string;
     /**
@@ -8889,6 +8942,11 @@ export type Resolution = {
 export type RevisionResponse = {
   created_at: string;
   created_by?: string | null;
+  /**
+   * Display name of `created_by`; `null` when nobody is recorded, the account was deleted, or
+   * the server runs without user accounts.
+   */
+  created_by_name?: string | null;
   entry_id: string;
   id: string;
   /**
@@ -8978,6 +9036,20 @@ export type RoleResponse = {
   /** `true`: the role's permissions work only for accounts with two-step sign-in. */
   requires_mfa: boolean;
   updated_at: string;
+};
+
+/** The object a saved item links to. With `include=targets`, also how it stands now. */
+export type SavedMenuTarget = {
+  id: string;
+  kind: string;
+  /** Only with `include=targets` and `state` = `public`: its public path, when it has one. */
+  path?: string | null;
+  state?: TargetState | null;
+  /**
+   * Only with `include=targets` and `state` = `public`: its title in the menu's language.
+   * Objects that are not public do not give their title to other modules.
+   */
+  title?: string | null;
 };
 
 /** A new schedule. */
@@ -9153,13 +9225,13 @@ export type SiteMenuItem = {
   auto_children_limit?: number | null;
   badge?: MenuBadge | null;
   children: SiteMenuItem[];
-  feature?: MenuTarget | null;
+  feature?: SavedMenuTarget | null;
   highlight?: string | null;
   icon?: string | null;
   id: string;
   /** Empty when the item shows the title of its `ref`. */
   label: string;
-  ref?: MenuTarget | null;
+  ref?: SavedMenuTarget | null;
   url?: string | null;
 };
 
@@ -9530,6 +9602,9 @@ export type TargetRequest = {
   /** `open` or `closed`. */
   state?: string | null;
 };
+
+/** How the object of a menu item stands now. */
+export type TargetState = "public" | "not_public" | "missing" | "unknown_kind";
 
 /** Who buys. */
 export type TaxBuyerKind = "consumer" | "business";
@@ -14201,6 +14276,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/menus/import-content": {
+    /** Import the old menus of module `content`. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ImportContentMenusRequest;
+      responses: {
+        200: Data_ImportContentMenusReport;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/menus/public/{key}": {
     /** Get a website menu, ready to show (public). */
     get: {
@@ -14218,7 +14307,7 @@ export interface paths {
   "/api/v1/menus/{id}": {
     /** Get a website menu. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { include?: string }; };
       responses: {
         200: Data_SiteMenu;
         401: Problem;

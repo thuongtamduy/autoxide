@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Admin interface requests (17/11): `created_by_name` on content revisions (`GET /api/v1/content/entries/{id}/revisions`
+  and one revision); `GET /api/v1/menus/{id}?include=targets` says how the object of each item stands (`public`,
+  `not_public`, `missing`, `unknown_kind`, with the title and path of public ones); `POST /api/v1/menus/import-content`
+  imports the old menus of module `content` over REST, with `dry_run`.
+
 - New module `ledger` (step 36): a double-entry ledger. Each organization unit keeps a book; accounts by purpose
   (`cash.bank`, `revenue.sales`, `payable.seller_held`… or `<module>.<name>`), per counterparty and currency, with an
   optional floor; entries are append-only (debits equal credits, one currency) and corrected by reversing them
@@ -432,6 +437,10 @@ endpoints are marked deprecated with a sunset date first.
   both gates run the test binaries in parallel (`cargo xtask test-all` in the full gate).
 
 ### Fixed
+
+- `cargo build --release` failed in `autoxide-plans` ("queries overflow the depth limit"); debug builds were fine.
+- `POST /api/v1/auth/me/reauth` with a wrong authenticator code reported the error on field `code` instead of
+  `totp_code`, the field that was sent.
 
 - `GET /api/v1/auth/me` in a tenant entered through a delegation or a support grant answered `401`: it now returns
   the account and the permissions you have in that tenant, with `tenant_id`, `access` (`direct`, `delegation`,

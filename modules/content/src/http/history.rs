@@ -32,6 +32,9 @@ pub(crate) struct RevisionResponse {
     /// `unpublished`, `restored` or `scheduled`.
     reason: String,
     created_by: Option<Uuid>,
+    /// Display name of `created_by`; `null` when nobody is recorded, the account was deleted, or
+    /// the server runs without user accounts.
+    created_by_name: Option<String>,
     created_at: DateTime<Utc>,
     /// The fields (`title`, `slug`, `excerpt`, `body`, media, SEO). Only when reading one
     /// revision.
@@ -46,8 +49,23 @@ pub(crate) fn revision(row: Revision, with_snapshot: bool) -> RevisionResponse {
         entry_id: row.entry_id,
         reason: row.reason,
         created_by: row.created_by,
+        created_by_name: None,
         created_at: row.created_at,
     }
+}
+
+/// Điền `created_by_name` cho các phiên bản bằng một lần tra theo lô.
+async fn with_names(
+    service: &ContentService,
+    tenant: &TenantContext,
+    mut revisions: Vec<RevisionResponse>,
+) -> Result<Vec<RevisionResponse>, Error> {
+    let ids: Vec<Uuid> = revisions.iter().filter_map(|r| r.created_by).collect();
+    let names = service.user_names(tenant, &ids).await?;
+    for revision in &mut revisions {
+        revision.created_by_name = revision.created_by.and_then(|id| names.get(&id).cloned());
+    }
+    Ok(revisions)
 }
 
 /// A scheduled publish or take-down.
@@ -127,10 +145,12 @@ pub(crate) async fn list_revisions(
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<RevisionResponse>, Error> {
     let page = page_request(paging, Vec::new())?;
-    Ok(service
+    let mut page = service
         .list_revisions(&tenant, &principal, id, &page)
         .await?
-        .map(|row| revision(row, false)))
+        .map(|row| revision(row, false));
+    page.data = with_names(&service, &tenant, page.data).await?;
+    Ok(page)
 }
 
 /// Get one revision of an entry, with its fields.
@@ -156,9 +176,12 @@ pub(crate) async fn get_revision(
     principal: Principal,
     Path((id, revision_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Data<RevisionResponse>, Error> {
-    Ok(Data {
-        data: revision(service.get_revision(&tenant, &principal, id, revision_id).await?, true),
-    })
+    let mut data =
+        revision(service.get_revision(&tenant, &principal, id, revision_id).await?, true);
+    if let Some(by) = data.created_by {
+        data.created_by_name = service.user_names(&tenant, &[by]).await?.remove(&by);
+    }
+    Ok(Data { data })
 }
 
 /// Copy a revision back into the draft.
