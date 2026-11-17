@@ -132,6 +132,8 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Kết nối MCP | Core công bố địa chỉ công khai (`AUTOXIDE_HTTP_PUBLIC_URL`) | mới | Dùng `AUTOXIDE_API_URL` của giao diện |
 | [ ] | Nhà phát triển › Request | `GET /kernel/requests?status_class=&api_key_id=` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |
 | [ ] | Nhà phát triển › Event theo bản ghi | `GET /kernel/records/{kind}/{id}/events` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |
+| [ ] | Cài đặt › Module | `GET /kernel/modules` trả phiên bản riêng của từng module | mới | Hiện phiên bản máy chủ (`kernel.version` của client-config) cho mọi module (W-056 của web) |
+| [ ] | Nhà phát triển › Event | Danh sách event gần đây của cả khách (mọi bản ghi, lọc theo loại, phân trang), không chỉ theo một bản ghi | mới (bước 52 chỉ có theo bản ghi) | Trạng thái rỗng kèm ví dụ tra một bản ghi (W-056) |
 
 ## Tiếp thị › Biểu mẫu, Bản tin, Bình luận (`/marketing/...`)
 
@@ -151,6 +153,9 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Bình luận › Cài đặt | Cài đặt bình luận theo khách (bật / tắt, chế độ duyệt) | 33 | Dữ liệu mẫu (`src/sample/engage.ts`) — **Phản hồi core (17/11):** chế độ duyệt theo khách **đã có** qua cài đặt khách `comments.guest_moderation`, `comments.user_moderation`, `comments.max_links`, `comments.banned_words`, `comments.suspect_words` (`GET/PUT /api/v1/kernel/settings`). Bật / tắt bình luận theo khách: tắt module qua gói (bước 35) hoặc không mở bình luận cho đích. |
 | [ ] | Bình luận › Cài đặt | Chính sách `posting.comments` (xác thực tài khoản, NĐ 147/2024) | 37 | Dữ liệu mẫu (`src/sample/engage.ts`) |
 | [ ] | Ba tab "Dữ liệu theo email" | Một yêu cầu của chủ thể dữ liệu gom mọi module, gắn với hồ sơ ở Tuân thủ | 37 | Ba tab riêng, mỗi module tra / xoá một lần |
+| [ ] | Soạn bản tin | Địa chỉ người gửi (tên + email) trong `GET /newsletter/settings`, để xem trước hộp thư đúng như người nhận thấy | mới | Hiện tên khách từ `GET /kernel/tenant` (W-056) |
+| [ ] | Bình luận, Người đăng ký | Lệnh hàng loạt: duyệt / từ chối / spam / xoá nhiều bình luận; chặn / bỏ chặn / xoá nhiều người đăng ký (nhận danh sách id, trả kết quả từng id) | 51 (hàng loạt chung) | Lặp lệnh từng cái (PATCH kèm `If-Match`, DELETE), gom lỗi "Xong 8/10" (W-058) |
+| [ ] | Bình luận, Người đăng ký | Sắp theo cột khác thời gian (`sort=` tên, trạng thái…) và tổng số khớp bộ lọc | mới (tổng số: 51) | Chỉ cột thời gian sắp được (`order`); phân trang theo con trỏ, không có tổng (W-058) |
 
 ## Nội dung › Thư viện media, Trang và cấu trúc, Menu
 
@@ -274,6 +279,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 | [ ] | Sức khoẻ | Cảnh báo đang bật kèm câu "làm gì": `GET /kernel/ops/alerts` | mới — **Phản hồi core (17/11):** chưa có trong lộ trình; bước 39 có backlog và backup (`/ops/backlog`, `/ops/backups`). Chờ chủ dự án quyết. |
 | [x] | Vào dữ liệu khách | `GET/POST/DELETE /auth/support-grants` | 34 — **Đã nối** (17/11, W-049 của web): màn "Vào dữ liệu khách" và khối ở chi tiết khách. **Còn thiếu:** (a) `GET` bắt buộc `tenant_id`, nên màn chung gọi từng khách — xin cho bỏ `tenant_id` (mọi khách, theo trang, mới trước); (b) trần thời hạn `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` chưa có trong API — xin đưa vào `GET /kernel/client-config` (giao diện đang đặt sẵn 1, 4, 8 giờ) — **Phản hồi core (17/11):** **(a) và (b) đã có** (D-335): `GET /auth/support-grants` bỏ `tenant_id` thì trả 200 lần cấp mới nhất của mọi khách; trần giờ ở `GET /kernel/client-config` → `auth.support_access_max_hours`. Kèm sửa lỗ: xem / thu hồi lần cấp giờ chỉ cho nhân sự ở khách nền tảng (`403 auth.support_platform_only`). — **Đã dùng** (17/11, W-055 của web) |
 | [x] | Vào dữ liệu khách | Nhà vận hành đọc cài đặt `auth.support_access` của khách; danh sách nhân sự nền tảng | mới — danh sách nhân sự: giao diện dùng `GET /auth/users` của khách nền tảng. **Còn thiếu:** nhân sự không biết trước khách đã tắt hỗ trợ, chỉ biết khi bị từ chối `auth.support_access_disabled` — **Phản hồi core (17/11):** **Đã có** (D-335): `GET /api/v1/auth/support-grants/allowed?tenant_id=` → `{tenant_id, support_access}` (`auth.support.grant`, khách nền tảng). — **Đã dùng** (17/11, W-055 của web) |
+| [ ] | Sức khoẻ | Lịch sử backlog theo giờ cho biểu đồ: `GET /kernel/ops/backlog/history?hours=24` (job chờ, job mới vào dead-letter mỗi giờ) | mới (39 chỉ có số hiện tại) |
 
 ## Tiếp thị › Khuyến mại (`/marketing/promotions`), Bán hàng › Vận chuyển (`/sales/shipping`)
 
@@ -306,6 +312,8 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/promotions
 | [ ] | Hãng vận chuyển | `GET/POST /carrier-accounts`, `PATCH /{id}`, `POST /{id}/test`; `check_status`, `checked_at`, `last_error`, `capabilities`, `secret_set_at` | 44 |
 | [ ] | Vận chuyển | Mã lỗi mới: `shipping.discrepancy_not_found`, `discrepancy_resolved`, `calendar_exists`, `parcel_count`, `days_range`, `outside_area`, `weight_out_of_range`, `no_pickup_point`, `carrier_name_taken` | mới |
 | [x] | Vận chuyển | Danh mục tỉnh / xã cho ô địa chỉ | 34 (`address`) — **Đã dùng** cho ô địa chỉ của website (17/11, W-057 của web) |
+| [ ] | Mã giảm giá | Vô hiệu một hay nhiều mã (`POST /promotions/codes/{id}/disable`), trạng thái `disabled`, giỏ hàng từ chối mã đã vô hiệu | mới |
+| [ ] | Mã giảm giá, mọi danh sách thương mại | Tham số `sort` theo cột (mã, lượt dùng, ngày tạo; sản phẩm: tên, giá; khách: số đơn, đã chi) | mới |
 
 ## Tài chính › Kế toán (`/finance`)
 
@@ -399,6 +407,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/market.ts`
 | [ ] | Tiền của người bán | `GET /settlements?seller=me`, `GET /payouts?seller=me`, `GET /statements` (CSV) | 46 (CSV qua route của giao diện) |
 | [ ] | "Xem như người bán" | Đọc gian hàng như người bán thấy, chỉ đọc, cho `marketplace.sellers.read` / `marketplace.finance.read` | 46 (cookie `ax_seller_view` trên dữ liệu mẫu) |
 | [ ] | Mọi màn Sàn | Mã lỗi chưa có trong đặc tả: `marketplace.listing_not_found`, `fee_rule_not_found`, `fee_rule_in_effect`, `payout_not_found`, `document_not_found`, `penalty_not_found`, `penalty_already_appealed`, `not_ready` | mới |
+| [ ] | Hiệu suất người bán | Lịch sử chỉ số 90 ngày cho biểu đồ: `GET /marketplace/sellers/{id}/metrics/history?days=90` (giao đúng hạn, huỷ do người bán theo tuần) | 46 (mới) |
 
 ## Khách hàng (`/customers`), Kênh bán (`/sales/channels`), Tiếp thị liên kết (`/marketing/affiliate`)
 
@@ -452,6 +461,7 @@ thì chỉ thay phần đọc. Ba nguồn đọc API thật (bình luận chờ 
 | [ ] | Tuỳ chọn thông báo | `GET/PUT /me/notification-preferences` theo loại việc và kênh | 37, 52 | Tab chỉ hiện khi bật dữ liệu mẫu |
 | [ ] | Ngôn ngữ ưa dùng | Lưu ngôn ngữ của người dùng ở core (`/me`) để email và thông báo theo đó | 52 | Chỉ nhớ bằng cookie của trình duyệt |
 | [ ] | Thẻ gói, khoá theo gói | `GET /plans/entitlements` (gói, hạn mức kèm mức dùng, `features`); thuê bao kèm tên gói | 35 (tên gói: mới) | **Đã nối** (17/11, W-049 của web): thẻ "Gói của bạn" ở Tổng quan; nút tạo API key và AI của bài viết khoá kèm nhãn "Cần gói cao hơn" khi gói chưa có `auth.api_keys` / `content.ai_suggestions`. **Còn thiếu:** `GET /plans/subscription` không kèm tên gói và `GET /plans/catalog` chỉ có gói đang bán, nên khách dùng gói đã ngừng bán không thấy tên gói của mình — **Phản hồi core (17/11):** **Đã sửa** (D-335): `GET /plans/subscription` (và mọi chỗ trả thuê bao) kèm `plan_code`, `plan_name`, cả khi gói đã ngừng bán. |
+| [ ] | Biểu đồ doanh thu | Doanh thu theo ngày (7 / 30 / 90 ngày) và cùng kỳ trước, theo kênh: dùng cho thẻ Tổng quan và Báo cáo kênh | 57 (mới cho Tổng quan) | Tổng hợp từ đơn mẫu (W-058) |
 
 ## Build của core (gặp 17/11 khi thử với core thật)
 
