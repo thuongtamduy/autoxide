@@ -244,6 +244,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::connections::CreateConnectionStatus),
             // Nhãn nội bộ gắn bản ghi (bước 51 P20).
             Box::new(crate::ops::tags::CreateTags),
+            // Câu chữ khách đổi (bước 51 P21).
+            Box::new(crate::ops::texts::CreateTextOverrides),
         ]
     }
 
@@ -279,6 +281,9 @@ impl Module for KernelModule {
         let export_days = reader.get_with(&crate::tenancy::exports::EXPORT_RETENTION_DAYS, |raw| {
             crate::config::parse_in_range(raw, 1i64, 365)
         });
+        let ui_texts = reader.get_with(&crate::ops::texts::UI_MAX, |raw| {
+            crate::config::parse_in_range(raw, 1u64, 100_000)
+        });
         let job_file_days = reader
             .get_with(&crate::ops::list_exports::FILE_RETENTION_DAYS, |raw| {
                 crate::config::parse_in_range(raw, 1u32, 365)
@@ -292,6 +297,7 @@ impl Module for KernelModule {
         self.templates = crate::template::TemplateEngine::new(template_bytes?);
         self.export_days = export_days?;
         self.job_file_days = job_file_days?;
+        self.catalog.text_overrides().set_ui_max(ui_texts?);
         Ok(())
     }
 
@@ -311,6 +317,7 @@ impl Module for KernelModule {
             crate::ops::views::VIEWS_SHARE,
             crate::ops::reasons::REASONS_MANAGE,
             crate::ops::tags::TAGS_MANAGE,
+            crate::ops::texts::TEXTS_MANAGE,
             crate::job::runs::JOBS_MANAGE,
         ]
     }
@@ -365,6 +372,10 @@ impl Module for KernelModule {
                 crate::ops::approvals::ApprovalsState { outbox: outbox.clone() },
             ));
         }
+        routes = routes.merge(crate::ops::texts::routes(crate::ops::texts::TextsState {
+            overrides: self.catalog.text_overrides(),
+            translations: self.translations.clone(),
+        }));
         routes = routes.merge(crate::ops::connections::routes(
             crate::ops::connections::ConnectionsState { probes: self.catalog.connection_probes() },
         ));

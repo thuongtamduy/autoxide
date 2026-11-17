@@ -72,6 +72,14 @@ struct ContentModule {
 }
 
 impl Module for ContentModule {
+    fn overridable_texts(&self) -> Vec<autoxide_kernel::texts::OverridableText> {
+        // Thuật ngữ khách đổi được (bước 51 P21): giao diện và website hiện tên loại mục theo khách.
+        vec![
+            autoxide_kernel::texts::OverridableText::new("content.term.post", "Post"),
+            autoxide_kernel::texts::OverridableText::new("content.term.page", "Page"),
+        ]
+    }
+
     fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
         use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
         Navigation::default()

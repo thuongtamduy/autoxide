@@ -76,6 +76,8 @@ pub(crate) struct ModuleCatalog {
     probes: crate::ops::connections::ConnectionProbes,
     /// Loại bản ghi gắn nhãn được (bước 51 P20).
     taggables: crate::ops::tags::Taggables,
+    /// Câu khách đổi được và câu khách đã đổi (bước 51 P21).
+    texts: crate::ops::texts::TextOverrides,
     /// Lịch sử theo bản ghi (bước 51 P13), module nhật ký công bố; điền sau khi mọi module khởi động.
     history: crate::ops::records::HistorySlot,
     /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
@@ -170,6 +172,10 @@ impl ModuleCatalog {
 
     pub(crate) fn taggables(&self) -> crate::ops::tags::Taggables {
         self.taggables.clone()
+    }
+
+    pub(crate) fn text_overrides(&self) -> crate::ops::texts::TextOverrides {
+        self.texts.clone()
     }
 
     pub(crate) fn lists(&self) -> crate::ops::list_exports::ListsHandle {

@@ -26,7 +26,7 @@ pub use data::{
 pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use ops::{
     bulk, connections, doctor, find, list_exports, logging, metrics, reasons, resolve, setup,
-    summary, tags, task, telemetry, work,
+    summary, tags, task, telemetry, texts, work,
 };
 pub use security::{
     access, antispam, entitlement, idempotency, ip_hash, secret, throttle, tls, tokens,

@@ -148,6 +148,8 @@
   "text:Entries waiting for a review": "Bài chờ duyệt",
   "text:Like content.write, but only on entries the caller created (same user and same API key). Meant for AI agents.": "Như content.write, nhưng chỉ với bài do chính người gọi tạo (cùng người dùng và cùng API key). Dành cho AI agent.",
   "text:Manage categories, tags, authors, menus and redirects.": "Quản lý danh mục, thẻ, tác giả, menu và chuyển hướng.",
+  "text:Page": "Trang",
+  "text:Post": "Bài viết",
   "text:Posts and pages": "Bài viết và trang",
   "text:Posts and pages whose writer asked for a review that was not published or withdrawn yet, in your scope.": "Bài viết và trang mà người viết đã nhờ duyệt, chưa được đăng hay huỷ yêu cầu, trong phạm vi của bạn.",
   "text:Publish and unpublish only entries the caller created (same user and same API key); no archive, delete, move or schedule. Meant for AI agents.": "Đăng và gỡ chỉ những bài do chính người gọi tạo (cùng người dùng và cùng API key); không lưu trữ, xoá, chuyển chỗ hay hẹn giờ. Dành cho AI agent.",

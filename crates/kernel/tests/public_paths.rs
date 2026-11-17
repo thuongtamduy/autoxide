@@ -55,6 +55,7 @@ use autoxide_kernel::task::TaskArgument;
 use autoxide_kernel::telemetry::TelemetryError;
 use autoxide_kernel::template::TemplateEngine;
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::texts::OverridableText;
 use autoxide_kernel::throttle::Outcome;
 use autoxide_kernel::tls::install_crypto_provider;
 use autoxide_kernel::tokens::Issued;
