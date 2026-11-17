@@ -1,0 +1,232 @@
+{
+ "key": "platform_rules",
+ "locale": "en",
+ "title": "Operating regulations of the marketplace",
+ "marketplace": true,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "owner.tax_code",
+   "required": true,
+   "description": "Tax code of the owner."
+  },
+  {
+   "path": "owner.address",
+   "required": true,
+   "description": "Address of the owner, on one line."
+  },
+  {
+   "path": "contact.email",
+   "required": true,
+   "description": "Contact email."
+  },
+  {
+   "path": "website.domain",
+   "required": false,
+   "description": "Domain of the website, e.g. shop.example."
+  },
+  {
+   "path": "owner.representative_name",
+   "required": false,
+   "description": "Legal representative."
+  },
+  {
+   "path": "policy.complaint_days",
+   "required": false,
+   "description": "Working days to answer a complaint."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Sample content — have a legal professional review it before use. It is not legal advice; check it against the laws in force.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "General principles"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ website.domain or \"This marketplace\" }} is owned and run by {{ owner.legal_name }} (tax code {{ owner.tax_code }}, {{ owner.address }}). Sellers, buyers and the operator follow these regulations and the law."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Sellers"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Sellers verify their identity before selling and keep their information true and current."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Each product page shows the seller's name, address and contact."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Prohibited goods, counterfeit goods and goods infringing intellectual property are not allowed; reports are handled and the listing may be hidden."
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Buyers"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Buyers give true information, pay as agreed, and may complain through the marketplace's channel."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "The operator"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Checks seller information, keeps transaction records, removes unlawful listings, cooperates with the authorities, and protects personal data."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Complaints and disputes"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Complaints go to {{ contact.email }}; answered within {{ policy.complaint_days or \"[number of]\" }} working days."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Effect"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "These regulations take effect when published; changes are announced before they apply. Representative: {{ owner.representative_name or \"[name]\" }}."
+     }
+    ]
+   }
+  ]
+ }
+}

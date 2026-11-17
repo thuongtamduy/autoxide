@@ -1,0 +1,185 @@
+{
+ "key": "complaint_policy",
+ "locale": "vi",
+ "title": "Cơ chế giải quyết khiếu nại",
+ "marketplace": false,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "contact.email",
+   "required": true,
+   "description": "Contact email."
+  },
+  {
+   "path": "contact.phone",
+   "required": true,
+   "description": "Contact phone number."
+  },
+  {
+   "path": "policy.complaint_days",
+   "required": true,
+   "description": "Working days to answer a complaint."
+  },
+  {
+   "path": "owner.address",
+   "required": false,
+   "description": "Address of the owner, on one line."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Nơi tiếp nhận"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Điện thoại: {{ contact.phone }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Email: {{ contact.email }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Địa chỉ: {{ owner.address or \"[địa chỉ]\" }}"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Các bước"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Chúng tôi xác nhận đã nhận khiếu nại."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Trả lời trong {{ policy.complaint_days }} ngày làm việc, nêu kết quả và cách khắc phục."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Không đồng ý thì hai bên thương lượng; không thành thì bạn có thể nhờ tổ chức bảo vệ người tiêu dùng, hoà giải, trọng tài hoặc toà án theo quy định."
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ owner.legal_name }} không gỡ, không ẩn đánh giá và khiếu nại chính đáng."
+     }
+    ]
+   }
+  ]
+ }
+}

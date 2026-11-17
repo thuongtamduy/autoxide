@@ -8,7 +8,7 @@
 //! 91/2025/QH15 + NĐ 356/2025 (đồng ý theo mục đích, rút lại).
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::{OrgId, TenantId};
+use autoxide_kernel::tenancy::{OrgId, TenantContext, TenantId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -371,3 +371,62 @@ pub const CONSENT_WITHDRAWN: &str = "compliance.consent_withdrawn";
 /// đã xác thực.
 pub const PHONE_VERIFIED: &str = "compliance.phone_verified";
 pub const PHONE_REMOVED: &str = "compliance.phone_removed";
+
+/// Loại trang bắt buộc gắn được với một website (danh sách kiểm Bộ Công Thương, mẫu trang của
+/// `content`). Cùng khoá với mẫu trang `modules/content/templates/legal/<khoá>.<ngôn ngữ>.json`.
+pub const PAGE_KINDS: [&str; 11] = [
+    "owner_info",
+    "privacy_policy",
+    "return_policy",
+    "shipping_policy",
+    "payment_policy",
+    "inspection_policy",
+    "complaint_policy",
+    "terms_of_use",
+    "general_conditions",
+    "platform_rules",
+    "seller_agreement",
+];
+
+/// Website mà một "fact" của danh sách kiểm được hỏi.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WebsiteRef {
+    pub id: Uuid,
+    /// Nút của website (nút gốc = cả khách).
+    pub org: OrgId,
+    pub domain: String,
+    /// `sales` hay `platform`.
+    pub kind: String,
+}
+
+/// Một điều kiện của danh sách kiểm do module khác trả lời (vd bước 46: "trang sản phẩm có thông
+/// tin người bán"). `true` = đạt.
+#[async_trait::async_trait]
+pub trait Fact: Send + Sync {
+    async fn holds(&self, tenant: TenantId, website: &WebsiteRef) -> Result<bool, Error>;
+}
+
+/// Nơi module đăng ký sau `compliance` góp "fact" cho danh sách kiểm Bộ Công Thương (mục `check.type
+/// = "fact"` của quy tắc `moit.checklist.*`). Chưa ai đăng ký khoá đó → mục báo `unknown`.
+pub trait ComplianceFacts: Send + Sync {
+    /// Đăng ký `fact` cho khoá `key` (vd `marketplace.seller_info_on_product`); khoá đã có → lỗi.
+    fn register(&self, key: &'static str, fact: std::sync::Arc<dyn Fact>) -> Result<(), Error>;
+}
+
+/// Hồ sơ pháp lý (chủ sở hữu website) cho module khác dùng làm biến mẫu — vd `content` điền mẫu
+/// trang bắt buộc. Không trả gì ngoài thông tin vốn phải công khai trên website.
+#[async_trait::async_trait]
+pub trait LegalProfiles: Send + Sync {
+    /// Biến mẫu (`owner.*`, `contact.*`) của hồ sơ áp cho nút `org` — hồ sơ của chính nút, hay của
+    /// nút cấp trên gần nhất có hồ sơ (`None`: cả khách). Không có hồ sơ nào → `None`.
+    async fn template_variables(
+        &self,
+        tenant: &TenantContext,
+        org: Option<OrgId>,
+    ) -> Result<Option<serde_json::Value>, Error>;
+}
+
+/// Event phát khi trạng thái thông báo / đăng ký Bộ Công Thương của một website đổi (payload
+/// `website_id`, `domain`, `kind`, `status`, `previous_status`).
+pub const WEBSITE_STATUS_CHANGED: &str = "compliance.website_status_changed";

@@ -76,15 +76,19 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       livestream, tiếp thị liên kết chưa xác thực bị chặn bán / phát (Luật TMĐT 122/2025 Điều 17, từ 01/7/2026)
       — module `compliance` (D-347): `dyn KycGate`, quy tắc `kyc.required_activities` là dữ liệu có ngày hiệu lực;
       nhà cung cấp thật (VNeID / eKYC) là module riêng cắm `IdentityVerifier`, hiện chỉ có bản giả
-- [ ] Hồ sơ pháp lý website và logo Bộ Công Thương: hồ sơ chủ sở hữu theo khách và theo người bán; loại website
+- [x] Hồ sơ pháp lý website và logo Bộ Công Thương: hồ sơ chủ sở hữu theo khách và theo người bán; loại website
       theo tên miền (bán hàng → thông báo, logo xanh; sàn / trung gian → đăng ký, logo đỏ); danh sách kiểm là dữ
-      liệu có phiên bản, API và `autoxide doctor` báo thứ còn thiếu
-- [ ] Bộ hồ sơ Bộ Công Thương: xuất bộ hồ sơ (dữ liệu tờ khai, nháp đề án, quy chế); lưu trạng thái và đoạn mã
+      liệu có phiên bản, API và `autoxide doctor` báo thứ còn thiếu — D-357: `/legal-profiles`, `/websites`, trang gắn
+      website, quy tắc `moit.checklist.sales|platform`, `ComplianceFacts` / `LegalProfiles`, `compliance.moit_readiness`
+- [x] Bộ hồ sơ Bộ Công Thương: xuất bộ hồ sơ (dữ liệu tờ khai, nháp đề án, quy chế); lưu trạng thái và đoạn mã
       logo, endpoint công khai trả về cho giao diện; đối chiếu "bán trước khi thông báo website" bị cấm hay bị
-      phạt rồi mới chọn chặn hay nhãn (A-3.5)
-- [ ] Trang bắt buộc có mẫu (`content`): thông tin chủ sở hữu, chính sách dữ liệu cá nhân, đổi trả, vận chuyển,
+      phạt rồi mới chọn chặn hay nhãn (A-3.5) — D-357: `/websites/{id}/dossier`, `/websites/{id}/status` (đoạn mã logo
+      đọc chặt, dựng lại), `/public/badge`, `/public/owner`; D-358: nhãn, không chặn (cần đối chiếu văn bản gốc)
+- [x] Trang bắt buộc có mẫu (`content`): thông tin chủ sở hữu, chính sách dữ liệu cá nhân, đổi trả, vận chuyển,
       thanh toán, kiểm hàng, giải quyết khiếu nại, điều khoản; sàn thêm quy chế, mẫu hợp đồng với người bán,
       thông tin người bán trên trang sản phẩm (EN + VI, ghi rõ cần người có chuyên môn pháp lý duyệt)
+      — D-359: `GET /content/templates`, `POST /content/templates/{key}/drafts` (biến từ `LegalProfiles` của
+      `compliance`, bộ dựng mẫu của kernel, chỉ vào text node), `content::api::PublishedEntries` (chưa có bên dùng)
 - [ ] Báo vi phạm sở hữu trí tuệ / hàng giả: tiếp nhận → ẩn → phản hồi của người bị báo → quyết định, có hạn xử
       lý, lưu vết; kênh khiếu nại của sàn; cung cấp thông tin người bán khi cơ quan có thẩm quyền yêu cầu (có
       audit)

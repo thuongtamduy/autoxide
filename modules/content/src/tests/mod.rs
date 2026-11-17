@@ -64,6 +64,7 @@ mod publishing;
 mod ra_soat;
 mod search;
 mod seo;
+mod templates;
 mod tenancy;
 mod translation;
 mod translation_recovery;

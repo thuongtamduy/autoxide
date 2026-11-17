@@ -105,12 +105,19 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `compliance.account_verification` | — | read-only |
 | `compliance.documents` | `compliance.documents.read` | read-only |
 | `compliance.kyc_profiles` | `compliance.kyc.read` | read-only |
+| `compliance.legal_profiles` | `compliance.legal.read` | read-only |
 | `compliance.pending_acceptances` | — | read-only |
 | `compliance.publish_document_version` | `compliance.documents.manage` | writes |
+| `compliance.set_website_status` | `compliance.legal.manage` | writes |
 | `compliance.verification_status` | — | read-only |
+| `compliance.website_checklist` | `compliance.legal.read` | read-only |
+| `compliance.website_dossier` | `compliance.legal.read` | read-only |
+| `compliance.websites` | `compliance.legal.read` | read-only |
 | `content.create_draft` | `content.write` or `content.write_own` | writes |
+| `content.draft_from_template` | `content.write` or `content.write_own` | writes |
 | `content.get` | `content.read` | read-only |
 | `content.get_translation_request` | `content.read` or `content.write_own` | read-only |
+| `content.legal_templates` | `content.read` | read-only |
 | `content.list` | `content.read` | read-only |
 | `content.list_revisions` | `content.read` | read-only |
 | `content.publish` | `content.publish` or `content.publish_own` | writes |

@@ -45,6 +45,11 @@ pub(crate) struct ContentService {
     /// Sổ đối tượng của kernel: tên người sửa (`auth.user`) mà không phụ thuộc module `auth`
     /// (D-046). Rỗng (test dựng tay, app không có `auth`): không có tên.
     pub(crate) resources: autoxide_kernel::resource::ResourceDirectory,
+    /// Bộ dựng mẫu của kernel (D-351): điền biến của mẫu trang bắt buộc.
+    pub(crate) templates: autoxide_kernel::template::TemplateEngine,
+    /// Hồ sơ pháp lý (module `compliance`) làm biến của mẫu trang bắt buộc; `None` khi app không
+    /// đăng ký `compliance` (test của riêng module): người gọi tự gửi mọi biến.
+    pub(crate) legal: Option<Arc<dyn autoxide_compliance::api::LegalProfiles>>,
 }
 
 /// Tính năng theo gói (bước 35): gợi ý và bản nháp do AI soạn (SEO, dịch).
@@ -89,7 +94,19 @@ impl ContentService {
             orgs: None,
             entitlements: Default::default(),
             resources: Default::default(),
+            templates: Default::default(),
+            legal: None,
         }
+    }
+
+    pub(crate) fn with_templates(
+        mut self,
+        templates: autoxide_kernel::template::TemplateEngine,
+        legal: Option<Arc<dyn autoxide_compliance::api::LegalProfiles>>,
+    ) -> Self {
+        self.templates = templates;
+        self.legal = legal;
+        self
     }
 
     pub(crate) fn with_resources(

@@ -1614,6 +1614,44 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the legal (owner) profiles of the tenant and its units: what Vietnamese law requires a commerce website to show about its owner.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "One page of a list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "compliance.legal_profiles",
+      "output_schema": null,
+      "permissions": [
+        "compliance.legal.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "The legal documents you must accept (again) before going on.",
       "input_schema": {
         "additionalProperties": false,
@@ -1682,6 +1720,61 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Record what happened with a website's file at the Ministry of Industry and Trade (submitted, notified, registered…). `notified` / `registered` need the logo code the ministry gave.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A status to record for a website.",
+        "properties": {
+          "reference": {
+            "description": "Number of the file at the ministry.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snippet": {
+            "description": "For `notified` / `registered`: the logo code the ministry gave, unchanged.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`not_submitted`, `submitted`, `needs_supplement`, `notified` (sales website),\n`registered` (marketplace), `rejected` or `revoked`.",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `ETag` read before (`\"…\"`), to avoid overwriting another change.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "website_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "website_id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.set_website_status",
+      "output_schema": null,
+      "permissions": [
+        "compliance.legal.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -1696,6 +1789,102 @@
       "name": "compliance.verification_status",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "What a website still lacks before it is notified to / registered with the Ministry of Industry and Trade; each item is `met`, `missing`, `unknown` or `manual`, with what to do.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which website.",
+        "properties": {
+          "website_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "website_id"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.website_checklist",
+      "output_schema": null,
+      "permissions": [
+        "compliance.legal.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "The draft dossier of a website for the Ministry of Industry and Trade, filled from the tenant's data (declaration; for a marketplace a draft project plan and regulations). A person reviews it with a legal professional and submits it on online.gov.vn.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which website.",
+        "properties": {
+          "website_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "website_id"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.website_dossier",
+      "output_schema": null,
+      "permissions": [
+        "compliance.legal.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the websites of the tenant with their kind (`sales` → notify the Ministry of Industry and Trade, `platform` → register) and status.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "One page of a list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "compliance.websites",
+      "output_schema": null,
+      "permissions": [
+        "compliance.legal.read"
+      ]
     },
     {
       "annotations": {
@@ -1786,6 +1975,58 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Make a draft page from a mandatory page template, filled with the unit's legal profile and the given variables. It stays a draft until a person reviews and publishes it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A draft page to make from a mandatory page template.",
+        "properties": {
+          "key": {
+            "description": "Key of the template (see `content.legal_templates`), e.g. `return_policy`.",
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variables": {
+            "description": "Values for the template, e.g. `{\"policy\": {\"return_days\": 7}}`; they complete the legal\nprofile of the unit."
+          }
+        },
+        "required": [
+          "key",
+          "locale"
+        ],
+        "type": "object"
+      },
+      "name": "content.draft_from_template",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -1842,6 +2083,26 @@
       "permissions": [
         "content.read",
         "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the mandatory page templates for a commerce website in Vietnam (owner information, privacy, returns, shipping, payment, inspection, complaints, terms, general conditions; marketplace regulations, seller agreement, seller information), with the variables each needs. Every text needs review by a legal professional.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "content.legal_templates",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
       ]
     },
     {

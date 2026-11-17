@@ -194,3 +194,20 @@ impl PostingVerifier for Provider {
         Ok(self.0.posting_level(tenant, PostingSurface::Comments).await? != VerificationLevel::None)
     }
 }
+
+#[async_trait::async_trait]
+impl crate::api::LegalProfiles for Provider {
+    async fn template_variables(
+        &self,
+        tenant: &TenantContext,
+        org: Option<autoxide_kernel::tenancy::OrgId>,
+    ) -> Result<Option<serde_json::Value>, Error> {
+        self.0.template_variables(tenant, org).await
+    }
+}
+
+impl crate::api::ComplianceFacts for Provider {
+    fn register(&self, key: &'static str, fact: Arc<dyn crate::api::Fact>) -> Result<(), Error> {
+        self.0.facts.register(key, fact)
+    }
+}

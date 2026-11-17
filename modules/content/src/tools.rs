@@ -250,7 +250,71 @@ pub(crate) struct ResolveInput {
     site: Option<Uuid>,
 }
 
+/// A draft page to make from a mandatory page template.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TemplateDraftInput {
+    /// Key of the template (see `content.legal_templates`), e.g. `return_policy`.
+    key: String,
+    /// `en` or `vi`.
+    locale: String,
+    /// Values for the template, e.g. `{"policy": {"return_days": 7}}`; they complete the legal
+    /// profile of the unit.
+    #[serde(default)]
+    variables: Value,
+    parent_id: Option<Uuid>,
+    org_id: Option<Uuid>,
+}
+
+/// Tool của mẫu trang bắt buộc (D-359): cùng service, cùng permission với REST.
+fn template_tools(service: &Arc<ContentService>) -> Vec<Tool> {
+    let draft = service.clone();
+    vec![
+        Tool::new(
+            "legal_templates",
+            "List the mandatory page templates for a commerce website in Vietnam (owner \
+             information, privacy, returns, shipping, payment, inspection, complaints, terms, \
+             general conditions; marketplace regulations, seller agreement, seller information), \
+             with the variables each needs. Every text needs review by a legal professional.",
+            move |_tenant: TenantContext, principal: Principal, _: autoxide_kernel::mcp::NoInput| async move {
+                principal.require(&CONTENT_READ)?;
+                Ok::<_, Error>(crate::templates::summaries())
+            },
+        )
+        .requires(CONTENT_READ)
+        .read_only(),
+        Tool::new(
+            "draft_from_template",
+            "Make a draft page from a mandatory page template, filled with the unit's legal profile \
+             and the given variables. It stays a draft until a person reviews and publishes it.",
+            move |tenant: TenantContext, principal: Principal, input: TemplateDraftInput| {
+                let service = draft.clone();
+                async move {
+                    let request = crate::templates::TemplateDraft {
+                        locale: input.locale,
+                        variables: input.variables,
+                        parent_id: input.parent_id,
+                        org_id: input.org_id,
+                    };
+                    let entry = service
+                        .draft_from_template(&tenant, &principal, &input.key, request)
+                        .await?;
+                    versioned(&service, &tenant, entry).await
+                }
+            },
+        )
+        .requires(CONTENT_WRITE)
+        .or_requires(CONTENT_WRITE_OWN),
+    ]
+}
+
 pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
+    let mut tools = entry_tools(service);
+    tools.extend(template_tools(service));
+    tools
+}
+
+fn entry_tools(service: &Arc<ContentService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let (list, get, create, update, publish) =
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());

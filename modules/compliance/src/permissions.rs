@@ -51,6 +51,21 @@ pub(crate) const RULES_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Write);
 
+pub(crate) const LEGAL_READ: Permission = Permission::new(
+    "compliance.legal.read",
+    "See the legal (owner) profiles and websites, their checklist and dossier for the Ministry of \
+     Industry and Trade.",
+)
+.scoped();
+
+pub(crate) const LEGAL_MANAGE: Permission = Permission::new(
+    "compliance.legal.manage",
+    "Set the legal (owner) profiles and websites of units in your scope, link their mandatory \
+     pages and record their status with the Ministry of Industry and Trade.",
+)
+.scoped()
+.with_risk(Risk::Write);
+
 pub(crate) fn all() -> Vec<Permission> {
     vec![
         KYC_READ,
@@ -62,5 +77,7 @@ pub(crate) fn all() -> Vec<Permission> {
         POLICIES_MANAGE,
         RULES_READ,
         RULES_MANAGE,
+        LEGAL_READ,
+        LEGAL_MANAGE,
     ]
 }

@@ -1,0 +1,232 @@
+{
+ "key": "platform_rules",
+ "locale": "vi",
+ "title": "Quy chế hoạt động của sàn giao dịch thương mại điện tử",
+ "marketplace": true,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "owner.tax_code",
+   "required": true,
+   "description": "Tax code of the owner."
+  },
+  {
+   "path": "owner.address",
+   "required": true,
+   "description": "Address of the owner, on one line."
+  },
+  {
+   "path": "contact.email",
+   "required": true,
+   "description": "Contact email."
+  },
+  {
+   "path": "website.domain",
+   "required": false,
+   "description": "Domain of the website, e.g. shop.example."
+  },
+  {
+   "path": "owner.representative_name",
+   "required": false,
+   "description": "Legal representative."
+  },
+  {
+   "path": "policy.complaint_days",
+   "required": false,
+   "description": "Working days to answer a complaint."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Nguyên tắc chung"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ website.domain or \"Sàn\" }} do {{ owner.legal_name }} (mã số thuế {{ owner.tax_code }}, {{ owner.address }}) sở hữu và vận hành. Người bán, người mua và chủ sàn tuân theo quy chế này và pháp luật."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Người bán"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Định danh trước khi bán, thông tin luôn đúng và cập nhật."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Trang sản phẩm hiện tên, địa chỉ, liên hệ của người bán."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Không bán hàng cấm, hàng giả, hàng xâm phạm sở hữu trí tuệ; phản ánh được xử lý và tin đăng có thể bị ẩn."
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Người mua"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Cung cấp thông tin đúng, thanh toán như đã thoả thuận, được khiếu nại qua kênh của sàn."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Chủ sàn"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Kiểm tra thông tin người bán, lưu dữ liệu giao dịch, gỡ tin đăng vi phạm, phối hợp với cơ quan có thẩm quyền, bảo vệ dữ liệu cá nhân."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Khiếu nại và tranh chấp"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Gửi khiếu nại tới {{ contact.email }}; trả lời trong {{ policy.complaint_days or \"[số]\" }} ngày làm việc."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Hiệu lực"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Quy chế có hiệu lực khi công bố; thay đổi được thông báo trước khi áp dụng. Người đại diện: {{ owner.representative_name or \"[họ tên]\" }}."
+     }
+    ]
+   }
+  ]
+ }
+}

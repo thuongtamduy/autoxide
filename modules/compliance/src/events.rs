@@ -38,5 +38,9 @@ events! {
     PHONE_VERIFIED, PhoneVerified, "compliance.phone_verified", "A user confirmed a phone number with a one-time code (`user_id`).";
     PHONE_REMOVED, PhoneRemoved, "compliance.phone_removed", "A user removed their verified phone number (`user_id`).";
     POLICY_UPDATED, PolicyUpdated, "compliance.policy_updated", "A compliance policy of the tenant was set (`key`).";
+    LEGAL_PROFILE_UPDATED, LegalProfileUpdated, "compliance.legal_profile_updated", "A legal (owner) profile was created or changed (`profile_id`, `org_id`).";
+    WEBSITE_CREATED, WebsiteCreated, "compliance.website_created", "A website was added for the Ministry of Industry and Trade checklist (`website_id`, `org_id`, `domain`, `kind`).";
+    WEBSITE_UPDATED, WebsiteUpdated, "compliance.website_updated", "A website or its linked mandatory pages changed (`website_id`, `domain`, `kind`).";
+    WEBSITE_STATUS_CHANGED, WebsiteStatusChanged, "compliance.website_status_changed", "The notification / registration status of a website with the Ministry of Industry and Trade changed (`website_id`, `domain`, `kind`, `status`, `previous_status`).";
     RULES_IMPORTED, RulesImported, "compliance.rules_imported", "Legal rules were imported (`jurisdiction`, `rules`).";
 }

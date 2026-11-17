@@ -27,6 +27,7 @@ mod publishing;
 mod resource;
 mod service;
 mod taxonomy;
+mod templates;
 mod tools;
 mod work;
 
@@ -182,7 +183,12 @@ impl Module for ContentModule {
             // Tuỳ chọn: app đăng ký `organizations` trước `content`; test riêng của module thì không.
             .with_orgs(context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok())
             .with_entitlements(context.entitlements())
-            .with_resources(context.resources()),
+            .with_resources(context.resources())
+            // Mẫu trang bắt buộc (D-359): biến từ hồ sơ pháp lý của `compliance` khi app có module đó.
+            .with_templates(
+                (*context.require::<autoxide_kernel::template::TemplateEngine>()?).clone(),
+                context.require::<dyn autoxide_compliance::api::LegalProfiles>().ok(),
+            ),
         );
         context.personal_data(service.clone())?;
         context.work_source(Arc::new(work::Review))?;
@@ -193,6 +199,8 @@ impl Module for ContentModule {
         context.resource_type(resource::TERM, Arc::new(resource::TermResolver(service.clone())))?;
         // Menu cũ cho module `menus` nhập sang (D-238).
         context.provide::<dyn api::LegacyMenus>(service.clone())?;
+        // Ảnh chụp bản đã đăng cho module khác (bước 37 C1).
+        context.provide::<dyn api::PublishedEntries>(service.clone())?;
         self.service = Some(service);
         Ok(())
     }

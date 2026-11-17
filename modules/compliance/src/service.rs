@@ -43,6 +43,14 @@ pub(crate) struct ComplianceService {
     pub secret: autoxide_kernel::secret::SecretKey,
     /// Giới hạn của mã một lần (`AUTOXIDE_COMPLIANCE_OTP_*`).
     pub otp: crate::config::Otp,
+    /// Kiểm địa chỉ của hồ sơ pháp lý (module `address`); `None` thì không nhận địa chỉ.
+    pub units: Option<Arc<dyn autoxide_address::api::AdministrativeUnits>>,
+    /// Sổ đối tượng (D-123): kiểm trang bắt buộc gắn với website (`content.entry`).
+    pub resources: autoxide_kernel::resource::ResourceDirectory,
+    /// Bộ dựng mẫu của kernel (D-351): bản nháp đề án, quy chế của bộ hồ sơ.
+    pub templates: autoxide_kernel::template::TemplateEngine,
+    /// "Fact" của danh sách kiểm do module khác đăng ký.
+    pub facts: Arc<crate::checklist::FactRegistry>,
 }
 
 /// Duyệt hay quyết định cần phiên đăng nhập của người, không nhận API key.
@@ -54,6 +62,11 @@ pub(crate) fn require_session(principal: &Principal) -> Result<(), Error> {
         ));
     }
     Ok(())
+}
+
+/// Lỗi vi phạm unique của database (hai bên báo khác nhau; SeaORM gom về một loại).
+pub(crate) fn is_unique_violation(error: &sea_orm::DbErr) -> bool {
+    matches!(error.sql_err(), Some(sea_orm::SqlErr::UniqueConstraintViolation(_)))
 }
 
 pub(crate) fn rules_invalid(detail: impl ToString) -> Error {

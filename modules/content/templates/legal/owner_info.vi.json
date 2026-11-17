@@ -1,0 +1,248 @@
+{
+ "key": "owner_info",
+ "locale": "vi",
+ "title": "Thông tin chủ sở hữu website",
+ "marketplace": false,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "owner.address",
+   "required": true,
+   "description": "Address of the owner, on one line."
+  },
+  {
+   "path": "contact.email",
+   "required": true,
+   "description": "Contact email."
+  },
+  {
+   "path": "contact.phone",
+   "required": true,
+   "description": "Contact phone number."
+  },
+  {
+   "path": "owner.trade_name",
+   "required": false,
+   "description": "Trade name of the owner."
+  },
+  {
+   "path": "owner.tax_code",
+   "required": false,
+   "description": "Tax code of the owner."
+  },
+  {
+   "path": "owner.registration_number",
+   "required": false,
+   "description": "Business registration number."
+  },
+  {
+   "path": "owner.registration_issued_on",
+   "required": false,
+   "description": "Date the registration was issued."
+  },
+  {
+   "path": "owner.registration_issued_by",
+   "required": false,
+   "description": "Who issued the registration."
+  },
+  {
+   "path": "owner.representative_name",
+   "required": false,
+   "description": "Legal representative."
+  },
+  {
+   "path": "website.domain",
+   "required": false,
+   "description": "Domain of the website, e.g. shop.example."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Chủ sở hữu"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Tên: {{ owner.legal_name }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Tên giao dịch: {{ owner.trade_name or owner.legal_name }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Mã số thuế: {{ owner.tax_code or \"[mã số thuế]\" }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Giấy chứng nhận đăng ký kinh doanh số {{ owner.registration_number or \"[số]\" }}, cấp ngày {{ owner.registration_issued_on or \"[ngày]\" }}, nơi cấp {{ owner.registration_issued_by or \"[nơi cấp]\" }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Địa chỉ: {{ owner.address }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Người đại diện theo pháp luật: {{ owner.representative_name or \"[họ tên]\" }}"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Liên hệ"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Điện thoại: {{ contact.phone }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Email: {{ contact.email }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Website: {{ website.domain or \"[tên miền]\" }}"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

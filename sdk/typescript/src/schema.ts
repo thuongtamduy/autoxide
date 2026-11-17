@@ -941,6 +941,75 @@ export type ComplianceAccountVerification = {
   phone_verified_at?: string | null;
 };
 
+/** The ministry's logo for a website footer. */
+export type ComplianceBadge = {
+  alt: string;
+  /** `blue` or `red`. */
+  color: string;
+  domain: string;
+  image_url: string;
+  /** `sales` or `platform`. */
+  kind: string;
+  link_url: string;
+  /** Ready-to-insert HTML, rebuilt from the checked addresses. */
+  snippet: string;
+  /** `notified` (blue logo) or `registered` (red logo). */
+  status: string;
+  website_id: string;
+};
+
+/**
+ * What a website still lacks before it is notified to, or registered with, the Ministry of
+ * Industry and Trade (data: the rule `moit.checklist.<kind>` in force).
+ */
+export type ComplianceChecklist = {
+  domain: string;
+  items: ComplianceChecklistItem[];
+  /** `sales` or `platform`. */
+  kind: string;
+  legal_basis: string;
+  /** Items `missing`. */
+  missing: number;
+  needs_legal_review: boolean;
+  /**
+   * `notification` (sales website, blue logo) or `registration` (marketplace or other
+   * intermediary, red logo).
+   */
+  procedure: string;
+  /** Version of the rule `moit.checklist.<kind>` used; `null` when no rule is in force. */
+  rule_version?: number | null;
+  /**
+   * Selling before the procedure is done is shown as "required by law" (`label`), not blocked:
+   * see `selling_note` (decision D-358; check with a legal professional).
+   */
+  selling_before_done: string;
+  selling_note: string;
+  /** Current status with the ministry. */
+  status: string;
+  /** Items `unknown`. */
+  unknown: number;
+  website_id: string;
+};
+
+/** One line of the checklist. */
+export type ComplianceChecklistItem = {
+  /** `profile_field`, `page`, `document`, `kyc`, `policy`, `fact` or `manual`. */
+  check: string;
+  /** What to do when it is not met. */
+  hint?: string | null;
+  key: string;
+  legal_basis: string;
+  /** Check against the original legal text before relying on it. */
+  needs_legal_review: boolean;
+  /**
+   * `met`, `missing`, `unknown` (cannot be answered yet, e.g. no module answers this fact) or
+   * `manual` (a person checks it).
+   */
+  status: string;
+  /** `{"en": "…", "vi": "…"}`. */
+  title: Record<string, unknown>;
+};
+
 /** A consent, as it stands. */
 export type ComplianceConsent = {
   channel: string;
@@ -1008,6 +1077,30 @@ export type ComplianceDocumentVersion = {
   sha256: string;
   title: string;
   version: number;
+};
+
+/**
+ * Draft dossier for the Ministry of Industry and Trade, filled from the tenant's data. A person
+ * submits it on online.gov.vn; have a legal professional review it first.
+ */
+export type ComplianceDossier = {
+  checklist: ComplianceChecklist;
+  disclaimer: string;
+  documents: ComplianceDossierDocument[];
+  /** Fields of the declaration form (owner, website, identity verification, pages). */
+  form: Record<string, unknown>;
+  generated_at: string;
+  website_id: string;
+};
+
+/** A document of the dossier. */
+export type ComplianceDossierDocument = {
+  body: string;
+  /** Always `markdown`. */
+  format: string;
+  /** `declaration`, `project_plan` or `platform_rules`. */
+  key: string;
+  title: string;
 };
 
 /** Files for a manual review. */
@@ -1088,6 +1181,78 @@ export type ComplianceKycSessionRequest = {
   return_url?: string | null;
 };
 
+/**
+ * The legal owner of a website (a tenant, or a seller unit): the information Vietnamese law
+ * requires a commerce website to show, and the declaration to the Ministry of Industry and Trade.
+ */
+export type ComplianceLegalProfile = {
+  address?: Address | null;
+  created_at: string;
+  email?: string | null;
+  /** `individual`, `household_business` or `organization`. */
+  entity_type: string;
+  id: string;
+  /** Identity verification (KYC) profile of the owner. */
+  kyc_profile_id?: string | null;
+  legal_name: string;
+  /** Organization unit it belongs to; the root unit (the tenant id) is the whole tenant. */
+  org_id: string;
+  phone?: string | null;
+  registration_issued_by?: string | null;
+  /** `YYYY-MM-DD`. */
+  registration_issued_on?: string | null;
+  /** Business registration certificate number (an individual: identity document number). */
+  registration_number?: string | null;
+  representative_name?: string | null;
+  representative_title?: string | null;
+  /** 10 or 12 digits, or 10 digits, `-` and 3 digits. */
+  tax_code?: string | null;
+  trade_name?: string | null;
+  updated_at: string;
+};
+
+/**
+ * Changes to a legal profile: a field left out stays; `""` clears a text, `null` clears
+ * `address` or `kyc_profile_id`.
+ */
+export type ComplianceLegalProfileChange = {
+  address?: AddressInput | null;
+  email?: string | null;
+  entity_type?: string | null;
+  kyc_profile_id?: string | null;
+  legal_name?: string | null;
+  phone?: string | null;
+  registration_issued_by?: string | null;
+  registration_issued_on?: string | null;
+  registration_number?: string | null;
+  representative_name?: string | null;
+  representative_title?: string | null;
+  tax_code?: string | null;
+  trade_name?: string | null;
+};
+
+/** A legal profile to create. */
+export type ComplianceLegalProfileRequest = {
+  address?: AddressInput | null;
+  email?: string | null;
+  /** `individual`, `household_business` or `organization`. */
+  entity_type: string;
+  kyc_profile_id?: string | null;
+  /** Registered name, 1 to 200 characters. */
+  legal_name: string;
+  /** Organization unit (e.g. a seller); left out: the whole tenant. One profile per unit. */
+  org_id?: string | null;
+  phone?: string | null;
+  registration_issued_by?: string | null;
+  /** `YYYY-MM-DD`. */
+  registration_issued_on?: string | null;
+  registration_number?: string | null;
+  representative_name?: string | null;
+  representative_title?: string | null;
+  tax_code?: string | null;
+  trade_name?: string | null;
+};
+
 /** Your verification profile, or none yet. */
 export type ComplianceMyKyc = {
   profile?: ComplianceKycProfile | null;
@@ -1142,6 +1307,22 @@ export type CompliancePolicyRequest = {
   value: unknown;
 };
 
+/** The website owner's information for a footer (what the law requires a commerce website to show). */
+export type CompliancePublicOwner = {
+  address?: Address | null;
+  email?: string | null;
+  /** `individual`, `household_business` or `organization`. */
+  entity_type: string;
+  legal_name: string;
+  phone?: string | null;
+  registration_issued_by?: string | null;
+  registration_issued_on?: string | null;
+  registration_number?: string | null;
+  representative_name?: string | null;
+  tax_code?: string | null;
+  trade_name?: string | null;
+};
+
 /** A legal rule in force. */
 export type ComplianceRule = {
   body: Record<string, unknown>;
@@ -1183,6 +1364,95 @@ export type ComplianceVersionRequest = {
   version?: number | null;
 };
 
+/** A website (or mobile app) and its procedure with the Ministry of Industry and Trade. */
+export type ComplianceWebsite = {
+  /** `website` or `mobile_app`. */
+  channel: string;
+  /** Checklist version when it was submitted. */
+  checklist_version?: number | null;
+  created_at: string;
+  decided_at?: string | null;
+  domain: string;
+  id: string;
+  /**
+   * `sales` (notify the ministry, blue logo) or `platform` (marketplace or other
+   * intermediary: register with the ministry, red logo).
+   */
+  kind: string;
+  logo_image_url?: string | null;
+  /** Logo link and image, once `notified` / `registered`. */
+  logo_link_url?: string | null;
+  /** Organization unit of the website; the root unit (the tenant id) is the whole tenant. */
+  org_id: string;
+  /** Linked mandatory pages (only on `GET /websites/{id}`). */
+  pages?: ComplianceWebsitePage[] | null;
+  /** Number of the file at the ministry. */
+  reference?: string | null;
+  /**
+   * `not_submitted`, `submitted`, `needs_supplement`, `notified`, `registered`, `rejected` or
+   * `revoked`.
+   */
+  status: string;
+  submitted_at?: string | null;
+  updated_at: string;
+};
+
+/** Changes to a website; a field left out stays. Changing `kind` starts the procedure again. */
+export type ComplianceWebsiteChange = {
+  channel?: string | null;
+  domain?: string | null;
+  kind?: string | null;
+  org_id?: string | null;
+};
+
+/** A mandatory page linked to a website. */
+export type ComplianceWebsitePage = {
+  linked_at: string;
+  /** e.g. `return_policy`. */
+  page_kind: string;
+  /** The linked object, e.g. `content.entry:<id>`. */
+  resource: string;
+};
+
+/** A page to link. */
+export type ComplianceWebsitePageRequest = {
+  /** A page (or post) of `content`; publish it so the checklist counts it. */
+  entry_id: string;
+};
+
+/** A website to add. */
+export type ComplianceWebsiteRequest = {
+  /** `website` (default) or `mobile_app`. */
+  channel?: string | null;
+  /** Domain name (international names in punycode). */
+  domain: string;
+  /** `sales` or `platform`. */
+  kind: string;
+  /** Organization unit (e.g. a seller's own site); left out: the whole tenant. */
+  org_id?: string | null;
+};
+
+/** A status to record. */
+export type ComplianceWebsiteStatusRequest = {
+  /** …and image. */
+  image_url?: string | null;
+  /** Instead of `snippet`: the logo's link… */
+  link_url?: string | null;
+  /** Number of the file at the ministry. */
+  reference?: string | null;
+  /**
+   * For `notified` / `registered`: the logo code the ministry gave, pasted unchanged. Only a
+   * link to online.gov.vn around an image from online.gov.vn is accepted; it is rebuilt, never
+   * stored as sent.
+   */
+  snippet?: string | null;
+  /**
+   * `not_submitted`, `submitted`, `needs_supplement`, `notified` (sales website),
+   * `registered` (marketplace), `rejected` or `revoked`.
+   */
+  status: string;
+};
+
 /** The token of a confirmation link. */
 export type ConfirmBody = {
   /**
@@ -1201,6 +1471,47 @@ export type ConfirmResponse = {
 export type ConfirmedList = {
   key: string;
   name: NewsletterText;
+};
+
+/** A mandatory page template. */
+export type ContentTemplate = {
+  /**
+   * e.g. `return_policy`; also the page kind to link in
+   * `PUT /api/v1/compliance/websites/{id}/pages/{page_kind}` (except `seller_info`, a block
+   * for product pages).
+   */
+  key: string;
+  /** Only a marketplace needs it. */
+  marketplace: boolean;
+  /** Always `true`: have a legal professional review the text before use. */
+  needs_legal_review: boolean;
+  /** Title per language, e.g. `{"en": "…", "vi": "…"}`. */
+  titles: Record<string, unknown>;
+  variables: ContentTemplateVariable[];
+};
+
+/** A draft page to make from a template. */
+export type ContentTemplateDraftRequest = {
+  /** `en` or `vi`; the tenant must write in that language. */
+  locale: string;
+  /** Organization unit of the page (and of the legal profile used); default as for a new page. */
+  org_id?: string | null;
+  /** Parent page. */
+  parent_id?: string | null;
+  /**
+   * Values for the template, e.g. `{"policy": {"return_days": 7}}`. They complete (and win
+   * over) the legal profile of the unit (`owner.*`, `contact.*`). Values only ever become text.
+   */
+  variables?: Record<string, unknown>;
+};
+
+/** A variable a template uses. */
+export type ContentTemplateVariable = {
+  description: string;
+  /** Dotted path, e.g. `owner.legal_name` or `policy.return_days`. */
+  path: string;
+  /** The draft cannot be made without it. */
+  required: boolean;
 };
 
 /** A key to create. */
@@ -2056,6 +2367,62 @@ export type Data_ComplianceAccountVerification = {
 };
 
 /** Envelope of a single result. */
+export type Data_ComplianceBadge = {
+  /** The ministry's logo for a website footer. */
+  data: {
+    alt: string;
+    /** `blue` or `red`. */
+    color: string;
+    domain: string;
+    image_url: string;
+    /** `sales` or `platform`. */
+    kind: string;
+    link_url: string;
+    /** Ready-to-insert HTML, rebuilt from the checked addresses. */
+    snippet: string;
+    /** `notified` (blue logo) or `registered` (red logo). */
+    status: string;
+    website_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceChecklist = {
+  /**
+   * What a website still lacks before it is notified to, or registered with, the Ministry of
+   * Industry and Trade (data: the rule `moit.checklist.<kind>` in force).
+   */
+  data: {
+    domain: string;
+    items: ComplianceChecklistItem[];
+    /** `sales` or `platform`. */
+    kind: string;
+    legal_basis: string;
+    /** Items `missing`. */
+    missing: number;
+    needs_legal_review: boolean;
+    /**
+     * `notification` (sales website, blue logo) or `registration` (marketplace or other
+     * intermediary, red logo).
+     */
+    procedure: string;
+    /** Version of the rule `moit.checklist.<kind>` used; `null` when no rule is in force. */
+    rule_version?: number | null;
+    /**
+     * Selling before the procedure is done is shown as "required by law" (`label`), not blocked:
+     * see `selling_note` (decision D-358; check with a legal professional).
+     */
+    selling_before_done: string;
+    selling_note: string;
+    /** Current status with the ministry. */
+    status: string;
+    /** Items `unknown`. */
+    unknown: number;
+    website_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceConsent = {
   /** A consent, as it stands. */
   data: {
@@ -2113,6 +2480,23 @@ export type Data_ComplianceDocumentVersion = {
 };
 
 /** Envelope of a single result. */
+export type Data_ComplianceDossier = {
+  /**
+   * Draft dossier for the Ministry of Industry and Trade, filled from the tenant's data. A person
+   * submits it on online.gov.vn; have a legal professional review it first.
+   */
+  data: {
+    checklist: ComplianceChecklist;
+    disclaimer: string;
+    documents: ComplianceDossierDocument[];
+    /** Fields of the declaration form (owner, website, identity verification, pages). */
+    form: Record<string, unknown>;
+    generated_at: string;
+    website_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceKycProfile = {
   /** An identity verification (KYC) profile. */
   data: {
@@ -2161,6 +2545,39 @@ export type Data_ComplianceKycSession = {
 };
 
 /** Envelope of a single result. */
+export type Data_ComplianceLegalProfile = {
+  /**
+   * The legal owner of a website (a tenant, or a seller unit): the information Vietnamese law
+   * requires a commerce website to show, and the declaration to the Ministry of Industry and Trade.
+   */
+  data: {
+    address?: Address | null;
+    created_at: string;
+    email?: string | null;
+    /** `individual`, `household_business` or `organization`. */
+    entity_type: string;
+    id: string;
+    /** Identity verification (KYC) profile of the owner. */
+    kyc_profile_id?: string | null;
+    legal_name: string;
+    /** Organization unit it belongs to; the root unit (the tenant id) is the whole tenant. */
+    org_id: string;
+    phone?: string | null;
+    registration_issued_by?: string | null;
+    /** `YYYY-MM-DD`. */
+    registration_issued_on?: string | null;
+    /** Business registration certificate number (an individual: identity document number). */
+    registration_number?: string | null;
+    representative_name?: string | null;
+    representative_title?: string | null;
+    /** 10 or 12 digits, or 10 digits, `-` and 3 digits. */
+    tax_code?: string | null;
+    trade_name?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceMyKyc = {
   /** Your verification profile, or none yet. */
   data: {
@@ -2198,10 +2615,77 @@ export type Data_CompliancePolicy = {
 };
 
 /** Envelope of a single result. */
+export type Data_CompliancePublicOwner = {
+  /** The website owner's information for a footer (what the law requires a commerce website to show). */
+  data: {
+    address?: Address | null;
+    email?: string | null;
+    /** `individual`, `household_business` or `organization`. */
+    entity_type: string;
+    legal_name: string;
+    phone?: string | null;
+    registration_issued_by?: string | null;
+    registration_issued_on?: string | null;
+    registration_number?: string | null;
+    representative_name?: string | null;
+    tax_code?: string | null;
+    trade_name?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceRulesImported = {
   /** How many rules were new. */
   data: {
     imported: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceWebsite = {
+  /** A website (or mobile app) and its procedure with the Ministry of Industry and Trade. */
+  data: {
+    /** `website` or `mobile_app`. */
+    channel: string;
+    /** Checklist version when it was submitted. */
+    checklist_version?: number | null;
+    created_at: string;
+    decided_at?: string | null;
+    domain: string;
+    id: string;
+    /**
+     * `sales` (notify the ministry, blue logo) or `platform` (marketplace or other
+     * intermediary: register with the ministry, red logo).
+     */
+    kind: string;
+    logo_image_url?: string | null;
+    /** Logo link and image, once `notified` / `registered`. */
+    logo_link_url?: string | null;
+    /** Organization unit of the website; the root unit (the tenant id) is the whole tenant. */
+    org_id: string;
+    /** Linked mandatory pages (only on `GET /websites/{id}`). */
+    pages?: ComplianceWebsitePage[] | null;
+    /** Number of the file at the ministry. */
+    reference?: string | null;
+    /**
+     * `not_submitted`, `submitted`, `needs_supplement`, `notified`, `registered`, `rejected` or
+     * `revoked`.
+     */
+    status: string;
+    submitted_at?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceWebsitePage = {
+  /** A mandatory page linked to a website. */
+  data: {
+    linked_at: string;
+    /** e.g. `return_policy`. */
+    page_kind: string;
+    /** The linked object, e.g. `content.entry:<id>`. */
+    resource: string;
   };
 };
 
@@ -5137,6 +5621,11 @@ export type Data_UserResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Value = {
+  data: unknown;
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ActivityResponse = {
   data: {
     /** The event, `<module>.<what_happened>`. */
@@ -5303,6 +5792,25 @@ export type Data_Vec_ComplianceRule = {
     /** Check against the original text before relying on it. */
     needs_legal_review: boolean;
     version: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ContentTemplate = {
+  data: {
+    /**
+     * e.g. `return_policy`; also the page kind to link in
+     * `PUT /api/v1/compliance/websites/{id}/pages/{page_kind}` (except `seller_info`, a block
+     * for product pages).
+     */
+    key: string;
+    /** Only a marketplace needs it. */
+    marketplace: boolean;
+    /** Always `true`: have a legal professional review the text before use. */
+    needs_legal_review: boolean;
+    /** Title per language, e.g. `{"en": "…", "vi": "…"}`. */
+    titles: Record<string, unknown>;
+    variables: ContentTemplateVariable[];
   }[];
 };
 
@@ -9299,6 +9807,74 @@ export type Page_ComplianceKycProfile = {
     updated_at: string;
     verified_at?: string | null;
     verified_name?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceLegalProfile = {
+  /** The items of this page, in the requested order. */
+  data: {
+    address?: Address | null;
+    created_at: string;
+    email?: string | null;
+    /** `individual`, `household_business` or `organization`. */
+    entity_type: string;
+    id: string;
+    /** Identity verification (KYC) profile of the owner. */
+    kyc_profile_id?: string | null;
+    legal_name: string;
+    /** Organization unit it belongs to; the root unit (the tenant id) is the whole tenant. */
+    org_id: string;
+    phone?: string | null;
+    registration_issued_by?: string | null;
+    /** `YYYY-MM-DD`. */
+    registration_issued_on?: string | null;
+    /** Business registration certificate number (an individual: identity document number). */
+    registration_number?: string | null;
+    representative_name?: string | null;
+    representative_title?: string | null;
+    /** 10 or 12 digits, or 10 digits, `-` and 3 digits. */
+    tax_code?: string | null;
+    trade_name?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceWebsite = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `website` or `mobile_app`. */
+    channel: string;
+    /** Checklist version when it was submitted. */
+    checklist_version?: number | null;
+    created_at: string;
+    decided_at?: string | null;
+    domain: string;
+    id: string;
+    /**
+     * `sales` (notify the ministry, blue logo) or `platform` (marketplace or other
+     * intermediary: register with the ministry, red logo).
+     */
+    kind: string;
+    logo_image_url?: string | null;
+    /** Logo link and image, once `notified` / `registered`. */
+    logo_link_url?: string | null;
+    /** Organization unit of the website; the root unit (the tenant id) is the whole tenant. */
+    org_id: string;
+    /** Linked mandatory pages (only on `GET /websites/{id}`). */
+    pages?: ComplianceWebsitePage[] | null;
+    /** Number of the file at the ministry. */
+    reference?: string | null;
+    /**
+     * `not_submitted`, `submitted`, `needs_supplement`, `notified`, `registered`, `rejected` or
+     * `revoked`.
+     */
+    status: string;
+    submitted_at?: string | null;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -15842,6 +16418,73 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/legal-profiles": {
+    /** List the legal profiles you can see. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceLegalProfile;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create the legal profile of the tenant or of a unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceLegalProfileRequest;
+      responses: {
+        201: Data_ComplianceLegalProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/legal-profiles/{id}": {
+    /** Get a legal profile. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceLegalProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a legal profile. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceLegalProfileChange;
+      responses: {
+        200: Data_ComplianceLegalProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/legal-profiles/{id}/template-variables": {
+    /** Get the template variables of a legal profile. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Value;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/me/acceptances": {
     /** Accept a version of a legal document. */
     post: {
@@ -16035,12 +16678,34 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/public/badge": {
+    /** Get the Ministry of Industry and Trade logo of a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { domain?: string; locale?: string; site?: string }; };
+      responses: {
+        200: Data_ComplianceBadge;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/public/documents/{kind}": {
     /** Get the current text of a legal document. */
     get: {
       parameters: { header: { "Accept-Language"?: string }; path: { kind: string }; query: { locale?: string }; };
       responses: {
         200: Data_ComplianceDocumentVersion;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/public/owner": {
+    /** Get the owner of the website being viewed. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string }; };
+      responses: {
+        200: Data_CompliancePublicOwner;
         404: Problem;
         default: Problem;
       };
@@ -16065,6 +16730,129 @@ export interface paths {
         200: Data_ComplianceRulesImported;
         401: Problem;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/websites": {
+    /** List the websites you can see. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceWebsite;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a website for the Ministry of Industry and Trade procedure. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceWebsiteRequest;
+      responses: {
+        201: Data_ComplianceWebsite;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/websites/{id}": {
+    /** Get a website with its linked pages. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceWebsite;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a website. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceWebsiteChange;
+      responses: {
+        200: Data_ComplianceWebsite;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/websites/{id}/checklist": {
+    /** Get what a website still lacks for the Ministry of Industry and Trade. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceChecklist;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/websites/{id}/dossier": {
+    /** Export the draft dossier of a website for the Ministry of Industry and Trade. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceDossier;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/websites/{id}/pages/{page_kind}": {
+    /** Link a mandatory page to a website. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; page_kind: string }; };
+      requestBody: ComplianceWebsitePageRequest;
+      responses: {
+        200: Data_ComplianceWebsitePage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Unlink a mandatory page from a website. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; page_kind: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/websites/{id}/status": {
+    /** Record the status of a website with the Ministry of Industry and Trade. */
+    post: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceWebsiteStatusRequest;
+      responses: {
+        200: Data_ComplianceWebsite;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
         422: Problem;
         default: Problem;
       };
@@ -16756,6 +17544,34 @@ export interface paths {
         200: Page_SearchHit;
         401: Problem;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/templates": {
+    /** List the mandatory page templates (Vietnam). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ContentTemplate;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/templates/{key}/drafts": {
+    /** Make a draft page from a mandatory page template. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: ContentTemplateDraftRequest;
+      responses: {
+        201: Data_EntryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
