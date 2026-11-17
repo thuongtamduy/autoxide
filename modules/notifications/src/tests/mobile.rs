@@ -1,4 +1,4 @@
-//! Kênh đẩy cho ứng dụng di động (D-220, D-367), cả SQLite và Postgres: đăng ký / xem / gỡ token của
+//! Kênh đẩy cho ứng dụng di động (D-220, D-368), cả SQLite và Postgres: đăng ký / xem / gỡ token của
 //! chính mình (token lưu mã hoá, không trả lại), token hết hiệu lực bị xoá, tin quảng cáo không gửi
 //! khi chưa đồng ý, ngoài khung giờ thì hoãn — cùng luật như web push.
 

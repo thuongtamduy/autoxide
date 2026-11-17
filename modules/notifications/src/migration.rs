@@ -25,7 +25,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0008_tenancy_throttle",
             vec![autoxide_kernel::throttle::tenant_table("notifications")],
         ),
-        // Mẫu khách tự soạn có nháp / xuất bản / quay lại và thương hiệu của mail (D-206, D-365).
+        // Mẫu khách tự soạn có nháp / xuất bản / quay lại và thương hiệu của mail (D-206, D-366).
         Box::new(CreateTemplateVersions),
     ]
 }
@@ -305,7 +305,7 @@ impl MigrationTrait for CreateNotifications {
 }
 
 /// Mẫu khách tự soạn (cú pháp của bộ dựng mẫu kernel): bản nháp, các bản đã xuất bản (không đổi
-/// sau khi ghi), bản đang dùng, và thương hiệu của mail HTML (D-206, D-365).
+/// sau khi ghi), bản đang dùng, và thương hiệu của mail HTML (D-206, D-366).
 struct CreateTemplateVersions;
 
 impl MigrationName for CreateTemplateVersions {

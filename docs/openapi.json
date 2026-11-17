@@ -609,6 +609,11 @@
             "format": "uuid",
             "type": "string"
           },
+          "kind": {
+            "description": "Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's\napproval) or `service` (another program). The audit log records it as `actor_kind`.",
+            "example": "agent",
+            "type": "string"
+          },
           "last_used_at": {
             "description": "Last time the key was used, to the minute; `null`: never used.",
             "format": "date-time",
@@ -649,7 +654,89 @@
           "prefix",
           "permissions",
           "org_id",
-          "created_at"
+          "created_at",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "ApprovalRequest": {
+        "description": "A command an AI agent asked to run, waiting for a person.",
+        "properties": {
+          "api_key_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decided_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decided_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Any of these permissions may approve it.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "description": "Why it was rejected.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_by": {
+            "description": "The user whose agent key asked.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`pending`, `approved`, `rejected`, `expired` or `used` (approved, then run).",
+            "example": "pending",
+            "type": "string"
+          },
+          "summary": {
+            "description": "The command, e.g. `DELETE /api/v1/content/entries/0190…`.",
+            "type": "string"
+          },
+          "url": {
+            "description": "Where to look at it and decide.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "summary",
+          "requested_by",
+          "status",
+          "permissions",
+          "expires_at",
+          "created_at",
+          "url"
         ],
         "type": "object"
       },
@@ -707,7 +794,7 @@
             ]
           },
           "actor_kind": {
-            "description": "Who made the change: `user` (a signed-in user or API key), `system` (command line,\nbackground jobs) or `public` (someone not signed in, such as a visitor sending a form).",
+            "description": "Who made the change: `user` (a person, signed in or through an API key of kind `human`),\n`agent` (an AI agent's API key), `service` (another program's API key), `support` (platform\nstaff through a support grant), `system` (command line, background jobs) or `public`\n(someone not signed in, such as a visitor sending a form).",
             "example": "user",
             "type": "string"
           },
@@ -6632,6 +6719,36 @@
         ],
         "type": "object"
       },
+      "ConnectionTest": {
+        "description": "The result of testing a connection.",
+        "properties": {
+          "connection": {
+            "description": "The connection tested, `<module>.connection.<kind>`.",
+            "example": "mail.connection.smtp",
+            "type": "string"
+          },
+          "error": {
+            "description": "Why it failed, for the administrator.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "tested_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection",
+          "ok",
+          "tested_at"
+        ],
+        "type": "object"
+      },
       "ContentTemplate": {
         "description": "A mandatory page template.",
         "properties": {
@@ -6734,6 +6851,14 @@
           "expires_at": {
             "description": "When the key stops working (RFC 3339, in the future). Omit for a key that does\nnot expire.",
             "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Who will use the key: `human` (you, the default), `agent` (an AI agent: commands marked\nfor approval wait for a person to approve them) or `service` (another program).",
+            "example": "agent",
             "type": [
               "string",
               "null"
@@ -7841,6 +7966,96 @@
         ],
         "type": "object"
       },
+      "Data_ApprovalRequest": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A command an AI agent asked to run, waiting for a person.",
+            "properties": {
+              "api_key_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "decided_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "decided_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "permissions": {
+                "description": "Any of these permissions may approve it.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "reason": {
+                "description": "Why it was rejected.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requested_by": {
+                "description": "The user whose agent key asked.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "status": {
+                "description": "`pending`, `approved`, `rejected`, `expired` or `used` (approved, then run).",
+                "example": "pending",
+                "type": "string"
+              },
+              "summary": {
+                "description": "The command, e.g. `DELETE /api/v1/content/entries/0190…`.",
+                "type": "string"
+              },
+              "url": {
+                "description": "Where to look at it and decide.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "summary",
+              "requested_by",
+              "status",
+              "permissions",
+              "expires_at",
+              "created_at",
+              "url"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_AuditEntryResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -7861,7 +8076,7 @@
                 ]
               },
               "actor_kind": {
-                "description": "Who made the change: `user` (a signed-in user or API key), `system` (command line,\nbackground jobs) or `public` (someone not signed in, such as a visitor sending a form).",
+                "description": "Who made the change: `user` (a person, signed in or through an API key of kind `human`),\n`agent` (an AI agent's API key), `service` (another program's API key), `support` (platform\nstaff through a support grant), `system` (command line, background jobs) or `public`\n(someone not signed in, such as a visitor sending a form).",
                 "example": "user",
                 "type": "string"
               },
@@ -11461,6 +11676,45 @@
         ],
         "type": "object"
       },
+      "Data_ConnectionTest": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The result of testing a connection.",
+            "properties": {
+              "connection": {
+                "description": "The connection tested, `<module>.connection.<kind>`.",
+                "example": "mail.connection.smtp",
+                "type": "string"
+              },
+              "error": {
+                "description": "Why it failed, for the administrator.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "tested_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "connection",
+              "ok",
+              "tested_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CreatedApiKeyResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -12085,6 +12339,13 @@
               "status": {
                 "$ref": "#/components/schemas/Status"
               },
+              "tags": {
+                "description": "The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`).",
+                "items": {
+                  "$ref": "#/components/schemas/TagRef"
+                },
+                "type": "array"
+              },
               "term_ids": {
                 "description": "Categories and tags, in order (the first category is the main one). Set with\n`PUT /api/v1/content/entries/{id}/terms`; takes effect at once.",
                 "items": {
@@ -12156,7 +12417,8 @@
               "updated_at",
               "term_ids",
               "author_ids",
-              "version"
+              "version",
+              "tags"
             ],
             "type": "object"
           }
@@ -19370,6 +19632,53 @@
         ],
         "type": "object"
       },
+      "Data_TagView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A tag of the tenant.",
+            "properties": {
+              "color": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "uses": {
+                "description": "Records carrying it.",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "color",
+              "uses",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_TaxPackResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -20059,6 +20368,21 @@
               "is_set": {
                 "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
                 "type": "boolean"
+              },
+              "last_error": {
+                "description": "For a setting of a partner connection: why its last use failed; omitted when it worked.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last_used_at": {
+                "description": "For a setting of a partner connection: the last time the connection was used (or tested\nwith `POST /api/v1/kernel/settings/{name}/test`).",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "name": {
                 "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
@@ -20842,6 +21166,99 @@
                 "kind",
                 "level",
                 "valid_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_ApprovalRequest": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A command an AI agent asked to run, waiting for a person.",
+              "properties": {
+                "api_key_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "decided_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decided_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "expires_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "permissions": {
+                  "description": "Any of these permissions may approve it.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "reason": {
+                  "description": "Why it was rejected.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requested_by": {
+                  "description": "The user whose agent key asked.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`pending`, `approved`, `rejected`, `expired` or `used` (approved, then run).",
+                  "example": "pending",
+                  "type": "string"
+                },
+                "summary": {
+                  "description": "The command, e.g. `DELETE /api/v1/content/entries/0190…`.",
+                  "type": "string"
+                },
+                "url": {
+                  "description": "Where to look at it and decide.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "summary",
+                "requested_by",
+                "status",
+                "permissions",
+                "expires_at",
+                "created_at",
+                "url"
               ],
               "type": "object"
             },
@@ -23336,6 +23753,66 @@
         ],
         "type": "object"
       },
+      "Data_Vec_ReasonView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "One reason of a list.",
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "builtin": {
+                  "description": "Declared by the module (else added by the tenant).",
+                  "type": "boolean"
+                },
+                "code": {
+                  "example": "customer_request",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "In the language of `Accept-Language`: the tenant's own label, else the default.",
+                  "type": "string"
+                },
+                "labels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "The tenant's own labels, by language.",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "legal": {
+                  "description": "Required by law: cannot be turned off.",
+                  "type": "boolean"
+                },
+                "position": {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "code",
+                "label",
+                "labels",
+                "active",
+                "position",
+                "builtin",
+                "legal"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_RecordNote": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -23852,6 +24329,90 @@
         ],
         "type": "object"
       },
+      "Data_Vec_TagRef": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A tag, as attached to a record.",
+              "properties": {
+                "color": {
+                  "description": "One of `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`.",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_TagView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A tag of the tenant.",
+              "properties": {
+                "color": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "uses": {
+                  "description": "Records carrying it.",
+                  "format": "int64",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
+                "uses",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_TaxCategoryResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -24319,6 +24880,21 @@
                 "is_set": {
                   "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
                   "type": "boolean"
+                },
+                "last_error": {
+                  "description": "For a setting of a partner connection: why its last use failed; omitted when it worked.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "last_used_at": {
+                  "description": "For a setting of a partner connection: the last time the connection was used (or tested\nwith `POST /api/v1/kernel/settings/{name}/test`).",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "name": {
                   "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
@@ -25515,6 +26091,13 @@
           "status": {
             "$ref": "#/components/schemas/Status"
           },
+          "tags": {
+            "description": "The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`).",
+            "items": {
+              "$ref": "#/components/schemas/TagRef"
+            },
+            "type": "array"
+          },
           "term_ids": {
             "description": "Categories and tags, in order (the first category is the main one). Set with\n`PUT /api/v1/content/entries/{id}/terms`; takes effect at once.",
             "items": {
@@ -25586,7 +26169,8 @@
           "updated_at",
           "term_ids",
           "author_ids",
-          "version"
+          "version",
+          "tags"
         ],
         "type": "object"
       },
@@ -30858,6 +31442,20 @@
         ],
         "type": "object"
       },
+      "MergeTag": {
+        "description": "The tag to merge into.",
+        "properties": {
+          "into": {
+            "description": "Every record of the merged tag gets this tag; the merged tag is deleted.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "into"
+        ],
+        "type": "object"
+      },
       "MetricValueView": {
         "description": "The value of a figure: `money` (`amount` in the smallest unit of `currency`), `count`, or\n`ratio` (`numerator` / `denominator`).",
         "properties": {
@@ -31740,6 +32338,32 @@
         },
         "required": [
           "body"
+        ],
+        "type": "object"
+      },
+      "NewTag": {
+        "description": "A tag to create.",
+        "properties": {
+          "color": {
+            "description": "A color of the fixed palette; `gray` by default.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 50 characters; unique in the tenant, ignoring case and accents.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
         ],
         "type": "object"
       },
@@ -33335,6 +33959,11 @@
                   "format": "uuid",
                   "type": "string"
                 },
+                "kind": {
+                  "description": "Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's\napproval) or `service` (another program). The audit log records it as `actor_kind`.",
+                  "example": "agent",
+                  "type": "string"
+                },
                 "last_used_at": {
                   "description": "Last time the key was used, to the minute; `null`: never used.",
                   "format": "date-time",
@@ -33375,7 +34004,8 @@
                 "prefix",
                 "permissions",
                 "org_id",
-                "created_at"
+                "created_at",
+                "kind"
               ],
               "type": "object"
             },
@@ -33413,7 +34043,7 @@
                   ]
                 },
                 "actor_kind": {
-                  "description": "Who made the change: `user` (a signed-in user or API key), `system` (command line,\nbackground jobs) or `public` (someone not signed in, such as a visitor sending a form).",
+                  "description": "Who made the change: `user` (a person, signed in or through an API key of kind `human`),\n`agent` (an AI agent's API key), `service` (another program's API key), `support` (platform\nstaff through a support grant), `system` (command line, background jobs) or `public`\n(someone not signed in, such as a visitor sending a form).",
                   "example": "user",
                   "type": "string"
                 },
@@ -35638,6 +36268,13 @@
                 "status": {
                   "$ref": "#/components/schemas/Status"
                 },
+                "tags": {
+                  "description": "The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`).",
+                  "items": {
+                    "$ref": "#/components/schemas/TagRef"
+                  },
+                  "type": "array"
+                },
                 "term_ids": {
                   "description": "Categories and tags, in order (the first category is the main one). Set with\n`PUT /api/v1/content/entries/{id}/terms`; takes effect at once.",
                   "items": {
@@ -35709,7 +36346,8 @@
                 "updated_at",
                 "term_ids",
                 "author_ids",
-                "version"
+                "version",
+                "tags"
               ],
               "type": "object"
             },
@@ -43845,6 +44483,86 @@
         ],
         "type": "string"
       },
+      "ReasonChange": {
+        "description": "Changes to a reason; omitted fields stay. A code the list does not have yet is added.",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The tenant's labels by language (`vi`, `en`…), up to 200 characters each; an empty label\ngoes back to the default. A new code needs at least one.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "position": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ReasonView": {
+        "description": "One reason of a list.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "builtin": {
+            "description": "Declared by the module (else added by the tenant).",
+            "type": "boolean"
+          },
+          "code": {
+            "example": "customer_request",
+            "type": "string"
+          },
+          "label": {
+            "description": "In the language of `Accept-Language`: the tenant's own label, else the default.",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The tenant's own labels, by language.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "legal": {
+            "description": "Required by law: cannot be turned off.",
+            "type": "boolean"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "labels",
+          "active",
+          "position",
+          "builtin",
+          "legal"
+        ],
+        "type": "object"
+      },
       "ReauthRequest": {
         "additionalProperties": false,
         "description": "Proof that you are the account owner, for one sensitive change.",
@@ -43950,6 +44668,27 @@
           "mentions",
           "created_at"
         ],
+        "type": "object"
+      },
+      "RecordTagsInput": {
+        "description": "The tags of a record.",
+        "properties": {
+          "new_tags": {
+            "description": "New tags to create and attach by name (an existing name is reused).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tag_ids": {
+            "description": "The tags the record has after the call (replaces the current ones).",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
         "type": "object"
       },
       "RecoveryCodesResponse": {
@@ -44117,6 +44856,19 @@
           "email",
           "name",
           "password"
+        ],
+        "type": "object"
+      },
+      "RejectRequest": {
+        "description": "Why a request is rejected.",
+        "properties": {
+          "reason": {
+            "description": "1 to 500 characters, shown to the agent.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
         ],
         "type": "object"
       },
@@ -46503,6 +47255,53 @@
         ],
         "type": "object"
       },
+      "TagChanges": {
+        "description": "Changes to a tag; omitted fields stay.",
+        "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "`\"\"` clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "TagRef": {
+        "description": "A tag, as attached to a record.",
+        "properties": {
+          "color": {
+            "description": "One of `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color"
+        ],
+        "type": "object"
+      },
       "TagResponse": {
         "description": "A tag. Items carry tags as names; tags are created when first given to an item.",
         "properties": {
@@ -46537,6 +47336,44 @@
           "item_count",
           "created_at",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "TagView": {
+        "description": "A tag of the tenant.",
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "uses": {
+            "description": "Records carrying it.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "uses",
+          "created_at"
         ],
         "type": "object"
       },
@@ -47970,6 +48807,21 @@
           "is_set": {
             "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
             "type": "boolean"
+          },
+          "last_error": {
+            "description": "For a setting of a partner connection: why its last use failed; omitted when it worked.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_used_at": {
+            "description": "For a setting of a partner connection: the last time the connection was used (or tested\nwith `POST /api/v1/kernel/settings/{name}/test`).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "name": {
             "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
@@ -50408,8 +51260,8 @@
             }
           },
           {
-            "description": "Only changes made by this kind of actor: `user`, `system` or `public` (see `actor_kind`).",
-            "example": "user",
+            "description": "Only changes made by these kinds of actor, comma-separated: `user` (a person), `agent`,\n`service`, `support`, `app`, `scim`, `system` or `public` (see `actor_kind`).",
+            "example": "agent,service",
             "in": "query",
             "name": "actor_kind",
             "required": false,
@@ -50566,7 +51418,7 @@
             "operator": "eq"
           },
           {
-            "description": "Only changes made by this kind of actor: `user`, `system` or `public` (see `actor_kind`).",
+            "description": "Only changes made by these kinds of actor, comma-separated: `user` (a person), `agent`,\n`service`, `support`, `app`, `scim`, `system` or `public` (see `actor_kind`).",
             "kind": "string",
             "name": "actor_kind",
             "operator": "eq"
@@ -74551,6 +75403,24 @@
             }
           },
           {
+            "description": "Only entries with at least one of these internal tags (comma-separated ids).",
+            "in": "query",
+            "name": "tags_any",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only entries with every one of these internal tags (comma-separated ids).",
+            "in": "query",
+            "name": "tags_all",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
             "example": 50,
             "in": "query",
@@ -74759,6 +75629,18 @@
             "kind": "uuid",
             "name": "site",
             "operator": "eq"
+          },
+          {
+            "description": "Only entries with at least one of these internal tags (comma-separated ids).",
+            "kind": "string",
+            "name": "tags_any",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries with every one of these internal tags (comma-separated ids).",
+            "kind": "string",
+            "name": "tags_all",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "content.list_content_entries",
@@ -74893,7 +75775,7 @@
     },
     "/api/v1/content/entries/{id}": {
       "delete": {
-        "description": "Requires `content.delete`. Its revisions and schedules go too. A page with subpages\ncannot be deleted. If it was published, its address answers 410. `If-Match` is required.",
+        "description": "Requires `content.delete`. Its revisions and schedules go too. A page with subpages\ncannot be deleted. If it was published, its address answers 410. `If-Match` is required. An\nAI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_entry",
         "parameters": [
           {
@@ -74942,6 +75824,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -75025,6 +75917,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.delete"
         ]
@@ -88213,6 +89106,419 @@
         ]
       }
     },
+    "/api/v1/kernel/approvals": {
+      "get": {
+        "description": "Any signed-in user: the requests of your own agents, and those you may decide (a person holding\none of the command's permissions). Newest first, at most 200.",
+        "operationId": "kernel_list_approvals",
+        "parameters": [
+          {
+            "description": "Only `pending`, `approved`, `rejected`, `expired` or `used` requests.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ApprovalRequest"
+                }
+              }
+            },
+            "description": "The requests."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`status` is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List approval requests.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/approvals/{id}": {
+      "get": {
+        "description": "Your own agent's request, or one you may decide.",
+        "operationId": "kernel_get_approval",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ApprovalRequest"
+                }
+              }
+            },
+            "description": "The request."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request for you; code `kernel.approval_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an approval request.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/approvals/{id}/approve": {
+      "post": {
+        "description": "A person holding one of the command's permissions. The agent may then send the command again,\nonce, before `expires_at`. Emits `kernel.approval_decided`.",
+        "operationId": "kernel_approve_request",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ApprovalRequest"
+                }
+              }
+            },
+            "description": "Approved."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You may not decide it (an agent, or none of its permissions); code `kernel.approval_forbidden`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request for you; code `kernel.approval_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not pending (decided or expired); code `kernel.approval_decided`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve an agent's command.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/approvals/{id}/reject": {
+      "post": {
+        "description": "A person holding one of the command's permissions; `reason` is shown to the agent. Emits\n`kernel.approval_decided`.",
+        "operationId": "kernel_reject_request",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ApprovalRequest"
+                }
+              }
+            },
+            "description": "Rejected."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You may not decide it; code `kernel.approval_forbidden`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request for you; code `kernel.approval_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not pending; code `kernel.approval_decided`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`reason` is empty or too long; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject an agent's command.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/kernel/bulk/{resource}/{action}": {
       "post": {
         "description": "Requires the permission of the action, and an `Idempotency-Key`. Send either `ids` (up to 500)\nor `filter` with `expected_count`: when the records matching `filter` now are not\n`expected_count`, nothing is done (409 `kernel.bulk_count_changed`). The action runs in a\nbackground job with your permissions, checked on each record: follow it with\n`GET /api/v1/kernel/jobs/{id}`; its `result.items` says what happened to each record (`ok`,\n`skipped` with a reason, `failed` with the error `code`). With `dry_run`, nothing is done: the\nanswer lists the records it would act on.",
@@ -90535,6 +91841,241 @@
         ]
       }
     },
+    "/api/v1/kernel/reasons/{list}": {
+      "get": {
+        "description": "Anyone who reads the module that owns the list (`<module>.read`), or holds\n`kernel.reasons.manage`. The module's reasons and the tenant's own, in order, with labels in the\nlanguage of `Accept-Language`.",
+        "operationId": "kernel_list_reasons",
+        "parameters": [
+          {
+            "description": "The list, e.g. `orders.cancel`.",
+            "in": "path",
+            "name": "list",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true`: also the reasons turned off.",
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ReasonView"
+                }
+              }
+            },
+            "description": "The reasons."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such list for you; code `kernel.reason_list_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the reasons of a list.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/reasons/{list}/{code}": {
+      "put": {
+        "description": "Requires `kernel.reasons.manage`. Changes the labels, order or on / off of a reason; a code the\nlist does not have yet becomes the tenant's own reason. Reasons required by law stay on\n(`kernel.reason_legal`). Codes are lower-case letters, digits and `_` (`kernel.reason_invalid`).",
+        "operationId": "kernel_set_reason",
+        "parameters": [
+          {
+            "description": "The list, e.g. `orders.cancel`.",
+            "in": "path",
+            "name": "list",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The reason's code, e.g. `customer_request`.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ReasonView"
+                }
+              }
+            },
+            "description": "The list after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.reasons.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such list; code `kernel.reason_list_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Turning off a reason required by law; code `kernel.reason_legal`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The code is malformed (`kernel.reason_invalid`), or a label is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change or add a reason.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.reasons.manage"
+        ]
+      }
+    },
     "/api/v1/kernel/records/{kind}/{id}/activity": {
       "get": {
         "description": "Requires being able to read the record. Its internal notes and the events recorded about it\n(when the program keeps an audit log), newest first.",
@@ -90971,6 +92512,149 @@
         "x-permissions": []
       }
     },
+    "/api/v1/kernel/records/{kind}/{id}/tags": {
+      "put": {
+        "description": "Requires the permission that writes the record (each taggable type declares it). Replaces the\nrecord's tags with `tag_ids`, plus `new_tags` created by name (an existing name is reused;\ncreating needs `kernel.tags.manage` when the tenant set `kernel.tags.restricted`). At most 50\ntags per record. Emits `kernel.record_tags_changed`.",
+        "operationId": "kernel_set_record_tags",
+        "parameters": [
+          {
+            "description": "Type of the record, e.g. `content.entry`.",
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the record.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordTagsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_TagRef"
+                }
+              }
+            },
+            "description": "The record's tags."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You may not write the record (`permission_denied`), or create tags here (`kernel.tags_restricted`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such taggable record (`kernel.record_not_found`) or tag (`kernel.tag_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "More than 50 tags; code `kernel.tag_limit_reached`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A new tag's name is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the tags of a record.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/kernel/resolve": {
       "get": {
         "description": "Any signed-in user. Asks the modules' code readers (order numbers, tracking numbers, invoice\nnumbers, page addresses…), among those the caller has permission for, and answers the first\nrecord found. No record and no permission answer the same 404, so a code never reveals that a\nrecord exists.",
@@ -91359,6 +93043,112 @@
         ]
       }
     },
+    "/api/v1/kernel/settings/{name}/test": {
+      "post": {
+        "description": "Requires `kernel.settings.manage`. Tries the partner connection the setting `name` belongs to\n(e.g. `mail.connection.smtp.url` tests the mail server) with this tenant's settings — or the\nserver's, for the ones not set — and records the result as `last_used_at` / `last_error`.\nGives up after 15 seconds.",
+        "operationId": "kernel_test_tenant_connection",
+        "parameters": [
+          {
+            "description": "A setting of the connection, e.g. `mail.connection.smtp.url`.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConnectionTest"
+                }
+              }
+            },
+            "description": "The result, whether the connection works or not."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.settings.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The setting belongs to no connection that can be tested; code `kernel.connection_untestable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Test a connection.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.settings.manage"
+        ]
+      }
+    },
     "/api/v1/kernel/setup": {
       "get": {
         "description": "Any signed-in user. The setup steps modules declare for the tenant's business model\n(`kernel.business_model`), among those you have permission for, each `done` or not as computed\nfrom the data — there is nothing to tick by hand.",
@@ -91500,6 +93290,553 @@
           "kernel"
         ],
         "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/tags": {
+      "get": {
+        "description": "Any signed-in user. Every tag of the tenant, by name, with how many records carry it.",
+        "operationId": "kernel_list_tags",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_TagView"
+                }
+              }
+            },
+            "description": "The tags."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the tags.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      },
+      "post": {
+        "description": "Requires `kernel.tags.manage`.",
+        "operationId": "kernel_create_tag",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTag"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TagView"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.tags.manage`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The name is taken (ignoring case and accents); code `kernel.tag_name_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid name or color; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a tag.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.tags.manage"
+        ]
+      }
+    },
+    "/api/v1/kernel/tags/{id}": {
+      "delete": {
+        "description": "Requires `kernel.tags.manage`. Records that carried it lose it.",
+        "operationId": "kernel_delete_tag",
+        "parameters": [
+          {
+            "description": "Id of the tag.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.tags.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tag; code `kernel.tag_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a tag.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.tags.manage"
+        ]
+      },
+      "patch": {
+        "description": "Requires `kernel.tags.manage`.",
+        "operationId": "kernel_update_tag",
+        "parameters": [
+          {
+            "description": "Id of the tag.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagChanges"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TagView"
+                }
+              }
+            },
+            "description": "The tag."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.tags.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tag; code `kernel.tag_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The name is taken; code `kernel.tag_name_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid name or color; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a tag.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.tags.manage"
+        ]
+      }
+    },
+    "/api/v1/kernel/tags/{id}/merge": {
+      "post": {
+        "description": "Requires `kernel.tags.manage`. Every record carrying this tag carries `into` instead; this tag\nis deleted.",
+        "operationId": "kernel_merge_tag",
+        "parameters": [
+          {
+            "description": "Id of the tag to merge away.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeTag"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TagView"
+                }
+              }
+            },
+            "description": "The tag merged into."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.tags.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tag; code `kernel.tag_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`into` is the same tag; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Merge a tag into another.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.tags.manage"
+        ]
       }
     },
     "/api/v1/kernel/tenant": {

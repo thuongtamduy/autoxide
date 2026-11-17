@@ -356,6 +356,14 @@
               "null"
             ]
           },
+          "kind": {
+            "description": "Who will use the key: `human` (you, the default), `agent` (an AI agent: commands marked\nfor approval wait for a person to approve them) or `service` (another program).",
+            "example": "agent",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "name": {
             "description": "What the key is for, 1 to 100 characters.",
             "example": "nightly report agent",

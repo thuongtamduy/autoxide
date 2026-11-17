@@ -15,13 +15,13 @@ endpoints are marked deprecated with a sunset date first.
   devices (tokens are stored encrypted and never returned) and the MCP tool `notifications.list_my_devices`; a device token
   the provider rejects is removed at once, one that fails 10 times in a row too, and one failing device no longer blocks the
   others. Firebase Cloud Messaging / Apple Push Notification service connectors still need the provider's keys. Step 37 is
-  complete. Decision D-367.
+  complete. Decision D-368.
 - Step 37, the newsletter on the shared consent ledger of `compliance` (`docs/NEWSLETTER.md`): every confirmed subscription
   is a consent (`marketing`, scope `newsletter.list:<id>`, channel `email`) and unsubscribing withdraws it; withdrawing in
   `compliance` unsubscribes; each batch asks the ledger again and skips people without consent (`consent_withdrawn`, no
   sending when the ledger cannot answer); existing confirmed subscriptions are recorded by the new hourly job
   `newsletter.backfill_consents`. Campaigns take `format: "template"` to personalise the subject and bodies for each recipient
-  (`subscriber.name`, masked `subscriber.email`, `list.name`, `unsubscribe_url`), checked on save. Decision D-366.
+  (`subscriber.name`, masked `subscriber.email`, `list.name`, `unsubscribe_url`), checked on save. Decision D-367.
 - Step 37, notification templates written by the tenant (`docs/NOTIFICATIONS.md`): drafts checked against the variables
   of the kind on save (syntax, unknown and required variables, every problem at once), publish into immutable versions (the
   last 20 kept), rollback and unpublish, preview with sample data, test send to the caller only (verified email or own
@@ -33,7 +33,26 @@ endpoints are marked deprecated with a sunset date first.
   `notifications.templates.read`, `notifications.branding.manage`; MCP tools `notifications.get_template_schema`,
   `notifications.preview_template`, `notifications.update_template_draft`; events `notifications.template_published`,
   `…template_rolled_back`, `…template_unpublished`, `…branding_updated`. The kernel template check no longer reports built-in
-  functions (`range`, `dict`…) as unknown variables. Decision D-365.
+  functions (`range`, `dict`…) as unknown variables. Decision D-366.
+- Internal tags on records (step 51): modules make a record type taggable (`StartContext::taggable`);
+  `/api/v1/kernel/tags` lists, creates, renames, merges and deletes the tenant's tags (`kernel.tags.manage`), and
+  `PUT /api/v1/kernel/records/{kind}/{id}/tags` sets a record's tags (writing the record is needed; creating tags
+  there can be restricted with the tenant setting `kernel.tags.restricted`). Names are unique ignoring case and
+  accents; at most 50 tags per record; event `kernel.record_tags_changed`. Posts and pages carry `tags` and filter
+  on `tags_any` / `tags_all`.
+- Tenant lists of reasons (step 51): modules declare lists of reason codes (`Module::reason_lists`);
+  `GET /api/v1/kernel/reasons/{list}` merges them with the tenant's own labels, order, codes turned off and codes
+  added with `PUT /api/v1/kernel/reasons/{list}/{code}` (`kernel.reasons.manage`); codes required by law stay on;
+  services check a code with `ReasonCodes::ensure`.
+- Partner connections (step 51): the settings of a connection (`<module>.connection.<kind>.<field>`) carry
+  `last_used_at` and `last_error`, and `POST /api/v1/kernel/settings/{name}/test` tries the connection now. The mail
+  module records each delivery and tests its SMTP server.
+- Agents as actors and approvals (step 51, D-365): API keys have a `kind` (`human`, `agent`, `service`); the audit
+  log records `actor_kind` `agent`, `service` and `support` besides `user`, and filters on several at once
+  (`actor_kind=agent,service`). Commands marked `x-approval: "agent"` (first: deleting a post or page) answer an
+  agent's call with `202` and an approval request; a person holding the command's permission approves or rejects
+  it (`/api/v1/kernel/approvals`, event `kernel.approval_decided`), and the agent sends the same request again with
+  `Autoxide-Approval: <id>`. MCP tools marked `requires_approval_for_agent` refuse agents (`approval_required`).
 - Step 37, reports of infringements and consumer complaints (Vietnam — E-commerce Law 2025, Intellectual Property Law, Decree
   85/2021/ND-CP, Consumer Protection Law 19/2023/QH15, Decree 55/2024/ND-CP; check the original texts; guide
   `docs/COMPLIANCE.md`): cases with intake from public forms with anti-spam tokens (`POST /api/v1/compliance/public/reports`,

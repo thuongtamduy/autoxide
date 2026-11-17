@@ -234,7 +234,9 @@ async fn settle(
         let outcome = keep(settings, tenant, id, refusal).await;
         return (response, outcome);
     }
-    if status.is_server_error() || is_temporary(status) {
+    // Lệnh chờ người duyệt (bước 51 P12): không giữ 202, để agent gửi lại cùng key khi được duyệt.
+    let pending = response.extensions().get::<crate::ops::approvals::Pending>().is_some();
+    if status.is_server_error() || is_temporary(status) || pending {
         // Lỗi phía máy chủ, hay lỗi tạm (429 vượt giới hạn, 408): không lưu, để client gửi lại
         // được với cùng key khi hết giới hạn (D-157).
         return (response, settings.store.abandon(tenant, id).await);

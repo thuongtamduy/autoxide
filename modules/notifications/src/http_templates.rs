@@ -1,4 +1,4 @@
-//! Route REST của mẫu khách tự soạn (D-206, D-365) dưới `/api/v1/notifications`: schema biến của loại,
+//! Route REST của mẫu khách tự soạn (D-206, D-366) dưới `/api/v1/notifications`: schema biến của loại,
 //! bản nháp, xuất bản, quay lại, xem trước, gửi thử, thương hiệu của mail. Permission được kiểm trong
 //! service TRƯỚC mọi bước tra cứu hay kiểm đầu vào.
 

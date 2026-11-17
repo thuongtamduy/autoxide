@@ -217,6 +217,11 @@ export type ApiKeyResponse = {
   /** When the key stops working; `null`: never. */
   expires_at?: string | null;
   id: string;
+  /**
+   * Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
+   * approval) or `service` (another program). The audit log records it as `actor_kind`.
+   */
+  kind: string;
   /** Last time the key was used, to the minute; `null`: never used. */
   last_used_at?: string | null;
   /** What the key is for. */
@@ -237,6 +242,28 @@ export type ApiKeyResponse = {
    * their first 12 characters.
    */
   prefix: string;
+};
+
+/** A command an AI agent asked to run, waiting for a person. */
+export type ApprovalRequest = {
+  api_key_id?: string | null;
+  created_at: string;
+  decided_at?: string | null;
+  decided_by?: string | null;
+  expires_at: string;
+  id: string;
+  /** Any of these permissions may approve it. */
+  permissions: string[];
+  /** Why it was rejected. */
+  reason?: string | null;
+  /** The user whose agent key asked. */
+  requested_by: string;
+  /** `pending`, `approved`, `rejected`, `expired` or `used` (approved, then run). */
+  status: string;
+  /** The command, e.g. `DELETE /api/v1/content/entries/0190…`. */
+  summary: string;
+  /** Where to look at it and decide. */
+  url: string;
 };
 
 /** Put a tenant on a plan. */
@@ -261,8 +288,10 @@ export type AuditEntryResponse = {
   /** API key used, when the change was made with one. */
   actor_api_key_id?: string | null;
   /**
-   * Who made the change: `user` (a signed-in user or API key), `system` (command line,
-   * background jobs) or `public` (someone not signed in, such as a visitor sending a form).
+   * Who made the change: `user` (a person, signed in or through an API key of kind `human`),
+   * `agent` (an AI agent's API key), `service` (another program's API key), `support` (platform
+   * staff through a support grant), `system` (command line, background jobs) or `public`
+   * (someone not signed in, such as a visitor sending a form).
    */
   actor_kind: string;
   /**
@@ -2299,6 +2328,16 @@ export type ConfirmedList = {
   name: NewsletterText;
 };
 
+/** The result of testing a connection. */
+export type ConnectionTest = {
+  /** The connection tested, `<module>.connection.<kind>`. */
+  connection: string;
+  /** Why it failed, for the administrator. */
+  error?: string | null;
+  ok: boolean;
+  tested_at: string;
+};
+
 /** A mandatory page template. */
 export type ContentTemplate = {
   /**
@@ -2353,6 +2392,11 @@ export type CreateApiKeyRequest = {
    * not expire.
    */
   expires_at?: string | null;
+  /**
+   * Who will use the key: `human` (you, the default), `agent` (an AI agent: commands marked
+   * for approval wait for a person to approve them) or `service` (another program).
+   */
+  kind?: string | null;
   /** What the key is for, 1 to 100 characters. */
   name: string;
   /**
@@ -2746,6 +2790,31 @@ export type Data_AltSuggestionResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ApprovalRequest = {
+  /** A command an AI agent asked to run, waiting for a person. */
+  data: {
+    api_key_id?: string | null;
+    created_at: string;
+    decided_at?: string | null;
+    decided_by?: string | null;
+    expires_at: string;
+    id: string;
+    /** Any of these permissions may approve it. */
+    permissions: string[];
+    /** Why it was rejected. */
+    reason?: string | null;
+    /** The user whose agent key asked. */
+    requested_by: string;
+    /** `pending`, `approved`, `rejected`, `expired` or `used` (approved, then run). */
+    status: string;
+    /** The command, e.g. `DELETE /api/v1/content/entries/0190…`. */
+    summary: string;
+    /** Where to look at it and decide. */
+    url: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_AuditEntryResponse = {
   /** One change, as recorded in the audit log. */
   data: {
@@ -2754,8 +2823,10 @@ export type Data_AuditEntryResponse = {
     /** API key used, when the change was made with one. */
     actor_api_key_id?: string | null;
     /**
-     * Who made the change: `user` (a signed-in user or API key), `system` (command line,
-     * background jobs) or `public` (someone not signed in, such as a visitor sending a form).
+     * Who made the change: `user` (a person, signed in or through an API key of kind `human`),
+     * `agent` (an AI agent's API key), `service` (another program's API key), `support` (platform
+     * staff through a support grant), `system` (command line, background jobs) or `public`
+     * (someone not signed in, such as a visitor sending a form).
      */
     actor_kind: string;
     /**
@@ -3952,6 +4023,19 @@ export type Data_ConfirmResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ConnectionTest = {
+  /** The result of testing a connection. */
+  data: {
+    /** The connection tested, `<module>.connection.<kind>`. */
+    connection: string;
+    /** Why it failed, for the administrator. */
+    error?: string | null;
+    ok: boolean;
+    tested_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CreatedApiKeyResponse = {
   /** A new API key, with its secret. The secret is shown only here. */
   data: ApiKeyResponse & {
@@ -4179,6 +4263,8 @@ export type Data_EntryResponse = {
     /** Last part of the address. */
     slug: string;
     status: Status;
+    /** The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`). */
+    tags: TagRef[];
     /**
      * Categories and tags, in order (the first category is the main one). Set with
      * `PUT /api/v1/content/entries/{id}/terms`; takes effect at once.
@@ -6553,6 +6639,20 @@ export type Data_TagResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_TagView = {
+  /** A tag of the tenant. */
+  data: {
+    color: string;
+    created_at: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** Records carrying it. */
+    uses: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TaxPackResponse = {
   /** An imported tax data pack. */
   data: {
@@ -6791,6 +6891,13 @@ export type Data_TenantSettingState = {
     group?: string | null;
     /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
     is_set: boolean;
+    /** For a setting of a partner connection: why its last use failed; omitted when it worked. */
+    last_error?: string | null;
+    /**
+     * For a setting of a partner connection: the last time the connection was used (or tested
+     * with `POST /api/v1/kernel/settings/{name}/test`).
+     */
+    last_used_at?: string | null;
     /**
      * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
      * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
@@ -7070,6 +7177,30 @@ export type Data_Vec_AdministrativeUnit = {
     valid_from: string;
     /** First day no longer in force; `null` while in force. */
     valid_to?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ApprovalRequest = {
+  data: {
+    api_key_id?: string | null;
+    created_at: string;
+    decided_at?: string | null;
+    decided_by?: string | null;
+    expires_at: string;
+    id: string;
+    /** Any of these permissions may approve it. */
+    permissions: string[];
+    /** Why it was rejected. */
+    reason?: string | null;
+    /** The user whose agent key asked. */
+    requested_by: string;
+    /** `pending`, `approved`, `rejected`, `expired` or `used` (approved, then run). */
+    status: string;
+    /** The command, e.g. `DELETE /api/v1/content/entries/0190…`. */
+    summary: string;
+    /** Where to look at it and decide. */
+    url: string;
   }[];
 };
 
@@ -7851,6 +7982,25 @@ export type Data_Vec_PublicProfileResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_ReasonView = {
+  data: {
+    active: boolean;
+    /** Declared by the module (else added by the tenant). */
+    builtin: boolean;
+    code: string;
+    /** In the language of `Accept-Language`: the tenant's own label, else the default. */
+    label: string;
+    /** The tenant's own labels, by language. */
+    labels: {
+      [key: string]: string;
+    };
+    /** Required by law: cannot be turned off. */
+    legal: boolean;
+    position: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_RecordNote = {
   data: {
     author_id: string;
@@ -8017,6 +8167,29 @@ export type Data_Vec_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_TagRef = {
+  data: {
+    /** One of `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`. */
+    color: string;
+    id: string;
+    name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TagView = {
+  data: {
+    color: string;
+    created_at: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** Records carrying it. */
+    uses: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_TaxCategoryResponse = {
   data: {
     code: string;
@@ -8146,6 +8319,13 @@ export type Data_Vec_TenantSettingState = {
     group?: string | null;
     /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
     is_set: boolean;
+    /** For a setting of a partner connection: why its last use failed; omitted when it worked. */
+    last_error?: string | null;
+    /**
+     * For a setting of a partner connection: the last time the connection was used (or tested
+     * with `POST /api/v1/kernel/settings/{name}/test`).
+     */
+    last_used_at?: string | null;
     /**
      * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
      * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
@@ -8567,6 +8747,8 @@ export type EntryResponse = {
   /** Last part of the address. */
   slug: string;
   status: Status;
+  /** The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`). */
+  tags: TagRef[];
   /**
    * Categories and tags, in order (the first category is the main one). Set with
    * `PUT /api/v1/content/entries/{id}/terms`; takes effect at once.
@@ -10335,6 +10517,12 @@ export type MenuTarget = {
   kind: string;
 };
 
+/** The tag to merge into. */
+export type MergeTag = {
+  /** Every record of the merged tag gets this tag; the merged tag is deleted. */
+  into: string;
+};
+
 /**
  * The value of a figure: `money` (`amount` in the smallest unit of `currency`), `count`, or
  * `ratio` (`numerator` / `denominator`).
@@ -10670,6 +10858,15 @@ export type NewRecordNote = {
   body: string;
   /** Up to 20 users to notify; each must be able to read the record. */
   mentions?: string[];
+};
+
+/** A tag to create. */
+export type NewTag = {
+  /** A color of the fixed palette; `gray` by default. */
+  color?: string | null;
+  description?: string | null;
+  /** 1 to 50 characters; unique in the tenant, ignoring case and accents. */
+  name: string;
 };
 
 /** A new tenant. */
@@ -11230,6 +11427,11 @@ export type Page_ApiKeyResponse = {
     /** When the key stops working; `null`: never. */
     expires_at?: string | null;
     id: string;
+    /**
+     * Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
+     * approval) or `service` (another program). The audit log records it as `actor_kind`.
+     */
+    kind: string;
     /** Last time the key was used, to the minute; `null`: never used. */
     last_used_at?: string | null;
     /** What the key is for. */
@@ -11263,8 +11465,10 @@ export type Page_AuditEntryResponse = {
     /** API key used, when the change was made with one. */
     actor_api_key_id?: string | null;
     /**
-     * Who made the change: `user` (a signed-in user or API key), `system` (command line,
-     * background jobs) or `public` (someone not signed in, such as a visitor sending a form).
+     * Who made the change: `user` (a person, signed in or through an API key of kind `human`),
+     * `agent` (an AI agent's API key), `service` (another program's API key), `support` (platform
+     * staff through a support grant), `system` (command line, background jobs) or `public`
+     * (someone not signed in, such as a visitor sending a form).
      */
     actor_kind: string;
     /**
@@ -11926,6 +12130,8 @@ export type Page_EntryResponse = {
     /** Last part of the address. */
     slug: string;
     status: Status;
+    /** The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`). */
+    tags: TagRef[];
     /**
      * Categories and tags, in order (the first category is the main one). Set with
      * `PUT /api/v1/content/entries/{id}/terms`; takes effect at once.
@@ -14554,6 +14760,36 @@ export type PutMenuRequest = {
  */
 export type Realm = "staff" | "customer";
 
+/** Changes to a reason; omitted fields stay. A code the list does not have yet is added. */
+export type ReasonChange = {
+  active?: boolean | null;
+  /**
+   * The tenant's labels by language (`vi`, `en`…), up to 200 characters each; an empty label
+   * goes back to the default. A new code needs at least one.
+   */
+  labels?: {
+    [key: string]: string;
+  } | null;
+  position?: number | null;
+};
+
+/** One reason of a list. */
+export type ReasonView = {
+  active: boolean;
+  /** Declared by the module (else added by the tenant). */
+  builtin: boolean;
+  code: string;
+  /** In the language of `Accept-Language`: the tenant's own label, else the default. */
+  label: string;
+  /** The tenant's own labels, by language. */
+  labels: {
+    [key: string]: string;
+  };
+  /** Required by law: cannot be turned off. */
+  legal: boolean;
+  position: number;
+};
+
 /** Proof that you are the account owner, for one sensitive change. */
 export type ReauthRequest = {
   /** How you prove it is you. */
@@ -14588,6 +14824,14 @@ export type RecordNote = {
   id: string;
   /** Users the note mentions. */
   mentions: string[];
+};
+
+/** The tags of a record. */
+export type RecordTagsInput = {
+  /** New tags to create and attach by name (an existing name is reused). */
+  new_tags?: string[];
+  /** The tags the record has after the call (replaces the current ones). */
+  tag_ids?: string[];
 };
 
 /** One-time recovery codes. Shown only once. */
@@ -14653,6 +14897,12 @@ export type RegisterRequest = {
    * the setting `auth.customer_registration`).
    */
   realm?: Realm;
+};
+
+/** Why a request is rejected. */
+export type RejectRequest = {
+  /** 1 to 500 characters, shown to the agent. */
+  reason: string;
 };
 
 /** The changes of one version. */
@@ -15535,6 +15785,22 @@ export type SuspendRequest = {
   reason: string;
 };
 
+/** Changes to a tag; omitted fields stay. */
+export type TagChanges = {
+  color?: string | null;
+  /** `""` clears it. */
+  description?: string | null;
+  name?: string | null;
+};
+
+/** A tag, as attached to a record. */
+export type TagRef = {
+  /** One of `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`. */
+  color: string;
+  id: string;
+  name: string;
+};
+
 /** A tag. Items carry tags as names; tags are created when first given to an item. */
 export type TagResponse = {
   created_at: string;
@@ -15544,6 +15810,17 @@ export type TagResponse = {
   /** Unique, ignoring case. */
   name: string;
   updated_at: string;
+};
+
+/** A tag of the tenant. */
+export type TagView = {
+  color: string;
+  created_at: string;
+  description?: string | null;
+  id: string;
+  name: string;
+  /** Records carrying it. */
+  uses: number;
 };
 
 /** A new comment state for a target. Omitted fields stay as they are. */
@@ -16052,6 +16329,13 @@ export type TenantSettingState = {
   group?: string | null;
   /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
   is_set: boolean;
+  /** For a setting of a partner connection: why its last use failed; omitted when it worked. */
+  last_error?: string | null;
+  /**
+   * For a setting of a partner connection: the last time the connection was used (or tested
+   * with `POST /api/v1/kernel/settings/{name}/test`).
+   */
+  last_used_at?: string | null;
   /**
    * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
    * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
@@ -19581,7 +19865,7 @@ export interface paths {
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; tags_any?: string; tags_all?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_EntryResponse;
         401: Problem;
@@ -19636,6 +19920,7 @@ export interface paths {
     delete: {
       parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -21045,6 +21330,60 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/approvals": {
+    /** List approval requests. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string }; };
+      responses: {
+        200: Data_Vec_ApprovalRequest;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/approvals/{id}": {
+    /** Get an approval request. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ApprovalRequest;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/approvals/{id}/approve": {
+    /** Approve an agent's command. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ApprovalRequest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/approvals/{id}/reject": {
+    /** Reject an agent's command. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RejectRequest;
+      responses: {
+        200: Data_ApprovalRequest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/bulk/{resource}/{action}": {
     /** Run an action on many records. */
     post: {
@@ -21343,6 +21682,34 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/reasons/{list}": {
+    /** List the reasons of a list. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { list: string }; query: { include_inactive?: boolean }; };
+      responses: {
+        200: Data_Vec_ReasonView;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/reasons/{list}/{code}": {
+    /** Change or add a reason. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { list: string; code: string }; };
+      requestBody: ReasonChange;
+      responses: {
+        200: Data_Vec_ReasonView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/records/{kind}/{id}/activity": {
     /** Get the activity of a record. */
     get: {
@@ -21388,6 +21755,22 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/records/{kind}/{id}/tags": {
+    /** Set the tags of a record. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; id: string }; };
+      requestBody: RecordTagsInput;
+      responses: {
+        200: Data_Vec_TagRef;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -21442,6 +21825,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/settings/{name}/test": {
+    /** Test a connection. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { name: string }; };
+      responses: {
+        200: Data_ConnectionTest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/setup": {
     /** Get the setup checklist. */
     get: {
@@ -21460,6 +21856,72 @@ export interface paths {
       responses: {
         200: Data_SummaryView;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tags": {
+    /** List the tags. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_TagView;
+        401: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a tag. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewTag;
+      responses: {
+        201: Data_TagView;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tags/{id}": {
+    /** Change a tag. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TagChanges;
+      responses: {
+        200: Data_TagView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a tag. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tags/{id}/merge": {
+    /** Merge a tag into another. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MergeTag;
+      responses: {
+        200: Data_TagView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

@@ -61,7 +61,7 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // nên đứng sau `mail` và `files`.
         Box::new(autoxide_forms::module()),
         // Bản tin: cần `dyn Mailer` (sau `mail`), sổ đồng ý chung `dyn ConsentLedger` của
-        // `compliance` (sau `compliance`, D-366), nghe bài mới của `content` qua sổ đối tượng của
+        // `compliance` (sau `compliance`, D-367), nghe bài mới của `content` qua sổ đối tượng của
         // kernel (sau `content`).
         Box::new(autoxide_newsletter::module()),
         // Bình luận: cần `dyn Mailer` (sau `mail`), kiểm đích qua sổ đối tượng của kernel và nghe
@@ -217,7 +217,7 @@ mod tests {
             // hạn — D-360, D-361, D-363;
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), hai của `media`, hai của `content`, một của `forms`, hai
-            // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-366) và một của `comments`) đúng một job.
+            // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367) và một của `comments`) đúng một job.
             assert_eq!(a.unwrap() + b.unwrap(), 36);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();

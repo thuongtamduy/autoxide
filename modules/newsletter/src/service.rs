@@ -42,7 +42,7 @@ pub(crate) struct NewsletterService {
     pub(crate) config: NewsletterConfig,
     /// Link trong thư theo tên miền của khách (`kernel.public_url`); mặc định: địa chỉ máy chủ.
     pub(crate) links: autoxide_kernel::tenancy::SiteLinks,
-    /// Sổ đồng ý của `compliance` (D-347, D-366); `None` khi chương trình không có `compliance`.
+    /// Sổ đồng ý của `compliance` (D-347, D-367); `None` khi chương trình không có `compliance`.
     pub(crate) consents: Option<Arc<dyn autoxide_compliance::api::ConsentLedger>>,
     /// Bộ dựng mẫu của kernel (chiến dịch `format = template`).
     pub(crate) templates: autoxide_kernel::template::TemplateEngine,

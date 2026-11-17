@@ -1,4 +1,4 @@
-//! Khung mail HTML chung (D-206, D-365): viết bằng MJML, dựng bằng `mrml` để hiển thị đúng trên
+//! Khung mail HTML chung (D-206, D-366): viết bằng MJML, dựng bằng `mrml` để hiển thị đúng trên
 //! Outlook, Gmail, điện thoại. Khách chỉnh logo, màu, chân thư bằng dữ liệu (`notifications_branding`),
 //! không sửa MJML. Mail nào cũng kèm bản chữ thuần (phần `text` của `Mail`).
 //!

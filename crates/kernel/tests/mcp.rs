@@ -412,3 +412,25 @@ fn permission_thay_the() {
     assert!(!tool.allows(&with("notes.read")));
     assert_eq!(tool.alternative().map(|permission| permission.name()), Some("notes.write_own"));
 }
+
+/// Tool cần duyệt (bước 51 P12): agent gọi thì bị từ chối `approval_required`, người thì chạy.
+#[tokio::test]
+async fn tool_can_duyet_tu_choi_agent() {
+    TestDatabase::run(async |test| {
+        let tool = Tool::new("purge", "Purge.", |_, _, _: NoInput| async { Ok(true) })
+            .requires_approval_for_agent();
+        let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+        let mut reader = ConfigReader::new(&source);
+        let database = DatabaseConfig::read(&mut reader);
+        let database = reader.finish(database).unwrap().0;
+        let database = Database::connect(&database).await.unwrap();
+        let tenant = DatabaseRegistry::single(database).default_tenant();
+        let person = Principal::new(Uuid::now_v7(), Vec::<String>::new());
+        let agent = person.clone().with_actor_kind(autoxide_kernel::access::ActorKind::Agent);
+        let refused = tool.call(tenant.clone(), agent, Value::Null).await.unwrap_err();
+        assert_eq!(refused.code(), "approval_required");
+        assert_eq!(tool.call(tenant, person, Value::Null).await.unwrap(), Value::Bool(true));
+    })
+    .await
+    .unwrap();
+}

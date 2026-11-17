@@ -30,6 +30,7 @@ mod m0031_realm;
 mod m0032_delegations;
 mod m0033_invitations;
 mod m0034_support_grants;
+mod m0035_api_key_kind;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -97,6 +98,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0033_invitations::Migration),
         // Quyền vào hỗ trợ của nhân sự nền tảng (bước 34 mục 13, D-313).
         Box::new(m0034_support_grants::Migration),
+        // Loại API key (bước 51 P12).
+        Box::new(m0035_api_key_kind::Migration),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "auth"),
     ]

@@ -236,6 +236,14 @@ impl Module for KernelModule {
             Box::new(crate::ops::work_states::CreateWorkStates),
             // Ghi chú trên mọi bản ghi (bước 51 P13).
             Box::new(crate::ops::records::CreateRecordNotes),
+            // Yêu cầu duyệt lệnh của agent (bước 51 P12).
+            Box::new(crate::ops::approvals::CreateApprovalRequests),
+            // Danh sách lý do theo khách (bước 51 P18).
+            Box::new(crate::ops::reasons::CreateReasonCodes),
+            // Lần dùng / lỗi cuối của kết nối ra ngoài (bước 51).
+            Box::new(crate::ops::connections::CreateConnectionStatus),
+            // Nhãn nội bộ gắn bản ghi (bước 51 P20).
+            Box::new(crate::ops::tags::CreateTags),
         ]
     }
 
@@ -301,6 +309,8 @@ impl Module for KernelModule {
             crate::tenancy::TENANTS_DELETE,
             crate::job::runs::JOBS_READ,
             crate::ops::views::VIEWS_SHARE,
+            crate::ops::reasons::REASONS_MANAGE,
+            crate::ops::tags::TAGS_MANAGE,
             crate::job::runs::JOBS_MANAGE,
         ]
     }
@@ -310,6 +320,8 @@ impl Module for KernelModule {
             crate::tenancy::settings::SETTING_CHANGED,
             crate::job::runs::JOB_RETRIED,
             crate::ops::records::RECORD_NOTE_ADDED,
+            crate::ops::approvals::APPROVAL_DECIDED,
+            crate::ops::tags::RECORD_TAGS_CHANGED,
             crate::tenancy::admin::TENANT_CREATED,
             crate::tenancy::admin::TENANT_UPDATED,
             crate::tenancy::domains::DOMAIN_ADDED,
@@ -327,7 +339,11 @@ impl Module for KernelModule {
     }
 
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
-        vec![crate::tenancy::PUBLIC_URL, crate::tenancy::BUSINESS_MODEL]
+        vec![
+            crate::tenancy::PUBLIC_URL,
+            crate::tenancy::BUSINESS_MODEL,
+            crate::ops::tags::TAGS_RESTRICTED,
+        ]
     }
 
     fn routes(&self) -> OpenApiRouter {
@@ -342,6 +358,32 @@ impl Module for KernelModule {
         if let Some(outbox) = &self.outbox {
             routes = routes.merge(crate::job::runs::routes(crate::job::runs::JobsState {
                 outbox: outbox.clone(),
+            }));
+        }
+        if let Some(outbox) = &self.outbox {
+            routes = routes.merge(crate::ops::approvals::routes(
+                crate::ops::approvals::ApprovalsState { outbox: outbox.clone() },
+            ));
+        }
+        routes = routes.merge(crate::ops::connections::routes(
+            crate::ops::connections::ConnectionsState { probes: self.catalog.connection_probes() },
+        ));
+        if let Some((_, permissions)) = &self.resources {
+            routes = routes.merge(crate::ops::reasons::routes(crate::ops::reasons::ReasonsState {
+                codes: self.catalog.reason_codes(),
+                permissions: permissions.clone(),
+                translations: self.translations.clone(),
+            }));
+        }
+        if let (Some(outbox), Some((resources, _))) = (&self.outbox, &self.resources) {
+            routes = routes.merge(crate::ops::tags::routes(crate::ops::tags::TagsState {
+                taggables: self.catalog.taggables(),
+                resources: resources.clone(),
+                outbox: outbox.clone(),
+                settings: self.settings.clone().map(|settings| {
+                    let settings: Arc<dyn crate::tenancy::settings::TenantSettings> = settings;
+                    settings
+                }),
             }));
         }
         if let (Some(outbox), Some((resources, permissions))) = (&self.outbox, &self.resources) {

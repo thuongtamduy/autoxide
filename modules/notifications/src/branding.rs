@@ -1,4 +1,4 @@
-//! Thương hiệu của mail HTML theo khách (D-206, D-365): tên, logo, màu chủ đạo, màu nền, chân thư.
+//! Thương hiệu của mail HTML theo khách (D-206, D-366): tên, logo, màu chủ đạo, màu nền, chân thư.
 //! Chân thư thêm tên và địa chỉ chủ sở hữu từ hồ sơ pháp lý của `compliance` khi có (thông tin vốn
 //! phải công khai). Chưa đặt gì thì dùng khung mặc định.
 

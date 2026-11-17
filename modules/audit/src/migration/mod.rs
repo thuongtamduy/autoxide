@@ -5,6 +5,7 @@ mod m0001_create_entry;
 mod m0002_add_actor_kind;
 mod m0003_add_module_index;
 mod m0004_add_hash_chain;
+mod m0007_actor_kind_index;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -34,5 +35,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0006_tenant_list_index",
             vec!["audit_entry"],
         ),
+        // Lọc theo loại bên làm (bước 51 P12).
+        Box::new(m0007_actor_kind_index::Migration),
     ]
 }

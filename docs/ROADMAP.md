@@ -149,18 +149,21 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       (`required_module`), `missing_permission`, cùng hàm kiểm với request thật. Còn: `feature_not_in_plan` /
       `quota_exceeded` (permission chưa gắn tính năng, hạn mức), `upgrade_to` (sổ gói của `plans`), `grantors`
       (cần bộ xác thực liệt kê người cấp được)
-- [ ] Agent là người dùng thật (P12): API key `agent`; `ActorKind` chung cho audit, nhật ký, event (D-224);
+- [x] Agent là người dùng thật (P12): API key `agent`; `ActorKind` chung cho audit, nhật ký, event (D-224);
       lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) agent gọi trả `202 approval_required`, yêu cầu
-      duyệt có hạn, đủ duyệt / từ chối / event / tool MCP, như nhau REST và MCP; việc chờ vào hộp việc
+      duyệt có hạn, đủ duyệt / từ chối / event / tool MCP, như nhau REST và MCP; việc chờ vào hộp việc — xong
+      (17/11, D-365): `x-approval: "agent"`, `/kernel/approvals`, gửi lại kèm `Autoxide-Approval`; MCP từ chối agent
+      và chỉ sang REST. Còn: yêu cầu chờ vào hộp việc, tool MCP `list_approvals` / `decide_approval`
 - [x] Cờ theo người dùng cho trợ giúp trong giao diện (P14, D-207): `/api/v1/me/flags` (`kernel_user_flags`),
       chỉ cờ của mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản xuất dữ liệu, xoá khi xoá tài khoản;
       `tenant_id` thêm ở bước 33 cùng mọi bảng
-- [ ] Danh sách lý do theo khách (P18, D-223); cài đặt nối ra ngoài có `last_used_at`, `last_error` và thử
+- [x] Danh sách lý do theo khách (P18, D-223); cài đặt nối ra ngoài có `last_used_at`, `last_error` và thử
 - [ ] Trường tự định nghĩa trên bản ghi (P19, D-235): module khai đích, khách thêm trường (kiểu, nhãn, bắt buộc,
       mức hiện `internal` / `public` / `buyer_input`), giá trị nằm trên bản ghi, lọc qua bảng index của module ghi
       cùng transaction, dùng chung cho xuất / nhập / tự động hoá; hạn mức theo gói; test trên cả hai database
-- [ ] Nhãn gắn bản ghi (P20, D-235): nhãn nội bộ dùng chung mọi loại bản ghi, lọc `tags_any` / `tags_all`, gắn
-      hàng loạt, gộp nhãn, event cho tự động hoá
+- [x] Nhãn gắn bản ghi (P20, D-235): nhãn nội bộ dùng chung mọi loại bản ghi, lọc `tags_any` / `tags_all`, gắn
+      hàng loạt, gộp nhãn, event cho tự động hoá — xong (17/11) trừ gắn hàng loạt: thao tác hàng loạt (P8) chưa nhận
+      tham số (nhãn nào), làm khi thêm tham số cho `BulkAction`
 - [ ] Đổi câu chữ hiển thị theo khách (P21, D-235): chỉ câu module cho đổi và không gian `ui.*`, giữ chỗ điền, không
       đổi mã lỗi và câu pháp lý, đọc qua cache không query
 - [ ] Nhập dữ liệu (P17, D-220): không làm ở kernel — `imports` (bước 56) thêm nguồn `autoxide` cùng cột với

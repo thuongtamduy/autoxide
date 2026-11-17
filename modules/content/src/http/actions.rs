@@ -217,11 +217,12 @@ pub(crate) async fn move_entry(
 /// Delete a post or page.
 ///
 /// Requires `content.delete`. Its revisions and schedules go too. A page with subpages
-/// cannot be deleted. If it was published, its address answers 410. `If-Match` is required.
+/// cannot be deleted. If it was published, its address answers 410. `If-Match` is required. An
+/// AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/entries/{id}",
-    extensions(("x-permissions" = json!(["content.delete"]))),
+    extensions(("x-permissions" = json!(["content.delete"])), ("x-approval" = json!("agent"))),
     operation_id = "delete_content_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),

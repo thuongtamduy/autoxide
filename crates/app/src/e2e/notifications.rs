@@ -267,7 +267,7 @@ async fn xoa_tai_khoan_thi_xoa_hop_thu_va_tuy_chon() {
     .unwrap();
 }
 
-/// Bản tin trên sổ đồng ý chung (bước 37 C3, D-366), với `compliance` thật: đăng ký có sẵn được lịch
+/// Bản tin trên sổ đồng ý chung (bước 37 C3, D-367), với `compliance` thật: đăng ký có sẵn được lịch
 /// đồng bộ ghi sổ; rút đồng ý quảng cáo qua email ở `compliance` huỷ đăng ký bản tin.
 #[tokio::test]
 async fn ban_tin_dung_so_dong_y_chung() {

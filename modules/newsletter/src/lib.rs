@@ -128,7 +128,7 @@ impl Module for NewsletterModule {
             .require::<dyn autoxide_kernel::tenancy::TenantSettings>()
             .map(autoxide_kernel::tenancy::SiteLinks::new)
             .unwrap_or_default();
-        // Sổ đồng ý chung (bước 37 C3, D-366): `newsletter` đăng ký SAU `compliance`.
+        // Sổ đồng ý chung (bước 37 C3, D-367): `newsletter` đăng ký SAU `compliance`.
         let consents = context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok();
         self.listens_consents = consents.is_some()
             && context.events().contains(autoxide_compliance::api::CONSENT_WITHDRAWN);
@@ -215,7 +215,7 @@ impl Module for NewsletterModule {
         let hour = std::time::Duration::from_secs(3600);
         vec![
             Schedule::new(retention::CLEANUP, retention::CLEANUP, day),
-            // Ghi sổ đồng ý cho đăng ký sổ chưa biết (đăng ký có sẵn, lần gọi sổ bị lỗi) — D-366.
+            // Ghi sổ đồng ý cho đăng ký sổ chưa biết (đăng ký có sẵn, lần gọi sổ bị lỗi) — D-367.
             Schedule::new(consents::BACKFILL, consents::BACKFILL, hour),
         ]
     }

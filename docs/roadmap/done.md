@@ -804,8 +804,8 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [x] Module nền `notifications` (D-194, D-348): kênh email, SMS, Zalo ZNS (trait), web push, đẩy di động, trong ứng
       dụng; mẫu theo i18n và theo khách; tuỳ chọn nhận của người dùng; hộp thư, nhật ký gửi, REST + MCP — bộ gửi ZNS,
       web push (VAPID) và đẩy di động (FCM / APNs) mới có trait ở kernel và bản giả ở testkit (bộ nối thật cần khoá của
-      nhà cung cấp — hỏi chủ dự án khi làm); `newsletter` trên sổ đồng ý chung và mẫu động D-206: mục dưới (D-365, D-366);
-      (thấp) báo cáo đã lưu và lịch gửi qua email (A-b10) dời sang bước 51 / 38 vì cần phần xuất chung (D-366)
+      nhà cung cấp — hỏi chủ dự án khi làm); `newsletter` trên sổ đồng ý chung và mẫu động D-206: mục dưới (D-366, D-367);
+      (thấp) báo cáo đã lưu và lịch gửi qua email (A-b10) dời sang bước 51 / 38 vì cần phần xuất chung (D-367)
 - [x] Tách tin giao dịch và tin quảng cáo (NĐ 91/2020 — cần đối chiếu bản thay thế đang dự thảo; D-348): tin quảng cáo
       chỉ gửi khi đã đồng ý trước (kiểm lại ngay trước khi gửi), rút đồng ý là huỷ tin đang chờ; khung giờ gửi và nhãn
       `QC` là quy tắc có ngày hiệu lực (`notifications.send_windows`, `notifications.marketing_labels`); chỉ một tin
@@ -813,8 +813,8 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [x] Mẫu mail, thông báo khách tự soạn (D-206): bộ dựng mẫu an toàn ở kernel (biến, điều kiện, vòng lặp, giới
       hạn chạy, luôn thoát HTML, kiểm biến theo schema khi lưu); mail HTML khung MJML có thương hiệu khách + bản
       chữ thuần; nháp / xuất bản / quay lại, xem trước, gửi thử tới chính người gọi; `newsletter` cá nhân hoá
-      — bộ dựng mẫu ở kernel (D-351); D-365: `/templates/{kind}/{channel}/{locale}/draft|publish|versions|rollback|published|
-      preview|test-send`, `/kinds/{kind}/schema`, `/branding`, khung MJML (`mrml`) cho mọi email; D-366: `newsletter` trên sổ
+      — bộ dựng mẫu ở kernel (D-351); D-366: `/templates/{kind}/{channel}/{locale}/draft|publish|versions|rollback|published|
+      preview|test-send`, `/kinds/{kind}/schema`, `/branding`, khung MJML (`mrml`) cho mọi email; D-367: `newsletter` trên sổ
       đồng ý chung (`ledger_state`, lịch `newsletter.backfill_consents`, hỏi sổ mỗi lô), chiến dịch `format = template`
 - [x] Mã theo dõi quảng cáo và đồng ý cookie (D-235): nhà cung cấp cho sẵn (GA4, GTM, Google Ads, Meta, TikTok,
       Zalo), khách chỉ điền mã ID; banner đồng ý theo nhóm, từ chối dễ như đồng ý, không tải gì trước khi đồng ý;
@@ -822,6 +822,6 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       — D-361: `/tracking-tags`, `/cookie-settings/{org_id}`, `/public/consent-config` (chỉ trả mã của nhóm đã đồng ý),
       `/public/cookie-consents`; gắn vào `/public/site` khi bước 67 có `SiteExtensions`
 - [x] Kênh đẩy cho ứng dụng di động (D-220): trait `MobilePushSender` (Firebase / Apple là module riêng, cần
-      khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push — D-367:
+      khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push — D-368:
       `GET|POST /me/device-tokens`, `DELETE /me/device-tokens/{id}`, tool `list_my_devices`, token mất / bị từ chối xoá
       ngay, lỗi 10 lần liên tiếp xoá; chưa có bộ nối FCM / APNs thật (cần khoá của nhà cung cấp)

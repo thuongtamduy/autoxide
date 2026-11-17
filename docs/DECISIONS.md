@@ -8972,7 +8972,30 @@ quyết khiếu nại. Chưa chắc: danh sách lý do được ẩn, thời h�
 4. **Điều kiện giao dịch chung**: văn bản loại `general_conditions` đã có (D-347), công khai qua `/public/documents/general_conditions`,
    bước 45 gọi `AcceptanceGate` lúc thanh toán — không thêm gì mới.
 
-## D-365 · Mẫu thông báo khách tự soạn: nháp / xuất bản / quay lại, khung mail MJML (`mrml`), thương hiệu (bước 37, D-206) — 2026-11-17 — agent quyết
+## D-365 · Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17 — agent quyết
+
+**Bối cảnh.** Bước 51 P12 cần phân biệt người, agent, chương trình trong audit, và buộc lệnh rủi ro chờ người
+duyệt khi agent gọi, như nhau cho REST và MCP.
+
+**Quyết định.**
+1. `autoxide_kernel::access::ActorKind` (`Human`, `Agent`, `Service`, `System`, `Support`, `App`, `Scim`) nằm trên
+   `Principal` (bộ xác thực đặt theo loại API key) và `Actor` của event. Giá trị cột `actor_kind` của người **giữ
+   là `user`** như trước bước 51 — không đổi giá trị đã có trong audit (hợp đồng API); giá trị mới chỉ thêm
+   (`agent`, `service`, `support`, `app`, `scim`). Bộ lọc audit nhận nhiều giá trị (`actor_kind=agent,service`).
+2. API key có `kind` (`human` mặc định, `agent`, `service`; cột `auth_api_key.kind`).
+3. Lệnh rủi ro khai bằng phần mở rộng OpenAPI `x-approval: "agent"` trên `#[utoipa::path]` (một chỗ khai, có
+   trong tài liệu, kernel thêm response 202). Lớp của kernel chặn agent, ghi `kernel_approval_requests` (băm method,
+   địa chỉ, thân), trả 202. Người có một permission của lệnh duyệt / từ chối. Agent **gửi lại đúng request đó** kèm
+   `Autoxide-Approval: <id>` và cùng `Idempotency-Key` (lớp idempotency không giữ 202 chờ duyệt); mỗi lần duyệt
+   dùng một lần (cập nhật có điều kiện), hạn 24 giờ. Chọn "gửi lại" thay vì kernel tự phát lại request: không cần
+   giữ thân request trong database, không phải chạy lệnh thay người khác ngoài request.
+4. MCP: tool khai `requires_approval_for_agent` từ chối agent (`approval_required`) và chỉ sang REST để xin duyệt
+   — MCP không làm được điều REST cấm (luật kiến trúc 8). Xin duyệt thẳng qua MCP làm sau khi có nhu cầu.
+
+**Hệ quả.** Lệnh đầu tiên cần duyệt: xoá bài viết / trang của `content`. Module khác đánh dấu lệnh rủi ro của mình
+bằng cùng phần mở rộng.
+
+## D-366 · Mẫu thông báo khách tự soạn: nháp / xuất bản / quay lại, khung mail MJML (`mrml`), thương hiệu (bước 37, D-206) — 2026-11-17 — agent quyết
 
 Bối cảnh: mục "Mẫu mail, thông báo khách tự soạn" của bước 37; bộ dựng mẫu kernel đã có (D-351). Đặc tả: `docs/steps/37-compliance.md`
 mục 2 và phần B.
@@ -9009,7 +9032,7 @@ mục 2 và phần B.
 11. Event mới: `notifications.template_published`, `…template_rolled_back`, `…template_unpublished`, `…branding_updated`; lưu nháp phát
     `…template_updated` với `draft: true`.
 
-## D-366 · `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17 — agent quyết
+## D-367 · `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17 — agent quyết
 
 Căn cứ (cần đối chiếu văn bản gốc / người có chuyên môn pháp lý): Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP
 (hiệu lực 01/01/2026) — đồng ý chứng minh được, rút dễ như cho; NĐ 91/2020/NĐ-CP — thư quảng cáo chỉ gửi khi đã đồng ý trước.
@@ -9043,7 +9066,7 @@ Căn cứ (cần đối chiếu văn bản gốc / người có chuyên môn ph�
 7. Mục "(thấp) báo cáo đã lưu và lịch gửi qua email (A-b10)" **không làm ở bước này**: nó dùng phần xuất chung của bước 51 (D-213),
    phần đó chưa có báo cáo đã lưu; làm cùng bước 51 / 38.
 
-## D-367 · Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17 — agent quyết
+## D-368 · Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17 — agent quyết
 
 Bối cảnh: mục cuối của bước 37. Trait `MobilePushSender` (kernel) và bản giả (testkit) có từ D-348; `notifications` đã có bảng
 `notifications_device_tokens` (token mã hoá bằng `Sealer`, `token_key` SHA-256), `POST` / `DELETE /me/device-tokens`, gửi qua trait,
@@ -9058,4 +9081,4 @@ push.
 3. **Không dựng** bộ nối Firebase Cloud Messaging / Apple Push Notification service: cần khoá của nhà cung cấp (CLAUDE.md "chỉ dừng lại
    hỏi khi cần secret thật"); là module riêng cài `MobilePushSender`, làm khi chủ dự án cấp khoá.
 4. Đóng bước 37: mọi mục `[x]`, chuyển sang `docs/roadmap/done.md` như bước 35 / 36. Còn lại có ghi: báo cáo đã lưu (A-b10) dời sang
-   bước 51 / 38 (D-366); bộ nối thật (SMS brandname, Zalo ZNS, web push VAPID, FCM / APNs, VNeID / eKYC) chờ khoá của nhà cung cấp.
+   bước 51 / 38 (D-367); bộ nối thật (SMS brandname, Zalo ZNS, web push VAPID, FCM / APNs, VNeID / eKYC) chờ khoá của nhà cung cấp.

@@ -1,4 +1,4 @@
-//! Mẫu khách tự soạn (D-206, D-365), cả SQLite và Postgres: kiểm biến theo schema khi lưu (gom lỗi một
+//! Mẫu khách tự soạn (D-206, D-366), cả SQLite và Postgres: kiểm biến theo schema khi lưu (gom lỗi một
 //! lần), nháp → xuất bản → quay lại, giá trị chèn vào HTML luôn được thoát, mail HTML trong khung MJML
 //! có thương hiệu kèm bản chữ thuần, tin quảng cáo luôn có chân thư huỷ nhận, gửi thử chỉ tới chính
 //! người gọi, mẫu hỏng lúc gửi thì dùng mẫu mặc định, giới hạn chạy, permission kiểm trước.

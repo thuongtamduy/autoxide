@@ -1,4 +1,4 @@
-//! Đăng ký bản tin trên sổ đồng ý chung của `compliance` (bước 37 C3, D-347, D-366).
+//! Đăng ký bản tin trên sổ đồng ý chung của `compliance` (bước 37 C3, D-347, D-367).
 //!
 //! - Mỗi đăng ký `confirmed` có một đồng ý trong sổ: chủ thể là email, mục đích `marketing`, phạm vi
 //!   `newsletter.list:<id>`, kênh `email`, bằng chứng là JSON `consent` module đã lưu. Huỷ đăng ký rút

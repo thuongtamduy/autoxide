@@ -102,6 +102,14 @@ impl Modules {
             }
         }
         let catalog = crate::module_catalog::ModuleCatalog::default();
+        // Danh sách lý do (bước 51 P18): kiểm khai báo, giữ trong sổ cho kernel và module đọc.
+        let mut reason_lists = Vec::new();
+        for module in &modules {
+            let lists = module.reason_lists();
+            crate::ops::reasons::check(module.name(), &lists, &mut problems);
+            reason_lists.extend(lists);
+        }
+        catalog.reason_codes().fill(reason_lists);
         let client_configs = crate::ops::client_config::ClientConfigs::default();
         let user_flags = crate::user_flags::Handle::default();
         let keys = crate::secret::KeyConfig::default();
@@ -258,6 +266,9 @@ impl Modules {
         let bulk = self.catalog.bulk_actions();
         let resolvers = self.catalog.code_resolvers();
         let setup = self.catalog.setup_steps();
+        let reasons = self.catalog.reason_codes();
+        let probes = self.catalog.connection_probes();
+        let taggables = self.catalog.taggables();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         // Gọi sau `configure` của mọi module: thời hạn đọc từ cấu hình.
@@ -290,6 +301,9 @@ impl Modules {
                 bulk: &bulk,
                 resolvers: &resolvers,
                 setup: &setup,
+                reasons: &reasons,
+                probes: &probes,
+                taggables: &taggables,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,

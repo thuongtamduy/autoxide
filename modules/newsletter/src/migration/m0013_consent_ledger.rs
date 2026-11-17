@@ -1,4 +1,4 @@
-//! Đăng ký bản tin trên sổ đồng ý chung của `compliance` (bước 37 C3, D-366):
+//! Đăng ký bản tin trên sổ đồng ý chung của `compliance` (bước 37 C3, D-367):
 //!
 //! - `newsletter_subscriptions.ledger_state` (`''`, `granted`, `withdrawn`): sổ đã biết tới đâu. Dòng có
 //!   sẵn nhận `''`, nên lịch `newsletter.backfill_consents` ghi sổ cho mọi đăng ký `confirmed` có sẵn

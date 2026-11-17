@@ -103,7 +103,7 @@ rust_decimal = { version = "1.43", default-features = false, features = ["std"] 
 # giới hạn bước chạy (`fuel`). Bỏ feature mặc định: không `multi_template` (không include / extends /
 # loader → không đọc file), không `macros`; `debug` chỉ để lỗi cú pháp có cột (hàm `debug()` bị gỡ).
 minijinja = { version = "3.1.0", default-features = false, features = ["builtins", "debug", "serde", "fuel"] }
-# Khung mail HTML của mẫu thông báo do khách soạn (D-206, D-365): MJML viết bằng Rust, chạy đúng trên
+# Khung mail HTML của mẫu thông báo do khách soạn (D-206, D-366): MJML viết bằng Rust, chạy đúng trên
 # Outlook, Gmail, điện thoại. Chỉ `parse` + `render`: không loader (không `mj-include` đọc file hay mạng),
 # không `json` / `print`.
 mrml = { version = "6.0.1", default-features = false, features = ["parse", "render"] }

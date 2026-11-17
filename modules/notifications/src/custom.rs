@@ -1,4 +1,4 @@
-//! Mẫu thông báo khách tự soạn (D-206, D-365): cú pháp của bộ dựng mẫu kernel (`{{ code }}`, `{% if %}`,
+//! Mẫu thông báo khách tự soạn (D-206, D-366): cú pháp của bộ dựng mẫu kernel (`{{ code }}`, `{% if %}`,
 //! `{% for %}`), kiểm biến theo schema của loại khi lưu, bản nháp → xuất bản (bản đã xuất bản không
 //! đổi, giữ 20 bản gần nhất) → quay lại bản cũ, xem trước bằng dữ liệu mẫu, gửi thử tới chính người
 //! gọi. Không có mẫu đang dùng thì tin dùng câu thay thế cũ (`notifications_templates`) rồi mẫu mặc

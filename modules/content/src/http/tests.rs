@@ -1241,3 +1241,234 @@ async fn ghi_chu_tren_ban_ghi() {
     .await
     .unwrap();
 }
+
+/// Lệnh cần duyệt khi agent gọi (bước 51 P12): agent xoá bài thì nhận 202 và yêu cầu duyệt, bài
+/// còn nguyên; agent không tự duyệt được; gửi lại trước khi duyệt là 409; người duyệt xong thì gửi
+/// lại cùng request (cùng `Idempotency-Key`) kèm `Autoxide-Approval` mới xoá thật, một lần.
+#[tokio::test]
+async fn agent_goi_lenh_rui_ro_nhan_202_approval_required() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let perms = ["content.read", "content.write", "content.delete"].map(str::to_owned);
+        let robot = Principal::new(Uuid::from_u128(1), perms.clone())
+            .via_api_key(Uuid::from_u128(9))
+            .with_actor_kind(autoxide_kernel::access::ActorKind::Agent);
+        let app = TestApp::builder(test)
+            .user("editor", 2, &["content.read", "content.write", "content.delete"])
+            .principal("robot", robot)
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let created = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("editor"),
+            &[],
+            Some(json!({"kind": "post", "title": "Sắp xoá"})),
+        )
+        .await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let read = send(&app, "GET", &format!("/entries/{id}"), Some("editor"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let key = Uuid::now_v7().to_string();
+        let delete = |approval: Option<&str>| {
+            let mut headers = vec![("if-match", etag.as_str()), ("idempotency-key", key.as_str())];
+            if let Some(approval) = approval {
+                headers.push(("autoxide-approval", approval));
+            }
+            let path = format!("/entries/{id}");
+            let headers: Vec<(String, String)> =
+                headers.into_iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect();
+            let app = &app;
+            async move {
+                let pairs: Vec<(&str, &str)> =
+                    headers.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+                send(app, "DELETE", &path, Some("robot"), &pairs, None).await
+            }
+        };
+
+        let asked = delete(None).await;
+        assert_eq!(asked.status(), StatusCode::ACCEPTED, "{}", asked.json());
+        let approval = asked.json()["data"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(asked.json()["data"]["status"], "pending");
+        assert_eq!(
+            send(&app, "GET", &format!("/entries/{id}"), Some("editor"), &[], None).await.status(),
+            StatusCode::OK,
+            "chưa xoá"
+        );
+        let early = delete(Some(&approval)).await;
+        assert_eq!(
+            (early.status(), early.json()["code"].as_str()),
+            (StatusCode::CONFLICT, Some("kernel.approval_invalid"))
+        );
+        let decide = |who: &str| {
+            app.post(&format!("/api/v1/kernel/approvals/{approval}/approve")).token(who).send()
+        };
+        let own = decide("robot").await.unwrap();
+        assert_eq!(
+            (own.status(), own.json()["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("kernel.approval_forbidden"))
+        );
+        let pending = app
+            .get("/api/v1/kernel/approvals?status=pending")
+            .token("editor")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        assert_eq!(pending["data"][0]["id"], approval, "người duyệt thấy yêu cầu");
+        let approved = decide("editor").await.unwrap();
+        assert_eq!(approved.json()["data"]["status"], "approved", "{}", approved.json());
+
+        let done = delete(Some(&approval)).await;
+        assert_eq!(
+            done.status(),
+            StatusCode::NO_CONTENT,
+            "{}",
+            String::from_utf8_lossy(done.body())
+        );
+        assert_eq!(
+            send(&app, "GET", &format!("/entries/{id}"), Some("editor"), &[], None).await.status(),
+            StatusCode::NOT_FOUND
+        );
+        let used = app
+            .get(&format!("/api/v1/kernel/approvals/{approval}"))
+            .token("robot")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        assert_eq!(used["data"]["status"], "used");
+    })
+    .await
+    .unwrap();
+}
+
+/// Nhãn nội bộ (bước 51 P20): gắn cần quyền ghi bài; tên trùng khác hoa thường / dấu là một nhãn;
+/// lọc `tags_any` / `tags_all`; bài trả `tags`; gộp nhãn chuyển hết bản ghi; khách bật
+/// `kernel.tags.restricted` thì người không có `kernel.tags.manage` không tạo nhãn mới.
+#[tokio::test]
+async fn nhan_noi_bo_tren_bai_viet() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let app = TestApp::builder(test)
+            .user(
+                "admin",
+                1,
+                &["content.read", "content.write", "kernel.tags.manage", "kernel.settings.manage"],
+            )
+            .user("writer", 2, &["content.read", "content.write"])
+            .user("reader", 3, &["content.read"])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let mut ids = Vec::new();
+        for title in ["Một", "Hai"] {
+            let created = send(
+                &app,
+                "POST",
+                "/entries",
+                Some("admin"),
+                &[],
+                Some(json!({"kind": "post", "title": title})),
+            )
+            .await;
+            ids.push(created.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        let tag = |who: &str, id: &str, body: Value| {
+            app.put(&format!("/api/v1/kernel/records/content.entry/{id}/tags"))
+                .token(who)
+                .json(body)
+                .send()
+        };
+        let first = tag("writer", &ids[0], json!({"new_tags": ["VIP", "Cần gọi"]})).await.unwrap();
+        assert_eq!(first.status(), StatusCode::OK, "{}", first.json());
+        assert_eq!(first.json()["data"].as_array().unwrap().len(), 2);
+        let second = tag("writer", &ids[1], json!({"new_tags": ["vip"]})).await.unwrap();
+        let vip = second.json()["data"][0]["id"].as_str().unwrap().to_owned();
+        assert_eq!(second.json()["data"][0]["name"], "VIP", "cùng tên khác hoa thường là một nhãn");
+        assert_eq!(
+            tag("reader", &ids[0], json!({"tag_ids": []})).await.unwrap().status(),
+            StatusCode::FORBIDDEN
+        );
+
+        let all = app.get("/api/v1/kernel/tags").token("reader").send().await.unwrap().json();
+        let call = all["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == "Cần gọi")
+            .cloned()
+            .unwrap();
+        assert_eq!(
+            all["data"].as_array().unwrap().iter().find(|t| t["name"] == "VIP").unwrap()["uses"],
+            2
+        );
+        let call_id = call["id"].as_str().unwrap().to_owned();
+        let list = |query: String| {
+            let app = &app;
+            async move {
+                send(app, "GET", &format!("/entries?{query}"), Some("reader"), &[], None).await
+            }
+        };
+        assert_eq!(
+            list(format!("tags_any={vip}")).await.json()["data"].as_array().unwrap().len(),
+            2
+        );
+        let both = list(format!("tags_all={vip},{call_id}")).await.json();
+        assert_eq!(both["data"].as_array().unwrap().len(), 1, "{both}");
+        assert_eq!(both["data"][0]["tags"].as_array().unwrap().len(), 2);
+
+        let merged = app
+            .post(&format!("/api/v1/kernel/tags/{call_id}/merge"))
+            .token("admin")
+            .json(json!({"into": vip}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(merged.status(), StatusCode::OK, "{}", merged.json());
+        let after = list(format!("tags_any={vip}")).await.json();
+        assert!(
+            after["data"].as_array().unwrap().iter().all(|entry| entry["tags"]
+                .as_array()
+                .unwrap()
+                .len()
+                == 1)
+        );
+
+        let restricted = app
+            .put("/api/v1/kernel/settings/kernel.tags.restricted")
+            .token("admin")
+            .json(json!({"value": "true"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(restricted.status(), StatusCode::OK, "{}", restricted.json());
+        let refused =
+            tag("writer", &ids[0], json!({"tag_ids": [vip], "new_tags": ["Mới"]})).await.unwrap();
+        assert_eq!(
+            (refused.status(), refused.json()["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("kernel.tags_restricted"))
+        );
+        assert_eq!(
+            tag("writer", &ids[0], json!({"tag_ids": []})).await.unwrap().status(),
+            StatusCode::OK,
+            "bỏ nhãn vẫn được"
+        );
+    })
+    .await
+    .unwrap();
+}

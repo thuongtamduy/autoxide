@@ -4,8 +4,8 @@ mod entity;
 mod service;
 
 pub(crate) use service::{
-    ApiKey, ApiKeyService, CreatedApiKey, NewApiKey, Reauth, invalid_api_key, revoke_all_in,
-    tenant_of,
+    ApiKey, ApiKeyService, CreatedApiKey, KeyKind, NewApiKey, Reauth, invalid_api_key,
+    revoke_all_in, tenant_of,
 };
 
 /// Tính năng theo gói (bước 35): tạo API key — khách bị gói giới hạn cần tính năng này.

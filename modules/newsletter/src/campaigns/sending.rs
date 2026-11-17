@@ -349,7 +349,7 @@ impl NewsletterService {
                 .as_ref()
                 .is_some_and(|ids| !ids.contains(&item.subscriber_id))
             {
-                // Sổ đồng ý chung không còn đồng ý (rút ở `compliance`, D-366).
+                // Sổ đồng ý chung không còn đồng ý (rút ở `compliance`, D-367).
                 Some("consent_withdrawn")
             } else if row.advertising
                 && self.config.advertising_max_per_day > 0

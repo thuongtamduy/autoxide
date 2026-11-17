@@ -172,7 +172,13 @@ async fn setting_secret_khong_bao_gio_tra_ra() {
             list["data"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
         assert_eq!(
             names,
-            ["demo.api_key", "demo.greeting", "kernel.business_model", "kernel.public_url"]
+            [
+                "demo.api_key",
+                "demo.greeting",
+                "kernel.business_model",
+                "kernel.public_url",
+                "kernel.tags.restricted"
+            ]
         );
         assert_eq!(list["data"][1]["value"], "Xin chào");
         assert_eq!(list["data"][3]["is_set"], false);
@@ -364,6 +370,7 @@ async fn doi_ten_cau_hinh_gia_tri_cu_van_dung_duoc() {
                 ("demo.connection.partner.key", &connection),
                 ("kernel.business_model", &Value::Null),
                 ("kernel.public_url", &Value::Null),
+                ("kernel.tags.restricted", &Value::Null),
             ]
         );
         let (status, none) =
@@ -453,7 +460,7 @@ async fn loc_nhom_cho_nhan_su_nen_tang_va_tool_mcp() {
         assert_eq!(names, ["demo.connection.partner.account", "demo.connection.partner.key"]);
         assert_eq!(only[0]["value"], "acct-1");
         let all = client.call_tool(tool("kernel.list_settings", json!({}))).await.unwrap();
-        assert_eq!(all.structured_content.unwrap()["data"].as_array().unwrap().len(), 5);
+        assert_eq!(all.structured_content.unwrap()["data"].as_array().unwrap().len(), 6);
         client.cancel().await.unwrap();
     })
     .await

@@ -498,7 +498,7 @@ impl NewsletterService {
         transaction.commit().await?;
         tracing::info!(subscriber_id = %subscriber_id, lists = confirmed.len(), "newsletter subscription confirmed");
         // Sổ đồng ý chung ghi sau commit (người đăng ký chỉ biết chắc trong transaction); lúc gửi
-        // luôn hỏi lại sổ (D-366).
+        // luôn hỏi lại sổ (D-367).
         self.sync_consents_quietly(tenant, subscriber_id).await;
         Ok(confirmed)
     }

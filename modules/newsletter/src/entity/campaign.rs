@@ -34,7 +34,7 @@ pub struct Model {
     pub created_by: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
-    /// `static` (gửi đúng như viết) hay `template` (mẫu dựng riêng cho từng người nhận, D-366).
+    /// `static` (gửi đúng như viết) hay `template` (mẫu dựng riêng cho từng người nhận, D-367).
     pub format: String,
 }
 

@@ -208,6 +208,14 @@ pub fn build(
                 entitlement::gate(handle.clone(), name, always, request, next)
             }));
         }
+        // Lệnh cần duyệt khi agent gọi (bước 51 P12): `x-approval: "agent"` của module.
+        let approvals = crate::ops::approvals::rules(name, routes.get_openapi_mut());
+        if !approvals.is_empty() {
+            let approvals = Arc::new(approvals);
+            routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
+                crate::ops::approvals::gate(approvals.clone(), request, next)
+            }));
+        }
         api = api.nest(&format!("/{name}"), routes);
     }
     let (router, mut openapi) = OpenApiRouter::with_openapi(openapi::base_document())

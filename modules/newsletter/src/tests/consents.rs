@@ -1,4 +1,4 @@
-//! Sổ đồng ý chung (bước 37 C3, D-366), cả SQLite và Postgres: xác nhận ghi sổ, huỷ rút đồng ý, rút
+//! Sổ đồng ý chung (bước 37 C3, D-367), cả SQLite và Postgres: xác nhận ghi sổ, huỷ rút đồng ý, rút
 //! ở `compliance` huỷ đăng ký, chiến dịch bỏ qua người đã rút, đồng bộ phần còn sót chạy lại không
 //! trùng, sổ lỗi thì không gửi; chiến dịch `template` cá nhân hoá từng người nhận.
 
