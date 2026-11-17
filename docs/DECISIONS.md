@@ -8306,3 +8306,31 @@ Bước 36 mục 5 (ROADMAP mục "Trait `PaymentGateway`…").
 7. **Đối soát**: sao kê có tiền mà sổ còn `pending` / `expired` (webhook lạc) → ghi như đã thu; lệch số →
    `needs_review` + `amount_mismatch`; giao dịch lạ → `unknown_in_statement`; sổ đã thu mà sao kê không có →
    `missing_in_statement`; tiền về sau khi hết hạn → vẫn ghi + `late_payment`. Xử lý tay `match` đi cùng đường ghi sổ.
+
+## D-344 · Module `invoices` — chứng từ, đánh số, hoá đơn điện tử — 2026-11-17 — agent quyết
+
+Bước 36 mục 6 và 8 (ROADMAP mục "Chứng từ…" và "Hoá đơn khởi tạo từ máy tính tiền").
+
+1. **Kernel** `autoxide_kernel::einvoice`: trait `EInvoiceProvider` (gửi, trạng thái, huỷ, tải XML/PDF), kiểu dữ liệu có
+   hàm dựng kiểu builder, ba mã lỗi `einvoice.*`. Bộ nối nhà cung cấp góp bằng `StartContext::contribute`; testkit có
+   `FakeEInvoiceProvider` (chấp nhận mặc định, giả từ chối / không trả lời).
+2. **Bảng** (giữ khi xoá khách): `invoices_series` (unique nút, loại, ký hiệu, năm), `invoices_documents` (unique
+   `series_id, number`; unique `source_module, reference`), `invoices_lines`, `invoices_mandates`. Điều chỉnh / thay thế
+   lưu `relation` + `related_document_id` + `direction` (`increase` / `decrease`) và giữ `kind` của chứng từ gốc —
+   thay cho loại `adjustment` / `replacement` riêng của đặc tả: loại hoá đơn (GTGT, bán hàng…) gửi nhà cung cấp phải
+   giữ nguyên.
+3. **Số**: chỉ cấp khi phát hành, trong transaction khoá dòng chứng từ, bằng `numbering::next("invoices:{series_id}")`
+   — rollback thì số không bị tiêu, không bao giờ nhảy số; phát hành lại trả cùng số; bị từ chối thì chỉ sửa được người
+   mua rồi gửi lại cùng số. Ký hiệu không nêu thì dùng ký hiệu đang dùng duy nhất của nút cho loại và năm.
+4. **Thuế** tính lúc lập / sửa nháp qua `dyn TaxEngine` (ngoài transaction), lưu ảnh chụp từng dòng và `tax_snapshot`.
+   **Ghi sổ** khi phát hành chứng từ bán hàng qua `dyn Ledger`, vào sổ của người bán (bên uỷ nhiệm nếu lập thay): Nợ
+   `receivable.customer` / Có `revenue.sales`, `tax.vat_output` (điều chỉnh giảm thì ngược lại), `reference`
+   `invoices:{id}:issued`; huỷ / thay thế đảo bút toán đó. Lấy ID bút toán gốc bằng cách gửi lại cùng bút toán (trả
+   `Replayed`) — không đọc bảng của `ledger`.
+5. **Hoá đơn điện tử** gửi trong job `invoices.submit_einvoice` (ngoài transaction), hỏi trạng thái ngay một lần rồi
+   lịch `invoices.poll_einvoice_status` mỗi 5 phút. Lập thay người bán cần uỷ nhiệm còn hiệu lực (`invoices.mandate_missing`).
+6. **Hạn lưu** `retention_until` = 31/12 của năm lập + 10 năm (Luật Kế toán 88/2015 Điều 41, NĐ 174/2016 Điều 12 — cần
+   đối chiếu khi năm tài chính không theo năm dương lịch); chứng từ đã phát hành không xoá được
+   (`invoices.retention_hold`).
+7. Test chạy cùng `tax` và `ledger` nằm ở `crates/app/src/e2e/invoices.rs`: luật ranh giới cấm test của module dựng
+   module khác.

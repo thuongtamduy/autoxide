@@ -56,6 +56,7 @@ autoxide-organizations = { path = "modules/organizations" }
 autoxide-plans = { path = "modules/plans" }
 autoxide-tax = { path = "modules/tax" }
 autoxide-ledger = { path = "modules/ledger" }
+autoxide-invoices = { path = "modules/invoices" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

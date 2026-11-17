@@ -27,6 +27,7 @@ autoxide-organizations.workspace = true
 autoxide-plans.workspace = true
 autoxide-tax.workspace = true
 autoxide-ledger.workspace = true
+autoxide-invoices.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
@@ -53,6 +54,7 @@ rmcp = { workspace = true, features = [
 ] }
 # Client HTTP thật cho test nâng cấp (gọi máy chủ chạy trong container).
 reqwest.workspace = true
+rust_decimal.workspace = true
 sea-orm.workspace = true
 tower.workspace = true
 

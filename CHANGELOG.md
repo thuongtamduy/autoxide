@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `invoices` (step 36): accounting documents. Series (symbols) per unit, kind and year
+  (`/api/v1/invoices/series`); draft documents with taxes computed by the tax engine (`/api/v1/invoices/documents`);
+  issuing gives the next number of the series with no gaps, even when issued at the same time, books the sale in the
+  ledger and sends the e-invoice through a provider (kernel trait `autoxide_kernel::einvoice::EInvoiceProvider`,
+  `FakeEInvoiceProvider` in the testkit) — also cash register invoices, and invoices issued on behalf of a seller under
+  a mandate (`/api/v1/invoices/mandates`). A refused e-invoice is sent again with the same number; issued documents
+  are corrected by adjustment or replacement, or cancelled, and are never deleted (kept at least 10 years). MCP
+  `invoices.documents`, `invoices.document`, `invoices.create_draft`, `invoices.issue`. Other modules use
+  `autoxide_invoices::api::Invoices`.
+
 - Payments through licensed partners (step 36): kernel trait `autoxide_kernel::payment::PaymentGateway` (connector
   modules contribute it; tests use `FakePaymentGateway` from the testkit). The `ledger` module creates payments
   (`POST /api/v1/ledger/payments`, the partner's checkout page comes back; sending the same `reference` again after a

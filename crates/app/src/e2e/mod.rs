@@ -4,6 +4,7 @@
 
 pub(crate) mod access;
 pub(crate) mod guides;
+pub(crate) mod invoices;
 pub(crate) mod media;
 pub(crate) mod migrations;
 pub(crate) mod plans;
