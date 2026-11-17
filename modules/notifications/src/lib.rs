@@ -94,6 +94,28 @@ impl Module for NotificationsModule {
         Ok(())
     }
 
+    // Thời hạn lưu dữ liệu cá nhân (bước 37 C5, D-360), đọc từ cấu hình đang có.
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        let days = |value: i64| Keep::Days(u32::try_from(value).unwrap_or(u32::MAX));
+        vec![
+            RetentionPolicy::new(
+                "notifications.send_log",
+                "Address and filled-in values of sent notifications (the log row stays, blanked).",
+                DataCategory::Basic,
+                days(self.config.retention_days),
+            )
+            .setting(config::RETENTION_DAYS.name),
+            RetentionPolicy::new(
+                "notifications.inbox",
+                "Notifications in the in-app inbox.",
+                DataCategory::Basic,
+                days(self.config.inbox_retention_days),
+            )
+            .setting(config::INBOX_RETENTION_DAYS.name),
+        ]
+    }
+
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
     }

@@ -11,6 +11,37 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, personal data (Vietnam, Personal Data Protection Law 91/2025/QH15, Decree 356/2025/ND-CP — check the
+  original texts; guide `docs/COMPLIANCE.md`): processing purposes with legal bases and recipients (`GET|POST
+  /api/v1/compliance/purposes`, `PATCH /purposes/{key}`, public `GET /public/purposes`), retention of each kind of
+  personal data against the legal rule `privacy.retention_limits` (`GET /retention`; new kernel hook
+  `Module::retention` with `autoxide_kernel::privacy::{RetentionPolicy, RetentionCatalog}`, declared by `compliance`,
+  `auth`, `forms`, `comments`, `notifications`, `media`), the processing register (`GET /processing-register`), data
+  residency per tenant (`GET|PUT /residency`; kernel columns `kernel_tenants.data_residency`,
+  `kernel_placements.country_code`, command `autoxide placement country`, error `tenant_residency_violation` when
+  the placement or a move does not meet it), personal data breaches with a 72-hour deadline from detection, reminders
+  by mail to the `incident.alert_emails` policy every 15 minutes at each milestone, and draft notifications to the
+  authority and to the people affected (`GET|POST /incidents`, `GET|PATCH /incidents/{id}`,
+  `POST /incidents/{id}/entries`, `GET /incidents/{id}/draft`; runbook in `docs/COMPLIANCE.md`), and the register of
+  data subject requests received through other channels with due dates as dated data (rule
+  `privacy.subject_requests`; `GET|POST /subject-requests`, `GET|PATCH /subject-requests/{id}`,
+  `POST /subject-requests/{id}/fulfil` exporting through every module or erasing the contact from the consent
+  ledger). Deleting an account now erases its verified phone number in `compliance`, and the personal data export
+  has a `compliance` part. Permissions `compliance.privacy.manage`, `compliance.incidents.manage`; doctor checks
+  `compliance.retention`, `compliance.data_residency`, `compliance.privacy_deadlines`; MCP tools
+  `compliance.purposes`, `compliance.retention`, `compliance.processing_register`, `compliance.incidents`,
+  `compliance.open_incident`, `compliance.add_incident_entry`, `compliance.incident_draft`,
+  `compliance.subject_requests`, `compliance.record_subject_request`.
+- Step 37, advertising tracking tags and cookie consent (D-235): built-in providers (GA4, Google Tag Manager, Google
+  Ads, Meta Pixel, TikTok Pixel, Zalo) where the tenant only enters the ID (`GET /api/v1/compliance/tracking-providers`,
+  `GET|POST /tracking-tags`, `GET|PATCH|DELETE /tracking-tags/{id}`), a cookie banner per website with consent
+  categories and a policy version raised when categories or active providers change (`GET|PUT
+  /cookie-settings/{org_id}`, `GET /cookie-consents/stats`), public `GET /public/consent-config` returning only the
+  tags of the categories the visitor accepted (none by default), the banner texts (reject as prominent as accept,
+  legal text not overridable) and `csp_hosts`, and public `POST /public/cookie-consents` recording anonymous proof
+  (random id, categories, version, hashed network block; signed-in visitors also in the consent ledger). Active
+  providers are listed as data recipients in `GET /public/purposes`. Permission `compliance.tracking.manage`, setting
+  `AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR`, MCP tool `compliance.tracking_tags`.
 - Step 37, mandatory page templates in `content` (Vietnam; every text says it needs review by a legal professional):
   owner information, personal data protection, returns, shipping, payment, inspection, complaints, terms of use,
   general conditions, and for a marketplace its regulations, the seller agreement and seller information, in English

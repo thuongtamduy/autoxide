@@ -97,11 +97,13 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       `PostingVerifier` (D-202) cho `comments` (`AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`) dùng trạng thái thật
       — D-356: `/me/verification`, `/me/phone-verifications` (+ `/confirm`), `DELETE /me/phone`, `PostingGate` /
       `AccountVerification`, mức định danh đọc từ KYC; chưa có bộ nối SMS brandname thật (chỉ bản giả)
-- [ ] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn lưu theo
+- [x] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn lưu theo
       loại dữ liệu; nơi lưu theo khách (chọn lưu tại VN); sự cố có mốc 72 giờ từ khi phát hiện trong sổ tay vận
       hành, kèm bản nháp thông báo; sổ yêu cầu của chủ thể qua kênh khác, hạn là dữ liệu (D-217, cần đối chiếu)
-      — đã có: sổ đồng ý theo mục đích `dyn ConsentLedger` (D-347); còn: căn cứ xử lý, thời hạn lưu, nơi lưu, sự
-      cố, yêu cầu của chủ thể
+      — D-360: `/purposes`, `/retention` (`Module::retention` + `RetentionCatalog` ở kernel), `/processing-register`,
+      `/residency` (cột kernel, `autoxide placement country`, `tenant_residency_violation` khi đặt / dời), `/incidents`
+      (nhắc 15 phút, bản nháp), `/subject-requests` (+ `/fulfil`); xoá tài khoản xoá số điện thoại, bản xuất có phần
+      `compliance`; còn: `Module::retention` cho `audit`, `webhooks`, `newsletter`
 - [x] Văn bản pháp lý có phiên bản (D-190; Luật Giao dịch điện tử 20/2023): điều khoản, chính sách dữ liệu cá
       nhân, quy chế sàn, hợp đồng người bán, điều kiện giao dịch chung — số phiên bản, ngày hiệu lực; ai chấp
       nhận bản nào, lúc nào, kênh nào; chấp nhận lại khi cần; số người chấp nhận theo phiên bản — `compliance`
@@ -126,9 +128,11 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       chữ thuần; nháp / xuất bản / quay lại, xem trước, gửi thử tới chính người gọi; `newsletter` cá nhân hoá
       — phần bộ dựng mẫu ở kernel đã xong (D-351, `autoxide_kernel::template`, mẫu in của bước 36 dùng); còn khung
       MJML, bản chữ thuần, nháp / xuất bản ở `notifications` và `newsletter`
-- [ ] Mã theo dõi quảng cáo và đồng ý cookie (D-235): nhà cung cấp cho sẵn (GA4, GTM, Google Ads, Meta, TikTok,
+- [x] Mã theo dõi quảng cáo và đồng ý cookie (D-235): nhà cung cấp cho sẵn (GA4, GTM, Google Ads, Meta, TikTok,
       Zalo), khách chỉ điền mã ID; banner đồng ý theo nhóm, từ chối dễ như đồng ý, không tải gì trước khi đồng ý;
       bằng chứng đồng ý ẩn danh; nhà cung cấp tự vào danh sách bên nhận dữ liệu; tải sau, không chặn hiển thị
+      — D-361: `/tracking-tags`, `/cookie-settings/{org_id}`, `/public/consent-config` (chỉ trả mã của nhóm đã đồng ý),
+      `/public/cookie-consents`; gắn vào `/public/site` khi bước 67 có `SiteExtensions`
 - [ ] Kênh đẩy cho ứng dụng di động (D-220): trait `MobilePushSender` (Firebase / Apple là module riêng, cần
       khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push
 

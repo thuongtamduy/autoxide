@@ -306,7 +306,11 @@ impl ComplianceService {
         Ok(LogoRule::of(kind, body.as_ref()))
     }
 
-    async fn website_org(&self, tenant: &TenantContext, org: Option<Uuid>) -> Result<OrgId, Error> {
+    pub(crate) async fn website_org(
+        &self,
+        tenant: &TenantContext,
+        org: Option<Uuid>,
+    ) -> Result<OrgId, Error> {
         let root = root_of(tenant.id());
         match org.map(OrgId::from_uuid) {
             None => Ok(root),

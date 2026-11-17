@@ -362,7 +362,11 @@ A module that keeps data about users takes part in data export and account delet
   it in `Module::start` with `context.personal_data(…)`; it then appears in
   `GET /api/v1/auth/me/export` under the module's name;
 - subscribe to `privacy::USER_DELETED` in `Module::subscriptions` and delete the user's
-  rows when it arrives (`privacy::deleted_user(event)` gives the id). It may arrive twice.
+  rows when it arrives (`privacy::deleted_user(event)` gives the id). It may arrive twice;
+- declare how long each kind of personal data is kept in `Module::retention` (a list of
+  `privacy::RetentionPolicy` — name `<module>.<kind>`, `DataCategory`, `Keep::Days(n)` /
+  `UntilDeleted` / `Forever`, and the setting that sets it), read from the module's settings. The
+  `compliance` module lists them at `GET /api/v1/compliance/retention` against the legal limits.
 
 ### Money and balances
 

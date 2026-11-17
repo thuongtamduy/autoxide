@@ -63,6 +63,24 @@
       "needs_legal_review": true
     },
     {
+      "key": "privacy.retention_limits",
+      "version": 1,
+      "effective_from": "2026-01-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"forever_allowed": ["accounting"], "max_days": {"basic": 3650, "sensitive": 1825, "security": 730}},
+      "legal_basis": "Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (lưu trữ trong thời gian phù hợp với mục đích xử lý) và NĐ 356/2025/NĐ-CP, hiệu lực 01/01/2026 — các giới hạn số ngày là lựa chọn mặc định thận trọng, không phải con số của luật; cần đối chiếu văn bản gốc / người có chuyên môn pháp lý.",
+      "needs_legal_review": true
+    },
+    {
+      "key": "privacy.subject_requests",
+      "version": 1,
+      "effective_from": "2026-01-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"respond_within_hours": {"access": 72, "erasure": 72, "rectification": 72, "objection": 72, "restriction": 72, "withdrawal": 72}},
+      "legal_basis": "Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (quyền của chủ thể dữ liệu) và NĐ 356/2025/NĐ-CP, hiệu lực 01/01/2026; 72 giờ lấy theo NĐ 13/2023/NĐ-CP (đã được thay thế) làm mặc định thận trọng — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý.",
+      "needs_legal_review": true
+    },
+    {
       "key": "moderation.hide_reasons",
       "version": 1,
       "effective_from": "2024-07-01T00:00:00+07:00",

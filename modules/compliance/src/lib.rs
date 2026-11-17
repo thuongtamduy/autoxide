@@ -21,14 +21,21 @@ mod events;
 mod http_kyc;
 mod http_legal;
 mod http_moit;
+mod http_privacy;
+mod http_tracking;
 mod http_verification;
+mod incidents;
 mod kyc;
 mod legal;
 mod migration;
 mod permissions;
+mod privacy;
 mod provider;
 mod service;
+mod subject_requests;
 mod tools;
+mod tools_privacy;
+mod tracking;
 mod verification;
 mod websites;
 
@@ -36,6 +43,10 @@ mod websites;
 mod tests;
 #[cfg(test)]
 mod tests_moit;
+#[cfg(test)]
+mod tests_privacy;
+#[cfg(test)]
+mod tests_tracking;
 #[cfg(test)]
 mod tests_verification;
 
@@ -45,7 +56,7 @@ use std::time::Duration;
 use autoxide_kernel::access::Permission;
 use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::EventInfo;
+use autoxide_kernel::event::{EventInfo, Subscription};
 use autoxide_kernel::job::{JobContext, JobHandler, JobRegistration, Schedule};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -148,8 +159,14 @@ impl Module for ComplianceModule {
             resources: context.resources(),
             templates: (*context.require::<autoxide_kernel::template::TemplateEngine>()?).clone(),
             facts: Arc::new(checklist::FactRegistry::default()),
+            mailer: context.require::<dyn autoxide_kernel::mail::Mailer>().ok(),
+            translations: context.translations().clone(),
+            personal_data: context.personal_data_export(),
+            retention: context.retention_catalog(),
+            cookie_consents_per_hour: self.config.cookie_consents_per_hour,
         });
         self.service = Some(service.clone());
+        context.personal_data(Arc::new(privacy::CompliancePersonalData(service.clone())))?;
         let provider = Arc::new(provider::Provider(service));
         context.provide::<dyn api::KycGate>(provider.clone())?;
         context.provide::<dyn api::AcceptanceGate>(provider.clone())?;
@@ -168,6 +185,8 @@ impl Module for ComplianceModule {
             http_kyc::routes(service.clone())
                 .merge(http_legal::routes(service.clone()))
                 .merge(http_moit::routes(service.clone()))
+                .merge(http_privacy::routes(service.clone()))
+                .merge(http_tracking::routes(service.clone()))
                 .merge(http_verification::routes(service))
         })
     }
@@ -178,16 +197,37 @@ impl Module for ComplianceModule {
 
     fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
         self.service.clone().map_or_else(Vec::new, |service| {
-            vec![autoxide_kernel::doctor::Check::new(
-                "moit_readiness",
-                "Every website has a legal profile and, before it is submitted to the Ministry of \
-                 Industry and Trade (Vietnam), nothing its checklist needs is missing.",
-                Arc::new(checklist::ReadinessProbe {
-                    databases: service.databases.clone(),
-                    service,
-                }),
-            )
-            .with_timeout(Duration::from_secs(60))]
+            vec![
+                autoxide_kernel::doctor::Check::new(
+                    "moit_readiness",
+                    "Every website has a legal profile and, before it is submitted to the Ministry of \
+                     Industry and Trade (Vietnam), nothing its checklist needs is missing.",
+                    Arc::new(checklist::ReadinessProbe {
+                        databases: service.databases.clone(),
+                        service: service.clone(),
+                    }),
+                )
+                .with_timeout(Duration::from_secs(60)),
+                autoxide_kernel::doctor::Check::new(
+                    "retention",
+                    "No kind of personal data is kept forever or longer than the legal rule \
+                     `privacy.retention_limits` allows.",
+                    Arc::new(privacy::RetentionProbe(service.clone())),
+                ),
+                autoxide_kernel::doctor::Check::new(
+                    "data_residency",
+                    "Every tenant that must keep its data in one country is on a placement in that \
+                     country.",
+                    Arc::new(privacy::ResidencyProbe(service.clone())),
+                ),
+                autoxide_kernel::doctor::Check::new(
+                    "privacy_deadlines",
+                    "No personal data breach is past its 72-hour reporting deadline and no data \
+                     subject request is past its due date.",
+                    Arc::new(privacy::DeadlinesProbe(service)),
+                )
+                .with_timeout(Duration::from_secs(60)),
+            ]
         })
     }
 
@@ -196,6 +236,14 @@ impl Module for ComplianceModule {
             vec![
                 JobRegistration::new(kyc::KYC_PROCESS, Arc::new(kyc::ProcessJob(service.clone()))),
                 JobRegistration::new(kyc::KYC_EXPIRY, Arc::new(kyc::ExpiryJob(service.clone()))),
+                JobRegistration::new(
+                    incidents::INCIDENT_DEADLINES,
+                    Arc::new(incidents::DeadlinesJob(service.clone())),
+                ),
+                JobRegistration::new(
+                    tracking::CONSENT_PROOF_PURGE,
+                    Arc::new(tracking::PurgeJob(service.clone())),
+                ),
                 JobRegistration::new(RULES_REFRESH, Arc::new(RulesRefreshJob(service))),
             ]
         })
@@ -204,8 +252,73 @@ impl Module for ComplianceModule {
     fn schedules(&self) -> Vec<Schedule> {
         vec![
             Schedule::new(kyc::KYC_EXPIRY, kyc::KYC_EXPIRY, Duration::from_secs(86_400)),
+            Schedule::new(
+                incidents::INCIDENT_DEADLINES,
+                incidents::INCIDENT_DEADLINES,
+                Duration::from_secs(900),
+            ),
+            Schedule::new(
+                tracking::CONSENT_PROOF_PURGE,
+                tracking::CONSENT_PROOF_PURGE,
+                Duration::from_secs(86_400),
+            ),
             Schedule::new(RULES_REFRESH, RULES_REFRESH, Duration::from_secs(3_600))
                 .on_control_only(),
+        ]
+    }
+
+    fn subscriptions(&self) -> Vec<Subscription> {
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![Subscription::new(
+                autoxide_kernel::privacy::USER_DELETED,
+                Arc::new(privacy::UserDeletedListener(service)),
+            )]
+        })
+    }
+
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        let callback_days = u32::try_from(self.config.callback_retention_days).unwrap_or(u32::MAX);
+        vec![
+            RetentionPolicy::new(
+                "compliance.kyc_callbacks",
+                "Raw callbacks of identity providers (identity verification results).",
+                DataCategory::Sensitive,
+                Keep::Days(callback_days),
+            )
+            .setting(config::KYC_CALLBACK_RETENTION_DAYS.name),
+            RetentionPolicy::new(
+                "compliance.kyc_profiles",
+                "Identity verification results: verified name, document kind, last 4 digits and a \
+                 hash of the document number (no image, no biometrics).",
+                DataCategory::Sensitive,
+                Keep::UntilDeleted,
+            ),
+            RetentionPolicy::new(
+                "compliance.phone_verifications",
+                "Verified phone number of an account; deleted with the account.",
+                DataCategory::Basic,
+                Keep::UntilDeleted,
+            ),
+            RetentionPolicy::new(
+                "compliance.phone_challenges",
+                "One-time codes sent by SMS (hashed), deleted after a day.",
+                DataCategory::Security,
+                Keep::Days(1),
+            ),
+            RetentionPolicy::new(
+                "compliance.consents",
+                "Proof of consents and of accepted legal documents, kept to prove them.",
+                DataCategory::Accounting,
+                Keep::Forever,
+            ),
+            RetentionPolicy::new(
+                "compliance.cookie_consents",
+                "Anonymous proof of cookie consents (random id, categories, hashed network block), \
+                 kept for the days of the legal rule `privacy.consent_proof_days`.",
+                DataCategory::Accounting,
+                Keep::Days(1825),
+            ),
         ]
     }
 }

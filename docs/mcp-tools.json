@@ -1544,6 +1544,39 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Add a line (what was found, what was done) to the log of a personal data breach.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A line for the log of a breach.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "incident_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "incident_id",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.add_incident_entry",
+      "output_schema": null,
+      "permissions": [
+        "compliance.incidents.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -1559,6 +1592,96 @@
       "output_schema": null,
       "permissions": [
         "compliance.documents.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "A draft notification of a personal data breach to the authority (`authority`) or to the people affected (`subjects`). A draft only: a person completes, reviews and sends it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which draft.",
+        "properties": {
+          "audience": {
+            "description": "`authority` or `subjects`.",
+            "type": "string"
+          },
+          "incident_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "description": "`vi` or `en` (default).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "incident_id",
+          "audience"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.incident_draft",
+      "output_schema": null,
+      "permissions": [
+        "compliance.incidents.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List personal data breaches with their 72-hour reporting deadline (`overdue` for those late).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Records with a deadline.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "overdue": {
+            "description": "Only records past their deadline and not done.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Only records with this status.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "compliance.incidents",
+      "output_schema": null,
+      "permissions": [
+        "compliance.incidents.manage"
       ]
     },
     {
@@ -1647,6 +1770,63 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Record a personal data breach. The report to the authority is due 72 hours after detection; reminders go to the `incident.alert_emails` policy.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A personal data breach to record.",
+        "properties": {
+          "affected_count": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "data_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "detected_at": {
+            "description": "When it was detected (the 72-hour deadline counts from here); defaults to now.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "severity": {
+            "description": "`low`, `medium`, `high` or `critical`.",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "severity"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.open_incident",
+      "output_schema": null,
+      "permissions": [
+        "compliance.incidents.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -1661,6 +1841,26 @@
       "name": "compliance.pending_acceptances",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "The register of processing activities: purposes, legal bases, kinds of data, recipients, retention and where the data is kept.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "compliance.processing_register",
+      "output_schema": null,
+      "permissions": [
+        "compliance.privacy.read"
+      ]
     },
     {
       "annotations": {
@@ -1720,6 +1920,99 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the tenant's purposes for processing personal data with their legal basis (Vietnam, Personal Data Protection Law 91/2025/QH15).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "compliance.purposes",
+      "output_schema": null,
+      "permissions": [
+        "compliance.privacy.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Record a request of a data subject received through another channel; the due date comes from the legal rule `privacy.subject_requests`. Fulfilling it (export / erase) is done through REST by a person.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A request of a data subject received through another channel.",
+        "properties": {
+          "channel": {
+            "description": "`email`, `post`, `phone`, `authority` or `other`.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`.",
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received_at": {
+            "description": "When it was received; defaults to now.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "description": "A user id, an email address or a phone number.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "channel",
+          "subject"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.record_subject_request",
+      "output_schema": null,
+      "permissions": [
+        "compliance.privacy.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "How long each kind of personal data is kept, compared with the limits of the legal rule `privacy.retention_limits` (`ok`, `exceeds_limit`, `forever_not_allowed`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "compliance.retention",
+      "output_schema": null,
+      "permissions": [
+        "compliance.privacy.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -1770,6 +2063,101 @@
       "output_schema": null,
       "permissions": [
         "compliance.legal.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the requests of data subjects received by email, post, phone or from an authority, with their due date (`overdue` for those late).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Records with a deadline.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "overdue": {
+            "description": "Only records past their deadline and not done.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Only records with this status.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "compliance.subject_requests",
+      "output_schema": null,
+      "permissions": [
+        "compliance.privacy.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the advertising and analytics tracking tags of the websites in your scope (GA4, GTM, Google Ads, Meta, TikTok, Zalo); they load only after visitor consent.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which tags.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only the tags of this unit (website).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "compliance.tracking_tags",
+      "output_schema": null,
+      "permissions": [
+        "compliance.tracking.manage"
       ]
     },
     {

@@ -8788,3 +8788,93 @@ Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15, NĐ 55/2024/N
    phiên bản (D-347) đã làm với thân gửi thẳng, và `compliance` đăng ký TRƯỚC `content` (`notifications`, `plans` cần
    `compliance`), nên `compliance` không `require` được trait này. Nối "phát hành phiên bản từ trang đã đăng" cần một chỗ góp
    muộn (như `ComplianceFacts`) — để mục sau, ghi ở đây để không ai đảo thứ tự đăng ký module.
+
+## D-360 · Dữ liệu cá nhân trong `compliance`: sổ mục đích, thời hạn lưu (`Module::retention`), nơi lưu theo khách, sự cố 72 giờ, sổ yêu cầu của chủ thể (bước 37, mục "Dữ liệu cá nhân") — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định
+356/2025/NĐ-CP (hiệu lực 01/01/2026): mục đích và căn cứ xử lý, lưu trữ trong thời gian phù hợp mục đích, quyền của chủ thể dữ
+liệu, thông báo vi phạm trong 72 giờ; Luật An ninh mạng 116/2025/QH15 (hiệu lực 01/7/2026) và NĐ 53/2022/NĐ-CP: lưu dữ liệu tại
+Việt Nam. Chưa chắc: cơ quan nhận báo cáo và mẫu báo cáo; mẫu hồ sơ đánh giá tác động; hạn trả lời yêu cầu của chủ thể; đối
+tượng bắt buộc lưu tại Việt Nam.
+
+1. **Sổ mục đích**: hiệu lực = quy tắc `privacy.default_purposes` (đã có) ∪ bảng mới `compliance_purposes` (chỉ phần khách thêm /
+   ghi đè, unique `tenant_id`,`key`; sửa mục mặc định thì lưu bản của khách). Có thêm `recipients` (tên, nước) so với đặc tả để
+   sổ xử lý ghi được bên nhận; nhà cung cấp mã theo dõi đang bật (D-361) tự vào bên nhận ở `GET /public/purposes`.
+2. **Thời hạn lưu**: kernel thêm `Module::retention()` (mặc định rỗng — D-038) trả `RetentionPolicy { name, description,
+   category: DataCategory (basic/sensitive/security/accounting), keep: Keep (Days/UntilDeleted/Forever), setting }`, gọi sau
+   `configure`; kernel gom thành `RetentionCatalog` (`autoxide_kernel::privacy`), module đọc qua
+   `StartContext::retention_catalog()`. Đặt trong `privacy` (cùng chỗ xuất / xoá dữ liệu cá nhân), không thêm đường dẫn công
+   khai mới. Đã khai: `compliance`, `auth`, `forms`, `comments`, `notifications`, `media` (đặc tả C5 còn `audit`, `webhooks`,
+   `newsletter` — để mục sau, không chặn). Quy tắc mới `privacy.retention_limits` (giới hạn số ngày theo loại, `forever_allowed`
+   chỉ `accounting`) — **con số là mặc định thận trọng, không phải của luật**. `GET /retention`, doctor `compliance.retention`.
+3. **Nơi lưu theo khách**: migration kernel mới `m0021_data_residency` thêm `kernel_placements.country_code` và
+   `kernel_tenants.data_residency` (TEXT NULL, ISO 3166-1 alpha-2; không sửa migration bước 33). API kernel
+   `DatabaseRegistry::residency / set_residency / residencies`, `Placements::set_country`, lệnh `autoxide placement country
+   <tên> <CC|->`. Đặt yêu cầu khi placement không rõ nước / khác nước → `tenant_residency_violation` (409); dời khách sang
+   placement không đáp ứng bị chặn (thêm vào danh sách lý do chặn của lượt dời); đổi nước của placement đang giữ khách có yêu
+   cầu cũng bị từ chối. REST `GET /residency` (`compliance.privacy.read`), `PUT /residency {tenant_id?, data_residency}`
+   (nhân sự nền tảng + `compliance.privacy.manage`). **Lệch đặc tả**: tạo khách mới (bước 35) chưa nhận yêu cầu nơi lưu lúc
+   cấp phát — khách mới chưa có yêu cầu, nên kiểm ở lúc đặt yêu cầu và lúc dời là đủ; doctor `compliance.data_residency`.
+4. **Sự cố 72 giờ**: bảng `compliance_incidents`, `compliance_incident_entries` (chỉ thêm). `report_due_at` = `detected_at` +
+   `report_within_hours` của quy tắc `privacy.incident` (đã có). Job `compliance.incident_deadlines` (lịch 15 phút) nhắc ở mốc
+   `remind_at_hours` **và ở mốc hạn**, mỗi mốc một lần nhờ cột `reminded_hours` + `UPDATE … WHERE reminded_hours = <cũ>` (đúng một
+   dòng mới phát event); chỉ nhắc mốc lớn nhất đã qua (không dồn nhiều mail khi job trễ). Mail qua `dyn Mailer` (tuỳ chọn) tới
+   chính sách `incident.alert_emails`, gửi **sau** khi ghi mốc; khoá chống trùng của mail. Bản nháp thông báo gửi cơ quan / người bị
+   ảnh hưởng dựng từ mẫu cố định có bản dịch (EN + VI) bằng `MailTemplate` — không dùng AI (đặc tả cho phép AI nháp; mẫu cố định
+   đủ và tất định, có thể thêm gợi ý AI sau qua `TextModel`). Sổ tay 72 giờ ở `docs/COMPLIANCE*.md`, `docs/DEPLOY*.md` trỏ tới.
+5. **Sổ yêu cầu của chủ thể** (D-217): bảng `compliance_subject_requests`; đối tượng nhận dạng thành `user` / `email` / `phone`
+   (chuẩn hoá). Hạn trả lời là dữ liệu: quy tắc mới `privacy.subject_requests` (`respond_within_hours` theo loại, mặc định 72 giờ
+   lấy từ NĐ 13/2023 đã được thay — **cần đối chiếu**), tính theo quy tắc hiệu lực lúc nhận. `fulfil` dùng cơ chế sẵn có, chạy
+   ngay (không qua job như đặc tả phác thảo — bản xuất là đọc, xoá giá trị là một transaction ngắn): `access` của người dùng →
+   `PersonalDataExport` của mọi module, trả trong response, không lưu; `erasure` / `withdrawal` của email / số → bỏ
+   `subject_value` trong sổ đồng ý (giữ khoá băm, bản ghi) và số đã xác thực trùng số; xoá cả tài khoản vẫn là `DELETE
+   /api/v1/auth/users/{id}` (`compliance` không phụ thuộc `auth`, D-046). Hộp việc chưa nối (để khi cần).
+6. **Permission cho endpoint đặc tả chưa nêu** ("Agent tự quyết" #11): sổ yêu cầu của chủ thể dùng `compliance.privacy.manage`
+   (mới, `sensitive_data`); sự cố `compliance.incidents.manage` (mới, `write`). `compliance.privacy.read` mở rộng mô tả (mục
+   đích, thời hạn, sổ xử lý, nơi lưu).
+7. **Phần còn lại từ D-356**: nghe `auth.user_deleted` → xoá `compliance_account_verifications` và `compliance_phone_challenges`
+   của người đó, gỡ `user_id` khỏi bằng chứng đồng ý cookie; đăng ký `PersonalData` của `compliance` (số đã xác thực, đồng ý,
+   kết quả định danh tóm tắt, văn bản đã chấp nhận, đồng ý cookie, yêu cầu của chủ thể) — bằng chứng giữ theo luật, có câu giải
+   thích trong bản xuất.
+8. Event mới: `compliance.purpose_updated`, `…residency_changed`, `…incident_opened`, `…incident_updated`,
+   `…incident_deadline_near`, `…subject_request_received`, `…subject_request_updated` (chỉ id / trạng thái). MCP:
+   `compliance.purposes`, `…retention`, `…processing_register` (đọc), `…incidents`, `…open_incident`, `…add_incident_entry`,
+   `…incident_draft`, `…subject_requests` (đọc), `…record_subject_request`. Doctor: `compliance.retention`,
+   `compliance.data_residency`, `compliance.privacy_deadlines` (sự cố quá hạn, yêu cầu quá hạn) — chỉ cảnh báo.
+
+## D-361 · Mã theo dõi quảng cáo và đồng ý cookie trong `compliance` (bước 37, D-235) — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ
+356/2025/NĐ-CP (đồng ý, chuyển dữ liệu ra nước ngoài), Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15. Chưa chắc: cookie đo
+lường có cần đồng ý không; hồ sơ đánh giá tác động khi bật pixel của nền tảng nước ngoài; thời hạn giữ bằng chứng đồng ý. Chọn
+cách hiểu chặt: hỏi trước, mặc định không tải gì.
+
+1. **Module sở hữu**: `compliance` (đặc tả A6) — đồng ý là việc của sổ đồng ý; bước 67 chỉ gắn vào `/public/site` qua
+   `SiteExtensions` khi có. Core chỉ có API: cấu hình + endpoint công khai; banner là giao diện ở repo riêng.
+2. **Nhà cung cấp là dữ liệu trong code** (`tracking::PROVIDERS`): `ga4` (analytics), `gtm`, `google_ads`, `meta`, `tiktok`, `zalo`
+   (marketing — GTM xếp nhóm chặt nhất vì container tải được mọi thứ); mỗi mục có dạng mã (kiểm khi lưu, tự viết vài dòng, không
+   thêm thư viện regex), ví dụ, host cho CSP, nước nhận dữ liệu, URL script (Zalo để giao diện tự dựng theo tài liệu nhà cung
+   cấp — chưa chắc URL). Khách chỉ điền mã, không dán script. Thêm nhà cung cấp = thêm một mục + test.
+3. **Bảng** (migration `m0014_tracking_and_cookies`): `compliance_tracking_tags` (unique `tenant_id`,`org_id`,`provider`,
+   `tracking_id`), `compliance_cookie_settings` (PK `tenant_id`,`org_id`; thêm `signature` = SHA-256 của nhóm hiệu lực + nhà cung cấp
+   đang bật: đổi thì `policy_version` + 1, kể cả khi đổi do thêm / tạm dừng / xoá mã), `compliance_cookie_consents` (`consent_id`
+   do giao diện tạo, nhóm, phiên bản, `ip_hash` = `ip_hash::fingerprint`, `user_id?`; dọn bằng lịch hằng ngày
+   `compliance.consent_proof_purge` theo `privacy.consent_proof_days` của từng khách).
+4. **Không trả mã của nhóm chưa đồng ý**: `GET /public/consent-config?granted=a,b` trả mã chỉ của nhóm trong `granted` (rỗng khi
+   không có) — máy chủ giữ luật "không tải gì trước khi đồng ý", giao diện không lọc nhầm được. `csp_hosts` gồm mọi nhà cung cấp
+   đang bật (để tải được sau khi đồng ý), không gồm nhà cung cấp tạm dừng.
+5. **Câu chữ banner** qua i18n (EN + VI) bằng cặp `MailTemplate` (tiêu đề / nội dung) để `cargo xtask check` kiểm bản dịch — chưa
+   có cơ chế đổi câu chữ theo khách (P21, bước 51); response ghi `overridable` cho từng câu, `legal` luôn `false`. Không thêm cách
+   đổi câu thứ hai trước P21 (một cách làm cho mỗi việc).
+6. **Bằng chứng đồng ý**: `POST /public/cookie-consents` công khai, giới hạn theo khối mạng băm
+   (`AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR`, mặc định 60), `policy_version` cũ → `compliance.cookie_policy_changed`
+   (409, hỏi lại); trả 204 (không có tài nguyên để đọc lại công khai). Người đã đăng nhập: ghi thêm vào sổ đồng ý chung —
+   `grant` / `withdraw` mục đích `analytics` / `marketing`, phạm vi `website:<org_id>`, `source_ref` theo id bản ghi.
+7. API quản trị: `GET /tracking-providers`, `GET|POST /tracking-tags`, `GET|PATCH|DELETE /tracking-tags/{id}`,
+   `GET|PUT /cookie-settings/{org_id}`, `GET /cookie-consents/stats?org_id` (số gộp 30 ngày) — permission mới
+   `compliance.tracking.manage` (theo nút, `write`). Event `compliance.tracking_changed`. MCP `compliance.tracking_tags` — **không**
+   đánh dấu `read_only` như đặc tả vì permission của nó mức `write` (bài e2e phân quyền chỉ cho tool đọc đòi permission mức
+   `read` / `sensitive_data`). Mã lỗi: `compliance.tracking_provider_unknown`, `compliance.tracking_id_invalid` (kèm `expected`),
+   `compliance.tracking_tag_not_found`, `compliance.tracking_tag_exists`, `compliance.cookie_policy_changed`,
+   `compliance.cookie_consents_throttled`.
+8. Ngoài phạm vi: gửi chuyển đổi từ máy chủ tới nền tảng quảng cáo (cần đối chiếu riêng về chuyển dữ liệu cá nhân).

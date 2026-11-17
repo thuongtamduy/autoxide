@@ -51,6 +51,16 @@ pub(crate) struct ComplianceService {
     pub templates: autoxide_kernel::template::TemplateEngine,
     /// "Fact" của danh sách kiểm do module khác đăng ký.
     pub facts: Arc<crate::checklist::FactRegistry>,
+    /// Gửi mail nhắc hạn sự cố (module `mail`); `None` thì chỉ phát event.
+    pub mailer: Option<Arc<dyn autoxide_kernel::mail::Mailer>>,
+    /// Bản dịch (mẫu mail, bản nháp thông báo sự cố, câu chữ của banner cookie).
+    pub translations: autoxide_kernel::i18n::Translations,
+    /// Sổ dữ liệu cá nhân của mọi module (yêu cầu `access` của chủ thể).
+    pub personal_data: autoxide_kernel::privacy::PersonalDataExport,
+    /// Sổ thời hạn lưu của mọi module.
+    pub retention: autoxide_kernel::privacy::RetentionCatalog,
+    /// `AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR`.
+    pub cookie_consents_per_hour: u32,
 }
 
 /// Duyệt hay quyết định cần phiên đăng nhập của người, không nhận API key.

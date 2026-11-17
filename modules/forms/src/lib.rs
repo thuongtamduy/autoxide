@@ -92,6 +92,41 @@ impl Module for FormsModule {
         Ok(())
     }
 
+    // Thời hạn lưu dữ liệu cá nhân (bước 37 C5, D-360), đọc từ cấu hình đang có.
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        let Some(config) = &self.config else {
+            return Vec::new();
+        };
+        let submissions = match config.retention_days {
+            0 => Keep::UntilDeleted,
+            days => Keep::Days(days),
+        };
+        vec![
+            RetentionPolicy::new(
+                "forms.submissions",
+                "Answers sent through forms (may hold names, emails, phone numbers).",
+                DataCategory::Basic,
+                submissions,
+            )
+            .setting(config::RETENTION_DAYS.name),
+            RetentionPolicy::new(
+                "forms.spam",
+                "Submissions marked as spam.",
+                DataCategory::Basic,
+                Keep::Days(config.spam_retention_days),
+            )
+            .setting(config::SPAM_RETENTION_DAYS.name),
+            RetentionPolicy::new(
+                "forms.ip_hashes",
+                "Hashed network address of each submission.",
+                DataCategory::Security,
+                Keep::Days(config.ip_retention_days),
+            )
+            .setting(config::IP_RETENTION_DAYS.name),
+        ]
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }

@@ -31,8 +31,33 @@ pub(crate) const DOCUMENTS_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Write);
 
-pub(crate) const PRIVACY_READ: Permission =
-    Permission::new("compliance.privacy.read", "See consents recorded in the tenant.");
+pub(crate) const PRIVACY_READ: Permission = Permission::new(
+    "compliance.privacy.read",
+    "See consents recorded in the tenant, the processing purposes, the retention of personal data, \
+     the processing register and where the tenant's data is kept.",
+);
+
+pub(crate) const PRIVACY_MANAGE: Permission = Permission::new(
+    "compliance.privacy.manage",
+    "Set the processing purposes of the tenant and handle the requests of data subjects received \
+     through other channels (export or erase their data).",
+)
+.with_risk(Risk::SensitiveData);
+
+pub(crate) const INCIDENTS_MANAGE: Permission = Permission::new(
+    "compliance.incidents.manage",
+    "Record personal data breaches, follow their 72-hour reporting deadline and draft the \
+     notifications.",
+)
+.with_risk(Risk::Write);
+
+pub(crate) const TRACKING_MANAGE: Permission = Permission::new(
+    "compliance.tracking.manage",
+    "Set the advertising and analytics tags of websites in your scope and their cookie consent \
+     banner, and see consent statistics.",
+)
+.scoped()
+.with_risk(Risk::Write);
 
 pub(crate) const POLICIES_MANAGE: Permission = Permission::new(
     "compliance.policies.manage",
@@ -74,6 +99,9 @@ pub(crate) fn all() -> Vec<Permission> {
         DOCUMENTS_READ,
         DOCUMENTS_MANAGE,
         PRIVACY_READ,
+        PRIVACY_MANAGE,
+        INCIDENTS_MANAGE,
+        TRACKING_MANAGE,
         POLICIES_MANAGE,
         RULES_READ,
         RULES_MANAGE,

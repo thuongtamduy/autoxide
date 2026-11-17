@@ -82,6 +82,15 @@ enum Action {
         #[arg(long)]
         force: bool,
     },
+    /// Record the country of a placement's servers (ISO 3166-1 alpha-2, e.g. `VN`; `-` for
+    /// unknown). Tenants that must keep their data in one country (data residency) can only be on,
+    /// or move to, a placement in that country.
+    Country {
+        /// Name of the placement (`main` too).
+        name: String,
+        /// Two-letter country code, or `-`.
+        country: String,
+    },
     /// Compare every placement's migrations with the program and record the result.
     Check,
 }
@@ -190,6 +199,17 @@ async fn execute(placements: &Placements, action: Action) -> Result<String, Stri
                 .map_err(|error| describe_error(&error))?;
             Ok(placement_line(&placement))
         }
+        Action::Country { name, country } => {
+            let country = (country != "-").then_some(country);
+            placements
+                .set_country(&name, country.as_deref())
+                .await
+                .map_err(|error| describe_error(&error))?;
+            Ok(format!(
+                "Placement `{name}` country: {}.",
+                country.as_deref().map_or("unknown".to_owned(), str::to_ascii_uppercase)
+            ))
+        }
         Action::Check => {
             let checks = placements.check().await.map_err(|error| describe_error(&error))?;
             if checks.is_empty() {
@@ -220,8 +240,9 @@ fn placement_line(placement: &Placement) -> String {
             (None, None) => format!("storage={}", storage.kind),
         },
     };
+    let country = placement.country_code.as_deref().unwrap_or("-");
     format!(
-        "{}  {}  {}  {}  {}  {storage}",
+        "{}  {}  {}  {}  {}  country={country}  {storage}",
         placement.id, placement.name, placement.kind, placement.backend, placement.schema_state
     )
 }

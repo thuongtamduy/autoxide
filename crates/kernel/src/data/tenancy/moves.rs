@@ -473,6 +473,13 @@ impl TenantMoves {
         if target.id != MAIN_PLACEMENT.as_uuid() && target.schema_state != "ready" {
             blockers.push(errors::tenant_placement_behind(to));
         }
+        // Khách buộc lưu dữ liệu ở một nước: chỉ dời tới placement ở đúng nước đó (D-360).
+        if let Err(error) = super::residency::check_target(
+            row.data_residency.as_deref(),
+            target.country_code.as_deref(),
+        ) {
+            blockers.push(error);
+        }
         let mut tables = Vec::new();
         let source_db = self.database(&source).await;
         let target_db = self.database(&target).await;
