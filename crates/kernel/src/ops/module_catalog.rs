@@ -60,6 +60,8 @@ pub(crate) struct ModuleCatalog {
     work: crate::ops::work::WorkSources,
     /// Sổ nguồn tìm xuyên phân hệ (bước 51 P3).
     finders: crate::ops::find::FinderSources,
+    /// Sổ số liệu tóm tắt (bước 51 P4).
+    metrics: crate::ops::summary::SummaryMetrics,
     /// Sổ điều hướng đã gom (bước 51 P1).
     navigation: Arc<OnceLock<crate::module::navigation::NavigationCatalog>>,
 }
@@ -114,6 +116,10 @@ impl ModuleCatalog {
 
     pub(crate) fn finder_sources(&self) -> crate::ops::find::FinderSources {
         self.finders.clone()
+    }
+
+    pub(crate) fn summary_metrics(&self) -> crate::ops::summary::SummaryMetrics {
+        self.metrics.clone()
     }
 
     pub(crate) fn fill_navigation(&self, navigation: crate::module::navigation::NavigationCatalog) {

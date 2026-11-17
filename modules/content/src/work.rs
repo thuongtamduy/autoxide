@@ -68,3 +68,31 @@ impl WorkSource for Review {
             .collect())
     }
 }
+
+/// Cùng câu đếm, làm số liệu tóm tắt (bước 51 P4).
+#[async_trait::async_trait]
+impl autoxide_kernel::summary::SummaryMetric for Review {
+    fn info(&self) -> autoxide_kernel::summary::MetricInfo {
+        autoxide_kernel::summary::MetricInfo::new(
+            "content.review",
+            "Entries waiting for a review",
+            "Posts and pages whose writer asked for a review that was not published or withdrawn yet, in your scope.",
+            "content",
+        )
+    }
+
+    fn permission(&self) -> Permission {
+        CONTENT_PUBLISH
+    }
+
+    async fn value(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        target: OrgTarget,
+    ) -> Result<autoxide_kernel::summary::MetricValue, Error> {
+        Ok(autoxide_kernel::summary::MetricValue::Count(
+            WorkSource::count(self, tenant, principal, target).await?,
+        ))
+    }
+}

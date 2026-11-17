@@ -61,3 +61,18 @@ pub(crate) fn folder_subject(id: uuid::Uuid) -> Option<String> {
 pub(crate) fn tag_subject(id: uuid::Uuid) -> Option<String> {
     Some(format!("media.tag:{id}"))
 }
+
+/// Event của module, kèm câu "hoạt động gần đây" (bước 51 P5) cho những event người dùng cần thấy.
+pub(crate) fn with_activity() -> Vec<EventInfo> {
+    all()
+        .into_iter()
+        .map(|event| match event.name() {
+            "media.item_uploaded" => {
+                event.activity("{actor} uploaded “{name}”", crate::permissions::MEDIA_READ)
+            }
+            "media.item_trashed" => event
+                .activity("{actor} moved “{name}” to the trash", crate::permissions::MEDIA_READ),
+            _ => event,
+        })
+        .collect()
+}

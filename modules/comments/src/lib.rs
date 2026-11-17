@@ -95,7 +95,7 @@ impl Module for CommentsModule {
     }
 
     fn events(&self) -> Vec<EventInfo> {
-        events::all()
+        events::with_activity()
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -134,6 +134,7 @@ impl Module for CommentsModule {
         let service = Arc::new(CommentsService::new(parts, config));
         context.personal_data(service.clone())?;
         context.work_source(Arc::new(work::Pending))?;
+        context.summary_metric(Arc::new(work::Pending))?;
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())

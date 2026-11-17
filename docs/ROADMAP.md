@@ -243,7 +243,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [ ] Tìm (P3, P9): `FinderSource` gom theo loại, không dấu vẫn tìm, chỉ nguồn người gọi có quyền, áp phạm vi
       nút; toán tử `is:`, `status:`, so sánh, phủ định; phạm vi `node | subtree | accessible`; `resolve` đổi
       mã (số đơn, mã vận đơn, ID) thành bản ghi người gọi được xem
-- [ ] Số liệu tóm tắt (P4): `SummaryMetric` (tiền, số đếm, tỉ lệ) theo phạm vi nút, số nặng từ bảng dẫn xuất;
+- [x] Số liệu tóm tắt (P4): `SummaryMetric` (tiền, số đếm, tỉ lệ) theo phạm vi nút, số nặng từ bảng dẫn xuất;
       `definition` (i18n key, mặc định `None`) trả đã dịch, gate kiểm mọi số liệu khai và có bản dịch (D-207)
 - [ ] Hoạt động (P5, P13): câu đọc được theo i18n key trên `EventInfo`, chỉ bản ghi người gọi đọc được ở nút
       của nó; dòng hoạt động và ghi chú nội bộ trên mọi bản ghi theo loại của sổ đối tượng (D-123), nhắc @

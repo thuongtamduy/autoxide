@@ -312,6 +312,12 @@ impl Module for KernelModule {
                 entitlements: entitlements.clone(),
             };
             routes = routes.merge(crate::ops::find::routes(find));
+            let summary = crate::ops::summary::SummaryState {
+                metrics: self.catalog.summary_metrics(),
+                entitlements: entitlements.clone(),
+                translations: self.translations.clone(),
+            };
+            routes = routes.merge(crate::ops::summary::routes(summary));
         }
         if let (Some(settings), Some(registry)) = (&self.settings, &self.registry) {
             routes =

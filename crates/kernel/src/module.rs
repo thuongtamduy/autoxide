@@ -286,6 +286,7 @@ pub struct StartContext<'a> {
     resources: &'a crate::resource::ResourceDirectory,
     work: &'a crate::ops::work::WorkSources,
     finders: &'a crate::ops::find::FinderSources,
+    metrics: &'a crate::ops::summary::SummaryMetrics,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -417,6 +418,14 @@ impl StartContext<'_> {
         source: Arc<dyn crate::ops::find::FinderSource>,
     ) -> Result<(), Error> {
         self.finders.register(self.module, source)
+    }
+
+    /// Đăng ký số liệu tóm tắt (bước 51 P4); id phải là `<module>.<số liệu>`, phải có định nghĩa.
+    pub fn summary_metric(
+        &mut self,
+        metric: Arc<dyn crate::ops::summary::SummaryMetric>,
+    ) -> Result<(), Error> {
+        self.metrics.register(self.module, metric)
     }
 
     /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do

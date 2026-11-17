@@ -251,6 +251,7 @@ impl Modules {
         let database = registry.control();
         let work = self.catalog.work_sources();
         let finders = self.catalog.finder_sources();
+        let metrics = self.catalog.summary_metrics();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         for module in &mut self.modules {
@@ -267,6 +268,7 @@ impl Modules {
                 resources: &self.resources,
                 work: &work,
                 finders: &finders,
+                metrics: &metrics,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,

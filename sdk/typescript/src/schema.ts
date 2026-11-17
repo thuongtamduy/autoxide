@@ -25,6 +25,20 @@ export type AcceptedResponse = {
 /** What a schedule does: `publish` or `unpublish`. */
 export type Action = "publish" | "unpublish";
 
+/** One line of recent activity. */
+export type ActivityResponse = {
+  /** The event, `<module>.<what_happened>`. */
+  action: string;
+  actor_user_id?: string | null;
+  /** Id of the audit entry. */
+  id: string;
+  occurred_at: string;
+  /** What happened, as a sentence in the language of `Accept-Language`. */
+  sentence: string;
+  /** Record that changed, as `<kind>:<id>`. */
+  subject?: string | null;
+};
+
 /** The authenticator's answer to an add-passkey ceremony. */
 export type AddPasskeyRequest = {
   /** The `ceremony_id` from `POST /api/v1/auth/me/passkeys/registration`. */
@@ -4335,6 +4349,16 @@ export type Data_SubscriberResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SummaryView = {
+  /** The figures. */
+  data: {
+    /** Figures that did not answer in time or failed. */
+    incomplete: string[];
+    metrics: MetricView[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportAllowedResponse = {
   /** Whether a tenant lets platform staff in for support. */
   data: {
@@ -4870,6 +4894,22 @@ export type Data_UserResponse = {
     roles?: UserRole[] | null;
     updated_at: string;
   };
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ActivityResponse = {
+  data: {
+    /** The event, `<module>.<what_happened>`. */
+    action: string;
+    actor_user_id?: string | null;
+    /** Id of the audit entry. */
+    id: string;
+    occurred_at: string;
+    /** What happened, as a sentence in the language of `Accept-Language`. */
+    sentence: string;
+    /** Record that changed, as `<kind>:<id>`. */
+    subject?: string | null;
+  }[];
 };
 
 /** Envelope of a single result. */
@@ -7671,6 +7711,34 @@ export type MenuSummary = {
 export type MenuTarget = {
   id: string;
   kind: string;
+};
+
+/**
+ * The value of a figure: `money` (`amount` in the smallest unit of `currency`), `count`, or
+ * `ratio` (`numerator` / `denominator`).
+ */
+export type MetricValueView = {
+  amount?: number | null;
+  count?: number | null;
+  currency?: string | null;
+  denominator?: number | null;
+  kind: string;
+  numerator?: number | null;
+};
+
+/** A figure for a dashboard. */
+export type MetricView = {
+  /**
+   * How it is computed (period, time zone, what is included), in the language of
+   * `Accept-Language`: show it behind an ⓘ.
+   */
+  definition: string;
+  /** Navigation group of the figure. */
+  group: string;
+  id: string;
+  /** Label in the language of `Accept-Language`. */
+  label: string;
+  value: MetricValueView;
 };
 
 /** Two-step sign-in: the password was right, a code is needed. */
@@ -12122,6 +12190,13 @@ export type SubscriptionResponse = {
 /** Where a subscriber stands on one list. */
 export type SubscriptionStatus = "unconfirmed" | "confirmed" | "unsubscribed";
 
+/** The figures. */
+export type SummaryView = {
+  /** Figures that did not answer in time or failed. */
+  incomplete: string[];
+  metrics: MetricView[];
+};
+
 /** Whether a tenant lets platform staff in for support. */
 export type SupportAllowedResponse = {
   /**
@@ -13350,6 +13425,18 @@ export interface paths {
         200: Page_AuditEntryResponse;
         401: Problem;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/audit/activity": {
+    /** List recent activity. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number }; };
+      responses: {
+        200: Data_Vec_ActivityResponse;
+        401: Problem;
         422: Problem;
         default: Problem;
       };
@@ -16781,6 +16868,17 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/summary": {
+    /** Get the summary figures. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { group?: string; org_id?: string }; };
+      responses: {
+        200: Data_SummaryView;
+        401: Problem;
         default: Problem;
       };
     };

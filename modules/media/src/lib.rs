@@ -22,6 +22,7 @@ mod library;
 mod migration;
 mod permissions;
 mod service;
+mod summary;
 mod tools;
 
 #[cfg(test)]
@@ -86,7 +87,7 @@ impl Module for MediaModule {
     }
 
     fn events(&self) -> Vec<EventInfo> {
-        events::all()
+        events::with_activity()
     }
 
     fn body_limits(&self) -> Vec<BodyLimit> {
@@ -142,6 +143,7 @@ impl Module for MediaModule {
         self.databases = Some(context.tenancy());
         context.personal_data(service.clone())?;
         context.finder_source(Arc::new(find::Items))?;
+        context.summary_metric(Arc::new(summary::Items))?;
         context.provide::<dyn api::Media>(service)
     }
 

@@ -49,9 +49,13 @@
   "text:An empty media folder was deleted.": "Một thư mục media trống bị xoá.",
   "text:Content": "Nội dung",
   "text:Delete media items in the trash for good.": "Xoá hẳn các tệp media trong thùng rác.",
+  "text:Files in the media library you may see, not counting the trash.": "Tệp trong thư viện media bạn được xem, không tính thùng rác.",
+  "text:Media items": "Tệp media",
   "text:Media library": "Thư viện media",
   "text:See the media library: every item (private ones too), folders and the trash.": "Xem thư viện media: mọi tệp (kể cả tệp riêng tư), thư mục và thùng rác.",
   "text:The content of a media item was replaced; its id stayed.": "Nội dung một tệp media được thay; id giữ nguyên.",
   "text:The details of a media item (name, texts, folder, visibility) changed.": "Thông tin một tệp media (tên, chữ mô tả, thư mục, chế độ hiển thị) thay đổi.",
-  "text:Upload, edit, replace, move, publish and trash media items; manage folders. Includes seeing any item it changes (a writer can make a private item public), so give it only to people who may also read the library.": "Tải lên, sửa, thay, chuyển, công khai và bỏ vào thùng rác các tệp media; quản lý thư mục. Có cả quyền xem mọi tệp nó sửa (người sửa có thể biến tệp riêng tư thành công khai), nên chỉ cấp cho người cũng được xem thư viện."
+  "text:Upload, edit, replace, move, publish and trash media items; manage folders. Includes seeing any item it changes (a writer can make a private item public), so give it only to people who may also read the library.": "Tải lên, sửa, thay, chuyển, công khai và bỏ vào thùng rác các tệp media; quản lý thư mục. Có cả quyền xem mọi tệp nó sửa (người sửa có thể biến tệp riêng tư thành công khai), nên chỉ cấp cho người cũng được xem thư viện.",
+  "text:{actor} moved “{name}” to the trash": "{actor} chuyển “{name}” vào thùng rác",
+  "text:{actor} uploaded “{name}”": "{actor} tải lên “{name}”"
 }
