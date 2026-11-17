@@ -1,5 +1,6 @@
 {
   "field:a form may have only one `consent` field": "mỗi biểu mẫu chỉ có một ô `consent`",
+  "field:at most {max} ids": "tối đa {max} mã",
   "field:every value must be one of: {allowed}": "mỗi giá trị phải là một trong: {allowed}",
   "field:has {count} more keys that are not fields of this form": "còn {count} khoá khác không phải ô của biểu mẫu này",
   "field:is not valid: {reason}": "không hợp lệ: {reason}",
@@ -30,6 +31,7 @@
   "field:must be lower-case letters and digits in groups joined by `-`, at most {key_max} characters": "phải là các nhóm chữ thường và số nối bằng `-`, tối đa {key_max} ký tự",
   "field:must be one of {allowed}": "phải là một trong {allowed}",
   "field:must be one of: {allowed}": "phải là một trong: {allowed}",
+  "field:must be submission ids separated by commas": "phải là mã bài nộp, cách nhau bằng dấu phẩy",
   "field:must be the key of an `email` field of the form": "phải là khoá của một ô `email` trong biểu mẫu",
   "field:must be {min} to {max} characters long": "phải dài {min} đến {max} ký tự",
   "field:must be {range}": "phải {range}",

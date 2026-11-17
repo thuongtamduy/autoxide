@@ -400,6 +400,7 @@ impl FormsService {
         principal: &Principal,
         form_id: Uuid,
         status: Option<SubmissionStatus>,
+        ids: &[Uuid],
     ) -> Result<(String, String), Error> {
         principal.require(&FORMS_EXPORT)?;
         let form = self.find_form(tenant, form_id).await?;
@@ -410,7 +411,7 @@ impl FormsService {
         let mut cursor = None;
         loop {
             let (rows, next) =
-                self.export_page(tenant, form_id, status, &columns.keys, cursor).await?;
+                self.export_page(tenant, form_id, status, ids, &columns.keys, cursor).await?;
             for row in &rows {
                 text.push_str(&csv::line(row));
             }
@@ -468,6 +469,7 @@ impl FormsService {
         tenant: &TenantContext,
         form_id: Uuid,
         status: Option<SubmissionStatus>,
+        ids: &[Uuid],
         keys: &[String],
         after: Option<Uuid>,
     ) -> Result<(Vec<Vec<String>>, Option<Uuid>), Error> {
@@ -478,10 +480,17 @@ impl FormsService {
         let mut select = submission::Entity::find()
             .scoped(tenant)
             .filter(submission::Column::FormId.eq(form_id));
-        select = match status {
-            Some(status) => select.filter(submission::Column::Status.eq(status.as_str())),
-            None => select.filter(submission::Column::Status.ne(SubmissionStatus::Spam.as_str())),
+        // Chọn từng bài (`ids`): xuất đúng các bài đó, kể cả bài rác, trừ khi lọc thêm `status`.
+        select = match (status, ids.is_empty()) {
+            (Some(status), _) => select.filter(submission::Column::Status.eq(status.as_str())),
+            (None, true) => {
+                select.filter(submission::Column::Status.ne(SubmissionStatus::Spam.as_str()))
+            }
+            (None, false) => select,
         };
+        if !ids.is_empty() {
+            select = select.filter(submission::Column::Id.is_in(ids.iter().copied()));
+        }
         let found = fetch_page(
             select,
             submission::Column::Id,

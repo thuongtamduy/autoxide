@@ -5481,6 +5481,14 @@ export type DeliveryResponse = {
   status: string;
 };
 
+/** What to call the copy of a form. */
+export type DuplicateFormRequest = {
+  /** Key of the copy; omitted: `<key>-copy` (then `-copy-2`, `-copy-3`… when taken). */
+  key?: string | null;
+  /** Name of the copy; omitted: the original name followed by ` (copy)`. */
+  name?: string | null;
+};
+
 /** An item with the same content, found at upload. */
 export type DuplicateItem = {
   /** `null` for the root. */
@@ -13004,6 +13012,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/users/{id}/email/verification": {
+    /** Send the verification mail of a user again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        202: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/users/{id}/memberships": {
     /** List the organization units a user works in, with the roles there. */
     get: {
@@ -14470,7 +14492,7 @@ export interface paths {
   "/api/v1/content/redirects": {
     /** List redirects. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; source?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; source?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_RedirectResponse;
         401: Problem;
@@ -14907,6 +14929,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/forms/{id}/duplicate": {
+    /** Duplicate a form. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: DuplicateFormRequest;
+      responses: {
+        201: Data_FormResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/forms/{id}/submissions": {
     /** List the submissions of a form. */
     get: {
@@ -14924,7 +14962,7 @@ export interface paths {
   "/api/v1/forms/{id}/submissions/export": {
     /** Export the submissions of a form as CSV. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { format?: string; status?: "new" | "read" | "archived" | "spam" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { format?: string; status?: "new" | "read" | "archived" | "spam"; ids?: string }; };
       responses: {
         200: string;
         401: Problem;

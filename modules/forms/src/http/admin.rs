@@ -380,3 +380,48 @@ pub(crate) async fn delete_form(
     service.delete_form(&tenant, &principal, id, expected).await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+/// What to call the copy of a form.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DuplicateFormRequest {
+    /// Key of the copy; omitted: `<key>-copy` (then `-copy-2`, `-copy-3`… when taken).
+    #[schema(example = "contact-copy")]
+    key: Option<String>,
+    /// Name of the copy; omitted: the original name followed by ` (copy)`.
+    name: Option<String>,
+}
+
+/// Duplicate a form.
+///
+/// Requires `forms.read` and `forms.manage` (for a form of a unit: at that unit). Copies the
+/// fields, allowed origins, thank-you message, limits and notification addresses into a new
+/// form of the same unit, `closed` so it takes no submissions until you open it. Submissions are
+/// not copied.
+#[utoipa::path(
+    post,
+    path = "/{id}/duplicate",
+    extensions(("x-permissions" = json!(["forms.read", "forms.manage"]))),
+    operation_id = "duplicate_form",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the form to copy.")),
+    request_body = DuplicateFormRequest,
+    responses(
+        (status = 201, description = "The copy.", body = Data<FormResponse>, headers(("Location" = String, description = "Address of the copy."))),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `forms.read` or `forms.manage`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No form has this id; code `forms.not_found`.", body = Problem),
+        (status = 409, description = "The key is taken; code `forms.key_taken`.", body = Problem),
+        (status = 422, description = "The key or name is invalid; see `errors`.", body = Problem),
+    )
+)]
+pub(crate) async fn duplicate_form(
+    State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<DuplicateFormRequest>,
+) -> Result<Created<FormResponse>, Error> {
+    let form = service.duplicate_form(&tenant, &principal, id, input.key, input.name).await?;
+    Ok(Created::new(format!("/forms/{}", form.row.id), form.into()))
+}

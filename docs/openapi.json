@@ -16105,6 +16105,28 @@
         ],
         "type": "object"
       },
+      "DuplicateFormRequest": {
+        "additionalProperties": false,
+        "description": "What to call the copy of a form.",
+        "properties": {
+          "key": {
+            "description": "Key of the copy; omitted: `<key>-copy` (then `-copy-2`, `-copy-3`… when taken).",
+            "example": "contact-copy",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Name of the copy; omitted: the original name followed by ` (copy)`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "DuplicateItem": {
         "description": "An item with the same content, found at upload.",
         "properties": {
@@ -43774,6 +43796,116 @@
         ]
       }
     },
+    "/api/v1/auth/users/{id}/email/verification": {
+      "post": {
+        "description": "Requires `auth.users.manage`, and every permission the user has (you cannot act on someone\nwith more power than you). For a teammate who lost or never got the mail: it goes to the\nuser's current address (in the language of `Accept-Language`), with a token valid 24 hours.\nAt most one mail per minute per address.",
+        "operationId": "auth_resend_user_email_verification",
+        "parameters": [
+          {
+            "description": "Id of the user.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "A verification mail is on its way to the user."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No user has this id; code `auth.user_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The address is already verified; code `auth.email_already_verified`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send the verification mail of a user again.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.users.manage"
+        ]
+      }
+    },
     "/api/v1/auth/users/{id}/memberships": {
       "get": {
         "description": "Requires `auth.users.read`.",
@@ -56793,6 +56925,15 @@
             }
           },
           {
+            "description": "Only redirects whose old path or target address contains this text, in any case and with\nor without accents.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
             "example": 50,
             "in": "query",
@@ -60805,6 +60946,152 @@
         ]
       }
     },
+    "/api/v1/forms/{id}/duplicate": {
+      "post": {
+        "description": "Requires `forms.read` and `forms.manage` (for a form of a unit: at that unit). Copies the\nfields, allowed origins, thank-you message, limits and notification addresses into a new\nform of the same unit, `closed` so it takes no submissions until you open it. Submissions are\nnot copied.",
+        "operationId": "forms_duplicate_form",
+        "parameters": [
+          {
+            "description": "Id of the form to copy.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateFormRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FormResponse"
+                }
+              }
+            },
+            "description": "The copy.",
+            "headers": {
+              "Location": {
+                "description": "Address of the copy.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `forms.read` or `forms.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No form has this id; code `forms.not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key is taken; code `forms.key_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key or name is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Duplicate a form.",
+        "tags": [
+          "forms"
+        ],
+        "x-permissions": [
+          "forms.read",
+          "forms.manage"
+        ]
+      }
+    },
     "/api/v1/forms/{id}/submissions": {
       "get": {
         "description": "Requires `forms.read`. Newest first; follow `pagination.next_cursor` with the same filters\nfor more. Each submission comes with the labels of the form version it was sent with.",
@@ -61008,6 +61295,15 @@
                 "archived",
                 "spam"
               ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only these submissions: up to 200 ids, separated by commas (e.g. the rows picked in a\nlist). Picked submissions are exported whatever their status, `spam` too, unless `status`\nis also given.",
+            "in": "query",
+            "name": "ids",
+            "required": false,
+            "schema": {
               "type": "string"
             }
           },

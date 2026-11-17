@@ -654,3 +654,53 @@ async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
     .await
     .unwrap();
 }
+
+/// Đề bài giao diện W-059: xuất CSV đúng các bài đã chọn (`ids`), nhân bản form (đóng, không chép
+/// bài, key tự đặt không trùng).
+#[tokio::test]
+async fn xuat_bai_da_chon_va_nhan_ban_form() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let created = send(&app, "POST", "/forms", Some("admin"), &[], Some(definition())).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let origin = [("origin", "https://example.com")];
+        let mut submissions = Vec::new();
+        for email in ["a@example.com", "b@example.com"] {
+            let token = form_token(&app).await;
+            let body = json!({"data": {"name": "Ada", "email": email}, "locale": "en", "form_token": token});
+            let sent = send(&app, "POST", "/forms/public/contact/submissions", None, &origin, Some(body)).await;
+            assert_eq!(sent.status(), StatusCode::CREATED, "{}", sent.json());
+            submissions.push(sent.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+
+        let picked = format!("/forms/{id}/submissions/export?ids={}", submissions[1]);
+        let csv = send(&app, "GET", &picked, Some("admin"), &[], None).await;
+        assert_eq!(csv.status(), StatusCode::OK);
+        let text = csv.text();
+        assert!(text.contains("b@example.com") && !text.contains("a@example.com"), "{text}");
+        let all = send(&app, "GET", &format!("/forms/{id}/submissions/export"), Some("admin"), &[], None).await;
+        assert!(all.text().contains("a@example.com") && all.text().contains("b@example.com"));
+        let bad = send(&app, "GET", &format!("/forms/{id}/submissions/export?ids=nope"), Some("admin"), &[], None).await;
+        assert_eq!((bad.status(), bad.json()["errors"][0]["field"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("ids")));
+
+        let copy = send(&app, "POST", &format!("/forms/{id}/duplicate"), Some("admin"), &[], Some(json!({}))).await;
+        assert_eq!(copy.status(), StatusCode::CREATED, "{}", copy.json());
+        let data = copy.json()["data"].clone();
+        assert_eq!((data["key"].as_str(), data["status"].as_str()), (Some("contact-copy"), Some("closed")));
+        assert_eq!(data["name"], "Contact us (copy)");
+        assert_eq!(data["fields"].as_array().unwrap().len(), 4);
+        let copy_id = data["id"].as_str().unwrap().to_owned();
+        let inbox = send(&app, "GET", &format!("/forms/{copy_id}/submissions"), Some("admin"), &[], None).await;
+        assert_eq!(inbox.json()["data"], json!([]), "không chép bài gửi");
+        let again = send(&app, "POST", &format!("/forms/{id}/duplicate"), Some("admin"), &[], Some(json!({}))).await;
+        assert_eq!(again.json()["data"]["key"], "contact-copy-2");
+        let named = json!({"key": "contact-copy", "name": "Khác"});
+        let taken = send(&app, "POST", &format!("/forms/{id}/duplicate"), Some("admin"), &[], Some(named)).await;
+        assert_eq!((taken.status(), taken.json()["code"].as_str()), (StatusCode::CONFLICT, Some("forms.key_taken")));
+        let denied = send(&app, "POST", &format!("/forms/{id}/duplicate"), Some("reader"), &[], Some(json!({}))).await;
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    })
+    .await
+    .unwrap();
+}

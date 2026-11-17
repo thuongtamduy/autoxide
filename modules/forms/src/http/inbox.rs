@@ -226,6 +226,10 @@ pub(crate) struct ExportQuery {
     /// `new`, `read`, `archived` or `spam`; omitted: every status but `spam`.
     #[param(value_type = Option<SubmissionStatus>, inline)]
     pub status: Option<String>,
+    /// Only these submissions: up to 200 ids, separated by commas (e.g. the rows picked in a
+    /// list). Picked submissions are exported whatever their status, `spam` too, unless `status`
+    /// is also given.
+    pub ids: Option<String>,
 }
 
 /// Export the submissions of a form as CSV.
@@ -263,10 +267,11 @@ pub(crate) async fn export_submissions(
         problems.push(FieldError::new("format", "invalid", "must be `csv`"));
     }
     let status = choice(query.status.as_deref(), "status", STATUSES, &mut problems);
+    let ids = picked_ids(query.ids.as_deref(), &mut problems);
     if !problems.is_empty() {
         return Err(Error::validation(problems));
     }
-    let (name, text) = service.export_csv(&tenant, &principal, id, status).await?;
+    let (name, text) = service.export_csv(&tenant, &principal, id, status, &ids).await?;
     let mut response = text.into_response();
     let headers = response.headers_mut();
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/csv; charset=utf-8"));
@@ -469,4 +474,35 @@ pub(crate) async fn delete_email_data(
     principal.require(&crate::permissions::FORMS_EXPORT)?;
     let deleted = service.erase_email(&tenant, &principal, query.email()?).await?;
     Ok(Data { data: ErasedResponse { deleted } })
+}
+
+/// Tối đa số bài chọn trong một lần xuất theo `ids`.
+const MAX_PICKED: usize = 200;
+
+/// `ids` của bản xuất: UUID cách nhau bằng dấu phẩy, bỏ trùng; sai dạng hay quá nhiều thì thêm lỗi.
+fn picked_ids(raw: Option<&str>, problems: &mut Vec<FieldError>) -> Vec<Uuid> {
+    let Some(raw) = raw.map(str::trim).filter(|raw| !raw.is_empty()) else {
+        return Vec::new();
+    };
+    let mut ids = Vec::new();
+    for part in raw.split(',').map(str::trim).filter(|part| !part.is_empty()) {
+        match part.parse::<Uuid>() {
+            Ok(id) if !ids.contains(&id) => ids.push(id),
+            Ok(_) => {}
+            Err(_) => {
+                problems.push(FieldError::new(
+                    "ids",
+                    "invalid",
+                    "must be submission ids separated by commas",
+                ));
+                return Vec::new();
+            }
+        }
+    }
+    if ids.len() > MAX_PICKED {
+        problems.push(
+            FieldError::new("ids", "too_many", "at most {max} ids").with_param("max", MAX_PICKED),
+        );
+    }
+    ids
 }

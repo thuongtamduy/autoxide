@@ -22,6 +22,11 @@ endpoints are marked deprecated with a sunset date first.
   New setting `AUTOXIDE_COMPLIANCE_KYC_CALLBACK_RETENTION_DAYS`. The legal bases are recorded but must be checked
   against the original texts by a legal professional.
 
+- Admin interface requests (W-059 of the web): `q` on `GET /api/v1/content/redirects` (old path or target, any case,
+  with or without accents); `ids` on `GET /api/v1/forms/{id}/submissions/export` to export picked submissions;
+  `POST /api/v1/forms/{id}/duplicate`; `POST /api/v1/auth/users/{id}/email/verification` to send a user's
+  verification mail again.
+
 - Subscription billing (step 35): each billing period becomes an invoice the operator issues to the tenant
   (numbered with no gaps, taxes computed — `AUTOXIDE_PLANS_TAX_CATEGORY`, booked in the operator's ledger); tenants
   pay online with `POST /api/v1/plans/billing-periods/{id}/pay` (the operator's payment partner, checkout page
