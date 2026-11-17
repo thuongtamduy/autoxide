@@ -255,6 +255,7 @@ impl Modules {
         let exports = self.catalog.export_sources();
         let bulk = self.catalog.bulk_actions();
         let resolvers = self.catalog.code_resolvers();
+        let setup = self.catalog.setup_steps();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         for module in &mut self.modules {
@@ -275,6 +276,7 @@ impl Modules {
                 exports: &exports,
                 bulk: &bulk,
                 resolvers: &resolvers,
+                setup: &setup,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,
@@ -639,7 +641,11 @@ impl Modules {
             let views = crate::ops::views::ViewsState { lists: schemas };
             let me = crate::user_flags::routes(flags)
                 .merge(crate::ops::my_permissions::routes(mine))
-                .merge(crate::ops::views::routes(views));
+                .merge(crate::ops::views::routes(views))
+                .merge(crate::ops::work_states::routes(crate::ops::work_states::WorkStatesState {
+                    sources: self.catalog.work_sources(),
+                    entitlements: self.entitlements.clone(),
+                }));
             routes.push((crate::user_flags::ME, me));
         }
         routes

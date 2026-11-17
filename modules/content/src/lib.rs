@@ -26,6 +26,7 @@ mod privacy;
 mod publishing;
 mod resource;
 mod service;
+mod setup;
 mod taxonomy;
 mod templates;
 mod tools;
@@ -195,6 +196,7 @@ impl Module for ContentModule {
         context.summary_metric(Arc::new(work::Review))?;
         context.finder_source(Arc::new(find::Entries))?;
         context.code_resolver(Arc::new(find::BySlug))?;
+        context.setup_step(Arc::new(setup::FirstPage))?;
         context.export_source(Arc::new(export::Entries(service.clone())))?;
         context.bulk_action(Arc::new(export::Archive(service.clone())))?;
         context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;

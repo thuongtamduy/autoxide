@@ -227,6 +227,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::views::CreateSavedViews),
             // File của job (bản xuất danh sách, bước 51 P16).
             Box::new(crate::job::runs::AddJobFiles),
+            // Hoãn / giao việc của hộp việc (bước 51 P10).
+            Box::new(crate::ops::work_states::CreateWorkStates),
         ]
     }
 
@@ -366,6 +368,15 @@ impl Module for KernelModule {
                 entitlements: entitlements.clone(),
             };
             routes = routes.merge(crate::ops::find::routes(find));
+            routes = routes.merge(crate::ops::setup::routes(crate::ops::setup::SetupState {
+                steps: self.catalog.setup_steps(),
+                entitlements: entitlements.clone(),
+                translations: self.translations.clone(),
+                settings: self.settings.clone().map(|settings| {
+                    let settings: Arc<dyn crate::tenancy::settings::TenantSettings> = settings;
+                    settings
+                }),
+            }));
             routes = routes.merge(crate::ops::resolve::routes(crate::ops::resolve::ResolveState {
                 resolvers: self.catalog.code_resolvers(),
                 entitlements: entitlements.clone(),
@@ -452,6 +463,10 @@ impl Module for KernelModule {
                 }),
             ));
             jobs.push(crate::job::JobRegistration::new(
+                crate::ops::work_states::CLEAN_WORK_STATES,
+                Arc::new(crate::ops::work_states::CleanRunner),
+            ));
+            jobs.push(crate::job::JobRegistration::new(
                 crate::ops::bulk::BULK,
                 Arc::new(crate::ops::bulk::BulkRunner { actions: self.catalog.bulk_actions() }),
             ));
@@ -499,6 +514,9 @@ impl Module for KernelModule {
         };
         if self.live_exports().is_some() {
             schedules.push(crate::tenancy::exports::schedule());
+        }
+        if self.registry.is_some() {
+            schedules.push(crate::ops::work_states::schedule());
         }
         if self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some()) {
             schedules.push(crate::ops::list_exports::schedule());

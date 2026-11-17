@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Inbox per person and setup checklist (step 51): `POST/DELETE /api/v1/me/work/{key}/snooze` hides a piece of work
+  from your inbox until a time; `POST /api/v1/me/work/{key}/assign` assigns it to a user who can see its source
+  (`Authenticator::principal_of`, default `None`); `GET /api/v1/kernel/work` shows `assignee_id`, filters
+  `assigned=me|nobody` and hides snoozed work unless `include_snoozed=true`. Modules declare setup steps computed
+  from their data (`StartContext::setup_step`); `GET /api/v1/kernel/setup` lists those that fit the tenant's
+  business model with progress. Content: "publish the first page".
 - Advanced search and open by code (step 51): `GET /api/v1/kernel/find?q=` understands `is:<type>`, `field:value`,
   `>`, `<`, `>=`, `<=`, `from..to`, `-` to exclude and quoted phrases (`SearchQuery`), and `scope=node|subtree|accessible`;
   parts no searched type understands come back in `ignored`. Posts and pages understand `status`, `kind`, `locale`,
