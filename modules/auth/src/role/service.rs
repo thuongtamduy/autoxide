@@ -1249,6 +1249,42 @@ pub(crate) async fn count_active_admins_unlocked<C: ConnectionTrait>(
     Ok(count)
 }
 
+/// ID của người dùng còn hoạt động có role mang mọi permission, theo thứ tự ID (chỉ đọc).
+pub(crate) async fn active_admin_ids<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+) -> Result<Vec<Uuid>, Error> {
+    let id = tenant.id().as_uuid();
+    let rows = user_role::Entity::find()
+        .filter(
+            user_role::Column::RoleId.in_subquery(
+                Query::select()
+                    .column(role::Column::Id)
+                    .from(role::Entity)
+                    .and_where(role::Column::TenantId.eq(id))
+                    .and_where(role::Column::AllPermissions.eq(true))
+                    .to_owned(),
+            ),
+        )
+        .filter(
+            user_role::Column::UserId.in_subquery(
+                Query::select()
+                    .column(user::Column::Id)
+                    .from(user::Entity)
+                    .and_where(user::Column::TenantId.eq(id))
+                    .and_where(user::Column::DisabledAt.is_null())
+                    .to_owned(),
+            ),
+        )
+        .scoped(tenant)
+        .all(connection)
+        .await?;
+    let mut ids: Vec<Uuid> = rows.into_iter().map(|row| row.user_id).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    Ok(ids)
+}
+
 /// Lỗi khi một thay đổi sẽ để hệ thống không còn admin nào hoạt động.
 pub(crate) fn last_admin() -> Error {
     Error::conflict(

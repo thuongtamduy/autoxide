@@ -43,6 +43,11 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // `dyn IdentityVerifier` nếu có module cung cấp (đứng trước); `plans` (khách tự đăng ký) và module
         // thương mại chặn qua `dyn KycGate` / `dyn AcceptanceGate`.
         Box::new(autoxide_compliance::module()),
+        // Thông báo (bước 37, D-348): email, SMS, ZNS, đẩy, hộp thư trong ứng dụng. Cần `dyn Mailer`,
+        // `dyn Users` / `dyn TenantAdmins` của `auth`, sổ đồng ý và quy tắc của `compliance` (đều
+        // đứng trước); `plans` (thông báo thuê bao tới quản trị khách) và module sau khai loại thông
+        // báo và gửi qua `dyn Notifier`.
+        Box::new(autoxide_notifications::module()),
         // Gói, thuê bao, quyền dùng (bước 35): sau mọi module nền nó cần — `invoices` (hoá đơn thuê
         // bao), `ledger` (thu tiền) — và (bước 37) `compliance`. Module đăng ký trước vẫn hỏi quyền
         // dùng được qua tay cầm của kernel, gắn sau khi mọi module khởi động (D-323).
@@ -207,10 +212,10 @@ mod tests {
 
             // Mỗi lịch (của `kernel` — dọn bản xuất —, `ai`, `auth`, `idempotency`, `webhooks`, `files`, năm của `plans`, một
             // của `tax`, ba của `ledger` (niêm phong, hết hạn thanh toán, đối soát), một của `invoices`, một của
-            // `compliance` (hết hạn định danh; nhập quy tắc chạy ở mặt điều khiển — cũng là database này), hai
-            // của `media`, hai của `content`, một của `forms`, một của `newsletter` và một của
-            // `comments`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 25);
+            // `compliance` (hết hạn định danh; nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
+            // của `notifications` (dọn nhật ký gửi), hai của `media`, hai của `content`, một của `forms`, một
+            // của `newsletter` và một của `comments`) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 26);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

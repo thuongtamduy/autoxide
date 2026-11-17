@@ -52,9 +52,11 @@ const TABLES: [&str; 9] = [
     "ledger_entry_seals",
     "ledger_chain_heads",
     "ledger_period_balances",
-    "ledger_periods",
+    // `ledger_entries` giữ foreign key tới `ledger_periods`: xoá bút toán trước kỳ (Postgres từ chối thứ tự
+    // ngược lại; SQLite không kiểm).
     "ledger_lines",
     "ledger_entries",
+    "ledger_periods",
     "ledger_account_balances",
     "ledger_accounts",
     "ledger_books",

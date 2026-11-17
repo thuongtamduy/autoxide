@@ -3269,6 +3269,131 @@ export type Data_NewsletterSettingsResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_NotificationDeviceToken = {
+  /** A registered mobile device (the token is never shown again). */
+  data: {
+    app_id: string;
+    created_at: string;
+    id: string;
+    last_used_at?: string | null;
+    locale?: string | null;
+    platform: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationInboxItem = {
+  /** A notification in your in-app inbox. */
+  data: {
+    body: string;
+    category: string;
+    created_at: string;
+    id: string;
+    kind: string;
+    link?: string | null;
+    /** When you read it; `null`: unread. */
+    read_at?: string | null;
+    title: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationMessage = {
+  /** One message of the send log (one notification on one channel). */
+  data: {
+    /** Email or phone number; `null` for push and in-app, and after the retention time. */
+    address?: string | null;
+    attempts: number;
+    category: string;
+    channel: string;
+    created_at: string;
+    dedupe_key: string;
+    /** Why it failed (error code of the provider, `unsubscribe_url_missing`, `zns_template_missing`…). */
+    error_code?: string | null;
+    id: string;
+    kind: string;
+    locale: string;
+    /** Deferred until then. */
+    not_before?: string | null;
+    provider_reference?: string | null;
+    sent_at?: string | null;
+    /** Why it was skipped or canceled (see `NotificationSkipReason`); empty otherwise. */
+    skip_reason: string;
+    /**
+     * `queued`, `deferred` (waiting for the allowed hours), `sent`, `failed`, `skipped` or
+     * `canceled` (consent withdrawn before sending).
+     */
+    status: string;
+    user_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationOutcome = {
+  /** What `notify` did. */
+  data: {
+    /** Messages queued for delivery (or already queued with the same `dedupe_key`). */
+    message_ids: string[];
+    /** Channels not used. */
+    skipped: NotificationSkipped[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationPushSubscription = {
+  /** A registered browser. */
+  data: {
+    created_at: string;
+    endpoint: string;
+    id: string;
+    last_used_at?: string | null;
+    user_agent?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationReadAll = {
+  /** How many notifications were marked read. */
+  data: {
+    updated: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationTemplate = {
+  /** A text of the tenant that replaces the default text of a kind on one channel and language. */
+  data: {
+    body: string;
+    channel: string;
+    kind: string;
+    locale: string;
+    /** For SMS, ZNS and push. */
+    short: string;
+    title: string;
+    updated_at: string;
+    /** Approved Zalo ZNS template id (channel `zns`). */
+    zns_template_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationUnreadCount = {
+  /** How many notifications you have not read. */
+  data: {
+    unread: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationWebPushKey = {
+  /** The public key browsers subscribe with. */
+  data: {
+    /** VAPID public key (base64url) for `PushManager.subscribe({applicationServerKey})`. */
+    public_key: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OverrideResponse = {
   /** An override for one tenant: turn a module or feature on or off, or replace a limit. */
   data: {
@@ -3429,6 +3554,14 @@ export type Data_PlanSubscription = {
     /** The tenant already had its free trial. */
     trial_used: boolean;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PlatformNotice = {
+  /** A queued platform notice. */
+  data: {
+    notice_id: string;
   };
 };
 
@@ -4883,6 +5016,48 @@ export type Data_Vec_MyTenantResponse = {
     id: string;
     name: string;
     slug: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_NotificationKindInfo = {
+  data: {
+    category: NotificationCategory;
+    /** Channels this kind may go to. */
+    channels: NotificationChannel[];
+    /** Advertising invitation: sent at most once per address and channel. */
+    invitation: boolean;
+    /** `<module>.<name>`, e.g. `orders.order_shipped`. */
+    key: string;
+    /** `true` for security notifications: they cannot be turned off. */
+    locked: boolean;
+    /** Advertising: the consent purpose it needs (in `compliance`). */
+    purpose?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_NotificationKindPreference = {
+  data: {
+    category: NotificationCategory;
+    channels: NotificationChannelPreference[];
+    kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_NotificationTemplate = {
+  data: {
+    body: string;
+    channel: string;
+    kind: string;
+    locale: string;
+    /** For SMS, ZNS and push. */
+    short: string;
+    title: string;
+    updated_at: string;
+    /** Approved Zalo ZNS template id (channel `zns`). */
+    zns_template_id?: string | null;
   }[];
 };
 
@@ -7434,6 +7609,235 @@ export type NewsletterText = {
   vi?: string | null;
 };
 
+/** Group of a notification kind: decides whether preferences and consent apply. */
+export type NotificationCategory = "security" | "transactional" | "marketing";
+
+/** Where a notification goes. */
+export type NotificationChannel = "email" | "sms" | "zns" | "web_push" | "in_app" | "mobile_push";
+
+/** Whether you get a kind on one channel. */
+export type NotificationChannelPreference = {
+  channel: NotificationChannel;
+  enabled: boolean;
+  /** Security notifications cannot be turned off. */
+  locked: boolean;
+};
+
+/** A registered mobile device (the token is never shown again). */
+export type NotificationDeviceToken = {
+  app_id: string;
+  created_at: string;
+  id: string;
+  last_used_at?: string | null;
+  locale?: string | null;
+  platform: string;
+};
+
+/** A mobile device to register. */
+export type NotificationDeviceTokenRequest = {
+  /** Bundle id / package name of the app. */
+  app_id: string;
+  /** `en` or `vi`. */
+  locale?: string | null;
+  /** `ios` or `android`. */
+  platform: string;
+  /** The push token from FCM or APNs. */
+  token: string;
+};
+
+/** A notification in your in-app inbox. */
+export type NotificationInboxItem = {
+  body: string;
+  category: string;
+  created_at: string;
+  id: string;
+  kind: string;
+  link?: string | null;
+  /** When you read it; `null`: unread. */
+  read_at?: string | null;
+  title: string;
+};
+
+/** A notification kind declared by a module. */
+export type NotificationKindInfo = {
+  category: NotificationCategory;
+  /** Channels this kind may go to. */
+  channels: NotificationChannel[];
+  /** Advertising invitation: sent at most once per address and channel. */
+  invitation: boolean;
+  /** `<module>.<name>`, e.g. `orders.order_shipped`. */
+  key: string;
+  /** `true` for security notifications: they cannot be turned off. */
+  locked: boolean;
+  /** Advertising: the consent purpose it needs (in `compliance`). */
+  purpose?: string | null;
+};
+
+/** Your choices for one kind (a kind setting wins over the category setting; no setting: on). */
+export type NotificationKindPreference = {
+  category: NotificationCategory;
+  channels: NotificationChannelPreference[];
+  kind: string;
+};
+
+/** One message of the send log (one notification on one channel). */
+export type NotificationMessage = {
+  /** Email or phone number; `null` for push and in-app, and after the retention time. */
+  address?: string | null;
+  attempts: number;
+  category: string;
+  channel: string;
+  created_at: string;
+  dedupe_key: string;
+  /** Why it failed (error code of the provider, `unsubscribe_url_missing`, `zns_template_missing`…). */
+  error_code?: string | null;
+  id: string;
+  kind: string;
+  locale: string;
+  /** Deferred until then. */
+  not_before?: string | null;
+  provider_reference?: string | null;
+  sent_at?: string | null;
+  /** Why it was skipped or canceled (see `NotificationSkipReason`); empty otherwise. */
+  skip_reason: string;
+  /**
+   * `queued`, `deferred` (waiting for the allowed hours), `sent`, `failed`, `skipped` or
+   * `canceled` (consent withdrawn before sending).
+   */
+  status: string;
+  user_id?: string | null;
+};
+
+/** What `notify` did. */
+export type NotificationOutcome = {
+  /** Messages queued for delivery (or already queued with the same `dedupe_key`). */
+  message_ids: string[];
+  /** Channels not used. */
+  skipped: NotificationSkipped[];
+};
+
+/** One change of your choices. */
+export type NotificationPreferenceChange = {
+  channel: string;
+  enabled: boolean;
+  /** `kind:<key>` (one kind) or `category:<security|transactional|marketing>` (every kind of it). */
+  target: string;
+};
+
+/** Changes of your choices. */
+export type NotificationPreferencesRequest = {
+  items: NotificationPreferenceChange[];
+};
+
+/** Keys of a browser push subscription. */
+export type NotificationPushKeys = {
+  /** Authentication secret (base64url). */
+  auth: string;
+  /** P-256 public key of the browser (base64url). */
+  p256dh: string;
+};
+
+/** A registered browser. */
+export type NotificationPushSubscription = {
+  created_at: string;
+  endpoint: string;
+  id: string;
+  last_used_at?: string | null;
+  user_agent?: string | null;
+};
+
+/** A browser push subscription (`PushSubscription.toJSON()` of the browser). */
+export type NotificationPushSubscriptionRequest = {
+  endpoint: string;
+  /** Ignored when sent (some browsers add it). */
+  expirationTime?: number | null;
+  keys: NotificationPushKeys;
+  /** Shown in your device list. */
+  user_agent?: string | null;
+};
+
+/** How many notifications were marked read. */
+export type NotificationReadAll = {
+  updated: number;
+};
+
+/** Who gets it: exactly one of the fields. */
+export type NotificationRecipient = {
+  /** An email address. */
+  email?: string | null;
+  /** A phone number, e.g. `+84912345678`. */
+  phone?: string | null;
+  /** `true`: every active admin of the tenant. */
+  tenant_admins?: boolean;
+  /** A user of the tenant (email from the account, in-app, push). */
+  user_id?: string | null;
+};
+
+/** A notification to send. */
+export type NotificationRequest = {
+  /** Required: sending again with the same key sends nothing new. */
+  dedupe_key: string;
+  /** Key of a declared kind (`GET /kinds`). */
+  kind: string;
+  /** Page opened from the notification: an http(s) URL or a path. */
+  link?: string | null;
+  /** `en` or `vi`; default the language of the user, else English. */
+  locale?: string | null;
+  /** Values for the `{name}` places of the text (display text only). */
+  params?: Record<string, unknown>;
+  recipient: NotificationRecipient;
+};
+
+/** Why a channel was not used. */
+export type NotificationSkipReason = "no_consent" | "consent_withdrawn" | "preference_off" | "no_address" | "channel_disabled" | "quiet_hours_expired" | "invitation_used" | "throttled";
+
+/** A channel that was not used, and why. */
+export type NotificationSkipped = {
+  channel: NotificationChannel;
+  reason: NotificationSkipReason;
+};
+
+/** A text of the tenant that replaces the default text of a kind on one channel and language. */
+export type NotificationTemplate = {
+  body: string;
+  channel: string;
+  kind: string;
+  locale: string;
+  /** For SMS, ZNS and push. */
+  short: string;
+  title: string;
+  updated_at: string;
+  /** Approved Zalo ZNS template id (channel `zns`). */
+  zns_template_id?: string | null;
+};
+
+/**
+ * A text to replace the default one. Use only the `{name}` values of the default text (and
+ * `{link}`).
+ */
+export type NotificationTemplateRequest = {
+  body: string;
+  short: string;
+  title: string;
+  zns_template_id?: string | null;
+};
+
+/** How many notifications you have not read. */
+export type NotificationUnreadCount = {
+  unread: number;
+};
+
+/** The token from an advertising email. */
+export type NotificationUnsubscribeRequest = {
+  token: string;
+};
+
+/** The public key browsers subscribe with. */
+export type NotificationWebPushKey = {
+  /** VAPID public key (base64url) for `PushManager.subscribe({applicationServerKey})`. */
+  public_key: string;
+};
+
 /** An override to set; it replaces one of the same kind and key. */
 export type OverrideRequest = {
   /** Required with `module` / `feature`. */
@@ -8471,6 +8875,55 @@ export type Page_MembershipRowResponse = {
     role_id: string;
     role_name: string;
     user_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_NotificationInboxItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    body: string;
+    category: string;
+    created_at: string;
+    id: string;
+    kind: string;
+    link?: string | null;
+    /** When you read it; `null`: unread. */
+    read_at?: string | null;
+    title: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_NotificationMessage = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Email or phone number; `null` for push and in-app, and after the retention time. */
+    address?: string | null;
+    attempts: number;
+    category: string;
+    channel: string;
+    created_at: string;
+    dedupe_key: string;
+    /** Why it failed (error code of the provider, `unsubscribe_url_missing`, `zns_template_missing`…). */
+    error_code?: string | null;
+    id: string;
+    kind: string;
+    locale: string;
+    /** Deferred until then. */
+    not_before?: string | null;
+    provider_reference?: string | null;
+    sent_at?: string | null;
+    /** Why it was skipped or canceled (see `NotificationSkipReason`); empty otherwise. */
+    skip_reason: string;
+    /**
+     * `queued`, `deferred` (waiting for the allowed hours), `sent`, `failed`, `skipped` or
+     * `canceled` (consent withdrawn before sending).
+     */
+    status: string;
+    user_id?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -9538,6 +9991,20 @@ export type PlanSubscription = {
   /** The tenant already had its free trial. */
   trial_used: boolean;
   updated_at: string;
+};
+
+/** A queued platform notice. */
+export type PlatformNotice = {
+  notice_id: string;
+};
+
+/** A notice from the platform to the admins of every tenant. */
+export type PlatformNoticeRequest = {
+  body: string;
+  /** `transactional` (admins may turn it off) or `security` (always delivered). */
+  category: string;
+  link?: string | null;
+  title: string;
 };
 
 /** A comment just posted, for its author. */
@@ -17067,6 +17534,248 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/kinds": {
+    /** List the notification kinds. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_NotificationKindInfo;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/device-tokens": {
+    /** Register this mobile device for push notifications. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NotificationDeviceTokenRequest;
+      responses: {
+        201: Data_NotificationDeviceToken;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/device-tokens/{id}": {
+    /** Stop push notifications to a mobile device. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/inbox": {
+    /** List your in-app notifications. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { unread?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_NotificationInboxItem;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/inbox/read-all": {
+    /** Mark all your notifications as read. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        200: Data_NotificationReadAll;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/inbox/unread-count": {
+    /** Count your unread notifications. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_NotificationUnreadCount;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/inbox/{id}/read": {
+    /** Mark one of your notifications as read. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_NotificationInboxItem;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/preferences": {
+    /** List which notifications you get. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_NotificationKindPreference;
+        401: Problem;
+        default: Problem;
+      };
+    };
+    /** Choose which notifications you get. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NotificationPreferencesRequest;
+      responses: {
+        200: Data_Vec_NotificationKindPreference;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/push-subscriptions": {
+    /** Register this browser for push notifications. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NotificationPushSubscriptionRequest;
+      responses: {
+        201: Data_NotificationPushSubscription;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/me/push-subscriptions/{id}": {
+    /** Stop push notifications to a browser. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/messages": {
+    /** List the send log. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; status?: string; channel?: string; user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_NotificationMessage;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Send a notification. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NotificationRequest;
+      responses: {
+        200: Data_NotificationOutcome;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/messages/{id}": {
+    /** Get one message of the send log. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_NotificationMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/platform-notices": {
+    /** Send a notice to the admins of every tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PlatformNoticeRequest;
+      responses: {
+        202: Data_PlatformNotice;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/public/unsubscribe": {
+    /** Stop advertising with the link of an email. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: NotificationUnsubscribeRequest;
+      responses: {
+        204: void;
+        400: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/public/web-push-key": {
+    /** Get the web push public key. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_NotificationWebPushKey;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates": {
+    /** List the replaced texts of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_NotificationTemplate;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates/{kind}/{channel}/{locale}": {
+    /** Replace the text of a kind on one channel and language. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      requestBody: NotificationTemplateRequest;
+      responses: {
+        200: Data_NotificationTemplate;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Go back to the default text of a kind on one channel and language. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

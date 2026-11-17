@@ -8399,3 +8399,47 @@ Bước 37, phần mà bước 35 (khách tự đăng ký) cần trước. Căn 
 7. **Nhà cung cấp thật** (VNeID qua đơn vị được cấp phép, eKYC) là module riêng cắm `IdentityVerifier`; cần hợp đồng và khoá
    — chưa làm, chỉ có `FakeIdentityVerifier` ở testkit. Không có nhà cung cấp: chỉ duyệt tay qua giấy tờ đã tải lên.
 
+
+## D-348 · Module `notifications` — loại thông báo, kênh, đồng ý và khung giờ tin quảng cáo, thông báo của nền tảng — 2026-11-17 — agent quyết
+
+Bước 37 phần B (giai đoạn đầu) và phần còn lại của bước 35 ("thông báo của nền tảng tới quản trị mọi khách"). Căn cứ
+pháp lý dưới đây — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**.
+
+1. **Module nền riêng `notifications`, luôn bật.** Đăng ký sau `compliance`, trước `plans`. Công bố một trait `Notifier`
+   (`declare` loại trong `Module::start` của module khác — sổ loại dùng chung có khoá bên trong vì module khai sau khi
+   `notifications` đã khởi động; khai trùng là lỗi khởi động — và `notify`). `notify` ghi tin + job trong transaction riêng
+   của `notifications`, không bao giờ trong transaction của module gọi; `dedupe_key` bắt buộc, unique theo (khách, khoá, kênh).
+2. **Phụ thuộc `auth` (chỉ qua `api`)**: email và ngôn ngữ của người nhận lấy qua `dyn Users`; quản trị viên của khách qua trait
+   mới `dyn TenantAdmins` (người dùng còn hoạt động có role mang mọi permission) — `auth` công bố. `notifications` là module nền
+   như `plans` (cũng dùng `autoxide_auth::api`), không phải module nghiệp vụ, nên D-046 không chặn. Mọi trait lấy bằng
+   `require().ok()`: thiếu bên nào thì kênh / chức năng đó bị bỏ qua, không lỗi khởi động.
+3. **Tách tin giao dịch và tin quảng cáo (NĐ 91/2020/NĐ-CP, hiệu lực 01/10/2020; Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15)**:
+   mỗi loại một nhóm `security` / `transactional` / `marketing`. Tin bảo mật bỏ qua tuỳ chọn và giới hạn mỗi giờ. Tin quảng cáo
+   cần `ConsentLedger::is_granted` (mục đích của loại, kênh) lúc xếp hàng **và kiểm lại ngay trước khi gửi**; nghe
+   `compliance.consent_withdrawn` để huỷ tin đang chờ (kiểm lại từng tin cùng mục đích — payload event không mang đối tượng).
+   Khung giờ (`notifications.send_windows`: SMS / ZNS 07:00–22:00, `utc_offset_minutes` 420 — Việt Nam không có giờ mùa hè, khỏi
+   thư viện múi giờ) và nhãn (`notifications.marketing_labels`: `QC ` / `[QC] `) là quy tắc có ngày hiệu lực thêm vào
+   `modules/compliance/rules/vn.json`, không viết cứng. Ngoài khung → `deferred` tới lúc mở; quá 24 giờ → bỏ
+   (`quiet_hours_expired`). Email quảng cáo luôn có `List-Unsubscribe` + chân thư; link mang token ngẫu nhiên (lưu bản băm, có
+   tiền tố khách theo D-281) — không dùng token ký bằng khoá gốc vì link phải sống lâu (D-113). Thiếu
+   `AUTOXIDE_NOTIFICATIONS_UNSUBSCRIBE_URL` thì không gửi email quảng cáo. Tin mời đăng ký nhận: mỗi (kênh, địa chỉ băm) một lần.
+4. **Kênh qua trait trung lập của kernel**: `Mailer` (có sẵn), `SmsSender` (có sẵn), mới `ZnsSender` (`autoxide_kernel::zns`),
+   `WebPushSender` và `MobilePushSender` (`autoxide_kernel::push`, trả `PushDelivery::Gone` khi đăng ký / token đã mất → xoá),
+   mỗi trait có lỗi `*_disabled` (503). **Bộ nối thật (Zalo OA, VAPID/RFC 8291, FCM, APNs) chưa làm** — cần khoá của nhà cung
+   cấp; testkit có `FakeZnsSender`, `FakeWebPushSender`, `FakeMobilePushSender`. Secret của đẩy (khoá `auth`, token thiết bị) mã
+   hoá bằng `Sealer` của kernel (D-257). Chưa có task `reseal_secrets` (chưa module nào có; làm chung khi cần).
+5. **Mẫu chữ thường**: câu mặc định trong code (`NotificationTemplate`, bản dịch `<key>.title/.body/.short` ở `locales/vi.json`
+   của module khai — `cargo xtask check` kiểm như `MailTemplate`); khách thay câu theo (loại, kênh, ngôn ngữ), chỉ dùng chỗ
+   điền mà câu mặc định có. Bộ mẫu động có nháp / xuất bản / xem trước / thương hiệu (D-206) là giai đoạn sau, sẽ thêm cột bằng
+   migration mới. Số điện thoại của người dùng chưa có nguồn (chưa có xác thực số ở `auth`) nên SMS / ZNS chỉ gửi tới số được nêu.
+6. **Thông báo của nền tảng**: `POST /notifications/platform-notices` (nhân sự nền tảng + `notifications.platform_notices.send`)
+   xếp một job; job duyệt khách đang hoạt động qua `TenantAdmin::list` theo lô 50, gửi `Recipient::TenantAdmins` (in-app +
+   email) với khoá chống trùng theo ID thông báo + người nhận — chạy lại không gửi trùng; một khách lỗi chỉ ghi log. `plans` khai
+   ba loại (`plans.subscription_past_due`, `plans.subscription_suspended`, `plans.usage_near_limit`) và gọi `Notifier` từ handler
+   event `plans.subscription_status_changed` của chính nó và sau job đối soát hằng ngày (mỗi khách mỗi tháng một lần) —
+   `notifications` không biết `plans`.
+7. **Giới hạn**: `AUTOXIDE_NOTIFICATIONS_PER_RECIPIENT_PER_HOUR` (20) qua `Throttle` của kernel; dọn hằng ngày
+   (`notifications.purge`): xoá địa chỉ / tham số của tin quá `…_RETENTION_DAYS` (90), xoá hộp thư quá `…_INBOX_RETENTION_DAYS`
+   (180). Link huỷ nhận hết dùng được khi địa chỉ đã bị xoá khỏi nhật ký.
+8. **Dữ liệu cá nhân**: module đăng ký `PersonalData` (hộp thư, tuỳ chọn, thiết bị không kèm secret, nhật ký gửi) và nghe
+   `auth.user_deleted` để xoá hộp thư, tuỳ chọn, đăng ký đẩy, bỏ địa chỉ / tham số trong nhật ký và huỷ tin đang chờ.

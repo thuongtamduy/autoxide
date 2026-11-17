@@ -28,7 +28,10 @@ struct ReconcileUsage(Arc<PlansService>);
 #[async_trait::async_trait]
 impl JobHandler for ReconcileUsage {
     async fn run(&self, _job: &JobContext) -> Result<(), Error> {
-        self.0.reconcile(now()).await.map(|_| ())
+        let at = now();
+        self.0.reconcile(at).await?;
+        // Sau khi số đã đúng: báo khách sắp chạm hạn mức (mỗi tháng một lần).
+        self.0.notify_near_limit(at).await.map(|_| ())
     }
 }
 

@@ -86,10 +86,11 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
 - [ ] Cấp phát: khách tự đăng ký (kèm KYC khi gói yêu cầu, bước 37) → tạo khách → chọn vị trí dữ
       liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng — đã làm phần nhân sự vận
       hành (D-338): `POST /plans/provisionings`, `autoxide tenant create --plan`; còn: khách tự đăng ký + KYC (chờ 37)
-- [ ] Đối chiếu thiết kế 2: xuất toàn bộ dữ liệu một khách bằng job khi huỷ thuê bao; `suspend` thuê bao
+- [x] Đối chiếu thiết kế 2: xuất toàn bộ dữ liệu một khách bằng job khi huỷ thuê bao; `suspend` thuê bao
       cho nhân sự nền tảng; hạn mức nút đếm mọi nút trừ gốc, hạn mức theo loại nút khai riêng; thông báo
-      của nền tảng tới quản trị mọi khách — đã làm (D-326, D-327, D-328): `suspend`, hạn mức nút trừ gốc, bộ lọc
-      `subscription_status` / `near_limit`, xuất dữ liệu khách bằng job; còn: thông báo nền tảng (chờ `notifications`, bước 37)
+      của nền tảng tới quản trị mọi khách — đã làm (D-326, D-327, D-328, D-348): `suspend`, hạn mức nút trừ gốc, bộ lọc
+      `subscription_status` / `near_limit`, xuất dữ liệu khách bằng job; thông báo nền tảng `POST /notifications/platform-notices`
+      (job theo lô, in-app + email tới mọi quản trị viên), `plans` báo quản trị viên khi thuê bao quá hạn / tạm khoá / sắp chạm hạn mức
 - [x] Xoá hẳn khách khi thuê bao `deleted` (D-327, D-337): `POST /kernel/tenants/{id}/erase`, bảng giữ lại khai ở
       `Module::retained_tables` (phần kế toán của bước 36); `plans` xoá khách khi hết thời hạn lưu
 - [x] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): hạn mức chia phần `Limit::per` (D-330)
@@ -186,12 +187,15 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [ ] Gắn nhãn nội dung do AI tạo (D-190; Luật Trí tuệ nhân tạo 134/2025/QH15, từ 01/3/2026, và nghị định hướng
       dẫn — cần đối chiếu): nội dung tạo hay sửa từ gợi ý AI mang `ai_assisted`, API trả về để giao diện gắn
       nhãn khi công khai
-- [ ] Module nền `notifications` (D-194): kênh email, SMS, Zalo ZNS (trait), web push, trong ứng dụng; mẫu theo
-      i18n và theo khách; tuỳ chọn nhận của người dùng; `newsletter` dùng chung sổ đồng ý; (thấp) báo cáo đã
-      lưu, lịch gửi qua email (A-b10)
-- [ ] Tách tin giao dịch và tin quảng cáo (NĐ 91/2020 — cần đối chiếu bản thay thế đang dự thảo): tin quảng cáo
-      chỉ gửi khi đã đồng ý trước, từ chối là dừng ngay; khung giờ gửi là dữ liệu (tin nhắn 7h–22h); chỉ một tin
-      mời đăng ký đầu tiên
+- [x] Module nền `notifications` (D-194, D-348): kênh email, SMS, Zalo ZNS (trait), web push, đẩy di động, trong ứng
+      dụng; mẫu theo i18n và theo khách; tuỳ chọn nhận của người dùng; hộp thư, nhật ký gửi, REST + MCP — bộ gửi ZNS,
+      web push (VAPID) và đẩy di động (FCM / APNs) mới có trait ở kernel và bản giả ở testkit (bộ nối thật cần khoá của
+      nhà cung cấp — hỏi chủ dự án khi làm); chưa làm: `newsletter` chuyển sang sổ đồng ý chung, (thấp) báo cáo đã lưu và
+      lịch gửi qua email (A-b10), mẫu động D-206 (mục dưới)
+- [x] Tách tin giao dịch và tin quảng cáo (NĐ 91/2020 — cần đối chiếu bản thay thế đang dự thảo; D-348): tin quảng cáo
+      chỉ gửi khi đã đồng ý trước (kiểm lại ngay trước khi gửi), rút đồng ý là huỷ tin đang chờ; khung giờ gửi và nhãn
+      `QC` là quy tắc có ngày hiệu lực (`notifications.send_windows`, `notifications.marketing_labels`); chỉ một tin
+      mời đăng ký đầu tiên; email quảng cáo có `List-Unsubscribe` và link rút đồng ý
 - [ ] Mẫu mail, thông báo khách tự soạn (D-206): bộ dựng mẫu an toàn ở kernel (biến, điều kiện, vòng lặp, giới
       hạn chạy, luôn thoát HTML, kiểm biến theo schema khi lưu); mail HTML khung MJML có thương hiệu khách + bản
       chữ thuần; nháp / xuất bản / quay lại, xem trước, gửi thử tới chính người gọi; `newsletter` cá nhân hoá

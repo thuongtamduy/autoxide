@@ -61,6 +61,24 @@
       "body": {"reasons": ["spam", "illegal_content", "personal_data", "unrelated", "offensive"]},
       "legal_basis": "Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15 và NĐ 55/2024/NĐ-CP (không ẩn đánh giá trái quy định) — cần đối chiếu văn bản gốc.",
       "needs_legal_review": true
+    },
+    {
+      "key": "notifications.send_windows",
+      "version": 1,
+      "effective_from": "2020-10-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"utc_offset_minutes": 420, "marketing": {"sms": {"from": "07:00", "to": "22:00"}, "zns": {"from": "07:00", "to": "22:00"}, "email": null, "push": null}, "max_marketing_per_day": {"sms": null}},
+      "legal_basis": "NĐ 91/2020/NĐ-CP về chống tin nhắn rác, thư điện tử rác, cuộc gọi rác (tin nhắn quảng cáo chỉ gửi từ 07:00 đến 22:00, khi người nhận đã đồng ý trước), hiệu lực 01/10/2020 — cần đối chiếu văn bản gốc.",
+      "needs_legal_review": true
+    },
+    {
+      "key": "notifications.marketing_labels",
+      "version": 1,
+      "effective_from": "2020-10-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"sms": {"prefix": "QC "}, "zns": {"prefix": ""}, "email": {"subject_prefix": "[QC] "}, "push": {"prefix": "[QC] "}},
+      "legal_basis": "NĐ 91/2020/NĐ-CP (tin nhắn quảng cáo có nhãn \"QC\", tiêu đề thư điện tử quảng cáo có nhãn \"QC\" hoặc \"ADV\", có cách từ chối nhận), hiệu lực 01/10/2020 — cần đối chiếu văn bản gốc.",
+      "needs_legal_review": true
     }
   ]
 }

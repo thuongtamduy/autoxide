@@ -9310,6 +9310,415 @@
         ],
         "type": "object"
       },
+      "Data_NotificationDeviceToken": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A registered mobile device (the token is never shown again).",
+            "properties": {
+              "app_id": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "last_used_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "platform": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "platform",
+              "app_id",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NotificationInboxItem": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A notification in your in-app inbox.",
+            "properties": {
+              "body": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "link": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "read_at": {
+                "description": "When you read it; `null`: unread.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "category",
+              "title",
+              "body",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NotificationMessage": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "One message of the send log (one notification on one channel).",
+            "properties": {
+              "address": {
+                "description": "Email or phone number; `null` for push and in-app, and after the retention time.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "attempts": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "category": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "dedupe_key": {
+                "type": "string"
+              },
+              "error_code": {
+                "description": "Why it failed (error code of the provider, `unsubscribe_url_missing`, `zns_template_missing`…).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "locale": {
+                "type": "string"
+              },
+              "not_before": {
+                "description": "Deferred until then.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "provider_reference": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sent_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "skip_reason": {
+                "description": "Why it was skipped or canceled (see `NotificationSkipReason`); empty otherwise.",
+                "type": "string"
+              },
+              "status": {
+                "description": "`queued`, `deferred` (waiting for the allowed hours), `sent`, `failed`, `skipped` or\n`canceled` (consent withdrawn before sending).",
+                "type": "string"
+              },
+              "user_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "category",
+              "channel",
+              "locale",
+              "status",
+              "skip_reason",
+              "attempts",
+              "dedupe_key",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NotificationOutcome": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What `notify` did.",
+            "properties": {
+              "message_ids": {
+                "description": "Messages queued for delivery (or already queued with the same `dedupe_key`).",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "skipped": {
+                "description": "Channels not used.",
+                "items": {
+                  "$ref": "#/components/schemas/NotificationSkipped"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "message_ids",
+              "skipped"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NotificationPushSubscription": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A registered browser.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "last_used_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "user_agent": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "endpoint",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NotificationReadAll": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "How many notifications were marked read.",
+            "properties": {
+              "updated": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "updated"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NotificationTemplate": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A text of the tenant that replaces the default text of a kind on one channel and language.",
+            "properties": {
+              "body": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "locale": {
+                "type": "string"
+              },
+              "short": {
+                "description": "For SMS, ZNS and push.",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "zns_template_id": {
+                "description": "Approved Zalo ZNS template id (channel `zns`).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "channel",
+              "locale",
+              "title",
+              "body",
+              "short",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NotificationUnreadCount": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "How many notifications you have not read.",
+            "properties": {
+              "unread": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "unread"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NotificationWebPushKey": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The public key browsers subscribe with.",
+            "properties": {
+              "public_key": {
+                "description": "VAPID public key (base64url) for `PushManager.subscribe({applicationServerKey})`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "public_key"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OverrideResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -9826,6 +10235,28 @@
               "addons",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_PlatformNotice": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A queued platform notice.",
+            "properties": {
+              "notice_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "notice_id"
             ],
             "type": "object"
           }
@@ -14179,6 +14610,152 @@
                 "slug",
                 "name",
                 "access"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_NotificationKindInfo": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A notification kind declared by a module.",
+              "properties": {
+                "category": {
+                  "$ref": "#/components/schemas/NotificationCategory"
+                },
+                "channels": {
+                  "description": "Channels this kind may go to.",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationChannel"
+                  },
+                  "type": "array"
+                },
+                "invitation": {
+                  "description": "Advertising invitation: sent at most once per address and channel.",
+                  "type": "boolean"
+                },
+                "key": {
+                  "description": "`<module>.<name>`, e.g. `orders.order_shipped`.",
+                  "type": "string"
+                },
+                "locked": {
+                  "description": "`true` for security notifications: they cannot be turned off.",
+                  "type": "boolean"
+                },
+                "purpose": {
+                  "description": "Advertising: the consent purpose it needs (in `compliance`).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "category",
+                "channels",
+                "locked",
+                "invitation"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_NotificationKindPreference": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "Your choices for one kind (a kind setting wins over the category setting; no setting: on).",
+              "properties": {
+                "category": {
+                  "$ref": "#/components/schemas/NotificationCategory"
+                },
+                "channels": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationChannelPreference"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "category",
+                "channels"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_NotificationTemplate": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A text of the tenant that replaces the default text of a kind on one channel and language.",
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "channel": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "locale": {
+                  "type": "string"
+                },
+                "short": {
+                  "description": "For SMS, ZNS and push.",
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "zns_template_id": {
+                  "description": "Approved Zalo ZNS template id (channel `zns`).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "channel",
+                "locale",
+                "title",
+                "body",
+                "short",
+                "updated_at"
               ],
               "type": "object"
             },
@@ -21735,6 +22312,711 @@
         },
         "type": "object"
       },
+      "NotificationCategory": {
+        "description": "Group of a notification kind: decides whether preferences and consent apply.",
+        "enum": [
+          "security",
+          "transactional",
+          "marketing"
+        ],
+        "type": "string"
+      },
+      "NotificationChannel": {
+        "description": "Where a notification goes.",
+        "enum": [
+          "email",
+          "sms",
+          "zns",
+          "web_push",
+          "in_app",
+          "mobile_push"
+        ],
+        "type": "string"
+      },
+      "NotificationChannelPreference": {
+        "description": "Whether you get a kind on one channel.",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/NotificationChannel"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "locked": {
+            "description": "Security notifications cannot be turned off.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "channel",
+          "enabled",
+          "locked"
+        ],
+        "type": "object"
+      },
+      "NotificationDeviceToken": {
+        "description": "A registered mobile device (the token is never shown again).",
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "last_used_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platform": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "platform",
+          "app_id",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "NotificationDeviceTokenRequest": {
+        "additionalProperties": false,
+        "description": "A mobile device to register.",
+        "properties": {
+          "app_id": {
+            "description": "Bundle id / package name of the app.",
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platform": {
+            "description": "`ios` or `android`.",
+            "type": "string"
+          },
+          "token": {
+            "description": "The push token from FCM or APNs.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "platform",
+          "token",
+          "app_id"
+        ],
+        "type": "object"
+      },
+      "NotificationInboxItem": {
+        "description": "A notification in your in-app inbox.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "read_at": {
+            "description": "When you read it; `null`: unread.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "category",
+          "title",
+          "body",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "NotificationKindInfo": {
+        "description": "A notification kind declared by a module.",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/NotificationCategory"
+          },
+          "channels": {
+            "description": "Channels this kind may go to.",
+            "items": {
+              "$ref": "#/components/schemas/NotificationChannel"
+            },
+            "type": "array"
+          },
+          "invitation": {
+            "description": "Advertising invitation: sent at most once per address and channel.",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "`<module>.<name>`, e.g. `orders.order_shipped`.",
+            "type": "string"
+          },
+          "locked": {
+            "description": "`true` for security notifications: they cannot be turned off.",
+            "type": "boolean"
+          },
+          "purpose": {
+            "description": "Advertising: the consent purpose it needs (in `compliance`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "category",
+          "channels",
+          "locked",
+          "invitation"
+        ],
+        "type": "object"
+      },
+      "NotificationKindPreference": {
+        "description": "Your choices for one kind (a kind setting wins over the category setting; no setting: on).",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/NotificationCategory"
+          },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationChannelPreference"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "category",
+          "channels"
+        ],
+        "type": "object"
+      },
+      "NotificationMessage": {
+        "description": "One message of the send log (one notification on one channel).",
+        "properties": {
+          "address": {
+            "description": "Email or phone number; `null` for push and in-app, and after the retention time.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "category": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "dedupe_key": {
+            "type": "string"
+          },
+          "error_code": {
+            "description": "Why it failed (error code of the provider, `unsubscribe_url_missing`, `zns_template_missing`…).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "not_before": {
+            "description": "Deferred until then.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sent_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "skip_reason": {
+            "description": "Why it was skipped or canceled (see `NotificationSkipReason`); empty otherwise.",
+            "type": "string"
+          },
+          "status": {
+            "description": "`queued`, `deferred` (waiting for the allowed hours), `sent`, `failed`, `skipped` or\n`canceled` (consent withdrawn before sending).",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "category",
+          "channel",
+          "locale",
+          "status",
+          "skip_reason",
+          "attempts",
+          "dedupe_key",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "NotificationOutcome": {
+        "description": "What `notify` did.",
+        "properties": {
+          "message_ids": {
+            "description": "Messages queued for delivery (or already queued with the same `dedupe_key`).",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "skipped": {
+            "description": "Channels not used.",
+            "items": {
+              "$ref": "#/components/schemas/NotificationSkipped"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "message_ids",
+          "skipped"
+        ],
+        "type": "object"
+      },
+      "NotificationPreferenceChange": {
+        "additionalProperties": false,
+        "description": "One change of your choices.",
+        "properties": {
+          "channel": {
+            "example": "email",
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "target": {
+            "description": "`kind:<key>` (one kind) or `category:<security|transactional|marketing>` (every kind of it).",
+            "example": "category:marketing",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "channel",
+          "enabled"
+        ],
+        "type": "object"
+      },
+      "NotificationPreferencesRequest": {
+        "additionalProperties": false,
+        "description": "Changes of your choices.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationPreferenceChange"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "NotificationPushKeys": {
+        "additionalProperties": false,
+        "description": "Keys of a browser push subscription.",
+        "properties": {
+          "auth": {
+            "description": "Authentication secret (base64url).",
+            "type": "string"
+          },
+          "p256dh": {
+            "description": "P-256 public key of the browser (base64url).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "type": "object"
+      },
+      "NotificationPushSubscription": {
+        "description": "A registered browser.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "last_used_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "endpoint",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "NotificationPushSubscriptionRequest": {
+        "additionalProperties": false,
+        "description": "A browser push subscription (`PushSubscription.toJSON()` of the browser).",
+        "properties": {
+          "endpoint": {
+            "example": "https://fcm.googleapis.com/fcm/send/abc",
+            "type": "string"
+          },
+          "expirationTime": {
+            "description": "Ignored when sent (some browsers add it).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "keys": {
+            "$ref": "#/components/schemas/NotificationPushKeys"
+          },
+          "user_agent": {
+            "description": "Shown in your device list.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "type": "object"
+      },
+      "NotificationReadAll": {
+        "description": "How many notifications were marked read.",
+        "properties": {
+          "updated": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "updated"
+        ],
+        "type": "object"
+      },
+      "NotificationRecipient": {
+        "additionalProperties": false,
+        "description": "Who gets it: exactly one of the fields.",
+        "properties": {
+          "email": {
+            "description": "An email address.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "description": "A phone number, e.g. `+84912345678`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_admins": {
+            "description": "`true`: every active admin of the tenant.",
+            "type": "boolean"
+          },
+          "user_id": {
+            "description": "A user of the tenant (email from the account, in-app, push).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "NotificationRequest": {
+        "additionalProperties": false,
+        "description": "A notification to send.",
+        "properties": {
+          "dedupe_key": {
+            "description": "Required: sending again with the same key sends nothing new.",
+            "example": "order-123-shipped",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Key of a declared kind (`GET /kinds`).",
+            "example": "notifications.platform_notice",
+            "type": "string"
+          },
+          "link": {
+            "description": "Page opened from the notification: an http(s) URL or a path.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "`en` or `vi`; default the language of the user, else English.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "params": {
+            "description": "Values for the `{name}` places of the text (display text only).",
+            "type": "object"
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/NotificationRecipient"
+          }
+        },
+        "required": [
+          "kind",
+          "recipient",
+          "dedupe_key"
+        ],
+        "type": "object"
+      },
+      "NotificationSkipReason": {
+        "description": "Why a channel was not used.",
+        "enum": [
+          "no_consent",
+          "consent_withdrawn",
+          "preference_off",
+          "no_address",
+          "channel_disabled",
+          "quiet_hours_expired",
+          "invitation_used",
+          "throttled"
+        ],
+        "type": "string"
+      },
+      "NotificationSkipped": {
+        "description": "A channel that was not used, and why.",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/NotificationChannel"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NotificationSkipReason"
+          }
+        },
+        "required": [
+          "channel",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "NotificationTemplate": {
+        "description": "A text of the tenant that replaces the default text of a kind on one channel and language.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "short": {
+            "description": "For SMS, ZNS and push.",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "zns_template_id": {
+            "description": "Approved Zalo ZNS template id (channel `zns`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "channel",
+          "locale",
+          "title",
+          "body",
+          "short",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "NotificationTemplateRequest": {
+        "additionalProperties": false,
+        "description": "A text to replace the default one. Use only the `{name}` values of the default text (and\n`{link}`).",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "short": {
+            "type": "string"
+          },
+          "title": {
+            "example": "Order {code} is on its way",
+            "type": "string"
+          },
+          "zns_template_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "short"
+        ],
+        "type": "object"
+      },
+      "NotificationUnreadCount": {
+        "description": "How many notifications you have not read.",
+        "properties": {
+          "unread": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unread"
+        ],
+        "type": "object"
+      },
+      "NotificationUnsubscribeRequest": {
+        "additionalProperties": false,
+        "description": "The token from an advertising email.",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "NotificationWebPushKey": {
+        "description": "The public key browsers subscribe with.",
+        "properties": {
+          "public_key": {
+            "description": "VAPID public key (base64url) for `PushManager.subscribe({applicationServerKey})`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "public_key"
+        ],
+        "type": "object"
+      },
       "OverrideRequest": {
         "additionalProperties": false,
         "description": "An override to set; it replaces one of the same kind and key.",
@@ -25182,6 +26464,183 @@
         ],
         "type": "object"
       },
+      "Page_NotificationInboxItem": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A notification in your in-app inbox.",
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "read_at": {
+                  "description": "When you read it; `null`: unread.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "category",
+                "title",
+                "body",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_NotificationMessage": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "One message of the send log (one notification on one channel).",
+              "properties": {
+                "address": {
+                  "description": "Email or phone number; `null` for push and in-app, and after the retention time.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "attempts": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "channel": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "dedupe_key": {
+                  "type": "string"
+                },
+                "error_code": {
+                  "description": "Why it failed (error code of the provider, `unsubscribe_url_missing`, `zns_template_missing`…).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "locale": {
+                  "type": "string"
+                },
+                "not_before": {
+                  "description": "Deferred until then.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider_reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sent_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "skip_reason": {
+                  "description": "Why it was skipped or canceled (see `NotificationSkipReason`); empty otherwise.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`queued`, `deferred` (waiting for the allowed hours), `sent`, `failed`, `skipped` or\n`canceled` (consent withdrawn before sending).",
+                  "type": "string"
+                },
+                "user_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "category",
+                "channel",
+                "locale",
+                "status",
+                "skip_reason",
+                "attempts",
+                "dedupe_key",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_OverrideResponse": {
         "description": "One page of a list.",
         "properties": {
@@ -28387,6 +29846,49 @@
           "addons",
           "created_at",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "PlatformNotice": {
+        "description": "A queued platform notice.",
+        "properties": {
+          "notice_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notice_id"
+        ],
+        "type": "object"
+      },
+      "PlatformNoticeRequest": {
+        "additionalProperties": false,
+        "description": "A notice from the platform to the admins of every tenant.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "description": "`transactional` (admins may turn it off) or `security` (always delivered).",
+            "example": "transactional",
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "example": "Scheduled maintenance on Sunday",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "title",
+          "body"
         ],
         "type": "object"
       },
@@ -79693,6 +81195,1865 @@
         ],
         "x-permissions": [
           "newsletter.manage"
+        ]
+      }
+    },
+    "/api/v1/notifications/kinds": {
+      "get": {
+        "description": "Any signed-in user. For a preferences page: every kind, its category and channels.",
+        "operationId": "notifications_list_notification_kinds",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_NotificationKindInfo"
+                }
+              }
+            },
+            "description": "Every declared kind, by key."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the notification kinds.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/device-tokens": {
+      "post": {
+        "description": "Any signed-in user. Registering the same token again updates it.",
+        "operationId": "notifications_add_my_device_token",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationDeviceTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationDeviceToken"
+                }
+              }
+            },
+            "description": "The device.",
+            "headers": {
+              "Location": {
+                "description": "Path of the device.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register this mobile device for push notifications.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/device-tokens/{id}": {
+      "delete": {
+        "description": "Any signed-in user, for their own devices.",
+        "operationId": "notifications_remove_my_device_token",
+        "parameters": [
+          {
+            "description": "Id of the device.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not one of your devices; code `notifications.device_token_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stop push notifications to a mobile device.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/inbox": {
+      "get": {
+        "description": "Any signed-in user; newest first.",
+        "operationId": "notifications_list_my_notifications",
+        "parameters": [
+          {
+            "description": "`true`: only unread notifications.",
+            "in": "query",
+            "name": "unread",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_NotificationInboxItem"
+                }
+              }
+            },
+            "description": "One page of your notifications."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List your in-app notifications.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/inbox/read-all": {
+      "post": {
+        "description": "Any signed-in user.",
+        "operationId": "notifications_mark_all_my_notifications_read",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationReadAll"
+                }
+              }
+            },
+            "description": "How many were unread."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark all your notifications as read.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/inbox/unread-count": {
+      "get": {
+        "description": "Any signed-in user. Cheap enough to poll for a badge.",
+        "operationId": "notifications_count_my_unread_notifications",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationUnreadCount"
+                }
+              }
+            },
+            "description": "The count."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Count your unread notifications.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/inbox/{id}/read": {
+      "post": {
+        "description": "Any signed-in user. Calling again changes nothing.",
+        "operationId": "notifications_mark_my_notification_read",
+        "parameters": [
+          {
+            "description": "Id of the notification.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationInboxItem"
+                }
+              }
+            },
+            "description": "The notification, read."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not in your inbox; code `notifications.inbox_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark one of your notifications as read.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/preferences": {
+      "get": {
+        "description": "Any signed-in user. Every kind with each of its channels, on or off.",
+        "operationId": "notifications_list_my_notification_preferences",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_NotificationKindPreference"
+                }
+              }
+            },
+            "description": "Your choices per kind and channel."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List which notifications you get.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      },
+      "put": {
+        "description": "Any signed-in user. Advertising also needs your consent (`PUT /api/v1/compliance/me/consents`);\nturning it off here stops it even with a consent.",
+        "operationId": "notifications_set_my_notification_preferences",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_NotificationKindPreference"
+                }
+              }
+            },
+            "description": "Your choices after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (every problem in `errors`), or a security notification would be turned off (`notifications.preference_locked`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Choose which notifications you get.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/push-subscriptions": {
+      "post": {
+        "description": "Any signed-in user. Registering the same browser again updates it.",
+        "operationId": "notifications_add_my_push_subscription",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPushSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationPushSubscription"
+                }
+              }
+            },
+            "description": "The subscription.",
+            "headers": {
+              "Location": {
+                "description": "Path of the subscription.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a valid subscription; code `notifications.push_subscription_invalid`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register this browser for push notifications.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/me/push-subscriptions/{id}": {
+      "delete": {
+        "description": "Any signed-in user, for their own subscriptions.",
+        "operationId": "notifications_remove_my_push_subscription",
+        "parameters": [
+          {
+            "description": "Id of the subscription.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not one of your subscriptions; code `notifications.push_subscription_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stop push notifications to a browser.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/notifications/messages": {
+      "get": {
+        "description": "Requires `notifications.messages.read` (it shows addresses).",
+        "operationId": "notifications_list_notification_messages",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`queued`, `deferred`, `sent`, `failed`, `skipped` or `canceled`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "e.g. `email`.",
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_NotificationMessage"
+                }
+              }
+            },
+            "description": "One page of messages, newest first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `notifications.messages.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the send log.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": [
+          "notifications.messages.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `notifications.send`; advertising also `notifications.send_marketing`. Channels without\nconsent, preference, address or provider are skipped and listed in `skipped`. Delivery runs in\nthe background; follow it with `GET /messages/{id}`.",
+        "operationId": "notifications_send_notification",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationOutcome"
+                }
+              }
+            },
+            "description": "What was queued and what was skipped."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `notifications.send` (or `notifications.send_marketing` for advertising); code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown kind (`notifications.kind_unknown`), unknown user (`notifications.recipient_unknown`), or an invalid value (every problem in `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a notification.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": [
+          "notifications.send"
+        ]
+      }
+    },
+    "/api/v1/notifications/messages/{id}": {
+      "get": {
+        "description": "Requires `notifications.messages.read`.",
+        "operationId": "notifications_get_notification_message",
+        "parameters": [
+          {
+            "description": "Id of the message.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationMessage"
+                }
+              }
+            },
+            "description": "The message."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `notifications.messages.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such message; code `notifications.message_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one message of the send log.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": [
+          "notifications.messages.read"
+        ]
+      }
+    },
+    "/api/v1/notifications/platform-notices": {
+      "post": {
+        "description": "Requires `notifications.platform_notices.send` and an account of the platform tenant. Goes in\nthe background, tenant by tenant, to the inbox and email of every active admin; running again\nnever sends twice to the same person.",
+        "operationId": "notifications_send_platform_notice",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformNoticeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlatformNotice"
+                }
+              }
+            },
+            "description": "Queued."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `notifications.platform_notices.send` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a notice to the admins of every tenant.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": [
+          "notifications.platform_notices.send"
+        ]
+      }
+    },
+    "/api/v1/notifications/public/unsubscribe": {
+      "post": {
+        "description": "No sign-in: the token of the link is the proof. Withdraws the consent the email was sent with\n(same purpose and channel) and cancels advertising still waiting. Calling again changes nothing.",
+        "operationId": "notifications_unsubscribe_from_notifications",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationUnsubscribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Consent withdrawn."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown or expired link; code `notifications.link_invalid`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Stop advertising with the link of an email.",
+        "tags": [
+          "notifications"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/notifications/public/web-push-key": {
+      "get": {
+        "description": "No sign-in.",
+        "operationId": "notifications_get_web_push_key",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationWebPushKey"
+                }
+              }
+            },
+            "description": "The key."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Web push is not set up on this server; code `web_push_disabled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Get the web push public key.",
+        "tags": [
+          "notifications"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/notifications/templates": {
+      "get": {
+        "description": "Requires `notifications.templates.manage`. Kinds and channels without a row use the default text.",
+        "operationId": "notifications_list_notification_templates",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_NotificationTemplate"
+                }
+              }
+            },
+            "description": "Every replaced text."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `notifications.templates.manage`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the replaced texts of the tenant.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": [
+          "notifications.templates.manage"
+        ]
+      }
+    },
+    "/api/v1/notifications/templates/{kind}/{channel}/{locale}": {
+      "delete": {
+        "description": "Requires `notifications.templates.manage`.",
+        "operationId": "notifications_delete_notification_template",
+        "parameters": [
+          {
+            "description": "Key of the kind.",
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Channel.",
+            "in": "path",
+            "name": "channel",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`en` or `vi`.",
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed; the default text applies."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `notifications.templates.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No replaced text there; code `notifications.template_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown kind, channel or language; code `notifications.kind_unknown` or `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Go back to the default text of a kind on one channel and language.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": [
+          "notifications.templates.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `notifications.templates.manage`. Advertising always gets the label and the\nunsubscribe link added; a text cannot remove them.",
+        "operationId": "notifications_set_notification_template",
+        "parameters": [
+          {
+            "description": "Key of the kind, e.g. `orders.order_shipped`.",
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "One channel of the kind, e.g. `email`.",
+            "in": "path",
+            "name": "channel",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`en` or `vi`.",
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NotificationTemplate"
+                }
+              }
+            },
+            "description": "The replaced text."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `notifications.templates.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown kind (`notifications.kind_unknown`), a value the kind does not have (`notifications.template_invalid`), or another invalid value (every problem in `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the text of a kind on one channel and language.",
+        "tags": [
+          "notifications"
+        ],
+        "x-permissions": [
+          "notifications.templates.manage"
         ]
       }
     },
