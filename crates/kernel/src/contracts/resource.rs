@@ -673,3 +673,59 @@ mod tests {
         assert_eq!(event.id_in("media.item:abc"), None);
     }
 }
+
+/// Một dòng lịch sử của một bản ghi (bước 51 P13): một event đã ghi về bản ghi đó.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct HistoryLine {
+    pub id: Uuid,
+    pub at: chrono::DateTime<chrono::Utc>,
+    /// Tên event, vd `content.entry_published`.
+    pub action: String,
+    pub actor_user_id: Option<Uuid>,
+    /// Tên người làm, nếu biết.
+    pub actor_name: Option<String>,
+    /// Câu đọc được của event (`EventInfo::activity`), đã dịch; `None` khi event không có câu.
+    pub sentence: Option<String>,
+}
+
+impl HistoryLine {
+    pub fn new(id: Uuid, at: chrono::DateTime<chrono::Utc>, action: impl Into<String>) -> Self {
+        HistoryLine {
+            id,
+            at,
+            action: action.into(),
+            actor_user_id: None,
+            actor_name: None,
+            sentence: None,
+        }
+    }
+
+    pub fn actor(mut self, user_id: Option<Uuid>, name: Option<String>) -> Self {
+        self.actor_user_id = user_id;
+        self.actor_name = name;
+        self
+    }
+
+    pub fn sentence(mut self, sentence: Option<String>) -> Self {
+        self.sentence = sentence;
+        self
+    }
+}
+
+/// Lịch sử theo bản ghi, do module giữ nhật ký (`audit`) công bố bằng
+/// `context.provide::<dyn RecordHistory>(…)`. Kernel đã kiểm người gọi đọc được bản ghi trước khi
+/// hỏi.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait RecordHistory: Send + Sync {
+    /// Tối đa `limit` event mới nhất có chủ thể `subject` (`<kind>:<id>`), mới trước.
+    async fn history(
+        &self,
+        tenant: &TenantContext,
+        subject: &str,
+        limit: u32,
+        language: crate::i18n::Language,
+    ) -> Result<Vec<HistoryLine>, Error>;
+}

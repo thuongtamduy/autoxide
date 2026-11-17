@@ -364,7 +364,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/orders.ts`
 | [ ] | Chi tiết đơn | Hoàn tác một lần chuyển trạng thái của nhân viên trong N phút | mới |
 | [ ] | Chi tiết đơn | `POST /{id}/refunds`, `POST /{id}/payments/manual`; nơi tiền về của từng khoản hoàn | 45 |
 | [ ] | Chi tiết đơn | `POST /{id}/payment-link` (gửi lại link thanh toán) | 45 |
-| [ ] | Chi tiết đơn | Ghi chú nội bộ: `POST /{id}/notes` | mới (51 có dòng hoạt động chung) |
+| [ ] | Chi tiết đơn | Ghi chú nội bộ: `POST /{id}/notes` | mới (51 có dòng hoạt động chung) | **Phần chung đã có** (17/11, bước 51 P13): `GET/POST /api/v1/kernel/records/{kind}/{id}/notes` (`body`, `mentions[]` — người được nhắc phải đọc được bản ghi), `DELETE …/notes/{note_id}` (người viết), `GET /kernel/records/{kind}/{id}/activity` (ghi chú + lịch sử event, mới trước). Đơn hàng dùng khi bước 45 đăng ký loại `orders.order` vào sổ đối tượng |
 | [ ] | Chi tiết đơn | Bút toán của một đơn: đọc sổ cái theo `reference` | 36 |
 | [ ] | Chi tiết đơn | Duyệt / từ chối đề xuất của agent: `/kernel/approvals/{id}/approve\|reject` | 51 |
 | [ ] | Đổi trả | `GET /returns`, `POST /returns/{id}/transitions`; `media_ids`, `return_deadline_at`, `respond_by` | 45 |

@@ -64,10 +64,13 @@ impl Module for AuditModule {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         self.recorder = Some(Arc::new(Recorder));
-        self.service = Some(Arc::new(
+        let service = Arc::new(
             AuditService::new(context.resources())
                 .with_events(context.events().clone(), context.translations().clone()),
-        ));
+        );
+        // Lịch sử theo bản ghi cho dòng hoạt động của kernel (bước 51 P13).
+        context.provide::<dyn autoxide_kernel::resource::RecordHistory>(service.clone())?;
+        self.service = Some(service);
         self.chain = Some(Arc::new(chain::ChainProbe { databases: context.tenancy() }));
         Ok(())
     }

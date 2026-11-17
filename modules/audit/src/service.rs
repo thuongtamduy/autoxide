@@ -89,27 +89,39 @@ impl AuditService {
             .into_iter()
             .map(|row| {
                 let template = sentences.get(row.action.as_str()).copied().unwrap_or_default();
-                let mut sentence = self.translations.describe(template, language);
-                let actor = row
-                    .actor_user_id
-                    .and_then(|id| names.get(&id).cloned())
-                    .unwrap_or_else(|| "—".to_owned());
-                sentence = sentence.replace("{actor}", &actor);
-                for side in [&row.after, &row.before] {
-                    let Some(Ok(serde_json::Value::Object(fields))) =
-                        side.as_deref().map(serde_json::from_str::<serde_json::Value>)
-                    else {
-                        continue;
-                    };
-                    for (key, value) in fields {
-                        if let serde_json::Value::String(text) = value {
-                            sentence = sentence.replace(&format!("{{{key}}}"), &text);
-                        }
-                    }
-                }
+                let sentence = self.sentence(template, &row, &names, language);
                 ActivityLine { row, sentence }
             })
             .collect())
+    }
+
+    /// Câu của event `action` cho dòng `row`, đã dịch và điền tên người làm, trường trước / sau.
+    fn sentence(
+        &self,
+        template: &str,
+        row: &entity::Model,
+        names: &std::collections::HashMap<uuid::Uuid, String>,
+        language: autoxide_kernel::i18n::Language,
+    ) -> String {
+        let mut sentence = self.translations.describe(template, language);
+        let actor = row
+            .actor_user_id
+            .and_then(|id| names.get(&id).cloned())
+            .unwrap_or_else(|| "—".to_owned());
+        sentence = sentence.replace("{actor}", &actor);
+        for side in [&row.after, &row.before] {
+            let Some(Ok(serde_json::Value::Object(fields))) =
+                side.as_deref().map(serde_json::from_str::<serde_json::Value>)
+            else {
+                continue;
+            };
+            for (key, value) in fields {
+                if let serde_json::Value::String(text) = value {
+                    sentence = sentence.replace(&format!("{{{key}}}"), &text);
+                }
+            }
+        }
+        sentence
     }
 
     /// Tên hiển thị của những người `ids`, theo lô (một lần tra cho cả trang). Chương trình không
@@ -178,5 +190,46 @@ impl AuditService {
             Error::not_found("audit.entry_not_found", "Audit entry `{id}` does not exist.")
                 .with_param("id", id)
         })
+    }
+}
+
+/// Lịch sử theo bản ghi (bước 51 P13): event có chủ thể `<kind>:<id>`, mới trước, kèm câu đọc được
+/// của event nào có. Kernel đã kiểm người gọi đọc được bản ghi.
+#[async_trait::async_trait]
+impl autoxide_kernel::resource::RecordHistory for AuditService {
+    async fn history(
+        &self,
+        tenant: &TenantContext,
+        subject: &str,
+        limit: u32,
+        language: autoxide_kernel::i18n::Language,
+    ) -> Result<Vec<autoxide_kernel::resource::HistoryLine>, Error> {
+        let page = PageRequest::first(limit, autoxide_kernel::pagination::Order::Desc);
+        let select = Entity::find().filter(Column::Subject.eq(subject)).scoped(tenant);
+        let rows = fetch_page(select, Column::Id, |row| row.id, &page, tenant.database().read())
+            .await?
+            .data;
+        let ids: Vec<Uuid> = rows.iter().filter_map(|row| row.actor_user_id).collect();
+        let names = self.actor_names(tenant, &ids).await?;
+        let sentences: std::collections::HashMap<&str, &str> = self
+            .events
+            .iter()
+            .filter_map(|event| event.activity_line().map(|(sentence, _)| (event.name(), sentence)))
+            .collect();
+        Ok(rows
+            .iter()
+            .map(|row| {
+                let sentence = sentences
+                    .get(row.action.as_str())
+                    .map(|template| self.sentence(template, row, &names, language));
+                autoxide_kernel::resource::HistoryLine::new(
+                    row.id,
+                    row.occurred_at,
+                    row.action.clone(),
+                )
+                .actor(row.actor_user_id, row.actor_user_id.and_then(|id| names.get(&id).cloned()))
+                .sentence(sentence)
+            })
+            .collect())
     }
 }

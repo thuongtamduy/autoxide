@@ -1163,3 +1163,81 @@ async fn hoan_giao_viec_va_buoc_thiet_lap() {
     .await
     .unwrap();
 }
+
+/// Ghi chú và dòng hoạt động trên bản ghi (bước 51 P13): người đọc được bài viết ghi chú, nhắc
+/// người đọc được; nhắc người không đọc được là 422; người không có `content.read` thấy 404; chỉ
+/// người viết xoá được ghi chú.
+#[tokio::test]
+async fn ghi_chu_tren_ban_ghi() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["content.read", "content.write"])
+            .user("editor", 3, &["content.read"])
+            .user("stranger", 4, &[])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let created = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "post", "title": "Ghi chú"})),
+        )
+        .await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let notes = format!("/api/v1/kernel/records/content.entry/{id}/notes");
+        let post = |who: &str, body: Value| app.post(&notes).token(who).json(body).send();
+
+        let wrong = post("admin", json!({"body": "Xem giúp", "mentions": [Uuid::from_u128(4)]}))
+            .await
+            .unwrap();
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", wrong.json());
+        assert_eq!(wrong.json()["errors"][0]["field"], "mentions[0]");
+        let written = post("admin", json!({"body": "Xem giúp", "mentions": [Uuid::from_u128(3)]}))
+            .await
+            .unwrap();
+        assert_eq!(written.status(), StatusCode::CREATED, "{}", written.json());
+        let note_id = written.json()["data"]["id"].as_str().unwrap().to_owned();
+        let hidden = post("stranger", json!({"body": "x"})).await.unwrap();
+        assert_eq!(
+            (hidden.status(), hidden.json()["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("kernel.record_not_found"))
+        );
+        let missing = app
+            .get(&format!("/api/v1/kernel/records/content.entry/{}/notes", Uuid::now_v7()))
+            .token("admin")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+
+        let activity = app
+            .get(&format!("/api/v1/kernel/records/content.entry/{id}/activity"))
+            .token("editor")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(activity.status(), StatusCode::OK, "{}", activity.json());
+        let first = &activity.json()["data"][0];
+        assert_eq!(
+            (first["kind"].as_str(), first["text"].as_str()),
+            (Some("note"), Some("Xem giúp"))
+        );
+        let theirs =
+            app.delete(&format!("{notes}/{note_id}")).token("editor").send().await.unwrap();
+        assert_eq!(theirs.status(), StatusCode::NOT_FOUND, "chỉ người viết xoá được");
+        let mine = app.delete(&format!("{notes}/{note_id}")).token("admin").send().await.unwrap();
+        assert_eq!(mine.status(), StatusCode::NO_CONTENT);
+    })
+    .await
+    .unwrap();
+}
