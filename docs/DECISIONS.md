@@ -8353,3 +8353,16 @@ Bước 35 mục 4 (ROADMAP mục "Tính tiền thuê bao SaaS").
    `plans:{period}:{n}` — gọi lại trả lượt còn chờ; lượt hết hạn / thất bại thì sang `n + 1`.
 5. **Đã thu**: `plans` nghe `ledger.payment_succeeded` (chỉ khi có `ledger`) → `mark_paid` (cùng đường thu tay: thuê bao
    quá hạn / tạm khoá đang dùng lại). Event đến lại vô hại.
+
+## D-346 · Chấp nhận tạm `chrono` / `chrono-tz` / `humantime` "không còn bảo trì" — 2026-11-17 — agent quyết
+
+Ngày 17/11/2026 cơ sở dữ liệu RustSec thêm RUSTSEC-2026-0543 (`chrono`), RUSTSEC-2026-0555 (`chrono-tz`),
+RUSTSEC-2026-0542 (`humantime`, bọc `chrono`): **không còn bảo trì**, không phải lỗ hổng; chưa có bản thay an toàn.
+`cargo deny` của gate báo lỗi.
+
+- `sqlx` 0.9 và SeaORM 2 (lớp database của Autoxide) dựng trên `chrono` (`DateTimeUtc`, `Date`): thay riêng phần của
+  Autoxide sang `jiff` / `time` không bỏ được `chrono` khỏi cây phụ thuộc, còn phải đổi kiểu thời gian ở mọi entity.
+- Vì vậy ghi ba mục vào `ignore` của `deny.toml` (kèm lý do), theo luật "ngoại lệ phải ghi ở `deny.toml` và
+  DECISIONS". Gate chạy `-D advisory-not-detected`: khi cảnh báo được gỡ hay không còn khớp, gate đỏ cho tới khi gỡ dòng.
+- Việc kế tiếp (không chặn lộ trình): theo dõi `sqlx` / SeaORM chuyển sang `jiff`; khi có, chuyển cả Autoxide trong
+  một bước riêng và gỡ ba dòng này.

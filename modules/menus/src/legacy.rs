@@ -1,5 +1,5 @@
 //! Nhập menu cũ của `content` (bước 17) sang module này (D-238):
-//! `autoxide task menus.import_content_menus`.
+//! `autoxide task menus.import_content_menus`, hay `POST /api/v1/menus/import-content` (có chạy thử).
 //!
 //! - Đọc qua trait `autoxide_content::api::LegacyMenus`, không đọc bảng của `content`.
 //! - Chạy lại nhiều lần không nhân đôi: menu đã có cùng (`key`, `locale`) thì bỏ qua — kể cả khi
@@ -12,12 +12,14 @@
 use std::sync::Arc;
 
 use autoxide_content::api::{LegacyMenuItem, LegacyTarget};
+use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
-use autoxide_kernel::tenancy::{DatabaseRegistry, Site, TenantContext};
+use autoxide_kernel::tenancy::{DatabaseRegistry, Site, TenantContext, root_of};
 
 use crate::config::canonical_locale;
 use crate::items::{ItemInput, RefInput};
+use crate::permissions::MENUS_MANAGE;
 use crate::service::{MenuService, NewMenu};
 
 /// Kết quả một lần nhập.
@@ -32,12 +34,21 @@ pub(crate) struct ImportReport {
 }
 
 impl MenuService {
-    /// Nhập mọi menu cũ của khách `tenant` ở `content` chưa có ở khách đó. Lệnh của người vận hành
-    /// máy chủ: không kiểm permission, event ghi là của hệ thống.
+    /// Nhập mọi menu cũ của khách `tenant` ở `content` chưa có ở khách đó. `principal` `None`:
+    /// lệnh của người vận hành máy chủ (không kiểm permission, event của hệ thống); có: người gọi
+    /// qua REST cần `menus.manage` ở cả khách (menu cũ là menu của cả khách) và là người làm của
+    /// event. `dry_run`: chỉ báo sẽ nhập gì, không ghi (`imported` là danh sách sẽ nhập).
     pub(crate) async fn import_content_menus(
         &self,
         tenant: &TenantContext,
+        principal: Option<&Principal>,
+        dry_run: bool,
     ) -> Result<ImportReport, Error> {
+        if let Some(principal) = principal {
+            principal.require(&MENUS_MANAGE)?;
+            let whole = OrgTarget::new(root_of(tenant.id()), None);
+            principal.require_at(tenant.database().read(), &MENUS_MANAGE, whole).await?;
+        }
         let legacy = self.legacy.as_ref().ok_or_else(|| {
             Error::bad_request(
                 "menus.import_source_missing",
@@ -61,13 +72,17 @@ impl MenuService {
                 report.skipped.push(pair);
                 continue;
             }
+            if dry_run {
+                report.imported.push(pair);
+                continue;
+            }
             let input = NewMenu {
                 key: old.key.clone(),
                 locale: Some(locale),
                 org_id: None,
                 items: old.items.iter().map(convert).collect(),
             };
-            match self.create_checked(tenant, None, input, false).await {
+            match self.create_checked(tenant, principal, input, false).await {
                 Ok(_) => report.imported.push(pair),
                 // Hai lần nhập chạy cùng lúc: bên kia vừa tạo xong menu này.
                 Err(error) if error.code() == "menus.menu_exists" => report.skipped.push(pair),
@@ -125,7 +140,7 @@ impl TaskRun for Import {
             Some(slug) => self.databases.tenant_by_slug(slug.trim()).await?,
             None => self.databases.default_tenant(),
         };
-        let report = self.service.import_content_menus(&tenant).await?;
+        let report = self.service.import_content_menus(&tenant, None, false).await?;
         let list = |pairs: &[(String, String)]| {
             pairs
                 .iter()

@@ -2,6 +2,7 @@
 //! service (service kiểm permission) → trả envelope. Mọi route đăng ký qua `routes!` để có tài
 //! liệu OpenAPI (luật kiến trúc 6).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -31,6 +32,7 @@ pub(crate) fn routes(service: Arc<MenuService>) -> OpenApiRouter {
         .routes(routes!(list_menus, create_menu))
         .routes(routes!(get_menu, replace_menu, delete_menu))
         .routes(routes!(get_public_menu))
+        .routes(routes!(import_content_menus))
         .with_state(service)
 }
 
@@ -184,6 +186,28 @@ pub(crate) struct SiteMenu {
     updated_at: DateTime<Utc>,
 }
 
+/// The object a saved item links to. With `include=targets`, also how it stands now.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub(crate) struct SavedMenuTarget {
+    #[schema(example = "content.term")]
+    kind: String,
+    id: String,
+    /// Only with `include=targets`: `public` (shown on the website), `not_public` (exists but
+    /// strangers cannot see it, e.g. a draft: the public menu leaves the item out), `missing` (no
+    /// such object any more) or `unknown_kind` (no installed module provides this type).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state: Option<TargetState>,
+    /// Only with `include=targets` and `state` = `public`: its title in the menu's language.
+    /// Objects that are not public do not give their title to other modules.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
+    /// Only with `include=targets` and `state` = `public`: its public path, when it has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<String>,
+}
+
+pub(crate) use crate::public::TargetState;
+
 /// A menu item as saved.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub(crate) struct SiteMenuItem {
@@ -192,24 +216,32 @@ pub(crate) struct SiteMenuItem {
     label: String,
     url: Option<String>,
     #[serde(rename = "ref")]
-    target: Option<MenuTarget>,
+    target: Option<SavedMenuTarget>,
     auto_children: bool,
     auto_children_limit: Option<i32>,
     icon: Option<String>,
     highlight: Option<String>,
     badge: Option<MenuBadge>,
-    feature: Option<MenuTarget>,
+    feature: Option<SavedMenuTarget>,
     #[schema(no_recursion)]
     children: Vec<SiteMenuItem>,
 }
 
-fn items(nodes: Vec<Node>) -> Vec<SiteMenuItem> {
+fn items(nodes: Vec<Node>, targets: &Targets) -> Vec<SiteMenuItem> {
     nodes
         .into_iter()
         .map(|node| {
             let row = node.item;
             let pair = |kind: Option<String>, id: Option<String>| {
-                Some(MenuTarget { kind: kind?, id: id? })
+                let (kind, id) = (kind?, id?);
+                let found = targets.get(&(kind.clone(), id.clone()));
+                Some(SavedMenuTarget {
+                    state: found.map(|info| info.state),
+                    title: found.and_then(|info| info.title.clone()),
+                    path: found.and_then(|info| info.path.clone()),
+                    kind,
+                    id,
+                })
             };
             SiteMenuItem {
                 id: row.id,
@@ -227,19 +259,26 @@ fn items(nodes: Vec<Node>) -> Vec<SiteMenuItem> {
                     _ => None,
                 },
                 feature: pair(row.feature_kind, row.feature_id),
-                children: items(node.children),
+                children: items(node.children, targets),
             }
         })
         .collect()
 }
 
+/// Tình trạng đích của từng mục, theo (`kind`, `id`); rỗng khi không xin `include=targets`.
+pub(crate) type Targets = HashMap<(String, String), crate::public::TargetInfo>;
+
 pub(crate) fn menu_response(menu: Menu, nodes: Vec<Node>) -> SiteMenu {
+    menu_response_with(menu, nodes, &Targets::new())
+}
+
+fn menu_response_with(menu: Menu, nodes: Vec<Node>, targets: &Targets) -> SiteMenu {
     SiteMenu {
         id: menu.id,
         org_id: menu.org_id.unwrap_or(menu.tenant_id),
         key: menu.key,
         locale: menu.locale,
-        items: items(nodes),
+        items: items(nodes, targets),
         created_at: menu.created_at,
         updated_at: menu.updated_at,
     }
@@ -343,15 +382,16 @@ async fn create_menu(
 
 /// Get a website menu.
 ///
-/// Requires `menus.read`. The items as saved, without working out titles and links (see
-/// `GET /api/v1/menus/public/{key}` for that).
+/// Requires `menus.read`. The items as saved. With `include=targets`, each `ref` and `feature`
+/// also says whether its object is shown on the website, with the title and path of public ones
+/// (see `GET /api/v1/menus/public/{key}` for the menu exactly as the website shows it).
 #[utoipa::path(
     get,
     path = "/{id}",
     extensions(("x-permissions" = json!(["menus.read"]))),
     operation_id = "get_menu",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the menu.")),
+    params(("id" = Uuid, Path, description = "Id of the menu."), MenuInclude),
     responses(
         (status = 200, description = "The menu.", body = Data<SiteMenu>, headers(("ETag" = String, description = "Version of the menu: send it in `If-Match` when replacing its items."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -364,9 +404,30 @@ async fn get_menu(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
+    Query(include): Query<MenuInclude>,
 ) -> Result<Tagged<SiteMenu>, Error> {
     let (menu, nodes) = service.get(&tenant, &principal, id).await?;
-    Ok(Tagged { version: menu.updated_at, data: menu_response(menu, nodes) })
+    let targets = match include.include.as_deref().map(str::trim) {
+        None | Some("") => Targets::new(),
+        Some("targets") => service.target_states(&tenant, &nodes, &menu.locale).await?,
+        Some(_) => {
+            return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
+                "include",
+                "invalid",
+                "must be `targets`",
+            )]));
+        }
+    };
+    Ok(Tagged { version: menu.updated_at, data: menu_response_with(menu, nodes, &targets) })
+}
+
+/// What to add to a menu.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct MenuInclude {
+    /// `targets`: how the object of each `ref` and `feature` stands now (`state`, and `title`,
+    /// `path` of public ones), in one request.
+    include: Option<String>,
 }
 
 /// Replace the items of a website menu.
@@ -493,4 +554,88 @@ async fn get_public_menu(
         headers.insert(header::CACHE_CONTROL, value);
     }
     Ok(response)
+}
+
+/// What to do when importing the old menus.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ImportContentMenusRequest {
+    /// `true`: only say what would be imported; nothing is saved. Defaults to `false`.
+    #[serde(default)]
+    dry_run: bool,
+}
+
+/// A menu of the import, by key and language.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub(crate) struct ImportedMenu {
+    #[schema(example = "main")]
+    key: String,
+    #[schema(example = "vi")]
+    locale: String,
+}
+
+/// A menu that could not be imported, and why.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub(crate) struct FailedMenu {
+    key: String,
+    locale: String,
+    /// Why, in English (e.g. the language is not one of the menu languages).
+    reason: String,
+}
+
+/// What the import did (or, with `dry_run`, would do).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub(crate) struct ImportContentMenusReport {
+    dry_run: bool,
+    /// Imported (with `dry_run`: would be imported).
+    imported: Vec<ImportedMenu>,
+    /// Already here with the same key and language: left as they are.
+    skipped: Vec<ImportedMenu>,
+    failed: Vec<FailedMenu>,
+}
+
+/// Import the old menus of module `content`.
+///
+/// Requires `menus.manage` for the whole tenant: the old menus become menus of the whole
+/// tenant. Copies the old website menus kept by module `content` (before module `menus`) into
+/// this module, like `autoxide task menus.import_content_menus`. A menu that already exists with
+/// the same key and language is left as it is, so running it again is safe. Try it first with
+/// `dry_run`: nothing is saved, and the answer lists what would be imported. When a dry run
+/// imports nothing and skips everything, the import was already done.
+#[utoipa::path(
+    post,
+    path = "/import-content",
+    extensions(("x-permissions" = json!(["menus.manage"]))),
+    operation_id = "import_content_menus",
+    security(("bearer" = [])),
+    request_body = ImportContentMenusRequest,
+    responses(
+        (status = 200, description = "What was imported (or would be, with `dry_run`).", body = Data<ImportContentMenusReport>),
+        (status = 400, description = "Module `content` is not installed; code `menus.import_source_missing`.", body = Problem),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `menus.manage` for the whole tenant; code `permission_denied` or `org_out_of_scope`.", body = Problem),
+    )
+)]
+async fn import_content_menus(
+    State(service): State<Arc<MenuService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    ValidJson(input): ValidJson<ImportContentMenusRequest>,
+) -> Result<Data<ImportContentMenusReport>, Error> {
+    let report = service.import_content_menus(&tenant, Some(&principal), input.dry_run).await?;
+    let menus = |pairs: Vec<(String, String)>| {
+        pairs.into_iter().map(|(key, locale)| ImportedMenu { key, locale }).collect()
+    };
+    Ok(Data {
+        data: ImportContentMenusReport {
+            dry_run: input.dry_run,
+            imported: menus(report.imported),
+            skipped: menus(report.skipped),
+            failed: report
+                .failed
+                .into_iter()
+                .map(|(key, locale, reason)| FailedMenu { key, locale, reason })
+                .collect(),
+        },
+    })
 }

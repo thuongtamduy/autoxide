@@ -390,3 +390,53 @@ async fn menu_theo_website_va_nhanh() {
     .await
     .unwrap();
 }
+
+/// Đề bài giao diện (menu, điểm 3 và 9): đọc menu kèm tình trạng từng đích (`include=targets`);
+/// nhập menu cũ qua REST — không có module `content` thì báo rõ, người chỉ đọc bị từ chối.
+#[tokio::test]
+async fn doc_menu_kem_tinh_trang_dich_va_nhap_menu_cu() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let body = json!({
+            "key": "main",
+            "locale": "vi",
+            "items": [
+                {"ref": {"kind": "shop.item", "id": "p1"}},
+                {"ref": {"kind": "shop.item", "id": "h1"}, "label": "Ẩn"}
+            ]
+        });
+        let created = send(&app, "POST", "", Some("admin"), &[], Some(body)).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+
+        let plain = send(&app, "GET", &format!("/{id}"), Some("reader"), &[], None).await;
+        assert_eq!(plain.json()["data"]["items"][0]["ref"].get("state"), None, "chỉ khi xin");
+        let read =
+            send(&app, "GET", &format!("/{id}?include=targets"), Some("reader"), &[], None).await;
+        assert_eq!(read.status(), StatusCode::OK, "{}", read.json());
+        let items = &read.json()["data"]["items"];
+        assert_eq!(items[0]["ref"]["state"], "public");
+        assert_eq!(items[0]["ref"]["title"], "p1@vi");
+        assert_eq!(items[0]["ref"]["path"], "/items/p1");
+        assert_eq!(items[1]["ref"]["state"], "not_public");
+        assert_eq!(
+            items[1]["ref"].get("title"),
+            None,
+            "không lộ tiêu đề của đối tượng chưa công khai"
+        );
+        let bad = send(&app, "GET", &format!("/{id}?include=all"), Some("reader"), &[], None).await;
+        assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+        let dry = json!({"dry_run": true});
+        let denied =
+            send(&app, "POST", "/import-content", Some("reader"), &[], Some(dry.clone())).await;
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        let missing = send(&app, "POST", "/import-content", Some("admin"), &[], Some(dry)).await;
+        assert_eq!(
+            (missing.status(), missing.json()["code"].as_str()),
+            (StatusCode::BAD_REQUEST, Some("menus.import_source_missing"))
+        );
+    })
+    .await
+    .unwrap();
+}

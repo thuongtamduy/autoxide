@@ -42,6 +42,9 @@ pub(crate) struct ContentService {
     pub(crate) orgs: Option<Arc<dyn OrgDirectory>>,
     /// Tính năng theo gói (bước 35): gợi ý AI cần `content.ai_suggestions`.
     pub(crate) entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+    /// Sổ đối tượng của kernel: tên người sửa (`auth.user`) mà không phụ thuộc module `auth`
+    /// (D-046). Rỗng (test dựng tay, app không có `auth`): không có tên.
+    pub(crate) resources: autoxide_kernel::resource::ResourceDirectory,
 }
 
 /// Tính năng theo gói (bước 35): gợi ý và bản nháp do AI soạn (SEO, dịch).
@@ -85,7 +88,35 @@ impl ContentService {
             translations: Default::default(),
             orgs: None,
             entitlements: Default::default(),
+            resources: Default::default(),
         }
+    }
+
+    pub(crate) fn with_resources(
+        mut self,
+        resources: autoxide_kernel::resource::ResourceDirectory,
+    ) -> Self {
+        self.resources = resources;
+        self
+    }
+
+    /// Tên hiển thị của người dùng `ids`, tra theo lô qua sổ đối tượng. Người đã bị xoá, hay
+    /// chương trình không có module tài khoản: vắng trong kết quả.
+    pub(crate) async fn user_names(
+        &self,
+        tenant: &TenantContext,
+        ids: &[uuid::Uuid],
+    ) -> Result<std::collections::HashMap<uuid::Uuid, String>, Error> {
+        const USER_KIND: &str = "auth.user";
+        if ids.is_empty() || !self.resources.knows(USER_KIND) {
+            return Ok(Default::default());
+        }
+        let keys: Vec<String> = ids.iter().map(ToString::to_string).collect();
+        let found = self.resources.resolve_many(tenant, USER_KIND, &keys, None).await?;
+        Ok(found
+            .into_iter()
+            .filter_map(|(id, resource)| Some((id.parse().ok()?, resource.title)))
+            .collect())
     }
 
     /// Dịch câu kết quả kiểm SEO bằng `translations`.

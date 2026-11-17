@@ -357,7 +357,22 @@ async fn nhap_menu_cu_hai_lan_khong_nhan_doi() {
         *harness.legacy.0.lock().unwrap() =
             vec![old("main", "en"), old("footer", "vi"), old("main", "fr")];
 
-        let report = service.import_content_menus(t).await.unwrap();
+        // Qua REST: cần `menus.manage`; chạy thử chỉ báo, không ghi gì.
+        let reader = autoxide_kernel::access::Principal::new(
+            uuid::Uuid::now_v7(),
+            ["menus.read".to_owned()],
+        );
+        let refused = service.import_content_menus(t, Some(&reader), true).await.unwrap_err();
+        assert_eq!(refused.code(), "permission_denied");
+        let preview = service.import_content_menus(t, Some(&admin()), true).await.unwrap();
+        assert_eq!((preview.imported.len(), preview.failed.len()), (2, 1));
+        let none = autoxide_kernel::pagination::PageRequest::try_from(
+            autoxide_kernel::pagination::PageQuery::default(),
+        )
+        .unwrap();
+        assert!(service.list(t, &admin(), None, &none).await.unwrap().data.is_empty(), "chạy thử");
+
+        let report = service.import_content_menus(t, Some(&admin()), false).await.unwrap();
         assert_eq!(report.imported.len(), 2);
         assert_eq!(report.failed.len(), 1, "`fr` is not a menus language");
         let first = service
@@ -376,7 +391,7 @@ async fn nhap_menu_cu_hai_lan_khong_nhan_doi() {
 
         // Sửa menu đã nhập rồi nhập lại: không thêm, không đè.
         service.replace(t, &admin(), first.id, vec![link("Mine", "/")], None).await.unwrap();
-        let report = service.import_content_menus(t).await.unwrap();
+        let report = service.import_content_menus(t, None, false).await.unwrap();
         assert_eq!((report.imported.len(), report.skipped.len()), (0, 2));
         let page = autoxide_kernel::pagination::PageRequest::try_from(
             autoxide_kernel::pagination::PageQuery::default(),
@@ -497,9 +512,12 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
             }],
         }];
         for tenant in [a, b] {
-            assert_eq!(service.import_content_menus(tenant).await.unwrap().imported.len(), 1);
+            assert_eq!(
+                service.import_content_menus(tenant, None, false).await.unwrap().imported.len(),
+                1
+            );
         }
-        let report = service.import_content_menus(a).await.unwrap();
+        let report = service.import_content_menus(a, None, false).await.unwrap();
         assert_eq!((report.imported.len(), report.skipped.len()), (0, 1));
         let old_b = service
             .find_by_key(b, &autoxide_kernel::tenancy::Site::whole(b), "old", "en")

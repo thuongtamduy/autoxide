@@ -5,6 +5,11 @@
 //! Không có gói nào (hay không có gói mặc định) thì khách không thuê bao không bị giới hạn: cài
 //! module này vào bản một khách không đổi gì.
 
+// Bản release tính bố cục (layout) của future `async` lồng nhau sâu ở job vòng đời thuê bao vượt mức
+// mặc định 128 của trình biên dịch ("queries overflow the depth limit"); bản debug không gặp. Nâng mức
+// theo đúng gợi ý của trình biên dịch — chỉ ảnh hưởng lúc biên dịch, không đổi code sinh ra.
+#![recursion_limit = "256"]
+
 pub mod api;
 mod billing;
 mod billing_profile;

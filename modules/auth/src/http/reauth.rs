@@ -269,6 +269,14 @@ mod tests {
             let (_, _, me) = call(&app, "GET", "/me", Some(&ada), None).await;
             assert_eq!(me["data"]["mfa_required"], false);
             assert_eq!(me["data"]["permissions"], json!(["notes.write"]));
+
+            // Mã sai khi xác nhận lại: lỗi chỉ đúng ô `totp_code` client đã gửi, không phải `code`.
+            let stale = code_at(&secret, now - 3600);
+            let body = json!({"method": "totp", "totp_code": stale});
+            let (status, _, refused) =
+                call(&app, "POST", "/me/reauth", Some(&ada), Some(body)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+            assert_eq!(refused["errors"][0]["field"], "totp_code", "{refused}");
         })
         .await
         .unwrap();
