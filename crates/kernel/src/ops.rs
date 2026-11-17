@@ -3,6 +3,7 @@
 
 pub(crate) mod alerts;
 pub(crate) mod builtin;
+pub mod bulk;
 pub(crate) mod client_config;
 pub mod doctor;
 pub mod find;
@@ -12,6 +13,7 @@ pub mod metrics;
 pub(crate) mod module_catalog;
 pub(crate) mod my_permissions;
 pub(crate) mod navigation;
+pub mod resolve;
 pub mod summary;
 pub mod task;
 pub mod telemetry;

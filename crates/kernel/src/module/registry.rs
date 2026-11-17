@@ -255,6 +255,8 @@ impl Modules {
         let finders = self.catalog.finder_sources();
         let metrics = self.catalog.summary_metrics();
         let exports = self.catalog.export_sources();
+        let bulk = self.catalog.bulk_actions();
+        let resolvers = self.catalog.code_resolvers();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         // Gọi sau `configure` của mọi module: thời hạn đọc từ cấu hình.
@@ -284,6 +286,8 @@ impl Modules {
                 finders: &finders,
                 metrics: &metrics,
                 exports: &exports,
+                bulk: &bulk,
+                resolvers: &resolvers,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,

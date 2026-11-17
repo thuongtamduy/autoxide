@@ -8,6 +8,7 @@
 //! của kernel nên đăng ký SAU `content`. Hướng dẫn dùng: `docs/NEWSLETTER.md`.
 
 mod audience;
+mod bulk;
 mod campaigns;
 mod config;
 mod entity;
@@ -128,6 +129,9 @@ impl Module for NewsletterModule {
         context.personal_data(service.clone())?;
         context.summary_metric(Arc::new(summary::Subscribers))?;
         context.summary_metric(Arc::new(summary::Suppressed))?;
+        for action in bulk::actions(&service) {
+            context.bulk_action(action)?;
+        }
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())

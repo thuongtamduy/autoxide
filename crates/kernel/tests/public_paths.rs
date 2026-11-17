@@ -9,6 +9,7 @@
 use autoxide_kernel::access::Permission;
 use autoxide_kernel::ai::TextModel;
 use autoxide_kernel::antispam::AntispamConfig;
+use autoxide_kernel::bulk::BulkAction;
 use autoxide_kernel::config::Config;
 use autoxide_kernel::csv::line;
 use autoxide_kernel::database::Database;
@@ -37,6 +38,7 @@ use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::public_url::PublicUrl;
 use autoxide_kernel::push::{MobilePushSender, WebPushSender};
 use autoxide_kernel::reference::MAX_LENGTH as REFERENCE_MAX_LENGTH;
+use autoxide_kernel::resolve::CodeResolver;
 use autoxide_kernel::resource::ResourceResolver;
 use autoxide_kernel::response::Data;
 use autoxide_kernel::rows::lock;

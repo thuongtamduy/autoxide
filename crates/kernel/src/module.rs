@@ -297,6 +297,8 @@ pub struct StartContext<'a> {
     finders: &'a crate::ops::find::FinderSources,
     metrics: &'a crate::ops::summary::SummaryMetrics,
     exports: &'a crate::ops::list_exports::ExportSources,
+    bulk: &'a crate::ops::bulk::BulkActions,
+    resolvers: &'a crate::ops::resolve::CodeResolvers,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -450,6 +452,22 @@ impl StartContext<'_> {
         source: Arc<dyn crate::ops::list_exports::ExportSource>,
     ) -> Result<(), Error> {
         self.exports.register(self.module, source)
+    }
+
+    /// Đăng ký hành động hàng loạt (bước 51 P8) trên một danh sách `<module>.<operation id>`.
+    pub fn bulk_action(
+        &mut self,
+        action: Arc<dyn crate::ops::bulk::BulkAction>,
+    ) -> Result<(), Error> {
+        self.bulk.register(self.module, action)
+    }
+
+    /// Đăng ký bộ nhận dạng mã (bước 51 P9) cho `GET /kernel/resolve`; loại `<module>.<loại>`.
+    pub fn code_resolver(
+        &mut self,
+        resolver: Arc<dyn crate::ops::resolve::CodeResolver>,
+    ) -> Result<(), Error> {
+        self.resolvers.register(self.module, resolver)
     }
 
     /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do

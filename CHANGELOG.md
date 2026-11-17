@@ -42,6 +42,18 @@ endpoints are marked deprecated with a sunset date first.
   (random id, categories, version, hashed network block; signed-in visitors also in the consent ledger). Active
   providers are listed as data recipients in `GET /public/purposes`. Permission `compliance.tracking.manage`, setting
   `AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR`, MCP tool `compliance.tracking_tags`.
+- Advanced search and open by code (step 51): `GET /api/v1/kernel/find?q=` understands `is:<type>`, `field:value`,
+  `>`, `<`, `>=`, `<=`, `from..to`, `-` to exclude and quoted phrases (`SearchQuery`), and `scope=node|subtree|accessible`;
+  parts no searched type understands come back in `ignored`. Posts and pages understand `status`, `kind`, `locale`,
+  `updated` and `created`. `GET /api/v1/kernel/resolve?code=` opens the first record a module recognises by its code
+  (`StartContext::code_resolver`; posts and pages by slug or address), with the same 404 for "none" and "not yours".
+- Bulk actions (step 51): modules declare actions on a list (`StartContext::bulk_action`, `bulk` module of the
+  kernel); `POST /api/v1/kernel/bulk/{resource}/{action}` takes `ids` (up to 500) or a `filter` with
+  `expected_count` (409 `kernel.bulk_count_changed` when the matches changed) and an `Idempotency-Key`, and runs
+  the action in a background job with the requester's permissions; the job's result lists what happened to each
+  record; `dry_run` lists the records it would act on without doing anything. Posts and pages can be archived,
+  comments approved, rejected, marked as spam or deleted, and newsletter subscribers blocked, unblocked or deleted
+  in bulk.
 - Step 37, mandatory page templates in `content` (Vietnam; every text says it needs review by a legal professional):
   owner information, personal data protection, returns, shipping, payment, inspection, complaints, terms of use,
   general conditions, and for a marketplace its regulations, the seller agreement and seller information, in English
