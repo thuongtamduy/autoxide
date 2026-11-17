@@ -208,6 +208,15 @@ impl PlansService {
         if changed {
             self.cache.forget(tenant);
         }
+        // Vừa thành `canceled`: tự xin một lượt xuất dữ liệu cho khách tải về (A-b9).
+        let status = subscription::Entity::find()
+            .filter(subscription::Column::TenantId.eq(tenant.as_uuid()))
+            .one(self.databases.control().write())
+            .await?
+            .map(|row| row.status);
+        if changed && status.as_deref() == Some("canceled") {
+            self.offer_export(tenant).await;
+        }
         if deleted {
             // Kernel chưa có lệnh xoá khách: khoá hẳn khách, giữ dữ liệu (D-327).
             self.suspend_tenant(Actor::system(), tenant).await?;
@@ -395,6 +404,17 @@ impl PlansService {
             tracing::info!(tenant_id = %tenant, from = %from, to, "subscription status changed");
         }
         Ok(row)
+    }
+
+    /// Thuê bao của khách `tenant` vừa bị huỷ: tự xin một lượt xuất dữ liệu để khách tải về (lỗi chỉ
+    /// ghi log — huỷ thuê bao không phụ thuộc việc xuất).
+    async fn offer_export(&self, tenant: TenantId) {
+        if let Some(exports) = &self.exports
+            && let Err(error) =
+                exports.request(Actor::system(), tenant, "subscription_canceled").await
+        {
+            tracing::warn!(tenant_id = %tenant, error = %error, "cannot start the data export of a canceled subscription");
+        }
     }
 
     /// Ghi event về khách `tenant` (dưới khách nền tảng).
@@ -821,6 +841,9 @@ impl PlansService {
         let _ = actor;
         transaction.commit().await?;
         self.cache.forget(tenant);
+        if !at_period_end {
+            self.offer_export(tenant).await;
+        }
         Ok(())
     }
 

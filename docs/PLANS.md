@@ -102,6 +102,18 @@ with a reason; undo it with `PATCH /api/v1/kernel/tenants/{id}` (`"status": "act
 `GET /api/v1/kernel/tenants?subscription_status=past_due` and `?near_limit=true` list tenants to
 follow up.
 
+## Exporting a tenant's data
+
+Platform staff (`kernel.tenants.operate`) and administrators of the tenant itself
+(`kernel.data.export`) can export all of a tenant's data as one JSON Lines file:
+`POST /api/v1/kernel/tenants/{id}/exports`, then `GET …/exports/{export_id}` until it is `ready`,
+then `GET …/exports/{export_id}/content` (or `POST …/link` for a 24-hour link that works without
+signing in). The first line describes the export; every other line is
+`{"table": "...", "row": {...}}`. Password hashes and secrets are left out, and so are the contents
+of uploaded files (their records are included; download them through the files API). When a
+subscription is canceled an export is started automatically. Exports are deleted after
+`AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` (30).
+
 ## Settings
 
 | Setting | Default | |
@@ -110,3 +122,4 @@ follow up.
 | `AUTOXIDE_PLANS_HOLD_MINUTES` | `15` | How long an unconfirmed reservation against a limit is held |
 | `AUTOXIDE_PLANS_REMINDER_DAYS` | `7,1` | Days before a period is due that a reminder is mailed |
 | `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS` | `3600` | How long a job of a module the plan excludes waits |
+| `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` | `30` | How long a tenant data export is kept |

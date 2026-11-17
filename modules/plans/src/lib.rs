@@ -112,6 +112,7 @@ impl Module for PlansModule {
             mailer: context.require::<dyn autoxide_kernel::mail::Mailer>().ok(),
             translations: context.translations().clone(),
             reminder_days: config.reminder_days.clone(),
+            exports: context.require::<autoxide_kernel::tenancy::TenantExports>().ok(),
         });
         self.service = Some(service.clone());
         context.provide::<dyn autoxide_kernel::entitlement::Entitlements>(Arc::new(

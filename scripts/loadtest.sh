@@ -18,6 +18,8 @@
 # với 100 khách trên database chính và 10 khách có database SQLite riêng, rồi thêm bài đo đọc /
 # list / ghi của người dùng một khách chung và một khách riêng (chọn khách bằng credential).
 # LOADTEST_TENANTS (100) và LOADTEST_DEDICATED (10) đổi số khách.
+# Thêm LOADTEST_PLAN=1 (bước 35): khách s1 có thuê bao gói bật mọi module, khách s2 không — đo cả
+# GET /forms (module bị gói chi phối) của hai khách để so lớp chặn theo gói.
 #
 # Máy tạo tải và máy chủ chạy chung một máy nên tranh CPU: số đo là cận dưới, dùng để so
 # trước / sau một thay đổi trên cùng máy.
@@ -88,7 +90,7 @@ if [ "$TENANCY" = multi ]; then
   for i in $(seq 1 "${LOADTEST_DEDICATED:-10}"); do
     "$BINARY" tenant create --slug "d$i" --name "Dedicated $i" --placement "d$i" >/dev/null 2>&1
   done
-  for slug in s1 d1; do
+  for slug in s1 s2 d1; do
     printf '%s' "$PASSWORD" | "$BINARY" user create --tenant "$slug" --email "admin@$slug.example" \
       --name Admin --admin --password-stdin >/dev/null 2>&1
   done
@@ -238,8 +240,23 @@ if [ "$TENANCY" = multi ]; then
   echo
   echo "| Bài đo                             | Kết nối |  Request/s |   p50 ms |   p95 ms |   p99 ms |  Thành công |"
   echo "| ---------------------------------- | ----: | --------: | -------: | -------: | -------: | ------: |"
-  for slug in s1 d1; do
+  # `LOADTEST_PLAN=1` (bước 35): khách s1 có thuê bao gói bật mọi module (không giới hạn), s2 không
+  # có — so lớp chặn theo gói của hai đường. Bản chưa có module `plans` thì bỏ qua bước gán gói.
+  slugs="s1 d1"
+  if [ -n "${LOADTEST_PLAN:-}" ]; then
+    slugs="s1 s2 d1"
+    plan="$(post /api/v1/plans/plans '{"code":"loadtest","name":"Loadtest","status":"active","modules":["ai","media","content","forms","newsletter","comments","menus"],"features":["auth.api_keys","content.ai_suggestions"],"limits":{"organizations.units":null,"auth.members":null,"files.storage_bytes":null,"kernel.api_requests":null}}' \
+      | json '["data"]["id"]' 2>/dev/null || true)"
+    s1="$(curl -sf "$BASE/api/v1/kernel/tenants/s1" -H "$AUTH" | json '["data"]["id"]' 2>/dev/null || true)"
+    if [ -n "$plan" ] && [ -n "$s1" ]; then
+      curl -sf -X PUT "$BASE/api/v1/plans/tenants/$s1/subscription" -H "$AUTH" -H 'content-type: application/json' \
+        -d "{\"plan_id\":\"$plan\",\"trial\":false}" >/dev/null
+    fi
+  fi
+  for slug in $slugs; do
     kind="chung"; [ "$slug" = d1 ] && kind="riêng"
+    [ -n "${LOADTEST_PLAN:-}" ] && [ "$slug" = s1 ] && kind="chung, có gói"
+    [ "$slug" = s2 ] && kind="chung, không gói"
     # Đăng nhập chọn khách bằng header; request sau đó lấy khách từ chính token.
     tenant_token="$(curl -sf "$BASE/api/v1/auth/login" -H 'content-type: application/json' \
       -H "autoxide-tenant: $slug" \
@@ -254,6 +271,9 @@ if [ "$TENANCY" = multi ]; then
     run "khách $kind: GET /auth/me"        "$CONNECTIONS" -H "authorization: Bearer $tenant_token" "$BASE/api/v1/auth/me"
     run "khách $kind: GET /auth/users"     "$CONNECTIONS" -H "authorization: Bearer $tenant_token" "$BASE/api/v1/auth/users?limit=50"
     run "khách $kind: PATCH /auth/users"   "$CONNECTIONS" -m PATCH -H "authorization: Bearer $tenant_token" -T application/json -d '{"name":"Robert"}' "$BASE/api/v1/auth/users/$member"
+    if [ -n "${LOADTEST_PLAN:-}" ]; then
+      run "khách $kind: GET /forms"        "$CONNECTIONS" -H "authorization: Bearer $tenant_token" "$BASE/api/v1/forms"
+    fi
   done
 fi
 

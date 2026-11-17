@@ -7982,3 +7982,31 @@ Quyết định:
    khách hỏi `plans` qua hai hàm mới có mặc định của `Entitlements` (`tenants_with_status`, `tenants_near_limit`).
 7. Test: thời gian "trôi" bằng cách sửa mốc trong database rồi chạy worker; xoá job đã xong trước mỗi lượt để lịch xếp
    lại trong cùng khung giờ (chỉ trong test).
+
+## D-328 · Xuất toàn bộ dữ liệu một khách; số đo sau bước 35 — 2026-11-17 — agent quyết
+
+Quyết định:
+
+1. **Kernel giữ việc xuất** (không phải `plans`): kernel biết bảng nào thuộc khách (`TenantTables` của việc dời khách,
+   D-292), `plans` chỉ gọi. Bảng `kernel_tenant_exports` ở control plane; job `kernel.export_tenant` (3 lần thử)
+   ghi một file JSON Lines `exports/<id>.jsonl` qua nơi lưu file chung (`files`): dòng đầu là header
+   (`autoxide-tenant-export`, phiên bản 1), mỗi dòng sau một bản ghi kèm tên bảng. Ghi theo luồng (channel + stream),
+   không dựng cả file trong RAM. Không có module `files` thì không có route, tool, job hay lịch của việc xuất.
+2. **Nội dung**: mọi bảng dữ liệu của khách, trừ cột secret (`is_secret_column`: hash mật khẩu, khoá, token) và trừ nội
+   dung file nhị phân (file đã nằm sẵn ở nơi lưu file của khách; bản xuất giữ metadata). Byte ghi base64, thời gian
+   RFC 3339.
+3. **Ai gọi được**: nhân sự nền tảng có `kernel.tenants.operate`, hoặc người của chính khách có permission mới
+   `kernel.data.export` (rủi ro `SensitiveData`); khách khác nhận `tenant_not_found` (không lộ khách có tồn tại).
+   Tải về qua phiên đăng nhập, hoặc link 24 giờ (token ngẫu nhiên, lưu sha256) cho trình duyệt / công cụ không gửi được
+   header; một yêu cầu đang chờ / đang chạy thì trả lại yêu cầu đó, không xếp thêm.
+4. **Tên biến** `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` (mặc định 30, 1–365) thay cho
+   `AUTOXIDE_PLANS_EXPORT_RETENTION_DAYS` của đặc tả, vì kernel giữ việc này. Job hằng ngày `kernel.clean_exports` (chỉ
+   chạy ở control plane) xoá file và dòng quá hạn.
+5. **Tự đề nghị khi huỷ**: `plans` xin một bản xuất (lý do `subscription_canceled`) khi thuê bao chuyển `canceled` — huỷ
+   ngay hay hết ân hạn; lỗi chỉ ghi log, không chặn việc huỷ.
+6. **Kiểm hợp đồng OpenAPI** của testkit bỏ qua response `application/x-ndjson` (không phải một tài liệu JSON).
+7. **Số đo sau bước 35** (`docs/BENCHMARKS.md`, `scripts/loadtest.sh` thêm `LOADTEST_PLAN=1`): mọi dòng trong ±5% so
+   với trước bước 35, kể cả khách có gói và khách không gói — lớp chặn theo gói không đo được trên đường nóng.
+
+Lý do: dùng lại đường đọc bảng của việc dời khách thay vì bắt mỗi module viết hàm xuất; JSON Lines đọc được bằng công cụ
+phổ biến và nạp lại theo từng dòng.

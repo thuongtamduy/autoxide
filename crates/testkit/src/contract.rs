@@ -86,7 +86,8 @@ pub fn check(
             known.join(", ")
         ));
     };
-    if !media.ends_with("json") {
+    // JSON Lines (`application/x-ndjson`) là nhiều văn bản JSON, không phải một: không kiểm schema.
+    if !media.ends_with("json") || media.ends_with("ndjson") {
         return Ok(());
     }
     let Some(schema) = declared.get("schema") else {
