@@ -2184,6 +2184,12 @@ export type Data_MeResponse = {
   /** The signed-in user and what they may do. */
   data: {
     /**
+     * How you are in that tenant: `direct` (your own tenant), `delegation` (a parent tenant's
+     * delegation, `GET /api/v1/auth/me/tenants`) or `support` (platform staff with a support
+     * grant).
+     */
+    access: string;
+    /**
      * `true` when a role grants every permission (the `admin` role); `permissions`
      * is then empty.
      */
@@ -2201,6 +2207,11 @@ export type Data_MeResponse = {
      * password through `POST /api/v1/auth/password-reset`.
      */
     has_password: boolean;
+    /**
+     * With `delegation` or `support`: the tenant your account belongs to (the profile fields
+     * above are of that account); `null` when `direct`.
+     */
+    home_tenant_id?: string | null;
     id: string;
     /**
      * Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
@@ -2218,6 +2229,8 @@ export type Data_MeResponse = {
     pending_email?: PendingEmail | null;
     /** Permissions granted by the user's roles, sorted by name. */
     permissions: string[];
+    /** The tenant of this request. `permissions` and `all_permissions` are what you may do here. */
+    tenant_id: string;
     /** Preferred IANA time zone; `null`: not set. */
     time_zone?: string | null;
   };
@@ -5122,6 +5135,12 @@ export type MatchedBy = "meaning" | "text";
 /** The signed-in user and what they may do. */
 export type MeResponse = {
   /**
+   * How you are in that tenant: `direct` (your own tenant), `delegation` (a parent tenant's
+   * delegation, `GET /api/v1/auth/me/tenants`) or `support` (platform staff with a support
+   * grant).
+   */
+  access: string;
+  /**
    * `true` when a role grants every permission (the `admin` role); `permissions`
    * is then empty.
    */
@@ -5139,6 +5158,11 @@ export type MeResponse = {
    * password through `POST /api/v1/auth/password-reset`.
    */
   has_password: boolean;
+  /**
+   * With `delegation` or `support`: the tenant your account belongs to (the profile fields
+   * above are of that account); `null` when `direct`.
+   */
+  home_tenant_id?: string | null;
   id: string;
   /**
    * Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
@@ -5156,6 +5180,8 @@ export type MeResponse = {
   pending_email?: PendingEmail | null;
   /** Permissions granted by the user's roles, sorted by name. */
   permissions: string[];
+  /** The tenant of this request. `permissions` and `all_permissions` are what you may do here. */
+  tenant_id: string;
   /** Preferred IANA time zone; `null`: not set. */
   time_zone?: string | null;
 };

@@ -5963,6 +5963,11 @@
           "data": {
             "description": "The signed-in user and what they may do.",
             "properties": {
+              "access": {
+                "description": "How you are in that tenant: `direct` (your own tenant), `delegation` (a parent tenant's\ndelegation, `GET /api/v1/auth/me/tenants`) or `support` (platform staff with a support\ngrant).",
+                "example": "direct",
+                "type": "string"
+              },
               "all_permissions": {
                 "description": "`true` when a role grants every permission (the `admin` role); `permissions`\nis then empty.",
                 "type": "boolean"
@@ -5987,6 +5992,14 @@
               "has_password": {
                 "description": "Whether the account has a password. Without one (signed in with a passkey), set a first\npassword through `POST /api/v1/auth/password-reset`.",
                 "type": "boolean"
+              },
+              "home_tenant_id": {
+                "description": "With `delegation` or `support`: the tenant your account belongs to (the profile fields\nabove are of that account); `null` when `direct`.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "id": {
                 "format": "uuid",
@@ -6030,6 +6043,11 @@
                 },
                 "type": "array"
               },
+              "tenant_id": {
+                "description": "The tenant of this request. `permissions` and `all_permissions` are what you may do here.",
+                "format": "uuid",
+                "type": "string"
+              },
               "time_zone": {
                 "description": "Preferred IANA time zone; `null`: not set.",
                 "example": "Asia/Ho_Chi_Minh",
@@ -6047,7 +6065,9 @@
               "all_permissions",
               "permissions",
               "has_password",
-              "mfa_required"
+              "mfa_required",
+              "tenant_id",
+              "access"
             ],
             "type": "object"
           }
@@ -14509,6 +14529,11 @@
       "MeResponse": {
         "description": "The signed-in user and what they may do.",
         "properties": {
+          "access": {
+            "description": "How you are in that tenant: `direct` (your own tenant), `delegation` (a parent tenant's\ndelegation, `GET /api/v1/auth/me/tenants`) or `support` (platform staff with a support\ngrant).",
+            "example": "direct",
+            "type": "string"
+          },
           "all_permissions": {
             "description": "`true` when a role grants every permission (the `admin` role); `permissions`\nis then empty.",
             "type": "boolean"
@@ -14533,6 +14558,14 @@
           "has_password": {
             "description": "Whether the account has a password. Without one (signed in with a passkey), set a first\npassword through `POST /api/v1/auth/password-reset`.",
             "type": "boolean"
+          },
+          "home_tenant_id": {
+            "description": "With `delegation` or `support`: the tenant your account belongs to (the profile fields\nabove are of that account); `null` when `direct`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "id": {
             "format": "uuid",
@@ -14576,6 +14609,11 @@
             },
             "type": "array"
           },
+          "tenant_id": {
+            "description": "The tenant of this request. `permissions` and `all_permissions` are what you may do here.",
+            "format": "uuid",
+            "type": "string"
+          },
           "time_zone": {
             "description": "Preferred IANA time zone; `null`: not set.",
             "example": "Asia/Ho_Chi_Minh",
@@ -14593,7 +14631,9 @@
           "all_permissions",
           "permissions",
           "has_password",
-          "mfa_required"
+          "mfa_required",
+          "tenant_id",
+          "access"
         ],
         "type": "object"
       },
@@ -31302,7 +31342,7 @@
                 }
               }
             },
-            "description": "The user the access token belongs to, with the permissions of their roles."
+            "description": "The user the access token belongs to, with the permissions of their roles in the tenant of the request — also in a tenant entered through a delegation or a support grant (`access`, `home_tenant_id`)."
           },
           "401": {
             "content": {
@@ -31821,7 +31861,7 @@
                 }
               }
             },
-            "description": "One entry per unit, sorted by unit id."
+            "description": "One entry per unit, sorted by unit id. Empty in a tenant entered through a delegation or a support grant: what you may do there is in `GET /api/v1/auth/me`."
           },
           "401": {
             "content": {

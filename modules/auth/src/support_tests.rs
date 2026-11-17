@@ -160,6 +160,23 @@ async fn ho_tro_het_han_thi_mat_quyen() {
         assert_eq!(status, StatusCode::OK, "{listed}");
         let (_, tenants) = call(&setup, "GET", "/me/tenants", &setup.agent, None, None).await;
         assert_eq!(tenants["data"][1]["access"], "support", "{tenants}");
+        // Ở khách đang vào: `GET /me` trả tài khoản (của khách nền tảng) và permission ở khách
+        // này, kèm cách vào; membership ở khách này: rỗng.
+        let (status, me) = call(&setup, "GET", "/me", &setup.agent, Some("shop"), None).await;
+        assert_eq!(status, StatusCode::OK, "{me}");
+        assert_eq!(me["data"]["email"], "agent@platform.example");
+        assert_eq!(me["data"]["access"], "support");
+        assert_eq!(me["data"]["tenant_id"], json!(setup.shop.id().as_uuid()));
+        assert!(me["data"]["home_tenant_id"].is_string(), "{me}");
+        assert_eq!(me["data"]["permissions"], json!(["auth.customers.read"]));
+        let (status, mine) =
+            call(&setup, "GET", "/me/memberships", &setup.agent, Some("shop"), None).await;
+        assert_eq!((status, mine["data"].clone()), (StatusCode::OK, json!([])), "{mine}");
+        let (_, own) = call(&setup, "GET", "/me", &setup.agent, None, None).await;
+        assert_eq!(
+            (own["data"]["access"].as_str(), own["data"]["home_tenant_id"].clone()),
+            (Some("direct"), Value::Null)
+        );
 
         // Khách thấy lần cấp và lần vào đầu, trong audit của mình.
         let (_, seen) = call(&setup, "GET", "/support-access", &setup.shop_admin, None, None).await;

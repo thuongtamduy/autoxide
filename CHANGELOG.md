@@ -412,6 +412,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- `GET /api/v1/auth/me` in a tenant entered through a delegation or a support grant answered `401`: it now returns
+  the account and the permissions you have in that tenant, with `tenant_id`, `access` (`direct`, `delegation`,
+  `support`) and `home_tenant_id`; `GET /api/v1/auth/me/memberships` returns an empty list there instead of `404`.
 - A missing or ill-typed query parameter (e.g. `locale` of `GET /api/v1/content/public/posts`) answered `400
   bad_request` with the library's raw English text; it now answers `422 validation_failed` with the field in
   `errors`, translated like every other validation problem.

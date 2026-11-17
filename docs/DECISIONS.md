@@ -8197,3 +8197,12 @@ Thay phần "kernel chưa có lệnh xoá khách: khoá hẳn, giữ dữ liệu
 7. Chưa làm (chờ bước 37): khách tự đăng ký (`POST /signups`, xác nhận email, KYC, chấp nhận điều khoản); gói
    `requires_kyc` trả `409 plans.kyc_required`.
 
+## D-339 · `GET /auth/me` ở khách đang vào — 2026-11-17 — agent quyết
+
+Người vào khách khác qua uỷ quyền (D-310), quyền hỗ trợ (D-313) hay header của nhân sự nền tảng có tài khoản ở khách
+gốc, không ở khách đang vào: `GET /auth/me` tìm tài khoản ở khách của request nên trả `401 auth.invalid_token`, và
+`GET /me/memberships` trả `404`. Nay `MeResponse::load` đọc tài khoản ở khách gốc (`Principal::operator_from`), còn
+`permissions` / `all_permissions` vẫn là của khách đang vào (principal đã mang); thêm `tenant_id`, `access`,
+`home_tenant_id` (chỉ thêm trường, không phá vỡ). `GET /me/memberships` ở khách đang vào trả rỗng: quyền ở đó đến từ lần
+uỷ quyền / cấp hỗ trợ, không từ membership.
+
