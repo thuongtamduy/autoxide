@@ -378,6 +378,8 @@ async fn module_thay_danh_muc_permission_cua_moi_module() {
             [
                 "kernel.data.export",
                 "kernel.domains.manage",
+                "kernel.jobs.manage",
+                "kernel.jobs.read",
                 "kernel.modules.read",
                 "kernel.placements.read",
                 "kernel.settings.manage",
@@ -386,6 +388,7 @@ async fn module_thay_danh_muc_permission_cua_moi_module() {
                 "kernel.tenants.move",
                 "kernel.tenants.operate",
                 "kernel.tenants.read",
+                "kernel.views.share",
                 "notes.write"
             ]
         );

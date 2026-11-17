@@ -489,6 +489,7 @@ mod tests {
             Box::new(crate::tenancy::schema::CreateTenancy) as Box<dyn MigrationTrait>,
             Box::new(CreateUserFlags),
             adopt_tenancy(),
+            Box::new(crate::ops::views::CreateSavedViews),
         ];
         Migrator::new(vec![ModuleMigrations::new("kernel", migrations)])
             .unwrap()
