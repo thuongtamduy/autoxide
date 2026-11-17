@@ -315,6 +315,26 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Count the people holding each role (at any unit, each person once).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "auth.count_role_members",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": true
@@ -2947,6 +2967,36 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Get a placement migration run: its `status` (`pending`, `running`, `done`, `failed`), the migrations applied per placement and the error.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which run to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the run.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.get_migration_run",
+      "output_schema": null,
+      "permissions": [
+        "kernel.tenants.operate"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Describe one installed module, like an item of `kernel.list_modules`, plus whether each of its migrations is applied to the database.",
       "input_schema": {
         "additionalProperties": false,
@@ -3208,6 +3258,40 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Migrate the tenant databases (placements), or with `dry_run` only list the pending migrations. A run goes on in the background; follow it with `kernel.get_migration_run` until `done` or `failed`. Platform staff only.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "What to migrate.",
+        "properties": {
+          "dry_run": {
+            "description": "`true`: only list the migrations that would run, change nothing. Default `false`.",
+            "type": "boolean"
+          },
+          "placement": {
+            "description": "Name of one placement; omitted: every placement (not `main`, which the server migrates\nbefore it starts).",
+            "example": "eu-1",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.migrate_placements",
+      "output_schema": null,
+      "permissions": [
+        "kernel.tenants.operate"
       ]
     },
     {

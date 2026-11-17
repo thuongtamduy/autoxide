@@ -532,6 +532,12 @@ Move a tenant to give a growing customer a database of its own, or to bring it b
    autoxide migrate up --all
    ```
 
+   Platform staff can also migrate the placements from the API, without a shell on the server:
+   `POST /api/v1/kernel/placements/migrations` with `{"dry_run": true}` lists what would run;
+   without `dry_run` it starts a run in the background (follow it with
+   `GET /api/v1/kernel/placements/migrations/{id}`). `main` is always migrated by
+   `autoxide migrate up` before the server starts.
+
 2. Try it first. A dry run changes nothing:
 
    ```bash

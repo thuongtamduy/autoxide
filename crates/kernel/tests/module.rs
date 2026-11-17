@@ -294,6 +294,8 @@ async fn module_nhan_database_va_khai_route() {
                     "/modules".to_owned(),
                     "/modules/{name}".to_owned(),
                     "/placements".to_owned(),
+                    "/placements/migrations".to_owned(),
+                    "/placements/migrations/{id}".to_owned(),
                     "/settings".to_owned(),
                     "/settings/{name}".to_owned(),
                     "/tenant".to_owned(),

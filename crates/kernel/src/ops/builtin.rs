@@ -60,6 +60,8 @@ pub(crate) struct KernelModule {
     moves: Option<Arc<crate::tenancy::TenantMoves>>,
     /// Xuất dữ liệu khách (bước 35, D-328); có sau `start`.
     exports: Option<Arc<crate::tenancy::TenantExports>>,
+    /// Migrate placement bằng API (D-334); có sau `start`.
+    migration_runs: Option<Arc<crate::tenancy::migration_runs::MigrationRuns>>,
     /// `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS`.
     export_days: i64,
     /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (đọc ở cấu hình kernel): dời khách chờ request đang
@@ -86,6 +88,7 @@ impl KernelModule {
             move_setup,
             moves: None,
             exports: None,
+            migration_runs: None,
             export_days: 30,
             request_timeout: std::time::Duration::from_secs(30),
             keys,
@@ -162,6 +165,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::exports::CreateTenantExports),
             // Dãy số tuần tự không nhảy số (bước 36): cấp khách hàng, có ở mọi database dữ liệu.
             Box::new(crate::numbering::CreateSequences),
+            // Lượt migrate placement bằng API (D-334, mặt điều khiển).
+            Box::new(crate::tenancy::migration_runs::CreateMigrationRuns),
         ]
     }
 
@@ -174,6 +179,7 @@ impl Module for KernelModule {
             "kernel_tenant_domains",
             "kernel_tenant_moves",
             "kernel_tenant_exports",
+            "kernel_migration_runs",
         ]
     }
 
@@ -261,6 +267,9 @@ impl Module for KernelModule {
         if let Some(exports) = self.live_exports() {
             routes = routes.merge(crate::tenancy::exports::routes(exports.clone()));
         }
+        if let Some(runs) = &self.migration_runs {
+            routes = routes.merge(crate::tenancy::migration_runs::routes(runs.clone()));
+        }
         routes
     }
 
@@ -296,6 +305,9 @@ impl Module for KernelModule {
         if let Some(exports) = self.live_exports() {
             tools.extend(crate::tenancy::exports::tools(exports.clone()));
         }
+        if let Some(runs) = &self.migration_runs {
+            tools.extend(crate::tenancy::migration_runs::tools(runs.clone()));
+        }
         tools
     }
 
@@ -321,6 +333,12 @@ impl Module for KernelModule {
             jobs.push(crate::job::JobRegistration::new(
                 crate::tenancy::exports::CLEAN_EXPORTS,
                 Arc::new(crate::tenancy::exports::CleanRunner(exports.clone())),
+            ));
+        }
+        if let Some(runs) = &self.migration_runs {
+            jobs.push(crate::job::JobRegistration::new(
+                crate::tenancy::migration_runs::MIGRATE_PLACEMENTS,
+                Arc::new(crate::tenancy::migration_runs::MigrateRunner(runs.clone())),
             ));
         }
         jobs
@@ -394,6 +412,11 @@ impl Module for KernelModule {
         ));
         self.exports = Some(exports.clone());
         context.provide::<crate::tenancy::TenantExports>(exports)?;
+        self.migration_runs = Some(Arc::new(crate::tenancy::migration_runs::MigrationRuns::new(
+            context.tenancy().clone(),
+            self.move_setup.clone(),
+            context.jobs(),
+        )));
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))

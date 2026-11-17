@@ -362,6 +362,76 @@ impl Placements {
         Ok(all)
     }
 
+    /// Migration còn chờ của từng placement (trừ `main`), hay chỉ của placement `only` — chạy thử,
+    /// không đổi gì. Placement không có: `placement_not_found`.
+    pub async fn pending(&self, only: Option<&str>) -> Result<Vec<PlacementMigrations>, Error> {
+        let mut all = Vec::new();
+        for row in self.selected(only).await? {
+            let database = self.registry.placement_database(PlacementId::from_uuid(row.id)).await?;
+            let migrations =
+                self.migrator.status(&database).await.map_err(|error| {
+                    Error::internal(format!("placement `{}`: {error}", row.name))
+                })?;
+            let migrations = migrations.into_iter().filter(|state| !state.applied).collect();
+            all.push(PlacementMigrations { name: row.name, migrations });
+        }
+        Ok(all)
+    }
+
+    /// Áp dụng migration còn thiếu ở từng placement (trừ `main`: `serve` không chạy khi `main` còn
+    /// migration chờ), hay chỉ ở placement `only` — như phần placement của [`up_all`](Self::up_all).
+    pub async fn up_placements(
+        &self,
+        only: Option<&str>,
+    ) -> Result<Vec<PlacementMigrations>, Error> {
+        let mut all = Vec::new();
+        for row in self.selected(only).await? {
+            all.push(self.up_placement(row).await?);
+        }
+        Ok(all)
+    }
+
+    async fn selected(&self, only: Option<&str>) -> Result<Vec<placement::Model>, Error> {
+        let rows = self.rows().await?;
+        match only {
+            None => Ok(rows),
+            Some(name) => {
+                let found: Vec<placement::Model> =
+                    rows.into_iter().filter(|row| row.name == name).collect();
+                if found.is_empty() {
+                    return Err(super::errors::tenant_placement_not_found(name));
+                }
+                Ok(found)
+            }
+        }
+    }
+
+    /// Một placement: `migrating` → migrate + upgrade dữ liệu → `ready`; hỏng thì `behind`.
+    async fn up_placement(&self, row: placement::Model) -> Result<PlacementMigrations, Error> {
+        let id = PlacementId::from_uuid(row.id);
+        self.set_state(id, &row.schema_state, SchemaState::Migrating).await?;
+        let migrating = SchemaState::Migrating.as_str();
+        let applied = match self.registry.placement_database(id).await {
+            Ok(database) => self.migrator.up(&database).await.map_err(|error| error.to_string()),
+            Err(error) => Err(error.to_string()),
+        };
+        match applied {
+            Ok(migrations) => {
+                self.set_state(id, migrating, SchemaState::Ready).await?;
+                Ok(PlacementMigrations { name: row.name, migrations })
+            }
+            Err(error) => {
+                self.set_state(id, migrating, SchemaState::Behind).await?;
+                Err(Error::internal(format!(
+                    "placement `{}`: {error}. Fix it and run the migrations again (`autoxide \
+                     migrate up --all`, or `POST /api/v1/kernel/placements/migrations`): what \
+                     is already applied is skipped",
+                    row.name
+                )))
+            }
+        }
+    }
+
     /// Áp dụng migration còn thiếu: database điều khiển trước, rồi từng placement theo tên (đặt
     /// `migrating` → migrate + upgrade dữ liệu → `ready`). Hỏng ở một placement thì dừng, đặt nó
     /// `behind` và báo tên; chạy lại thì tiếp từ chỗ dừng (mỗi database tự nhớ phần đã xong).
@@ -372,29 +442,7 @@ impl Placements {
             migrations: self.migrator.up(control).await.map_err(migration_error)?,
         }];
         for row in self.rows().await? {
-            let id = PlacementId::from_uuid(row.id);
-            self.set_state(id, &row.schema_state, SchemaState::Migrating).await?;
-            let migrating = SchemaState::Migrating.as_str();
-            let applied = match self.registry.placement_database(id).await {
-                Ok(database) => {
-                    self.migrator.up(&database).await.map_err(|error| error.to_string())
-                }
-                Err(error) => Err(error.to_string()),
-            };
-            match applied {
-                Ok(migrations) => {
-                    self.set_state(id, migrating, SchemaState::Ready).await?;
-                    all.push(PlacementMigrations { name: row.name, migrations });
-                }
-                Err(error) => {
-                    self.set_state(id, migrating, SchemaState::Behind).await?;
-                    return Err(Error::internal(format!(
-                        "placement `{}`: {error}. Fix it and run `autoxide migrate up --all` \
-                         again: what is already applied is skipped",
-                        row.name
-                    )));
-                }
-            }
+            all.push(self.up_placement(row).await?);
         }
         Ok(all)
     }

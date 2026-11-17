@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `POST /api/v1/kernel/placements/migrations` (platform staff, MCP `kernel.migrate_placements`): migrate the tenant
+  databases from the API — `dry_run` lists the pending migrations, otherwise a run goes on in the background
+  (`GET …/migrations/{id}`, `GET …/migrations`). One run at a time.
+- `GET /api/v1/auth/roles/counts` (MCP `auth.count_role_members`): how many people hold each role.
+- `PATCH /api/v1/kernel/tenants/{id}` takes a `reason`, kept with the change in the audit log; suspending a tenant
+  from `plans` now records its reason there too.
 - `GET /api/v1/auth/me/memberships` (and `/users/{id}/memberships`) include `org_name` and `org_unit_type`, so a user
   who cannot read the organization tree still sees where they work.
 - `GET /api/v1/auth/delegations/tenants`: a parent tenant lists the tenants below it, to choose where a delegation
@@ -381,6 +387,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- Adding a passkey failed on authenticators without the `credProtect` extension (the server required it): it is now
+  asked for but not enforced. Signing in with a passkey still always verifies the user.
 - `GET /api/v1/kernel/modules/{name}` answered 500 for modules with data upgrades (`auth`, `webhooks`).
 
 - Lists of one tenant ordered by id (audit entries, users, roles, media, content entries, terms, authors, redirects,

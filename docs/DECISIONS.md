@@ -8093,3 +8093,22 @@ Hai yêu cầu của giao diện (`docs/prompts/web-build-api-gaps.md`).
 3. **Phần `auth` của client-config**: `login_link`, `passkeys`, `self_registration` — chỉ cờ bật / tắt, không secret.
 4. **`staff_name`** trong câu trả lời về lần cấp quyền hỗ trợ: tên hiển thị của tài khoản nhân sự ở khách nền tảng (một câu
    cho cả danh sách); không trả email — khách cần biết ai vào, không cần liên lạc riêng với nhân sự.
+
+## D-334 · Lỗ nhỏ của backend từ phía giao diện (nhóm 2) — 2026-11-17 — agent quyết
+
+1. **Migrate placement bằng API**: `POST /api/v1/kernel/placements/migrations` (`kernel.tenants.operate`, khách nền tảng) +
+   tool MCP. `dry_run` trả ngay migration còn chờ của từng placement; còn lại ghi một dòng `kernel_migration_runs` (mặt
+   điều khiển, migration `m0017_create_migration_runs`) và xếp job `kernel.migrate_placements` (một lần thử: migration
+   hỏng thì sửa rồi chạy lượt mới). Chạy như phần placement của `migrate up --all` (dùng chung `Placements::up_placement`),
+   ghi phần đã áp dụng kể cả khi một placement sau hỏng. Một lượt một lúc (`kernel.migration_run_busy`). Không migrate
+   `main` qua API: `serve` không chạy khi `main` còn migration chờ. `Placements` có ở `MoveSetup` sau khi mọi module
+   khởi động.
+2. **`GET /api/v1/auth/roles/counts`** (+ tool MCP): số người giữ mỗi role, như `memberships/counts` (D-332) — không thêm
+   trường vào `RoleResponse` vì kiểu đó lồng trong nhiều câu trả lời khác.
+3. **`reason` khi sửa khách** (`TenantChanges.reason`, 1–500 ký tự) vào payload event `kernel.tenant_updated` (nhật ký
+   audit). Sửa lỗi kèm theo: `plans` khoá hẳn khách chỉ ghi lý do vào log máy chủ dù D-327 ghi "có audit" — nay truyền lý
+   do vào event của kernel (khoá tự động khi hết hạn lưu cũng có lý do).
+4. **Passkey: xin `credProtect` nhưng không ép** (`ExtensionInfo::AllowDontEnforceValue` của `webauthn_rp` 0.3, thay mặc
+   định `AllowEnforceValue` của `PublicKeyCredentialCreationOptions::passkey`). Lý do: authenticator không hỗ trợ phần mở
+   rộng (Chromium ảo, một số thiết bị) từ chối hẳn khi bị ép. Đăng nhập bằng passkey vẫn luôn đòi xác minh người dùng.
+5. Mô tả `TenantMovePlan.files`: `0` cả khi khách không có file nào.

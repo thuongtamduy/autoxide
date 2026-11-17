@@ -9,10 +9,10 @@ use serde_json::Value;
 use webauthn_rp::bin::{Decode, Encode};
 use webauthn_rp::request::auth::AuthenticationVerificationOptions;
 use webauthn_rp::request::register::{
-    Nickname, PublicKeyCredentialUserEntity, RegistrationVerificationOptions, UserHandle64,
-    Username,
+    CredProtect, Nickname, PublicKeyCredentialUserEntity, RegistrationVerificationOptions,
+    UserHandle64, Username,
 };
-use webauthn_rp::request::{AsciiDomain, PublicKeyCredentialDescriptor, RpId};
+use webauthn_rp::request::{AsciiDomain, ExtensionInfo, PublicKeyCredentialDescriptor, RpId};
 use webauthn_rp::response::auth::ser_relaxed::DiscoverableAuthenticationRelaxed64;
 use webauthn_rp::response::register::ser_relaxed::RegistrationRelaxed;
 use webauthn_rp::response::register::{CompressedPubKey, DynamicState, StaticState};
@@ -102,10 +102,16 @@ impl Engine {
                 .map_err(|_| Rejected("cannot build the transports".into()))?;
             exclude.push(PublicKeyCredentialDescriptor { id: id.into(), transports });
         }
+        let mut creation =
+            PublicKeyCredentialCreationOptions::passkey(&self.rp_id, entity, exclude);
+        // Xin `credProtect = userVerificationRequired` nhưng không ÉP (D-334): nhiều authenticator
+        // (Chromium ảo, một số khoá / thiết bị cũ) không hỗ trợ phần mở rộng này và từ chối hẳn khi bị
+        // ép. Đăng nhập bằng passkey vẫn luôn đòi xác minh người dùng (`authenticator_selection` của
+        // passkey), nên không yếu đi.
+        creation.extensions.cred_protect =
+            CredProtect::UserVerificationRequired(ExtensionInfo::AllowDontEnforceValue);
         let (server, client) =
-            PublicKeyCredentialCreationOptions::passkey(&self.rp_id, entity, exclude)
-                .start_ceremony()
-                .map_err(|error| Rejected(error.to_string()))?;
+            creation.start_ceremony().map_err(|error| Rejected(error.to_string()))?;
         let options = serde_json::to_value(&client).map_err(|error| Rejected(error.to_string()))?;
         let state = server.encode().map_err(|error| Rejected(error.to_string()))?;
         Ok(Started { state, options })

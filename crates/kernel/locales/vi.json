@@ -172,5 +172,8 @@
   "unavailable": "Máy chủ tạm thời không xử lý được request. Hãy thử lại sau.",
   "unsupported_media_type": "Kiểu nội dung không được hỗ trợ. Gửi JSON với `content-type: application/json`.",
   "uri_too_long": "Đường dẫn của request quá dài.",
-  "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì."
+  "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì.",
+  "kernel.migration_run_busy": "Đang có một lượt chạy migration (`{run}`); hãy chờ lượt đó xong.",
+  "kernel.migration_run_not_found": "Không có lượt chạy migration `{run}`.",
+  "field:must be 1 to 500 characters long": "phải dài 1 đến 500 ký tự"
 }
