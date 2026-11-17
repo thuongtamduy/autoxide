@@ -24,6 +24,8 @@ endpoints are marked deprecated with a sunset date first.
   `WebPushSender`, `MobilePushSender` (providers are separate modules; the testkit has fakes) and `auth` trait
   `TenantAdmins`. New settings `AUTOXIDE_NOTIFICATIONS_RETENTION_DAYS`, `…_INBOX_RETENTION_DAYS`,
   `…_UNSUBSCRIBE_URL`, `…_PER_RECIPIENT_PER_HOUR`. See `docs/NOTIFICATIONS.md`.
+- `GET /api/v1/audit?actor_kind=user|system|public`; `GET /api/v1/newsletter/subscribers?sort=email|status` (emails
+  sort byte by byte, the same on SQLite and PostgreSQL).
 
 - New module `compliance` (step 37): identity verification (KYC) through a provider (`IdentityVerifier`, callbacks
   checked by signature, processed in the background) or by manual review (signed-in reviewers only); duplicate

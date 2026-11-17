@@ -12494,7 +12494,7 @@ export interface paths {
   "/api/v1/audit": {
     /** List the audit log. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; include?: "actor"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; actor_kind?: string; include?: "actor"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_AuditEntryResponse;
         401: Problem;
@@ -17299,7 +17299,7 @@ export interface paths {
   "/api/v1/newsletter/subscribers": {
     /** List subscribers. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; list_id?: string; status?: "unconfirmed" | "confirmed" | "unsubscribed"; blocked?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; list_id?: string; status?: "unconfirmed" | "confirmed" | "unsubscribed"; blocked?: boolean; sort?: "created_at" | "email" | "status"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_SubscriberResponse;
         401: Problem;
