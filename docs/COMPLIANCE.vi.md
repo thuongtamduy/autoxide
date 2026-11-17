@@ -22,11 +22,13 @@ Module gồm:
 | **Dữ liệu cá nhân**: mục đích và căn cứ xử lý, thời hạn lưu, sổ hoạt động xử lý, nơi lưu dữ liệu | `/purposes…`, `/retention`, `/processing-register`, `/residency`, `/public/purposes` |
 | **Sự cố dữ liệu cá nhân** (72 giờ) và **yêu cầu của chủ thể dữ liệu** qua kênh khác | `/incidents…`, `/subject-requests…` |
 | **Mã theo dõi quảng cáo và đồng ý cookie** | `/tracking-tags…`, `/cookie-settings/{org_id}`, `/public/consent-config`, `/public/cookie-consents` |
+| **Báo vi phạm** (sở hữu trí tuệ, hàng giả) và **khiếu nại của người tiêu dùng**, cung cấp thông tin cho cơ quan | `/cases…`, `/respondent/cases`, `/disclosures`, `/public/reports`, `/public/complaints`, `/public/cases/{id}` |
 | Quy tắc pháp lý có ngày hiệu lực, chính sách của khách | `/rules`, `/policies…` |
 | **Hồ sơ pháp lý website và Bộ Công Thương** | `/legal-profiles…`, `/websites…`, `/public/badge`, `/public/owner` |
 
 Hướng dẫn này nói về thủ tục với Bộ Công Thương cùng mẫu trang bắt buộc của `content`, rồi dữ liệu cá nhân
-(kèm sổ tay sự cố 72 giờ) và mã theo dõi quảng cáo với đồng ý cookie.
+(kèm sổ tay sự cố 72 giờ), báo vi phạm cùng khiếu nại của người tiêu dùng, và mã theo dõi quảng cáo với
+đồng ý cookie.
 
 ## Thủ tục với Bộ Công Thương
 
@@ -266,6 +268,79 @@ Khi tài khoản bị xoá (`auth.user_deleted`), `compliance` xoá số điện
 đó, gỡ người dùng khỏi bằng chứng đồng ý cookie; bằng chứng đồng ý, văn bản đã chấp nhận và kết quả định danh giữ
 trong thời gian luật yêu cầu. Bản xuất dữ liệu cá nhân của người dùng (`GET /api/v1/auth/me/export`) có phần của
 `compliance`.
+
+## Báo vi phạm và khiếu nại của người tiêu dùng
+
+Vi phạm sở hữu trí tuệ, hàng giả, hàng cấm được báo dưới dạng **vụ việc**; khiếu nại của người tiêu
+dùng cũng vậy. Một vụ việc đi: tiếp nhận → (ẩn đối tượng) → phản hồi của bên bị phản ánh → quyết định,
+có hạn và lưu vết chỉ thêm. Căn cứ — cần đối chiếu văn bản gốc: Luật Thương mại điện tử 2025, Luật Sở
+hữu trí tuệ, NĐ 85/2021/NĐ-CP (gỡ khi cơ quan có thẩm quyền yêu cầu), Luật Bảo vệ quyền lợi người tiêu
+dùng 19/2023/QH15 và NĐ 55/2024/NĐ-CP (khiếu nại).
+
+| Ai | Endpoint (dưới `/api/v1/compliance`) |
+| --- | --- |
+| Bất kỳ ai (form công khai, khách suy từ tên miền) | `POST /public/reports`, `POST /public/complaints`, `GET /public/complaints`, `GET /public/cases/{id}?token=`, `GET /public/moderation-reasons` |
+| Nhân sự (`compliance.cases.read` / `.handle`) | `GET\|POST /cases`, `GET /cases/{id}`, `POST /cases/{id}/entries`, `…/restrict`, `…/restore`, `…/decision`, `…/close` |
+| Bên bị phản ánh (đăng nhập) | `GET /respondent/cases`, `POST /cases/{id}/responses` |
+| Nhân sự (`compliance.disclosures.manage`) | `GET\|POST /disclosures` |
+
+**Tiếp nhận.** Form công khai xin token form trước (`GET /api/v1/antispam/token?scope=compliance:reports`,
+hay `compliance:complaints`) và bị giới hạn theo khối mạng và email mỗi giờ
+(`AUTOXIDE_COMPLIANCE_PUBLIC_REPORTS_PER_IP_PER_HOUR`, mặc định 5). Đối tượng là thứ bị báo, dạng
+`<module>.<type>:<id>` (vd `content.entry:…`, `comments.comment:…`; sản phẩm khi có bước 41); phải có
+thật. Người gửi nhận `tracking_token` một lần — chỉ lưu SHA-256 — và thư báo đã nhận khi có để lại địa
+chỉ (link: `AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL` có `{case}` và `{token}`). Nhân sự ghi vụ nhận qua
+thư (`POST /cases`, `reporter_kind` `rights_holder` hay `authority`).
+
+**Hạn** lấy từ quy tắc `cases.deadlines`: số giờ để xác nhận, số ngày làm việc để phản hồi và để quyết
+định theo loại (khiếu nại của người tiêu dùng: 3 và 7), và 24 giờ để quyết định yêu cầu của cơ quan.
+Ngày làm việc bỏ thứ Bảy, Chủ nhật và ngày lễ ghi trong quy tắc (giờ Việt Nam); Tết âm lịch và ngày
+nghỉ bù nhập mỗi năm. Lịch hằng giờ `compliance.case_deadlines` phát event `compliance.case_overdue` và
+gửi thư tới `email` của chính sách `complaints.contact`, mỗi mốc hạn một lần.
+
+**Ẩn đối tượng.** Yêu cầu của cơ quan ẩn đối tượng ngay; báo vi phạm sở hữu trí tuệ hay hàng giả cũng
+vậy khi khách đặt chính sách `cases.auto_restrict` là `true`. Nhân sự ẩn hay hiện tay (`/restrict`,
+`/restore`). `compliance` không bao giờ đụng bảng của module khác: nó phát `compliance.target_restricted`
+/ `compliance.target_restored` (hợp đồng kernel `autoxide_kernel::moderation`), module sở hữu tự ẩn —
+`content` trả **451** `content.restricted` và bỏ trang khỏi danh sách, sitemap, feed, tìm kiếm;
+`comments` ẩn bình luận và khôi phục trạng thái cũ. Đối tượng chỉ hiện lại khi không còn vụ nào khác
+đang ẩn nó.
+
+**Bên bị phản ánh** là chủ đối tượng (từ sổ đối tượng của kernel, vd tác giả của trang) và người có
+`compliance.cases.respond` trên nút bị phản ánh (`respondent_org_id`, người bán trên sàn). Họ thấy vụ của
+mình không kèm cách liên lạc của người báo, và phản hồi trước `respond_by`; muộn hơn thì
+`compliance.response_closed` (409).
+
+**Quyết định.** Một người đăng nhập có `compliance.cases.handle` quyết định (`upheld` hay
+`partially_upheld` giữ ẩn; `rejected` hiện lại); API key nhận `compliance.session_required`. Lý do hiện cho
+cả hai bên và gửi thư cho người báo. Không có tool MCP để quyết định.
+
+**Cung cấp thông tin cho cơ quan.** `POST /disclosures` (người đăng nhập, `compliance.disclosures.manage`)
+ghi cơ quan, số văn bản yêu cầu, căn cứ và tên các trường đã đưa, rồi trả giá trị một lần — từ hồ sơ
+pháp lý và hồ sơ định danh của người bán mà `compliance` giữ. Bản ghi và event
+`compliance.disclosure_recorded` không bao giờ chứa giá trị.
+
+Tool MCP: `compliance.list_cases`, `compliance.get_case` (đọc), `compliance.add_case_note`,
+`compliance.restrict_case_target`.
+
+### Bảo vệ người tiêu dùng
+
+- **Ẩn đánh giá.** Nội dung của người tiêu dùng chỉ được ẩn vì các lý do của quy tắc
+  `moderation.hide_reasons` (`spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive` — cần
+  đối chiếu). Module kiểm duyệt đánh giá hỏi trait `ModerationPolicy` trước khi ẩn
+  (`compliance.hide_reason_not_allowed`, 422) và ghi lý do trong event của chính nó; danh sách công khai ở
+  `GET /public/moderation-reasons`. Đánh giá tiêu cực mà hợp lệ vẫn hiện.
+- **Điều kiện giao dịch chung** là văn bản pháp lý có phiên bản loại `general_conditions`, công khai ở
+  `GET /public/documents/general_conditions`.
+- **Kênh khiếu nại.** `GET /public/complaints` cho trang khiếu nại của website liên hệ (chính sách
+  `complaints.contact`) và hạn xử lý; khiếu nại là vụ việc loại `consumer_complaint`.
+
+### Nhãn AI
+
+Nội dung viết hay sửa từ gợi ý của AI mang `ai_assisted` (`content`) và alt text của ảnh lấy từ gợi ý
+mang `alt_ai_assisted` (`media`), endpoint công khai trả về để giao diện gắn nhãn (Luật Trí tuệ nhân tạo
+134/2025/QH15, từ 1/3/2026 — cần đối chiếu nghị định). Xem [`CONTENT.vi.md`](CONTENT.vi.md) và
+[`MEDIA.vi.md`](MEDIA.vi.md).
 
 ## Mã theo dõi quảng cáo và đồng ý cookie
 

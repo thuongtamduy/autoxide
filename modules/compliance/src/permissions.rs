@@ -91,6 +91,33 @@ pub(crate) const LEGAL_MANAGE: Permission = Permission::new(
 .scoped()
 .with_risk(Risk::Write);
 
+pub(crate) const CASES_READ: Permission = Permission::new(
+    "compliance.cases.read",
+    "See reports of infringements (intellectual property, counterfeit, prohibited goods) and \
+     consumer complaints, with the reporter's contact details and the log.",
+);
+
+pub(crate) const CASES_HANDLE: Permission = Permission::new(
+    "compliance.cases.handle",
+    "Record reports and complaints, hide or show their target, add notes and decide them (deciding \
+     needs a signed-in person, not an API key).",
+)
+.with_risk(Risk::Write);
+
+pub(crate) const CASES_RESPOND: Permission = Permission::new(
+    "compliance.cases.respond",
+    "Answer reports and complaints about the units in your scope (e.g. a seller on a marketplace).",
+)
+.scoped()
+.with_risk(Risk::Write);
+
+pub(crate) const DISCLOSURES_MANAGE: Permission = Permission::new(
+    "compliance.disclosures.manage",
+    "Give competent authorities information about sellers and users on their written request, and \
+     see the record of what was given (signed-in person only, not API keys).",
+)
+.with_risk(Risk::SensitiveData);
+
 pub(crate) fn all() -> Vec<Permission> {
     vec![
         KYC_READ,
@@ -107,5 +134,9 @@ pub(crate) fn all() -> Vec<Permission> {
         RULES_MANAGE,
         LEGAL_READ,
         LEGAL_MANAGE,
+        CASES_READ,
+        CASES_HANDLE,
+        CASES_RESPOND,
+        DISCLOSURES_MANAGE,
     ]
 }

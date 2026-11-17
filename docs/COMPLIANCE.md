@@ -22,11 +22,13 @@ What the module covers:
 | **Personal data**: purposes and legal bases, retention, processing register, data residency | `/purposes…`, `/retention`, `/processing-register`, `/residency`, `/public/purposes` |
 | **Personal data breaches** (72 hours) and **data subject requests** from other channels | `/incidents…`, `/subject-requests…` |
 | **Tracking tags and cookie consent** | `/tracking-tags…`, `/cookie-settings/{org_id}`, `/public/consent-config`, `/public/cookie-consents` |
+| **Reports of infringements** (intellectual property, counterfeit) and **consumer complaints**, disclosures to authorities | `/cases…`, `/respondent/cases`, `/disclosures`, `/public/reports`, `/public/complaints`, `/public/cases/{id}` |
 | Legal rules with effective dates, tenant policies | `/rules`, `/policies…` |
 | **Website legal profile and the Ministry of Industry and Trade (MOIT)** | `/legal-profiles…`, `/websites…`, `/public/badge`, `/public/owner` |
 
 This guide explains the Ministry of Industry and Trade procedure with the mandatory page templates of
-`content`, then personal data (with the 72-hour breach runbook) and tracking tags with cookie consent.
+`content`, then personal data (with the 72-hour breach runbook), reports of infringements with consumer
+complaints, and tracking tags with cookie consent.
 
 ## The Ministry of Industry and Trade procedure
 
@@ -277,6 +279,79 @@ When an account is deleted (`auth.user_deleted`), `compliance` deletes its verif
 pending codes and removes the user from cookie consent records; proof of consents, accepted documents and
 the identity verification result stay for the time the law requires. The personal data export of a user
 (`GET /api/v1/auth/me/export`) includes the `compliance` part.
+
+## Reports of infringements and consumer complaints
+
+Intellectual property infringements, counterfeits and prohibited goods are reported as **cases**;
+so are consumer complaints. A case goes: intake → (hide the target) → answer of the reported party →
+decision, with deadlines and a log that only grows. Basis — check the original texts: E-commerce Law
+2025, Intellectual Property Law, Decree 85/2021/ND-CP (take-down on request of an authority), Consumer
+Protection Law 19/2023/QH15 and Decree 55/2024/ND-CP (complaints).
+
+| Who | Endpoints (under `/api/v1/compliance`) |
+| --- | --- |
+| Anyone (public form, tenant from the domain) | `POST /public/reports`, `POST /public/complaints`, `GET /public/complaints`, `GET /public/cases/{id}?token=`, `GET /public/moderation-reasons` |
+| Staff (`compliance.cases.read` / `.handle`) | `GET\|POST /cases`, `GET /cases/{id}`, `POST /cases/{id}/entries`, `…/restrict`, `…/restore`, `…/decision`, `…/close` |
+| The reported party (signed in) | `GET /respondent/cases`, `POST /cases/{id}/responses` |
+| Staff (`compliance.disclosures.manage`) | `GET\|POST /disclosures` |
+
+**Intake.** The public forms ask a form token first (`GET /api/v1/antispam/token?scope=compliance:reports`,
+or `compliance:complaints`) and are limited per network block and email per hour
+(`AUTOXIDE_COMPLIANCE_PUBLIC_REPORTS_PER_IP_PER_HOUR`, default 5). The target is the reported object as
+`<module>.<type>:<id>` (e.g. `content.entry:…`, `comments.comment:…`; a product once step 41 exists);
+it must exist. The sender gets `tracking_token` once — only its SHA-256 is kept — and a receipt mail
+when they gave an address (link: `AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL` with `{case}` and `{token}`).
+Staff record cases received by letter (`POST /cases`, `reporter_kind` `rights_holder` or `authority`).
+
+**Deadlines** come from the legal rule `cases.deadlines`: hours to acknowledge, working days to answer
+and to decide by kind (consumer complaints: 3 and 7), and 24 hours to decide a request of an authority.
+Working days skip Saturdays, Sundays and the holidays listed in the rule (Vietnam time); lunar new year
+and make-up days are entered each year. The hourly schedule `compliance.case_deadlines` sends the event
+`compliance.case_overdue` and a mail to the `complaints.contact` policy's `email`, once per deadline.
+
+**Hiding the target.** A request of an authority hides the target at once; so does an intellectual
+property or counterfeit report when the tenant sets the policy `cases.auto_restrict` to `true`. Staff
+hide or show it by hand (`/restrict`, `/restore`). `compliance` never touches the tables of other
+modules: it sends `compliance.target_restricted` / `compliance.target_restored` (kernel contract
+`autoxide_kernel::moderation`), and the owning module hides the object — `content` answers **451**
+`content.restricted` and leaves the page out of lists, sitemap, feed and search; `comments` hides the
+comment and restores its former status. The target is shown again only when no other case still hides it.
+
+**The reported party** is the owner of the target (from the kernel's resource directory, e.g. the author
+of the page) and anyone with `compliance.cases.respond` on the reported unit (`respondent_org_id`, a
+seller on a marketplace). They see their cases without the reporter's contact details and answer before
+`respond_by`; later gives `compliance.response_closed` (409).
+
+**Decision.** A signed-in person with `compliance.cases.handle` decides (`upheld` or `partially_upheld`
+keep the target hidden; `rejected` shows it again); API keys get `compliance.session_required`. The
+reason is shown to both sides and mailed to the reporter. There is no MCP tool for deciding.
+
+**Disclosures to authorities.** `POST /disclosures` (signed-in person, `compliance.disclosures.manage`)
+records the authority, its request number, the legal basis and the names of the fields given, and
+returns the values once — from the seller's legal profile and identity verification kept by
+`compliance`. The record and the event `compliance.disclosure_recorded` never hold the values.
+
+MCP tools: `compliance.list_cases`, `compliance.get_case` (read), `compliance.add_case_note`,
+`compliance.restrict_case_target`.
+
+### Consumer protection
+
+- **Hiding reviews.** Content of consumers may be hidden only for the reasons of the legal rule
+  `moderation.hide_reasons` (`spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive` — to
+  check). Modules that moderate reviews ask the trait `ModerationPolicy` before hiding
+  (`compliance.hide_reason_not_allowed`, 422) and record the reason in their own event; the list is
+  public at `GET /public/moderation-reasons`. A negative but lawful review stays visible.
+- **General conditions of trade** are a versioned legal document of kind `general_conditions`, public at
+  `GET /public/documents/general_conditions`.
+- **Complaint channel.** `GET /public/complaints` gives the website's complaint page the contact (policy
+  `complaints.contact`) and the deadlines; complaints are cases of kind `consumer_complaint`.
+
+### AI labels
+
+Content written or edited from AI suggestions carries `ai_assisted` (`content`) and image alt texts from
+suggestions carry `alt_ai_assisted` (`media`), returned by the public endpoints so the interface labels
+them (Law on Artificial Intelligence 134/2025/QH15, from 1 March 2026 — check the decree). See
+[`CONTENT.md`](CONTENT.md) and [`MEDIA.md`](MEDIA.md).
 
 ## Tracking tags and cookie consent
 

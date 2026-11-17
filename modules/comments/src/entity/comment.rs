@@ -62,6 +62,8 @@ pub struct Model {
     pub report_count: i32,
     /// Lúc bị giữ lại vì đủ báo cáo — chỉ một lần.
     pub reports_held_at: Option<DateTimeUtc>,
+    /// Trạng thái trước khi bị ẩn vì vụ việc của `compliance` (D-363); `None`: không bị ẩn.
+    pub restricted_status: Option<String>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

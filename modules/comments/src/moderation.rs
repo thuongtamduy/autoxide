@@ -150,6 +150,9 @@ impl CommentsService {
         if from == Status::Deleted {
             return Err(deleted_by_author());
         }
+        if before.restricted_status.is_some() {
+            return Err(crate::restriction::restricted());
+        }
         if from == to {
             return self.find_named(tenant, id).await;
         }

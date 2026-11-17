@@ -18,6 +18,7 @@ mod notify;
 mod permissions;
 mod posting;
 mod privacy;
+mod restriction;
 mod retention;
 mod service;
 mod text;
@@ -164,6 +165,8 @@ impl Module for CommentsModule {
             settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
         };
         let service = Arc::new(CommentsService::new(parts, config));
+        // Vụ việc của `compliance` kiểm đích và bên bị phản ánh qua sổ đối tượng (D-363).
+        context.resource_type(restriction::COMMENT, Arc::new(restriction::CommentResolver))?;
         context.personal_data(service.clone())?;
         context.work_source(Arc::new(work::Pending))?;
         context.summary_metric(Arc::new(work::Pending))?;
@@ -187,6 +190,15 @@ impl Module for CommentsModule {
             ),
             // Tài khoản bị xoá: xoá mềm bình luận, bỏ `user_id` (`privacy.rs`).
             Subscription::new(autoxide_kernel::privacy::USER_DELETED, service.clone()),
+            // Vụ việc của `compliance` ẩn / hiện lại bình luận (D-363, `restriction.rs`).
+            Subscription::new(
+                autoxide_kernel::moderation::TARGET_RESTRICTED,
+                Arc::new(restriction::Listener(service.clone())),
+            ),
+            Subscription::new(
+                autoxide_kernel::moderation::TARGET_RESTORED,
+                Arc::new(restriction::Listener(service.clone())),
+            ),
         ];
         let owner = Arc::new(posting::targets::OwnerEvents {
             service: service.clone(),

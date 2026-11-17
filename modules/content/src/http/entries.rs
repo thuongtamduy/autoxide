@@ -64,6 +64,10 @@ pub(crate) struct EntryResponse {
     /// the entry, and always when the writer has only `content.write_own`). Shown to readers by
     /// the public endpoints.
     ai_generated: bool,
+    /// A person wrote or edited the content from AI suggestions (e.g. applied
+    /// `seo-suggestions`). Public endpoints return it so the interface labels the content
+    /// (Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).
+    ai_assisted: bool,
     /// When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no
     /// review pending. Cleared when the entry is published.
     review_requested_at: Option<DateTime<Utc>>,
@@ -166,6 +170,7 @@ fn entry_response(
         canonical_url: entry.canonical_url,
         noindex: entry.noindex,
         ai_generated: entry.ai_generated,
+        ai_assisted: entry.ai_assisted,
         review_requested_at: entry.review_requested_at,
         review_requested_by: entry.review_requested_by,
         created_by: entry.created_by,
@@ -331,6 +336,12 @@ pub(crate) struct EntryFieldsInput {
     /// told (public endpoints return it). With only `content.write_own` the server always sets
     /// `true`, whatever is sent.
     pub ai_generated: Option<bool>,
+    /// Send `true` when the content was written or edited from AI suggestions (applied
+    /// `seo-suggestions`, rewritten from an AI draft); public endpoints return it so the interface
+    /// labels it (Vietnam's Law on Artificial Intelligence 134/2025/QH15). Removing the label
+    /// (`false` while it is `true`) needs `content.publish` (else 403
+    /// `content.ai_label_requires_publish`).
+    pub ai_assisted: Option<bool>,
 }
 
 impl From<EntryFieldsInput> for EntryFields {
@@ -348,6 +359,7 @@ impl From<EntryFieldsInput> for EntryFields {
             canonical_url: input.canonical_url,
             noindex: input.noindex,
             ai_generated: input.ai_generated,
+            ai_assisted: input.ai_assisted,
             translated_from: None,
         }
     }

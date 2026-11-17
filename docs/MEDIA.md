@@ -206,6 +206,12 @@ when `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Nothing is saved: store what a perso
 may also set an alt text on its own image nodes, which wins over the item's. Turning AI on:
 [`AI.md`](AI.md).
 
+When the stored default alt text comes from a suggestion, send `"alt_ai_assisted": true` with it
+(`PATCH /api/v1/media/{id}`, MCP `media.update`); send `false` once a person rewrote it. Items return
+`alt_ai_assisted`, and so do the images of public content entries (only when the image uses the
+library's alt), so the interface can label it (Vietnam's Law on Artificial Intelligence
+134/2025/QH15, from 1 March 2026 — the form of the label still needs checking against the decree).
+
 ## AI agents (MCP)
 
 Tools `media.list`, `media.get`, `media.update`, `media.set_alt`, `media.trash`,

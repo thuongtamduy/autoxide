@@ -11,6 +11,28 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, reports of infringements and consumer complaints (Vietnam — E-commerce Law 2025, Intellectual Property Law, Decree
+  85/2021/ND-CP, Consumer Protection Law 19/2023/QH15, Decree 55/2024/ND-CP; check the original texts; guide
+  `docs/COMPLIANCE.md`): cases with intake from public forms with anti-spam tokens (`POST /api/v1/compliance/public/reports`,
+  `POST /public/complaints`), a one-time tracking code (`GET /public/cases/{id}?token=`), staff intake and handling
+  (`GET|POST /cases`, `GET /cases/{id}`, `POST /cases/{id}/entries`, `/restrict`, `/restore`, `/decision` — signed-in person —
+  and `/close`), answers of the reported party (`GET /respondent/cases`, `POST /cases/{id}/responses`), deadlines in working
+  days from the new legal rule `cases.deadlines` with an hourly reminder schedule `compliance.case_deadlines`, the tenant policy
+  `cases.auto_restrict`, and disclosures to authorities that keep only the names of the fields given (`GET|POST /disclosures`).
+  Hiding a target goes through the new kernel contract `autoxide_kernel::moderation` (events `compliance.target_restricted` /
+  `compliance.target_restored`): `content` answers 451 `content.restricted` (new `ErrorKind::UnavailableForLegalReasons`) and
+  leaves the entry out of lists, sitemap, feed and search; `comments` hides the comment and restores its former status, and
+  registers the resource type `comments.comment`. Consumer protection: trait `ModerationPolicy` with the legal rule
+  `moderation.hide_reasons` (`GET /public/moderation-reasons`) and the complaint channel `GET /public/complaints`. Permissions
+  `compliance.cases.read`, `compliance.cases.handle`, `compliance.cases.respond`, `compliance.disclosures.manage`; MCP tools
+  `compliance.list_cases`, `compliance.get_case`, `compliance.add_case_note`, `compliance.restrict_case_target`; settings
+  `AUTOXIDE_COMPLIANCE_PUBLIC_REPORTS_PER_IP_PER_HOUR`, `AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL`. Decisions D-363, D-364.
+- Step 37, AI labels (Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01 — check the decree):
+  content entries carry `ai_assisted` (written or edited from AI suggestions), set on `POST /api/v1/content/entries`,
+  `PATCH /entries/{id}` and the MCP tools `create_draft` / `update_draft`, copied to the published version and
+  returned by the admin, preview and public endpoints; removing it needs `content.publish` (new error
+  `content.ai_label_requires_publish`). Media items carry `alt_ai_assisted` (`PATCH /api/v1/media/{id}`,
+  `media.update`), also returned with the images of public entries. Decision D-362.
 - Notes and activity on any record (step 51): `GET/POST /api/v1/kernel/records/{kind}/{id}/notes` and
   `DELETE …/notes/{note_id}` keep internal notes on any record of the resource directory, for those who can read it
   (`<module>.read`); `mentions` must name users who can read it too, and the event `kernel.record_note_added`

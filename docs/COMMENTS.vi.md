@@ -182,6 +182,15 @@ vượt duyệt, kể cả khi đã xác nhận.
 Mọi quyết định là một event (`comments.comment_status_changed`, `comments.comment_deleted`,
 `comments.ban_created`, `comments.target_closed`…) mà module `audit` ghi lại kèm ai làm, lúc nào.
 
+### Bị ẩn vì vụ việc
+
+Một bình luận có thể là đối tượng của vụ việc của module `compliance` (`comments.comment:<id>`;
+`comments` đăng ký loại này trong sổ đối tượng của kernel, tác giả là chủ). Khi vụ việc ẩn nó (event
+`compliance.target_restricted`), bình luận thành `rejected` với lý do giữ `compliance` và nhớ trạng thái
+cũ; `compliance.target_restored` trả lại trạng thái đó. Trong lúc đó người kiểm duyệt không đổi được
+trạng thái của nó (`comments.restricted`, 409). Xem
+[`COMPLIANCE.vi.md`](COMPLIANCE.vi.md#báo-vi-phạm-và-khiếu-nại-của-người-tiêu-dùng).
+
 ## Mail báo trả lời
 
 Tắt cho tới khi đặt cả `AUTOXIDE_COMMENTS_VERIFY_URL` lẫn `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL`.

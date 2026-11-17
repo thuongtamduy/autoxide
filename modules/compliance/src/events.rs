@@ -50,5 +50,12 @@ events! {
     SUBJECT_REQUEST_RECEIVED, SubjectRequestReceived, "compliance.subject_request_received", "A request of a data subject received through another channel was recorded (`request_id`, `kind`, `channel`, `due_at`).";
     SUBJECT_REQUEST_UPDATED, SubjectRequestUpdated, "compliance.subject_request_updated", "A request of a data subject changed status (`request_id`, `kind`, `status`, `previous_status`).";
     TRACKING_CHANGED, TrackingChanged, "compliance.tracking_changed", "A tracking tag or the cookie banner of a website changed (`org_id`, `tag_id`, `provider`, `status`, `action`).";
+    CASE_OPENED, CaseOpened, "compliance.case_opened", "A report of an infringement or a consumer complaint was received (`case_id`, `kind`, `status`, `target`, `reporter_kind`, `restricted`, `respondent_org_id`, `respondent_user_ids`).";
+    CASE_UPDATED, CaseUpdated, "compliance.case_updated", "A case changed: note, answer of the reported party, restriction, closing (`case_id`, `kind`, `status`, `previous_status`, `target`, `restricted`).";
+    CASE_DECIDED, CaseDecided, "compliance.case_decided", "A case was decided (`case_id`, `kind`, `status`, `decision`, `target`, `restricted`).";
+    CASE_OVERDUE, CaseOverdue, "compliance.case_overdue", "An open case passed its deadline to acknowledge (`step` = `ack`) or to decide (`decide`) (`case_id`, `kind`, `status`, `due_at`).";
+    TARGET_RESTRICTED, TargetRestricted, "compliance.target_restricted", "The target of a case must be hidden by the module that owns it (`case_id`, `target`, `case_kind`; contract `autoxide_kernel::moderation`).";
+    TARGET_RESTORED, TargetRestored, "compliance.target_restored", "The target of a case may be shown again (`case_id`, `target`, `case_kind`; contract `autoxide_kernel::moderation`).";
+    DISCLOSURE_RECORDED, DisclosureRecorded, "compliance.disclosure_recorded", "Information about a seller or user was given to a competent authority (`disclosure_id`, `case_id`, `subject`, `fields` — names only, no values).";
     RULES_IMPORTED, RulesImported, "compliance.rules_imported", "Legal rules were imported (`jurisdiction`, `rules`).";
 }

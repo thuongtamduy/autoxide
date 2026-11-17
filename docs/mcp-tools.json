@@ -1549,6 +1549,40 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Add an internal note to the log of a case (what was checked, who was contacted).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A note for the log of a case.",
+        "properties": {
+          "body": {
+            "description": "1 to 20000 characters (internal: the reporter and the reported party do not see notes).",
+            "type": "string"
+          },
+          "case_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.add_case_note",
+      "output_schema": null,
+      "permissions": [
+        "compliance.cases.handle"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Add a line (what was found, what was done) to the log of a personal data breach.",
       "input_schema": {
         "additionalProperties": false,
@@ -1592,6 +1626,35 @@
       "output_schema": null,
       "permissions": [
         "compliance.documents.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a report or complaint with its log (notes, answers of the reported party, restrictions, decision).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "One case.",
+        "properties": {
+          "case_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.get_case",
+      "output_schema": null,
+      "permissions": [
+        "compliance.cases.read"
       ]
     },
     {
@@ -1765,6 +1828,69 @@
       "output_schema": null,
       "permissions": [
         "compliance.legal.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List reports of infringements (intellectual property, counterfeit, prohibited goods) and consumer complaints, with their deadlines (`overdue` for those late).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which cases.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Only cases of this kind (`ip_infringement`, `counterfeit`, `prohibited_goods`,\n`consumer_complaint`, `other`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "overdue": {
+            "description": "Only open cases past their decision deadline.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Only cases with this status (`received`, `under_review`, `awaiting_response`, `decided`,\n`closed`, `withdrawn`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "description": "Only cases about this object (`<module>.<type>:<id>`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "compliance.list_cases",
+      "output_schema": null,
+      "permissions": [
+        "compliance.cases.read"
       ]
     },
     {
@@ -1988,6 +2114,40 @@
       "output_schema": null,
       "permissions": [
         "compliance.privacy.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Hide the target of an open case while it is handled (the owning module hides it, e.g. a page answers 451). Deciding the case needs a person through REST.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Hide the target of a case.",
+        "properties": {
+          "case_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why, kept in the log.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.restrict_case_target",
+      "output_schema": null,
+      "permissions": [
+        "compliance.cases.handle"
       ]
     },
     {
@@ -2287,6 +2447,13 @@
         "additionalProperties": false,
         "description": "A new post or page, created as a draft.",
         "properties": {
+          "ai_assisted": {
+            "description": "A person wrote or edited it from AI suggestions (label for readers, Vietnam's Law on\nArtificial Intelligence 134/2025/QH15). Removing it needs `content.publish`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "ai_generated": {
             "description": "The content was generated by AI. AI agents should send `true`; with only\n`content.write_own` the server always sets it.",
             "type": [
@@ -2984,6 +3151,13 @@
         "additionalProperties": false,
         "description": "Changes to the draft of an entry; omitted fields stay as they are.",
         "properties": {
+          "ai_assisted": {
+            "description": "A person wrote or edited it from AI suggestions (label for readers, Vietnam's Law on\nArtificial Intelligence 134/2025/QH15). Removing it needs `content.publish`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "ai_generated": {
             "description": "The content was generated by AI. AI agents should send `true`; with only\n`content.write_own` the server always sets it.",
             "type": [
@@ -5683,6 +5857,13 @@
             "description": "Text alternative for screen readers, up to 1000 characters; `\"\"` clears it.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "alt_ai_assisted": {
+            "description": "`true` when the default `alt` was written from an AI suggestion (`suggest_alt`), so the\ninterface labels it (Vietnam's Law on Artificial Intelligence 134/2025/QH15).",
+            "type": [
+              "boolean",
               "null"
             ]
           },

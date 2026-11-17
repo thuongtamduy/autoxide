@@ -690,6 +690,30 @@ impl ComplianceService {
             .scoped(tenant)
             .exec(&transaction)
             .await?;
+        // Vụ việc người đó gửi: bỏ liên kết tài khoản và cách liên lạc; nội dung báo là chứng cứ của
+        // vụ (D-363). Người đó thôi là bên bị phản ánh của vụ nào.
+        crate::entity::case::Entity::update_many()
+            .col_expr(
+                crate::entity::case::Column::ReporterUserId,
+                Expr::value(Option::<Uuid>::None),
+            )
+            .col_expr(
+                crate::entity::case::Column::ReporterEmail,
+                Expr::value(Option::<String>::None),
+            )
+            .col_expr(
+                crate::entity::case::Column::ReporterPhone,
+                Expr::value(Option::<String>::None),
+            )
+            .filter(crate::entity::case::Column::ReporterUserId.eq(user))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
+        crate::entity::case_respondent::Entity::delete_many()
+            .filter(crate::entity::case_respondent::Column::UserId.eq(user))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
         transaction.commit().await?;
         Ok(())
     }

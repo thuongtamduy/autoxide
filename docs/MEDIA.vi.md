@@ -200,6 +200,11 @@ ngữ mặc định) hay `PUT /api/v1/media/{id}/alts/{locale}` (ngôn ngữ kh�
 ảnh không thêm thông tin — để alt trống. Thân bài cũng có thể đặt alt riêng trên node ảnh của nó, và
 alt đó được ưu tiên hơn alt của item. Bật AI: [`AI.vi.md`](AI.vi.md).
 
+Khi alt mặc định đã lưu lấy từ gợi ý, gửi kèm `"alt_ai_assisted": true` (`PATCH /api/v1/media/{id}`,
+MCP `media.update`); gửi `false` khi một người đã viết lại. Item trả `alt_ai_assisted`, ảnh của bài
+công khai cũng vậy (chỉ khi ảnh dùng alt của thư viện), để giao diện gắn nhãn (Luật Trí tuệ nhân tạo
+134/2025/QH15, từ 1/3/2026 — hình thức nhãn còn cần đối chiếu nghị định hướng dẫn).
+
 ## AI agent (MCP)
 
 Tool `media.list`, `media.get`, `media.update`, `media.set_alt`, `media.trash`,
