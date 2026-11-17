@@ -8334,3 +8334,35 @@ Bước 36 mục 6 và 8 (ROADMAP mục "Chứng từ…" và "Hoá đơn khởi
    (`invoices.retention_hold`).
 7. Test chạy cùng `tax` và `ledger` nằm ở `crates/app/src/e2e/invoices.rs`: luật ranh giới cấm test của module dựng
    module khác.
+
+## D-345 · Tính tiền thuê bao SaaS qua `invoices` và `ledger` — 2026-11-17 — agent quyết
+
+Bước 35 mục 4 (ROADMAP mục "Tính tiền thuê bao SaaS").
+
+1. **Thứ tự đăng ký**: `plans` dời ra sau `invoices` (sau `tax`, `ledger`) để `require` được `dyn Invoices`, `dyn Ledger`
+   (cả hai `.ok()`: thiếu thì kỳ không có hoá đơn / chỉ thu tay). Module đăng ký trước vẫn hỏi quyền dùng qua tay cầm của
+   kernel (D-323).
+2. **Bên bán là khách vận hành** (khách mặc định / nền tảng): hoá đơn `vat_invoice` lập ở nút gốc của khách vận hành cho
+   người mua là hồ sơ thanh toán của khách thuê (không có hồ sơ: tên khách, người mua cá nhân). Giá gói **đã gồm thuế**
+   (số khách trả), nhóm thuế của dòng là `AUTOXIDE_PLANS_TAX_CATEGORY` (mặc định `vat.standard` — cần đối chiếu nhóm thuế
+   của dịch vụ phần mềm). `reference` của chứng từ `plans:{period_id}`.
+3. **Lập hoá đơn** trong job `plans.invoice_period`, xếp cùng transaction mở kỳ (unique theo kỳ); khách vận hành chưa có
+   ký hiệu → ghi log, kỳ vẫn trả được. Huỷ kỳ (`void`) huỷ hoá đơn của kỳ.
+4. **Trả**: `POST /billing-periods/{id}/pay` (khách, `plans.billing.manage`, cần hồ sơ thanh toán) → `dyn
+   Ledger::create_payment` ở khách vận hành, `source_module = plans`, `source_id` = kỳ, `reference`
+   `plans:{period}:{n}` — gọi lại trả lượt còn chờ; lượt hết hạn / thất bại thì sang `n + 1`.
+5. **Đã thu**: `plans` nghe `ledger.payment_succeeded` (chỉ khi có `ledger`) → `mark_paid` (cùng đường thu tay: thuê bao
+   quá hạn / tạm khoá đang dùng lại). Event đến lại vô hại.
+
+## D-346 · Chấp nhận tạm `chrono` / `chrono-tz` / `humantime` "không còn bảo trì" — 2026-11-17 — agent quyết
+
+Ngày 17/11/2026 cơ sở dữ liệu RustSec thêm RUSTSEC-2026-0543 (`chrono`), RUSTSEC-2026-0555 (`chrono-tz`),
+RUSTSEC-2026-0542 (`humantime`, bọc `chrono`): **không còn bảo trì**, không phải lỗ hổng; chưa có bản thay an toàn.
+`cargo deny` của gate báo lỗi.
+
+- `sqlx` 0.9 và SeaORM 2 (lớp database của Autoxide) dựng trên `chrono` (`DateTimeUtc`, `Date`): thay riêng phần của
+  Autoxide sang `jiff` / `time` không bỏ được `chrono` khỏi cây phụ thuộc, còn phải đổi kiểu thời gian ở mọi entity.
+- Vì vậy ghi ba mục vào `ignore` của `deny.toml` (kèm lý do), theo luật "ngoại lệ phải ghi ở `deny.toml` và
+  DECISIONS". Gate chạy `-D advisory-not-detected`: khi cảnh báo được gỡ hay không còn khớp, gate đỏ cho tới khi gỡ dòng.
+- Việc kế tiếp (không chặn lộ trình): theo dõi `sqlx` / SeaORM chuyển sang `jiff`; khi có, chuyển cả Autoxide trong
+  một bước riêng và gỡ ba dòng này.

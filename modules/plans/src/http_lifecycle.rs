@@ -37,6 +37,7 @@ pub(crate) fn routes() -> OpenApiRouter<Arc<PlansService>> {
         .routes(routes!(tenant_billing_periods))
         .routes(routes!(mark_paid))
         .routes(routes!(void_period))
+        .routes(routes!(pay_period))
 }
 
 /// A billing period of a subscription: what is charged for which time, and whether it is paid.
@@ -60,6 +61,9 @@ pub(crate) struct BillingPeriodResponse {
     paid_at: Option<DateTime<Utc>>,
     /// The payment provider's reference (or the bank transfer's), when paid.
     provider_reference: Option<String>,
+    /// The operator's invoice for the period (`GET /api/v1/invoices/documents/{id}` for the
+    /// operator), and its series and number.
+    invoice_id: Option<Uuid>,
     invoice_number: Option<String>,
     created_at: DateTime<Utc>,
 }
@@ -82,6 +86,7 @@ impl From<billing_period::Model> for BillingPeriodResponse {
             due_at: row.due_at,
             paid_at: row.paid_at,
             provider_reference: row.provider_reference,
+            invoice_id: row.invoice_id,
             invoice_number: row.invoice_number,
             created_at: row.created_at,
         }
@@ -463,4 +468,48 @@ async fn void_period(
 ) -> Result<Data<BillingPeriodResponse>, Error> {
     operator(&principal, &SUBSCRIPTIONS_MANAGE)?;
     Ok(Data { data: service.void_period(Actor::from(&principal), id).await?.into() })
+}
+
+/// How to pay a billing period.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PayRequest {
+    /// `card`, `wallet`, `vietqr`… — one the operator's payment partner supports; default `card`.
+    method: Option<String>,
+    /// Page to come back to after paying.
+    return_url: Option<String>,
+}
+
+/// Pay a billing period of your tenant online.
+///
+/// Requires `plans.billing.manage` and a billing profile. Starts a payment with the operator's
+/// payment partner and returns its checkout page; the period is marked paid when the partner reports
+/// the payment. Calling again returns the payment still waiting, or starts a new one when the last
+/// one expired.
+#[utoipa::path(
+    post,
+    path = "/billing-periods/{id}/pay",
+    extensions(("x-permissions" = json!(["plans.billing.manage"]))),
+    operation_id = "pay_billing_period",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the billing period.")),
+    request_body = PayRequest,
+    responses(
+        (status = 200, description = "The payment to complete.", body = Data<crate::billing::PayResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `plans.billing.manage`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No such billing period of your tenant; code `plans.billing_period_not_found`.", body = Problem),
+        (status = 409, description = "Already paid or void (`plans.billing_period_not_payable`), or no billing profile (`plans.billing_profile_required`).", body = Problem),
+        (status = 422, description = "The method is not supported (`validation_failed`) or the partner refused (`payment.provider_rejected`).", body = Problem),
+        (status = 503, description = "Online payment is not set up (`plans.payments_unavailable`) or the partner did not answer (`payment.provider_unavailable`).", body = Problem),
+    )
+)]
+async fn pay_period(
+    State(service): State<Arc<PlansService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<PayRequest>,
+) -> Result<Data<crate::billing::PayResponse>, Error> {
+    Ok(Data { data: service.pay(&tenant, &principal, id, input.method, input.return_url).await? })
 }

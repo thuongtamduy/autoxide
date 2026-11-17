@@ -80,8 +80,9 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
 - [x] Vòng đời thuê bao: dùng thử → đang dùng → quá hạn (ân hạn) → tạm khoá (chỉ đọc) → huỷ (cho
       xuất dữ liệu) → xoá sau thời hạn lưu; thu hồi module giữ dữ liệu theo chính sách lưu; gia hạn
       và nhắc nợ bằng job
-- [ ] Tính tiền thuê bao SaaS: hoá đơn theo kỳ, đánh số tuần tự, thu qua `PaymentGateway` (bước 36)
-      bằng tài khoản của nhà vận hành nền tảng
+- [x] Tính tiền thuê bao SaaS: hoá đơn theo kỳ, đánh số tuần tự, thu qua `PaymentGateway` (bước 36)
+      bằng tài khoản của nhà vận hành nền tảng (D-345: kỳ mở → `dyn Invoices`, `POST /billing-periods/{id}/pay`
+      → `dyn Ledger::create_payment`, nghe `ledger.payment_succeeded` → kỳ đã trả)
 - [ ] Cấp phát: khách tự đăng ký (kèm KYC khi gói yêu cầu, bước 37) → tạo khách → chọn vị trí dữ
       liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng — đã làm phần nhân sự vận
       hành (D-338): `POST /plans/provisionings`, `autoxide tenant create --plan`; còn: khách tự đăng ký + KYC (chờ 37)

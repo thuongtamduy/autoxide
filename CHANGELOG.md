@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Subscription billing (step 35): each billing period becomes an invoice the operator issues to the tenant
+  (numbered with no gaps, taxes computed — `AUTOXIDE_PLANS_TAX_CATEGORY`, booked in the operator's ledger); tenants
+  pay online with `POST /api/v1/plans/billing-periods/{id}/pay` (the operator's payment partner, checkout page
+  returned), and the period is marked paid when the partner reports the payment. Billing periods show their
+  `invoice_id`. Voiding a period cancels its invoice. `plans` is now registered after `invoices`.
+
 - Admin interface requests (17/11): `created_by_name` on content revisions (`GET /api/v1/content/entries/{id}/revisions`
   and one revision); `GET /api/v1/menus/{id}?include=targets` says how the object of each item stands (`public`,
   `not_public`, `missing`, `unknown_kind`, with the title and path of public ones); `POST /api/v1/menus/import-content`

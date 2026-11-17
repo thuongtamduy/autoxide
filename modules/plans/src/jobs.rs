@@ -77,6 +77,10 @@ pub(crate) fn registrations(service: &Arc<PlansService>) -> Vec<JobRegistration>
             crate::provisioning::PROVISION_JOB,
             Arc::new(crate::provisioning::ProvisionRunner(service.clone())),
         ),
+        JobRegistration::new(
+            crate::billing::INVOICE_PERIOD,
+            Arc::new(crate::billing::InvoicePeriodJob(service.clone())),
+        ),
     ]
 }
 
