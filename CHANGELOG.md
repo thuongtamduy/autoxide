@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `GET /api/v1/auth/memberships/counts` (MCP `auth.count_memberships`): how many people work in every organization
+  unit — `direct` and `total` (including people on the units above) — without reading every membership.
+- `GET /api/v1/organizations/settings` gives each setting's `schema` (JSON Schema of its value: `type`, `enum`,
+  `pattern`…), so interfaces show the right input. Modules declare it with `OrgSetting::with_schema`.
 - `GET /api/v1/organizations/public/site`: the public profile of the website being visited — the unit its domain is
   bound to (or `?site=`), else the whole tenant — so a store's own domain shows the store, not the head office.
 - Plans can cap organization units per unit type: `"organizations.units.store": 2` next to the overall

@@ -75,6 +75,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `ai.status` | `ai.view` | read-only |
 | `audit.get_entry` | `audit.read` | read-only |
 | `audit.list_entries` | `audit.read` | read-only |
+| `auth.count_memberships` | `auth.users.read` | read-only |
 | `auth.create_api_key` | — | writes |
 | `auth.create_invitation` | `auth.invitations.manage` | writes |
 | `auth.create_role` | `auth.roles.manage` | writes |

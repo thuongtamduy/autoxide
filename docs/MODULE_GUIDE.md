@@ -201,7 +201,8 @@ has the id of the tenant. `modules/notes` is the full example.
   whole tenant) and ask them to choose when they work in several.
 - **Settings that units inherit** (time zone, currency, language, a module's policy): declare
   them in `Module::org_settings` — `OrgSetting::new("shop.return_days", "…").with_default("30")
-  .checked(check)`, key prefixed with the module, default and check in JSON. The `organizations`
+  .with_schema(r#"{"type":"integer","minimum":0}"#).checked(check)`, key prefixed with the module,
+  default and check in JSON; the schema tells interfaces which input to show. The `organizations`
   module stores the values (`PUT /api/v1/organizations/units/{id}/settings/{key}`, permission
   `organizations.settings.write`) and answers the value in force at a unit — the nearest unit up
   the chain that sets it, else the default — through `OrgDirectory::setting(tenant, unit, key)`.

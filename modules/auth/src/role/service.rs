@@ -72,6 +72,14 @@ pub(crate) struct MembershipFilter {
     pub inherited: bool,
 }
 
+/// Số người ở một nút (xem `member_counts`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MemberCount {
+    pub org_id: Uuid,
+    pub direct: usize,
+    pub total: usize,
+}
+
 /// Một dòng membership (người, nút, role).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MembershipRow {
@@ -704,6 +712,55 @@ impl RoleService {
                 created_at: row.created_at,
             }
         }))
+    }
+
+    /// Số người ở mỗi nút của cây: `direct` = người có membership ở chính nút, `total` = người có
+    /// membership ở nút hay ở một nút trên nó (cùng nghĩa với `inherited=true` của danh sách). Mỗi
+    /// người tính một lần dù có nhiều role. Mọi nút của cây (kể cả nút không có ai), nút gốc trước.
+    /// Hai câu: các cặp (nút, người) khác nhau, và các cặp tổ tiên – con cháu của cây.
+    pub(crate) async fn member_counts(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<Vec<MemberCount>, Error> {
+        use std::collections::{BTreeMap, BTreeSet};
+        let connection = tenant.database().read();
+        let root = root_of(tenant.id()).as_uuid();
+        let rows: Vec<(Option<Uuid>, Uuid)> = user_role::Entity::find()
+            .select_only()
+            .column(user_role::Column::OrgId)
+            .column(user_role::Column::UserId)
+            .distinct()
+            .scoped(tenant)
+            .into_tuple()
+            .all(connection)
+            .await?;
+        let mut people: BTreeMap<Uuid, BTreeSet<Uuid>> = BTreeMap::new();
+        for (org, user) in rows {
+            people.entry(org.unwrap_or(root)).or_default().insert(user);
+        }
+        let pairs = OrgTree::pairs(connection, tenant.id()).await?;
+        // Tổ tiên (gồm chính nó) của từng nút; nút gốc luôn có, kể cả khi cây chưa được tạo.
+        let mut ancestors: BTreeMap<Uuid, Vec<Uuid>> = BTreeMap::from([(root, vec![root])]);
+        for (ancestor, descendant) in pairs {
+            let list = ancestors.entry(descendant.as_uuid()).or_default();
+            if !list.contains(&ancestor.as_uuid()) {
+                list.push(ancestor.as_uuid());
+            }
+        }
+        let mut counts: Vec<MemberCount> = ancestors
+            .iter()
+            .map(|(org, above)| {
+                let reach: BTreeSet<&Uuid> =
+                    above.iter().filter_map(|id| people.get(id)).flatten().collect();
+                MemberCount {
+                    org_id: *org,
+                    direct: people.get(org).map_or(0, BTreeSet::len),
+                    total: reach.len(),
+                }
+            })
+            .collect();
+        counts.sort_by_key(|count| (count.org_id != root, count.org_id));
+        Ok(counts)
     }
 
     /// Bên gọi là người dùng `user_id`: permission của họ là hợp các permission của

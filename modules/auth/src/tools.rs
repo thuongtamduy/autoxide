@@ -694,8 +694,24 @@ fn invitations(state: &Arc<HttpState>) -> Vec<Tool> {
 
 /// Tool về membership theo nút (bước 34): cùng service với `/api/v1/auth/memberships`.
 fn memberships(state: &Arc<HttpState>) -> Vec<Tool> {
-    let (list, set) = (state.clone(), state.clone());
+    let (list, set, count) = (state.clone(), state.clone(), state.clone());
     vec![
+        Tool::new(
+            "count_memberships",
+            "Count the people of every organization unit: `direct` (memberships on the unit) and \
+             `total` (on the unit or a unit above it).",
+            move |tenant: TenantContext, _: Principal, _: autoxide_kernel::mcp::NoInput| {
+                let state = count.clone();
+                async move {
+                    let counts = state.roles.member_counts(&tenant).await?;
+                    let data: Vec<crate::http::memberships::MemberCountResponse> =
+                        counts.into_iter().map(Into::into).collect();
+                    Ok::<_, Error>(autoxide_kernel::response::Data { data })
+                }
+            },
+        )
+        .requires(USERS_READ)
+        .read_only(),
         Tool::new(
             "list_memberships",
             "List who works in which organization unit with which role; filter by unit, role or \

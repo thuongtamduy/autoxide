@@ -339,3 +339,44 @@ async fn api_key_ngoai_nhanh_bi_tu_choi() {
     .await
     .unwrap();
 }
+
+/// Số người ở mỗi nút: `direct` ở chính nút, `total` gồm người ở nút trên; mỗi người một lần dù
+/// nhiều role; nút không ai cũng có dòng; gốc đứng đầu.
+#[tokio::test]
+async fn dem_so_nguoi_moi_nut() {
+    TestDatabase::run(async |test| {
+        let services = services(test).await;
+        let tenant = &services.tenant;
+        let tree = tree(&services).await;
+        let (ann, bob) =
+            (user(&services, "ann@example.com").await, user(&services, "bob@example.com").await);
+        let reader = role(&services, "reader", &[], &[("notes.read", Scope::Subtree)]).await;
+        let viewer = role(&services, "viewer", &["auth.users.read"], &[]).await;
+        let admin = Principal::with_all_permissions(Uuid::now_v7());
+        // Ann: hai role ở A, một ở gốc. Bob: một role ở A1.
+        let wanted = vec![
+            (tree.a.as_uuid(), vec![reader.id, viewer.id]),
+            (tree.root.as_uuid(), vec![viewer.id]),
+        ];
+        services.roles.set_memberships(tenant, &admin, ann, wanted).await.unwrap();
+        services
+            .roles
+            .set_memberships(tenant, &admin, bob, vec![(tree.a1.as_uuid(), vec![reader.id])])
+            .await
+            .unwrap();
+
+        let counts = services.roles.member_counts(tenant).await.unwrap();
+        assert_eq!(counts.len(), 4, "{counts:?}");
+        assert_eq!(counts[0].org_id, tree.root.as_uuid(), "gốc đứng đầu");
+        let of = |org: OrgId| {
+            let found = counts.iter().find(|count| count.org_id == org.as_uuid()).unwrap();
+            (found.direct, found.total)
+        };
+        assert_eq!(of(tree.root), (1, 1));
+        assert_eq!(of(tree.a), (1, 1), "Ann ở A và ở gốc: một người");
+        assert_eq!(of(tree.a1), (1, 2), "Bob trực tiếp, Ann từ trên");
+        assert_eq!(of(tree.b), (0, 1), "chỉ Ann từ gốc");
+    })
+    .await
+    .unwrap();
+}

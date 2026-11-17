@@ -45,6 +45,15 @@ async fn cai_dat_ke_thua_theo_cay() {
                 "organizations.timezone"
             ]
         );
+        // Mỗi cài đặt nói dạng giá trị (JSON Schema) để giao diện dựng ô nhập đúng loại.
+        let types: Vec<&str> = catalog["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["schema"]["type"].as_str().unwrap())
+            .collect();
+        assert_eq!(types, ["string", "string", "array", "string"]);
+        assert_eq!(catalog["data"][1]["schema"]["enum"], json!(["en", "vi"]));
 
         // Chưa ai đặt: mặc định, không có nút nguồn.
         let fresh = at(&app, &tree.s1).await;

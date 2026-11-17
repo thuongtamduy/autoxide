@@ -8068,3 +8068,16 @@ Quyết định:
 4. Thông tin pháp lý và logo Bộ Công Thương không thêm vào hồ sơ công khai: thuộc `compliance` (bước 37,
    `GET /public/owner`, `/public/badge`); logo thương hiệu thuộc dòng "Thông tin cửa hàng công khai" (bước 68) — không
    lưu hai chỗ.
+
+## D-332 · Số người ở mỗi nút; dạng giá trị của cài đặt theo nút — 2026-11-17 — agent quyết
+
+Hai yêu cầu của giao diện (`docs/prompts/web-build-api-gaps.md`).
+
+1. **`GET /api/v1/auth/memberships/counts`** (+ tool MCP `auth.count_memberships`, `auth.users.read`): mỗi nút của cây một
+   dòng `org_id`, `direct` (người có membership ở chính nút), `total` (ở nút hay nút trên — cùng nghĩa `inherited=true` của
+   danh sách); mỗi người một lần dù nhiều role. Đặt ở `auth` (chủ của membership), không ở `GET /organizations/units`:
+   `organizations` không đọc bảng của `auth` và không phụ thuộc `auth`. Hai câu: cặp (nút, người) khác nhau của
+   `auth_user_roles`, và cặp tổ tiên – con cháu qua hàm mới `OrgTree::pairs` của kernel; gộp trong bộ nhớ.
+2. **`OrgSetting::with_schema`** (tuỳ chọn, D-038): dạng giá trị viết bằng JSON Schema, trả ở trường `schema` của
+   `GET /organizations/settings`. Khai báo kiểm: object có `type` thuộc kiểu JSON Schema, mặc định khớp `type`. Bộ kiểm
+   (`checked`) vẫn là nơi quyết định giá trị hợp lệ — schema chỉ để dựng ô nhập. Sáu cài đặt hiện có đã khai schema.

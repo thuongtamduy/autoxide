@@ -27,6 +27,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(get_user_memberships, replace_user_memberships))
         .routes(routes!(list_memberships))
+        .routes(routes!(count_memberships))
         .routes(routes!(get_my_memberships))
 }
 
@@ -216,6 +217,54 @@ async fn list_memberships(
     let page =
         state.roles.list_memberships(&tenant, &filter, &PageRequest::try_from(page)?).await?;
     Ok(page.map(MembershipRowResponse::from))
+}
+
+/// How many people work in one organization unit.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct MemberCountResponse {
+    org_id: Uuid,
+    /// People with a membership on this unit itself (each person once, whatever their roles).
+    direct: u64,
+    /// People with a membership on this unit or on a unit above it — the people
+    /// `GET /api/v1/auth/memberships?org_id=…&inherited=true` lists.
+    total: u64,
+}
+
+/// Count the people of every organization unit.
+///
+/// Requires `auth.users.read`. One entry per unit of the tree, the root first, including units
+/// nobody works in — for showing a number next to each unit without reading every membership.
+#[utoipa::path(
+    get,
+    path = "/memberships/counts",
+    extensions(("x-permissions" = json!(["auth.users.read"]))),
+    operation_id = "count_memberships",
+    security(("bearer" = [])),
+    responses(
+        (status = 200, description = "The counts, one entry per unit.", body = Data<Vec<MemberCountResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.users.read`; code `permission_denied`.", body = Problem),
+    )
+)]
+async fn count_memberships(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    principal: Principal,
+) -> Result<Data<Vec<MemberCountResponse>>, Error> {
+    principal.require(&USERS_READ)?;
+    let counts = state.roles.member_counts(&tenant).await?;
+    Ok(Data { data: counts.into_iter().map(MemberCountResponse::from).collect() })
+}
+
+impl From<crate::role::MemberCount> for MemberCountResponse {
+    fn from(count: crate::role::MemberCount) -> Self {
+        let to_u64 = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+        MemberCountResponse {
+            org_id: count.org_id,
+            direct: to_u64(count.direct),
+            total: to_u64(count.total),
+        }
+    }
 }
 
 /// List the organization units you work in, with your roles there.

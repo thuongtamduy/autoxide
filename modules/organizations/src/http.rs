@@ -584,6 +584,11 @@ pub(crate) struct SettingResponse {
     description: String,
     /// The value when no unit sets it; `null`: none.
     default: Option<serde_json::Value>,
+    /// The shape of the value as a JSON Schema (`type`: `string`, `boolean`, `integer`, `number`,
+    /// `array` or `object`, with `enum`, `pattern`, `items`… where they apply), for building the
+    /// right input; `null` when the module does not say. The server checks every value anyway.
+    #[schema(value_type = Option<Object>, example = json!({"type": "string", "enum": ["en", "vi"]}))]
+    schema: Option<serde_json::Value>,
 }
 
 /// The value of a setting at a unit.
@@ -647,6 +652,7 @@ async fn list_settings(
             key: setting.key().to_owned(),
             description: setting.description().to_owned(),
             default: setting.default_value(),
+            schema: setting.schema(),
         })
         .collect();
     Ok(Data { data })
