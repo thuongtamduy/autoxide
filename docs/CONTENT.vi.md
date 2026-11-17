@@ -317,6 +317,16 @@ người đọc khi luật yêu cầu (ví dụ Điều 50 của EU AI Act, áp 
 người duyệt" được hiểu hẹp). Autoxide chỉ ghi lại sự thật, không đưa ra lời khuyên pháp lý. API
 quản trị cũng cho biết mục được tạo thế nào: `created_via` là `session` hoặc `api_key`.
 
+**Nội dung viết với gợi ý của AI.** Khi một người viết hay sửa nội dung từ gợi ý của AI (áp
+`seo-suggestions`, viết lại từ bản nháp AI), gửi `"ai_assisted": true` ở `POST /entries` hay
+`PATCH /entries/{id}` (MCP: `create_draft`, `update_draft`). Cờ được chép sang bản công khai khi
+đăng; endpoint quản trị, xem trước và công khai trả `ai_assisted`, để website gắn nhãn nội dung
+(Luật Trí tuệ nhân tạo 134/2025/QH15, từ 1/3/2026 — hình thức nhãn và phạm vi "sửa" còn cần đối
+chiếu nghị định hướng dẫn). Ai được viết thì đặt được; bỏ nhãn (`false` khi đang `true`) cần
+`content.publish` (không thì 403 `content.ai_label_requires_publish`), và khôi phục revision cũ không
+bao giờ bỏ nhãn. `ai_generated` (AI viết cả bài) giữ nguyên. Ảnh: `alt_ai_assisted` của thư viện
+media ([`MEDIA.vi.md`](MEDIA.vi.md)) đi kèm mỗi ảnh công khai dưới tên `alt_ai_assisted`.
+
 ## Khi một tài khoản bị xoá
 
 Bài và trang thuộc về site, không thuộc người viết: chúng được giữ. Hồ sơ tác giả gắn với tài

@@ -304,6 +304,7 @@ pub(crate) mod testing {
                         width: Some(10),
                         height: Some(10),
                         alt: String::new(),
+                        alt_ai_assisted: false,
                         url: format!("/api/v1/media/{id}/content?v=1"),
                         variants: Vec::new(),
                     })

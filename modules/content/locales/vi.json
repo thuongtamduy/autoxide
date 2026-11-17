@@ -1,4 +1,5 @@
 {
+  "content.ai_label_requires_publish": "Chỉ người có quyền `content.publish` mới bỏ được nhãn `ai_assisted` (viết từ gợi ý của AI).",
   "content.ai_review_requires_human": "Chỉ một người đăng nhập (không phải API key) mới xác nhận được rằng nội dung do AI tạo đã được duyệt.",
   "content.archived": "Một biên tập viên đã lưu trữ mục này; với `content.publish_own` bạn không đăng lại được. Hãy nhờ người có `content.publish`.",
   "content.author_not_found": "Không tìm thấy tác giả này.",

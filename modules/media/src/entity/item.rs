@@ -25,6 +25,8 @@ pub struct Model {
     pub caption: String,
     /// Ảnh chỉ để trang trí: `alt` để trống có chủ ý (D-267).
     pub decorative: bool,
+    /// `alt` mặc định viết từ gợi ý của AI (Luật 134/2025/QH15, D-362).
+    pub alt_ai_assisted: bool,
     /// `private` hoặc `public`.
     pub visibility: String,
     pub version_id: Uuid,

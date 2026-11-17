@@ -45,6 +45,8 @@ pub struct Model {
     pub created_by_api_key_id: Option<Uuid>,
     /// Nội dung do AI tạo (máy chủ dịch, hay bên gọi tự khai).
     pub ai_generated: bool,
+    /// Một người viết hay sửa từ gợi ý của AI (Luật 134/2025/QH15, D-362); bỏ cần `content.publish`.
+    pub ai_assisted: bool,
     /// Lúc bên viết xin duyệt (`NULL`: không xin, hay đã đăng / rút lại).
     pub review_requested_at: Option<DateTimeUtc>,
     pub review_requested_by: Option<Uuid>,

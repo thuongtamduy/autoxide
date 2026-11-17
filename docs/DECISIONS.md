@@ -8878,3 +8878,25 @@ cách hiểu chặt: hỏi trước, mặc định không tải gì.
    `compliance.tracking_tag_not_found`, `compliance.tracking_tag_exists`, `compliance.cookie_policy_changed`,
    `compliance.cookie_consents_throttled`.
 8. Ngoài phạm vi: gửi chuyển đổi từ máy chủ tới nền tảng quảng cáo (cần đối chiếu riêng về chuyển dữ liệu cá nhân).
+
+## D-362 · Nhãn nội dung viết với gợi ý của AI: `ai_assisted` / `alt_ai_assisted` (bước 37) — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Trí tuệ nhân tạo 134/2025/QH15 (hiệu lực
+01/3/2026) và nghị định hướng dẫn — nghĩa vụ gắn nhãn nội dung do AI tạo / sửa. Chưa chắc: hình thức nhãn, phạm vi "sửa" (sửa
+một câu theo gợi ý có phải gắn không). Chọn cách hiểu rộng: có dùng gợi ý thì gắn, bỏ nhãn là quyết định biên tập.
+
+1. **Cờ riêng, không gộp vào `ai_generated`**: `ai_generated` (D-109) nghĩa là AI viết cả bài (agent, máy chủ dịch);
+   `ai_assisted` nghĩa là một người viết hay sửa từ gợi ý của AI. Hai cờ độc lập; giao diện gắn nhãn khi một trong hai `true`.
+2. **Bên gọi khai, máy chủ không đoán**: máy chủ không biết người dùng đã áp gợi ý nào (gợi ý chỉ trả về, không tự lưu — D-109),
+   nên `PATCH /entries/{id}` / `POST /entries` / MCP `create_draft`, `update_draft` nhận `ai_assisted`. Đặt `true`: ai viết được
+   cũng đặt được. Bỏ (`true` → `false`): cần `content.publish`, thiếu thì 403 `content.ai_label_requires_publish` (mã mới, có bản
+   dịch). Khôi phục revision cũ không bao giờ bỏ nhãn (nội dung hiện tại có thể đã dùng gợi ý). Bản dịch mới không mang cờ của
+   bản gốc (như `ai_generated`).
+3. **Lưu**: migration `content.m0016_ai_assisted` thêm `ai_assisted BOOL DEFAULT false` vào `content_entries` và
+   `content_published` (chép khi đăng); snapshot revision có trường mới (`serde(default)`). Response quản trị, xem trước và công
+   khai (`PublicEntryResponse`) trả `ai_assisted`.
+4. **Ảnh**: migration `media.m0014_alt_ai_assisted` thêm `media_item.alt_ai_assisted`; `PATCH /media/{id}` và MCP `media.update`
+   nhận, item trả. `media` không có permission "đăng", nên đặt / bỏ cùng `media.write` (lần đổi có trong event `media.*` before /
+   after). Hợp đồng `autoxide_media::api::MediaRef` thêm `alt_ai_assisted`; ảnh của bài công khai (`PublicMedia`) trả
+   `alt_ai_assisted` chỉ khi ảnh dùng alt của thư viện — alt đặt trên bài đi theo `ai_assisted` của bài.
+5. Bài đánh giá (bước 45) và trang dựng từ khối (bước 67) dùng cùng quy ước khi có.

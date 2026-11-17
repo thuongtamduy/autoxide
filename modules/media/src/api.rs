@@ -32,6 +32,8 @@ pub struct MediaRef {
     pub height: Option<i32>,
     /// Mô tả thay thế (`alt` của thẻ `<img>`); rỗng nếu chưa đặt.
     pub alt: String,
+    /// `alt` mặc định viết từ gợi ý của AI (Luật 134/2025/QH15, D-362): giao diện gắn nhãn.
+    pub alt_ai_assisted: bool,
     /// Đường dẫn tải nội dung, kèm phiên bản (`/api/v1/media/<id>/content?v=<phiên bản>`):
     /// đổi khi nội dung đổi, nên cache được lâu. Không cần đăng nhập khi `Public`.
     pub url: String,

@@ -215,6 +215,7 @@ impl MediaService {
             title: Set(String::new()),
             caption: Set(String::new()),
             decorative: Set(false),
+            alt_ai_assisted: Set(false),
             visibility: Set(Visibility::Private.as_str().to_owned()),
             version_id: Set(version_id),
             uploaded_by: Set(Some(principal.user_id())),

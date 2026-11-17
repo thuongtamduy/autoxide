@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, AI labels (Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01 — check the decree):
+  content entries carry `ai_assisted` (written or edited from AI suggestions), set on `POST /api/v1/content/entries`,
+  `PATCH /entries/{id}` and the MCP tools `create_draft` / `update_draft`, copied to the published version and
+  returned by the admin, preview and public endpoints; removing it needs `content.publish` (new error
+  `content.ai_label_requires_publish`). Media items carry `alt_ai_assisted` (`PATCH /api/v1/media/{id}`,
+  `media.update`), also returned with the images of public entries. Decision D-362.
 - Step 37, personal data (Vietnam, Personal Data Protection Law 91/2025/QH15, Decree 356/2025/ND-CP — check the
   original texts; guide `docs/COMPLIANCE.md`): processing purposes with legal bases and recipients (`GET|POST
   /api/v1/compliance/purposes`, `PATCH /purposes/{key}`, public `GET /public/purposes`), retention of each kind of

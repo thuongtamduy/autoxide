@@ -8,6 +8,7 @@ mod m0007_variant_formats;
 mod m0008_alt_translations;
 mod m0010_add_decorative;
 mod m0013_org;
+mod m0014_alt_ai_assisted;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -82,5 +83,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0013_org::Migration),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "media"),
+        // `alt` viết từ gợi ý của AI, để giao diện gắn nhãn (Luật 134/2025/QH15, D-362).
+        Box::new(m0014_alt_ai_assisted::Migration),
     ]
 }

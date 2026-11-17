@@ -54,6 +54,9 @@ pub(crate) struct Snapshot {
     /// Revision cũ (trước D-109) không có trường này: coi là `false`.
     #[serde(default)]
     pub ai_generated: bool,
+    /// Revision cũ (trước D-362) không có trường này: coi là `false`.
+    #[serde(default)]
+    pub ai_assisted: bool,
 }
 
 impl Snapshot {
@@ -72,6 +75,7 @@ impl Snapshot {
             canonical_url: entry.canonical_url.clone(),
             noindex: entry.noindex,
             ai_generated: entry.ai_generated,
+            ai_assisted: entry.ai_assisted,
         }
     }
 }
@@ -341,6 +345,8 @@ pub(crate) fn fields_of(snapshot: Snapshot) -> EntryFields {
         canonical_url: Some(snapshot.canonical_url),
         noindex: Some(snapshot.noindex),
         ai_generated: Some(snapshot.ai_generated),
+        // Khôi phục bản cũ không bỏ nhãn AI: nội dung hiện tại có thể đã dùng gợi ý (D-362).
+        ai_assisted: snapshot.ai_assisted.then_some(true),
         translated_from: None,
     }
 }

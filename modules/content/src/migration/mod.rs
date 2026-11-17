@@ -10,6 +10,7 @@ mod m0012_org;
 mod m0013_site_paths;
 mod m0014_redirect_search;
 mod m0015_review_index;
+mod m0016_ai_assisted;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -143,5 +144,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0014_redirect_search::Migration),
         // Index của nguồn việc "chờ duyệt" (bước 51 P2).
         Box::new(m0015_review_index::Migration),
+        // Nhãn "viết từ gợi ý của AI" (Luật 134/2025/QH15, bước 37, D-362).
+        Box::new(m0016_ai_assisted::Migration),
     ]
 }

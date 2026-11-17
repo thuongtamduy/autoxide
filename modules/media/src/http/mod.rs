@@ -84,6 +84,9 @@ pub(crate) struct MediaItemResponse {
     /// `true` for a purely decorative image: its empty `alt` is on purpose (render `alt=""`), so
     /// it does not count as missing one.
     decorative: bool,
+    /// The default `alt` was written from an AI suggestion: label it where it is shown (Vietnam's
+    /// Law on Artificial Intelligence 134/2025/QH15).
+    alt_ai_assisted: bool,
     visibility: Visibility,
     /// Version of the content; changes when the content is replaced.
     version_id: Uuid,
@@ -178,6 +181,7 @@ impl From<ItemDetails> for MediaItemResponse {
             title: item.title,
             caption: item.caption,
             decorative: item.decorative,
+            alt_ai_assisted: item.alt_ai_assisted,
             version_id: item.version_id,
             uploaded_by: item.uploaded_by,
             uploaded_by_name: None,

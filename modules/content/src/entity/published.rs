@@ -38,6 +38,8 @@ pub struct Model {
     pub canonical_url: String,
     pub noindex: bool,
     pub ai_generated: bool,
+    /// Chép từ mục khi đăng (D-362).
+    pub ai_assisted: bool,
     /// Người (phiên đăng nhập, không phải API key) đã xác nhận duyệt nội dung do AI tạo khi đăng.
     pub ai_reviewed_by: Option<Uuid>,
     pub ai_reviewed_at: Option<DateTimeUtc>,

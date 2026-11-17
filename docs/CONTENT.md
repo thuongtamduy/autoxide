@@ -330,6 +330,17 @@ its exception for human-reviewed text is read narrowly). Autoxide records the fa
 not give legal advice. The admin API also tells how an entry was created: `created_via` is
 `session` or `api_key`.
 
+**AI-assisted content.** When a person writes or edits content from AI suggestions (applies
+`seo-suggestions`, rewrites an AI draft), send `"ai_assisted": true` on `POST /entries` or
+`PATCH /entries/{id}` (MCP: `create_draft`, `update_draft`). The flag is copied to the published
+version on publish; the admin, preview and public endpoints return `ai_assisted`, so the website
+labels the content (Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 1 March 2026 —
+the form of the label and what counts as "edited" still need checking against the decree).
+Anyone who may write sets it; removing it (`false` while it is `true`) needs `content.publish`
+(else 403 `content.ai_label_requires_publish`), and restoring an older revision never removes
+it. `ai_generated` (the whole text written by AI) is unchanged. Images: the media library's
+`alt_ai_assisted` ([`MEDIA.md`](MEDIA.md)) comes with each public image as `alt_ai_assisted`.
+
 ## When an account is deleted
 
 Posts and pages belong to the site, not to the person who wrote them: they stay. Author
