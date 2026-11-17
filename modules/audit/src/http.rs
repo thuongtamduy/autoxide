@@ -29,6 +29,7 @@ pub(crate) const AUDIT_READ: Permission = Permission::new(
 pub(crate) fn routes(service: Arc<AuditService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_entries))
+        .routes(routes!(list_activity))
         .routes(routes!(get_entry))
         .with_state(service)
 }
@@ -121,6 +122,81 @@ pub(crate) struct AuditFilter {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AuditInclude {
     Actor,
+}
+
+/// One line of recent activity.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ActivityResponse {
+    /// Id of the audit entry.
+    id: Uuid,
+    /// The event, `<module>.<what_happened>`.
+    #[schema(example = "content.entry_published")]
+    action: String,
+    /// What happened, as a sentence in the language of `Accept-Language`.
+    #[schema(example = "Ada published “Đường đến Đà Lạt”")]
+    sentence: String,
+    /// Record that changed, as `<kind>:<id>`.
+    subject: Option<String>,
+    actor_user_id: Option<Uuid>,
+    occurred_at: DateTime<Utc>,
+}
+
+/// How many lines.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct ActivityQuery {
+    /// At most this many lines, 1 to 100. Defaults to 20.
+    limit: Option<u32>,
+}
+
+/// List recent activity.
+///
+/// Any signed-in user. Readable sentences ("Ada published …") for the events modules mark as
+/// activity, newest first — only those whose module lets the caller see them (for example
+/// published entries need `content.read`). Unlike `GET /api/v1/audit` it needs no `audit.read`
+/// and shows no before / after values.
+#[utoipa::path(
+    get,
+    path = "/activity",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "list_activity",
+    security(("bearer" = [])),
+    params(ActivityQuery),
+    responses(
+        (status = 200, description = "Recent activity, newest first.", body = Data<Vec<ActivityResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "`limit` is not between 1 and 100; see `errors`.", body = Problem),
+    )
+)]
+async fn list_activity(
+    State(service): State<Arc<AuditService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    language: autoxide_kernel::i18n::Language,
+    Query(query): Query<ActivityQuery>,
+) -> Result<Data<Vec<ActivityResponse>>, Error> {
+    let limit = query.limit.unwrap_or(20);
+    if !(1..=100).contains(&limit) {
+        return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
+            "limit",
+            "invalid",
+            "must be between 1 and 100",
+        )]));
+    }
+    let lines = service.recent_activity(&tenant, &principal, limit, language).await?;
+    Ok(Data {
+        data: lines
+            .into_iter()
+            .map(|line| ActivityResponse {
+                id: line.row.id,
+                action: line.row.action,
+                sentence: line.sentence,
+                subject: line.row.subject,
+                actor_user_id: line.row.actor_user_id,
+                occurred_at: line.row.occurred_at,
+            })
+            .collect(),
+    })
 }
 
 /// List the audit log.
@@ -453,6 +529,73 @@ mod tests {
             let finding = probe.probe().await;
             assert_eq!(finding.status, Status::Failed);
             assert!(finding.message.contains(&a.id().as_uuid().to_string()), "{finding:?}");
+        })
+        .await
+        .unwrap();
+    }
+
+    const SHOP_READ: autoxide_kernel::access::Permission =
+        autoxide_kernel::access::Permission::new("shop.read", "See the shop.");
+
+    /// Module giả khai event `shop.item_added` có câu hoạt động.
+    struct Shop;
+
+    impl autoxide_kernel::module::Module for Shop {
+        fn name(&self) -> &'static str {
+            "shop"
+        }
+
+        fn permissions(&self) -> Vec<autoxide_kernel::access::Permission> {
+            vec![SHOP_READ]
+        }
+
+        fn events(&self) -> Vec<autoxide_kernel::event::EventInfo> {
+            vec![
+                autoxide_kernel::event::EventInfo::new("shop.item_added", "An item was added.")
+                    .activity("{actor} added “{name}”", SHOP_READ),
+                autoxide_kernel::event::EventInfo::new("shop.item_viewed", "An item was viewed."),
+            ]
+        }
+    }
+
+    /// Bước 51 P5: hoạt động gần đây chỉ có event khai câu hoạt động, chỉ cho người có permission
+    /// đọc của event, câu điền tên người làm và trường của dữ liệu.
+    #[tokio::test]
+    async fn hoat_dong_gan_day_theo_cau_cua_event() {
+        TestDatabase::run(async |test| {
+            let app = TestApp::builder(test)
+                .user("clerk", 0, &["shop.read"])
+                .user("nobody", 0, &[])
+                .module(Shop)
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let recorder = crate::recorder::Recorder;
+            let actor = Uuid::now_v7();
+            for name in ["shop.item_added", "shop.item_viewed"] {
+                let delivered = Delivered::new(
+                    autoxide_kernel::tenancy::DatabaseRegistry::single(app.database().clone())
+                        .default_tenant(),
+                    "shop",
+                    name.to_owned(),
+                    json!({"after": {"name": "Ấm trà"}}),
+                )
+                .actor(Actor::user(actor))
+                .subject(Some("shop.item:1".to_owned()))
+                .occurred_at(Utc::now().trunc_subsecs(6));
+                recorder.handle(&delivered).await.unwrap();
+            }
+            let (status, body) = get(&app, "/api/v1/audit/activity", "clerk").await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let lines = body["data"].as_array().unwrap();
+            assert_eq!(lines.len(), 1, "chỉ event có câu hoạt động: {body}");
+            assert_eq!(
+                lines[0]["sentence"], "— added “Ấm trà”",
+                "không có module tài khoản: không có tên"
+            );
+            let (_, none) = get(&app, "/api/v1/audit/activity", "nobody").await;
+            assert_eq!(none["data"], json!([]), "không có permission đọc của event");
         })
         .await
         .unwrap();

@@ -19,6 +19,7 @@ mod privacy;
 mod public;
 mod retention;
 mod service;
+mod summary;
 mod text;
 mod tools;
 
@@ -125,6 +126,8 @@ impl Module for NewsletterModule {
             .unwrap_or_default();
         let service = Arc::new(NewsletterService::new(parts, config).with_links(links));
         context.personal_data(service.clone())?;
+        context.summary_metric(Arc::new(summary::Subscribers))?;
+        context.summary_metric(Arc::new(summary::Suppressed))?;
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())

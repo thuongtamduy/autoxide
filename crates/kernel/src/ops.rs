@@ -11,6 +11,7 @@ pub mod metrics;
 pub(crate) mod module_catalog;
 pub(crate) mod my_permissions;
 pub(crate) mod navigation;
+pub mod summary;
 pub mod task;
 pub mod telemetry;
 pub(crate) mod user_flags;

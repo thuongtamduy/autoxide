@@ -64,3 +64,19 @@ pub(crate) fn target_subject(kind: &str, id: &str) -> Option<String> {
 pub(crate) fn ban_subject(id: uuid::Uuid) -> Option<String> {
     Some(format!("comments.ban:{id}"))
 }
+
+/// Event của module, kèm câu "hoạt động gần đây" (bước 51 P5) cho những event người dùng cần thấy.
+pub(crate) fn with_activity() -> Vec<EventInfo> {
+    all()
+        .into_iter()
+        .map(|event| match event.name() {
+            "comments.comment_created" => {
+                event.activity("A new comment came in", crate::permissions::COMMENTS_READ)
+            }
+            "comments.comment_status_changed" => {
+                event.activity("{actor} moderated a comment", crate::permissions::COMMENTS_READ)
+            }
+            _ => event,
+        })
+        .collect()
+}

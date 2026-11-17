@@ -177,6 +177,11 @@ pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
     found.extend(call_arguments(text, ".section(", 0));
     // Tiêu đề việc của hộp việc (bước 51 P2).
     found.extend(call_arguments(text, "WorkItem::new(", 2));
+    // Câu "hoạt động gần đây" của event (bước 51 P5).
+    found.extend(call_arguments(text, ".activity(", 0));
+    // Nhãn và câu định nghĩa của số liệu tóm tắt (bước 51 P4, D-207).
+    found.extend(call_arguments(text, "MetricInfo::new(", 1));
+    found.extend(call_arguments(text, "MetricInfo::new(", 2));
     found.retain(
         |(_, site)| !matches!(site, FieldMessage::Built(expression) if expression.starts_with('$')),
     );

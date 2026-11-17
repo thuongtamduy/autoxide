@@ -70,3 +70,25 @@ pub(crate) fn entry_subject(id: uuid::Uuid) -> Option<String> {
 pub(crate) fn subject(kind: &str, id: uuid::Uuid) -> Option<String> {
     Some(format!("content.{kind}:{id}"))
 }
+
+/// Event của module, kèm câu "hoạt động gần đây" (bước 51 P5) cho những event người dùng cần thấy.
+pub(crate) fn with_activity() -> Vec<EventInfo> {
+    all()
+        .into_iter()
+        .map(|event| match event.name() {
+            "content.entry_created" => event
+                .activity("{actor} created the draft “{title}”", crate::permissions::CONTENT_READ),
+            "content.entry_published" => {
+                event.activity("{actor} published “{title}”", crate::permissions::CONTENT_READ)
+            }
+            "content.entry_unpublished" => {
+                event.activity("{actor} took down “{title}”", crate::permissions::CONTENT_READ)
+            }
+            "content.review_requested" => event.activity(
+                "{actor} asked for a review of “{title}”",
+                crate::permissions::CONTENT_READ,
+            ),
+            _ => event,
+        })
+        .collect()
+}

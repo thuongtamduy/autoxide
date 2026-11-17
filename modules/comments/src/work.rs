@@ -76,3 +76,31 @@ impl WorkSource for Pending {
             .collect())
     }
 }
+
+/// Cùng câu đếm, làm số liệu tóm tắt (bước 51 P4).
+#[async_trait::async_trait]
+impl autoxide_kernel::summary::SummaryMetric for Pending {
+    fn info(&self) -> autoxide_kernel::summary::MetricInfo {
+        autoxide_kernel::summary::MetricInfo::new(
+            "comments.pending",
+            "Comments waiting for approval",
+            "Comments of every target with the status `pending` now, whoever wrote them.",
+            "marketing",
+        )
+    }
+
+    fn permission(&self) -> Permission {
+        COMMENTS_MODERATE
+    }
+
+    async fn value(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        target: OrgTarget,
+    ) -> Result<autoxide_kernel::summary::MetricValue, Error> {
+        Ok(autoxide_kernel::summary::MetricValue::Count(
+            WorkSource::count(self, tenant, principal, target).await?,
+        ))
+    }
+}

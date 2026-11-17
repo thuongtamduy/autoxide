@@ -96,7 +96,7 @@ impl Module for ContentModule {
     }
 
     fn events(&self) -> Vec<EventInfo> {
-        events::all()
+        events::with_activity()
     }
 
     fn resource_events(&self) -> Vec<ResourceEvent> {
@@ -185,6 +185,7 @@ impl Module for ContentModule {
         );
         context.personal_data(service.clone())?;
         context.work_source(Arc::new(work::Review))?;
+        context.summary_metric(Arc::new(work::Review))?;
         context.finder_source(Arc::new(find::Entries))?;
         context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;
         context.resource_type(resource::TERM, Arc::new(resource::TermResolver(service.clone())))?;

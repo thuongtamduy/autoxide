@@ -45,12 +45,32 @@ pub use outbox::Outbox;
 pub struct EventInfo {
     name: &'static str,
     description: &'static str,
+    /// Câu hoạt động (bước 51 P5) và permission cần để thấy nó.
+    activity: Option<(&'static str, crate::access::Permission)>,
 }
 
 impl EventInfo {
     /// `name`: `<module>.<việc>` (chữ thường, số, `_`). `description`: câu tiếng Anh.
     pub const fn new(name: &'static str, description: &'static str) -> Self {
-        EventInfo { name, description }
+        EventInfo { name, description, activity: None }
+    }
+
+    /// Event này hiện trong "hoạt động gần đây" (bước 51 P5, `GET /api/v1/audit/activity`) với câu
+    /// tiếng Anh `sentence` (dịch qua `text:` của module): `{actor}` là tên người làm, `{tên}` khác
+    /// lấy từ trường cùng tên của dữ liệu `after` (hay `before`) của event. Chỉ người có
+    /// `reader` mới thấy dòng này.
+    pub const fn activity(
+        mut self,
+        sentence: &'static str,
+        reader: crate::access::Permission,
+    ) -> Self {
+        self.activity = Some((sentence, reader));
+        self
+    }
+
+    /// Câu hoạt động và permission để thấy nó, khi event khai.
+    pub fn activity_line(&self) -> Option<(&'static str, crate::access::Permission)> {
+        self.activity
     }
 
     pub fn name(&self) -> &'static str {

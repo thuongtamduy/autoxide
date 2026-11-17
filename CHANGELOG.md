@@ -11,6 +11,14 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Summary figures (step 51): modules declare figures with a mandatory definition (`StartContext::summary_metric`);
+  `GET /api/v1/kernel/summary?group=` returns those the caller may see, each with how it is computed in the
+  caller's language. Figures: comments waiting, new submissions, entries waiting for a review, media items,
+  newsletter subscribers, addresses never mailed.
+- Recent activity (step 51): events can carry a readable sentence (`EventInfo::activity`); `GET
+  /api/v1/audit/activity` lists them, translated, for callers who may read that kind of record — no `audit.read`
+  needed.
+
 - Search across modules (step 51): modules declare finders for their record types
   (`StartContext::finder_source`); `GET /api/v1/kernel/find?q=` returns matches grouped by type (posts and pages,
   media, staff), with or without accents, only from types the caller may read at the chosen unit.
