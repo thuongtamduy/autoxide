@@ -252,6 +252,7 @@ impl Modules {
         let work = self.catalog.work_sources();
         let finders = self.catalog.finder_sources();
         let metrics = self.catalog.summary_metrics();
+        let exports = self.catalog.export_sources();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         for module in &mut self.modules {
@@ -269,6 +270,7 @@ impl Modules {
                 work: &work,
                 finders: &finders,
                 metrics: &metrics,
+                exports: &exports,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,
@@ -617,13 +619,23 @@ impl Modules {
     pub fn routes(&self) -> Vec<(&'static str, OpenApiRouter)> {
         let mut routes: Vec<(&'static str, OpenApiRouter)> =
             self.modules.iter().map(|module| (module.name(), module.routes())).collect();
+        // Schema bộ lọc (P7): sinh từ tham số của từng endpoint danh sách, gắn vào OpenAPI và giữ
+        // lại để kiểm view đã lưu.
+        let mut lists = Vec::new();
+        for (name, router) in &mut routes {
+            lists.extend(crate::ops::views::annotate(name, router.get_openapi_mut()));
+        }
         if let Some(flags) = self.user_flags.get() {
             let mine = crate::ops::my_permissions::MyPermissions {
                 catalog: self.permissions.clone(),
                 translations: self.translations.clone(),
             };
-            let me =
-                crate::user_flags::routes(flags).merge(crate::ops::my_permissions::routes(mine));
+            let schemas = crate::ops::views::schemas(lists);
+            self.catalog.lists().fill(schemas.clone());
+            let views = crate::ops::views::ViewsState { lists: schemas };
+            let me = crate::user_flags::routes(flags)
+                .merge(crate::ops::my_permissions::routes(mine))
+                .merge(crate::ops::views::routes(views));
             routes.push((crate::user_flags::ME, me));
         }
         routes
@@ -901,6 +913,7 @@ mod tests {
                 "AUTOXIDE_HTTP_PUBLIC_URL",
                 "AUTOXIDE_USER_FLAGS_MAX",
                 "AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS",
+                "AUTOXIDE_JOBS_FILE_RETENTION_DAYS",
                 "AUTOXIDE_TEMPLATE_MAX_BYTES",
             ]
             .contains(name)

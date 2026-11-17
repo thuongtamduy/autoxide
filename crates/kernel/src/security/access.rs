@@ -347,6 +347,84 @@ enum Grants {
     Only(Arc<BTreeMap<String, Vec<Grant>>>),
 }
 
+/// Bản chụp của một [`Principal`] để ghi vào payload của job (bước 51 P15–P16): job chạy sau,
+/// không có request, nhưng phải kiểm quyền đúng như người đã yêu cầu — cùng grant ở cùng nút, cùng
+/// hàng rào của API key. Quyền bị thu hồi sau khi xếp job thì job vẫn chạy với quyền lúc yêu cầu
+/// (như mọi hàng đợi job): job ngắn và có audit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrincipalSnapshot {
+    user_id: Uuid,
+    /// `None`: mọi permission (role `admin`).
+    grants: Option<Vec<(String, Uuid, Scope)>>,
+    api_key: Option<Uuid>,
+    tenant: Uuid,
+    operator_from: Option<Uuid>,
+    realm: Realm,
+    fence: Option<Uuid>,
+    access: AccessPath,
+}
+
+impl PrincipalSnapshot {
+    /// Dựng lại người gọi đã chụp.
+    pub fn restore(&self) -> Principal {
+        let grants = match &self.grants {
+            None => Grants::All,
+            Some(list) => {
+                let mut map: BTreeMap<String, Vec<Grant>> = BTreeMap::new();
+                for (permission, org, scope) in list {
+                    map.entry(permission.clone())
+                        .or_default()
+                        .push(Grant::new(OrgId::from_uuid(*org), *scope));
+                }
+                Grants::Only(Arc::new(map))
+            }
+        };
+        Principal {
+            user_id: self.user_id,
+            grants,
+            api_key: self.api_key,
+            tenant: TenantId::from_uuid(self.tenant),
+            operator_from: self.operator_from.map(TenantId::from_uuid),
+            realm: self.realm,
+            fence: self.fence.map(OrgId::from_uuid),
+            access: self.access,
+        }
+    }
+
+    /// Người đã yêu cầu.
+    pub fn user_id(&self) -> Uuid {
+        self.user_id
+    }
+}
+
+impl Principal {
+    /// Chụp người gọi để job chạy sau kiểm quyền như họ ([`PrincipalSnapshot::restore`]).
+    pub fn snapshot(&self) -> PrincipalSnapshot {
+        let grants = match &self.grants {
+            Grants::All => None,
+            Grants::Only(map) => Some(
+                map.iter()
+                    .flat_map(|(permission, grants)| {
+                        grants
+                            .iter()
+                            .map(|grant| (permission.clone(), grant.org.as_uuid(), grant.scope))
+                    })
+                    .collect(),
+            ),
+        };
+        PrincipalSnapshot {
+            user_id: self.user_id,
+            grants,
+            api_key: self.api_key,
+            tenant: self.tenant.as_uuid(),
+            operator_from: self.operator_from.map(|tenant| tenant.as_uuid()),
+            realm: self.realm,
+            fence: self.fence.map(|fence| fence.as_uuid()),
+            access: self.access,
+        }
+    }
+}
+
 impl Principal {
     /// Người dùng `user_id` với đúng các permission `permissions`, ở độ sâu `tenant`.
     pub fn new(user_id: Uuid, permissions: impl IntoIterator<Item = String>) -> Self {
@@ -855,6 +933,28 @@ impl<S: Send + Sync> OptionalFromRequestParts<S> for Principal {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn ban_chup_nguoi_goi_dung_lai_dung_quyen() {
+        let org = OrgId::from_uuid(Uuid::now_v7());
+        let principal = Principal::with_grants(
+            Uuid::now_v7(),
+            [
+                ("content.read".to_owned(), Grant::new(org, Scope::Subtree)),
+                ("content.write".to_owned(), Grant::new(org, Scope::Own)),
+            ],
+        )
+        .via_api_key(Uuid::now_v7());
+        let snapshot: PrincipalSnapshot =
+            serde_json::from_value(serde_json::to_value(principal.snapshot()).unwrap()).unwrap();
+        let restored = snapshot.restore();
+        assert_eq!(restored.user_id(), principal.user_id());
+        assert_eq!(restored.grant_map(), principal.grant_map());
+        assert_eq!(restored.snapshot(), principal.snapshot());
+        let admin = Principal::with_all_permissions(Uuid::now_v7());
+        assert!(admin.snapshot().restore().has_all_permissions());
+    }
+
     use super::*;
     use crate::error::ErrorKind;
 

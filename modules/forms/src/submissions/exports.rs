@@ -171,7 +171,8 @@ impl FormsService {
         }
         .insert(&transaction)
         .await?;
-        self.jobs
+        let job_id = self
+            .jobs
             .enqueue(
                 &transaction,
                 tenant,
@@ -179,6 +180,20 @@ impl FormsService {
                 EnqueueOptions::default(),
             )
             .await?;
+        // Hiện trong `GET /kernel/jobs` của người yêu cầu (bước 51 P15).
+        if let Some(job_id) = job_id {
+            autoxide_kernel::job::runs::track(
+                &transaction,
+                tenant,
+                "forms",
+                job_id,
+                "forms.export",
+                "CSV export of form submissions",
+                Some(principal.user_id()),
+                None,
+            )
+            .await?;
+        }
         transaction.commit().await?;
         tracing::info!(form_id = %form_id, export_id = %row.id, "forms export requested");
         self.view(tenant, row).await

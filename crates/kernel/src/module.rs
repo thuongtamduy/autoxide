@@ -287,6 +287,7 @@ pub struct StartContext<'a> {
     work: &'a crate::ops::work::WorkSources,
     finders: &'a crate::ops::find::FinderSources,
     metrics: &'a crate::ops::summary::SummaryMetrics,
+    exports: &'a crate::ops::list_exports::ExportSources,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -426,6 +427,15 @@ impl StartContext<'_> {
         metric: Arc<dyn crate::ops::summary::SummaryMetric>,
     ) -> Result<(), Error> {
         self.metrics.register(self.module, metric)
+    }
+
+    /// Đăng ký danh sách xuất được (bước 51 P16); `resource` phải là id danh sách
+    /// `<module>.<operation id>` của P7.
+    pub fn export_source(
+        &mut self,
+        source: Arc<dyn crate::ops::list_exports::ExportSource>,
+    ) -> Result<(), Error> {
+        self.exports.register(self.module, source)
     }
 
     /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do

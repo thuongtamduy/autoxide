@@ -4,7 +4,7 @@
 
 mod actions;
 mod assist;
-mod entries;
+pub(crate) mod entries;
 mod history;
 mod library;
 mod links;

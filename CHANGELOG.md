@@ -38,6 +38,21 @@ endpoints are marked deprecated with a sunset date first.
   `compliance.moit_readiness` (warning only). Error codes `compliance.profile_not_found`, `compliance.profile_exists`,
   `compliance.website_not_found`, `compliance.domain_taken`, `compliance.logo_snippet_invalid`. Selling before the
   procedure is done is labelled, not blocked (D-358).
+- List exports (step 51): modules declare exportable lists (`StartContext::export_source`, `list_exports`
+  module of the kernel); `POST /api/v1/kernel/exports {resource, params, columns}` checks the filters against
+  the list's schema and writes a CSV file (protected against CSV injection, `autoxide_kernel::csv`) in a background
+  job that reads with the requester's permissions; download it from `GET /api/v1/kernel/jobs/{id}/file` until
+  it expires (`AUTOXIDE_JOBS_FILE_RETENTION_DAYS`, 7 days by default). Posts and pages can be exported.
+- Filter schemas and saved views (step 51): every list endpoint carries `x-autoxide-list` (its id) and
+  `x-autoxide-filters` (name, type, allowed values and operator of each filter) in the API document, generated
+  from its own query parameters. `GET/POST /api/v1/me/views` and `PATCH/DELETE /api/v1/me/views/{id}` save list
+  views (filters, sort, columns, grouping, density) checked against that schema; views shared with a unit or the
+  whole tenant need `kernel.views.share`.
+- Background jobs (step 51): modules track the jobs people start (`job::runs::track`, with `progress` and
+  `set_result`); `GET /api/v1/kernel/jobs?status=` and `GET /api/v1/kernel/jobs/{id}` show status, progress,
+  who asked and the last error (your own jobs, or every job with `kernel.jobs.read`), and `POST
+  /api/v1/kernel/jobs/{id}/retry` (`kernel.jobs.manage`) runs a failed job again and records an audit event. The
+  CSV export of form submissions is tracked.
 - Step 37, account verification for posting (Vietnam, Decree 147/2024 — check the original text): verification levels
   `none` / `phone` / `identity` (identity = verified KYC profile). `GET /api/v1/compliance/me/verification`,
   `POST /me/phone-verifications` (6-digit SMS code through `dyn SmsSender`; Vietnamese mobile numbers only, from the

@@ -204,7 +204,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [ ] Hoạt động (P5, P13): câu đọc được theo i18n key trên `EventInfo`, chỉ bản ghi người gọi đọc được ở nút
       của nó; dòng hoạt động và ghi chú nội bộ trên mọi bản ghi theo loại của sổ đối tượng (D-123), nhắc @
       có thông báo; một chỗ dùng chung thay cho mỗi module tự làm ghi chú
-- [ ] Schema bộ lọc mỗi danh sách công bố trong OpenAPI (máy, agent dựng chip lọc) và view đã lưu `/me/views`
+- [x] Schema bộ lọc mỗi danh sách công bố trong OpenAPI (máy, agent dựng chip lọc) và view đã lưu `/me/views`
       (P7): tham số, sắp xếp, cột, nhóm, mật độ; phạm vi cá nhân / nút / khách; bộ lọc nội dung `review`,
       `scheduled`, `ai_generated`, `missing_locale`, `missing_alt`
 - [ ] Job và hàng loạt (P8, P15, P16; D-213): job API chung (danh sách, tiến độ, file, chạy lại có audit);

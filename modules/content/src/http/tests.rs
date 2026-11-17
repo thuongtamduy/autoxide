@@ -695,3 +695,151 @@ async fn tim_xuyen_phan_he_tim_bai_khong_dau() {
     .await
     .unwrap();
 }
+
+/// Schema bộ lọc và view đã lưu (bước 51 P7): danh sách bài có `x-autoxide-filters` sinh từ tham
+/// số của nó; view lưu `params` sai schema thì 422 nêu từng tham số; view chung cần quyền.
+#[tokio::test]
+async fn view_da_luu_kiem_theo_schema_bo_loc() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let document = serde_json::to_value(app.openapi()).unwrap();
+        let list = &document["paths"]["/api/v1/content/entries"]["get"];
+        assert_eq!(list["x-autoxide-list"], "content.list_content_entries");
+        let filters = list["x-autoxide-filters"].as_array().unwrap();
+        let named = |name: &str| filters.iter().find(|filter| filter["name"] == name).cloned();
+        assert_eq!(named("status").unwrap()["values"], json!(["draft", "published", "archived"]));
+        assert_eq!(named("scheduled").unwrap()["kind"], "boolean");
+        assert_eq!(named("q").unwrap()["operator"], "contains");
+        assert!(named("cursor").is_none() && named("sort").is_none(), "không phải bộ lọc");
+
+        let views = |method: Method, uri: &str, who: &str, body: Option<Value>| {
+            let mut request = app.request(method, &format!("/api/v1/me/views{uri}")).token(who);
+            if let Some(body) = body {
+                request = request.json(body);
+            }
+            request.send()
+        };
+        let wrong = views(
+            Method::POST,
+            "",
+            "reader",
+            Some(json!({"resource": "content.list_content_entries", "name": "Sai",
+                "params": {"status": "gone", "scheduled": "maybe", "colour": "red"}})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", wrong.json());
+        let mut fields: Vec<String> = wrong.json()["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|error| error["field"].as_str().unwrap().to_owned())
+            .collect();
+        fields.sort();
+        assert_eq!(fields, ["params.colour", "params.scheduled", "params.status"]);
+
+        let saved = views(
+            Method::POST,
+            "",
+            "reader",
+            Some(json!({"resource": "content.list_content_entries", "name": "Chờ duyệt",
+                "params": {"review_requested": true, "sort": "updated_at"},
+                "columns": ["title", "status"], "density": "compact"})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved.status(), StatusCode::CREATED, "{}", saved.json());
+        let id = saved.json()["data"]["id"].as_str().unwrap().to_owned();
+        let shared = views(
+            Method::POST,
+            "",
+            "reader",
+            Some(json!({"resource": "content.list_content_entries", "name": "Cả nhà", "scope": "tenant"})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(shared.status(), StatusCode::FORBIDDEN, "cần kernel.views.share");
+
+        let mine = views(Method::GET, "?resource=content.list_content_entries", "reader", None)
+            .await
+            .unwrap()
+            .json();
+        assert_eq!(mine["data"][0]["params"]["review_requested"], true);
+        let renamed =
+            views(Method::PATCH, &format!("/{id}"), "reader", Some(json!({"name": "Duyệt"})))
+                .await
+                .unwrap();
+        assert_eq!(renamed.json()["data"]["name"], "Duyệt");
+        let deleted = views(Method::DELETE, &format!("/{id}"), "reader", None).await.unwrap();
+        assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+    })
+    .await
+    .unwrap();
+}
+
+/// Xuất danh sách theo bộ lọc (bước 51 P16): job của kernel đọc bài bằng chính bộ lọc của danh
+/// sách, ghi CSV chống CSV injection, người yêu cầu tải về; cột lạ là 422, thiếu quyền là 403.
+#[tokio::test]
+async fn xuat_danh_sach_bai_theo_bo_loc() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let storage: Arc<dyn autoxide_kernel::storage::Storage> =
+            Arc::new(autoxide_testkit::MemoryStorage::new());
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["content.read", "content.write"])
+            .user("nobody", 2, &[])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .provide::<dyn autoxide_kernel::storage::Storage>(storage)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        for (kind, title) in [("post", "=cmd|'/c calc'!A1"), ("post", "Bài hai"), ("page", "Giới thiệu")] {
+            let created = send(&app, "POST", "/entries", Some("admin"), &[], Some(json!({"kind": kind, "title": title}))).await;
+            assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        }
+        let export = |who: &str, body: Value| {
+            app.request(Method::POST, "/api/v1/kernel/exports").token(who).json(body).send()
+        };
+        let resource = "content.list_content_entries";
+        let bad = export("admin", json!({"resource": resource, "columns": ["title", "secret"]}))
+            .await
+            .unwrap();
+        assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", bad.json());
+        assert_eq!(bad.json()["errors"][0]["field"], "columns");
+        let denied = export("nobody", json!({"resource": resource})).await.unwrap();
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+
+        let queued = export(
+            "admin",
+            json!({"resource": resource, "params": {"kind": "post", "order": "asc"}, "columns": ["title", "kind"]}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(queued.status(), StatusCode::CREATED, "{}", queued.json());
+        let id = queued.json()["data"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(queued.json()["data"]["status"], "queued");
+        let worker = app.modules().worker(2).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+
+        let job = app.get(&format!("/api/v1/kernel/jobs/{id}")).token("admin").send().await.unwrap().json();
+        assert_eq!(job["data"]["status"], "succeeded", "{job}");
+        assert_eq!(job["data"]["result"]["rows"], 2);
+        let url = job["data"]["file"]["url"].as_str().unwrap().to_owned();
+        let file = app.get(&url).token("admin").send().await.unwrap();
+        assert_eq!(file.status(), StatusCode::OK);
+        let csv = file.text();
+        assert_eq!(
+            csv,
+            "\u{feff}\"title\",\"kind\"\r\n\"'=cmd|'/c calc'!A1\",\"post\"\r\n\"Bài hai\",\"post\"\r\n"
+        );
+        let other = app.get(&url).token("nobody").send().await.unwrap();
+        assert_eq!(other.status(), StatusCode::NOT_FOUND, "job của người khác");
+    })
+    .await
+    .unwrap();
+}
