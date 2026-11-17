@@ -1,6 +1,7 @@
 {
   "field:is required": "là bắt buộc",
   "field:must be `en` or `vi`": "phải là `en` hay `vi`",
+  "field:must be `static` or `template`": "phải là `static` hoặc `template`",
   "field:must be `true` or `false`": "phải là `true` hay `false`",
   "field:must be a UUID": "phải là một UUID",
   "field:must be at most {attributes_max} bytes of JSON": "phải tối đa {attributes_max} byte JSON",

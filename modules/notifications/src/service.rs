@@ -68,6 +68,12 @@ pub(crate) struct NotificationsService {
     pub zns: Option<Arc<dyn ZnsSender>>,
     pub web_push: Option<Arc<dyn WebPushSender>>,
     pub mobile_push: Option<Arc<dyn MobilePushSender>>,
+    /// Bộ dựng mẫu của kernel (mẫu khách tự soạn, D-206).
+    pub templates: autoxide_kernel::template::TemplateEngine,
+    /// Hồ sơ pháp lý của `compliance` (chân thư của mail HTML).
+    pub legal: Option<Arc<dyn autoxide_compliance::api::LegalProfiles>>,
+    /// Giới hạn gửi thử mẫu mỗi người mỗi giờ.
+    pub test_throttle: Throttle,
 }
 
 // ---- Lỗi -----------------------------------------------------------------------------------------

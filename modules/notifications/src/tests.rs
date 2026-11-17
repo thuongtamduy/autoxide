@@ -34,6 +34,9 @@ use crate::api::{
     SkipReason,
 };
 
+mod mobile;
+mod templates;
+
 // Bọc `NotificationTemplate::new` để `cargo xtask check` không đòi bản dịch cho loại chỉ có trong test.
 const fn template(
     key: &'static str,
@@ -49,6 +52,7 @@ const ADMIN_PERMISSIONS: &[&str] = &[
     "notifications.send_marketing",
     "notifications.messages.read",
     "notifications.templates.manage",
+    "notifications.branding.manage",
 ];
 
 const SHIPPED: NotificationKind = NotificationKind::new(

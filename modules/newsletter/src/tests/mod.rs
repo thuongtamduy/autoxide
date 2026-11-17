@@ -8,6 +8,7 @@
 //! - `admin.rs`: danh sách, nhập, xuất / xoá theo email, dọn dẹp, bài mới, tài khoản bị xoá.
 
 mod admin;
+mod consents;
 mod sending;
 mod subscribe;
 

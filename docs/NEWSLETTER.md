@@ -175,6 +175,29 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
 - One gap cannot be closed: if a server dies right after handing a mail to the queue and before
   recording it, that recipient is marked `failed` (`interrupted`) rather than risk a second mail.
 
+### Personalised campaigns (`format: "template"`)
+
+A campaign is `format: "static"` by default (sent as written). With `"format": "template"` the
+subject, `body_text` and `body_html` are templates of the shared template engine, rendered for each
+recipient: `{{ subscriber.name }}`, `{{ subscriber.email }}` (masked, e.g. `a***@example.com`),
+`{{ list.name }}`, `{{ unsubscribe_url }}` (the preferences page of this recipient), with
+`{% if %}`, `{% for %}` and the filters `money`, `number`, `date`. Nothing else is available. The
+templates are checked when the campaign is saved (syntax and variables, every problem at once with
+line and column); values put into `body_html` are always HTML-escaped. Preview and test mails use a
+sample recipient (`Subscriber`, `s***@example.invalid`).
+
+## Consent ledger
+
+When the `compliance` module is installed, subscriptions share its consent ledger
+(`docs/COMPLIANCE.md`): every confirmed subscription is a consent (subject: the email, purpose
+`marketing`, scope `newsletter.list:<id>`, channel `email`, with the consent text, version and
+source the module stored), and unsubscribing withdraws it. Withdrawing an advertising consent in
+`compliance` (for this list, or every list) unsubscribes the person here. Right before each batch
+the ledger is asked again: a person whose consent was withdrawn there is skipped
+(`consent_withdrawn`); if the ledger cannot answer, the batch waits and retries. Subscriptions
+confirmed before this version are written into the ledger by the hourly job
+`newsletter.backfill_consents` (running it again adds nothing).
+
 ## Suppressions and bounces
 
 - A suppressed address gets no campaign mail, whatever its subscriptions.

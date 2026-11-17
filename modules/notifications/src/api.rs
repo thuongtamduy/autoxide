@@ -9,6 +9,7 @@
 //! khung giờ quy tắc `notifications.send_windows` cho phép, kèm nhãn quảng cáo và link huỷ nhận.
 
 use autoxide_kernel::error::Error;
+pub use autoxide_kernel::template::Variable;
 use autoxide_kernel::tenancy::TenantId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -151,6 +152,11 @@ pub struct NotificationKind {
     pub purpose: Option<&'static str>,
     /// Tin mời đăng ký nhận quảng cáo: mỗi địa chỉ chỉ nhận một lần trên mỗi kênh.
     pub invitation: bool,
+    /// Schema biến cho mẫu khách tự soạn (D-206): biến mẫu được dùng (`{{ code }}`). Rỗng → suy ra từ
+    /// chỗ điền `{tên}` của mẫu mặc định (đều không bắt buộc), cộng `link`.
+    pub variables: &'static [Variable],
+    /// Dữ liệu mẫu để xem trước (JSON object); `None` → sinh từ schema (`"[tên]"`).
+    pub sample: Option<&'static str>,
 }
 
 impl NotificationKind {
@@ -159,7 +165,27 @@ impl NotificationKind {
         channels: &'static [Channel],
         template: NotificationTemplate,
     ) -> Self {
-        NotificationKind { category, channels, template, purpose: None, invitation: false }
+        NotificationKind {
+            category,
+            channels,
+            template,
+            purpose: None,
+            invitation: false,
+            variables: &[],
+            sample: None,
+        }
+    }
+
+    /// Khai schema biến cho mẫu khách tự soạn (D-206), vd `Variable::required("link", "…")`.
+    pub const fn variables(mut self, variables: &'static [Variable]) -> Self {
+        self.variables = variables;
+        self
+    }
+
+    /// Dữ liệu mẫu (JSON object) cho xem trước và gửi thử.
+    pub const fn sample(mut self, sample: &'static str) -> Self {
+        self.sample = Some(sample);
+        self
     }
 
     /// Đặt khoá mục đích trong sổ đồng ý (tin quảng cáo).

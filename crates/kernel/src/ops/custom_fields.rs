@@ -972,8 +972,8 @@ impl CustomFieldsState {
 
 /// List custom fields.
 ///
-/// `kernel.custom_fields.manage`, or the permission that reads `target`'s records. The fields the
-/// tenant defined, in order — interfaces and agents build forms and filter chips from them.
+/// `kernel.custom_fields.manage`, or the permission that reads `target`'s records (without
+/// `target`: the fields of every record type you may read). The fields the tenant defined, in order — interfaces and agents build forms and filter chips from them.
 #[utoipa::path(
     get,
     path = "/custom-fields",
@@ -994,13 +994,16 @@ async fn list_custom_fields(
     principal: Principal,
     Query(query): Query<FieldsQuery>,
 ) -> Result<Data<Vec<CustomFieldView>>, Error> {
-    match &query.target {
-        Some(target) => {
-            state.require_read(&principal, target)?;
-        }
-        None => principal.require(&CUSTOM_FIELDS_MANAGE)?,
+    if let Some(target) = &query.target {
+        state.require_read(&principal, target)?;
     }
-    Ok(Data { data: list(&tenant, query.target.as_deref()).await? })
+    // Không nêu loại: chỉ trường của loại bản ghi người gọi đọc được.
+    let fields = list(&tenant, query.target.as_deref())
+        .await?
+        .into_iter()
+        .filter(|field| state.require_read(&principal, &field.target).is_ok())
+        .collect();
+    Ok(Data { data: fields })
 }
 
 /// Define a custom field.

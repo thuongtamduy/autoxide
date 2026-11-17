@@ -6249,6 +6249,13 @@
             "description": "Plain-text body. A footer with the unsubscribe link is added to every mail.",
             "type": "string"
           },
+          "format": {
+            "description": "`static` (default) or `template` (`{{ subscriber.name }}`, `{{ subscriber.email }}`,\n`{{ list.name }}`, `{{ unsubscribe_url }}`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "list_id": {
             "description": "The list to send to.",
             "format": "uuid",
@@ -6507,6 +6514,33 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Show the variables a notification template of a kind may use (`{{ path }}`), which are required, and sample data.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which template (kind, channel, language).",
+        "properties": {
+          "kind": {
+            "description": "Key of a declared kind (see `list_kinds`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "name": "notifications.get_template_schema",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the notification kinds declared by modules: key, category (`security`, `transactional`, `marketing`) and channels.",
       "input_schema": {
         "additionalProperties": false,
@@ -6590,6 +6624,24 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List your mobile devices registered for push notifications (platform, app, last use); tokens are never shown.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "notifications.list_my_devices",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List your in-app notifications, newest first.",
       "input_schema": {
         "additionalProperties": false,
@@ -6649,6 +6701,67 @@
       "name": "notifications.mark_inbox_read",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Render a notification template (the draft by default, or the published or an older version) with the sample data of the kind or your `data`. Nothing is sent.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A template to preview.",
+        "properties": {
+          "channel": {
+            "description": "One channel of the kind, e.g. `email`.",
+            "type": "string"
+          },
+          "data": {
+            "description": "Values to render with (only variables of the kind); omitted → the sample data.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": "string"
+          },
+          "source": {
+            "description": "`draft` (default), `published` or `version`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "description": "With `source = version`.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "channel",
+          "locale"
+        ],
+        "type": "object"
+      },
+      "name": "notifications.preview_template",
+      "output_schema": null,
+      "permissions": [
+        "notifications.templates.read",
+        "notifications.templates.manage"
+      ]
     },
     {
       "annotations": {
@@ -6726,6 +6839,69 @@
       "output_schema": null,
       "permissions": [
         "notifications.send"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Save the draft of a notification template (template engine syntax: `{{ name }}`, `{% if %}`, `{% for %}`). Checked against the variables of the kind; every problem is reported at once. A draft is not used until a person publishes it over REST.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A template draft to save.",
+        "properties": {
+          "body_html": {
+            "description": "HTML of the email body (`email` only).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body_text": {
+            "description": "Plain text (email text part, inbox).",
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": "string"
+          },
+          "short": {
+            "description": "SMS, ZNS and push text.",
+            "type": "string"
+          },
+          "subject": {
+            "description": "Email subject, push and inbox title.",
+            "type": "string"
+          },
+          "zns_template_id": {
+            "description": "Approved Zalo ZNS template id.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "channel",
+          "locale"
+        ],
+        "type": "object"
+      },
+      "name": "notifications.update_template_draft",
+      "output_schema": null,
+      "permissions": [
+        "notifications.templates.manage"
       ]
     },
     {

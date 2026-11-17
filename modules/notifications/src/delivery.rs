@@ -45,6 +45,17 @@ pub(crate) const UNSUBSCRIBE_FOOTER: MailTemplate = MailTemplate::new(
     "You get this advertising because you agreed to it. To stop, open {url}",
 );
 
+/// Số lần gửi lỗi tạm thời liên tiếp tới một thiết bị trước khi xoá token.
+const MAX_DEVICE_FAILURES: i32 = 10;
+
+/// Lỗi vĩnh viễn của nhà cung cấp (địa chỉ / token sai, bị chặn): không thử lại.
+fn is_permanent(error: &Error) -> bool {
+    matches!(
+        error.kind(),
+        ErrorKind::Validation | ErrorKind::BadRequest | ErrorKind::NotFound | ErrorKind::Forbidden
+    )
+}
+
 /// Tin quảng cáo chưa gửi được trong khung giờ sau chừng này giờ thì bỏ.
 const QUIET_HOURS_LIMIT_HOURS: i64 = 24;
 
@@ -215,6 +226,9 @@ impl NotificationsService {
             }
         }
         let rendered = self.render(tenant, &kind, &row).await?;
+        if rendered.fallback {
+            self.mark_fallback(tenant, row.id).await?;
+        }
         let result = match channel {
             Channel::Email => self.send_email(tenant, &kind, &row, &rendered, at).await,
             Channel::Sms => self.send_sms(tenant, &kind, &row, &rendered, at).await,
@@ -226,15 +240,7 @@ impl NotificationsService {
         match result {
             Ok(sent) => self.finish(tenant, &row, sent).await,
             // Lỗi vĩnh viễn (địa chỉ sai, bị chặn, mẫu chưa duyệt): không thử lại.
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    ErrorKind::Validation
-                        | ErrorKind::BadRequest
-                        | ErrorKind::NotFound
-                        | ErrorKind::Forbidden
-                ) =>
-            {
+            Err(error) if is_permanent(&error) => {
                 self.finish(tenant, &row, Sent::Failed(error.code().to_owned())).await
             }
             // Lỗi tạm thời: job queue thử lại với backoff.
@@ -301,10 +307,18 @@ impl NotificationsService {
         };
         let mut subject = rendered.title.clone();
         let mut text = rendered.body.clone();
+        // Phần HTML: của khách, hay sinh từ chữ thuần; link mở thành nút bấm.
+        let mut body_html =
+            rendered.html.clone().unwrap_or_else(|| crate::layout::text_to_html(&rendered.body));
         if let Some(link) = &row.link {
             text = format!("{text}\n\n{link}");
+            if rendered.html.is_none() {
+                let link = crate::layout::escape(link);
+                body_html.push_str(&format!("\n<p><a href=\"{link}\">{link}</a></p>"));
+            }
         }
         let mut headers = Vec::new();
+        let mut footer_html = None;
         if kind.category == Category::Marketing {
             let Some(page) = &self.config.unsubscribe_url else {
                 return Ok(Sent::Failed("unsubscribe_url_missing".to_owned()));
@@ -327,9 +341,13 @@ impl NotificationsService {
             subject =
                 format!("{}{subject}", self.marketing_label(tenant, Channel::Email, at).await?);
             text = format!("{text}\n\n--\n{}", footer.text);
+            footer_html = self.unsubscribe_footer_html(kind, &row.locale, Some(&url));
             headers.push(("List-Unsubscribe".to_owned(), format!("<{url}>")));
         }
+        let brand = self.brand(tenant).await?;
+        let html = crate::layout::mail_html(&brand, &subject, &body_html, footer_html.as_deref())?;
         let mut mail = Mail::new(address.clone(), subject, text)
+            .html(html)
             .dedupe_key(format!("notifications:{}", row.id));
         for (name, value) in headers {
             mail = mail.header(name, value);
@@ -376,18 +394,24 @@ impl NotificationsService {
         else {
             return Ok(Sent::Skipped(SkipReason::NoAddress));
         };
-        // Mã mẫu ZNS do khách đăng ký với Zalo: nằm ở mẫu thay thế của khách.
+        // Mã mẫu ZNS do khách đăng ký với Zalo: ở mẫu khách tự soạn đang dùng, hay mẫu thay thế cũ.
+        let live = self
+            .live_content(tenant, &row.kind, Channel::Zns.as_str(), &row.locale)
+            .await?
+            .and_then(|content| content.zns_template_id);
         let found = template::Entity::find()
             .scoped(tenant)
             .filter(template::Column::Kind.eq(row.kind.as_str()))
             .filter(template::Column::Channel.eq(Channel::Zns.as_str()))
             .all(tenant.database().read())
             .await?;
-        let chosen = found
-            .iter()
-            .find(|item| item.locale == row.locale)
-            .or_else(|| found.first())
-            .and_then(|item| item.zns_template_id.clone());
+        let chosen = live.or_else(|| {
+            found
+                .iter()
+                .find(|item| item.locale == row.locale)
+                .or_else(|| found.first())
+                .and_then(|item| item.zns_template_id.clone())
+        });
         let Some(template_id) = chosen else {
             return Ok(Sent::Failed("zns_template_missing".to_owned()));
         };
@@ -504,6 +528,7 @@ impl NotificationsService {
             self.push_content(tenant, kind, Channel::MobilePush, row, rendered, at).await?;
         let sealer = secret.sealer().await?;
         let mut reference = None;
+        let mut transient = None;
         for item in devices {
             let token = sealer.open(
                 tenant.id(),
@@ -513,17 +538,19 @@ impl NotificationsService {
             )?;
             let token = String::from_utf8_lossy(&token).into_owned();
             let device = DeviceToken::new(item.platform.clone(), token, item.app_id.clone());
-            match sender.send(tenant.id(), &device, &content).await? {
-                PushDelivery::Sent { provider_reference } => {
+            match sender.send(tenant.id(), &device, &content).await {
+                Ok(PushDelivery::Sent { provider_reference }) => {
                     reference.get_or_insert(provider_reference);
                     device_token::Entity::update_many()
                         .col_expr(device_token::Column::LastUsedAt, Expr::value(Some(now())))
+                        .col_expr(device_token::Column::Failures, Expr::value(0))
                         .filter(device_token::Column::Id.eq(item.id))
                         .scoped(tenant)
                         .exec(tenant.database().write())
                         .await?;
                 }
-                PushDelivery::Gone => {
+                // Nhà cung cấp báo token hết hiệu lực (gỡ app, token đổi): xoá.
+                Ok(PushDelivery::Gone) => {
                     self.remove_device_token(
                         tenant,
                         Actor::system(),
@@ -533,12 +560,50 @@ impl NotificationsService {
                     )
                     .await?;
                 }
+                // Token bị nhà cung cấp từ chối (sai dạng, sai app): xoá, không thử lại.
+                Err(error) if is_permanent(&error) => {
+                    tracing::info!(device_id = %item.id, error_code = error.code(), "mobile push token rejected; removed");
+                    self.remove_device_token(
+                        tenant,
+                        Actor::system(),
+                        item.id,
+                        item.user_id,
+                        "invalid",
+                    )
+                    .await?;
+                }
+                // Lỗi tạm thời: đếm; quá giới hạn liên tiếp thì coi token là hỏng và xoá.
+                Err(error) => {
+                    if item.failures + 1 >= MAX_DEVICE_FAILURES {
+                        self.remove_device_token(
+                            tenant,
+                            Actor::system(),
+                            item.id,
+                            item.user_id,
+                            "failing",
+                        )
+                        .await?;
+                    } else {
+                        device_token::Entity::update_many()
+                            .col_expr(
+                                device_token::Column::Failures,
+                                Expr::value(item.failures + 1),
+                            )
+                            .filter(device_token::Column::Id.eq(item.id))
+                            .scoped(tenant)
+                            .exec(tenant.database().write())
+                            .await?;
+                    }
+                    transient.get_or_insert(error);
+                }
             }
         }
-        Ok(match reference {
-            Some(reference) => Sent::Done(Some(reference)),
-            None => Sent::Skipped(SkipReason::NoAddress),
-        })
+        match (reference, transient) {
+            (Some(reference), _) => Ok(Sent::Done(Some(reference))),
+            // Không thiết bị nào nhận và có lỗi tạm thời: để job queue thử lại.
+            (None, Some(error)) => Err(error),
+            (None, None) => Ok(Sent::Skipped(SkipReason::NoAddress)),
+        }
     }
 
     async fn send_in_app(

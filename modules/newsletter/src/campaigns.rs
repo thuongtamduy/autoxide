@@ -43,6 +43,46 @@ const HTML_MAX: usize = 500_000;
 /// Hẹn giờ xa nhất.
 const SCHEDULE_MAX_DAYS: i64 = 366;
 
+/// How the subject and bodies of a campaign are used.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+#[schema(as = NewsletterCampaignFormat)]
+pub(crate) enum CampaignFormat {
+    /// Sent as written (default).
+    Static,
+    /// Templates rendered for each recipient: `{{ subscriber.name }}`, `{{ subscriber.email }}`
+    /// (masked), `{{ list.name }}`, `{{ unsubscribe_url }}`.
+    Template,
+}
+
+impl CampaignFormat {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            CampaignFormat::Static => "static",
+            CampaignFormat::Template => "template",
+        }
+    }
+
+    pub(crate) fn stored(raw: &str) -> CampaignFormat {
+        if raw == "template" { CampaignFormat::Template } else { CampaignFormat::Static }
+    }
+}
+
+/// Biến chiến dịch `template` được dùng (bước 37 C3): thông tin người nhận đã có, danh sách, link
+/// huỷ — không gì khác.
+pub(crate) fn template_schema() -> autoxide_kernel::template::TemplateSchema {
+    use autoxide_kernel::template::{TemplateSchema, Variable};
+    TemplateSchema::new(vec![
+        Variable::optional("subscriber.name", "Name of the recipient (may be empty)."),
+        Variable::optional(
+            "subscriber.email",
+            "Email of the recipient, masked (a***@example.com).",
+        ),
+        Variable::optional("list.name", "Name of the list in the campaign's language."),
+        Variable::optional("unsubscribe_url", "Preferences page of this recipient."),
+    ])
+}
+
 /// Where a campaign is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -144,6 +184,7 @@ pub(crate) struct CampaignInput {
     pub body_html: Option<Option<String>>,
     pub locale: Option<Locale>,
     pub advertising: Option<bool>,
+    pub format: Option<CampaignFormat>,
 }
 
 /// Bộ lọc danh sách chiến dịch.
@@ -377,6 +418,7 @@ impl NewsletterService {
         row.body_html = Set(next.body_html);
         row.locale = Set(next.locale);
         row.advertising = Set(next.advertising);
+        row.format = Set(next.format);
         row.updated_at = Set(now);
         if unscheduled {
             row.status = Set(CampaignStatus::Draft.as_str().to_owned());
@@ -641,7 +683,8 @@ impl NewsletterService {
         let list = self.find_list(tenant, campaign.row.list_id).await?;
         let token = autoxide_kernel::secret::random_token(32)?;
         let token = autoxide_kernel::tenancy::link_token(tenant, &token);
-        let mail = self.campaign_mail(tenant, &campaign.row, &list, &email, &token, None).await?;
+        let mail =
+            self.campaign_mail(tenant, &campaign.row, &list, (&email, None), &token, None).await?;
         self.mailer.send(tenant, mail).await?;
         tracing::info!(campaign_id = %id, "newsletter test mail queued");
         Ok(())
@@ -749,6 +792,26 @@ impl NewsletterService {
         if let Some(advertising) = input.advertising {
             row.advertising = advertising;
         }
+        if let Some(format) = input.format {
+            row.format = format.as_str().to_owned();
+        }
+        if CampaignFormat::stored(&row.format) == CampaignFormat::Template {
+            // Mẫu kiểm khi lưu: cú pháp và biến, mọi lỗi một lần (D-083).
+            let schema = template_schema();
+            let html = row.body_html.clone().unwrap_or_default();
+            for (field, source) in [
+                ("subject", row.subject.as_str()),
+                ("body_text", row.body_text.as_str()),
+                ("body_html", html.as_str()),
+            ] {
+                if let Err(error) = self.templates.validate(field, source, &schema) {
+                    if error.fields().is_empty() {
+                        return Err(error);
+                    }
+                    problems.extend(error.fields().iter().cloned());
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -762,6 +825,7 @@ fn content_changed(before: &campaign::Model, after: &campaign::Model) -> bool {
         || before.body_html != after.body_html
         || before.locale != after.locale
         || before.advertising != after.advertising
+        || before.format != after.format
 }
 
 /// Chiến dịch nháp rỗng của danh sách `list_id`.
@@ -787,6 +851,7 @@ pub(crate) fn blank(tenant: &TenantContext, list_id: Uuid, now: DateTime<Utc>) -
         created_by: None,
         created_at: now,
         updated_at: now,
+        format: CampaignFormat::Static.as_str().to_owned(),
     }
 }
 

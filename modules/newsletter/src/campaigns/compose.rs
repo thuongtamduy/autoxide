@@ -10,6 +10,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::mail::{Mail, MailTemplate};
 
 use crate::audience::lists::List;
+use crate::campaigns::CampaignFormat;
 use crate::entity::campaign;
 use crate::service::NewsletterService;
 use crate::text::{Locale, token_link};
@@ -83,14 +84,15 @@ impl NewsletterService {
         Ok(mail)
     }
 
-    /// Mail chiến dịch `row` của danh sách `list` gửi tới `to`, với token huỷ đăng ký `token`.
-    /// `delivery_id`: khoá chống trùng (`None` cho mail thử).
+    /// Mail chiến dịch `row` của danh sách `list` gửi tới `to` (email, tên), với token huỷ đăng ký
+    /// `token`. `delivery_id`: khoá chống trùng (`None` cho mail thử). Chiến dịch `template`: dựng
+    /// riêng cho người nhận này bằng bộ dựng mẫu của kernel.
     pub(crate) async fn campaign_mail(
         &self,
         tenant: &autoxide_kernel::tenancy::TenantContext,
         row: &campaign::Model,
         list: &List,
-        to: &str,
+        (to, name): (&str, Option<&str>),
         token: &str,
         delivery_id: Option<uuid::Uuid>,
     ) -> Result<Mail, Error> {
@@ -107,14 +109,38 @@ impl NewsletterService {
         ];
         let footer = FOOTER.render(&self.translations, locale.language(), &params).text;
         let footer = footer.trim_end();
+        let (subject, body_text, body_html) = match CampaignFormat::stored(&row.format) {
+            CampaignFormat::Static => {
+                (row.subject.clone(), row.body_text.clone(), row.body_html.clone())
+            }
+            CampaignFormat::Template => {
+                use autoxide_kernel::template::Output;
+                let context = serde_json::json!({
+                    "subscriber": {"name": name.unwrap_or_default(), "email": mask_email(to)},
+                    "list": {"name": list.name.get(locale)},
+                    "unsubscribe_url": preferences,
+                });
+                let engine = &self.templates;
+                let tag = locale.as_str();
+                let html = match &row.body_html {
+                    Some(source) => Some(engine.render(source, Output::Html, tag, &context)?),
+                    None => None,
+                };
+                (
+                    engine.render(&row.subject, Output::Text, tag, &context)?,
+                    engine.render(&row.body_text, Output::Text, tag, &context)?,
+                    html,
+                )
+            }
+        };
         let label = &self.config.advertising_label;
         let subject = if row.advertising && !label.is_empty() {
-            format!("{label} {}", row.subject)
+            format!("{label} {subject}")
         } else {
-            row.subject.clone()
+            subject
         };
-        let text = format!("{}\n\n-- \n{footer}\n", row.body_text.trim_end());
-        let html = row.body_html.as_ref().map(|body| {
+        let text = format!("{}\n\n-- \n{footer}\n", body_text.trim_end());
+        let html = body_html.as_ref().map(|body| {
             let preheader = row.preheader.as_deref().map_or_else(String::new, |preheader| {
                 format!(
                     "<div style=\"display:none;max-height:0;overflow:hidden\">{}</div>",
@@ -139,6 +165,17 @@ impl NewsletterService {
             mail = mail.dedupe_key(delivery_key(id));
         }
         Ok(mail)
+    }
+}
+
+/// Email đã che bớt cho mẫu: `a***@example.com`.
+pub(crate) fn mask_email(email: &str) -> String {
+    match email.split_once('@') {
+        Some((local, domain)) => {
+            let first: String = local.chars().take(1).collect();
+            format!("{first}***@{domain}")
+        }
+        None => "***".to_owned(),
     }
 }
 
@@ -203,7 +240,7 @@ impl NewsletterService {
                 tenant,
                 &campaign.row,
                 &list,
-                "subscriber@example.invalid",
+                ("subscriber@example.invalid", Some("Subscriber")),
                 PREVIEW_TOKEN,
                 None,
             )
