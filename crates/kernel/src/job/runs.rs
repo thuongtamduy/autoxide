@@ -580,7 +580,7 @@ impl MigrationTrait for AddJobFiles {
         manager
             .create_index(
                 Index::create()
-                    .name("kernel_job_runs_file_expires_idx")
+                    .name("kernel_job_runs_file_sweep_idx")
                     .table(Alias::new(TABLE))
                     .col(Alias::new("file_expires_at"))
                     .to_owned(),
@@ -592,7 +592,7 @@ impl MigrationTrait for AddJobFiles {
         manager
             .drop_index(
                 Index::drop()
-                    .name("kernel_job_runs_file_expires_idx")
+                    .name("kernel_job_runs_file_sweep_idx")
                     .table(Alias::new(TABLE))
                     .to_owned(),
             )
