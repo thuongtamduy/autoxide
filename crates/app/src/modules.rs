@@ -31,10 +31,6 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_idempotency::module()),
         // Webhook: gửi event của mọi module ra ngoài; không module nào cần trait của nó.
         Box::new(autoxide_webhooks::module()),
-        // Gói, thuê bao, quyền dùng (bước 35): sau mọi module nền nó sẽ cần (bước 36 / 37 chèn
-        // `invoices`, `compliance`… TRƯỚC nó). Module đăng ký trước vẫn hỏi quyền dùng được qua tay
-        // cầm của kernel, gắn sau khi mọi module khởi động (D-323).
-        Box::new(autoxide_plans::module()),
         // Thuế (bước 36): sổ cái và chứng từ (sau) cần `dyn TaxEngine`, nên đứng trước chúng.
         Box::new(autoxide_tax::module()),
         // Sổ cái kép (bước 36): cần `dyn OrgDirectory` (múi giờ, tiền tệ của nút); chứng từ, thanh
@@ -43,6 +39,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Chứng từ (bước 36): cần `dyn TaxEngine` và `dyn Ledger`; `plans` (tính tiền thuê bao) và module
         // thương mại lập chứng từ qua `dyn Invoices`.
         Box::new(autoxide_invoices::module()),
+        // Gói, thuê bao, quyền dùng (bước 35): sau mọi module nền nó cần — `invoices` (hoá đơn thuê
+        // bao), `ledger` (thu tiền) — và (bước 37) `compliance`. Module đăng ký trước vẫn hỏi quyền
+        // dùng được qua tay cầm của kernel, gắn sau khi mọi module khởi động (D-323).
+        Box::new(autoxide_plans::module()),
         // Thư viện media: cần nơi lưu của `files` (đứng sau nó); module nội dung sau này
         // cần trait `Media` của nó.
         Box::new(autoxide_media::module()),

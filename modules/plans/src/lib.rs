@@ -6,6 +6,7 @@
 //! module này vào bản một khách không đổi gì.
 
 pub mod api;
+mod billing;
 mod billing_profile;
 mod config;
 mod entity;
@@ -120,6 +121,9 @@ impl Module for PlansModule {
             units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
             jobs: context.jobs(),
             invitations: context.require::<dyn autoxide_auth::api::Invitations>().ok(),
+            invoices: context.require::<dyn autoxide_invoices::api::Invoices>().ok(),
+            ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
+            tax_category: config.tax_category.clone(),
         });
         self.service = Some(service.clone());
         context.provide::<dyn api::Provisioning>(Arc::new(provisioning::Provisioner(
@@ -136,6 +140,20 @@ impl Module for PlansModule {
 
     fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
         jobs::schedules()
+    }
+
+    // Tiền thuê bao về (module `ledger`): đánh dấu kỳ đã trả.
+    fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
+        // Chỉ khi có `ledger` (event chưa ai khai thì kernel từ chối đăng ký nghe).
+        self.service.clone().filter(|service| service.ledger.is_some()).map_or_else(
+            Vec::new,
+            |service| {
+                vec![autoxide_kernel::event::Subscription::new(
+                    "ledger.payment_succeeded",
+                    Arc::new(billing::PaymentListener(service)),
+                )]
+            },
+        )
     }
 
     fn routes(&self) -> OpenApiRouter {

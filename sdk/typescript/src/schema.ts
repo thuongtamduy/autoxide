@@ -287,6 +287,11 @@ export type BillingPeriodResponse = {
   created_at: string;
   due_at: string;
   id: string;
+  /**
+   * The operator's invoice for the period (`GET /api/v1/invoices/documents/{id}` for the
+   * operator), and its series and number.
+   */
+  invoice_id?: string | null;
   invoice_number?: string | null;
   /**
    * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
@@ -1330,6 +1335,11 @@ export type Data_BillingPeriodResponse = {
     created_at: string;
     due_at: string;
     id: string;
+    /**
+     * The operator's invoice for the period (`GET /api/v1/invoices/documents/{id}` for the
+     * operator), and its series and number.
+     */
+    invoice_id?: string | null;
     invoice_number?: string | null;
     /**
      * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
@@ -2855,6 +2865,23 @@ export type Data_PasskeyResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_PayResponse = {
+  /** A payment started for a billing period. */
+  data: {
+    amount: Money;
+    /** The partner's page where you pay. */
+    checkout_url?: string | null;
+    expires_at: string;
+    payment_id: string;
+    period_id: string;
+    /** QR payload, when the partner gives one. */
+    qr_payload?: string | null;
+    /** `pending` until the partner reports the payment. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PersonalDataResponse = {
   /**
    * Everything the server keeps about you: one entry per module that keeps personal
@@ -4080,6 +4107,11 @@ export type Data_Vec_BillingPeriodResponse = {
     created_at: string;
     due_at: string;
     id: string;
+    /**
+     * The operator's invoice for the period (`GET /api/v1/invoices/documents/{id}` for the
+     * operator), and its series and number.
+     */
+    invoice_id?: string | null;
     invoice_number?: string | null;
     /**
      * `initial` (first period), `renewal`, `proration` (part of a period after an upgrade) or
@@ -8618,6 +8650,28 @@ export type PasskeyResponse = {
   last_used_at?: string | null;
   /** Name the user gave it, e.g. the device. */
   name: string;
+};
+
+/** How to pay a billing period. */
+export type PayRequest = {
+  /** `card`, `wallet`, `vietqr`… — one the operator's payment partner supports; default `card`. */
+  method?: string | null;
+  /** Page to come back to after paying. */
+  return_url?: string | null;
+};
+
+/** A payment started for a billing period. */
+export type PayResponse = {
+  amount: Money;
+  /** The partner's page where you pay. */
+  checkout_url?: string | null;
+  expires_at: string;
+  payment_id: string;
+  period_id: string;
+  /** QR payload, when the partner gives one. */
+  qr_payload?: string | null;
+  /** `pending` until the partner reports the payment. */
+  status: string;
 };
 
 /** An email change waiting for its confirmation link. */
@@ -16124,6 +16178,23 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/billing-periods/{id}/pay": {
+    /** Pay a billing period of your tenant online. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PayRequest;
+      responses: {
+        200: Data_PayResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };

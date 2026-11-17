@@ -148,6 +148,12 @@ pub(crate) struct PlansService {
     pub jobs: autoxide_kernel::job::JobQueue,
     /// Mời quản trị viên của khách mới (module `auth`); `None` thì bước mời báo lỗi.
     pub invitations: Option<Arc<dyn autoxide_auth::api::Invitations>>,
+    /// Lập hoá đơn thuê bao (module `invoices`); `None` thì kỳ không có hoá đơn.
+    pub invoices: Option<Arc<dyn autoxide_invoices::api::Invoices>>,
+    /// Thu tiền thuê bao qua cổng thanh toán (module `ledger`); `None` thì chỉ thu tay.
+    pub ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
+    /// `AUTOXIDE_PLANS_TAX_CATEGORY`: nhóm thuế của dòng thuê bao trên hoá đơn.
+    pub tax_category: String,
 }
 
 /// Bộ nhớ đệm quyền dùng theo khách trong tiến trình (`AUTOXIDE_PLANS_CACHE_SECONDS`): quyền dùng

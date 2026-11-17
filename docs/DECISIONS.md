@@ -8334,3 +8334,22 @@ Bước 36 mục 6 và 8 (ROADMAP mục "Chứng từ…" và "Hoá đơn khởi
    (`invoices.retention_hold`).
 7. Test chạy cùng `tax` và `ledger` nằm ở `crates/app/src/e2e/invoices.rs`: luật ranh giới cấm test của module dựng
    module khác.
+
+## D-345 · Tính tiền thuê bao SaaS qua `invoices` và `ledger` — 2026-11-17 — agent quyết
+
+Bước 35 mục 4 (ROADMAP mục "Tính tiền thuê bao SaaS").
+
+1. **Thứ tự đăng ký**: `plans` dời ra sau `invoices` (sau `tax`, `ledger`) để `require` được `dyn Invoices`, `dyn Ledger`
+   (cả hai `.ok()`: thiếu thì kỳ không có hoá đơn / chỉ thu tay). Module đăng ký trước vẫn hỏi quyền dùng qua tay cầm của
+   kernel (D-323).
+2. **Bên bán là khách vận hành** (khách mặc định / nền tảng): hoá đơn `vat_invoice` lập ở nút gốc của khách vận hành cho
+   người mua là hồ sơ thanh toán của khách thuê (không có hồ sơ: tên khách, người mua cá nhân). Giá gói **đã gồm thuế**
+   (số khách trả), nhóm thuế của dòng là `AUTOXIDE_PLANS_TAX_CATEGORY` (mặc định `vat.standard` — cần đối chiếu nhóm thuế
+   của dịch vụ phần mềm). `reference` của chứng từ `plans:{period_id}`.
+3. **Lập hoá đơn** trong job `plans.invoice_period`, xếp cùng transaction mở kỳ (unique theo kỳ); khách vận hành chưa có
+   ký hiệu → ghi log, kỳ vẫn trả được. Huỷ kỳ (`void`) huỷ hoá đơn của kỳ.
+4. **Trả**: `POST /billing-periods/{id}/pay` (khách, `plans.billing.manage`, cần hồ sơ thanh toán) → `dyn
+   Ledger::create_payment` ở khách vận hành, `source_module = plans`, `source_id` = kỳ, `reference`
+   `plans:{period}:{n}` — gọi lại trả lượt còn chờ; lượt hết hạn / thất bại thì sang `n + 1`.
+5. **Đã thu**: `plans` nghe `ledger.payment_succeeded` (chỉ khi có `ledger`) → `mark_paid` (cùng đường thu tay: thuê bao
+   quá hạn / tạm khoá đang dùng lại). Event đến lại vô hại.

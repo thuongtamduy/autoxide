@@ -12,6 +12,13 @@ pub(crate) const CACHE_SECONDS: Setting = Setting::new(
 )
 .with_default("30");
 
+pub(crate) const TAX_CATEGORY: Setting = Setting::new(
+    "AUTOXIDE_PLANS_TAX_CATEGORY",
+    "Tax category of the subscription line on the invoices the operator issues to tenants \
+     (`GET /api/v1/tax/categories`). Plan prices include this tax.",
+)
+.with_default("vat.standard");
+
 pub(crate) const HOLD_MINUTES: Setting = Setting::new(
     "AUTOXIDE_PLANS_HOLD_MINUTES",
     "How long a reservation against a limit is held before it is released by itself when the \
@@ -29,6 +36,7 @@ pub(crate) const REMINDER_DAYS: Setting = Setting::new(
 
 #[derive(Debug, Clone)]
 pub(crate) struct PlansConfig {
+    pub tax_category: String,
     pub cache: Duration,
     pub hold: chrono::Duration,
     pub reminder_days: Vec<u32>,
@@ -45,7 +53,19 @@ impl PlansConfig {
             }
             Ok(days)
         });
+        let tax_category = reader.get_with(&TAX_CATEGORY, |raw| {
+            let valid = (1..=64).contains(&raw.len())
+                && raw.bytes().all(|b| {
+                    b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'.' || b == b'_'
+                });
+            if valid {
+                Ok(raw.to_owned())
+            } else {
+                Err("must be a tax category code, e.g. `vat.standard`".to_owned())
+            }
+        });
         Ok(PlansConfig {
+            tax_category: tax_category?,
             cache: Duration::from_secs(cache?),
             hold: chrono::Duration::minutes(hold?),
             reminder_days: reminder_days?,

@@ -346,8 +346,9 @@ impl PlansService {
         let NewPeriod { kind, plan_id, price_id, amount, currency, start, end, due } = period;
         let at = now();
         let reference = period_reference(sub.id, start, kind);
+        let period_id = Uuid::now_v7();
         let row = billing_period::ActiveModel {
-            id: Set(Uuid::now_v7()),
+            id: Set(period_id),
             tenant_id: Set(sub.tenant_id),
             subscription_id: Set(sub.id),
             kind: Set(kind.to_owned()),
@@ -380,6 +381,9 @@ impl PlansService {
             .exec_without_returning(connection)
             .await?;
         if inserted > 0 {
+            if amount > 0 {
+                self.enqueue_invoice(connection, period_id).await?;
+            }
             let event = events::BillingPeriodOpened(json!({
                 "tenant_id": sub.tenant_id, "kind": kind, "reference": reference,
                 "amount": amount.to_string(), "currency": currency, "due_at": due,
@@ -662,6 +666,8 @@ impl PlansService {
         );
         self.record_event(&transaction, actor, tenant, &event).await?;
         transaction.commit().await?;
+        // Sau commit: huỷ hoá đơn của kỳ (gọi `dyn Invoices`, có thể gọi nhà cung cấp).
+        self.cancel_invoice(&voided).await?;
         Ok(voided)
     }
 
@@ -990,7 +996,7 @@ pub(crate) fn billing_period_not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
-fn billing_period_not_payable() -> Error {
+pub(crate) fn billing_period_not_payable() -> Error {
     Error::conflict(
         "plans.billing_period_not_payable",
         "This billing period is already paid or void.",
