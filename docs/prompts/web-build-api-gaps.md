@@ -107,7 +107,8 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 
 | | Màn | Cần | Bước | Giao diện đang làm gì |
 |---|---|---|---|---|
-| [ ] | Gói và thuê bao | `GET /plans/subscription`, `/entitlements` (hạn mức kèm `used`, `over_limit`), `/catalog`, `/billing-periods`, `GET/PUT /billing-profile`, `POST /subscription/change`, `/cancel`, `/resume`; trả kèm tên gói và giá | 35 | Dữ liệu mẫu (`src/sample/settings.ts`) |
+| [x] | Gói và thuê bao | `GET /plans/subscription`, `/entitlements` (hạn mức kèm `used`, `over_limit`), `/catalog`, `/billing-periods`, `GET/PUT /billing-profile`, `POST /subscription/change`, `/cancel`, `/resume`; trả kèm tên gói và giá | 35 | **Đã nối** (17/11, W-047 của web): thuê bao, `/usage`, kỳ thanh toán, catalog, đổi gói, huỷ / tiếp tục. Tên gói và giá giao diện tự ghép từ catalog (gói đã ngừng bán chỉ có mã). Còn thiếu `billing-profile` (dòng dưới) |
+| [ ] | Gói và thuê bao | Hồ sơ xuất hoá đơn của khách (`GET/PUT /plans/billing-profile`: tên pháp lý, mã số thuế, email nhận hoá đơn, địa chỉ) | 35 (chưa có trong `openapi.json`) | Dữ liệu mẫu có nhãn |
 | [ ] | Gói và thuê bao | `POST /billing-periods/{id}/pay` (trả tiền qua cổng của nhà vận hành) | 35 | Chưa có nút "Trả tiền" |
 | [x] | Tên miền | `GET/POST/DELETE /kernel/domains`, `POST /{id}/verify` | 33 | **Đã nối** (16/11, W-032): danh sách, thêm, bản ghi TXT, kiểm tra ngay, gỡ; chế độ một khách hiện lời giải thích |
 | [ ] | Tên miền | Gắn tên miền với nút: `PATCH /kernel/domains/{id} {org_id}` | 33, 34 | Core đã có API (D-297) nhưng chỉ nhận `null` tới khi có cây tổ chức; giao diện hiện `org_id` khi có, form gắn chờ danh sách nút của bước 34 (W-037 của web) |
@@ -261,9 +262,9 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 | [ ] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Quyền dùng của một khách bất kỳ: `GET /plans/tenants/{id}/entitlements` | mới |
 | [ ] | Chi tiết khách, Thuê bao | Lịch sử thuê bao; đặt / bỏ chỉ đọc; kỳ thanh toán theo khách cho nhà vận hành | mới — **đặt / bỏ chỉ đọc đã nối** (cờ của nhà vận hành, D-296, W-035 của web); lịch sử thuê bao và kỳ thanh toán chờ bước 35 |
-| [ ] | Thuê bao | `GET /plans/subscriptions`, `PUT` / `cancel` thuê bao của khách, `POST /billing-periods/{id}/mark-paid` | 35 |
-| [ ] | Gói và giá | `GET/POST/PUT` gói, `retire`, `prices`, `deactivate`; `subscriber_count` | 35 (`subscriber_count`: mới) |
-| [ ] | Ghi đè | Danh sách ghi đè của mọi khách (`GET /plans/overrides`) | mới |
+| [x] | Thuê bao | `GET /plans/subscriptions`, `PUT` / `cancel` thuê bao của khách, `POST /billing-periods/{id}/mark-paid` | 35 — **Đã nối** (17/11, W-047 của web): danh sách, gán gói, huỷ, khoá hẳn. "Đánh dấu đã thu" chưa nối: nhân sự nền tảng chưa đọc được kỳ thanh toán của một khách (dòng "kỳ thanh toán theo khách" ở trên) |
+| [x] | Gói và giá | `GET/POST/PUT` gói, `retire`, `prices`, `deactivate`; `subscriber_count` | 35 (`subscriber_count`: mới) — **Đã nối** (17/11, W-047 của web). `subscriber_count` chưa có: giao diện đếm từ `GET /plans/subscriptions` |
+| [ ] | Ghi đè | Danh sách ghi đè của mọi khách (`GET /plans/overrides`) | mới — ghi đè theo từng khách **đã nối** (17/11, W-047 của web); giao diện đọc từng khách để gom danh sách |
 | [ ] | Cấp phát | `POST/GET /plans/provisionings`, `…/retry` | 35 |
 | [ ] | Cấp phát | Danh sách lượt cấp phát `?status=`; lịch sử từng bước; `slug`, `business_model`, tên placement trong body | mới |
 | [ ] | Đội database | Migrate bằng job, chạy thử trước: `POST /kernel/placements/migrations` `{placement_id?, dry_run}` | mới (33 mới có CLI) |
