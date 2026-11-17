@@ -2,17 +2,22 @@
 //! có một sổ; tài khoản theo mục đích (`revenue.sales`, `payable.seller_held`…); bút toán chỉ thêm,
 //! sửa sai bằng bút toán đảo; số dư có sàn, chịu được ghi đồng thời; kỳ tháng khoá được; chuỗi băm
 //! phát hiện sửa ngoài module. Sổ cái chỉ ghi nghĩa vụ — core không giữ tiền (D-187). Module khác
-//! ghi sổ qua [`api::Ledger`].
+//! ghi sổ qua [`api::Ledger`]. Thêm (mục 4, 9): ba chế độ dòng tiền và tạm giữ ([`flows`]), chi trả
+//! ([`payouts`]), VietQR và biến động số dư ngân hàng ([`bank`], [`vietqr`]).
 
 pub mod api;
+mod bank;
 mod chain;
 mod config;
 mod entity;
 mod events;
+mod flows;
 mod http;
+mod http_flows;
 mod http_payments;
 mod migration;
 mod payments;
+mod payouts;
 mod periods;
 mod permissions;
 mod posting;
@@ -20,11 +25,17 @@ mod provider;
 mod reconcile;
 mod service;
 mod tools;
+mod tools_flows;
+mod vietqr;
 
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_flows;
+#[cfg(test)]
 mod tests_payments;
+#[cfg(test)]
+mod tests_vietqr;
 
 use std::sync::Arc;
 
@@ -94,6 +105,11 @@ impl Module for LedgerModule {
             "ledger_statement_lines",
             "ledger_exceptions",
             "ledger_reconciliations",
+            "ledger_flow_settings",
+            "ledger_holds",
+            "ledger_payouts",
+            "ledger_bank_accounts",
+            "ledger_bank_transactions",
         ]
     }
 
@@ -106,11 +122,18 @@ impl Module for LedgerModule {
     }
 
     fn body_limits(&self) -> Vec<autoxide_kernel::http::BodyLimit> {
-        vec![autoxide_kernel::http::BodyLimit::new(
-            axum::http::Method::POST,
-            "/webhooks/{provider}",
-            self.config.webhook_max_bytes,
-        )]
+        vec![
+            autoxide_kernel::http::BodyLimit::new(
+                axum::http::Method::POST,
+                "/webhooks/{provider}",
+                self.config.webhook_max_bytes,
+            ),
+            autoxide_kernel::http::BodyLimit::new(
+                axum::http::Method::POST,
+                "/bank-feeds/{provider}",
+                self.config.webhook_max_bytes,
+            ),
+        ]
     }
 
     fn permissions(&self) -> Vec<Permission> {
@@ -131,6 +154,9 @@ impl Module for LedgerModule {
             outbox: context.outbox()?,
             directory: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             gateways: context.contributions::<dyn autoxide_kernel::payment::PaymentGateway>(),
+            payout_gateways: context.contributions::<dyn autoxide_kernel::payment::PayoutGateway>(),
+            bank_feeds: context.contributions::<dyn autoxide_kernel::payment::BankFeed>(),
+            tax: context.require::<dyn autoxide_tax::api::TaxEngine>().ok(),
             jobs: context.jobs(),
             config: self.config,
         });
@@ -140,12 +166,18 @@ impl Module for LedgerModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
-            http::routes(service.clone()).merge(http_payments::routes(service))
+            http::routes(service.clone())
+                .merge(http_payments::routes(service.clone()))
+                .merge(http_flows::routes(service))
         })
     }
 
     fn tools(&self) -> Vec<Tool> {
-        self.service.as_ref().map_or_else(Vec::new, tools::all)
+        self.service.as_ref().map_or_else(Vec::new, |service| {
+            let mut tools = tools::all(service);
+            tools.extend(tools_flows::all(service));
+            tools
+        })
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
@@ -162,6 +194,22 @@ impl Module for LedgerModule {
             jobs.push(JobRegistration::new(
                 reconcile::RECONCILE_JOB,
                 Arc::new(reconcile::ReconcileJob(service.clone())),
+            ));
+            jobs.push(JobRegistration::new(
+                flows::RELEASE_HOLDS,
+                Arc::new(flows::ReleaseHoldsJob(service.clone())),
+            ));
+            jobs.push(JobRegistration::new(
+                payouts::CHECK_PAYOUTS,
+                Arc::new(payouts::CheckPayoutsJob(service.clone())),
+            ));
+            jobs.push(JobRegistration::new(
+                bank::MATCH_BANK_TRANSACTION,
+                Arc::new(bank::MatchBankTransactionJob(service.clone())),
+            ));
+            jobs.push(JobRegistration::new(
+                bank::POLL_BANK_FEED,
+                Arc::new(bank::PollBankFeedJob(service.clone())),
             ));
         }
         jobs
@@ -180,6 +228,13 @@ impl Module for LedgerModule {
                 reconcile::RECONCILE_JOB,
                 reconcile::RECONCILE_JOB,
                 Duration::from_secs(86_400),
+            ),
+            Schedule::new(flows::RELEASE_HOLDS, flows::RELEASE_HOLDS, Duration::from_secs(300)),
+            Schedule::new(payouts::CHECK_PAYOUTS, payouts::CHECK_PAYOUTS, Duration::from_secs(300)),
+            Schedule::new(
+                bank::POLL_BANK_FEED,
+                bank::POLL_BANK_FEED,
+                Duration::from_secs(self.config.bank_feed_poll_seconds),
             ),
         ]
     }

@@ -80,8 +80,9 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
       tác: kiểm chữ ký, ghi nguyên văn, xử lý qua job, không trùng (mã tham chiếu D-184); đối soát
       định kỳ sổ cái với sao kê đối tác; một bộ cài đặt giả cho test (D-343; `PayoutGateway` đi cùng
       mục chi trả)
-- [ ] Ba chế độ dòng tiền theo khách / sàn: tự thu, thu hộ qua đối tác, chia tại cổng — mỗi chế độ
-      sinh đúng bút toán (phải trả người bán, phí, thuế khấu trừ, tạm giữ tới hết hạn đổi trả)
+- [x] Ba chế độ dòng tiền theo khách / sàn: tự thu, thu hộ qua đối tác, chia tại cổng — mỗi chế độ
+      sinh đúng bút toán (phải trả người bán, phí, thuế khấu trừ, tạm giữ tới hết hạn đổi trả) — D-350:
+      `Ledger::settle`, `ledger_holds`, chi trả qua `PayoutGateway`; đối tác chi hộ thật chưa có (chỉ bản giả)
 - [x] Engine thuế: nhóm hàng hoá, biểu thuế theo vùng thuế với ngày hiệu lực, giá gồm / chưa gồm
       thuế, hồ sơ thuế người bán, thuế khấu trừ thay; ảnh chụp thuế suất trên từng dòng chứng từ;
       gói dữ liệu "vn" (GTGT, mức giảm tạm thời, thuế tiêu thụ đặc biệt, tỉ lệ khấu trừ hộ kinh
@@ -97,22 +98,23 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 - [x] Hoá đơn khởi tạo từ máy tính tiền (D-190): `EInvoiceProvider` hỗ trợ cả loại này cho bán lẻ
       tại quầy (NĐ 123/2020 sửa bởi NĐ 70/2025: hộ kinh doanh doanh thu từ 1 tỷ đồng / năm từ
       01/6/2025; ngưỡng theo lộ trình — để dạng dữ liệu, cần đối chiếu văn bản mới nhất)
-- [ ] Chuyển khoản VietQR tự khớp (D-194): sinh mã QR theo chuẩn VietQR với nội dung mang mã tham
+- [x] Chuyển khoản VietQR tự khớp (D-194): sinh mã QR theo chuẩn VietQR với nội dung mang mã tham
       chiếu, nhận biến động số dư qua trait `BankFeed` (ngân hàng hay dịch vụ đọc sao kê), khớp tự
       động theo mã và số tiền, sai lệch vào hàng chờ xử lý tay; tiền vào thẳng tài khoản của người
-      bán / khách (chế độ tự thu, D-187)
+      bán / khách (chế độ tự thu, D-187) — D-350; nguồn biến động thật (ngân hàng, Casso / SePay…) cần hợp
+      đồng và khoá, hiện chỉ có `FakeBankFeed`
 - [ ] Tỉ giá có ngày hiệu lực theo cặp tiền (nhập tay hay lấy từ nguồn qua trait); chứng từ ngoại tệ
       lưu ảnh chụp tỉ giá; báo cáo gộp nhiều tiền tệ (bước 38) dùng bảng này
 - [ ] Mẫu in chứng từ (hoá đơn bán lẻ, phiếu giao hàng, phiếu nhập, phiếu thu): mẫu theo khách và
       i18n, xuất HTML và PDF — chọn thư viện sau khi kiểm, ghi `STACK.md`
 - [ ] Xuất dữ liệu kế toán: sổ nhật ký chung và chứng từ theo kỳ ra CSV / Excel theo định dạng nhập
       của phần mềm kế toán phổ biến, để kế toán của khách không nhập lại tay
-- [ ] Đối chiếu thiết kế 2 (D-216, D-218): một bộ tên tài khoản, một cơ chế tạm giữ (`ledger_holds`), một
+- [x] Đối chiếu thiết kế 2 (D-216, D-218): một bộ tên tài khoản, một cơ chế tạm giữ (`ledger_holds`), một
       hạn thanh toán cho cả VietQR; `cod_remittance` (COD không về tài khoản nhà vận hành sàn); mã số thuế 12
       số (TT 86/2024 — cần đối chiếu); `GET /ledger/entries?source_module&source_id`; phí sàn tách GTGT,
-      khấu trừ thay chỉ cho hộ / cá nhân (NĐ 117/2025 — cần đối chiếu)
-- [ ] Đối chiếu đợt 2: `sealed_at` và số đếm niêm phong theo kỳ; `Ledger::balances` theo nhiều đối tượng (công
-      nợ nhà cung cấp)
+      khấu trừ thay chỉ cho hộ / cá nhân (NĐ 117/2025 — cần đối chiếu) — D-350
+- [x] Đối chiếu đợt 2: `sealed_at` và số đếm niêm phong theo kỳ; `Ledger::balances` theo nhiều đối tượng (công
+      nợ nhà cung cấp) — D-350
 
 ## 37. Tuân thủ pháp luật Việt Nam (D-186)
 

@@ -380,6 +380,199 @@ pub trait PaymentGateway: Send + Sync {
     ) -> Result<StatementPage, Error>;
 }
 
+// ---- Chi trả ----------------------------------------------------------------------------------
+
+/// Một lượt chi trả cần gửi đối tác (sàn trả tiền người bán từ tài khoản thu hộ của đối tác).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PayoutIntent {
+    /// ID lượt chi trong sổ, gửi làm mã của merchant: gọi lại cùng ID không chi hai lần.
+    pub payout_id: Uuid,
+    /// Bên nhận (ID nút của người bán); bộ nối tự tra tài khoản nhận đã đăng ký ở đối tác.
+    pub payee: String,
+    pub amount: Money,
+    /// Chữ ngắn, không chứa dữ liệu cá nhân.
+    pub description: String,
+}
+
+impl PayoutIntent {
+    pub fn new(
+        payout_id: Uuid,
+        payee: impl Into<String>,
+        amount: Money,
+        description: impl Into<String>,
+    ) -> Self {
+        PayoutIntent { payout_id, payee: payee.into(), amount, description: description.into() }
+    }
+}
+
+/// Trạng thái một lượt chi ở đối tác.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PayoutStatus {
+    /// Đối tác đã nhận lệnh, chưa xong (hỏi lại bằng [`PayoutGateway::payout_status`]).
+    Pending,
+    Succeeded,
+    Failed {
+        reason: String,
+    },
+}
+
+/// Kết quả gửi lượt chi.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct GatewayPayout {
+    pub provider_ref: String,
+    pub status: PayoutStatus,
+}
+
+impl GatewayPayout {
+    pub fn new(provider_ref: impl Into<String>, status: PayoutStatus) -> Self {
+        GatewayPayout { provider_ref: provider_ref.into(), status }
+    }
+}
+
+/// Đối tác chi hộ (có giấy phép): trả tiền người bán từ tài khoản thu hộ — core không giữ tiền.
+/// Bộ nối góp bằng `context.contribute::<dyn PayoutGateway>(…)`; test dùng `FakePayoutGateway`.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait PayoutGateway: Send + Sync {
+    /// Tên ổn định (`fake`…), ghi trên mỗi lượt chi.
+    fn provider(&self) -> &'static str;
+
+    /// Gửi lệnh chi. Gọi lại cùng `payout_id` phải trả cùng lệnh (không chi thêm).
+    async fn payout(&self, tenant: TenantId, intent: &PayoutIntent)
+    -> Result<GatewayPayout, Error>;
+
+    /// Trạng thái lệnh chi `provider_ref`.
+    async fn payout_status(
+        &self,
+        tenant: TenantId,
+        provider_ref: &str,
+    ) -> Result<PayoutStatus, Error>;
+}
+
+// ---- Biến động số dư ngân hàng (VietQR tự khớp) -------------------------------------------------
+
+/// Chiều của một biến động số dư.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BankDirection {
+    /// Tiền vào tài khoản.
+    Credit,
+    /// Tiền ra.
+    Debit,
+}
+
+impl BankDirection {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BankDirection::Credit => "credit",
+            BankDirection::Debit => "debit",
+        }
+    }
+}
+
+/// Một biến động số dư của tài khoản ngân hàng của người bán / khách.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct BankTransaction {
+    /// Mã giao dịch ở nhà cung cấp (duy nhất): gửi lại không ghi hai lần.
+    pub provider_txn_id: String,
+    /// Số tài khoản nhận / chi.
+    pub account_number: String,
+    pub direction: BankDirection,
+    /// Luôn dương.
+    pub amount: Money,
+    /// Nội dung chuyển khoản như ngân hàng ghi (có thể bị bỏ dấu, cắt ngắn, chèn khoảng trắng).
+    pub memo: String,
+    pub booked_at: DateTime<Utc>,
+}
+
+impl BankTransaction {
+    pub fn new(
+        provider_txn_id: impl Into<String>,
+        account_number: impl Into<String>,
+        direction: BankDirection,
+        amount: Money,
+        memo: impl Into<String>,
+        booked_at: DateTime<Utc>,
+    ) -> Self {
+        BankTransaction {
+            provider_txn_id: provider_txn_id.into(),
+            account_number: account_number.into(),
+            direction,
+            amount,
+            memo: memo.into(),
+            booked_at,
+        }
+    }
+}
+
+/// Tài khoản ngân hàng cần đọc biến động.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct BankAccountRef {
+    /// Mã BIN của ngân hàng (NAPAS), vd `970436`.
+    pub bank_bin: String,
+    pub account_number: String,
+}
+
+impl BankAccountRef {
+    pub fn new(bank_bin: impl Into<String>, account_number: impl Into<String>) -> Self {
+        BankAccountRef { bank_bin: bank_bin.into(), account_number: account_number.into() }
+    }
+}
+
+/// Một lượt kéo biến động.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct BankBatch {
+    pub transactions: Vec<BankTransaction>,
+    /// Lần sau gửi lại mã này (lưu ở tài khoản), kể cả khi trang rỗng.
+    pub next_cursor: Option<String>,
+    /// Còn dữ liệu ngay sau trang này.
+    pub has_more: bool,
+}
+
+impl BankBatch {
+    pub fn new(transactions: Vec<BankTransaction>, next_cursor: Option<String>) -> Self {
+        BankBatch { transactions, next_cursor, has_more: false }
+    }
+
+    #[must_use]
+    pub fn more(mut self) -> Self {
+        self.has_more = true;
+        self
+    }
+}
+
+/// Nguồn biến động số dư: ngân hàng hay dịch vụ đọc sao kê (D-194). Tiền vào thẳng tài khoản của
+/// người bán / khách — nền tảng chỉ đọc biến động để khớp thanh toán, không giữ tiền (D-187). Bộ
+/// nối góp bằng `context.contribute::<dyn BankFeed>(…)`; test dùng `FakeBankFeed`.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait BankFeed: Send + Sync {
+    /// Tên ổn định, nằm trong đường dẫn webhook `/api/v1/ledger/bank-feeds/{provider}`.
+    fn provider(&self) -> &'static str;
+
+    /// Kiểu đẩy: kiểm chữ ký trên **thân thô** rồi mới đọc. Sai → [`signature_invalid`].
+    fn verify_webhook(
+        &self,
+        tenant: TenantId,
+        headers: &axum::http::HeaderMap,
+        body: &[u8],
+    ) -> Result<Vec<BankTransaction>, Error>;
+
+    /// Kiểu kéo: biến động sau `cursor` (lần đầu `None`).
+    async fn fetch(
+        &self,
+        tenant: TenantId,
+        account: &BankAccountRef,
+        cursor: Option<String>,
+    ) -> Result<BankBatch, Error>;
+}
+
 /// `payment.signature_invalid` (401): chữ ký của thông báo không hợp lệ.
 pub fn signature_invalid() -> Error {
     Error::new(

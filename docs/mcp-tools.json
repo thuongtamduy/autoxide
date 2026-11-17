@@ -3851,6 +3851,118 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Pay a seller (in the partner collect mode) from its available balance through the payout partner. Never more than the balance; a refused payout puts the money back. The same reference and content again returns the payout already made.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A payout to make.",
+        "properties": {
+          "amount": {
+            "description": "Amount as a decimal string, e.g. `\"935000\"`; at most the available balance.",
+            "type": "string"
+          },
+          "currency": {
+            "description": "Currency code, e.g. `VND`.",
+            "type": "string"
+          },
+          "description": {
+            "description": "Short text, 1 to 140 characters, no personal data.",
+            "type": "string"
+          },
+          "payee_org_id": {
+            "description": "The seller (unit) to pay.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your id of this payout: sending it again returns the same payout.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payee_org_id",
+          "amount",
+          "currency",
+          "description",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.create_payout",
+      "output_schema": null,
+      "permissions": [
+        "ledger.payouts_create"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a VietQR bank transfer payment into the unit's own bank account: returns the QR payload and the transfer code the buyer keeps in the description. Matched automatically when the bank reports the transfer.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A VietQR payment to create.",
+        "properties": {
+          "amount": {
+            "description": "Amount in VND as a decimal string, e.g. `\"150000\"`.",
+            "type": "string"
+          },
+          "bank_account_id": {
+            "description": "Receiving bank account; may be left out when the unit has only one.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "Short text, 1 to 140 characters, no personal data.",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit that receives the money; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this payment: sending it again returns the same payment.",
+            "type": "string"
+          },
+          "source_id": {
+            "description": "Id of your document.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "description",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.create_vietqr_payment",
+      "output_schema": null,
+      "permissions": [
+        "ledger.payments_create"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -3977,6 +4089,103 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "The money-flow mode in force for a unit (self collect, partner collect, split at the gateway), its partners, hold days and where cash on delivery goes.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which unit.",
+        "properties": {
+          "org_id": {
+            "description": "Id of the unit; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "ledger.flow_settings",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Seller money held until the return window ends, with what is still held; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which held amounts.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "seller_org_id": {
+            "description": "Only for this seller (unit id).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_id": {
+            "description": "Only for this document.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_module": {
+            "description": "Only for documents of this module, e.g. `orders`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`held` or `released`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "ledger.holds",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "A payment collected through a payment partner, with its status and refunded amount.",
       "input_schema": {
         "additionalProperties": false,
@@ -3994,6 +4203,59 @@
         "type": "object"
       },
       "name": "ledger.payment",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Payouts of seller balances through the payout partner, with their status; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which payouts.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "payee_org_id": {
+            "description": "Only payouts to this seller.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `sent`, `succeeded` or `failed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "ledger.payouts",
       "output_schema": null,
       "permissions": [
         "ledger.read"
@@ -4081,6 +4343,36 @@
       "output_schema": null,
       "permissions": [
         "ledger.post"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Release held seller money now: what is still held moves to the seller's available balance. Releasing again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which hold.",
+        "properties": {
+          "hold_id": {
+            "description": "Id of the hold.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hold_id"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.release_hold",
+      "output_schema": null,
+      "permissions": [
+        "ledger.holds_release"
       ]
     },
     {

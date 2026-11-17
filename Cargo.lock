@@ -716,6 +716,7 @@ dependencies = [
  "async-trait",
  "autoxide-kernel",
  "autoxide-organizations",
+ "autoxide-tax",
  "autoxide-testkit",
  "axum",
  "chrono",

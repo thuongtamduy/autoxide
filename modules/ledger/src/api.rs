@@ -51,12 +51,14 @@ impl Side {
 /// Mục đích cơ bản của tài khoản (chuỗi ổn định — hợp đồng với module khác) và bên thường của nó.
 /// Module khác thêm mục đích riêng có tiền tố `<module>.` (vd `customers.points_liability`) và mở
 /// tài khoản bằng [`Ledger::open_account`] với bên thường tự chọn.
-pub const PURPOSES: [(&str, Side); 21] = [
+pub const PURPOSES: [(&str, Side); 22] = [
     ("cash.bank", Side::Debit),
     ("cash.on_hand", Side::Debit),
     ("clearing.gateway", Side::Debit),
     ("clearing.carrier_cod", Side::Debit),
     ("receivable.customer", Side::Debit),
+    // Người bán nợ sàn (phí, khấu trừ thay khi tiền COD về thẳng người bán — D-216).
+    ("receivable.seller", Side::Debit),
     ("payable.seller_held", Side::Credit),
     ("payable.seller_available", Side::Credit),
     ("payable.supplier", Side::Credit),
@@ -84,7 +86,7 @@ pub fn normal_side_of(purpose: &str) -> Option<Side> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[schema(as = LedgerCounterparty)]
 pub struct Counterparty {
-    /// `org`, `customer`, `carrier`, `partner`, or `<module>.<kind>`.
+    /// `org`, `customer`, `supplier`, `carrier`, `partner`, `bank_account`, or `<module>.<kind>`.
     pub kind: String,
     /// Id of the party in its own module.
     pub id: String,
@@ -297,6 +299,10 @@ pub struct Entry {
     pub reversed_by_entry_id: Option<Uuid>,
     pub actor_user_id: Option<Uuid>,
     pub lines: Vec<EntryLine>,
+    /// Position in the book's hash chain; `null` until the entry is sealed (within seconds).
+    pub sequence: Option<i64>,
+    /// When the entry was sealed into the hash chain; `null` while not yet sealed.
+    pub sealed_at: Option<DateTime<Utc>>,
 }
 
 /// A payment collected through a licensed partner.
@@ -322,8 +328,12 @@ pub struct Payment {
     pub status: String,
     /// Partner page where the buyer pays.
     pub checkout_url: Option<String>,
-    /// QR payload, when the partner gives one.
+    /// QR payload, when the partner gives one, or the VietQR code of a bank transfer payment.
     pub qr_payload: Option<String>,
+    /// Bank transfer payments: the code the buyer must keep in the transfer description.
+    pub transfer_code: Option<String>,
+    /// Bank transfer payments: the receiving bank account (of the unit, never of the platform).
+    pub bank_account_id: Option<Uuid>,
     pub expires_at: DateTime<Utc>,
     pub captured_at: Option<DateTime<Utc>>,
     /// Module that asked for the payment (`plans`, `orders`…) and its document.
@@ -432,6 +442,310 @@ impl NewRefund {
     }
 }
 
+// ---- Dòng tiền (bước 36 mục 4, D-187, D-216, D-218) ------------------------------------------
+
+/// How money flows for a unit (D-187: the platform never holds buyers' money).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = LedgerFlowMode)]
+pub enum FlowMode {
+    /// The seller collects into its own partner or bank account; entries go to the seller's book.
+    SelfCollect,
+    /// A licensed partner collects on behalf of the marketplace and pays the sellers out; entries go
+    /// to the marketplace book, the seller's share is held until the return window ends.
+    PartnerCollect,
+    /// The payment partner splits the money at payment time; the marketplace book records only its
+    /// share (fee and withholding), nothing is held.
+    SplitAtGateway,
+}
+
+impl FlowMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FlowMode::SelfCollect => "self_collect",
+            FlowMode::PartnerCollect => "partner_collect",
+            FlowMode::SplitAtGateway => "split_at_gateway",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<FlowMode> {
+        match raw {
+            "self_collect" => Some(FlowMode::SelfCollect),
+            "partner_collect" => Some(FlowMode::PartnerCollect),
+            "split_at_gateway" => Some(FlowMode::SplitAtGateway),
+            _ => None,
+        }
+    }
+}
+
+/// Where cash on delivery goes (D-216): never to the marketplace operator's own account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = LedgerCodRemittance)]
+pub enum CodRemittance {
+    /// The carrier pays the cash into the licensed partner's collection account.
+    PartnerCollection,
+    /// The carrier pays the seller directly; fees and withholding become a debt of the seller
+    /// (`receivable.seller`).
+    SellerDirect,
+}
+
+impl CodRemittance {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CodRemittance::PartnerCollection => "partner_collection",
+            CodRemittance::SellerDirect => "seller_direct",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<CodRemittance> {
+        match raw {
+            "partner_collection" => Some(CodRemittance::PartnerCollection),
+            "seller_direct" => Some(CodRemittance::SellerDirect),
+            _ => None,
+        }
+    }
+}
+
+/// The money-flow settings in force for a unit (set on it or inherited from the nearest unit above).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerFlowSettings)]
+pub struct FlowSettings {
+    /// The unit asked about.
+    pub org_id: Uuid,
+    /// The unit the settings are set on (its book gets the entries in the collect and split
+    /// modes); `null` when nothing is set and the defaults apply.
+    pub source_org_id: Option<Uuid>,
+    pub mode: FlowMode,
+    /// Payment partner used in the collect and split modes.
+    pub payment_provider: Option<String>,
+    /// Partner that pays the sellers out (collect mode).
+    pub payout_provider: Option<String>,
+    /// Days the seller's share is held after the money comes in (return window), 0 to 365.
+    pub hold_days: i32,
+    pub cod_remittance: CodRemittance,
+    /// The settings come from a unit above.
+    pub inherited: bool,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Đường tiền của một lượt thu / hoàn.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Collection {
+    /// Qua cổng thanh toán `provider` (tài khoản `clearing.gateway` của đối tác).
+    Gateway { provider: String },
+    /// Tiền thu hộ khi giao hàng (COD) qua đơn vị vận chuyển `carrier`.
+    Cod { carrier: String },
+    /// Chuyển khoản vào tài khoản ngân hàng của người bán / khách (chế độ tự thu).
+    BankTransfer { bank_account: Uuid },
+}
+
+/// Số tiền của một lượt bán: `gross` = `net` + `vat` (thuế do `TaxEngine` tính, ngoài sổ).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SaleAmounts {
+    pub gross: Money,
+    pub net: Money,
+    pub vat: Money,
+}
+
+impl SaleAmounts {
+    pub fn new(gross: Money, net: Money, vat: Money) -> Self {
+        SaleAmounts { gross, net, vat }
+    }
+}
+
+/// Một việc của dòng tiền; mỗi việc sinh (tối đa) một bút toán theo chế độ của người bán.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FlowEvent {
+    /// Tiền của một lượt bán đã về. Chế độ chia tại cổng: `operator_share` là phần cổng chia cho
+    /// sàn (bắt buộc).
+    Collected { amounts: SaleAmounts, via: Collection, operator_share: Option<Money> },
+    /// Phí sàn `fee` (gồm GTGT `vat` của phí — tách riêng trên sổ và hoá đơn phí).
+    FeeCharged { fee: Money, vat: Money },
+    /// Khấu trừ, nộp thay thuế của người bán trên doanh thu `revenue` (NĐ 117/2025/NĐ-CP — cần
+    /// đối chiếu): sổ hỏi `TaxEngine`; chỉ hộ / cá nhân kinh doanh bị khấu trừ, doanh nghiệp tự kê
+    /// khai (không sinh bút toán). `business_line`: `goods`, `services`, `production_transport`,
+    /// `other`.
+    TaxWithheld { revenue: Money, business_line: String },
+    /// Hoàn cho người mua. Trước khi hết hạn đổi trả: giảm khoản tạm giữ. Chế độ chia tại cổng:
+    /// `amounts.gross` là phần trả lại từ phần của sàn.
+    Refunded { amounts: SaleAmounts, via: Collection },
+    /// Phí đối tác thanh toán.
+    GatewayFeeCharged { provider: String, fee: Money },
+}
+
+/// Một việc của dòng tiền gửi [`Ledger::settle`]. `reference` duy nhất theo (khách,
+/// `source_module`) — dùng chung không gian với [`Ledger::post`].
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct Settlement {
+    /// Người bán (nút); chế độ đọc theo cài đặt của nút này hay nút trên gần nhất.
+    pub seller: OrgId,
+    pub event: FlowEvent,
+    pub source_module: String,
+    /// Chứng từ nguồn (đơn hàng…): khoản tạm giữ gắn theo nó.
+    pub source_id: String,
+    pub reference: String,
+    /// Bỏ trống: hôm nay theo múi giờ của sổ.
+    pub effective_date: Option<NaiveDate>,
+}
+
+impl Settlement {
+    pub fn new(
+        seller: OrgId,
+        event: FlowEvent,
+        source_module: impl Into<String>,
+        source_id: impl Into<String>,
+        reference: impl Into<String>,
+    ) -> Self {
+        Settlement {
+            seller,
+            event,
+            source_module: source_module.into(),
+            source_id: source_id.into(),
+            reference: reference.into(),
+            effective_date: None,
+        }
+    }
+
+    #[must_use]
+    pub fn on(mut self, day: NaiveDate) -> Self {
+        self.effective_date = Some(day);
+        self
+    }
+}
+
+/// Kết quả của [`Ledger::settle`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Settled {
+    pub mode: FlowMode,
+    /// Nút của sổ nhận bút toán (người bán ở chế độ tự thu, sàn ở hai chế độ kia).
+    pub book_org: OrgId,
+    /// `None`: việc này không sinh bút toán (vd khấu trừ thay với người bán là doanh nghiệp).
+    pub entry: Option<Entry>,
+    /// Khoản tạm giữ của lượt bán, sau việc này.
+    pub hold: Option<Hold>,
+}
+
+/// The seller's share of a sale held until the return window ends.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerHold)]
+pub struct Hold {
+    pub id: Uuid,
+    pub book_id: Uuid,
+    /// The unit of the book (the marketplace).
+    pub org_id: Uuid,
+    pub seller_org_id: Uuid,
+    /// Still held: the sale minus fees, withholding and refunds so far.
+    pub amount: Money,
+    /// Held when the money came in.
+    pub original: Money,
+    /// When the job moves the money to the seller's available balance.
+    pub release_at: DateTime<Utc>,
+    /// `held` or `released`.
+    pub status: String,
+    pub source_module: String,
+    pub source_id: String,
+    /// The entry that moved the money to the available balance.
+    pub release_entry_id: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// A payout of a seller's available balance through the payout partner.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerPayout)]
+pub struct Payout {
+    pub id: Uuid,
+    pub book_id: Uuid,
+    /// The unit of the book (the marketplace).
+    pub org_id: Uuid,
+    /// The seller paid.
+    pub payee_org_id: Uuid,
+    pub amount: Money,
+    pub provider: String,
+    pub provider_ref: Option<String>,
+    /// `pending` (the partner has not answered yet; send the same request again), `sent` (the
+    /// partner is working on it), `succeeded` or `failed` (the money is back on the seller's
+    /// available balance).
+    pub status: String,
+    pub failure_reason: Option<String>,
+    pub description: String,
+    pub reference: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Một lượt chi trả số dư khả dụng của người bán. `reference` duy nhất theo khách.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct NewPayout {
+    pub payee: OrgId,
+    pub amount: Money,
+    /// Chữ ngắn (tối đa 140 ký tự), không dữ liệu cá nhân.
+    pub description: String,
+    pub reference: String,
+}
+
+impl NewPayout {
+    pub fn new(
+        payee: OrgId,
+        amount: Money,
+        description: impl Into<String>,
+        reference: impl Into<String>,
+    ) -> Self {
+        NewPayout { payee, amount, description: description.into(), reference: reference.into() }
+    }
+}
+
+/// Một lượt thu bằng chuyển khoản VietQR vào tài khoản ngân hàng của nút nhận (chế độ tự thu).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct NewTransferPayment {
+    pub org: OrgId,
+    /// Tài khoản nhận; bỏ trống khi nút chỉ có một tài khoản đang dùng.
+    pub bank_account: Option<Uuid>,
+    /// Chỉ VND.
+    pub amount: Money,
+    pub description: String,
+    pub source_module: String,
+    pub source_id: Option<String>,
+    pub reference: String,
+}
+
+impl NewTransferPayment {
+    pub fn new(
+        org: OrgId,
+        amount: Money,
+        description: impl Into<String>,
+        source_module: impl Into<String>,
+        reference: impl Into<String>,
+    ) -> Self {
+        NewTransferPayment {
+            org,
+            bank_account: None,
+            amount,
+            description: description.into(),
+            source_module: source_module.into(),
+            source_id: None,
+            reference: reference.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn bank_account(mut self, id: Uuid) -> Self {
+        self.bank_account = Some(id);
+        self
+    }
+
+    #[must_use]
+    pub fn source_id(mut self, id: impl Into<String>) -> Self {
+        self.source_id = Some(id.into());
+        self
+    }
+}
+
 /// Ghi và đọc sổ cái.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
@@ -497,4 +811,59 @@ pub trait Ledger: Send + Sync {
 
     /// Một thanh toán, hoặc `None`.
     async fn payment(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Payment>, Error>;
+
+    /// Số dư (theo bên thường) của nhiều tài khoản một lượt (tối đa 500 khoá), cùng thứ tự với
+    /// `keys` — vd công nợ nhà cung cấp (`payable.supplier`, đối tượng `supplier`). Chưa có: 0.
+    async fn balances(
+        &self,
+        tenant: &TenantContext,
+        keys: &[AccountKey],
+        as_of: Option<NaiveDate>,
+    ) -> Result<Vec<Money>, Error>;
+
+    /// Cài đặt dòng tiền hiệu lực của nút `org` (kế thừa theo cây; chưa đặt: tự thu).
+    async fn flow_settings(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+    ) -> Result<FlowSettings, Error>;
+
+    /// Ghi một việc của dòng tiền theo chế độ của người bán: tiền vào, phí sàn, khấu trừ thay, hoàn,
+    /// phí cổng. Ở chế độ thu hộ, tiền vào tạo khoản tạm giữ tới hết hạn đổi trả (job
+    /// `ledger.release_holds` chuyển sang số dư khả dụng). Việc không hợp với chế độ hay cổng →
+    /// `ledger.flow_mode_unsupported`. Cùng `reference` + cùng nội dung → `Replayed`.
+    async fn settle(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        settlement: Settlement,
+    ) -> Result<Submitted<Settled>, Error>;
+
+    /// Khoản tạm giữ của chứng từ nguồn (`marketplace` hỏi trước khi cho rút tiền).
+    async fn hold_status(
+        &self,
+        tenant: &TenantContext,
+        source_module: &str,
+        source_id: &str,
+    ) -> Result<Option<Hold>, Error>;
+
+    /// Chi trả số dư khả dụng của người bán qua `PayoutGateway` (chế độ thu hộ). Trừ số dư trước,
+    /// gọi đối tác ngoài transaction; đối tác từ chối → ghi lại số dư. Không vượt số dư khả dụng,
+    /// kể cả khi gửi đồng thời (`ledger.insufficient_balance`).
+    async fn create_payout(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        payout: NewPayout,
+    ) -> Result<Submitted<Payout>, Error>;
+
+    /// Tạo lượt thu chuyển khoản VietQR (mã QR mang mã chuyển khoản; tiền vào thẳng tài khoản của
+    /// nút nhận). Biến động số dư (`BankFeed`) khớp mã + số tiền thì ghi đã thu; sai lệch vào hàng
+    /// chờ. Cùng hạn thanh toán với mọi thanh toán (`expires_at`).
+    async fn create_transfer_payment(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        payment: NewTransferPayment,
+    ) -> Result<Submitted<Payment>, Error>;
 }

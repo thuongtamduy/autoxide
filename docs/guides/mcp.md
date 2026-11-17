@@ -155,10 +155,16 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
 | `ledger.balance` | `ledger.read` | read-only |
+| `ledger.create_payout` | `ledger.payouts_create` | writes |
+| `ledger.create_vietqr_payment` | `ledger.payments_create` | writes |
 | `ledger.entries` | `ledger.read` | read-only |
 | `ledger.exceptions` | `ledger.read` | read-only |
+| `ledger.flow_settings` | `ledger.read` | read-only |
+| `ledger.holds` | `ledger.read` | read-only |
 | `ledger.payment` | `ledger.read` | read-only |
+| `ledger.payouts` | `ledger.read` | read-only |
 | `ledger.post_entry` | `ledger.post` | writes |
+| `ledger.release_hold` | `ledger.holds_release` | writes |
 | `ledger.resolve_exception` | `ledger.reconcile` | writes |
 | `ledger.trial_balance` | `ledger.read` | read-only |
 | `media.get` | `media.read` | read-only |

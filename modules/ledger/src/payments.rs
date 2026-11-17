@@ -90,6 +90,8 @@ pub(crate) fn describe_payment(row: &payment::Model) -> Result<Payment, Error> {
         status: row.status.clone(),
         checkout_url: row.checkout_url.clone(),
         qr_payload: row.qr_payload.clone(),
+        transfer_code: row.transfer_code.clone(),
+        bank_account_id: row.bank_account_id,
         expires_at: row.expires_at,
         captured_at: row.captured_at,
         source_module: row.source_module.clone(),
@@ -326,6 +328,8 @@ impl LedgerService {
                 reference_fingerprint: Set(fingerprint.clone()),
                 created_at: Set(at),
                 updated_at: Set(at),
+                transfer_code: Set(None),
+                bank_account_id: Set(None),
             };
             let saved = payment::Entity::insert(row).exec_with_returning(&transaction).await?;
             let event = events::PaymentCreated(payment_payload(&saved)?);
@@ -637,8 +641,14 @@ impl LedgerService {
         }
         // Bút toán trước (gọi lại an toàn), trạng thái sau: lỗi giữa chừng thì job chạy lại.
         let book = OrgId::from_uuid(current.org_id);
-        let clearing = AccountKey::new(book, "clearing.gateway", received.currency())
-            .with_counterparty(Counterparty::new("partner", current.provider.clone()));
+        // Chuyển khoản VietQR: tiền đã vào thẳng tài khoản ngân hàng của nút (tự thu); qua cổng:
+        // tiền nằm ở đối tác (`clearing.gateway`).
+        let clearing = match current.bank_account_id {
+            Some(account) => AccountKey::new(book, "cash.bank", received.currency())
+                .with_counterparty(Counterparty::new("bank_account", account.to_string())),
+            None => AccountKey::new(book, "clearing.gateway", received.currency())
+                .with_counterparty(Counterparty::new("partner", current.provider.clone())),
+        };
         let receivable = AccountKey::new(book, "receivable.customer", received.currency());
         let entry = NewEntry::new(
             book,
