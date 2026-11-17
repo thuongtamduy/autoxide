@@ -11,7 +11,10 @@ use chrono::NaiveDate;
 use sea_orm::EntityTrait;
 use uuid::Uuid;
 
-use crate::api::{AccountKey, Entry, Ledger, NewEntry, NewReversal, OpenAccount};
+use crate::api::{
+    AccountKey, Entry, Ledger, NewEntry, NewPayment, NewRefund, NewReversal, OpenAccount, Payment,
+    Refund,
+};
 use crate::entity::entry;
 use crate::service::{LedgerService, describe_entry};
 
@@ -74,6 +77,31 @@ impl Ledger for Provider {
         let read = tenant.database().read();
         match entry::Entity::find_by_id(id).scoped(tenant).one(read).await? {
             Some(row) => Ok(Some(describe_entry(read, tenant, row).await?)),
+            None => Ok(None),
+        }
+    }
+
+    async fn create_payment(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        payment: NewPayment,
+    ) -> Result<Submitted<Payment>, Error> {
+        self.0.create_payment(tenant, actor, payment).await
+    }
+
+    async fn refund(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        refund: NewRefund,
+    ) -> Result<Submitted<Refund>, Error> {
+        self.0.refund(tenant, actor, refund).await
+    }
+
+    async fn payment(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Payment>, Error> {
+        match LedgerService::find_payment(tenant.database().read(), tenant, id).await? {
+            Some(row) => Ok(Some(crate::payments::describe_payment(&row)?)),
             None => Ok(None),
         }
     }

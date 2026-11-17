@@ -18,6 +18,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0006_tenancy_jobs",
             vec![autoxide_kernel::job::tenant_table("ledger")],
         ),
+        Box::new(CreatePayments),
     ]
 }
 
@@ -342,6 +343,267 @@ impl MigrationTrait for CreateLedger {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for table in TABLES {
+            manager.drop_table(Table::drop().table(table).to_owned()).await?;
+        }
+        Ok(())
+    }
+}
+
+/// Thanh toán, hoàn tiền, thông báo đối tác, sao kê, hàng chờ sai lệch, lượt đối soát (bước 36 mục 5).
+struct CreatePayments;
+
+impl MigrationName for CreatePayments {
+    fn name(&self) -> &str {
+        "m0007_create_payments"
+    }
+}
+
+const PAYMENT_TABLES: [&str; 6] = [
+    "ledger_reconciliations",
+    "ledger_exceptions",
+    "ledger_statement_lines",
+    "ledger_gateway_events",
+    "ledger_refunds",
+    "ledger_payments",
+];
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreatePayments {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_payments")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::uuid("book_id"))
+                    .col(schema::string_len("provider", 32))
+                    .col(schema::string_len_null("provider_ref", 100))
+                    .col(schema::string_len("method", 32))
+                    .col(schema::string_len("description", 140))
+                    .col(schema::big_integer("amount_minor"))
+                    .col(schema::string_len("amount_currency", 3))
+                    .col(schema::big_integer("refunded_minor"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::text_null("checkout_url"))
+                    .col(schema::text_null("qr_payload"))
+                    .col(schema::text_null("return_url"))
+                    .col(schema::timestamp_with_time_zone("expires_at"))
+                    .col(schema::timestamp_with_time_zone_null("captured_at"))
+                    .col(schema::string_len("source_module", 64))
+                    .col(schema::string_len_null("source_id", 100))
+                    .col(schema::string_len("reference", 100))
+                    .col(schema::string_len("reference_fingerprint", 64))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("ledger_payments_book_fk")
+                            .from("ledger_payments", "book_id")
+                            .to("ledger_books", "id"),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_payments",
+            "ledger_payments_reference_idx",
+            &["tenant_id", "source_module", "reference"],
+            true,
+        )
+        .await?;
+        // Nhiều `NULL` (chưa gọi đối tác) không đụng nhau trên cả hai database.
+        index(
+            manager,
+            "ledger_payments",
+            "ledger_payments_provider_ref_idx",
+            &["tenant_id", "provider", "provider_ref"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_payments",
+            "ledger_payments_expiry_sweep_idx",
+            &["status", "expires_at"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_payments",
+            "ledger_payments_source_idx",
+            &["tenant_id", "source_module", "source_id"],
+            false,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_refunds")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("payment_id"))
+                    .col(schema::big_integer("amount_minor"))
+                    .col(schema::string_len("amount_currency", 3))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::string_len_null("provider_ref", 100))
+                    .col(schema::string_len("reason", 200))
+                    .col(schema::string_len("reference", 100))
+                    .col(schema::string_len("reference_fingerprint", 64))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("ledger_refunds_payment_fk")
+                            .from("ledger_refunds", "payment_id")
+                            .to("ledger_payments", "id"),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_refunds",
+            "ledger_refunds_reference_idx",
+            &["tenant_id", "payment_id", "reference"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_refunds",
+            "ledger_refunds_provider_ref_idx",
+            &["tenant_id", "provider_ref"],
+            false,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_gateway_events")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("provider", 32))
+                    .col(schema::string_len("provider_event_id", 100))
+                    .col(schema::string_len("kind", 16))
+                    .col(schema::text("body"))
+                    .col(schema::text("notification"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::text_null("error"))
+                    .col(schema::timestamp_with_time_zone("received_at"))
+                    .col(schema::timestamp_with_time_zone_null("processed_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_gateway_events",
+            "ledger_gateway_events_provider_idx",
+            &["tenant_id", "provider", "provider_event_id"],
+            true,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_reconciliations")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("provider", 32))
+                    .col(schema::date("on_date"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::big_integer("lines"))
+                    .col(schema::big_integer("matched"))
+                    .col(schema::big_integer("exceptions"))
+                    .col(schema::text_null("error"))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_reconciliations",
+            "ledger_reconciliations_created_idx",
+            &["tenant_id", "created_at"],
+            false,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_statement_lines")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("provider", 32))
+                    .col(schema::string_len("provider_line_id", 100))
+                    .col(schema::string_len("provider_ref", 100))
+                    .col(schema::string_len("kind", 16))
+                    .col(schema::big_integer("amount_minor"))
+                    .col(schema::string_len("amount_currency", 3))
+                    .col(schema::big_integer("fee_minor"))
+                    .col(schema::date("booked_on"))
+                    .col(schema::string_len("match_status", 16))
+                    .col(schema::uuid_null("payment_id"))
+                    .col(schema::uuid("reconciliation_id"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_statement_lines",
+            "ledger_statement_lines_provider_idx",
+            &["tenant_id", "provider", "provider_line_id"],
+            true,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_exceptions")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("kind", 32))
+                    .col(schema::string_len("subject", 100))
+                    .col(schema::text("details"))
+                    .col(schema::string_len("dedupe_key", 200))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::string_len_null("resolution", 32))
+                    .col(schema::string_len_null("note", 500))
+                    .col(schema::uuid_null("resolved_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_exceptions",
+            "ledger_exceptions_dedupe_idx",
+            &["tenant_id", "dedupe_key"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_exceptions",
+            "ledger_exceptions_status_idx",
+            &["tenant_id", "status", "created_at"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for table in PAYMENT_TABLES {
             manager.drop_table(Table::drop().table(table).to_owned()).await?;
         }
         Ok(())

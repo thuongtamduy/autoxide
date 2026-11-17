@@ -14,6 +14,7 @@ autoxide-organizations.workspace = true
 axum.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
+metrics.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -25,6 +26,7 @@ validator.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
+futures-util.workspace = true
 tokio.workspace = true
 
 [lints]

@@ -299,6 +299,139 @@ pub struct Entry {
     pub lines: Vec<EntryLine>,
 }
 
+/// A payment collected through a licensed partner.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerPayment)]
+pub struct Payment {
+    pub id: Uuid,
+    /// The unit that receives the money (its book gets the entries).
+    pub org_id: Uuid,
+    pub book_id: Uuid,
+    /// Partner, e.g. `vnpay`.
+    pub provider: String,
+    /// Id of the transaction at the partner, once created there.
+    pub provider_ref: Option<String>,
+    /// `card`, `wallet`, `vietqr`…
+    pub method: String,
+    pub description: String,
+    pub amount: Money,
+    /// Refunded or being refunded.
+    pub refunded: Money,
+    /// `pending`, `succeeded`, `failed`, `expired` or `needs_review` (the partner reported another
+    /// amount; see the exceptions).
+    pub status: String,
+    /// Partner page where the buyer pays.
+    pub checkout_url: Option<String>,
+    /// QR payload, when the partner gives one.
+    pub qr_payload: Option<String>,
+    pub expires_at: DateTime<Utc>,
+    pub captured_at: Option<DateTime<Utc>>,
+    /// Module that asked for the payment (`plans`, `orders`…) and its document.
+    pub source_module: String,
+    pub source_id: Option<String>,
+    pub reference: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// A refund of (part of) a payment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerRefund)]
+pub struct Refund {
+    pub id: Uuid,
+    pub payment_id: Uuid,
+    pub amount: Money,
+    /// `pending`, `succeeded` or `failed`.
+    pub status: String,
+    pub provider_ref: Option<String>,
+    pub reason: String,
+    pub reference: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Một lượt thu mới. `reference` bắt buộc (D-184): duy nhất theo (khách, `source_module`); gửi lại
+/// sau lỗi mạng thì gọi lại đối tác với cùng thanh toán.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct NewPayment {
+    /// Nút nhận tiền.
+    pub org: OrgId,
+    /// Đối tác; bỏ trống khi máy chủ chỉ có một cổng.
+    pub provider: Option<String>,
+    pub method: String,
+    pub amount: Money,
+    /// Chữ ngắn cho người mua (tối đa 140 ký tự), không dữ liệu cá nhân.
+    pub description: String,
+    pub return_url: Option<String>,
+    pub source_module: String,
+    pub source_id: Option<String>,
+    pub reference: String,
+}
+
+impl NewPayment {
+    pub fn new(
+        org: OrgId,
+        method: impl Into<String>,
+        amount: Money,
+        description: impl Into<String>,
+        source_module: impl Into<String>,
+        reference: impl Into<String>,
+    ) -> Self {
+        NewPayment {
+            org,
+            provider: None,
+            method: method.into(),
+            amount,
+            description: description.into(),
+            return_url: None,
+            source_module: source_module.into(),
+            source_id: None,
+            reference: reference.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn provider(mut self, provider: impl Into<String>) -> Self {
+        self.provider = Some(provider.into());
+        self
+    }
+
+    #[must_use]
+    pub fn source_id(mut self, id: impl Into<String>) -> Self {
+        self.source_id = Some(id.into());
+        self
+    }
+
+    #[must_use]
+    pub fn return_url(mut self, url: impl Into<String>) -> Self {
+        self.return_url = Some(url.into());
+        self
+    }
+}
+
+/// Một lượt hoàn. `reference` duy nhất theo thanh toán.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct NewRefund {
+    pub payment: Uuid,
+    pub amount: Money,
+    /// Chữ ngắn (tối đa 200 ký tự), không dữ liệu cá nhân.
+    pub reason: String,
+    pub reference: String,
+}
+
+impl NewRefund {
+    pub fn new(
+        payment: Uuid,
+        amount: Money,
+        reason: impl Into<String>,
+        reference: impl Into<String>,
+    ) -> Self {
+        NewRefund { payment, amount, reason: reason.into(), reference: reference.into() }
+    }
+}
+
 /// Ghi và đọc sổ cái.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
@@ -343,4 +476,25 @@ pub trait Ledger: Send + Sync {
 
     /// Một bút toán, hoặc `None`.
     async fn entry(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Entry>, Error>;
+
+    /// Tạo lượt thu qua đối tác: trả `checkout_url` / `qr_payload` cho người mua. Đối tác báo đã
+    /// thu (webhook, đối soát) thì sổ ghi bút toán và phát event `ledger.payment_succeeded`
+    /// (`payment_id`, `source_module`, `source_id`, `reference`, `amount`) cho module nguồn.
+    async fn create_payment(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        payment: NewPayment,
+    ) -> Result<Submitted<Payment>, Error>;
+
+    /// Hoàn (một phần) một thanh toán đã thu; không vượt số còn lại.
+    async fn refund(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        refund: NewRefund,
+    ) -> Result<Submitted<Refund>, Error>;
+
+    /// Một thanh toán, hoặc `None`.
+    async fn payment(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Payment>, Error>;
 }

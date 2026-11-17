@@ -33,6 +33,35 @@ pub(crate) const PERIODS_CLOSE: Permission = Permission::new(
 .scoped()
 .with_risk(Risk::Money);
 
+pub(crate) const PAYMENTS_CREATE: Permission = Permission::new(
+    "ledger.payments_create",
+    "Create payments through the payment partners for the units in your scope.",
+)
+.scoped()
+.with_risk(Risk::Money);
+
+pub(crate) const REFUNDS_CREATE: Permission = Permission::new(
+    "ledger.refunds_create",
+    "Refund payments received by the units in your scope.",
+)
+.scoped()
+.with_risk(Risk::Money);
+
+pub(crate) const RECONCILE: Permission = Permission::new(
+    "ledger.reconcile",
+    "Run reconciliations with partner statements and resolve the differences found.",
+)
+.with_risk(Risk::Money);
+
 pub(crate) fn all() -> Vec<Permission> {
-    vec![READ, POST, REVERSE, ACCOUNTS_MANAGE, PERIODS_CLOSE]
+    vec![
+        READ,
+        POST,
+        REVERSE,
+        ACCOUNTS_MANAGE,
+        PERIODS_CLOSE,
+        PAYMENTS_CREATE,
+        REFUNDS_CREATE,
+        RECONCILE,
+    ]
 }

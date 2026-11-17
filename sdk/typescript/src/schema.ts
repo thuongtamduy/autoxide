@@ -2205,6 +2205,75 @@ export type Data_LedgerEntry = {
 };
 
 /** Envelope of a single result. */
+export type Data_LedgerExceptionResponse = {
+  /** A difference waiting for a person. */
+  data: {
+    created_at: string;
+    details: Record<string, unknown>;
+    id: string;
+    /**
+     * `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
+     * `unknown_in_statement` or `late_payment`.
+     */
+    kind: string;
+    note?: string | null;
+    resolution?: string | null;
+    resolved_by?: string | null;
+    /** `open`, `resolved` or `ignored`. */
+    status: string;
+    /** The record concerned, e.g. `ledger.payment:<id>`. */
+    subject: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerPayment = {
+  /** A payment collected through a licensed partner. */
+  data: {
+    amount: Money;
+    book_id: string;
+    captured_at?: string | null;
+    /** Partner page where the buyer pays. */
+    checkout_url?: string | null;
+    created_at: string;
+    description: string;
+    expires_at: string;
+    id: string;
+    /** `card`, `wallet`, `vietqr`… */
+    method: string;
+    /** The unit that receives the money (its book gets the entries). */
+    org_id: string;
+    /** Partner, e.g. `vnpay`. */
+    provider: string;
+    /** Id of the transaction at the partner, once created there. */
+    provider_ref?: string | null;
+    /** QR payload, when the partner gives one. */
+    qr_payload?: string | null;
+    reference: string;
+    /** Refunded or being refunded. */
+    refunded: Money;
+    source_id?: string | null;
+    /** Module that asked for the payment (`plans`, `orders`…) and its document. */
+    source_module: string;
+    /**
+     * `pending`, `succeeded`, `failed`, `expired` or `needs_review` (the partner reported another
+     * amount; see the exceptions).
+     */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerPaymentDetail = {
+  /** A payment with its refunds. */
+  data: LedgerPayment & {
+    refunds: LedgerRefund[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LedgerPeriodResponse = {
   /** An accounting period (a calendar month). */
   data: {
@@ -2220,6 +2289,44 @@ export type Data_LedgerPeriodResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_LedgerReconciliationResponse = {
+  /** A reconciliation run. */
+  data: {
+    created_at: string;
+    created_by?: string | null;
+    /** The day reconciled. */
+    date: string;
+    /** Differences sent to the exceptions. */
+    exceptions: number;
+    id: string;
+    /** Statement lines read. */
+    lines: number;
+    /** Lines that matched the book. */
+    matched: number;
+    provider: string;
+    /** `completed` or `failed`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerRefund = {
+  /** A refund of (part of) a payment. */
+  data: {
+    amount: Money;
+    created_at: string;
+    id: string;
+    payment_id: string;
+    provider_ref?: string | null;
+    reason: string;
+    reference: string;
+    /** `pending`, `succeeded` or `failed`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LedgerTrialBalanceResponse = {
   /** A trial balance. */
   data: {
@@ -2229,6 +2336,14 @@ export type Data_LedgerTrialBalanceResponse = {
     org_id: string;
     to: string;
     totals: LedgerTrialBalanceTotal[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerWebhookReceipt = {
+  /** Receipt of a partner notification. */
+  data: {
+    received: boolean;
   };
 };
 
@@ -5406,12 +5521,95 @@ export type LedgerEntryRequest = {
   source_kind?: string | null;
 };
 
+/** A difference waiting for a person. */
+export type LedgerExceptionResponse = {
+  created_at: string;
+  details: Record<string, unknown>;
+  id: string;
+  /**
+   * `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
+   * `unknown_in_statement` or `late_payment`.
+   */
+  kind: string;
+  note?: string | null;
+  resolution?: string | null;
+  resolved_by?: string | null;
+  /** `open`, `resolved` or `ignored`. */
+  status: string;
+  /** The record concerned, e.g. `ledger.payment:<id>`. */
+  subject: string;
+  updated_at: string;
+};
+
 /** One line of a manual entry. */
 export type LedgerLineRequest = {
   account_id: string;
   /** Greater than zero; every line in the same currency as its account. */
   amount: Money;
   side: LedgerSide;
+};
+
+/** A payment collected through a licensed partner. */
+export type LedgerPayment = {
+  amount: Money;
+  book_id: string;
+  captured_at?: string | null;
+  /** Partner page where the buyer pays. */
+  checkout_url?: string | null;
+  created_at: string;
+  description: string;
+  expires_at: string;
+  id: string;
+  /** `card`, `wallet`, `vietqr`… */
+  method: string;
+  /** The unit that receives the money (its book gets the entries). */
+  org_id: string;
+  /** Partner, e.g. `vnpay`. */
+  provider: string;
+  /** Id of the transaction at the partner, once created there. */
+  provider_ref?: string | null;
+  /** QR payload, when the partner gives one. */
+  qr_payload?: string | null;
+  reference: string;
+  /** Refunded or being refunded. */
+  refunded: Money;
+  source_id?: string | null;
+  /** Module that asked for the payment (`plans`, `orders`…) and its document. */
+  source_module: string;
+  /**
+   * `pending`, `succeeded`, `failed`, `expired` or `needs_review` (the partner reported another
+   * amount; see the exceptions).
+   */
+  status: string;
+  updated_at: string;
+};
+
+/** A payment with its refunds. */
+export type LedgerPaymentDetail = LedgerPayment & {
+  refunds: LedgerRefund[];
+};
+
+/** A payment to create. */
+export type LedgerPaymentRequest = {
+  /** In the currency of the unit's book. */
+  amount: Money;
+  /** Short text shown to the buyer, 1 to 140 characters, no personal data. */
+  description: string;
+  /** `card`, `wallet`, `vietqr`… — one the partner supports. */
+  method: string;
+  /** The unit that receives the money; default the tenant's root. */
+  org_id?: string | null;
+  /** Payment partner; may be left out when the server has only one. */
+  provider?: string | null;
+  /**
+   * Your id of this payment: sending it again returns the same payment (and asks the partner
+   * again if it did not answer the first time).
+   */
+  reference: string;
+  /** Page the buyer returns to. */
+  return_url?: string | null;
+  /** Id of your document (order, invoice…). */
+  source_id?: string | null;
 };
 
 /** An accounting period (a calendar month). */
@@ -5424,6 +5622,66 @@ export type LedgerPeriodResponse = {
   starts_on: string;
   /** `open` or `closed`. */
   status: string;
+};
+
+/** A reconciliation to run. */
+export type LedgerReconciliationRequest = {
+  /** Day to reconcile, `YYYY-MM-DD`. */
+  date: string;
+  /** Partner; may be left out when the server has only one. */
+  provider?: string | null;
+};
+
+/** A reconciliation run. */
+export type LedgerReconciliationResponse = {
+  created_at: string;
+  created_by?: string | null;
+  /** The day reconciled. */
+  date: string;
+  /** Differences sent to the exceptions. */
+  exceptions: number;
+  id: string;
+  /** Statement lines read. */
+  lines: number;
+  /** Lines that matched the book. */
+  matched: number;
+  provider: string;
+  /** `completed` or `failed`. */
+  status: string;
+};
+
+/** A refund of (part of) a payment. */
+export type LedgerRefund = {
+  amount: Money;
+  created_at: string;
+  id: string;
+  payment_id: string;
+  provider_ref?: string | null;
+  reason: string;
+  reference: string;
+  /** `pending`, `succeeded` or `failed`. */
+  status: string;
+  updated_at: string;
+};
+
+/** A refund to make. */
+export type LedgerRefundRequest = {
+  /** At most what is left of the payment. */
+  amount: Money;
+  /** Short reason, 1 to 200 characters, no personal data. */
+  reason: string;
+  /** Your id of this refund: sending it again returns the same refund. */
+  reference: string;
+};
+
+/** How to resolve an item. */
+export type LedgerResolveRequest = {
+  /** `match` (record the money for `payment_id`), `ignore`, or `refunded_outside`. */
+  action: string;
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** With `match`. */
+  payment_id?: string | null;
 };
 
 /** A reversal. */
@@ -5469,6 +5727,11 @@ export type LedgerTrialBalanceTotal = {
   credit: Money;
   currency: string;
   debit: Money;
+};
+
+/** Receipt of a partner notification. */
+export type LedgerWebhookReceipt = {
+  received: boolean;
 };
 
 /** Totals of the media library. */
@@ -6901,6 +7164,69 @@ export type Page_LedgerEntry = {
 };
 
 /** One page of a list. */
+export type Page_LedgerExceptionResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    details: Record<string, unknown>;
+    id: string;
+    /**
+     * `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
+     * `unknown_in_statement` or `late_payment`.
+     */
+    kind: string;
+    note?: string | null;
+    resolution?: string | null;
+    resolved_by?: string | null;
+    /** `open`, `resolved` or `ignored`. */
+    status: string;
+    /** The record concerned, e.g. `ledger.payment:<id>`. */
+    subject: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerPayment = {
+  /** The items of this page, in the requested order. */
+  data: {
+    amount: Money;
+    book_id: string;
+    captured_at?: string | null;
+    /** Partner page where the buyer pays. */
+    checkout_url?: string | null;
+    created_at: string;
+    description: string;
+    expires_at: string;
+    id: string;
+    /** `card`, `wallet`, `vietqr`… */
+    method: string;
+    /** The unit that receives the money (its book gets the entries). */
+    org_id: string;
+    /** Partner, e.g. `vnpay`. */
+    provider: string;
+    /** Id of the transaction at the partner, once created there. */
+    provider_ref?: string | null;
+    /** QR payload, when the partner gives one. */
+    qr_payload?: string | null;
+    reference: string;
+    /** Refunded or being refunded. */
+    refunded: Money;
+    source_id?: string | null;
+    /** Module that asked for the payment (`plans`, `orders`…) and its document. */
+    source_module: string;
+    /**
+     * `pending`, `succeeded`, `failed`, `expired` or `needs_review` (the partner reported another
+     * amount; see the exceptions).
+     */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_LedgerPeriodResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -6911,6 +7237,28 @@ export type Page_LedgerPeriodResponse = {
     id: string;
     starts_on: string;
     /** `open` or `closed`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerReconciliationResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    created_by?: string | null;
+    /** The day reconciled. */
+    date: string;
+    /** Differences sent to the exceptions. */
+    exceptions: number;
+    id: string;
+    /** Statement lines read. */
+    lines: number;
+    /** Lines that matched the book. */
+    matched: number;
+    provider: string;
+    /** `completed` or `failed`. */
     status: string;
   }[];
   pagination: Pagination;
@@ -13770,6 +14118,92 @@ export interface paths {
       };
     };
   };
+  "/api/v1/ledger/exceptions": {
+    /** List the differences waiting for a person. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerExceptionResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/exceptions/{id}/resolve": {
+    /** Resolve a difference. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: LedgerResolveRequest;
+      responses: {
+        200: Data_LedgerExceptionResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/payments": {
+    /** List payments in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; source_module?: string; source_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerPayment;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a payment through a payment partner. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerPaymentRequest;
+      responses: {
+        200: Data_LedgerPayment;
+        201: Data_LedgerPayment;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/payments/{id}": {
+    /** Get a payment with its refunds. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_LedgerPaymentDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/payments/{id}/refunds": {
+    /** Refund (part of) a payment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: LedgerRefundRequest;
+      responses: {
+        200: Data_LedgerRefund;
+        201: Data_LedgerRefund;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ledger/periods": {
     /** List the periods of a book. */
     get: {
@@ -13798,6 +14232,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/ledger/reconciliations": {
+    /** List reconciliation runs. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerReconciliationResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Reconcile a day now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerReconciliationRequest;
+      responses: {
+        201: Data_LedgerReconciliationResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ledger/trial-balance": {
     /** Get the trial balance of a book for a range of days. */
     get: {
@@ -13807,6 +14267,20 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/webhooks/{provider}": {
+    /** Receive a notification from a payment partner. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { provider: string }; };
+      requestBody: string;
+      responses: {
+        200: Data_LedgerWebhookReceipt;
+        401: Problem;
+        413: Problem;
         422: Problem;
         default: Problem;
       };

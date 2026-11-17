@@ -17,7 +17,7 @@ use validator::Validate;
 
 use crate::api::{Entry, LineAccount, NewEntry, NewLine, Side};
 use crate::http::{TrialBalanceResponse, describe_trial};
-use crate::permissions::{POST, READ};
+use crate::permissions::{POST, READ, RECONCILE};
 use crate::service::{EntryFilter, LedgerService};
 
 /// Which account and day.
@@ -105,10 +105,127 @@ pub(crate) struct PostInput {
     lines: Vec<LineInput>,
 }
 
+/// Which payment.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PaymentInput {
+    /// Id of the payment.
+    payment_id: Uuid,
+}
+
+/// Which items.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExceptionsInput {
+    /// `open` (default), `resolved` or `ignored`.
+    status: Option<String>,
+    /// Maximum number of items, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+}
+
+/// How to resolve an item.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ResolveInput {
+    /// Id of the item.
+    exception_id: Uuid,
+    /// `match` (record the money for `payment_id`), `ignore` or `refunded_outside`.
+    action: String,
+    /// With `match`.
+    payment_id: Option<Uuid>,
+    /// Up to 500 characters.
+    note: Option<String>,
+}
+
+/// A difference waiting for a person.
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct ExceptionItem {
+    id: Uuid,
+    kind: String,
+    subject: String,
+    #[schema(value_type = Object)]
+    details: serde_json::Value,
+    status: String,
+    resolution: Option<String>,
+}
+
+impl From<crate::entity::exception::Model> for ExceptionItem {
+    fn from(row: crate::entity::exception::Model) -> Self {
+        ExceptionItem {
+            id: row.id,
+            details: serde_json::from_str(&row.details).unwrap_or_default(),
+            kind: row.kind,
+            subject: row.subject,
+            status: row.status,
+            resolution: row.resolution,
+        }
+    }
+}
+
 pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
     let (balance, entries, trial, post) =
         (service.clone(), service.clone(), service.clone(), service.clone());
+    let (payment, exceptions, resolve) = (service.clone(), service.clone(), service.clone());
     vec![
+        Tool::new(
+            "payment",
+            "A payment collected through a payment partner, with its status and refunded amount.",
+            move |tenant: TenantContext, principal: Principal, input: PaymentInput| {
+                let service = payment.clone();
+                async move {
+                    let row = service.payment_for(&tenant, &principal, &READ, input.payment_id).await?;
+                    crate::payments::describe_payment(&row)
+                }
+            },
+        )
+        .requires(READ)
+        .read_only(),
+        Tool::new(
+            "exceptions",
+            "Differences between the book and the payment partners that wait for a person \
+             (amount mismatches, unknown or missing transactions, late payments).",
+            move |tenant: TenantContext, principal: Principal, input: ExceptionsInput| {
+                let service = exceptions.clone();
+                async move {
+                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let status = Some(input.status.unwrap_or_else(|| "open".to_owned()));
+                    let found = service.list_exceptions(&tenant, &principal, status, &page).await?;
+                    Ok::<Page<ExceptionItem>, Error>(found.map(ExceptionItem::from))
+                }
+            },
+        )
+        .requires(READ)
+        .read_only(),
+        Tool::new(
+            "resolve_exception",
+            "Resolve a difference: `match` records the money the partner collected for a payment, \
+             `ignore` closes it, `refunded_outside` notes it was refunded outside Autoxide.",
+            move |tenant: TenantContext, principal: Principal, input: ResolveInput| {
+                let service = resolve.clone();
+                async move {
+                    use crate::reconcile::Resolution;
+                    let resolution = match (input.action.as_str(), input.payment_id) {
+                        ("match", Some(payment)) => Resolution::Match(payment),
+                        ("ignore", _) => Resolution::Ignore,
+                        ("refunded_outside", _) => Resolution::RefundedOutside,
+                        _ => {
+                            return Err(Error::validation(vec![FieldError::new(
+                                "action",
+                                "invalid",
+                                "must be `match` (with `payment_id`), `ignore` or `refunded_outside`",
+                            )]));
+                        }
+                    };
+                    let row = service
+                        .resolve_exception(&tenant, &principal, input.exception_id, resolution, input.note)
+                        .await?;
+                    Ok::<_, Error>(ExceptionItem::from(row))
+                }
+            },
+        )
+        .requires(RECONCILE),
         Tool::new(
             "balance",
             "The balance of a ledger account, now or at the end of a day.",
