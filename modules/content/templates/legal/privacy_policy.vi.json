@@ -1,0 +1,243 @@
+{
+ "key": "privacy_policy",
+ "locale": "vi",
+ "title": "Chính sách bảo vệ dữ liệu cá nhân",
+ "marketplace": false,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "contact.email",
+   "required": true,
+   "description": "Contact email."
+  },
+  {
+   "path": "owner.address",
+   "required": false,
+   "description": "Address of the owner, on one line."
+  },
+  {
+   "path": "website.domain",
+   "required": false,
+   "description": "Domain of the website, e.g. shop.example."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ owner.legal_name }} (\"chúng tôi\") xử lý dữ liệu cá nhân của người dùng {{ website.domain or \"website\" }} như chính sách này nêu."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Dữ liệu chúng tôi thu thập"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Dữ liệu tài khoản và liên hệ bạn cung cấp: họ tên, email, số điện thoại, địa chỉ giao hàng."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Dữ liệu đơn hàng và thanh toán cần để giao hàng (không lưu số thẻ đầy đủ)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Dữ liệu kỹ thuật: thiết bị, trang đã xem — chỉ khi bạn đồng ý nếu không thật sự cần thiết."
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Mục đích sử dụng"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Cung cấp dịch vụ và giao đơn hàng (thực hiện hợp đồng)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Thực hiện nghĩa vụ pháp lý, vd hoá đơn, lưu trữ (nghĩa vụ theo luật)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Gửi tin tức, ưu đãi — chỉ khi bạn đồng ý; bạn rút đồng ý bất cứ lúc nào."
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Quyền của bạn"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Bạn có quyền xem, sửa, xoá dữ liệu, rút đồng ý, phản đối việc xử lý. Gửi yêu cầu tới {{ contact.email }}."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Lưu giữ và bảo vệ"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Chúng tôi chỉ giữ dữ liệu trong thời gian cần cho các mục đích trên hoặc theo luật định, và bảo vệ bằng biện pháp kỹ thuật, tổ chức. Sự cố lộ dữ liệu được xử lý trong thời hạn luật định."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Liên hệ"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ owner.legal_name }}, {{ owner.address or \"[địa chỉ]\" }} — {{ contact.email }}."
+     }
+    ]
+   }
+  ]
+ }
+}

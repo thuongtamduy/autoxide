@@ -12,6 +12,7 @@
 //! pháp lý trước khi chạy thật.
 
 pub mod api;
+mod checklist;
 mod config;
 mod consents;
 mod documents;
@@ -19,17 +20,22 @@ mod entity;
 mod events;
 mod http_kyc;
 mod http_legal;
+mod http_moit;
 mod http_verification;
 mod kyc;
+mod legal;
 mod migration;
 mod permissions;
 mod provider;
 mod service;
 mod tools;
 mod verification;
+mod websites;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_moit;
 #[cfg(test)]
 mod tests_verification;
 
@@ -78,6 +84,7 @@ impl Module for ComplianceModule {
                 crate::permissions::DOCUMENTS_READ,
                 crate::permissions::PRIVACY_READ,
                 crate::permissions::RULES_READ,
+                crate::permissions::LEGAL_READ,
             ]),
         )
     }
@@ -137,6 +144,10 @@ impl Module for ComplianceModule {
             sms: context.require::<dyn autoxide_kernel::sms::SmsSender>().ok(),
             secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
             otp: self.config.otp,
+            units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
+            resources: context.resources(),
+            templates: (*context.require::<autoxide_kernel::template::TemplateEngine>()?).clone(),
+            facts: Arc::new(checklist::FactRegistry::default()),
         });
         self.service = Some(service.clone());
         let provider = Arc::new(provider::Provider(service));
@@ -145,6 +156,8 @@ impl Module for ComplianceModule {
         context.provide::<dyn api::ConsentLedger>(provider.clone())?;
         context.provide::<dyn api::PostingGate>(provider.clone())?;
         context.provide::<dyn api::AccountVerification>(provider.clone())?;
+        context.provide::<dyn api::LegalProfiles>(provider.clone())?;
+        context.provide::<dyn api::ComplianceFacts>(provider.clone())?;
         // Bộ hỏi "đã xác thực để đăng nội dung chưa" của kernel (D-202) — `comments` hỏi qua nó.
         context.posting_verifier(provider.clone())?;
         context.provide::<dyn api::ComplianceRules>(provider)
@@ -154,12 +167,28 @@ impl Module for ComplianceModule {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
             http_kyc::routes(service.clone())
                 .merge(http_legal::routes(service.clone()))
+                .merge(http_moit::routes(service.clone()))
                 .merge(http_verification::routes(service))
         })
     }
 
     fn tools(&self) -> Vec<Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![autoxide_kernel::doctor::Check::new(
+                "moit_readiness",
+                "Every website has a legal profile and, before it is submitted to the Ministry of \
+                 Industry and Trade (Vietnam), nothing its checklist needs is missing.",
+                Arc::new(checklist::ReadinessProbe {
+                    databases: service.databases.clone(),
+                    service,
+                }),
+            )
+            .with_timeout(Duration::from_secs(60))]
+        })
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {

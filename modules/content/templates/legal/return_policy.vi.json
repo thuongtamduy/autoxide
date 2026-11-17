@@ -1,0 +1,161 @@
+{
+ "key": "return_policy",
+ "locale": "vi",
+ "title": "Chính sách đổi trả và hoàn tiền",
+ "marketplace": false,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "policy.return_days",
+   "required": true,
+   "description": "Days a buyer has to ask for a return."
+  },
+  {
+   "path": "contact.phone",
+   "required": true,
+   "description": "Contact phone number."
+  },
+  {
+   "path": "contact.email",
+   "required": false,
+   "description": "Contact email."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Khi nào được đổi trả"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Bạn được yêu cầu đổi hoặc trả hàng trong {{ policy.return_days }} ngày kể từ khi nhận hàng khi hàng lỗi, hư hỏng do vận chuyển hoặc không đúng mô tả."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Điều kiện"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Hàng còn bao bì, nhãn mác, phụ kiện, trừ khi lỗi do chúng tôi."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Giữ hoá đơn hoặc mã đơn hàng."
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Cách yêu cầu"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Gọi {{ contact.phone }} hoặc gửi email tới {{ contact.email or \"[email]\" }} kèm mã đơn hàng và ảnh hàng hoá."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Hoàn tiền"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ owner.legal_name }} hoàn tiền theo phương thức thanh toán ban đầu sau khi kiểm hàng trả lại. Phí gửi trả miễn phí khi lỗi do chúng tôi."
+     }
+    ]
+   }
+  ]
+ }
+}

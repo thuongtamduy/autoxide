@@ -1,0 +1,186 @@
+{
+ "key": "seller_agreement",
+ "locale": "en",
+ "title": "Agreement with sellers (template)",
+ "marketplace": true,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "website.domain",
+   "required": false,
+   "description": "Domain of the website, e.g. shop.example."
+  },
+  {
+   "path": "policy.commission",
+   "required": false,
+   "description": "Commission the platform takes from sellers."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Sample content — have a legal professional review it before use. It is not legal advice; check it against the laws in force.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Between {{ owner.legal_name }}, operator of {{ website.domain or \"the marketplace\" }}, and the seller named in the registration."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Scope"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "The operator provides the marketplace; the seller sells its own goods and is responsible for them."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Seller duties"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Verify its identity and keep its information true; give the documents its goods require."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Follow the operating regulations, deliver as promised, handle returns and complaints."
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Fees and payments"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Commission: {{ policy.commission or \"[rate]\" }}. Money from buyers goes through licensed payment providers."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Suspension and termination"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "The operator may hide listings or suspend the seller for breaches of the law or the regulations, with notice and a chance to answer."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Disputes"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Negotiation first; otherwise as the law provides."
+     }
+    ]
+   }
+  ]
+ }
+}

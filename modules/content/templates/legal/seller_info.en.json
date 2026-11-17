@@ -1,0 +1,119 @@
+{
+ "key": "seller_info",
+ "locale": "en",
+ "title": "Seller information",
+ "marketplace": true,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "owner.address",
+   "required": true,
+   "description": "Address of the owner, on one line."
+  },
+  {
+   "path": "owner.tax_code",
+   "required": false,
+   "description": "Tax code of the owner."
+  },
+  {
+   "path": "contact.phone",
+   "required": false,
+   "description": "Contact phone number."
+  },
+  {
+   "path": "contact.email",
+   "required": false,
+   "description": "Contact email."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Sample content — have a legal professional review it before use. It is not legal advice; check it against the laws in force.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Seller: {{ owner.legal_name }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Address: {{ owner.address }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Tax code: {{ owner.tax_code or \"[tax code]\" }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Contact: {{ contact.phone or \"[phone]\" }} — {{ contact.email or \"[email]\" }}"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

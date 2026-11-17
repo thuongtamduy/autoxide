@@ -29,6 +29,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0011_tenancy_throttle",
             vec![autoxide_kernel::throttle::tenant_table("compliance")],
         ),
+        Box::new(MoitWebsites),
     ]
 }
 
@@ -527,5 +528,118 @@ impl MigrationTrait for AccountVerification {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         drop_all(manager, &["compliance_phone_challenges", "compliance_account_verifications"])
             .await
+    }
+}
+
+/// Hồ sơ pháp lý, website và trang gắn website cho thông báo / đăng ký với Bộ Công Thương (D-357).
+/// `org_id` luôn có giá trị: nút gốc (`root_of(tenant)`) là cả khách — không dùng NULL, nên unique
+/// và lọc theo phạm vi giống mọi bảng theo nút.
+struct MoitWebsites;
+
+impl MigrationName for MoitWebsites {
+    fn name(&self) -> &str {
+        "m0012_moit_websites"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for MoitWebsites {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_legal_profiles")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::string_len("entity_type", 32))
+                    .col(schema::string_len("legal_name", 200))
+                    .col(schema::string_len_null("trade_name", 200))
+                    .col(schema::string_len_null("tax_code", 14))
+                    .col(schema::string_len_null("registration_number", 50))
+                    .col(schema::string_len_null("registration_issued_on", 10))
+                    .col(schema::string_len_null("registration_issued_by", 200))
+                    // `Address` của module `address` (JSON, kèm tên lúc ghi).
+                    .col(schema::text_null("address"))
+                    .col(schema::string_len_null("representative_name", 200))
+                    .col(schema::string_len_null("representative_title", 100))
+                    .col(schema::string_len_null("phone", 20))
+                    .col(schema::string_len_null("email", 254))
+                    .col(schema::uuid_null("kyc_profile_id"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_legal_profiles",
+            "compliance_legal_profiles_org_key",
+            &["tenant_id", "org_id"],
+            true,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_websites")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::string_len("domain", 253))
+                    .col(schema::string_len("channel", 16))
+                    .col(schema::string_len("website_kind", 16))
+                    .col(schema::string_len("moit_status", 24))
+                    .col(schema::string_len_null("moit_reference", 100))
+                    .col(schema::timestamp_with_time_zone_null("submitted_at"))
+                    .col(schema::timestamp_with_time_zone_null("decided_at"))
+                    .col(schema::string_len_null("logo_link_url", 500))
+                    .col(schema::string_len_null("logo_image_url", 500))
+                    .col(schema::integer_null("checklist_version"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_websites",
+            "compliance_websites_domain_key",
+            &["tenant_id", "domain"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "compliance_websites",
+            "compliance_websites_org_idx",
+            &["tenant_id", "org_id", "id"],
+            false,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_website_pages")
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("website_id"))
+                    .col(schema::string_len("page_kind", 32))
+                    // Đối tượng của sổ đối tượng (D-123), vd `content.entry:<id>`.
+                    .col(schema::string_len("resource", 200))
+                    .col(schema::timestamp_with_time_zone("linked_at"))
+                    .primary_key(
+                        Index::create().col("tenant_id").col("website_id").col("page_kind"),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        drop_all(
+            manager,
+            &["compliance_website_pages", "compliance_websites", "compliance_legal_profiles"],
+        )
+        .await
     }
 }

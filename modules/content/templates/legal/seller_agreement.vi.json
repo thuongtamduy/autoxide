@@ -1,0 +1,186 @@
+{
+ "key": "seller_agreement",
+ "locale": "vi",
+ "title": "Hợp đồng với người bán (mẫu)",
+ "marketplace": true,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "website.domain",
+   "required": false,
+   "description": "Domain of the website, e.g. shop.example."
+  },
+  {
+   "path": "policy.commission",
+   "required": false,
+   "description": "Commission the platform takes from sellers."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Giữa {{ owner.legal_name }}, chủ sàn {{ website.domain or \"sàn\" }}, và người bán ghi trong hồ sơ đăng ký."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Phạm vi"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Chủ sàn cung cấp sàn giao dịch; người bán bán hàng của mình và chịu trách nhiệm về hàng hoá."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Nghĩa vụ người bán"
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Định danh và giữ thông tin đúng; cung cấp giấy tờ ngành hàng yêu cầu."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Tuân thủ quy chế hoạt động, giao hàng như cam kết, xử lý đổi trả và khiếu nại."
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Phí và thanh toán"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Phí hoa hồng: {{ policy.commission or \"[tỉ lệ]\" }}. Tiền của người mua đi qua đơn vị trung gian thanh toán được cấp phép."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Tạm ngừng, chấm dứt"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Chủ sàn được ẩn tin đăng hoặc tạm ngừng người bán khi vi phạm pháp luật hay quy chế, có thông báo và cơ hội phản hồi."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Tranh chấp"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Thương lượng trước; không thành thì theo quy định của pháp luật."
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,119 @@
+{
+ "key": "seller_info",
+ "locale": "vi",
+ "title": "Thông tin người bán",
+ "marketplace": true,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "owner.address",
+   "required": true,
+   "description": "Address of the owner, on one line."
+  },
+  {
+   "path": "owner.tax_code",
+   "required": false,
+   "description": "Tax code of the owner."
+  },
+  {
+   "path": "contact.phone",
+   "required": false,
+   "description": "Contact phone number."
+  },
+  {
+   "path": "contact.email",
+   "required": false,
+   "description": "Contact email."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "bulletList",
+    "content": [
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Người bán: {{ owner.legal_name }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Địa chỉ: {{ owner.address }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Mã số thuế: {{ owner.tax_code or \"[mã số thuế]\" }}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "listItem",
+      "content": [
+       {
+        "type": "paragraph",
+        "content": [
+         {
+          "type": "text",
+          "text": "Liên hệ: {{ contact.phone or \"[số điện thoại]\" }} — {{ contact.email or \"[email]\" }}"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

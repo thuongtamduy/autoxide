@@ -1,0 +1,132 @@
+{
+ "key": "shipping_policy",
+ "locale": "vi",
+ "title": "Chính sách vận chuyển và giao nhận",
+ "marketplace": false,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "policy.shipping_days",
+   "required": false,
+   "description": "Usual delivery time, in days."
+  },
+  {
+   "path": "contact.phone",
+   "required": false,
+   "description": "Contact phone number."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Phạm vi và thời gian giao"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ owner.legal_name }} giao hàng trong lãnh thổ Việt Nam, thường trong {{ policy.shipping_days or \"[số]\" }} ngày kể từ khi xác nhận đơn."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Phí"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Phí vận chuyển hiện trước khi bạn thanh toán, tuỳ khối lượng và địa chỉ."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Nhận hàng"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Kiểm kiện hàng cùng người giao trước khi ký nhận. Hàng hư hỏng thì từ chối hoặc ghi chú, rồi gọi {{ contact.phone or \"[số điện thoại]\" }}."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Trách nhiệm"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Chúng tôi chịu trách nhiệm về hàng hoá tới khi giao cho bạn, và về chậm trễ do chúng tôi."
+     }
+    ]
+   }
+  ]
+ }
+}

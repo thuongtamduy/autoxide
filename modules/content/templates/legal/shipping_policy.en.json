@@ -1,0 +1,132 @@
+{
+ "key": "shipping_policy",
+ "locale": "en",
+ "title": "Shipping and delivery policy",
+ "marketplace": false,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "policy.shipping_days",
+   "required": false,
+   "description": "Usual delivery time, in days."
+  },
+  {
+   "path": "contact.phone",
+   "required": false,
+   "description": "Contact phone number."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Sample content — have a legal professional review it before use. It is not legal advice; check it against the laws in force.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Delivery area and time"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ owner.legal_name }} delivers within Vietnam, usually within {{ policy.shipping_days or \"[number of]\" }} days of confirming the order."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Fees"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "The shipping fee is shown before you pay and depends on the weight and the address."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Receiving goods"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Check the package with the carrier before signing for it. If it is damaged, refuse it or note it, and call {{ contact.phone or \"[phone]\" }}."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Responsibility"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "We are responsible for the goods until they are handed to you, and for delays caused by us."
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -8690,3 +8690,101 @@ phạm vi hay không chưa chắc, nên mọi thứ là cấu hình theo khách 
 8. **Chưa làm:** bộ nối nhà cung cấp SMS brandname thật (chỉ có `FakeSmsSender` của testkit; chủ dự án chọn nhà cung cấp,
    cấp tài khoản và đăng ký brandname); nghe `auth.user_deleted` để xoá số của người đã xoá tài khoản và xuất số trong dữ liệu cá
    nhân — làm cùng mục "Dữ liệu cá nhân" của bước 37.
+
+## D-357 · Hồ sơ pháp lý website, danh sách kiểm, bộ hồ sơ và logo Bộ Công Thương trong `compliance` (bước 37, hai mục "Hồ sơ pháp lý website" và "Bộ hồ sơ Bộ Công Thương") — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: NĐ 52/2013/NĐ-CP về thương mại điện tử, sửa đổi bởi
+NĐ 85/2021/NĐ-CP (hiệu lực 01/01/2022): website TMĐT **bán hàng** phải **thông báo** với Bộ Công Thương (logo "Đã thông
+báo", xanh); website **cung cấp dịch vụ** TMĐT (sàn, trung gian) phải **đăng ký** (logo "Đã đăng ký", đỏ; hồ sơ có đề án cung
+cấp dịch vụ, quy chế quản lý hoạt động); website phải công khai thông tin chủ sở hữu, điều kiện giao dịch chung, chính sách
+vận chuyển, thanh toán, đổi trả, kiểm hàng, bảo vệ thông tin cá nhân, giải quyết khiếu nại. Từ 01/7/2026 Luật Thương mại điện
+tử 122/2025/QH15 và nghị định hướng dẫn có thể đổi danh mục hồ sơ, mẫu tờ khai, miền của logo — vì vậy mọi thứ đó là dữ liệu.
+
+1. **Bảng** (migration mới `m0012_moit_websites`, có `down`): `compliance_legal_profiles` (một hồ sơ mỗi nút),
+   `compliance_websites` (unique `tenant_id`,`domain`), `compliance_website_pages` (PK `tenant_id`,`website_id`,`page_kind`;
+   đích là chuỗi của sổ đối tượng `content.entry:<id>`, không foreign key). Khác đặc tả: **`org_id` luôn có giá trị** — nút gốc
+   (`root_of(tenant)` = ID khách) là "cả khách" — thay cho cặp `org_id` NULL + `org_key ''`: unique, lọc theo phạm vi
+   (`scope_condition`) và kiểm `require_at` dùng chung như mọi bảng theo nút. Bỏ `domain_id` (tên miền đã xác minh của kernel
+   tra lúc cần, không chép), `profile_id` (website dùng hồ sơ của nút gần nhất: chính nút, rồi các nút cấp trên) và
+   `logo_snippet` (đoạn mã luôn dựng lại từ hai URL đã kiểm — không có bản HTML nào của người dùng được lưu).
+2. **Danh sách kiểm là dữ liệu có phiên bản**: quy tắc `moit.checklist.sales` / `moit.checklist.platform` (phiên bản 1, hiệu lực
+   01/01/2022, trong `rules/vn.json`, mọi mục `needs_legal_review: true`). Thân quy tắc có `registration`
+   (`notification`/`registration`), `status_when_done`, `logo` (`color`, `alt`, `link_hosts`, `image_hosts` =
+   `online.gov.vn`), `sell_before_done` (D-358) và `items` với `check.type` thuộc tập cố định trong code: `profile_field`,
+   `page` (trang gắn với website phải `public` và có `url` theo `ResourceDirectory`), `document` (văn bản pháp lý có phiên bản
+   hiện hành), `kyc` (hồ sơ định danh của chủ sở hữu `verified` — `kyc_profile_id` của hồ sơ, hoặc hồ sơ KYC của nút), `policy`
+   (khoá chính sách có giá trị, vd `complaints.contact`), `fact`, `manual`. Kết quả mỗi mục `met` / `missing` / `unknown` /
+   `manual`, kèm gợi ý endpoint cần gọi. Nhập bản mới qua `POST /compliance/rules` là đổi danh sách, không sửa code.
+3. **`ComplianceFacts`** (hợp đồng mới): module đăng ký sau `compliance` góp `dyn Fact` cho một khoá (vd bước 46:
+   `marketplace.seller_info_on_product`); chưa ai góp → `unknown`. `Fact::holds(tenant, &WebsiteRef)` nhận cả nút, tên miền,
+   loại website (đặc tả phác thảo chỉ có `website_id` — module trả lời không đọc được bảng của `compliance`, nên phải được đưa).
+4. **`LegalProfiles`** (hợp đồng mới): biến mẫu `owner.*`, `contact.*` của hồ sơ áp cho một nút — `content` dùng để điền mẫu
+   trang bắt buộc (D-359), không đọc bảng của `compliance`. Cùng dữ liệu ở `GET /legal-profiles/{id}/template-variables`.
+5. **Bộ hồ sơ** `GET /websites/{id}/dossier`: `form` (trường tờ khai từ hồ sơ pháp lý, website, KYC, trang đã gắn kèm URL đầy đủ,
+   đầu mối khiếu nại), `documents` (Markdown tiếng Việt dựng bằng bộ dựng mẫu của kernel, D-351: `declaration`; sàn thêm
+   `project_plan` — nháp đề án — và `platform_rules` — nháp quy chế), `checklist`, `disclaimer`. Chưa điền "chế độ dòng tiền"
+   (bước 36) và hạn xử lý khiếu nại (`cases.deadlines` chưa có — mục "Báo vi phạm" của bước 37): làm khi hai phần đó có hợp đồng.
+6. **Trạng thái và logo cập nhật tay** (`POST /websites/{id}/status`): con người nộp trên online.gov.vn (không có API công khai).
+   `notified` chỉ cho website `sales`, `registered` chỉ cho `platform`; hai trạng thái đó cần logo — đoạn mã dán nguyên văn hoặc
+   `link_url` + `image_url`. Đoạn mã được đọc bằng bộ đọc tự viết rất hẹp (đúng một `<a>` bọc đúng một `<img>`, chỉ thuộc tính
+   `href/target/rel/title` và `src/alt/title/width/height/border`; `script`, `onerror`, `style`, nội dung thêm đều bị từ chối),
+   URL chỉ `http(s)` tới miền trong quy tắc, không có tài khoản trong URL → ngược lại `compliance.logo_snippet_invalid` (422).
+   Nhận `http://` vì đoạn mã thật của Bộ đang dùng `http`. Trạng thái khác bỏ logo. Gửi `submitted` ghi phiên bản danh sách kiểm.
+7. **Công khai**: `GET /public/badge` (website theo `?domain=`, rồi tên miền của request, rồi website đã xong thủ tục của nút đang
+   xem — `?site=` hay tên miền gắn nút; không có logo → 404 `compliance.website_not_found`) và `GET /public/owner` (hồ sơ của nút
+   gần nhất); cả hai trả `ETag`, `If-None-Match` → 304. Tên miền của request đọc từ `Host` (proxy chuyển nguyên `Host`, như Caddy;
+   giao diện ở tên miền khác gửi `?domain=`).
+8. **Permission** `compliance.legal.read` / `compliance.legal.manage` (có phạm vi theo nút: người bán chỉ thấy, sửa hồ sơ và
+   website của nút mình; ngoài phạm vi → 404). Kiểm permission trước mọi tra cứu. **Event** `compliance.legal_profile_updated`,
+   `…website_created`, `…website_updated`, `…website_status_changed` (chỉ ID, tên miền, loại, trạng thái). **MCP**:
+   `compliance.legal_profiles`, `…websites`, `…website_checklist`, `…website_dossier` (đọc), `…set_website_status` (ghi).
+9. **`autoxide doctor`**: bước `compliance.moit_readiness` — chưa có website nào có hồ sơ, hay website `not_submitted` /
+   `needs_supplement` còn mục thiếu → `warning` (không bao giờ `failed`), kèm đường dẫn danh sách kiểm. Chưa kiểm cư trú dữ liệu
+   (`data_residency`) như đặc tả gợi ý — thuộc mục "Dữ liệu cá nhân" của bước 37.
+10. Không làm: nộp hồ sơ tự động (không có API công khai); cổng chặn bán khi chưa thông báo (D-358).
+
+## D-358 · "Bán trước khi thông báo website" (A-3.5): nhãn "bắt buộc theo luật", không chặn — 2026-11-17 — agent quyết
+
+Đối chiếu (nguồn thứ cấp, **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**): NĐ 52/2013/NĐ-CP (sửa bởi NĐ
+85/2021/NĐ-CP) đặt **nghĩa vụ** thông báo / đăng ký website trước khi hoạt động; chế tài tìm thấy là **xử phạt vi phạm hành
+chính** (NĐ 98/2020/NĐ-CP về xử phạt trong hoạt động thương mại, bảo vệ người tiêu dùng, sửa bởi NĐ 17/2022/NĐ-CP — mức phạt
+tiền và biện pháp khắc phục như gỡ bỏ / đình chỉ website), không thấy quy định giao dịch đã làm trước khi thông báo bị vô hiệu
+hay phải bị nền tảng chặn. Các nguồn không thống nhất việc hành vi này có nằm trong danh sách "hành vi bị cấm" hay không; Luật
+TMĐT 122/2025/QH15 (từ 01/7/2026) và nghị định hướng dẫn chưa đối chiếu được điều cụ thể.
+
+Theo luật của dự án khi nguồn chưa thống nhất (CLAUDE.md, Luật số hai: không chặn công việc), chọn phương án **ít chặn hơn**:
+
+1. Không thêm cổng chặn đặt hàng và **không** thêm mã lỗi `compliance.website_not_notified`.
+2. Danh sách kiểm trả `selling_before_done = "label"` và `selling_note` (câu đối chiếu ở trên); giao diện hiện nhãn "bắt buộc
+   theo luật" cho website chưa `notified` / `registered`; `autoxide doctor` cảnh báo.
+3. Giá trị nằm trong dữ liệu (`sell_before_done` của quy tắc `moit.checklist.*`): nếu đối chiếu sau kết luận "cấm", nhập bản quy
+   tắc mới với `"block"` và thêm cổng chặn (gọi từ checkout của bước 45) trong một quyết định mới — không đổi code đã có.
+
+## D-359 · Mẫu trang bắt buộc trong `content`, biến từ hồ sơ pháp lý qua `LegalProfiles`; `PublishedEntries` (bước 37, mục "Trang bắt buộc có mẫu") — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: NĐ 52/2013/NĐ-CP sửa bởi NĐ 85/2021/NĐ-CP (thông tin
+phải công khai trên website TMĐT); Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP (chính sách dữ liệu cá nhân);
+Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15, NĐ 55/2024/NĐ-CP (điều kiện giao dịch chung, khiếu nại).
+
+1. **Mẫu ở `content`** (đặc tả C1, "Agent tự quyết" #1): một cách soạn trang. 12 khoá × 2 ngôn ngữ (EN + VI) trong
+   `modules/content/templates/legal/<khoá>.<en|vi>.json`: `owner_info`, `privacy_policy`, `return_policy`, `shipping_policy`,
+   `payment_policy`, `inspection_policy`, `complaint_policy`, `terms_of_use`, `general_conditions`; sàn thêm `platform_rules`,
+   `seller_agreement` và `seller_info` (khối thông tin người bán cho trang sản phẩm — không phải trang gắn website). Mỗi file:
+   tiêu đề, `marketplace`, danh sách biến (đường dẫn, bắt buộc, mô tả), thân ProseMirror theo allowlist của `content`. Đoạn
+   đầu mọi mẫu: "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng". Test kiểm mọi mẫu qua allowlist, mọi
+   biến dùng trong chữ đã khai, hai ngôn ngữ cùng danh sách biến.
+2. **Điền biến bằng bộ dựng mẫu của kernel** (D-351), ở chế độ chữ thuần, **chỉ trong từng text node**: giá trị không bao giờ
+   thành thẻ hay node mới (không cần thoát HTML vì thân là JSON). Biến tuỳ chọn có giá trị thay thế `[…]` trong chính mẫu.
+3. **Nguồn biến**: hồ sơ pháp lý của nút (hay nút cấp trên gần nhất) qua hợp đồng mới `autoxide_compliance::api::LegalProfiles`
+   (`compliance` đăng ký trước `content` nên `content` `require` được; tuỳ chọn — test riêng của `content` không có), rồi
+   `variables` người gọi gửi (gộp sâu, người gọi thắng). `content` không đọc bảng của `compliance`; khái niệm "chủ sở hữu"
+   vẫn ở `compliance`, `content` chỉ thấy JSON biến — trung lập với nghiệp vụ.
+4. **API**: `GET /api/v1/content/templates` (`content.read`), `POST /api/v1/content/templates/{key}/drafts {locale, variables,
+   parent_id?, org_id?}` (`content.write` hay `content.write_own`, đi qua `create` có sẵn: cùng kiểm ngôn ngữ, nút, slug) tạo
+   trang **nháp**. Thiếu biến bắt buộc → `content.template_variables_missing` (422) liệt kê đủ một lần (`variables.<đường dẫn>`);
+   khoá lạ → `content.template_not_found` (404). MCP `content.legal_templates` (đọc), `content.draft_from_template` (ghi).
+5. **`PublishedEntries`** (đặc tả C1b): `content::api` thêm trait `published_snapshot(tenant, entry_id)` (tiêu đề, ngôn ngữ, thân,
+   chữ thuần, `revision_id` của bản đã đăng, `published_at`), công bố trong `start`. **Chưa có bên dùng**: văn bản pháp lý có
+   phiên bản (D-347) đã làm với thân gửi thẳng, và `compliance` đăng ký TRƯỚC `content` (`notifications`, `plans` cần
+   `compliance`), nên `compliance` không `require` được trait này. Nối "phát hành phiên bản từ trang đã đăng" cần một chỗ góp
+   muộn (như `ComplianceFacts`) — để mục sau, ghi ở đây để không ai đảo thứ tự đăng ký module.

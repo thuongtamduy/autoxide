@@ -18,6 +18,33 @@ endpoints are marked deprecated with a sunset date first.
   record; `dry_run` lists the records it would act on without doing anything. Posts and pages can be archived,
   comments approved, rejected, marked as spam or deleted, and newsletter subscribers blocked, unblocked or deleted
   in bulk.
+- Step 37, mandatory page templates in `content` (Vietnam; every text says it needs review by a legal professional):
+  owner information, personal data protection, returns, shipping, payment, inspection, complaints, terms of use,
+  general conditions, and for a marketplace its regulations, the seller agreement and seller information, in English
+  and Vietnamese (`modules/content/templates/legal/`). `GET /api/v1/content/templates`,
+  `POST /api/v1/content/templates/{key}/drafts` make a draft page filled with the unit's legal profile (from
+  `compliance` through the new `LegalProfiles` contract) and the given `variables`, through the kernel template engine,
+  values only ever becoming text; errors `content.template_not_found`, `content.template_variables_missing`; MCP
+  `content.legal_templates`, `content.draft_from_template`. New contract `autoxide_content::api::PublishedEntries`
+  (snapshot of a published entry).
+- Step 37, website legal profile and the Ministry of Industry and Trade (Vietnam, Decree 52/2013 as amended by Decree
+  85/2021 — check the original texts; guide `docs/COMPLIANCE.md`): legal (owner) profiles per tenant and per unit
+  (`GET|POST /api/v1/compliance/legal-profiles`, `GET|PATCH /legal-profiles/{id}` with `ETag` / `If-Match`,
+  `GET /legal-profiles/{id}/template-variables`; address checked by `address`), websites by domain with kind
+  `sales` (notification, blue logo) or `platform` (registration, red logo) (`GET|POST /websites`,
+  `GET|PATCH /websites/{id}`), mandatory pages linked to a website (`PUT|DELETE /websites/{id}/pages/{page_kind}`),
+  a checklist that is versioned data (rules `moit.checklist.sales` / `moit.checklist.platform`;
+  `GET /websites/{id}/checklist`), a draft dossier filled from the data (`GET /websites/{id}/dossier`: declaration
+  fields, Markdown drafts of the declaration, service project plan and operating regulations), status and logo recorded
+  by hand (`POST /websites/{id}/status`; the logo code is parsed strictly and rebuilt), public
+  `GET /public/badge` and `GET /public/owner` for the interface. Permissions `compliance.legal.read`,
+  `compliance.legal.manage` (scoped by unit); events `compliance.legal_profile_updated`, `…website_created`,
+  `…website_updated`, `…website_status_changed`; MCP `compliance.legal_profiles`, `…websites`,
+  `…website_checklist`, `…website_dossier`, `…set_website_status`; contracts `ComplianceFacts` / `Fact` (other modules
+  answer checklist items) and `LegalProfiles` (template variables); `autoxide doctor` check
+  `compliance.moit_readiness` (warning only). Error codes `compliance.profile_not_found`, `compliance.profile_exists`,
+  `compliance.website_not_found`, `compliance.domain_taken`, `compliance.logo_snippet_invalid`. Selling before the
+  procedure is done is labelled, not blocked (D-358).
 - List exports (step 51): modules declare exportable lists (`StartContext::export_source`, `list_exports`
   module of the kernel); `POST /api/v1/kernel/exports {resource, params, columns}` checks the filters against
   the list's schema and writes a CSV file (protected against CSV injection, `autoxide_kernel::csv`) in a background

@@ -1,0 +1,151 @@
+{
+ "key": "general_conditions",
+ "locale": "vi",
+ "title": "Điều kiện giao dịch chung",
+ "marketplace": false,
+ "needs_legal_review": true,
+ "variables": [
+  {
+   "path": "owner.legal_name",
+   "required": true,
+   "description": "Registered name of the owner (legal profile)."
+  },
+  {
+   "path": "website.domain",
+   "required": false,
+   "description": "Domain of the website, e.g. shop.example."
+  },
+  {
+   "path": "owner.address",
+   "required": false,
+   "description": "Address of the owner, on one line."
+  },
+  {
+   "path": "contact.email",
+   "required": false,
+   "description": "Contact email."
+  },
+  {
+   "path": "contact.phone",
+   "required": false,
+   "description": "Contact phone number."
+  }
+ ],
+ "body": {
+  "type": "doc",
+  "content": [
+   {
+    "type": "blockquote",
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng. Đây không phải tư vấn pháp lý; hãy đối chiếu quy định đang có hiệu lực.",
+        "marks": [
+         {
+          "type": "bold"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Điều kiện giao dịch chung này áp dụng cho mọi giao dịch mua hàng trên {{ website.domain or \"website này\" }} với {{ owner.legal_name }}, {{ owner.address or \"[địa chỉ]\" }}."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Đặt hàng"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Đơn hàng được xác nhận khi chúng tôi gửi thông báo xác nhận. Giá đã gồm thuế hiện ở bước thanh toán."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Giao hàng, thanh toán, đổi trả"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Xem chính sách vận chuyển, thanh toán, kiểm hàng, đổi trả trên website; các chính sách đó là một phần của điều kiện này."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Bảo hành và khiếu nại"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "Điều kiện bảo hành ghi ở từng sản phẩm. Khiếu nại theo cơ chế giải quyết khiếu nại của chúng tôi."
+     }
+    ]
+   },
+   {
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "Liên hệ"
+     }
+    ]
+   },
+   {
+    "type": "paragraph",
+    "content": [
+     {
+      "type": "text",
+      "text": "{{ contact.phone or \"[số điện thoại]\" }} — {{ contact.email or \"[email]\" }}"
+     }
+    ]
+   }
+  ]
+ }
+}

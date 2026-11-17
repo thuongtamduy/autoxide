@@ -44,3 +44,31 @@ pub trait LegacyMenus: Send + Sync {
     /// Mọi menu cũ của khách `tenant`, theo khoá rồi ngôn ngữ.
     async fn legacy_menus(&self, tenant: &TenantContext) -> Result<Vec<LegacyMenu>, Error>;
 }
+
+/// Ảnh chụp bản đã đăng của một bài / trang (bước 37 C1): đủ để module khác (vd văn bản pháp lý
+/// của `compliance`) chép lại thành bản bất biến mà không đọc bảng của `content`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PublishedSnapshot {
+    pub entry_id: Uuid,
+    pub title: String,
+    pub locale: String,
+    /// Thân ProseMirror JSON đã đăng.
+    pub body: serde_json::Value,
+    pub plain_text: String,
+    /// Revision của bản đã đăng (không phải bản nháp).
+    pub revision_id: Uuid,
+    pub published_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Đọc bản đã đăng của bài / trang. Lấy bằng `context.require::<dyn PublishedEntries>()` (đăng ký
+/// SAU `content`).
+#[async_trait::async_trait]
+pub trait PublishedEntries: Send + Sync {
+    /// Bản đã đăng của mục `entry_id`; chưa đăng hay không có → `None`.
+    async fn published_snapshot(
+        &self,
+        tenant: &TenantContext,
+        entry_id: Uuid,
+    ) -> Result<Option<PublishedSnapshot>, Error>;
+}
