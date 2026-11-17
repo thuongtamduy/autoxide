@@ -9,6 +9,7 @@ mod m0009_schedule_ai_review;
 mod m0012_org;
 mod m0013_site_paths;
 mod m0014_redirect_search;
+mod m0015_review_index;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -140,5 +141,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "content"),
         // Khoá tìm của chuyển hướng: `q` của `GET /redirects` (W-059 của giao diện).
         Box::new(m0014_redirect_search::Migration),
+        // Index của nguồn việc "chờ duyệt" (bước 51 P2).
+        Box::new(m0015_review_index::Migration),
     ]
 }

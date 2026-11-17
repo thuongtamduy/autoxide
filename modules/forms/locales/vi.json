@@ -74,6 +74,7 @@
   "text:Mark submissions read, archived, spam or not spam, and delete single submissions.": "Đánh dấu bài nộp đã đọc, lưu trữ, spam hay không phải spam, và xoá từng bài nộp.",
   "text:Marketing": "Tiếp thị",
   "text:Read forms and their submissions (personal data).": "Xem biểu mẫu và bài nộp (dữ liệu cá nhân).",
+  "text:Read the new submission to {form}": "Đọc bài nộp mới của {form}",
   "text:Send form submissions without the anti-spam checks for anonymous visitors — for a website server's own API key; still limited per account.": "Gửi bài nộp biểu mẫu mà không qua kiểm chống spam dành cho khách vãng lai — cho API key riêng của máy chủ website; vẫn bị giới hạn theo tài khoản.",
   "text:The daily job deleted submissions past their retention time.": "Việc chạy hằng ngày đã xoá các bài nộp quá hạn lưu."
 }

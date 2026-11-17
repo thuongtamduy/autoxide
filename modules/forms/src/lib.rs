@@ -18,6 +18,7 @@ mod retention;
 mod service;
 mod submissions;
 mod tools;
+mod work;
 
 #[cfg(test)]
 mod tests;
@@ -117,6 +118,7 @@ impl Module for FormsModule {
         };
         let service = Arc::new(FormsService::new(parts, config));
         context.personal_data(service.clone())?;
+        context.work_source(Arc::new(work::NewSubmissions))?;
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())

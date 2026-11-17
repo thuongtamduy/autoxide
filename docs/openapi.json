@@ -6833,6 +6833,39 @@
         ],
         "type": "object"
       },
+      "Data_FindView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Records found, by type.",
+            "properties": {
+              "groups": {
+                "description": "One group per record type that found something, in the order modules start.",
+                "items": {
+                  "$ref": "#/components/schemas/FoundGroup"
+                },
+                "type": "array"
+              },
+              "incomplete": {
+                "description": "Sources that did not answer in time or failed.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "groups",
+              "incomplete"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_FolderResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -16746,6 +16779,76 @@
         ],
         "type": "object"
       },
+      "Data_WorkCounts": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Counts for the menu.",
+            "properties": {
+              "counts": {
+                "additionalProperties": {
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "description": "Pending work by source (the `counter` of navigation items); `work` is the total.",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "incomplete": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "counts",
+              "incomplete"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_WorkView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The inbox.",
+            "properties": {
+              "incomplete": {
+                "description": "Sources that did not answer in time or failed: the list may miss their work.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "items": {
+                "description": "Most urgent first (`blocking`, `attention`, `info`), then soonest due.",
+                "items": {
+                  "$ref": "#/components/schemas/WorkItemView"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "items",
+              "incomplete"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "DecimalString": {
         "description": "A decimal number written as a string, like \"12.5\" or \"-0.08\": a dot before the fraction, no thousands separators, no exponent, at most 28 digits.",
         "examples": [
@@ -17967,6 +18070,30 @@
         ],
         "type": "object"
       },
+      "FindView": {
+        "description": "Records found, by type.",
+        "properties": {
+          "groups": {
+            "description": "One group per record type that found something, in the order modules start.",
+            "items": {
+              "$ref": "#/components/schemas/FoundGroup"
+            },
+            "type": "array"
+          },
+          "incomplete": {
+            "description": "Sources that did not answer in time or failed.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups",
+          "incomplete"
+        ],
+        "type": "object"
+      },
       "FindingLevel": {
         "description": "How serious a finding is.",
         "enum": [
@@ -18193,6 +18320,54 @@
           "markdown"
         ],
         "type": "string"
+      },
+      "FoundGroup": {
+        "description": "Records of one type.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FoundView"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "example": "content.entry",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "items"
+        ],
+        "type": "object"
+      },
+      "FoundView": {
+        "description": "One record found.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "screen": {
+            "description": "Screen id of the navigation that opens the record.",
+            "example": "content.entries",
+            "type": "string"
+          },
+          "subtitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "screen"
+        ],
+        "type": "object"
       },
       "Health": {
         "description": "Health of the service.",
@@ -33498,6 +33673,15 @@
         ],
         "type": "object"
       },
+      "Severity": {
+        "description": "How urgent a piece of work is.",
+        "enum": [
+          "blocking",
+          "attention",
+          "info"
+        ],
+        "type": "string"
+      },
       "SignupAccepted": {
         "description": "The answer to a sign-up: always the same.",
         "properties": {
@@ -37768,6 +37952,115 @@
           "components",
           "total",
           "snapshot"
+        ],
+        "type": "object"
+      },
+      "WorkCounts": {
+        "description": "Counts for the menu.",
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "Pending work by source (the `counter` of navigation items); `work` is the total.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "incomplete": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "counts",
+          "incomplete"
+        ],
+        "type": "object"
+      },
+      "WorkItemView": {
+        "description": "One piece of work.",
+        "properties": {
+          "due_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "description": "Stable key, `<source>:<record id>`.",
+            "example": "comments.pending:0190a1b2-…",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "source": {
+            "example": "comments.pending",
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/WorkTarget",
+            "description": "Where to do it: the screen of `GET /api/v1/kernel/navigation` and the record."
+          },
+          "title": {
+            "description": "What to do, in the language of `Accept-Language`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "source",
+          "severity",
+          "title",
+          "target"
+        ],
+        "type": "object"
+      },
+      "WorkTarget": {
+        "description": "Where a piece of work is done.",
+        "properties": {
+          "record_id": {
+            "type": "string"
+          },
+          "screen": {
+            "description": "Screen id of the navigation, e.g. `marketing.comments`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "screen",
+          "record_id"
+        ],
+        "type": "object"
+      },
+      "WorkView": {
+        "description": "The inbox.",
+        "properties": {
+          "incomplete": {
+            "description": "Sources that did not answer in time or failed: the list may miss their work.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "items": {
+            "description": "Most urgent first (`blocking`, `attention`, `info`), then soonest due.",
+            "items": {
+              "$ref": "#/components/schemas/WorkItemView"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "incomplete"
         ],
         "type": "object"
       }
@@ -66900,6 +67193,108 @@
         "x-public": true
       }
     },
+    "/api/v1/kernel/find": {
+      "get": {
+        "description": "Any signed-in user. Asks every module's finder for records whose title (or name, email…)\ncontains `q`, in any case and with or without accents, among the types the caller has\npermission for at `org_id`; results are grouped by type, each record with the screen that\nopens it. A slow or failing source is skipped and named in `incomplete`.",
+        "operationId": "kernel_find_records",
+        "parameters": [
+          {
+            "description": "At least 2 characters; any case, with or without accents.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The organization unit chosen; omitted: the whole tenant.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "At most this many records per type, 1 to 20. Defaults to 5.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FindView"
+                }
+              }
+            },
+            "description": "The records found."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`q` is shorter than 2 characters, or `limit` is not between 1 and 20; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Find records across modules.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/kernel/modules": {
       "get": {
         "description": "Requires `kernel.modules.read`. Every module the server runs, in start order, with what\neach declares. Modules are compiled into the server: installing or removing one means\nrebuilding it, so this list does not change while the server runs. Migration `applied`\nis `null` here; get one module to read it.",
@@ -69947,6 +70342,182 @@
           "kernel"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/kernel/work": {
+      "get": {
+        "description": "Any signed-in user. Work that modules compute from their data (comments waiting for approval,\nnew form submissions, entries waiting for a review…) from the sources you have permission for\nat `org_id`, most urgent first. Work disappears when the record is handled; there is no \"done\"\nto set. A source that is slow or failing is skipped and named in `incomplete`.",
+        "operationId": "kernel_list_work",
+        "parameters": [
+          {
+            "description": "The organization unit chosen; omitted: the whole tenant.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "At most this many items, 1 to 200. Defaults to 50.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_WorkView"
+                }
+              }
+            },
+            "description": "The work."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`limit` is not between 1 and 200; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the work waiting for you.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/work/counts": {
+      "get": {
+        "description": "Any signed-in user. For the counters of the menu (the `counter` of navigation items): pending\nwork by source at `org_id`, and `work` for the total. Counts are kept for ten seconds.",
+        "operationId": "kernel_count_work",
+        "parameters": [
+          {
+            "description": "The organization unit chosen; omitted: the whole tenant.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "At most this many items, 1 to 200. Defaults to 50.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_WorkCounts"
+                }
+              }
+            },
+            "description": "The counts."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Count the work waiting for you, by source.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
       }
     },
     "/api/v1/ledger/accounts": {

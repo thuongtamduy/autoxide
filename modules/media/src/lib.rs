@@ -14,6 +14,7 @@ mod client_config;
 mod config;
 mod entity;
 mod events;
+mod find;
 mod http;
 mod images;
 mod jobs;
@@ -140,6 +141,7 @@ impl Module for MediaModule {
         self.service = Some(service.clone());
         self.databases = Some(context.tenancy());
         context.personal_data(service.clone())?;
+        context.finder_source(Arc::new(find::Items))?;
         context.provide::<dyn api::Media>(service)
     }
 

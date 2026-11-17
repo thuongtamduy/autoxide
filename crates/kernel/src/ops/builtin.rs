@@ -300,6 +300,19 @@ impl Module for KernelModule {
         if let Some(state) = self.navigation_state() {
             routes = routes.merge(crate::ops::navigation::routes(state));
         }
+        if let Some(entitlements) = &self.entitlements {
+            let state = crate::ops::work::WorkState::new(
+                self.catalog.work_sources(),
+                entitlements.clone(),
+                self.translations.clone(),
+            );
+            routes = routes.merge(crate::ops::work::routes(state));
+            let find = crate::ops::find::FindState {
+                sources: self.catalog.finder_sources(),
+                entitlements: entitlements.clone(),
+            };
+            routes = routes.merge(crate::ops::find::routes(find));
+        }
         if let (Some(settings), Some(registry)) = (&self.settings, &self.registry) {
             routes =
                 routes.merge(crate::tenancy::settings::routes(settings.clone(), registry.clone()));

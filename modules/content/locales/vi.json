@@ -145,6 +145,7 @@
   "text:Publish, unpublish, archive and schedule posts and pages; move published pages; change the terms and authors of published entries.": "Đăng, gỡ, lưu trữ và hẹn giờ bài viết và trang; chuyển chỗ trang đã đăng; đổi danh mục, thẻ và tác giả của bài đã đăng.",
   "text:Publishing or unpublishing was scheduled.": "Việc đăng hay gỡ đã được hẹn giờ.",
   "text:Read drafts, revisions and schedules of posts and pages.": "Xem bản nháp, phiên bản cũ và lịch hẹn của bài viết và trang.",
+  "text:Review and publish “{title}”": "Duyệt và đăng “{title}”",
   "text:The draft of a post or page changed.": "Bản nháp của bài viết hay trang thay đổi.",
   "text:The writer of a draft (often an AI agent) asked a person to review and publish it.": "Người viết bản nháp (thường là AI agent) nhờ một người duyệt và đăng nó.",
   "text:heading level {level} comes after level {last_level}; do not skip levels": "tiêu đề cấp {level} đứng sau cấp {last_level}; đừng nhảy cấp",

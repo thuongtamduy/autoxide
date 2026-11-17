@@ -22,6 +22,7 @@ mod service;
 mod text;
 mod threads;
 mod tools;
+mod work;
 
 #[cfg(test)]
 mod tests;
@@ -132,6 +133,7 @@ impl Module for CommentsModule {
         };
         let service = Arc::new(CommentsService::new(parts, config));
         context.personal_data(service.clone())?;
+        context.work_source(Arc::new(work::Pending))?;
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())
