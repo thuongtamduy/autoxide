@@ -6,14 +6,14 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::reference::Submitted;
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use chrono::NaiveDate;
 use sea_orm::EntityTrait;
 use uuid::Uuid;
 
 use crate::api::{
-    AccountKey, Entry, Ledger, NewEntry, NewPayment, NewRefund, NewReversal, OpenAccount, Payment,
-    Refund,
+    AccountKey, Entry, FlowSettings, Hold, Ledger, NewEntry, NewPayment, NewPayout, NewRefund,
+    NewReversal, NewTransferPayment, OpenAccount, Payment, Payout, Refund, Settled, Settlement,
 };
 use crate::entity::entry;
 use crate::service::{LedgerService, describe_entry};
@@ -104,5 +104,58 @@ impl Ledger for Provider {
             Some(row) => Ok(Some(crate::payments::describe_payment(&row)?)),
             None => Ok(None),
         }
+    }
+
+    async fn balances(
+        &self,
+        tenant: &TenantContext,
+        keys: &[AccountKey],
+        as_of: Option<NaiveDate>,
+    ) -> Result<Vec<Money>, Error> {
+        self.0.balances_of_keys(tenant, keys, as_of).await
+    }
+
+    async fn flow_settings(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+    ) -> Result<FlowSettings, Error> {
+        self.0.flow_settings(tenant, org).await
+    }
+
+    async fn settle(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        settlement: Settlement,
+    ) -> Result<Submitted<Settled>, Error> {
+        self.0.settle(tenant, actor, settlement).await
+    }
+
+    async fn hold_status(
+        &self,
+        tenant: &TenantContext,
+        source_module: &str,
+        source_id: &str,
+    ) -> Result<Option<Hold>, Error> {
+        self.0.hold_status(tenant, source_module, source_id).await
+    }
+
+    async fn create_payout(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        payout: NewPayout,
+    ) -> Result<Submitted<Payout>, Error> {
+        self.0.create_payout(tenant, actor, payout).await
+    }
+
+    async fn create_transfer_payment(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        payment: NewTransferPayment,
+    ) -> Result<Submitted<Payment>, Error> {
+        self.0.create_transfer_payment(tenant, actor, payment).await
     }
 }

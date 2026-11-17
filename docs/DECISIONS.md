@@ -8485,3 +8485,58 @@ merge. Căn cứ pháp lý dưới đây — **cần đối chiếu văn bản g
    token form và dòng giữ theo email + slug. Event mới `plans.signup_created`, `signup_completed`, `signup_rejected` (không
    mang email). Danh sách cho nhân sự `GET /signups` + tool MCP chỉ đọc `plans.list_signups` (`plans.subscriptions.read`, như
    danh sách cấp phát; không thêm permission).
+
+## D-350 · Ba chế độ dòng tiền, tạm giữ, chi trả, VietQR tự khớp (bước 36 mục 4, 9 và hai mục đối chiếu) — 2026-11-17 — agent quyết
+
+Bối cảnh: bước 36 còn thiếu dòng tiền theo chế độ, chi trả, chuyển khoản VietQR và các điểm đối chiếu thiết kế (D-216, D-218,
+đợt 2). Chưa có module thương mại (41–49): mọi thứ mở qua `dyn Ledger` để `orders` / `marketplace` gọi sau. Căn cứ pháp lý dưới
+đây — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**.
+
+1. **Ba chế độ, một API** (`Ledger::settle`, D-187). Cài đặt `ledger_flow_settings` theo nút, kế thừa theo cây
+   (`OrgTree::ancestors` + `nearest`); chưa đặt = `self_collect`, giữ 7 ngày. Mỗi việc (`FlowEvent`: tiền vào, phí sàn, khấu trừ
+   thay, hoàn, phí cổng) sinh tối đa một bút toán, `reference` của bên gọi (cùng không gian với `post`). Tự thu: sổ người bán,
+   Nợ `clearing.gateway` / `cash.bank` / `clearing.carrier_cod` — Có `revenue.sales`, `tax.vat_output`; phí sàn và khấu trừ thay
+   → `ledger.flow_mode_unsupported` (sàn không giữ tiền thì không khấu trừ). Thu hộ: sổ của nút đặt cài đặt (sàn), Có
+   `payable.seller_held[S]` + một dòng `ledger_holds`. Chia tại cổng: sổ sàn chỉ ghi phần cổng chia cho sàn (`operator_share`),
+   không tạm giữ. Cổng không có `collection_on_behalf` / `split` → `ledger.flow_mode_unsupported` (kiểm cả lúc đặt cài đặt).
+2. **Một cơ chế tạm giữ** (D-218): `ledger_holds`, unique theo (khách, module nguồn, chứng từ); số còn giữ giảm theo phí, khấu
+   trừ, hoàn **trong cùng transaction với bút toán** (thứ tự khoá: dòng tạm giữ → sổ → số dư). Đã nhả → trừ
+   `payable.seller_available`. Không có tạm giữ ở chế độ thu hộ = tiền không qua sàn → `receivable.seller` (mục đích mới).
+   Job `ledger.release_holds` (5 phút) và `POST /holds/{id}/release` (permission mới `ledger.holds_release`) nhả một lần.
+   `payable.seller_held` / `payable.seller_available` mở với sàn 0: hoàn / phí / chi quá số đang có bị chặn
+   (`ledger.insufficient_balance`), kể cả đồng thời.
+3. **COD** (D-216): `cod_remittance` = `partner_collection` (Nợ `clearing.carrier_cod[đơn vị vận chuyển]`, có tạm giữ) hay
+   `seller_direct` (sàn không ghi gì; phí, khấu trừ sau đó thành `receivable.seller`). Không có đường nào đưa COD vào tài khoản
+   của nhà vận hành sàn. Chia tại cổng + COD → không hỗ trợ.
+4. **Chi trả** (`PayoutGateway` trong kernel, `FakePayoutGateway` ở testkit): một transaction ghi lượt chi `pending` và Nợ
+   `payable.seller_available[S]` / Có `clearing.gateway[đối tác chi]`; gọi đối tác SAU commit; từ chối → bút toán ngược,
+   `failed`, event `ledger.payout_failed`; xong → `ledger.payout_sent`; đối tác báo chờ → `sent`, lịch `ledger.check_payouts`
+   (5 phút) hỏi trạng thái và gửi lại lượt `pending` cũ (đối tác chống trùng theo ID). Khác đặc tả: chưa có webhook chi trả
+   (`verify_webhook` của `PayoutGateway`) — chờ đối tác thật, hỏi trạng thái là đủ cho bản giả.
+5. **VietQR** (`vietqr.rs`, tự viết TLV EMV + CRC-16/CCITT-FALSE, không thêm thư viện): chuỗi động `00 01 12 38(A000000727,
+   BIN+tài khoản, QRIBFTTA) 53 704 54 58 VN 62.08 63`, nội dung = mã chuyển khoản `AX` + 10 ký tự base32 từ phần ngẫu nhiên của
+   UUIDv7 (unique theo khách). Test dựng lại đúng từng ký tự một mã VietQR đã công bố và kiểm CRC mẫu EMVCo. Căn cứ: đặc tả QR của
+   NAPAS dựa trên EMVCo MPM; TCCS 03:2018/NHNN — cần đối chiếu bản mới nhất. Danh sách BIN là dữ liệu (`data/vn-banks.json`,
+   cần đối chiếu danh sách NAPAS). Thanh toán VietQR là dòng `ledger_payments` (`provider` = `vietqr`, cột mới `transfer_code`,
+   `bank_account_id`), cùng hạn thanh toán `AUTOXIDE_LEDGER_PAYMENT_EXPIRY_MINUTES` và cùng job hết hạn.
+6. **`BankFeed`** (kernel, `FakeBankFeed` ở testkit): kiểu đẩy `POST /bank-feeds/{provider}` (công khai, chữ ký trên thân thô,
+   giới hạn thân như webhook thanh toán) và kiểu kéo `ledger.poll_bank_feed` (`AUTOXIDE_LEDGER_BANK_FEED_POLL_SECONDS`, con
+   trỏ lưu ở tài khoản). Biến động unique theo (khách, nguồn, mã giao dịch); job `ledger.match_bank_transaction` tách mã (bỏ
+   mọi ký tự không phải chữ / số, không phân biệt hoa thường): đúng mã + số tiền + `pending` → đã thu, Nợ
+   `cash.bank[tài khoản]` / Có `receivable.customer`; sai số → `amount_mismatch`; không mã → `unmatched_credit`; đã thu rồi →
+   `duplicate_payment`; đã hết hạn → `late_payment` (vẫn ghi: tiền đã ở tài khoản người bán). Tiền vào thẳng tài khoản của nút
+   (tự thu) — nền tảng chỉ đọc biến động. Khác đặc tả: không có `PATCH /bank-accounts/{id}` ở bước này.
+7. **Khấu trừ thay** (NĐ 117/2025/NĐ-CP, hiệu lực 01/7/2025 — cần đối chiếu, cùng NĐ 68/2026 và quy định hộ kinh doanh từ
+   2026): `ledger` đọc `TaxEngine::profile` của người bán; chỉ `regime = household` (hộ, cá nhân kinh doanh) bị khấu trừ, tỉ lệ
+   từ `TaxEngine::withholding` (gói "vn"); doanh nghiệp tự kê khai → không bút toán. `ledger` phụ thuộc `autoxide-tax` (đăng ký
+   trước, `require().ok()`). Phí sàn ghi tách GTGT (`FeeCharged { fee, vat }` → `revenue.platform_fee` + `tax.vat_output`).
+8. **Mã số thuế 12 số** (TT 86/2024/TT-BTC — cần đối chiếu): hồ sơ thuế đã nhận 10 / 12 / 13 số (bước 36 mục engine thuế); test
+   đầu-cuối mới xác nhận qua REST.
+9. **Đối chiếu đợt 2**: `Entry` có `sequence`, `sealed_at`; `GET /books/{id}/seal-status?period_id` (đếm theo index, chưa niêm
+   phong = không có trong `ledger_entry_seals`); `Ledger::balances(keys ≤ 500, as_of)` cùng thứ tự khoá. `GET
+   /entries?source_module&source_id` đã có từ D-342 (dùng `ledger.read`, không thêm `ledger.entries.read`).
+10. **Permission mới**: `ledger.settings_manage`, `ledger.payouts_create`, `ledger.holds_release` (đều theo nút, rủi ro tiền).
+    Event mới: `ledger.payout_sent`, `ledger.payout_failed`, `ledger.hold_released`. Ba lịch mới (tổng 6 của `ledger`).
+
+Chỉ có bản giả: bộ nối ngân hàng / dịch vụ đọc sao kê (Casso, SePay…) và đối tác chi hộ thật cần hợp đồng và khoá API — dừng hỏi
+chủ dự án khi làm (D-191).

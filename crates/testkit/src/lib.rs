@@ -54,7 +54,9 @@ pub use einvoice::{FAKE_EINVOICE_PROVIDER, FakeEInvoiceProvider};
 pub use identity::{FAKE_IDENTITY_PROVIDER, FakeIdentityVerifier, FakeSmsSender};
 pub use leak::{branch_leak_check, cursor_leak_check, leak_check};
 pub use ownership::schema_ownership_violations;
-pub use payment::{FAKE_PROVIDER, FakePaymentGateway};
+pub use payment::{
+    FAKE_PROVIDER, FakeBankFeed, FakePaymentGateway, FakePayoutGateway, FakePayoutOutcome,
+};
 pub use push::{FakeMobilePushSender, FakeWebPushSender, FakeZnsSender};
 pub use s3::{
     TEST_S3_ACCESS_KEY_ID, TEST_S3_BUCKET, TEST_S3_ENDPOINT, TEST_S3_SECRET_ACCESS_KEY, s3_settings,

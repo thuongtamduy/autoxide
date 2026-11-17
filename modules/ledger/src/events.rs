@@ -75,6 +75,23 @@ pub(crate) const EXCEPTION_RESOLVED: EventInfo = EventInfo::new(
     "A difference was resolved (`exception_id`, `kind`, `subject`, `resolution`).",
 );
 
+pub(crate) const PAYOUT_SENT: EventInfo = EventInfo::new(
+    "ledger.payout_sent",
+    "The payout partner paid a seller (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`).",
+);
+
+pub(crate) const PAYOUT_FAILED: EventInfo = EventInfo::new(
+    "ledger.payout_failed",
+    "The payout partner refused a payout; the amount is back on the seller's available balance \
+     (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`, `reason`).",
+);
+
+pub(crate) const HOLD_RELEASED: EventInfo = EventInfo::new(
+    "ledger.hold_released",
+    "Held seller money became available (`hold_id`, `org_id`, `seller_org_id`, `amount`, \
+     `source_module`, `source_id`).",
+);
+
 /// Một kiểu event (thân JSON) cho mỗi tên.
 macro_rules! event {
     ($kind:ident, $name:literal) => {
@@ -93,6 +110,9 @@ event!(PaymentFailed, "ledger.payment_failed");
 event!(PaymentRefunded, "ledger.payment_refunded");
 event!(ExceptionOpened, "ledger.exception_opened");
 event!(ExceptionResolved, "ledger.exception_resolved");
+event!(PayoutSent, "ledger.payout_sent");
+event!(PayoutFailed, "ledger.payout_failed");
+event!(HoldReleased, "ledger.hold_released");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -105,5 +125,8 @@ pub(crate) fn all() -> Vec<EventInfo> {
         PAYMENT_REFUNDED,
         EXCEPTION_OPENED,
         EXCEPTION_RESOLVED,
+        PAYOUT_SENT,
+        PAYOUT_FAILED,
+        HOLD_RELEASED,
     ]
 }

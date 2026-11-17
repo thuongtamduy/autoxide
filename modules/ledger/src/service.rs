@@ -31,6 +31,12 @@ pub(crate) struct LedgerService {
     pub directory: Option<Arc<dyn OrgDirectory>>,
     /// Cổng thanh toán các module bộ nối góp vào (`StartContext::contribute`).
     pub gateways: Vec<Arc<dyn autoxide_kernel::payment::PaymentGateway>>,
+    /// Đối tác chi hộ (`StartContext::contribute`).
+    pub payout_gateways: Vec<Arc<dyn autoxide_kernel::payment::PayoutGateway>>,
+    /// Nguồn biến động số dư ngân hàng (`StartContext::contribute`).
+    pub bank_feeds: Vec<Arc<dyn autoxide_kernel::payment::BankFeed>>,
+    /// Engine thuế (module `tax`, đăng ký trước) cho khấu trừ thay; không có thì không khấu trừ được.
+    pub tax: Option<Arc<dyn autoxide_tax::api::TaxEngine>>,
     pub jobs: autoxide_kernel::job::JobQueue,
     pub config: crate::config::LedgerConfig,
 }
@@ -166,9 +172,17 @@ pub(crate) async fn describe_entries<C: ConnectionTrait>(
     }
     let reversals = entry::Entity::find()
         .scoped(tenant)
-        .filter(entry::Column::ReversesEntryId.is_in(ids))
+        .filter(entry::Column::ReversesEntryId.is_in(ids.clone()))
         .all(connection)
         .await?;
+    let seals: HashMap<uuid::Uuid, (i64, DateTime<Utc>)> = crate::entity::seal::Entity::find()
+        .scoped(tenant)
+        .filter(crate::entity::seal::Column::EntryId.is_in(ids.clone()))
+        .all(connection)
+        .await?
+        .into_iter()
+        .map(|row| (row.entry_id, (row.sequence, row.sealed_at)))
+        .collect();
     let reversed_by: HashMap<uuid::Uuid, uuid::Uuid> = reversals
         .iter()
         .filter_map(|row| row.reverses_entry_id.map(|original| (original, row.id)))
@@ -177,6 +191,8 @@ pub(crate) async fn describe_entries<C: ConnectionTrait>(
         .into_iter()
         .map(|row| Entry {
             lines: by_entry.remove(&row.id).unwrap_or_default(),
+            sequence: seals.get(&row.id).map(|seal| seal.0),
+            sealed_at: seals.get(&row.id).map(|seal| seal.1),
             reversed_by_entry_id: reversed_by.get(&row.id).copied(),
             id: row.id,
             book_id: row.book_id,
@@ -854,5 +870,153 @@ impl LedgerService {
 fn check_name(name: Option<&str>, problems: &mut Vec<FieldError>) {
     if name.is_some_and(|name| !(1..=200).contains(&name.chars().count())) {
         problems.push(FieldError::new("name", "length", "must be 1 to 200 characters long"));
+    }
+}
+
+/// Số đếm niêm phong của một sổ (hay một kỳ của sổ).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SealStatus {
+    pub total: u64,
+    pub sealed: u64,
+    pub oldest_unsealed_at: Option<DateTime<Utc>>,
+}
+
+/// Khoá tối đa của một lần [`LedgerService::balances_of_keys`].
+pub(crate) const MAX_BALANCE_KEYS: usize = 500;
+
+impl LedgerService {
+    /// Số dư của nhiều khoá tài khoản, cùng thứ tự (`dyn Ledger::balances`). Hiện tại: hai câu cho
+    /// mọi khoá (tài khoản, số dư cộng dồn); tại ngày `as_of`: mỗi tài khoản tìm thấy một lần tính.
+    pub(crate) async fn balances_of_keys(
+        &self,
+        tenant: &TenantContext,
+        keys: &[AccountKey],
+        as_of: Option<NaiveDate>,
+    ) -> Result<Vec<Money>, Error> {
+        use sea_orm::Condition;
+        if keys.len() > MAX_BALANCE_KEYS {
+            return Err(Error::validation(vec![
+                FieldError::new("keys", "count", "must be at most {max} keys")
+                    .with_param("max", MAX_BALANCE_KEYS),
+            ]));
+        }
+        let read = tenant.database().read();
+        let orgs: Vec<uuid::Uuid> = keys.iter().map(|key| key.book.as_uuid()).collect();
+        let books = book::Entity::find()
+            .scoped(tenant)
+            .filter(book::Column::OrgId.is_in(orgs))
+            .all(read)
+            .await?;
+        let book_of =
+            |org: OrgId| books.iter().find(|row| row.org_id == org.as_uuid()).map(|row| row.id);
+        let party = |key: &AccountKey| {
+            key.counterparty.as_ref().map_or((String::new(), String::new()), |found| {
+                (found.kind.clone(), found.id.clone())
+            })
+        };
+        let mut any = Condition::any();
+        let mut wanted = false;
+        for key in keys {
+            let Some(book_id) = book_of(key.book) else { continue };
+            let (kind, id) = party(key);
+            wanted = true;
+            any = any.add(
+                Condition::all()
+                    .add(account::Column::BookId.eq(book_id))
+                    .add(account::Column::Purpose.eq(key.purpose.as_str()))
+                    .add(account::Column::CounterpartyKind.eq(kind))
+                    .add(account::Column::CounterpartyId.eq(id))
+                    .add(account::Column::Currency.eq(key.currency.code())),
+            );
+        }
+        let accounts = if wanted {
+            account::Entity::find().scoped(tenant).filter(any).all(read).await?
+        } else {
+            Vec::new()
+        };
+        let current: HashMap<uuid::Uuid, i64> = if as_of.is_none() && !accounts.is_empty() {
+            balance::Entity::find()
+                .scoped(tenant)
+                .filter(balance::Column::AccountId.is_in(accounts.iter().map(|row| row.id)))
+                .all(read)
+                .await?
+                .into_iter()
+                .map(|row| (row.account_id, row.balance_minor))
+                .collect()
+        } else {
+            HashMap::new()
+        };
+        let mut found = Vec::with_capacity(keys.len());
+        for key in keys {
+            let (kind, id) = party(key);
+            let matched = book_of(key.book).and_then(|book_id| {
+                accounts.iter().find(|row| {
+                    row.book_id == book_id
+                        && row.purpose == key.purpose
+                        && row.counterparty_kind == kind
+                        && row.counterparty_id == id
+                        && row.currency == key.currency.code()
+                })
+            });
+            let amount = match (matched, as_of) {
+                (None, _) => Money::zero(key.currency),
+                (Some(row), None) => {
+                    money(current.get(&row.id).copied().unwrap_or(0), &row.currency)?
+                }
+                (Some(row), Some(_)) => Self::account_balance(read, tenant, row, as_of).await?,
+            };
+            found.push(amount);
+        }
+        Ok(found)
+    }
+
+    /// Bút toán của sổ `book_id` (hay kỳ `period_id`) đã vào chuỗi băm chưa: tổng, đã niêm phong,
+    /// bút toán chưa niêm phong lâu nhất. Đếm theo index (sổ, ngày) và (bút toán) — không quét bảng.
+    pub(crate) async fn seal_status(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        book_id: uuid::Uuid,
+        period_id: Option<uuid::Uuid>,
+    ) -> Result<SealStatus, Error> {
+        use crate::entity::{period, seal};
+        use sea_orm::{PaginatorTrait, QuerySelect, sea_query::Query};
+        let book = self.book_for(tenant, principal, &READ, book_id).await?;
+        let read = tenant.database().read();
+        let mut entries =
+            entry::Entity::find().scoped(tenant).filter(entry::Column::BookId.eq(book.id));
+        if let Some(period_id) = period_id {
+            let found = period::Entity::find_by_id(period_id)
+                .scoped(tenant)
+                .filter(period::Column::BookId.eq(book.id))
+                .one(read)
+                .await?
+                .ok_or_else(|| {
+                    Error::not_found(
+                        "ledger.period_not_found",
+                        "There is no such accounting period.",
+                    )
+                })?;
+            entries = entries
+                .filter(entry::Column::EffectiveDate.gte(found.starts_on))
+                .filter(entry::Column::EffectiveDate.lte(found.ends_on));
+        }
+        let total = entries.clone().count(read).await?;
+        let sealed_ids = Query::select()
+            .column(seal::Column::EntryId)
+            .from(seal::Entity)
+            .and_where(seal::Column::TenantId.eq(tenant.id().as_uuid()))
+            .and_where(seal::Column::BookId.eq(book.id))
+            .to_owned();
+        let unsealed = entries.filter(entry::Column::Id.not_in_subquery(sealed_ids));
+        let pending = unsealed.clone().count(read).await?;
+        let oldest = unsealed
+            .order_by_asc(entry::Column::Id)
+            .select_only()
+            .column(entry::Column::PostedAt)
+            .into_tuple::<DateTime<Utc>>()
+            .one(read)
+            .await?;
+        Ok(SealStatus { total, sealed: total.saturating_sub(pending), oldest_unsealed_at: oldest })
     }
 }

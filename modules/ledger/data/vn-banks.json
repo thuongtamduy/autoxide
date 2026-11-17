@@ -1,0 +1,24 @@
+{
+  "source": "NAPAS bank identification numbers (BIN) used in VietQR, as published by the banks and the VietQR bank list; checked on 2026-11-17. Needs checking against the latest NAPAS list before production use.",
+  "checked_on": "2026-11-17",
+  "banks": [
+    {"bin": "970405", "code": "AGRIBANK", "name": "Vietnam Bank for Agriculture and Rural Development"},
+    {"bin": "970415", "code": "VIETINBANK", "name": "Vietnam Joint Stock Commercial Bank for Industry and Trade"},
+    {"bin": "970418", "code": "BIDV", "name": "Joint Stock Commercial Bank for Investment and Development of Vietnam"},
+    {"bin": "970436", "code": "VCB", "name": "Joint Stock Commercial Bank for Foreign Trade of Vietnam"},
+    {"bin": "970407", "code": "TCB", "name": "Vietnam Technological and Commercial Joint Stock Bank"},
+    {"bin": "970416", "code": "ACB", "name": "Asia Commercial Joint Stock Bank"},
+    {"bin": "970422", "code": "MB", "name": "Military Commercial Joint Stock Bank"},
+    {"bin": "970432", "code": "VPB", "name": "Vietnam Prosperity Joint Stock Commercial Bank"},
+    {"bin": "970423", "code": "TPB", "name": "Tien Phong Commercial Joint Stock Bank"},
+    {"bin": "970403", "code": "STB", "name": "Saigon Thuong Tin Commercial Joint Stock Bank"},
+    {"bin": "970437", "code": "HDB", "name": "Ho Chi Minh City Development Joint Stock Commercial Bank"},
+    {"bin": "970441", "code": "VIB", "name": "Vietnam International Commercial Joint Stock Bank"},
+    {"bin": "970443", "code": "SHB", "name": "Saigon - Hanoi Commercial Joint Stock Bank"},
+    {"bin": "970431", "code": "EIB", "name": "Vietnam Export Import Commercial Joint Stock Bank"},
+    {"bin": "970426", "code": "MSB", "name": "Vietnam Maritime Commercial Joint Stock Bank"},
+    {"bin": "970448", "code": "OCB", "name": "Orient Commercial Joint Stock Bank"},
+    {"bin": "970440", "code": "SEAB", "name": "Southeast Asia Commercial Joint Stock Bank"},
+    {"bin": "970454", "code": "VCCB", "name": "Viet Capital Commercial Joint Stock Bank"}
+  ]
+}

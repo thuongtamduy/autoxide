@@ -19,6 +19,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![autoxide_kernel::job::tenant_table("ledger")],
         ),
         Box::new(CreatePayments),
+        Box::new(CreateFlows),
     ]
 }
 
@@ -606,6 +607,306 @@ impl MigrationTrait for CreatePayments {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for table in PAYMENT_TABLES {
+            manager.drop_table(Table::drop().table(table).to_owned()).await?;
+        }
+        Ok(())
+    }
+}
+
+/// Chế độ dòng tiền, tạm giữ, chi trả, tài khoản ngân hàng và biến động số dư (VietQR), mã chuyển
+/// khoản trên thanh toán (bước 36 mục 4 và 9, D-216, D-218).
+struct CreateFlows;
+
+impl MigrationName for CreateFlows {
+    fn name(&self) -> &str {
+        "m0008_create_flows"
+    }
+}
+
+const FLOW_TABLES: [&str; 5] = [
+    "ledger_bank_transactions",
+    "ledger_bank_accounts",
+    "ledger_payouts",
+    "ledger_holds",
+    "ledger_flow_settings",
+];
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateFlows {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_flow_settings")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::string_len("mode", 24))
+                    .col(schema::string_len_null("payment_provider", 32))
+                    .col(schema::string_len_null("payout_provider", 32))
+                    .col(schema::integer("hold_days"))
+                    .col(schema::string_len("cod_remittance", 24))
+                    .col(schema::uuid_null("updated_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_flow_settings",
+            "ledger_flow_settings_org_idx",
+            &["tenant_id", "org_id"],
+            true,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_holds")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("book_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::uuid("seller_org_id"))
+                    .col(schema::big_integer("amount_minor"))
+                    .col(schema::big_integer("original_minor"))
+                    .col(schema::string_len("currency", 3))
+                    .col(schema::timestamp_with_time_zone("release_at"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::string_len("source_module", 64))
+                    .col(schema::string_len("source_id", 100))
+                    .col(schema::uuid_null("release_entry_id"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("ledger_holds_book_fk")
+                            .from("ledger_holds", "book_id")
+                            .to("ledger_books", "id"),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        // Một lượt bán (chứng từ nguồn) một khoản tạm giữ.
+        index(
+            manager,
+            "ledger_holds",
+            "ledger_holds_source_idx",
+            &["tenant_id", "source_module", "source_id"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_holds",
+            "ledger_holds_status_idx",
+            &["tenant_id", "status", "release_at"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_holds",
+            "ledger_holds_seller_idx",
+            &["tenant_id", "seller_org_id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_holds",
+            "ledger_holds_release_sweep_idx",
+            &["status", "release_at"],
+            false,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_payouts")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("book_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::uuid("payee_org_id"))
+                    .col(schema::big_integer("amount_minor"))
+                    .col(schema::string_len("amount_currency", 3))
+                    .col(schema::string_len("provider", 32))
+                    .col(schema::string_len_null("provider_ref", 100))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::string_len_null("failure_reason", 200))
+                    .col(schema::string_len("description", 140))
+                    .col(schema::string_len("reference", 100))
+                    .col(schema::string_len("reference_fingerprint", 64))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("ledger_payouts_book_fk")
+                            .from("ledger_payouts", "book_id")
+                            .to("ledger_books", "id"),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_payouts",
+            "ledger_payouts_reference_idx",
+            &["tenant_id", "reference"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_payouts",
+            "ledger_payouts_payee_idx",
+            &["tenant_id", "payee_org_id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_payouts",
+            "ledger_payouts_status_sweep_idx",
+            &["status", "updated_at"],
+            false,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_bank_accounts")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::string_len("bank_bin", 8))
+                    .col(schema::string_len("account_number", 19))
+                    .col(schema::string_len("account_name", 50))
+                    .col(schema::string_len_null("feed_provider", 32))
+                    .col(schema::text_null("feed_cursor"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_bank_accounts",
+            "ledger_bank_accounts_number_idx",
+            &["tenant_id", "bank_bin", "account_number"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_bank_accounts",
+            "ledger_bank_accounts_lookup_idx",
+            &["tenant_id", "account_number"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_bank_accounts",
+            "ledger_bank_accounts_org_idx",
+            &["tenant_id", "org_id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_bank_accounts",
+            "ledger_bank_accounts_feed_sweep_idx",
+            &["feed_provider", "status"],
+            false,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_bank_transactions")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("bank_account_id"))
+                    .col(schema::string_len("provider", 32))
+                    .col(schema::string_len("provider_txn_id", 100))
+                    .col(schema::string_len("direction", 8))
+                    .col(schema::big_integer("amount_minor"))
+                    .col(schema::string_len("amount_currency", 3))
+                    .col(schema::string_len("memo", 500))
+                    .col(schema::timestamp_with_time_zone("booked_at"))
+                    .col(schema::string_len("match_status", 16))
+                    .col(schema::uuid_null("payment_id"))
+                    .col(schema::timestamp_with_time_zone("received_at"))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("ledger_bank_transactions_account_fk")
+                            .from("ledger_bank_transactions", "bank_account_id")
+                            .to("ledger_bank_accounts", "id"),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_bank_transactions",
+            "ledger_bank_transactions_provider_idx",
+            &["tenant_id", "provider", "provider_txn_id"],
+            true,
+        )
+        .await?;
+
+        // Thanh toán chuyển khoản VietQR: mã trong nội dung chuyển khoản, tài khoản nhận.
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("ledger_payments")
+                    .add_column(schema::string_len_null("transfer_code", 16))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("ledger_payments")
+                    .add_column(schema::uuid_null("bank_account_id"))
+                    .to_owned(),
+            )
+            .await?;
+        // Nhiều `NULL` (thanh toán qua cổng) không đụng nhau trên cả hai database.
+        index(
+            manager,
+            "ledger_payments",
+            "ledger_payments_transfer_code_idx",
+            &["tenant_id", "transfer_code"],
+            true,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ledger_payments_transfer_code_idx")
+                    .table(Alias::new("ledger_payments"))
+                    .to_owned(),
+            )
+            .await?;
+        for column in ["bank_account_id", "transfer_code"] {
+            manager
+                .alter_table(Table::alter().table("ledger_payments").drop_column(column).to_owned())
+                .await?;
+        }
+        for table in FLOW_TABLES {
             manager.drop_table(Table::drop().table(table).to_owned()).await?;
         }
         Ok(())

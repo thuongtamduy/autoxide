@@ -7776,6 +7776,92 @@
         ],
         "type": "object"
       },
+      "Data_LedgerBankAccount": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A bank account money is transferred into (the unit's own account, never the platform's).",
+            "properties": {
+              "account_name": {
+                "type": "string"
+              },
+              "account_number": {
+                "type": "string"
+              },
+              "bank_bin": {
+                "description": "NAPAS bank identification number, e.g. `970436`.",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "feed_provider": {
+                "description": "Bank feed that reports the transfers, if any.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "status": {
+                "description": "`active` or `disabled`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "bank_bin",
+              "account_number",
+              "account_name",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerBankFeedReceipt": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Receipt of a bank feed notification.",
+            "properties": {
+              "stored": {
+                "description": "Transactions stored now (ones sent before are not counted).",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "stored"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_LedgerBookResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -7896,6 +7982,22 @@
                   "null"
                 ]
               },
+              "sealed_at": {
+                "description": "When the entry was sealed into the hash chain; `null` while not yet sealed.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sequence": {
+                "description": "Position in the book's hash chain; `null` until the entry is sealed (within seconds).",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "source_id": {
                 "type": [
                   "string",
@@ -8000,6 +8102,162 @@
         ],
         "type": "object"
       },
+      "Data_LedgerFlowSettings": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The money-flow settings in force for a unit (set on it or inherited from the nearest unit above).",
+            "properties": {
+              "cod_remittance": {
+                "$ref": "#/components/schemas/LedgerCodRemittance"
+              },
+              "hold_days": {
+                "description": "Days the seller's share is held after the money comes in (return window), 0 to 365.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "inherited": {
+                "description": "The settings come from a unit above.",
+                "type": "boolean"
+              },
+              "mode": {
+                "$ref": "#/components/schemas/LedgerFlowMode"
+              },
+              "org_id": {
+                "description": "The unit asked about.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "payment_provider": {
+                "description": "Payment partner used in the collect and split modes.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "payout_provider": {
+                "description": "Partner that pays the sellers out (collect mode).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_org_id": {
+                "description": "The unit the settings are set on (its book gets the entries in the collect and split\nmodes); `null` when nothing is set and the defaults apply.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "org_id",
+              "mode",
+              "hold_days",
+              "cod_remittance",
+              "inherited"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerHold": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The seller's share of a sale held until the return window ends.",
+            "properties": {
+              "amount": {
+                "$ref": "#/components/schemas/Money",
+                "description": "Still held: the sale minus fees, withholding and refunds so far."
+              },
+              "book_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The unit of the book (the marketplace).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "original": {
+                "$ref": "#/components/schemas/Money",
+                "description": "Held when the money came in."
+              },
+              "release_at": {
+                "description": "When the job moves the money to the seller's available balance.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "release_entry_id": {
+                "description": "The entry that moved the money to the available balance.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "seller_org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "source_id": {
+                "type": "string"
+              },
+              "source_module": {
+                "type": "string"
+              },
+              "status": {
+                "description": "`held` or `released`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "book_id",
+              "org_id",
+              "seller_org_id",
+              "amount",
+              "original",
+              "release_at",
+              "status",
+              "source_module",
+              "source_id",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_LedgerPayment": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -8008,6 +8266,14 @@
             "properties": {
               "amount": {
                 "$ref": "#/components/schemas/Money"
+              },
+              "bank_account_id": {
+                "description": "Bank transfer payments: the receiving bank account (of the unit, never of the platform).",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "book_id": {
                 "format": "uuid",
@@ -8063,7 +8329,7 @@
                 ]
               },
               "qr_payload": {
-                "description": "QR payload, when the partner gives one.",
+                "description": "QR payload, when the partner gives one, or the VietQR code of a bank transfer payment.",
                 "type": [
                   "string",
                   "null"
@@ -8089,6 +8355,13 @@
               "status": {
                 "description": "`pending`, `succeeded`, `failed`, `expired` or `needs_review` (the partner reported another\namount; see the exceptions).",
                 "type": "string"
+              },
+              "transfer_code": {
+                "description": "Bank transfer payments: the code the buyer must keep in the transfer description.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "updated_at": {
                 "format": "date-time",
@@ -8143,6 +8416,88 @@
               }
             ],
             "description": "A payment with its refunds."
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerPayout": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A payout of a seller's available balance through the payout partner.",
+            "properties": {
+              "amount": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "book_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "failure_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The unit of the book (the marketplace).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "payee_org_id": {
+                "description": "The seller paid.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reference": {
+                "type": "string"
+              },
+              "status": {
+                "description": "`pending` (the partner has not answered yet; send the same request again), `sent` (the\npartner is working on it), `succeeded` or `failed` (the money is back on the seller's\navailable balance).",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "book_id",
+              "org_id",
+              "payee_org_id",
+              "amount",
+              "provider",
+              "status",
+              "description",
+              "reference",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
           }
         },
         "required": [
@@ -8324,6 +8679,56 @@
               "reference",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerSealStatus": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "How many entries of a book are in its hash chain.",
+            "properties": {
+              "book_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "oldest_unsealed_at": {
+                "description": "When the oldest entry not yet sealed was posted; entries are sealed within seconds.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "period_id": {
+                "description": "The period counted, or `null` for the whole book.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sealed": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "total": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "book_id",
+              "total",
+              "sealed"
             ],
             "type": "object"
           }
@@ -19824,6 +20229,114 @@
         ],
         "type": "object"
       },
+      "LedgerBankAccount": {
+        "description": "A bank account money is transferred into (the unit's own account, never the platform's).",
+        "properties": {
+          "account_name": {
+            "type": "string"
+          },
+          "account_number": {
+            "type": "string"
+          },
+          "bank_bin": {
+            "description": "NAPAS bank identification number, e.g. `970436`.",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "feed_provider": {
+            "description": "Bank feed that reports the transfers, if any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`active` or `disabled`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "bank_bin",
+          "account_number",
+          "account_name",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "LedgerBankAccountRequest": {
+        "additionalProperties": false,
+        "description": "A bank account to register.",
+        "properties": {
+          "account_name": {
+            "description": "Name on the account, 1 to 50 characters.",
+            "type": "string"
+          },
+          "account_number": {
+            "description": "1 to 19 letters or digits.",
+            "type": "string"
+          },
+          "bank_bin": {
+            "description": "NAPAS bank identification number (6 digits), e.g. `970436`.",
+            "example": "970436",
+            "type": "string"
+          },
+          "feed_provider": {
+            "description": "Bank feed (statement reader) that reports transfers into this account.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The unit that owns the account; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "bank_bin",
+          "account_number",
+          "account_name"
+        ],
+        "type": "object"
+      },
+      "LedgerBankFeedReceipt": {
+        "description": "Receipt of a bank feed notification.",
+        "properties": {
+          "stored": {
+            "description": "Transactions stored now (ones sent before are not counted).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stored"
+        ],
+        "type": "object"
+      },
       "LedgerBookRequest": {
         "additionalProperties": false,
         "description": "A book to open.",
@@ -19899,6 +20412,14 @@
         ],
         "type": "object"
       },
+      "LedgerCodRemittance": {
+        "description": "Where cash on delivery goes (D-216): never to the marketplace operator's own account.",
+        "enum": [
+          "partner_collection",
+          "seller_direct"
+        ],
+        "type": "string"
+      },
       "LedgerCounterparty": {
         "description": "The other party an account is kept for (a seller, a customer, a carrier…).",
         "properties": {
@@ -19907,7 +20428,7 @@
             "type": "string"
           },
           "kind": {
-            "description": "`org`, `customer`, `carrier`, `partner`, or `<module>.<kind>`.",
+            "description": "`org`, `customer`, `supplier`, `carrier`, `partner`, `bank_account`, or `<module>.<kind>`.",
             "type": "string"
           }
         },
@@ -19978,6 +20499,22 @@
             "format": "uuid",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "sealed_at": {
+            "description": "When the entry was sealed into the hash chain; `null` while not yet sealed.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sequence": {
+            "description": "Position in the book's hash chain; `null` until the entry is sealed (within seconds).",
+            "format": "int64",
+            "type": [
+              "integer",
               "null"
             ]
           },
@@ -20167,6 +20704,197 @@
         ],
         "type": "object"
       },
+      "LedgerFlowMode": {
+        "description": "How money flows for a unit (D-187: the platform never holds buyers' money).",
+        "enum": [
+          "self_collect",
+          "partner_collect",
+          "split_at_gateway"
+        ],
+        "type": "string"
+      },
+      "LedgerFlowSettings": {
+        "description": "The money-flow settings in force for a unit (set on it or inherited from the nearest unit above).",
+        "properties": {
+          "cod_remittance": {
+            "$ref": "#/components/schemas/LedgerCodRemittance"
+          },
+          "hold_days": {
+            "description": "Days the seller's share is held after the money comes in (return window), 0 to 365.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "inherited": {
+            "description": "The settings come from a unit above.",
+            "type": "boolean"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/LedgerFlowMode"
+          },
+          "org_id": {
+            "description": "The unit asked about.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "payment_provider": {
+            "description": "Payment partner used in the collect and split modes.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payout_provider": {
+            "description": "Partner that pays the sellers out (collect mode).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_org_id": {
+            "description": "The unit the settings are set on (its book gets the entries in the collect and split\nmodes); `null` when nothing is set and the defaults apply.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "org_id",
+          "mode",
+          "hold_days",
+          "cod_remittance",
+          "inherited"
+        ],
+        "type": "object"
+      },
+      "LedgerFlowSettingsRequest": {
+        "additionalProperties": false,
+        "description": "Money-flow settings to set on a unit.",
+        "properties": {
+          "cod_remittance": {
+            "description": "`partner_collection` (default) or `seller_direct`: where cash on delivery goes.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hold_days": {
+            "description": "Days the seller's share is held after the money comes in, 0 to 365. Defaults to 7.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mode": {
+            "description": "`self_collect`, `partner_collect` or `split_at_gateway`.",
+            "example": "partner_collect",
+            "type": "string"
+          },
+          "payment_provider": {
+            "description": "Payment partner; required in the collect and split modes, and must support them.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payout_provider": {
+            "description": "Payout partner; required in the collect mode.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "type": "object"
+      },
+      "LedgerHold": {
+        "description": "The seller's share of a sale held until the return window ends.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Still held: the sale minus fees, withholding and refunds so far."
+          },
+          "book_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit of the book (the marketplace).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "original": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Held when the money came in."
+          },
+          "release_at": {
+            "description": "When the job moves the money to the seller's available balance.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "release_entry_id": {
+            "description": "The entry that moved the money to the available balance.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seller_org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "source_module": {
+            "type": "string"
+          },
+          "status": {
+            "description": "`held` or `released`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "book_id",
+          "org_id",
+          "seller_org_id",
+          "amount",
+          "original",
+          "release_at",
+          "status",
+          "source_module",
+          "source_id",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "LedgerLineRequest": {
         "additionalProperties": false,
         "description": "One line of a manual entry.",
@@ -20195,6 +20923,14 @@
         "properties": {
           "amount": {
             "$ref": "#/components/schemas/Money"
+          },
+          "bank_account_id": {
+            "description": "Bank transfer payments: the receiving bank account (of the unit, never of the platform).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "book_id": {
             "format": "uuid",
@@ -20250,7 +20986,7 @@
             ]
           },
           "qr_payload": {
-            "description": "QR payload, when the partner gives one.",
+            "description": "QR payload, when the partner gives one, or the VietQR code of a bank transfer payment.",
             "type": [
               "string",
               "null"
@@ -20276,6 +21012,13 @@
           "status": {
             "description": "`pending`, `succeeded`, `failed`, `expired` or `needs_review` (the partner reported another\namount; see the exceptions).",
             "type": "string"
+          },
+          "transfer_code": {
+            "description": "Bank transfer payments: the code the buyer must keep in the transfer description.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "updated_at": {
             "format": "date-time",
@@ -20375,6 +21118,109 @@
         },
         "required": [
           "method",
+          "amount",
+          "description",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "LedgerPayout": {
+        "description": "A payout of a seller's available balance through the payout partner.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "book_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit of the book (the marketplace).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "payee_org_id": {
+            "description": "The seller paid.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "provider_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "description": "`pending` (the partner has not answered yet; send the same request again), `sent` (the\npartner is working on it), `succeeded` or `failed` (the money is back on the seller's\navailable balance).",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "book_id",
+          "org_id",
+          "payee_org_id",
+          "amount",
+          "provider",
+          "status",
+          "description",
+          "reference",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "LedgerPayoutRequest": {
+        "additionalProperties": false,
+        "description": "A payout to make.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "At most the seller's available balance."
+          },
+          "description": {
+            "description": "Short text, 1 to 140 characters, no personal data.",
+            "type": "string"
+          },
+          "payee_org_id": {
+            "description": "The seller (unit) to pay.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your id of this payout: sending it again returns the same payout (and asks the partner again\nif it did not answer the first time).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payee_org_id",
           "amount",
           "description",
           "reference"
@@ -20634,6 +21480,47 @@
         ],
         "type": "object"
       },
+      "LedgerSealStatus": {
+        "description": "How many entries of a book are in its hash chain.",
+        "properties": {
+          "book_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "oldest_unsealed_at": {
+            "description": "When the oldest entry not yet sealed was posted; entries are sealed within seconds.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "period_id": {
+            "description": "The period counted, or `null` for the whole book.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sealed": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "book_id",
+          "total",
+          "sealed"
+        ],
+        "type": "object"
+      },
       "LedgerSide": {
         "description": "Debit or credit.",
         "enum": [
@@ -20758,6 +21645,53 @@
           "currency",
           "debit",
           "credit"
+        ],
+        "type": "object"
+      },
+      "LedgerVietqrPaymentRequest": {
+        "additionalProperties": false,
+        "description": "A VietQR payment to create.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "In VND."
+          },
+          "bank_account_id": {
+            "description": "Receiving bank account; may be left out when the unit has only one active account.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "Short text, 1 to 140 characters, no personal data.",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit that receives the money; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this payment: sending it again returns the same payment.",
+            "type": "string"
+          },
+          "source_id": {
+            "description": "Id of your document (order, invoice…).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "description",
+          "reference"
         ],
         "type": "object"
       },
@@ -26024,6 +26958,76 @@
         ],
         "type": "object"
       },
+      "Page_LedgerBankAccount": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A bank account money is transferred into (the unit's own account, never the platform's).",
+              "properties": {
+                "account_name": {
+                  "type": "string"
+                },
+                "account_number": {
+                  "type": "string"
+                },
+                "bank_bin": {
+                  "description": "NAPAS bank identification number, e.g. `970436`.",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "feed_provider": {
+                  "description": "Bank feed that reports the transfers, if any.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`active` or `disabled`.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "bank_bin",
+                "account_number",
+                "account_name",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_LedgerBookResponse": {
         "description": "One page of a list.",
         "properties": {
@@ -26154,6 +27158,22 @@
                     "null"
                   ]
                 },
+                "sealed_at": {
+                  "description": "When the entry was sealed into the hash chain; `null` while not yet sealed.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sequence": {
+                  "description": "Position in the book's hash chain; `null` until the entry is sealed (within seconds).",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
                 "source_id": {
                   "type": [
                     "string",
@@ -26272,6 +27292,99 @@
         ],
         "type": "object"
       },
+      "Page_LedgerHold": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "The seller's share of a sale held until the return window ends.",
+              "properties": {
+                "amount": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "Still held: the sale minus fees, withholding and refunds so far."
+                },
+                "book_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The unit of the book (the marketplace).",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "original": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "Held when the money came in."
+                },
+                "release_at": {
+                  "description": "When the job moves the money to the seller's available balance.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "release_entry_id": {
+                  "description": "The entry that moved the money to the available balance.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "seller_org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "source_id": {
+                  "type": "string"
+                },
+                "source_module": {
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`held` or `released`.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "book_id",
+                "org_id",
+                "seller_org_id",
+                "amount",
+                "original",
+                "release_at",
+                "status",
+                "source_module",
+                "source_id",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_LedgerPayment": {
         "description": "One page of a list.",
         "properties": {
@@ -26282,6 +27395,14 @@
               "properties": {
                 "amount": {
                   "$ref": "#/components/schemas/Money"
+                },
+                "bank_account_id": {
+                  "description": "Bank transfer payments: the receiving bank account (of the unit, never of the platform).",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "book_id": {
                   "format": "uuid",
@@ -26337,7 +27458,7 @@
                   ]
                 },
                 "qr_payload": {
-                  "description": "QR payload, when the partner gives one.",
+                  "description": "QR payload, when the partner gives one, or the VietQR code of a bank transfer payment.",
                   "type": [
                     "string",
                     "null"
@@ -26364,6 +27485,13 @@
                   "description": "`pending`, `succeeded`, `failed`, `expired` or `needs_review` (the partner reported another\namount; see the exceptions).",
                   "type": "string"
                 },
+                "transfer_code": {
+                  "description": "Bank transfer payments: the code the buyer must keep in the transfer description.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "updated_at": {
                   "format": "date-time",
                   "type": "string"
@@ -26381,6 +27509,96 @@
                 "status",
                 "expires_at",
                 "source_module",
+                "reference",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_LedgerPayout": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A payout of a seller's available balance through the payout partner.",
+              "properties": {
+                "amount": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "book_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "failure_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The unit of the book (the marketplace).",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "payee_org_id": {
+                  "description": "The seller paid.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "provider_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`pending` (the partner has not answered yet; send the same request again), `sent` (the\npartner is working on it), `succeeded` or `failed` (the money is back on the seller's\navailable balance).",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "book_id",
+                "org_id",
+                "payee_org_id",
+                "amount",
+                "provider",
+                "status",
+                "description",
                 "reference",
                 "created_at",
                 "updated_at"
@@ -71283,6 +72501,346 @@
         ]
       }
     },
+    "/api/v1/ledger/bank-accounts": {
+      "get": {
+        "description": "Requires `ledger.read`.",
+        "operationId": "ledger_list_ledger_bank_accounts",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerBankAccount"
+                }
+              }
+            },
+            "description": "One page of bank accounts."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the bank accounts in your scope.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `ledger.settings_manage` on the unit. Buyers transfer straight into this account; the\nbank feed reports the transfers so payments are matched automatically.",
+        "operationId": "ledger_create_ledger_bank_account",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerBankAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerBankAccount"
+                }
+              }
+            },
+            "description": "The bank account.",
+            "headers": {
+              "Location": {
+                "description": "Path of the bank accounts.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.settings_manage` (`permission_denied`) or the unit is outside your scope (`org_out_of_scope`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The account is already registered (`ledger.bank_account_exists`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (unknown bank BIN, bad account number…); every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register a bank account for VietQR transfers.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.settings_manage"
+        ]
+      }
+    },
+    "/api/v1/ledger/bank-feeds/{provider}": {
+      "post": {
+        "description": "No sign-in: the bank feed signs every notification and the signature is checked on the raw body\nbefore anything is stored. A transaction sent again is stored once; matching runs in the\nbackground. Point the bank feed's webhook setting at this URL.",
+        "operationId": "ledger_receive_ledger_bank_feed",
+        "parameters": [
+          {
+            "description": "Bank feed name.",
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "The bank feed's notification, as it sends it.",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerBankFeedReceipt"
+                }
+              }
+            },
+            "description": "Stored (or stored before)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The signature is not valid; code `payment.signature_invalid`."
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is larger than `AUTOXIDE_LEDGER_WEBHOOK_MAX_BYTES`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The bank feed is not set up on this server; code `ledger.bank_feed_not_configured`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Receive bank account transactions from a bank feed.",
+        "tags": [
+          "ledger"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/ledger/books": {
       "get": {
         "description": "Requires `ledger.read`.",
@@ -71612,6 +73170,110 @@
           }
         ],
         "summary": "Get a book.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      }
+    },
+    "/api/v1/ledger/books/{id}/seal-status": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit. Shows how many entries are sealed into the book's hash\nchain (tamper evidence) and the oldest one still waiting.",
+        "operationId": "ledger_get_ledger_seal_status",
+        "parameters": [
+          {
+            "description": "Id of the book.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Count only the entries of this period.",
+            "in": "query",
+            "name": "period_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerSealStatus"
+                }
+              }
+            },
+            "description": "The counts."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such book (`ledger.book_not_found`) or period (`ledger.period_not_found`) in your scope."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the seal status of a book.",
         "tags": [
           "ledger"
         ],
@@ -72436,6 +74098,479 @@
         ]
       }
     },
+    "/api/v1/ledger/flow-settings/{org_id}": {
+      "get": {
+        "description": "Requires `ledger.read` on the unit. Settings are inherited from the nearest unit above that has\nthem; with none set, the unit collects its own money (`self_collect`).",
+        "operationId": "ledger_get_ledger_flow_settings",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerFlowSettings"
+                }
+              }
+            },
+            "description": "The settings in force."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read` (`permission_denied`) or the unit is outside your scope (`org_out_of_scope`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the money-flow settings in force for a unit.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      },
+      "put": {
+        "description": "Requires `ledger.settings_manage` on the unit. Units below inherit it. In `partner_collect`, a\nlicensed partner collects for the marketplace (this unit's book) and pays sellers out after the\nhold; in `split_at_gateway` the partner splits each payment. The platform itself never holds the\nmoney.",
+        "operationId": "ledger_set_ledger_flow_settings",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerFlowSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerFlowSettings"
+                }
+              }
+            },
+            "description": "The settings now in force."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.settings_manage` (`permission_denied`) or the unit is outside your scope (`org_out_of_scope`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (every problem in `errors`) or the partner cannot work in this mode (`ledger.flow_mode_unsupported`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the money-flow mode of a unit.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.settings_manage"
+        ]
+      }
+    },
+    "/api/v1/ledger/holds": {
+      "get": {
+        "description": "Requires `ledger.read`; shows the holds in the books of your scope.",
+        "operationId": "ledger_list_ledger_holds",
+        "parameters": [
+          {
+            "description": "`held` or `released`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only for this seller (unit id).",
+            "in": "query",
+            "name": "seller_org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only for documents of this module (e.g. `orders`).",
+            "in": "query",
+            "name": "source_module",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only for this document.",
+            "in": "query",
+            "name": "source_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerHold"
+                }
+              }
+            },
+            "description": "One page of held amounts."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List seller money held until the return window ends.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      }
+    },
+    "/api/v1/ledger/holds/{id}/release": {
+      "post": {
+        "description": "Requires `ledger.holds_release` on the book's unit. Moves what is still held to the seller's\navailable balance (the job does this when the return window ends). Releasing a released hold\nreturns it unchanged.",
+        "operationId": "ledger_release_ledger_hold",
+        "parameters": [
+          {
+            "description": "Id of the hold.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerHold"
+                }
+              }
+            },
+            "description": "The hold after the release."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.holds_release`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such hold in your scope; code `ledger.hold_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The accounting period is closed (`ledger.period_closed`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Release held seller money now.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.holds_release"
+        ]
+      }
+    },
     "/api/v1/ledger/payments": {
       "get": {
         "description": "Requires `ledger.read`.",
@@ -72716,6 +74851,141 @@
         ]
       }
     },
+    "/api/v1/ledger/payments/vietqr": {
+      "post": {
+        "description": "Requires `ledger.payments_create` on the unit. The answer has `qr_payload` (the VietQR code to\nshow) and `transfer_code`, which the transfer description must keep. When the bank feed reports\na transfer with the code and the exact amount, the payment succeeds; another amount, an unknown\ncode or a second transfer goes to `GET /exceptions`. The money goes straight to the unit's bank\naccount. The payment expires like every payment (`expires_at`).",
+        "operationId": "ledger_create_ledger_vietqr_payment",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerVietqrPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerPayment"
+                }
+              }
+            },
+            "description": "The payment was created before with this `reference` and content."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerPayment"
+                }
+              }
+            },
+            "description": "The payment.",
+            "headers": {
+              "Location": {
+                "description": "Path of the payment.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.payments_create` (`permission_denied`) or the unit is outside your scope (`org_out_of_scope`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit has no such active bank account (`ledger.bank_account_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (amount not in VND…) or the reference was used for other content (`reference_reused`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a VietQR bank transfer payment.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.payments_create"
+        ]
+      }
+    },
     "/api/v1/ledger/payments/{id}": {
       "get": {
         "description": "Requires `ledger.read` on the unit that receives it.",
@@ -72972,6 +75242,382 @@
         ],
         "x-permissions": [
           "ledger.refunds_create"
+        ]
+      }
+    },
+    "/api/v1/ledger/payouts": {
+      "get": {
+        "description": "Requires `ledger.read`.",
+        "operationId": "ledger_list_ledger_payouts",
+        "parameters": [
+          {
+            "description": "`pending`, `sent`, `succeeded` or `failed`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only payouts to this seller.",
+            "in": "query",
+            "name": "payee_org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerPayout"
+                }
+              }
+            },
+            "description": "One page of payouts."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List payouts in your scope.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `ledger.payouts_create` on the seller's unit, and the seller must be in the\n`partner_collect` mode. The balance is taken first, then the payout partner pays from its\ncollection account; if it refuses, the amount goes back to the balance. Payouts never exceed\nthe available balance, even when sent at the same time.",
+        "operationId": "ledger_create_ledger_payout",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerPayoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerPayout"
+                }
+              }
+            },
+            "description": "The payout was made before with this `reference` and content."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerPayout"
+                }
+              }
+            },
+            "description": "The payout.",
+            "headers": {
+              "Location": {
+                "description": "Path of the payout.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.payouts_create` (`permission_denied`) or the seller is outside your scope (`org_out_of_scope`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The available balance is not enough (`ledger.insufficient_balance`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid, the seller is not in the collect mode (`ledger.flow_mode_unsupported`), the payout partner is not set up (`ledger.payout_not_configured`) or the reference was used for other content (`reference_reused`)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The partner did not answer; send the same request again (`payment.provider_unavailable`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pay a seller its available balance.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.payouts_create"
+        ]
+      }
+    },
+    "/api/v1/ledger/payouts/{id}": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit.",
+        "operationId": "ledger_get_ledger_payout",
+        "parameters": [
+          {
+            "description": "Id of the payout.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerPayout"
+                }
+              }
+            },
+            "description": "The payout."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such payout in your scope; code `ledger.payout_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a payout.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
         ]
       }
     },
