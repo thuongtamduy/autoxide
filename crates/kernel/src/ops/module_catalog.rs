@@ -288,6 +288,7 @@ impl ModuleInfo {
                             }
                             _ => None,
                         },
+                        parts: limit.parts().map(str::to_owned),
                     }
                 })
                 .collect(),
@@ -319,6 +320,9 @@ pub(crate) struct ModuleLimit {
     unit: Option<String>,
     /// Period of a `metered` limit: `month`.
     period: Option<String>,
+    /// When set, a plan can also cap each part separately with the key `<key>.<part>`; this says
+    /// what a part is (e.g. `unit type`: `organizations.units.store` caps units of type `store`).
+    parts: Option<String>,
 }
 
 /// A permission a module declares.

@@ -443,6 +443,11 @@ context.usage_counter(&PRODUCTS, Arc::new(ProductCounter))?; // số đếm th�
   Không bao giờ giữ chỗ bên trong transaction ghi của chính module: SQLite chỉ có một bên ghi, giữ
   chỗ sẽ chờ chính nó. Tiến trình chết giữa lúc giữ chỗ và xác nhận thì không mất gì: chỗ giữ tự
   hết hạn (`AUTOXIDE_PLANS_HOLD_MINUTES`) và job hằng ngày đặt lại số đang dùng theo `UsageCounter`.
+- **Hạn mức chia phần** (`Limit::count(…).per("unit type")`): gói đặt thêm được mức riêng cho từng
+  phần bằng `<key>.<phần>` (`organizations.units.store`). Giữ chỗ chung trước, rồi chỗ của phần
+  (`reserve_part(tenant, &LIMIT, part, 1, &reference)`; phần bị từ chối thì trả lại chỗ chung), và
+  xác nhận / trả lại cả hai. Phần không có mức riêng chỉ được đếm. Cài `UsageCounter::count_parts` để
+  job hằng ngày sửa cả số theo phần.
 - **Hạn mức theo lượng dùng** (`Limit::metered`, lượng dùng mỗi tháng): `record_usage(tenant,
   &LIMIT, quantity, reference)`; cùng `reference` chỉ tính một lần; vượt quota của tháng thì trả
   `429 quota_exhausted` kèm `Retry-After`.

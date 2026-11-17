@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 
 use autoxide_kernel::entitlement::{
-    Limit, LimitKind, limit_exceeded, quota_exhausted, reference_reused,
+    Limit, LimitKind, UsageCounter, limit_exceeded, quota_exhausted, reference_reused,
 };
 use autoxide_kernel::error::Error;
 use autoxide_kernel::rows::{self, Bounds};
@@ -53,10 +53,35 @@ impl PlansService {
         amount: i64,
         reference: &str,
     ) -> Result<(), Error> {
+        self.reserve_key(tenant, limit.key(), false, amount, reference).await
+    }
+
+    /// Xem [`Entitlements::reserve_part`](autoxide_kernel::entitlement::Entitlements::reserve_part).
+    pub(crate) async fn reserve_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        amount: i64,
+        reference: &str,
+    ) -> Result<(), Error> {
+        self.reserve_key(tenant, &limit.part_key(part), true, amount, reference).await
+    }
+
+    /// Giữ chỗ theo khoá hạn mức `key`; `part`: khoá mức riêng của một phần — vắng mặt trong gói là
+    /// không giới hạn riêng (vẫn ghi lượng dùng, để đặt mức sau thì số đã đúng).
+    async fn reserve_key(
+        &self,
+        tenant: TenantId,
+        key: &str,
+        part: bool,
+        amount: i64,
+        reference: &str,
+    ) -> Result<(), Error> {
         if amount <= 0 || reference.is_empty() || reference.len() > 200 {
             return Err(Error::internal(format!(
                 "reserve `{}` needs an amount above 0 and a reference of 1 to 200 bytes",
-                limit.key()
+                key
             )));
         }
         let entitlements = self.snapshot(tenant).await?;
@@ -64,14 +89,14 @@ impl PlansService {
         if entitlements.unrestricted {
             return Ok(());
         }
-        let max = entitlements.limit(limit.key());
+        let max = if part { entitlements.part_limit(key) } else { entitlements.limit(key) };
         let at = now();
         let id = tenant.as_uuid();
         let transaction = self.databases.control().begin_write().await?;
         let held = reservation::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(id),
-            limit_key: Set(limit.key().to_owned()),
+            limit_key: Set(key.to_owned()),
             reference: Set(reference.to_owned()),
             amount: Set(amount),
             status: Set("held".to_owned()),
@@ -89,7 +114,7 @@ impl PlansService {
             drop(transaction);
             let existing = reservation::Entity::find()
                 .filter(reservation::Column::TenantId.eq(id))
-                .filter(reservation::Column::LimitKey.eq(limit.key()))
+                .filter(reservation::Column::LimitKey.eq(key))
                 .filter(reservation::Column::Reference.eq(reference))
                 .one(self.databases.control().write())
                 .await?;
@@ -100,25 +125,25 @@ impl PlansService {
                     reservation::Entity::delete_by_id(row.id)
                         .exec(self.databases.control().write())
                         .await?;
-                    Box::pin(self.reserve(tenant, limit, amount, reference)).await
+                    Box::pin(self.reserve_key(tenant, key, part, amount, reference)).await
                 }
-                _ => Err(reference_reused(reference, limit.key())),
+                _ => Err(reference_reused(reference, key)),
             };
         }
-        ensure_usage(&transaction, id, limit.key(), NO_PERIOD).await?;
+        ensure_usage(&transaction, id, key, NO_PERIOD).await?;
         let ceiling = max.unwrap_or(i64::MAX);
         let changed = rows::adjust::<usage::Entity, _>(
             &transaction,
             usage::Column::Used,
-            usage_filter(id, limit.key(), NO_PERIOD),
+            usage_filter(id, key, NO_PERIOD),
             amount,
             Bounds { floor: 0, ceiling },
         )
         .await?;
         if changed == 0 {
             drop(transaction);
-            let used = self.used(tenant, limit.key(), NO_PERIOD).await?;
-            return Err(limit_exceeded(limit.key(), used, ceiling));
+            let used = self.used(tenant, key, NO_PERIOD).await?;
+            return Err(limit_exceeded(key, used, ceiling));
         }
         transaction.commit().await?;
         Ok(())
@@ -132,12 +157,27 @@ impl PlansService {
         limit: &Limit,
         reference: &str,
     ) -> Result<(), Error> {
+        self.confirm_key(tenant, limit.key(), reference).await
+    }
+
+    /// Xem [`Entitlements::confirm_part`](autoxide_kernel::entitlement::Entitlements::confirm_part).
+    pub(crate) async fn confirm_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        self.confirm_key(tenant, &limit.part_key(part), reference).await
+    }
+
+    async fn confirm_key(&self, tenant: TenantId, key: &str, reference: &str) -> Result<(), Error> {
         let at = now();
         let changed = reservation::Entity::update_many()
             .col_expr(reservation::Column::Status, sea_orm::sea_query::Expr::value("confirmed"))
             .col_expr(reservation::Column::UpdatedAt, sea_orm::sea_query::Expr::value(at))
             .filter(reservation::Column::TenantId.eq(tenant.as_uuid()))
-            .filter(reservation::Column::LimitKey.eq(limit.key()))
+            .filter(reservation::Column::LimitKey.eq(key))
             .filter(reservation::Column::Reference.eq(reference))
             .filter(reservation::Column::Status.eq("held"))
             .exec(self.databases.control().write())
@@ -148,7 +188,7 @@ impl PlansService {
         }
         let existing = reservation::Entity::find()
             .filter(reservation::Column::TenantId.eq(tenant.as_uuid()))
-            .filter(reservation::Column::LimitKey.eq(limit.key()))
+            .filter(reservation::Column::LimitKey.eq(key))
             .filter(reservation::Column::Reference.eq(reference))
             .one(self.databases.control().write())
             .await?;
@@ -158,7 +198,7 @@ impl PlansService {
             None if self.snapshot(tenant).await?.unrestricted => Ok(()),
             _ => Err(Error::internal(format!(
                 "confirm `{}` `{reference}`: there is no hold (it expired, or reserve was not called)",
-                limit.key()
+                key
             ))),
         }
     }
@@ -171,6 +211,17 @@ impl PlansService {
         reference: &str,
     ) -> Result<(), Error> {
         self.release_key(tenant, limit.key(), reference, false).await
+    }
+
+    /// Xem [`Entitlements::release_part`](autoxide_kernel::entitlement::Entitlements::release_part).
+    pub(crate) async fn release_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        self.release_key(tenant, &limit.part_key(part), reference, false).await
     }
 
     /// Như [`release`](Self::release) theo khoá hạn mức; `only_held`: chỉ trả chỗ còn `held` (job
@@ -307,14 +358,13 @@ impl PlansService {
     /// và lúc ghi, hay do khách vào gói khi đã có dữ liệu. Trả số dòng đã sửa.
     pub(crate) async fn reconcile(&self, at: DateTime<Utc>) -> Result<usize, Error> {
         let catalog = self.entitlements.catalog();
-        let limits: Vec<(
-            &'static str,
-            std::sync::Arc<dyn autoxide_kernel::entitlement::UsageCounter>,
-        )> = catalog
+        // (khoá, có chia phần, bộ đếm) của mỗi hạn mức đếm được.
+        let limits: Vec<(&'static str, bool, std::sync::Arc<dyn UsageCounter>)> = catalog
             .limits()
             .filter(|found| !matches!(found.limit.kind(), LimitKind::Metered { .. }))
             .filter_map(|found| {
-                catalog.counter(found.limit.key()).map(|counter| (found.limit.key(), counter))
+                let key = found.limit.key();
+                catalog.counter(key).map(|counter| (key, found.limit.parts().is_some(), counter))
             })
             .collect();
         if limits.is_empty() {
@@ -337,29 +387,70 @@ impl PlansService {
                 .filter(reservation::Column::ExpiresAt.gt(at))
                 .all(self.databases.control().read())
                 .await?;
-            for (key, counter) in &limits {
-                let real = counter.count(&context).await?;
-                let pending: i64 =
-                    held.iter().filter(|hold| hold.limit_key == *key).map(|hold| hold.amount).sum();
-                let target = real.saturating_add(pending);
-                let current = self.used(tenant, key, NO_PERIOD).await?;
-                if current == target {
-                    continue;
+            for (key, parts, counter) in &limits {
+                let mut targets = vec![((*key).to_owned(), counter.count(&context).await?)];
+                if *parts {
+                    // Mỗi phần đang có bản ghi, cộng mọi phần đã có dòng lượng dùng (phần không còn
+                    // bản ghi nào thì về 0).
+                    let real = counter.count_parts(&context).await?;
+                    let prefix = format!("{key}.");
+                    let mut keys: BTreeMap<String, i64> =
+                        real.into_iter().map(|(part, n)| (format!("{prefix}{part}"), n)).collect();
+                    for known in self.usage_keys(tenant, &prefix).await? {
+                        keys.entry(known).or_insert(0);
+                    }
+                    targets.extend(keys);
                 }
-                let write = self.databases.control().write();
-                ensure_usage(write, row.tenant_id, key, NO_PERIOD).await?;
-                usage::Entity::update_many()
-                    .col_expr(usage::Column::Used, sea_orm::sea_query::Expr::value(target))
-                    .col_expr(usage::Column::UpdatedAt, sea_orm::sea_query::Expr::value(now()))
-                    .filter(usage_filter(row.tenant_id, key, NO_PERIOD))
-                    .exec(write)
-                    .await?;
-                metrics::counter!("plans_usage_reconciled_total").increment(1);
-                tracing::info!(tenant_id = %tenant, limit = *key, from = current, to = target, "usage reconciled");
-                fixed += 1;
+                for (limit_key, real) in targets {
+                    if self.reconcile_one(tenant, &held, &limit_key, real).await? {
+                        fixed += 1;
+                    }
+                }
             }
         }
         Ok(fixed)
+    }
+
+    /// Đặt lượng dùng của `key` = `real` + chỗ còn giữ; `true` khi đã sửa.
+    async fn reconcile_one(
+        &self,
+        tenant: TenantId,
+        held: &[reservation::Model],
+        key: &str,
+        real: i64,
+    ) -> Result<bool, Error> {
+        let pending: i64 =
+            held.iter().filter(|hold| hold.limit_key == key).map(|hold| hold.amount).sum();
+        let target = real.saturating_add(pending);
+        let current = self.used(tenant, key, NO_PERIOD).await?;
+        if current == target {
+            return Ok(false);
+        }
+        let id = tenant.as_uuid();
+        let write = self.databases.control().write();
+        ensure_usage(write, id, key, NO_PERIOD).await?;
+        usage::Entity::update_many()
+            .col_expr(usage::Column::Used, sea_orm::sea_query::Expr::value(target))
+            .col_expr(usage::Column::UpdatedAt, sea_orm::sea_query::Expr::value(now()))
+            .filter(usage_filter(id, key, NO_PERIOD))
+            .exec(write)
+            .await?;
+        metrics::counter!("plans_usage_reconciled_total").increment(1);
+        tracing::info!(tenant_id = %tenant, limit = key, from = current, to = target, "usage reconciled");
+        Ok(true)
+    }
+
+    /// Các khoá đã có dòng lượng dùng (không theo kỳ) của khách, bắt đầu bằng `prefix`.
+    async fn usage_keys(&self, tenant: TenantId, prefix: &str) -> Result<Vec<String>, Error> {
+        let keys: Vec<String> = usage::Entity::find()
+            .select_only()
+            .column(usage::Column::LimitKey)
+            .filter(usage::Column::TenantId.eq(tenant.as_uuid()))
+            .filter(usage::Column::PeriodStart.eq(NO_PERIOD))
+            .into_tuple()
+            .all(self.databases.control().read())
+            .await?;
+        Ok(keys.into_iter().filter(|key| key.starts_with(prefix)).collect())
     }
 
     /// Khách có thuê bao ở trạng thái `status`.

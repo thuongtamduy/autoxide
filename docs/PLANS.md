@@ -32,6 +32,9 @@ curl -X POST https://api.example.com/api/v1/plans/plans \
 ```
 
 - A limit set to `null` is unlimited; a limit left out is `0`.
+- A limit that has parts (`parts` in `GET /api/v1/kernel/modules`) also takes a cap per part:
+  `"organizations.units.store": 2` allows at most 2 units of type `store`, within the overall
+  `organizations.units`. A part left out has no cap of its own.
 - A base plan that turns on a module must turn on the modules it needs (`requires`), or the
   request answers `plans.module_dependency_missing`.
 - `"is_default": true` makes it the plan of tenants without a subscription (only one plan is the

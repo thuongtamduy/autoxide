@@ -287,8 +287,8 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
                 "migrations": [{ "name": "m0001_create_items", "applied": null }],
                 "features": [{ "key": "notes.sharing", "description": "Share notes by link." }],
                 "limits": [
-                    { "key": "notes.notes", "description": "Notes kept.", "kind": "count", "unit": null, "period": null },
-                    { "key": "notes.bytes", "description": "Text stored.", "kind": "amount", "unit": "bytes", "period": null },
+                    { "key": "notes.notes", "description": "Notes kept.", "kind": "count", "unit": null, "period": null, "parts": null },
+                    { "key": "notes.bytes", "description": "Text stored.", "kind": "amount", "unit": "bytes", "period": null, "parts": null },
                 ],
                 "always_enabled": false,
                 "requires": [],

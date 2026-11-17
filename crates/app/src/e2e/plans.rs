@@ -6,6 +6,7 @@ use autoxide_kernel::tenancy::TenantId;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::body::Body;
 use axum::http::{Method, StatusCode};
+use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 
 const OWNER: [&str; 7] = [
@@ -266,6 +267,90 @@ async fn huy_thue_bao_tu_xin_xuat_du_lieu() {
         let listed = exports.list(acme).await.unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].reason, "subscription_canceled");
+    })
+    .await
+    .unwrap();
+}
+
+/// Hạn mức theo loại nút (A-3.12): gói đặt `organizations.units.store` = 1 bên cạnh mức chung; loại
+/// không đặt mức riêng chỉ tính vào mức chung; lưu trữ trả lại chỗ của loại; đối soát đếm lại theo
+/// loại; danh sách quyền dùng có dòng của loại.
+#[tokio::test]
+async fn han_muc_theo_loai_nut() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        put_on(
+            &app,
+            "typed",
+            &[],
+            json!({"organizations.units": 3, "organizations.units.store": 1}),
+        )
+        .await;
+        for code in ["store", "warehouse"] {
+            let body = json!({"code": code, "name": code});
+            let uri = "/api/v1/organizations/unit-types";
+            let (status, _) = call(&app, Method::POST, uri, "owner", Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED);
+        }
+        let root = app.tenant("acme").await.unwrap().id().as_uuid();
+        let create = async |kind: &str, name: &str| {
+            let body = json!({"parent_id": root, "unit_type": kind, "name": name});
+            call(&app, Method::POST, "/api/v1/organizations/units", "owner", Some(body)).await
+        };
+        let (status, store) = create("store", "S1").await;
+        assert_eq!(status, StatusCode::CREATED, "{store}");
+        let (status, full) = create("store", "S2").await;
+        assert_eq!(
+            (status, full["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("limit_exceeded"))
+        );
+        assert!(full.to_string().contains("organizations.units.store"), "{full}");
+        // Loại không có mức riêng: chỉ tính vào mức chung (3).
+        assert_eq!(create("warehouse", "W1").await.0, StatusCode::CREATED);
+        // Lưu trữ cửa hàng đầu: trả lại cả chỗ chung lẫn chỗ của loại.
+        let id = store["data"]["id"].as_str().unwrap();
+        let uri = format!("/api/v1/organizations/units/{id}/status");
+        let (status, _) =
+            call(&app, Method::POST, &uri, "owner", Some(json!({"status": "archived"}))).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(create("store", "S2").await.0, StatusCode::CREATED);
+        assert_eq!(create("warehouse", "W2").await.0, StatusCode::CREATED);
+        // Đầy mức chung (3 nút không lưu trữ) dù loại `warehouse` không có mức riêng.
+        let (status, full) = create("warehouse", "W3").await;
+        assert_eq!(
+            (status, full["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("limit_exceeded"))
+        );
+
+        let (_, entitlements) =
+            call(&app, Method::GET, "/api/v1/plans/entitlements", "owner", None).await;
+        let limits = entitlements["data"]["limits"].as_array().unwrap();
+        let find = |key: &str| limits.iter().find(|limit| limit["key"] == key).cloned();
+        let store = find("organizations.units.store").unwrap();
+        assert_eq!((store["max"].clone(), store["used"].clone()), (json!(1), json!(1)));
+        let warehouse = find("organizations.units.warehouse").unwrap();
+        assert_eq!((warehouse["max"].clone(), warehouse["used"].clone()), (json!(null), json!(2)));
+
+        // Số dùng bị lệch (tiến trình chết giữa chừng): job đối soát đếm lại, cả theo loại.
+        let statement = sea_orm::Statement::from_string(
+            app.database().write().get_database_backend(),
+            "UPDATE plans_usage SET used = 9 WHERE limit_key LIKE 'organizations.units%'",
+        );
+        app.database().write().execute_raw(statement).await.unwrap();
+        drain(&app).await;
+        let (_, entitlements) =
+            call(&app, Method::GET, "/api/v1/plans/entitlements", "owner", None).await;
+        let limits = entitlements["data"]["limits"].as_array().unwrap();
+        let used =
+            |key: &str| limits.iter().find(|limit| limit["key"] == key).unwrap()["used"].clone();
+        assert_eq!(used("organizations.units"), json!(3), "{entitlements}");
+        assert_eq!(used("organizations.units.store"), json!(1));
+        assert_eq!(used("organizations.units.warehouse"), json!(2));
+
+        // Sổ module nói hạn mức chia theo loại nút.
+        let (_, module) =
+            call(&app, Method::GET, "/api/v1/kernel/modules/organizations", "ops", None).await;
+        assert_eq!(module["data"]["limits"][0]["parts"], "unit type", "{module}");
     })
     .await
     .unwrap();

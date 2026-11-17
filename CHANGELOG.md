@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Plans can cap organization units per unit type: `"organizations.units.store": 2` next to the overall
+  `organizations.units`. Modules declare such limits with `Limit::per` and reserve parts with
+  `reserve_part` / `confirm_part` / `release_part`; `GET /api/v1/kernel/modules` shows `parts`, and
+  `GET /api/v1/plans/entitlements` lists the per-part use.
 - For module authors (step 36): `autoxide_kernel::numbering` hands out gapless sequential numbers (invoice and receipt
   numbers) inside the caller's write transaction — concurrent requests get 1, 2, 3… with no duplicates, and a rolled
   back transaction does not use up a number; `rows::lock_one_shared` takes a shared row lock; `StartContext::contribute`

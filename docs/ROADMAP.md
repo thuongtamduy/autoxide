@@ -90,8 +90,7 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
       `subscription_status` / `near_limit`, xuất dữ liệu khách bằng job; còn: thông báo nền tảng (chờ `notifications`, bước 37)
 - [ ] Xoá hẳn khách khi thuê bao `deleted` (D-327): kernel chưa có lệnh xoá khách — thêm lệnh xoá (giữ phần kế toán theo
       bước 36), rồi `plans` gọi thay vì chỉ khoá hẳn
-- [ ] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): loại nút là dữ liệu của khách mà sổ hạn mức của kernel
-      khai tĩnh — cần hạn mức có tham số (vd khoá `organizations.units` + loại) hay khai sẵn các loại hay dùng (D-326)
+- [x] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): hạn mức chia phần `Limit::per` (D-330)
 
 ## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)
 

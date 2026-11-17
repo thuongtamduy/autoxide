@@ -8030,3 +8030,22 @@ Quyết định:
 
 Test trên cả hai database: 32 transaction đồng thời nhận đúng 1..32; rollback không tiêu số; dãy và khách độc lập;
 khoá độc quyền chờ khoá chia sẻ.
+
+## D-330 · Hạn mức chia phần — hạn mức theo loại nút (bước 35, A-3.12) — 2026-11-17 — agent quyết
+
+Bối cảnh: D-326 để lại hạn mức theo loại nút vì loại nút là dữ liệu của khách, còn sổ hạn mức của kernel khai tĩnh.
+
+Quyết định:
+
+1. **Hạn mức chia phần**: `Limit::count(…).per("unit type")` khai rằng gói đặt được thêm mức riêng cho từng phần bằng khoá
+   `<key>.<phần>` (`organizations.units.store`), phần là tên dạng định danh. Sổ hạn mức nhận khoá đó
+   (`EntitlementCatalog::limit`), nên gói, gói thêm, ghi đè riêng dùng được như hạn mức thường — không đổi bảng nào.
+2. **Phần không có mức riêng thì không bị giới hạn riêng** (`TenantEntitlements::part_limit` trả `None`), khác hạn mức
+   thường (vắng = 0) — loại nút mới không bị chặn chỉ vì gói chưa nhắc tới nó; mức chung vẫn chặn.
+3. **Giữ chỗ phần**: hàm mới có mặc định của `Entitlements` (`reserve_part` / `confirm_part` / `release_part`, D-038).
+   Module giữ chỗ chung trước rồi chỗ của phần, phần bị từ chối thì trả chỗ chung. `plans` luôn ghi lượng dùng của phần
+   (kể cả khi chưa có mức) để đặt mức sau thì số đã đúng.
+4. **Đối soát**: `UsageCounter::count_parts` (mặc định rỗng); `plans.reconcile_usage` đặt lại số của mọi phần đang có
+   bản ghi hay đã có dòng lượng dùng. `organizations` đếm bằng một câu `GROUP BY unit_type`.
+5. API: `GET /api/v1/kernel/modules` thêm `parts` cho hạn mức; `GET /api/v1/plans/entitlements` liệt kê dòng của từng phần
+   gói đặt mức hay khách đang dùng. Chỉ thêm trường, không phá vỡ.

@@ -3575,6 +3575,11 @@ export type Data_Vec_EventTypeResponse = {
 /** Envelope of a single result. */
 export type Data_Vec_LimitUse = {
   data: {
+    /**
+     * The limit; `<limit>.<part>` is the separate cap of one part of a limit that has parts (for
+     * example `organizations.units.store`: units of type `store`), listed when the plan caps that
+     * part or the tenant uses it.
+     */
     key: string;
     /** `count`, `amount` or `metered`. */
     kind: string;
@@ -4689,6 +4694,11 @@ export type LibrarySummaryResponse = {
 
 /** Use of one limit. */
 export type LimitUse = {
+  /**
+   * The limit; `<limit>.<part>` is the separate cap of one part of a limit that has parts (for
+   * example `organizations.units.store`: units of type `store`), listed when the plan caps that
+   * part or the tenant uses it.
+   */
   key: string;
   /** `count`, `amount` or `metered`. */
   kind: string;
@@ -5126,6 +5136,11 @@ export type ModuleLimit = {
    * (use within a period, back to 0 at its start, see `period`).
    */
   kind: string;
+  /**
+   * When set, a plan can also cap each part separately with the key `<key>.<part>`; this says
+   * what a part is (e.g. `unit type`: `organizations.units.store` caps units of type `store`).
+   */
+  parts?: string | null;
   /** Period of a `metered` limit: `month`. */
   period?: string | null;
   /** Unit of an `amount` limit, e.g. `bytes`. */
@@ -6882,7 +6897,11 @@ export type PlanRequest = {
   is_default?: boolean;
   /** `base` (default) or `addon`. */
   kind?: string;
-  /** Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0. */
+  /**
+   * Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0. A limit
+   * that has parts also takes a cap per part, `<limit>.<part>` (for example
+   * `organizations.units.store`); a part left out has no cap of its own.
+   */
   limits?: {
     [key: string]: number | null;
   };

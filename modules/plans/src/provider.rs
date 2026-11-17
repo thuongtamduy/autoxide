@@ -35,6 +35,37 @@ impl Entitlements for Provider {
         self.0.release(tenant, limit, reference).await
     }
 
+    async fn reserve_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        amount: i64,
+        reference: &str,
+    ) -> Result<(), Error> {
+        self.0.reserve_part(tenant, limit, part, amount, reference).await
+    }
+
+    async fn confirm_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        self.0.confirm_part(tenant, limit, part, reference).await
+    }
+
+    async fn release_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        self.0.release_part(tenant, limit, part, reference).await
+    }
+
     async fn record_usage(
         &self,
         tenant: TenantId,

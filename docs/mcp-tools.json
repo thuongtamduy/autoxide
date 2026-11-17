@@ -4747,7 +4747,7 @@
                 "null"
               ]
             },
-            "description": "Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0.",
+            "description": "Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0. A limit\nthat has parts also takes a cap per part, `<limit>.<part>` (for example\n`organizations.units.store`); a part left out has no cap of its own.",
             "propertyNames": {
               "type": "string"
             },
