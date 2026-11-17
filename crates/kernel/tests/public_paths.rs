@@ -12,6 +12,7 @@ use autoxide_kernel::antispam::AntispamConfig;
 use autoxide_kernel::config::Config;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::doctor::CHECK_TIMEOUT;
+use autoxide_kernel::einvoice::EInvoiceProvider;
 use autoxide_kernel::email::MAX_LENGTH as EMAIL_MAX_LENGTH;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::EventInfo;

@@ -34,6 +34,7 @@ pub mod ai;
 mod app;
 mod contract;
 mod dns;
+mod einvoice;
 mod leak;
 mod ownership;
 mod payment;
@@ -47,6 +48,7 @@ mod tenancy;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
 pub use dns::FakeDns;
+pub use einvoice::{FAKE_EINVOICE_PROVIDER, FakeEInvoiceProvider};
 pub use leak::{branch_leak_check, cursor_leak_check, leak_check};
 pub use ownership::schema_ownership_violations;
 pub use payment::{FAKE_PROVIDER, FakePaymentGateway};

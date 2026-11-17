@@ -129,6 +129,10 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `forms.list_submissions` | `forms.read` | read-only |
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
+| `invoices.create_draft` | `invoices.write` | writes |
+| `invoices.document` | `invoices.read` | read-only |
+| `invoices.documents` | `invoices.read` | read-only |
+| `invoices.issue` | `invoices.issue` | writes |
 | `kernel.add_domain` | `kernel.domains.manage` | writes |
 | `kernel.current_tenant` | — | read-only |
 | `kernel.export_tenant` | `kernel.data.export` | writes |

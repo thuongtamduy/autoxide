@@ -4,6 +4,7 @@
 //! Bước 33+ thêm vào đây: `payment`, `einvoice`, `identity`, `sms`, `entitlement`.
 
 pub mod ai;
+pub mod einvoice;
 pub mod mail;
 pub mod payment;
 pub mod privacy;
