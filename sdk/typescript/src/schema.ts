@@ -3282,6 +3282,50 @@ export type Data_TagResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_TaxPackResponse = {
+  /** An imported tax data pack. */
+  data: {
+    /** Day its sources were last checked. */
+    checked_on: string;
+    code: string;
+    content_sha256: string;
+    id: string;
+    imported_at: string;
+    imported_by?: string | null;
+    source_note: string;
+    version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TaxProfileResponse = {
+  /** The tax profile that applies to a unit. */
+  data: TaxProfile & {
+    /** `true` when the profile is the unit's own; `false` when it comes from a unit above. */
+    own: boolean;
+    updated_at: string;
+    updated_by?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TaxQuote = {
+  /** Taxes of a document. */
+  data: {
+    gross: Money;
+    invoice_type: TaxInvoiceType;
+    lines: TaxedLine[];
+    net: Money;
+    /** The seller's regime used: `vat_credit`, `vat_direct`, `household` or `exempt`. */
+    regime: string;
+    /** What was used (rates and their ids, pack version, rounding): keep it with the document. */
+    snapshot: Record<string, unknown>;
+    tax: Money;
+    totals: TaxTotal[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Tenant = {
   /** A customer (tenant) of the platform. */
   data: {
@@ -4277,6 +4321,100 @@ export type Data_Vec_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_TaxCategoryResponse = {
+  data: {
+    code: string;
+    jurisdiction: string;
+    name_en: string;
+    name_vi: string;
+    /** `vat`, `excise`, `environment`. */
+    tax_kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TaxJurisdictionResponse = {
+  data: {
+    code: string;
+    default_currency: string;
+    name: string;
+    /** The data pack it comes from, and its version. */
+    pack_code: string;
+    pack_version: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TaxPackResponse = {
+  data: {
+    /** Day its sources were last checked. */
+    checked_on: string;
+    code: string;
+    content_sha256: string;
+    id: string;
+    imported_at: string;
+    imported_by?: string | null;
+    source_note: string;
+    version: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TaxRateResponse = {
+  data: {
+    /** `percent`, `per_unit` or `exempt` (not subject to the tax). */
+    basis: string;
+    category: string;
+    /** First day in force. */
+    effective_from: string;
+    /** First day no longer in force; `null` while in force. */
+    effective_to?: string | null;
+    id: string;
+    jurisdiction: string;
+    /** Legal basis (check it against the original document before production use). */
+    legal_basis: string;
+    pack_version: number;
+    per_unit?: Money | null;
+    rate_percent: string;
+    /** Order the taxes apply in: a later stage is computed on the price plus earlier taxes. */
+    stage: number;
+    tax_kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TaxRuleResponse = {
+  data: {
+    code: string;
+    effective_from: string;
+    effective_to?: string | null;
+    id: string;
+    jurisdiction: string;
+    legal_basis: string;
+    value: Record<string, unknown>;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TaxWithholdingRateResponse = {
+  data: {
+    business_line: string;
+    effective_from: string;
+    effective_to?: string | null;
+    id: string;
+    jurisdiction: string;
+    legal_basis: string;
+    payee_regime: string;
+    /** `marketplace` or `affiliate`. */
+    payer_kind: string;
+    rate_percent: string;
+    /** `vat` or `pit`. */
+    tax_kind: string;
+    threshold?: Money | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_TenantExport = {
   data: {
     created_at: string;
@@ -4391,6 +4529,19 @@ export type Data_VerifiedResponse = {
     verified: boolean;
   };
 };
+
+/** Envelope of a single result. */
+export type Data_WithholdingQuote = {
+  /** Taxes to withhold. */
+  data: {
+    components: TaxComponent[];
+    snapshot: Record<string, unknown>;
+    total: Money;
+  };
+};
+
+/** A decimal number written as a string, like "12.5" or "-0.08": a dot before the fraction, no thousands separators, no exponent, at most 28 digits. */
+export type DecimalString = string;
 
 /** A new delegation to a child tenant. */
 export type DelegationRequest = {
@@ -7036,6 +7187,18 @@ export type Page_TagResponse = {
 };
 
 /** One page of a list. */
+export type Page_TaxProfileResponse = {
+  /** The items of this page, in the requested order. */
+  data: (TaxProfile & {
+    /** `true` when the profile is the unit's own; `false` when it comes from a unit above. */
+    own: boolean;
+    updated_at: string;
+    updated_by?: string | null;
+  })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_Tenant = {
   /** The items of this page, in the requested order. */
   data: {
@@ -8929,6 +9092,243 @@ export type TargetRequest = {
   state?: string | null;
 };
 
+/** Who buys. */
+export type TaxBuyerKind = "consumer" | "business";
+
+/** A tax category. */
+export type TaxCategoryResponse = {
+  code: string;
+  jurisdiction: string;
+  name_en: string;
+  name_vi: string;
+  /** `vat`, `excise`, `environment`. */
+  tax_kind: string;
+};
+
+/** One tax on a line. */
+export type TaxComponent = {
+  amount: Money;
+  /** `true`: not subject to this tax (shown as such on the invoice, not as 0%). */
+  exempt: boolean;
+  /** Rate in percent as a decimal string, e.g. `"8"`; `"0"` for a per-unit or exempt tax. */
+  rate_percent: string;
+  /** `vat`, `excise`, `pit`… */
+  tax_kind: string;
+};
+
+/** Kind of invoice the seller issues. */
+export type TaxInvoiceType = "vat_invoice" | "sales_invoice";
+
+/** A tax jurisdiction. */
+export type TaxJurisdictionResponse = {
+  code: string;
+  default_currency: string;
+  name: string;
+  /** The data pack it comes from, and its version. */
+  pack_code: string;
+  pack_version: number;
+};
+
+/** A tax data pack to import. */
+export type TaxPackRequest = {
+  /**
+   * The pack, in the format of `modules/tax/packs/vn.json`: `code`, `version`, `checked_on`,
+   * `source_note`, `jurisdictions`, `categories`, `rates`, `withholding_rates`, `rules`.
+   */
+  pack: Record<string, unknown>;
+};
+
+/** An imported tax data pack. */
+export type TaxPackResponse = {
+  /** Day its sources were last checked. */
+  checked_on: string;
+  code: string;
+  content_sha256: string;
+  id: string;
+  imported_at: string;
+  imported_by?: string | null;
+  source_note: string;
+  version: number;
+};
+
+/** Whether the line amounts include the taxes. */
+export type TaxPriceMode = "inclusive" | "exclusive";
+
+/** Tax profile of an organization unit. */
+export type TaxProfile = {
+  address?: Record<string, unknown> | null;
+  annual_revenue?: Money | null;
+  /** `goods`, `services`, `production_transport`, `other`. */
+  business_lines: string[];
+  jurisdiction: string;
+  legal_name?: string | null;
+  /** The unit the profile is set on (the unit asked about, or the nearest one above it). */
+  org_id: string;
+  /**
+   * `vat_credit` (VAT by credit), `vat_direct` (VAT on revenue), `household` (household
+   * business) or `exempt`.
+   */
+  regime: string;
+  /**
+   * Tax code: 10 or 13 digits (`0101234567-001` for a branch), or a 12-digit personal id used
+   * as tax code.
+   */
+  tax_code?: string | null;
+};
+
+/** The whole tax profile of a unit. */
+export type TaxProfileRequest = {
+  address?: AddressInput | null;
+  annual_revenue?: Money | null;
+  /** `goods`, `services`, `production_transport`, `other`. */
+  business_lines?: string[];
+  jurisdiction: string;
+  /** Up to 200 characters. */
+  legal_name?: string | null;
+  /** `vat_credit`, `vat_direct`, `household` or `exempt`. */
+  regime: string;
+  /**
+   * 10 or 13 digits (`0101234567-001` for a branch), or a 12-digit personal id used as tax
+   * code.
+   */
+  tax_code?: string | null;
+};
+
+/** The tax profile that applies to a unit. */
+export type TaxProfileResponse = TaxProfile & {
+  /** `true` when the profile is the unit's own; `false` when it comes from a unit above. */
+  own: boolean;
+  updated_at: string;
+  updated_by?: string | null;
+};
+
+/** Taxes of a document. */
+export type TaxQuote = {
+  gross: Money;
+  invoice_type: TaxInvoiceType;
+  lines: TaxedLine[];
+  net: Money;
+  /** The seller's regime used: `vat_credit`, `vat_direct`, `household` or `exempt`. */
+  regime: string;
+  /** What was used (rates and their ids, pack version, rounding): keep it with the document. */
+  snapshot: Record<string, unknown>;
+  tax: Money;
+  totals: TaxTotal[];
+};
+
+/** A document to tax. */
+export type TaxQuoteRequest = {
+  buyer_kind?: TaxBuyerKind | null;
+  currency: string;
+  jurisdiction: string;
+  /** 1 to 1000 lines. */
+  lines: TaxableLine[];
+  /** `exclusive`: amounts are before taxes; `inclusive`: they include them. */
+  price_mode: TaxPriceMode;
+  /**
+   * The selling unit; default the tenant's root. Its tax profile (or the nearest above) decides
+   * the regime; without one the seller declares VAT by credit.
+   */
+  seller_org_id?: string | null;
+  /** Day the tax applies (`YYYY-MM-DD`, in the seller's time zone). */
+  tax_point: string;
+};
+
+/** A tax rate with its dates. */
+export type TaxRateResponse = {
+  /** `percent`, `per_unit` or `exempt` (not subject to the tax). */
+  basis: string;
+  category: string;
+  /** First day in force. */
+  effective_from: string;
+  /** First day no longer in force; `null` while in force. */
+  effective_to?: string | null;
+  id: string;
+  jurisdiction: string;
+  /** Legal basis (check it against the original document before production use). */
+  legal_basis: string;
+  pack_version: number;
+  per_unit?: Money | null;
+  rate_percent: string;
+  /** Order the taxes apply in: a later stage is computed on the price plus earlier taxes. */
+  stage: number;
+  tax_kind: string;
+};
+
+/** A tax rule with its dates (e.g. when cash register invoices are required). */
+export type TaxRuleResponse = {
+  code: string;
+  effective_from: string;
+  effective_to?: string | null;
+  id: string;
+  jurisdiction: string;
+  legal_basis: string;
+  value: Record<string, unknown>;
+};
+
+/** Total of one tax at one rate on the whole document. */
+export type TaxTotal = {
+  amount: Money;
+  /** Amount the tax is computed on. */
+  base: Money;
+  exempt: boolean;
+  rate_percent: string;
+  tax_kind: string;
+};
+
+/** Tax a platform withholds. */
+export type TaxWithholdingInput = {
+  amount: Money;
+  /** `goods`, `services`, `production_transport` or `other`. */
+  business_line: string;
+  jurisdiction: string;
+  /** Day of the payment. */
+  on: string;
+  /** The payee's regime: `household`… (a business declares itself: nothing is withheld). */
+  payee_regime: string;
+  /** `marketplace` or `affiliate`. */
+  payer_kind: string;
+};
+
+/** A rate a platform withholds from payments to sellers. */
+export type TaxWithholdingRateResponse = {
+  business_line: string;
+  effective_from: string;
+  effective_to?: string | null;
+  id: string;
+  jurisdiction: string;
+  legal_basis: string;
+  payee_regime: string;
+  /** `marketplace` or `affiliate`. */
+  payer_kind: string;
+  rate_percent: string;
+  /** `vat` or `pit`. */
+  tax_kind: string;
+  threshold?: Money | null;
+};
+
+/** One line to tax. */
+export type TaxableLine = {
+  /** Amount of the line (after discounts), in the document currency; not negative. */
+  amount: Money;
+  /** Tax category code, e.g. `vat.standard` (`GET /api/v1/tax/categories`). */
+  category: string;
+  /** The caller's id of the line, given back in the answer. */
+  line_id: string;
+  quantity?: DecimalString | null;
+};
+
+/** A line with its taxes. */
+export type TaxedLine = {
+  category: string;
+  /** Amount with taxes: `net` + every tax. */
+  gross: Money;
+  line_id: string;
+  /** Amount before taxes. */
+  net: Money;
+  taxes: TaxComponent[];
+};
+
 /** What a term groups. */
 export type Taxonomy = "category" | "tag";
 
@@ -9678,6 +10078,13 @@ export type VerifiedResponse = {
 
 /** Who may load the content without signing in. */
 export type Visibility = "private" | "public";
+
+/** Taxes to withhold. */
+export type WithholdingQuote = {
+  components: TaxComponent[];
+  snapshot: Record<string, unknown>;
+  total: Money;
+};
 
 export interface paths {
   "/api/v1/address/provinces": {
@@ -14402,6 +14809,162 @@ export interface paths {
         200: Data_Vec_LimitUse;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/categories": {
+    /** List the tax categories. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string }; };
+      responses: {
+        200: Data_Vec_TaxCategoryResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/jurisdictions": {
+    /** List the tax jurisdictions. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_TaxJurisdictionResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/packs": {
+    /** List the imported tax data packs. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_TaxPackResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Import a tax data pack. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: TaxPackRequest;
+      responses: {
+        200: Data_TaxPackResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/profiles": {
+    /** List the tax profiles in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_TaxProfileResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/profiles/{org_id}": {
+    /** Get the tax profile that applies to a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_TaxProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Set the tax profile of a unit. */
+    put: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: TaxProfileRequest;
+      responses: {
+        200: Data_TaxProfileResponse;
+        401: Problem;
+        403: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/quote": {
+    /** Compute the taxes of a document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: TaxQuoteRequest;
+      responses: {
+        200: Data_TaxQuote;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/rates": {
+    /** List the tax rates with their dates. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string }; };
+      responses: {
+        200: Data_Vec_TaxRateResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/rules": {
+    /** List the tax rules with their dates. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string }; };
+      responses: {
+        200: Data_Vec_TaxRuleResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/withholding": {
+    /** Compute the taxes a platform withholds from a payment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: TaxWithholdingInput;
+      responses: {
+        200: Data_WithholdingQuote;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/tax/withholding-rates": {
+    /** List the withholding rates for platforms. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; category?: string; on?: string }; };
+      responses: {
+        200: Data_Vec_TaxWithholdingRateResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

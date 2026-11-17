@@ -327,7 +327,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/finance.ts
 | [ ] | Ký hiệu và uỷ nhiệm | `GET/POST /invoices/series`, `PATCH /series/{id}`, `GET/POST /mandates`, `POST /mandates/{id}/revoke`; mã `invoices.series_taken`, `invoices.mandate_overlap` | 36 (mã lỗi: mới) |
 | [ ] | Ký hiệu và uỷ nhiệm | Đính kèm văn bản uỷ nhiệm (`document_file_id` qua media) | 36 (giao diện chỉ có ô đánh dấu) |
 | [ ] | Thuế | `GET /tax/rates`, `/packs`, `/profiles`, `PUT /profiles/{org_id}`, `POST /tax/quote` | 36 |
-| [ ] | Thuế | `GET /tax/withholding-rates`, `GET /tax/rules` | mới (bảng đã có trong đặc tả, endpoint chưa) |
+| [x] | Thuế | `GET /tax/withholding-rates`, `GET /tax/rules` | mới (bảng đã có trong đặc tả, endpoint chưa) — **Đã có** (17/11, D-341): `GET /api/v1/tax/withholding-rates`, `GET /api/v1/tax/rules` (lọc `jurisdiction`, `on`), kèm `/rates`, `/categories`, `POST /tax/quote`, hồ sơ thuế `GET/PUT /tax/profiles/{org_id}`. |
 | [ ] | Thuế | GTGT đầu ra / đầu vào theo kỳ và thuế suất (`GET /tax/vat-summary?book_id=&from=&to=`) | mới |
 | [ ] | Kỳ kế toán | `GET /ledger/periods` (kèm số bút toán / đã niêm phong), `POST /periods/{id}/close` | 36 |
 | [ ] | Kỳ kế toán | Kiểm trước khi khoá; mã `ledger.period_not_ended`; kết quả kiểm chuỗi băm qua API (`GET /ledger/integrity`) | mới |

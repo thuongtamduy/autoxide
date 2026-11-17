@@ -185,5 +185,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `plans.retire_plan` | `plans.plans.manage` | writes |
 | `plans.set_override` | `plans.subscriptions.manage` | writes |
 | `plans.update_plan` | `plans.plans.manage` | writes |
+| `tax.quote` | `tax.read` | read-only |
+| `tax.rates` | `tax.read` | read-only |
 
 <!-- tools:end -->

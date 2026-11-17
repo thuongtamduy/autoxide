@@ -372,6 +372,7 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   endpoint công khai và cache, chuyển từ menu của module nội dung
 - [`docs/ADDRESS.vi.md`](docs/ADDRESS.vi.md) — đơn vị hành chính và địa chỉ: đọc danh mục, nhập
   danh mục chính thức
+- [`docs/TAX.vi.md`](docs/TAX.vi.md) — thuế: gói dữ liệu thuế Việt Nam, tính thuế, hồ sơ thuế
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

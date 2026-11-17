@@ -5397,6 +5397,132 @@
       "permissions": [
         "plans.plans.manage"
       ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Compute the taxes of a document (per line and per rate) without saving anything. Taxes are rounded once per rate on the whole document, then shared between lines.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A document to tax.",
+        "properties": {
+          "currency": {
+            "description": "Currency code, e.g. `VND`.",
+            "type": "string"
+          },
+          "jurisdiction": {
+            "description": "Tax jurisdiction, e.g. `VN`.",
+            "type": "string"
+          },
+          "lines": {
+            "description": "The lines.",
+            "items": {
+              "additionalProperties": false,
+              "description": "One line to tax.",
+              "properties": {
+                "amount": {
+                  "description": "Amount in the document currency, as a decimal string, e.g. `\"100000\"`.",
+                  "type": "string"
+                },
+                "category": {
+                  "description": "Tax category, e.g. `vat.standard`.",
+                  "type": "string"
+                },
+                "line_id": {
+                  "description": "Your id of the line.",
+                  "type": "string"
+                },
+                "quantity": {
+                  "description": "Quantity as a decimal string, for taxes per unit.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "line_id",
+                "category",
+                "amount"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "price_mode": {
+            "description": "`exclusive` (amounts before taxes) or `inclusive`.",
+            "type": "string"
+          },
+          "seller_org_id": {
+            "description": "The selling unit; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_point": {
+            "description": "Day the tax applies, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jurisdiction",
+          "tax_point",
+          "price_mode",
+          "currency",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "tax.quote",
+      "output_schema": null,
+      "permissions": [
+        "tax.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "The tax rates in force on a day for a jurisdiction, with their legal basis.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which rates.",
+        "properties": {
+          "jurisdiction": {
+            "description": "Tax jurisdiction, e.g. `VN`.",
+            "type": "string"
+          },
+          "on": {
+            "description": "Day, `YYYY-MM-DD`; default today.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "jurisdiction"
+        ],
+        "type": "object"
+      },
+      "name": "tax.rates",
+      "output_schema": null,
+      "permissions": [
+        "tax.read"
+      ]
     }
   ]
 }

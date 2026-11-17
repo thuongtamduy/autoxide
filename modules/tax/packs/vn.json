@@ -1,0 +1,38 @@
+{
+  "code": "vn",
+  "version": 1,
+  "checked_on": "2026-11-17",
+  "source_note": "Vietnam: VAT (Law 48/2024/QH15; the 2% reduction to 8% under the resolutions of the National Assembly and its decrees), special consumption tax samples (Law 66/2025/QH15), withholding by marketplaces (Decree 117/2025/ND-CP), cash register invoices (Decree 123/2020/ND-CP amended by Decree 70/2025/ND-CP). Every rate must be checked against the original documents before production use.",
+  "jurisdictions": [
+    {"code": "VN", "name": "Viet Nam", "default_currency": "VND"}
+  ],
+  "categories": [
+    {"jurisdiction": "VN", "code": "vat.standard", "name_en": "VAT standard rate", "name_vi": "Thuế GTGT thuế suất phổ thông", "tax_kind": "vat"},
+    {"jurisdiction": "VN", "code": "vat.standard_reducible", "name_en": "VAT standard rate, reduced by 2% for now", "name_vi": "Thuế GTGT phổ thông, đang được giảm 2%", "tax_kind": "vat"},
+    {"jurisdiction": "VN", "code": "vat.reduced_5", "name_en": "VAT 5%", "name_vi": "Thuế GTGT 5%", "tax_kind": "vat"},
+    {"jurisdiction": "VN", "code": "vat.zero", "name_en": "VAT 0% (exports)", "name_vi": "Thuế GTGT 0% (xuất khẩu)", "tax_kind": "vat"},
+    {"jurisdiction": "VN", "code": "vat.exempt", "name_en": "Not subject to VAT", "name_vi": "Không chịu thuế GTGT", "tax_kind": "vat"},
+    {"jurisdiction": "VN", "code": "excise.beer", "name_en": "Beer (special consumption tax, then VAT)", "name_vi": "Bia (thuế TTĐB, rồi thuế GTGT)", "tax_kind": "excise"}
+  ],
+  "rates": [
+    {"jurisdiction": "VN", "category_code": "vat.standard", "tax_kind": "vat", "basis": "percent", "rate_percent": "10", "stage": 2, "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Law on VAT 48/2024/QH15, Article 9 — needs checking against the original document"},
+    {"jurisdiction": "VN", "category_code": "vat.standard_reducible", "tax_kind": "vat", "basis": "percent", "rate_percent": "8", "stage": 2, "effective_from": "2025-07-01", "effective_to": "2027-01-01", "legal_basis": "2% VAT reduction until 2026-12-31 (resolution of the National Assembly and its decree; excluded goods listed there) — needs checking against the original document"},
+    {"jurisdiction": "VN", "category_code": "vat.standard_reducible", "tax_kind": "vat", "basis": "percent", "rate_percent": "10", "stage": 2, "effective_from": "2027-01-01", "effective_to": null, "legal_basis": "Law on VAT 48/2024/QH15, Article 9, once the reduction ends — import a new pack if it is extended"},
+    {"jurisdiction": "VN", "category_code": "vat.reduced_5", "tax_kind": "vat", "basis": "percent", "rate_percent": "5", "stage": 2, "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Law on VAT 48/2024/QH15, Article 9 — needs checking against the original document"},
+    {"jurisdiction": "VN", "category_code": "vat.zero", "tax_kind": "vat", "basis": "percent", "rate_percent": "0", "stage": 2, "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Law on VAT 48/2024/QH15, Article 9 — needs checking against the original document"},
+    {"jurisdiction": "VN", "category_code": "vat.exempt", "tax_kind": "vat", "basis": "exempt", "rate_percent": "0", "stage": 2, "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Law on VAT 48/2024/QH15, Article 5 (not subject to VAT) — needs checking against the original document"},
+    {"jurisdiction": "VN", "category_code": "excise.beer", "tax_kind": "excise", "basis": "percent", "rate_percent": "65", "stage": 1, "effective_from": "2026-01-01", "effective_to": null, "legal_basis": "Law on special consumption tax 66/2025/QH15, schedule (sample; the rate rises by year) — needs checking against the original document"},
+    {"jurisdiction": "VN", "category_code": "excise.beer", "tax_kind": "vat", "basis": "percent", "rate_percent": "10", "stage": 2, "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Law on VAT 48/2024/QH15 (VAT on the price including special consumption tax) — needs checking against the original document"}
+  ],
+  "withholding_rates": [
+    {"jurisdiction": "VN", "payer_kind": "marketplace", "payee_regime": "household", "business_line": "goods", "tax_kind": "vat", "rate_percent": "1", "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Decree 117/2025/ND-CP (withholding by e-commerce platforms with payment) — needs checking against the original document"},
+    {"jurisdiction": "VN", "payer_kind": "marketplace", "payee_regime": "household", "business_line": "goods", "tax_kind": "pit", "rate_percent": "0.5", "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Decree 117/2025/ND-CP — needs checking against the original document"},
+    {"jurisdiction": "VN", "payer_kind": "marketplace", "payee_regime": "household", "business_line": "services", "tax_kind": "vat", "rate_percent": "5", "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Decree 117/2025/ND-CP — needs checking against the original document"},
+    {"jurisdiction": "VN", "payer_kind": "marketplace", "payee_regime": "household", "business_line": "services", "tax_kind": "pit", "rate_percent": "2", "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Decree 117/2025/ND-CP — needs checking against the original document"},
+    {"jurisdiction": "VN", "payer_kind": "marketplace", "payee_regime": "household", "business_line": "production_transport", "tax_kind": "vat", "rate_percent": "3", "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Decree 117/2025/ND-CP — needs checking against the original document"},
+    {"jurisdiction": "VN", "payer_kind": "marketplace", "payee_regime": "household", "business_line": "production_transport", "tax_kind": "pit", "rate_percent": "1.5", "effective_from": "2025-07-01", "effective_to": null, "legal_basis": "Decree 117/2025/ND-CP — needs checking against the original document"}
+  ],
+  "rules": [
+    {"jurisdiction": "VN", "code": "einvoice.cash_register_required", "value": {"regimes": ["household"], "annual_revenue_minor": 1000000000, "currency": "VND"}, "effective_from": "2025-06-01", "effective_to": null, "legal_basis": "Decree 123/2020/ND-CP amended by Decree 70/2025/ND-CP: households with revenue from 1 billion VND a year use cash register invoices — needs checking against the latest schedule"}
+  ]
+}

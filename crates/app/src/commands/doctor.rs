@@ -326,6 +326,8 @@ mod tests {
                 ("mail.smtp", "warning"),
                 // Chưa nhập danh mục đơn vị hành chính (D-314).
                 ("address.administrative_units", "warning"),
+                // Gói thuế chưa nhập (job nhập trong vòng một giờ, D-341).
+                ("tax.tax_rates", "warning"),
             ] {
                 assert!(found.contains(&expected), "{expected:?} not in {found:?}");
             }
@@ -333,7 +335,7 @@ mod tests {
             let text = render(&lines, true);
             assert!(text.contains("→ Run `autoxide user create"), "{text}");
             assert!(
-                text.ends_with("No failed checks; 4 warning(s) to look at before going live.\n"),
+                text.ends_with("No failed checks; 5 warning(s) to look at before going live.\n"),
                 "{text}"
             );
             let _ = std::fs::remove_dir_all(dir);

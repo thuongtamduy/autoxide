@@ -1,0 +1,51 @@
+//! `dyn TaxEngine` module `tax` công bố.
+
+use std::sync::Arc;
+
+use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::{OrgId, TenantContext};
+use chrono::NaiveDate;
+
+use crate::api::{
+    InvoiceRequirements, TaxEngine, TaxProfile, TaxQuote, TaxQuoteRequest, WithholdingQuote,
+    WithholdingRequest,
+};
+use crate::service::{TaxService, describe_profile};
+
+pub(crate) struct Provider(pub Arc<TaxService>);
+
+#[async_trait::async_trait]
+impl TaxEngine for Provider {
+    async fn quote(
+        &self,
+        tenant: &TenantContext,
+        request: TaxQuoteRequest,
+    ) -> Result<TaxQuote, Error> {
+        self.0.quote(tenant, request).await
+    }
+
+    async fn withholding(
+        &self,
+        _tenant: &TenantContext,
+        request: WithholdingRequest,
+    ) -> Result<WithholdingQuote, Error> {
+        self.0.withholding(request).await
+    }
+
+    async fn profile(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+    ) -> Result<Option<TaxProfile>, Error> {
+        Ok(self.0.nearest_profile(tenant, org).await?.as_ref().map(describe_profile))
+    }
+
+    async fn invoice_requirements(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        on: NaiveDate,
+    ) -> Result<InvoiceRequirements, Error> {
+        self.0.invoice_requirements(tenant, org, on).await
+    }
+}

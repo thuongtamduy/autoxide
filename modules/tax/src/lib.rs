@@ -1,0 +1,167 @@
+//! Module `tax` (bước 36 mục 5, D-188, D-341): engine thuế. Nhóm thuế và thuế suất có ngày hiệu lực
+//! là **dữ liệu** (gói dữ liệu, gói "vn" đi kèm), không viết cứng trong code; hồ sơ thuế theo nút
+//! (kế thừa theo cây tổ chức); thuế khấu trừ thay của sàn; yêu cầu hoá đơn (máy tính tiền). Module
+//! khác tính thuế qua [`api::TaxEngine`].
+
+pub mod api;
+mod config;
+mod engine;
+mod entity;
+mod events;
+mod http;
+mod migration;
+mod pack;
+mod permissions;
+mod provider;
+mod service;
+mod tools;
+
+#[cfg(test)]
+mod tests;
+
+use std::sync::Arc;
+
+use autoxide_kernel::access::Permission;
+use autoxide_kernel::config::{ConfigReader, Invalid};
+use autoxide_kernel::error::Error;
+use autoxide_kernel::event::EventInfo;
+use autoxide_kernel::job::{JobContext, JobHandler, JobRegistration, Schedule};
+use autoxide_kernel::mcp::Tool;
+use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::module::{Module, StartContext};
+use utoipa_axum::router::OpenApiRouter;
+
+use crate::service::{TablesCache, TaxService};
+
+pub fn module() -> impl Module {
+    TaxModule::default()
+}
+
+#[derive(Default)]
+struct TaxModule {
+    warning_days: Option<i64>,
+    service: Option<Arc<TaxService>>,
+}
+
+const IMPORT_BUNDLED: &str = "tax.import_bundled";
+
+/// Nhập gói đi kèm khi nó mới hơn bản trong database (hằng giờ, và ngay sau khi máy chủ chạy).
+struct ImportBundled(Arc<TaxService>);
+
+#[async_trait::async_trait]
+impl JobHandler for ImportBundled {
+    async fn run(&self, _job: &JobContext) -> Result<(), Error> {
+        self.0.import_bundled().await.map(|_| ())
+    }
+}
+
+impl Module for TaxModule {
+    fn name(&self) -> &'static str {
+        "tax"
+    }
+
+    // Module nền: không gói nào tắt được (bước 35, D-323).
+    fn always_enabled(&self) -> bool {
+        true
+    }
+
+    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        migration::all()
+    }
+
+    fn control_plane_tables(&self) -> Vec<&'static str> {
+        vec![
+            "tax_packs",
+            "tax_jurisdictions",
+            "tax_categories",
+            "tax_rates",
+            "tax_withholding_rates",
+            "tax_rules",
+        ]
+    }
+
+    fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
+        self.warning_days = Some(config::read(reader)?);
+        Ok(())
+    }
+
+    fn permissions(&self) -> Vec<Permission> {
+        permissions::all()
+    }
+
+    fn events(&self) -> Vec<EventInfo> {
+        events::all()
+    }
+
+    fn translations(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("vi", include_str!("../locales/vi.json"))]
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let service = Arc::new(TaxService {
+            databases: context.tenancy(),
+            outbox: context.outbox()?,
+            tables: TablesCache::new(),
+            units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
+            warning_days: self.warning_days.unwrap_or(60),
+        });
+        self.service = Some(service.clone());
+        context.provide::<dyn api::TaxEngine>(Arc::new(provider::Provider(service)))
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    fn tools(&self) -> Vec<Tool> {
+        self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    fn jobs(&self) -> Vec<JobRegistration> {
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![JobRegistration::new(IMPORT_BUNDLED, Arc::new(ImportBundled(service)))]
+        })
+    }
+
+    fn schedules(&self) -> Vec<Schedule> {
+        vec![
+            Schedule::new(IMPORT_BUNDLED, IMPORT_BUNDLED, std::time::Duration::from_secs(3600))
+                .on_control_only(),
+        ]
+    }
+
+    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
+        self.service.clone().map_or_else(Vec::new, |service| vec![pack::task(service)])
+    }
+
+    fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![autoxide_kernel::doctor::Check::new(
+                "tax_rates",
+                "Tax rates are imported, and none ends soon without a rate after it.",
+                Arc::new(ExpiringRates(service)),
+            )]
+        })
+    }
+}
+
+/// `autoxide doctor`: thuế suất sắp hết hạn mà chưa có bản kế tiếp cho cùng nhóm.
+struct ExpiringRates(Arc<TaxService>);
+
+#[async_trait::async_trait]
+impl autoxide_kernel::doctor::Probe for ExpiringRates {
+    async fn probe(&self) -> autoxide_kernel::doctor::Finding {
+        use autoxide_kernel::doctor::Finding;
+        match self.0.expiring_rates(chrono::Utc::now().date_naive()).await {
+            Ok(None) => Finding::warning("No tax data pack is imported: taxes cannot be computed.")
+                .with_hint("Run `autoxide task tax.import_pack` to import the pack shipped with the server."),
+            Ok(Some(expiring)) if expiring.is_empty() => Finding::ok("Every tax rate in force has a rate after it, or does not end."),
+            Ok(Some(expiring)) => Finding::warning(format!(
+                "Tax rates end soon with no rate after them: {}.",
+                expiring.join("; ")
+            ))
+            .with_hint("Import a newer tax data pack (`autoxide task tax.import_pack path=…`)."),
+            Err(error) => Finding::failed(format!("cannot read the tax rates: {error}")),
+        }
+    }
+}

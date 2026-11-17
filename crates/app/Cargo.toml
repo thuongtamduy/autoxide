@@ -25,6 +25,7 @@ autoxide-menus.workspace = true
 autoxide-address.workspace = true
 autoxide-organizations.workspace = true
 autoxide-plans.workspace = true
+autoxide-tax.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
