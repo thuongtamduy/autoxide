@@ -23,7 +23,11 @@ const OPS: [&str; 8] = [
 ];
 
 async fn app(test: &TestDatabase, gateway: Arc<FakePaymentGateway>) -> TestApp {
+    // Thư và file ghi vào thư mục tạm, không vào `crates/app/data/` của repo.
+    let dir = std::env::temp_dir().join(format!("autoxide-billing-{}", uuid::Uuid::now_v7()));
     let mut builder = TestApp::builder(test)
+        .setting("AUTOXIDE_FILES_DIR", &dir.join("files").display().to_string())
+        .setting("AUTOXIDE_MAIL_FILE_DIR", &dir.join("mail").display().to_string())
         .setting("AUTOXIDE_PLANS_CACHE_SECONDS", "0")
         .contribute::<dyn PaymentGateway>(gateway)
         .tenant("acme")

@@ -1,5 +1,8 @@
 /target/
 /data/
+# Thư mục dữ liệu mặc định khi chạy test hay lệnh trong thư mục của một crate.
+**/data/mail/
+**/data/files/
 .env
 .env.*
 !.env.example
