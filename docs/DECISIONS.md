@@ -8081,3 +8081,15 @@ Hai yêu cầu của giao diện (`docs/prompts/web-build-api-gaps.md`).
 2. **`OrgSetting::with_schema`** (tuỳ chọn, D-038): dạng giá trị viết bằng JSON Schema, trả ở trường `schema` của
    `GET /organizations/settings`. Khai báo kiểm: object có `type` thuộc kiểu JSON Schema, mặc định khớp `type`. Bộ kiểm
    (`checked`) vẫn là nơi quyết định giá trị hợp lệ — schema chỉ để dựng ô nhập. Sáu cài đặt hiện có đã khai schema.
+
+## D-333 · Bốn yêu cầu nhỏ của giao diện (PR #68) — 2026-11-17 — agent quyết
+
+1. **Tên và loại nút trong membership** (`org_name`, `org_unit_type`): `auth` tra qua `OrgDirectory::unit` của
+   `organizations` (đã phụ thuộc sẵn), một lần mỗi nút — người dùng làm ở ít nút. Không có `organizations` → `null`.
+2. **Khách cấp dưới**: `GET /api/v1/auth/delegations/tenants` (`auth.delegations.manage`) — mọi khách con, cháu… (uỷ quyền
+   nhận mọi khách cấp dưới, không chỉ con trực tiếp), chỉ tên / slug / trạng thái. Kernel thêm
+   `DatabaseRegistry::tenant_descendants` (mỗi tầng một câu, tối đa 16 tầng như `tenant_ancestors`). Không mở
+   `GET /kernel/tenants?parent_id=` cho khách thường: endpoint đó là của nhà vận hành, trả cả placement, thuê bao.
+3. **Phần `auth` của client-config**: `login_link`, `passkeys`, `self_registration` — chỉ cờ bật / tắt, không secret.
+4. **`staff_name`** trong câu trả lời về lần cấp quyền hỗ trợ: tên hiển thị của tài khoản nhân sự ở khách nền tảng (một câu
+   cho cả danh sách); không trả email — khách cần biết ai vào, không cần liên lạc riêng với nhân sự.

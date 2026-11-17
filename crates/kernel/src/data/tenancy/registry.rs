@@ -69,6 +69,18 @@ struct StorageSlot {
     opener: Option<Arc<dyn StorageOpener>>,
 }
 
+/// Một khách cấp dưới (xem [`DatabaseRegistry::tenant_descendants`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ChildTenant {
+    pub id: TenantId,
+    pub parent_id: TenantId,
+    pub slug: String,
+    pub name: String,
+    /// `provisioning`, `active`, `suspended`, `maintenance` hay `moving`.
+    pub status: String,
+}
+
 /// Sổ database của bản cài. Clone rẻ (bên trong là `Arc`).
 #[derive(Clone)]
 pub struct DatabaseRegistry(Arc<Inner>);
@@ -176,6 +188,42 @@ impl DatabaseRegistry {
             }
             found.push(TenantId::from_uuid(parent));
             current = parent;
+        }
+        Ok(found)
+    }
+
+    /// Mọi khách cấp dưới của khách `id` (con, cháu…), theo từng tầng, mỗi tầng một câu; dừng ở 16
+    /// tầng như [`tenant_ancestors`](Self::tenant_ancestors). Trả `(id, khách cha, slug, tên, trạng thái)`.
+    pub async fn tenant_descendants(&self, id: TenantId) -> Result<Vec<ChildTenant>, Error> {
+        use super::admin::tenant;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+        let mut found: Vec<ChildTenant> = Vec::new();
+        let mut level = vec![id.as_uuid()];
+        for _ in 0..16 {
+            if level.is_empty() {
+                break;
+            }
+            let rows = tenant::Entity::find()
+                .filter(tenant::Column::ParentId.is_in(level.clone()))
+                .order_by_asc(tenant::Column::Slug)
+                .all(self.control().read())
+                .await?;
+            level = rows
+                .iter()
+                .map(|row| row.id)
+                .filter(|child| {
+                    *child != id.as_uuid() && !found.iter().any(|seen| seen.id.as_uuid() == *child)
+                })
+                .collect();
+            for row in rows.into_iter().filter(|row| level.contains(&row.id)) {
+                found.push(ChildTenant {
+                    id: TenantId::from_uuid(row.id),
+                    parent_id: row.parent_id.map(TenantId::from_uuid).unwrap_or(id),
+                    slug: row.slug,
+                    name: row.name,
+                    status: row.status,
+                });
+            }
         }
         Ok(found)
     }

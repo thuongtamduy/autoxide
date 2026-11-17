@@ -37,6 +37,10 @@ pub(crate) struct SupportGrantResponse {
     tenant_id: Uuid,
     /// The platform staff account.
     staff_user_id: Uuid,
+    /// Display name of that staff member, so the tenant knows who may enter; `null` when the
+    /// account no longer exists.
+    #[schema(example = "Lan Nguyen")]
+    staff_name: Option<String>,
     /// The role of the platform tenant whose permissions they get.
     role_id: Uuid,
     /// `support`, or `legal_request` (a request of a competent authority; the tenant cannot
@@ -63,6 +67,7 @@ impl From<SupportGrant> for SupportGrantResponse {
             id: row.id,
             tenant_id: row.target_tenant_id,
             staff_user_id: row.staff_user_id,
+            staff_name: None,
             role_id: row.role_id,
             basis: row.basis,
             reason: row.reason,
@@ -108,6 +113,29 @@ pub(crate) struct TenantQuery {
     tenant_id: Uuid,
 }
 
+/// Câu trả lời kèm tên nhân sự (một câu cho mọi dòng).
+async fn described(
+    state: &HttpState,
+    rows: Vec<SupportGrant>,
+) -> Result<Vec<SupportGrantResponse>, Error> {
+    let names = state.support.staff_names(rows.iter().map(|row| row.staff_user_id)).await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let name = names.get(&row.staff_user_id).cloned();
+            SupportGrantResponse { staff_name: name, ..row.into() }
+        })
+        .collect())
+}
+
+async fn described_one(
+    state: &HttpState,
+    row: SupportGrant,
+) -> Result<SupportGrantResponse, Error> {
+    let mut list = described(state, vec![row]).await?;
+    list.pop().ok_or_else(|| Error::internal("a described grant went missing"))
+}
+
 /// List platform staff access to this tenant's data.
 ///
 /// Requires `auth.support_access.read`. Every grant, newest first, with when it was first used
@@ -132,7 +160,7 @@ async fn list_support_access(
 ) -> Result<Data<Vec<SupportGrantResponse>>, Error> {
     principal.require(&SUPPORT_ACCESS_READ)?;
     let rows = state.support.for_tenant(tenant.id()).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    Ok(Data { data: described(&state, rows).await? })
 }
 
 /// Revoke a platform staff access to this tenant.
@@ -161,7 +189,7 @@ async fn revoke_support_access(
 ) -> Result<Data<SupportGrantResponse>, Error> {
     principal.require(&SUPPORT_ACCESS_REVOKE)?;
     let row = state.support.revoke(tenant.id(), &principal, id, true).await?;
-    Ok(Data { data: row.into() })
+    Ok(Data { data: described_one(&state, row).await? })
 }
 
 /// List the support access grants for a tenant (platform).
@@ -187,7 +215,7 @@ async fn list_support_grants(
 ) -> Result<Data<Vec<SupportGrantResponse>>, Error> {
     principal.require(&SUPPORT_GRANT)?;
     let rows = state.support.for_tenant(TenantId::from_uuid(query.tenant_id)).await?;
-    Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+    Ok(Data { data: described(&state, rows).await? })
 }
 
 /// Grant platform staff time-limited access to a tenant's data (platform).
@@ -227,7 +255,7 @@ async fn grant_support(
     };
     let row = state.support.grant(&principal, input).await?;
     let path = format!("/auth/support-grants/{}", row.id);
-    Ok(Created::new(path, row.into()))
+    Ok(Created::new(path, described_one(&state, row).await?))
 }
 
 /// Revoke a support access grant (platform).
@@ -257,5 +285,5 @@ async fn revoke_support_grant(
     principal.require(&SUPPORT_GRANT)?;
     let target = TenantId::from_uuid(query.tenant_id);
     let row = state.support.revoke(target, &principal, id, false).await?;
-    Ok(Data { data: row.into() })
+    Ok(Data { data: described_one(&state, row).await? })
 }

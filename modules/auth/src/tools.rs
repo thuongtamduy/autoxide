@@ -754,9 +754,9 @@ fn memberships(state: &Arc<HttpState>) -> Vec<Tool> {
                         .roles
                         .set_memberships(&tenant, &principal, input.user_id, wanted)
                         .await?;
-                    let after: Vec<crate::http::memberships::MembershipResponse> =
-                        after.into_iter().map(Into::into).collect();
-                    Ok::<_, Error>(serde_json::json!({ "memberships": after }))
+                    let after =
+                        crate::http::memberships::memberships(&state, &tenant, after).await?;
+                    Ok::<_, Error>(serde_json::json!({ "memberships": after.data }))
                 }
             },
         )

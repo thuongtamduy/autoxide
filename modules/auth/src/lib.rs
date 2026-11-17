@@ -12,6 +12,7 @@ mod access;
 pub mod api;
 mod api_key;
 mod cleanup;
+mod client_config;
 mod config;
 mod delegation;
 #[cfg(test)]
@@ -46,6 +47,8 @@ mod token;
 mod tools;
 mod user;
 mod verify;
+#[cfg(test)]
+mod web_tests;
 
 use std::sync::Arc;
 
@@ -121,6 +124,10 @@ impl Module for AuthModule {
 
     fn seed_tenant(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::TenantSeed>> {
         Some(Arc::new(role::AdminRoleSeed))
+    }
+
+    fn client_config(&self) -> Result<Option<autoxide_kernel::module::ClientSection>, Error> {
+        self.config.as_ref().map_or(Ok(None), client_config::section)
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {

@@ -199,3 +199,25 @@ async fn uy_quyen_khong_cho_khach_khong_phai_con() {
     .await
     .unwrap();
 }
+
+/// Khách cha xem danh sách khách con để chọn khi uỷ quyền: thấy khách con, không thấy khách lạ;
+/// người không có `auth.delegations.manage` bị chặn.
+#[tokio::test]
+async fn khach_cha_xem_danh_sach_khach_con() {
+    TestDatabase::run(async |test| {
+        let (chain, _) = chain(test).await;
+        let (status, listed) =
+            call(&chain, "GET", "/delegations/tenants", &chain.admin, None, None).await;
+        assert_eq!(status, StatusCode::OK, "{listed}");
+        let rows = listed["data"].as_array().unwrap();
+        assert_eq!(rows.len(), 1, "{listed}");
+        assert_eq!(rows[0]["id"], chain.child.id().as_uuid().to_string());
+        assert_eq!(rows[0]["parent_id"], chain.parent.id().as_uuid().to_string());
+        assert_eq!(rows[0]["slug"], "child");
+        let (status, _) =
+            call(&chain, "GET", "/delegations/tenants", &chain.agent, None, None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    })
+    .await
+    .unwrap();
+}

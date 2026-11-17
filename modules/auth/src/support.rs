@@ -241,6 +241,30 @@ impl SupportService {
         Ok(row.is_some_and(|row| row.realm == "staff" && row.disabled_at.is_none()))
     }
 
+    /// Tên hiển thị của các tài khoản nhân sự `ids` (ở khách nền tảng) — khách thấy ai được vào dữ
+    /// liệu của mình. Chỉ tên, không email.
+    pub(crate) async fn staff_names(
+        &self,
+        ids: impl IntoIterator<Item = Uuid>,
+    ) -> Result<std::collections::HashMap<Uuid, String>, Error> {
+        let ids: std::collections::BTreeSet<Uuid> = ids.into_iter().collect();
+        if ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let platform = self.platform();
+        use sea_orm::QuerySelect as _;
+        let rows: Vec<(Uuid, String)> = crate::user::entity::Entity::find()
+            .select_only()
+            .column(crate::user::entity::Column::Id)
+            .column(crate::user::entity::Column::Name)
+            .filter(crate::user::entity::Column::Id.is_in(ids))
+            .scoped(&platform)
+            .into_tuple()
+            .all(platform.database().read())
+            .await?;
+        Ok(rows.into_iter().collect())
+    }
+
     /// Mọi lần cấp cho khách `target` (mới nhất trước) — cho quản trị của khách và của nền tảng.
     pub(crate) async fn for_tenant(&self, target: TenantId) -> Result<Vec<SupportGrant>, Error> {
         let platform = self.platform();
