@@ -174,6 +174,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                             &mut problems,
                         ),
                         blocked: input.blocked,
+                        sort: Default::default(),
                     };
                     let paging = PageQuery::new(
                         input.limit.map(|limit| limit.to_string()),

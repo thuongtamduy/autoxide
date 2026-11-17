@@ -23,7 +23,7 @@ use validator::Validate;
 use super::{choice, page_request, present, required, uuid_param};
 use crate::audience::subscribers::{
     ImportInput, ImportPerson, ImportReport, Membership, Subscriber, SubscriberChange,
-    SubscriberFilter, SubscriberStatus, SubscriptionStatus,
+    SubscriberFilter, SubscriberSort, SubscriberStatus, SubscriptionStatus,
 };
 use crate::entity::delivery;
 use crate::service::NewsletterService;
@@ -120,6 +120,10 @@ pub(crate) struct SubscribersQuery {
     /// `true`: only blocked subscribers (they get no mail); `false`: only the others.
     #[param(value_type = Option<bool>)]
     pub blocked: Option<String>,
+    /// `created_at` (the default), `email` or `status`; the direction is `order`. Keep the same
+    /// `sort` while following `next_cursor`.
+    #[param(value_type = Option<SubscriberSort>, inline)]
+    pub sort: Option<String>,
 }
 
 /// One person to import.
@@ -220,6 +224,13 @@ pub(crate) async fn list_subscribers(
                 None
             }
         },
+        sort: choice(
+            query.sort.as_deref(),
+            "sort",
+            "`created_at`, `email`, `status`",
+            &mut problems,
+        )
+        .unwrap_or_default(),
     };
     let page = page_request(paging, problems)?;
     Ok(service.list_subscribers(&tenant, &principal, &filter, &page).await?.map(Into::into))

@@ -553,3 +553,73 @@ async fn raw_send(
     assert_eq!(answer.status(), StatusCode::OK, "{}", String::from_utf8_lossy(answer.body()));
     answer
 }
+
+/// Đề bài giao diện W-058: sắp người đăng ký theo email (theo byte, như nhau trên hai database) và
+/// theo trạng thái, đi tiếp bằng `next_cursor` giữ đúng thứ tự.
+#[tokio::test]
+async fn sap_nguoi_dang_ky_theo_email_va_trang_thai() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let http = &app.http;
+        let list =
+            send(http, "POST", "/newsletter/lists", Some("admin"), &[], Some(list_body())).await;
+        let list_id = list.json()["data"]["id"].as_str().unwrap().to_owned();
+        let people = ["b.c@example.com", "a_z@example.com", "a.b@example.com", "ab@example.com"];
+        let body = json!({
+            "subscribers": people.iter().map(|email| json!({"email": email})).collect::<Vec<_>>(),
+            "list_ids": [list_id],
+            "consent_source": "test"
+        });
+        let imported =
+            send(http, "POST", "/newsletter/subscribers/import", Some("admin"), &[], Some(body))
+                .await;
+        assert!(imported.status().is_success(), "{}", imported.json());
+
+        let mut seen = Vec::new();
+        let mut uri = "/newsletter/subscribers?sort=email&order=asc&limit=3".to_owned();
+        loop {
+            let page = send(http, "GET", &uri, Some("reader"), &[], None).await;
+            assert_eq!(page.status(), StatusCode::OK, "{}", page.json());
+            let json = page.json();
+            seen.extend(
+                json["data"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|row| row["email"].as_str().unwrap().to_owned()),
+            );
+            match json["pagination"]["next_cursor"].as_str() {
+                Some(next) => {
+                    uri = format!(
+                        "/newsletter/subscribers?sort=email&order=asc&limit=3&cursor={next}"
+                    )
+                }
+                None => break,
+            }
+        }
+        // Theo byte: `.` (0x2E) < `_` (0x5F) < `b` (0x62) — locale của Postgres sẽ bỏ qua dấu.
+        assert_eq!(
+            seen,
+            ["a.b@example.com", "a_z@example.com", "ab@example.com", "b.c@example.com"]
+        );
+        let desc = send(
+            http,
+            "GET",
+            "/newsletter/subscribers?sort=email&order=desc&limit=1",
+            Some("reader"),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(desc.json()["data"][0]["email"], "b.c@example.com");
+        let by_status =
+            send(http, "GET", "/newsletter/subscribers?sort=status", Some("reader"), &[], None)
+                .await;
+        assert_eq!(by_status.status(), StatusCode::OK);
+        let bad =
+            send(http, "GET", "/newsletter/subscribers?sort=name", Some("reader"), &[], None).await;
+        assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    })
+    .await
+    .unwrap();
+}

@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
@@ -133,6 +133,21 @@ pub(crate) struct SubscriberFilter {
     pub status: Option<SubscriptionStatus>,
     /// `true`: chỉ người bị chặn; `false`: chỉ người không bị chặn.
     pub blocked: Option<bool>,
+    /// Sắp theo gì (chiều là `order` của trang).
+    pub sort: SubscriberSort,
+}
+
+/// How to sort subscribers; the direction is `order`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SubscriberSort {
+    /// When they were added (the default).
+    #[default]
+    CreatedAt,
+    /// Email address, byte by byte (the same order on every database).
+    Email,
+    /// Status of the person: `active` or `blocked`.
+    Status,
 }
 
 /// Một người cần nhập.
@@ -224,14 +239,23 @@ impl NewsletterService {
             }
             select = select.filter(subscriber::Column::Id.in_subquery(inner.to_owned()));
         }
-        let found = fetch_page(
-            select,
-            subscriber::Column::Id,
-            |row| row.id,
-            page,
-            tenant.database().read(),
-        )
-        .await?;
+        let read = tenant.database().read();
+        let id = |row: &subscriber::Model| row.id;
+        let found = match filter.sort {
+            SubscriberSort::CreatedAt => {
+                fetch_page(select, subscriber::Column::Id, id, page, read).await?
+            }
+            SubscriberSort::Email => {
+                let key = |row: &subscriber::Model| SortValue::Text(row.email.clone());
+                let column = subscriber::Column::Email;
+                fetch_page_by(select, column, key, subscriber::Column::Id, id, page, read).await?
+            }
+            SubscriberSort::Status => {
+                let key = |row: &subscriber::Model| SortValue::Text(row.status.clone());
+                let column = subscriber::Column::Status;
+                fetch_page_by(select, column, key, subscriber::Column::Id, id, page, read).await?
+            }
+        };
         let Page { data, pagination } = found;
         let data = self.describe(tenant.database().read(), tenant, data).await?;
         Ok(Page { data, pagination })

@@ -60,6 +60,7 @@ pub(crate) fn all(service: &Arc<AuditService>) -> Vec<Tool> {
                         subject: input.subject,
                         action: input.action,
                         module: input.module,
+                        actor_kind: None,
                     };
                     let page = service.list(&tenant, filter, &page.page()?).await?;
                     Ok::<Page<AuditEntryResponse>, Error>(page.map(AuditEntryResponse::from))

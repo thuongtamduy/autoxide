@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `GET /api/v1/audit?actor_kind=user|system|public`; `GET /api/v1/newsletter/subscribers?sort=email|status` (emails
+  sort byte by byte, the same on SQLite and PostgreSQL).
+
 - New module `compliance` (step 37): identity verification (KYC) through a provider (`IdentityVerifier`, callbacks
   checked by signature, processed in the background) or by manual review (signed-in reviewers only); duplicate
   documents wait for review; only the result, the provider reference, the verified name and the last four digits are
