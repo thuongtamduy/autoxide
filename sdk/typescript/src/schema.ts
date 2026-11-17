@@ -2674,6 +2674,51 @@ export type CurrentTenant = {
   status: string;
 };
 
+/** A custom field of the tenant. */
+export type CustomFieldView = {
+  active: boolean;
+  created_at: string;
+  /**
+   * `text`, `long_text`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `option`,
+   * `options`, `url`, `email`, `phone`, `media` or `reference`.
+   */
+  data_type: string;
+  /** Any JSON value of the field's type. */
+  default?: unknown;
+  /** Lists filter on it (`cf.<key>=`). */
+  filterable: boolean;
+  /** Help texts by language. */
+  help: {
+    [key: string]: string;
+  };
+  id: string;
+  /** `snake_case`, never changes: the key in the records' `custom_fields`. */
+  key: string;
+  /** Labels by language. */
+  labels: {
+    [key: string]: string;
+  };
+  /** Longest text, largest number (or date). */
+  max?: string | null;
+  /** Shortest text, smallest number (or date as `YYYY-MM-DD`). */
+  min?: string | null;
+  /** Allowed values of `option` / `options`. */
+  options: string[];
+  /** Personal data: goes into personal-data exports and erasure. */
+  personal_data: boolean;
+  position: number;
+  /** With `reference`: the record type it points to. */
+  reference_kind?: string | null;
+  required: boolean;
+  /** Digits after the decimal point of `decimal` (0 to 6). */
+  scale?: number | null;
+  /** The record type, e.g. `content.entry`. */
+  target: string;
+  updated_at: string;
+  /** `internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it). */
+  visibility: string;
+};
+
 /** A customer account of the tenant's shop. */
 export type CustomerResponse = {
   created_at: string;
@@ -4084,6 +4129,54 @@ export type Data_CurrentTenant = {
 };
 
 /** Envelope of a single result. */
+export type Data_CustomFieldView = {
+  /** A custom field of the tenant. */
+  data: {
+    active: boolean;
+    created_at: string;
+    /**
+     * `text`, `long_text`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `option`,
+     * `options`, `url`, `email`, `phone`, `media` or `reference`.
+     */
+    data_type: string;
+    /** Any JSON value of the field's type. */
+    default?: unknown;
+    /** Lists filter on it (`cf.<key>=`). */
+    filterable: boolean;
+    /** Help texts by language. */
+    help: {
+      [key: string]: string;
+    };
+    id: string;
+    /** `snake_case`, never changes: the key in the records' `custom_fields`. */
+    key: string;
+    /** Labels by language. */
+    labels: {
+      [key: string]: string;
+    };
+    /** Longest text, largest number (or date). */
+    max?: string | null;
+    /** Shortest text, smallest number (or date as `YYYY-MM-DD`). */
+    min?: string | null;
+    /** Allowed values of `option` / `options`. */
+    options: string[];
+    /** Personal data: goes into personal-data exports and erasure. */
+    personal_data: boolean;
+    position: number;
+    /** With `reference`: the record type it points to. */
+    reference_kind?: string | null;
+    required: boolean;
+    /** Digits after the decimal point of `decimal` (0 to 6). */
+    scale?: number | null;
+    /** The record type, e.g. `content.entry`. */
+    target: string;
+    updated_at: string;
+    /** `internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it). */
+    visibility: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CustomerResponse = {
   /** A customer account of the tenant's shop. */
   data: {
@@ -4228,6 +4321,8 @@ export type Data_EntryResponse = {
      * AI agent).
      */
     created_via: string;
+    /** Values of the tenant's custom fields, by key. */
+    custom_fields: Record<string, unknown>;
     /** Short summary. */
     excerpt: string;
     featured_media_alt: string;
@@ -7375,6 +7470,53 @@ export type Data_Vec_ContentTemplate = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CustomFieldView = {
+  data: {
+    active: boolean;
+    created_at: string;
+    /**
+     * `text`, `long_text`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `option`,
+     * `options`, `url`, `email`, `phone`, `media` or `reference`.
+     */
+    data_type: string;
+    /** Any JSON value of the field's type. */
+    default?: unknown;
+    /** Lists filter on it (`cf.<key>=`). */
+    filterable: boolean;
+    /** Help texts by language. */
+    help: {
+      [key: string]: string;
+    };
+    id: string;
+    /** `snake_case`, never changes: the key in the records' `custom_fields`. */
+    key: string;
+    /** Labels by language. */
+    labels: {
+      [key: string]: string;
+    };
+    /** Longest text, largest number (or date). */
+    max?: string | null;
+    /** Shortest text, smallest number (or date as `YYYY-MM-DD`). */
+    min?: string | null;
+    /** Allowed values of `option` / `options`. */
+    options: string[];
+    /** Personal data: goes into personal-data exports and erasure. */
+    personal_data: boolean;
+    position: number;
+    /** With `reference`: the record type it points to. */
+    reference_kind?: string | null;
+    required: boolean;
+    /** Digits after the decimal point of `decimal` (0 to 6). */
+    scale?: number | null;
+    /** The record type, e.g. `content.entry`. */
+    target: string;
+    updated_at: string;
+    /** `internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it). */
+    visibility: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_DelegationResponse = {
   data: {
     /** The tenant they may enter, with the header `Autoxide-Tenant`. */
@@ -8573,6 +8715,11 @@ export type EntryFieldsInput = {
   body?: BodyNode | null;
   /** Canonical address, when the content first appeared elsewhere; empty: none. */
   canonical_url?: string | null;
+  /**
+   * Values of the tenant's custom fields (`GET /api/v1/kernel/custom-fields?target=content.entry`),
+   * by key; `null` clears one. Every problem is listed at once under `custom_fields.<key>`.
+   */
+  custom_fields?: Record<string, unknown> | null;
   /** Up to 1000 characters. */
   excerpt?: string | null;
   /** Text alternative of the main image, up to 1000 characters. */
@@ -8627,6 +8774,8 @@ export type EntryResponse = {
    * AI agent).
    */
   created_via: string;
+  /** Values of the tenant's custom fields, by key. */
+  custom_fields: Record<string, unknown>;
   /** Short summary. */
   excerpt: string;
   featured_media_alt: string;
@@ -8797,6 +8946,31 @@ export type FieldOption = {
   label?: Localized;
   /** What is stored and sent: 1 to 200 characters, unique in the field. */
   value: string;
+};
+
+/** The changeable settings of a field; omitted fields stay (or take their default). */
+export type FieldSettings = {
+  active?: boolean | null;
+  /** With `data_type`: change the type (only while no record has a value). */
+  data_type?: string | null;
+  /** Any JSON value of the field's type. */
+  default?: unknown;
+  filterable?: boolean | null;
+  help?: {
+    [key: string]: string;
+  } | null;
+  labels?: {
+    [key: string]: string;
+  } | null;
+  max?: string | null;
+  min?: string | null;
+  options?: string[] | null;
+  personal_data?: boolean | null;
+  position?: number | null;
+  reference_kind?: string | null;
+  required?: boolean | null;
+  scale?: number | null;
+  visibility?: string | null;
 };
 
 /** The kind of a field. The list is closed: anything else is refused. */
@@ -10754,6 +10928,16 @@ export type NavigationView = {
   groups: NavGroupView[];
 };
 
+/** A field to define. */
+export type NewCustomField = FieldSettings & {
+  /** One of the types listed on `data_type` of the answer. */
+  data_type: string;
+  /** `snake_case`, 1 to 64 characters; never changes. */
+  key: string;
+  /** The record type, e.g. `content.entry`. */
+  target: string;
+};
+
 /** A list to export. */
 export type NewExport = {
   /** The columns to write, in order; omitted: every column of the export. */
@@ -11873,6 +12057,8 @@ export type Page_EntryResponse = {
      * AI agent).
      */
     created_via: string;
+    /** Values of the tenant's custom fields, by key. */
+    custom_fields: Record<string, unknown>;
     /** Short summary. */
     excerpt: string;
     featured_media_alt: string;
@@ -21207,6 +21393,70 @@ export interface paths {
         403: Problem;
         500: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/custom-fields": {
+    /** List custom fields. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { target?: string }; };
+      responses: {
+        200: Data_Vec_CustomFieldView;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Define a custom field. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewCustomField;
+      responses: {
+        201: Data_CustomFieldView;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/custom-fields/{id}": {
+    /** Get a custom field. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomFieldView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a custom field. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: FieldSettings;
+      responses: {
+        200: Data_CustomFieldView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Turn a custom field off. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

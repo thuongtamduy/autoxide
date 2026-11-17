@@ -7612,6 +7612,134 @@
         ],
         "type": "object"
       },
+      "CustomFieldView": {
+        "description": "A custom field of the tenant.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "data_type": {
+            "description": "`text`, `long_text`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `option`,\n`options`, `url`, `email`, `phone`, `media` or `reference`.",
+            "type": "string"
+          },
+          "default": {
+            "description": "Any JSON value of the field's type."
+          },
+          "filterable": {
+            "description": "Lists filter on it (`cf.<key>=`).",
+            "type": "boolean"
+          },
+          "help": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Help texts by language.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "key": {
+            "description": "`snake_case`, never changes: the key in the records' `custom_fields`.",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Labels by language.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "max": {
+            "description": "Longest text, largest number (or date).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min": {
+            "description": "Shortest text, smallest number (or date as `YYYY-MM-DD`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "options": {
+            "description": "Allowed values of `option` / `options`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "personal_data": {
+            "description": "Personal data: goes into personal-data exports and erasure.",
+            "type": "boolean"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "reference_kind": {
+            "description": "With `reference`: the record type it points to.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "scale": {
+            "description": "Digits after the decimal point of `decimal` (0 to 6).",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "target": {
+            "description": "The record type, e.g. `content.entry`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "visibility": {
+            "description": "`internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "target",
+          "key",
+          "data_type",
+          "labels",
+          "help",
+          "required",
+          "options",
+          "visibility",
+          "filterable",
+          "personal_data",
+          "position",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "CustomerResponse": {
         "description": "A customer account of the tenant's shop.",
         "properties": {
@@ -11822,6 +11950,143 @@
         ],
         "type": "object"
       },
+      "Data_CustomFieldView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A custom field of the tenant.",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "data_type": {
+                "description": "`text`, `long_text`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `option`,\n`options`, `url`, `email`, `phone`, `media` or `reference`.",
+                "type": "string"
+              },
+              "default": {
+                "description": "Any JSON value of the field's type."
+              },
+              "filterable": {
+                "description": "Lists filter on it (`cf.<key>=`).",
+                "type": "boolean"
+              },
+              "help": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Help texts by language.",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "key": {
+                "description": "`snake_case`, never changes: the key in the records' `custom_fields`.",
+                "type": "string"
+              },
+              "labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Labels by language.",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "max": {
+                "description": "Longest text, largest number (or date).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "min": {
+                "description": "Shortest text, smallest number (or date as `YYYY-MM-DD`).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "options": {
+                "description": "Allowed values of `option` / `options`.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "personal_data": {
+                "description": "Personal data: goes into personal-data exports and erasure.",
+                "type": "boolean"
+              },
+              "position": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "reference_kind": {
+                "description": "With `reference`: the record type it points to.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "scale": {
+                "description": "Digits after the decimal point of `decimal` (0 to 6).",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "target": {
+                "description": "The record type, e.g. `content.entry`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "visibility": {
+                "description": "`internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "target",
+              "key",
+              "data_type",
+              "labels",
+              "help",
+              "required",
+              "options",
+              "visibility",
+              "filterable",
+              "personal_data",
+              "position",
+              "active",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CustomerResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -12236,6 +12501,10 @@
                 "example": "api_key",
                 "type": "string"
               },
+              "custom_fields": {
+                "description": "Values of the tenant's custom fields, by key.",
+                "type": "object"
+              },
               "excerpt": {
                 "description": "Short summary.",
                 "type": "string"
@@ -12415,7 +12684,8 @@
               "term_ids",
               "author_ids",
               "version",
-              "tags"
+              "tags",
+              "custom_fields"
             ],
             "type": "object"
           }
@@ -21820,6 +22090,146 @@
         ],
         "type": "object"
       },
+      "Data_Vec_CustomFieldView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A custom field of the tenant.",
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "data_type": {
+                  "description": "`text`, `long_text`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `option`,\n`options`, `url`, `email`, `phone`, `media` or `reference`.",
+                  "type": "string"
+                },
+                "default": {
+                  "description": "Any JSON value of the field's type."
+                },
+                "filterable": {
+                  "description": "Lists filter on it (`cf.<key>=`).",
+                  "type": "boolean"
+                },
+                "help": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Help texts by language.",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "key": {
+                  "description": "`snake_case`, never changes: the key in the records' `custom_fields`.",
+                  "type": "string"
+                },
+                "labels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Labels by language.",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "max": {
+                  "description": "Longest text, largest number (or date).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "min": {
+                  "description": "Shortest text, smallest number (or date as `YYYY-MM-DD`).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "options": {
+                  "description": "Allowed values of `option` / `options`.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "personal_data": {
+                  "description": "Personal data: goes into personal-data exports and erasure.",
+                  "type": "boolean"
+                },
+                "position": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "reference_kind": {
+                  "description": "With `reference`: the record type it points to.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "scale": {
+                  "description": "Digits after the decimal point of `decimal` (0 to 6).",
+                  "format": "int32",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "target": {
+                  "description": "The record type, e.g. `content.entry`.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "visibility": {
+                  "description": "`internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "target",
+                "key",
+                "data_type",
+                "labels",
+                "help",
+                "required",
+                "options",
+                "visibility",
+                "filterable",
+                "personal_data",
+                "position",
+                "active",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_DelegationResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -25579,6 +25989,13 @@
               "null"
             ]
           },
+          "custom_fields": {
+            "description": "Values of the tenant's custom fields (`GET /api/v1/kernel/custom-fields?target=content.entry`),\nby key; `null` clears one. Every problem is listed at once under `custom_fields.<key>`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "excerpt": {
             "description": "Up to 1000 characters.",
             "type": [
@@ -25693,6 +26110,10 @@
             "description": "How the entry was created: `session` (a person signed in) or `api_key` (a machine or an\nAI agent).",
             "example": "api_key",
             "type": "string"
+          },
+          "custom_fields": {
+            "description": "Values of the tenant's custom fields, by key.",
+            "type": "object"
           },
           "excerpt": {
             "description": "Short summary.",
@@ -25873,7 +26294,8 @@
           "term_ids",
           "author_ids",
           "version",
-          "tags"
+          "tags",
+          "custom_fields"
         ],
         "type": "object"
       },
@@ -26169,6 +26591,117 @@
         "required": [
           "value"
         ],
+        "type": "object"
+      },
+      "FieldSettings": {
+        "description": "The changeable settings of a field; omitted fields stay (or take their default).",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "data_type": {
+            "description": "With `data_type`: change the type (only while no record has a value).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default": {
+            "description": "Any JSON value of the field's type."
+          },
+          "filterable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "help": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "max": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "personal_data": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "position": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reference_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "scale": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "visibility": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "FieldType": {
@@ -31983,6 +32516,36 @@
         ],
         "type": "object"
       },
+      "NewCustomField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldSettings"
+          },
+          {
+            "properties": {
+              "data_type": {
+                "description": "One of the types listed on `data_type` of the answer.",
+                "type": "string"
+              },
+              "key": {
+                "description": "`snake_case`, 1 to 64 characters; never changes.",
+                "type": "string"
+              },
+              "target": {
+                "description": "The record type, e.g. `content.entry`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "target",
+              "key",
+              "data_type"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "A field to define."
+      },
       "NewExport": {
         "description": "A list to export.",
         "properties": {
@@ -35483,6 +36046,10 @@
                   "example": "api_key",
                   "type": "string"
                 },
+                "custom_fields": {
+                  "description": "Values of the tenant's custom fields, by key.",
+                  "type": "object"
+                },
                 "excerpt": {
                   "description": "Short summary.",
                   "type": "string"
@@ -35662,7 +36229,8 @@
                 "term_ids",
                 "author_ids",
                 "version",
-                "tags"
+                "tags",
+                "custom_fields"
               ],
               "type": "object"
             },
@@ -74585,7 +75153,7 @@
     },
     "/api/v1/content/entries": {
       "get": {
-        "description": "Requires `content.read`. Newest first unless `order=asc`.",
+        "description": "Requires `content.read`. Newest first unless `order=asc`. Filter on the tenant's filterable\ncustom fields with `cf.<key>=<eq|in|gte|lte|prefix>:<value>`, e.g. `cf.owner=eq:ada`.",
         "operationId": "content_list_content_entries",
         "parameters": [
           {
@@ -89123,6 +89691,545 @@
           "kernel"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/kernel/custom-fields": {
+      "get": {
+        "description": "`kernel.custom_fields.manage`, or the permission that reads `target`'s records. The fields the\ntenant defined, in order — interfaces and agents build forms and filter chips from them.",
+        "operationId": "kernel_list_custom_fields",
+        "parameters": [
+          {
+            "description": "Only the fields of this record type, e.g. `content.entry`.",
+            "in": "query",
+            "name": "target",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CustomFieldView"
+                }
+              }
+            },
+            "description": "The fields."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`target` takes no custom fields; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List custom fields.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      },
+      "post": {
+        "description": "Requires `kernel.custom_fields.manage`. At most 100 fields per record type.",
+        "operationId": "kernel_create_custom_field",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCustomField"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CustomFieldView"
+                }
+              }
+            },
+            "description": "Defined.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.custom_fields.manage`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key is taken (`kernel.custom_field_key_taken`) or the record type has 100 fields (`kernel.custom_field_limit_reached`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid definition; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Define a custom field.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.custom_fields.manage"
+        ]
+      }
+    },
+    "/api/v1/kernel/custom-fields/{id}": {
+      "delete": {
+        "description": "Requires `kernel.custom_fields.manage`. The field stops being shown and accepted; values already\non records stay (a field is never deleted with its data).",
+        "operationId": "kernel_delete_custom_field",
+        "parameters": [
+          {
+            "description": "Id of the field.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Turned off."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.custom_fields.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such field; code `kernel.custom_field_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turn a custom field off.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.custom_fields.manage"
+        ]
+      },
+      "get": {
+        "description": "`kernel.custom_fields.manage`, or the permission that reads its record type.",
+        "operationId": "kernel_get_custom_field",
+        "parameters": [
+          {
+            "description": "Id of the field.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CustomFieldView"
+                }
+              }
+            },
+            "description": "The field."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such field; code `kernel.custom_field_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a custom field.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      },
+      "patch": {
+        "description": "Requires `kernel.custom_fields.manage`. Labels, options, constraints and the rest change; the\nkey never does, and the type only while no record has a value (`kernel.custom_field_type_locked`).",
+        "operationId": "kernel_update_custom_field",
+        "parameters": [
+          {
+            "description": "Id of the field.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CustomFieldView"
+                }
+              }
+            },
+            "description": "The field."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.custom_fields.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such field; code `kernel.custom_field_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Changing the type of a field records already use; code `kernel.custom_field_type_locked`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid settings; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a custom field.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.custom_fields.manage"
+        ]
       }
     },
     "/api/v1/kernel/domains": {
