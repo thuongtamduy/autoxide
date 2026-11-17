@@ -366,6 +366,10 @@ impl Module for KernelModule {
                 entitlements: entitlements.clone(),
             };
             routes = routes.merge(crate::ops::find::routes(find));
+            routes = routes.merge(crate::ops::resolve::routes(crate::ops::resolve::ResolveState {
+                resolvers: self.catalog.code_resolvers(),
+                entitlements: entitlements.clone(),
+            }));
             let summary = crate::ops::summary::SummaryState {
                 metrics: self.catalog.summary_metrics(),
                 entitlements: entitlements.clone(),

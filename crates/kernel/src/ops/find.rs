@@ -46,6 +46,182 @@ impl Found {
     }
 }
 
+/// Phép so của một bộ lọc trong ô tìm.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SearchOp {
+    /// `field:value`
+    Eq(String),
+    /// `field>value`
+    Gt(String),
+    /// `field>=value`
+    Ge(String),
+    /// `field<value`
+    Lt(String),
+    /// `field<=value`
+    Le(String),
+    /// `field:from..to` (gồm hai đầu; một đầu trống là không giới hạn phía đó).
+    Range(String, String),
+}
+
+/// Một bộ lọc trong ô tìm, vd `status:draft`, `-locale:en`, `updated>2026-01-01`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchFilter {
+    /// Tên trường, chữ thường.
+    pub field: String,
+    pub op: SearchOp,
+    /// Có `-` đứng trước: loại bản ghi khớp.
+    pub negated: bool,
+    /// Nguyên văn trong ô tìm (để báo lại trong `ignored`).
+    pub raw: String,
+}
+
+/// Phạm vi tìm theo cây tổ chức (bước 51 P9).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SearchScope {
+    /// Mọi nút người gọi có quyền (mặc định; phạm vi quyền do nguồn tự áp).
+    #[default]
+    Accessible,
+    /// Chỉ bản ghi của đúng nút này.
+    Node(OrgId),
+    /// Bản ghi của nút này và mọi nút con.
+    Subtree(OrgId),
+}
+
+/// Truy vấn của ô tìm đã phân tích (bước 51 P9): từ khoá còn lại, loại (`is:`), bộ lọc.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SearchQuery {
+    /// Từ khoá còn lại, cách nhau một khoảng trắng.
+    pub text: String,
+    /// `is:<loại>`: chỉ các loại này (tên đầy đủ `content.entry` hay phần sau dấu chấm `entry`).
+    pub kinds: Vec<String>,
+    /// `-is:<loại>`: trừ các loại này.
+    pub excluded_kinds: Vec<String>,
+    pub filters: Vec<SearchFilter>,
+    /// Phần không hiểu (từ khoá phủ định `-chữ`, phép so thiếu giá trị).
+    pub ignored: Vec<String>,
+    /// Phạm vi theo cây tổ chức (`scope=` của endpoint).
+    pub scope: SearchScope,
+}
+
+impl SearchQuery {
+    /// Phân tích ô tìm. Cụm trong ngoặc kép là một từ khoá (giữ khoảng trắng).
+    pub fn parse(input: &str) -> Self {
+        let mut query = SearchQuery::default();
+        let mut words = Vec::new();
+        for token in tokens(input) {
+            if token.quoted {
+                words.push(token.text);
+                continue;
+            }
+            let raw = token.text;
+            let (negated, body) = match raw.strip_prefix('-') {
+                Some(rest) if !rest.is_empty() => (true, rest),
+                _ => (false, raw.as_str()),
+            };
+            match operator(body) {
+                Some((field, _)) if field == "is" => {
+                    let kind = body[3..].to_lowercase();
+                    if kind.is_empty() {
+                        query.ignored.push(raw.clone());
+                    } else if negated {
+                        query.excluded_kinds.push(kind);
+                    } else {
+                        query.kinds.push(kind);
+                    }
+                }
+                Some((field, op)) => {
+                    query.filters.push(SearchFilter { field, op, negated, raw: raw.clone() })
+                }
+                None if negated => query.ignored.push(raw.clone()),
+                None => words.push(raw.clone()),
+            }
+        }
+        query.text = words.join(" ");
+        query
+    }
+
+    /// Điều kiện phạm vi cho cột nút `column` của bảng nguồn; `None` với `Accessible`.
+    pub fn scope_condition<Col: sea_orm::ColumnTrait>(
+        &self,
+        tenant: &TenantContext,
+        column: Col,
+    ) -> Option<sea_orm::Condition> {
+        match self.scope {
+            SearchScope::Accessible => None,
+            SearchScope::Node(org) => Some(sea_orm::Condition::all().add(column.eq(org.as_uuid()))),
+            SearchScope::Subtree(org) => {
+                Some(crate::tenancy::OrgTree::subtree_condition(tenant.id(), &[org], column))
+            }
+        }
+    }
+
+    /// Có loại `kind` (`<module>.<loại>`) theo `is:` / `-is:` không.
+    pub fn wants(&self, kind: &str) -> bool {
+        let short = kind.rsplit('.').next().unwrap_or(kind);
+        let named =
+            |list: &Vec<String>| list.iter().any(|wanted| wanted == kind || wanted == short);
+        (self.kinds.is_empty() || named(&self.kinds)) && !named(&self.excluded_kinds)
+    }
+}
+
+struct Token {
+    text: String,
+    quoted: bool,
+}
+
+fn tokens(input: &str) -> Vec<Token> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    let mut was_quoted = false;
+    for c in input.chars() {
+        match c {
+            '"' => {
+                quoted = !quoted;
+                was_quoted = true;
+            }
+            c if c.is_whitespace() && !quoted => {
+                if !current.is_empty() {
+                    out.push(Token { text: std::mem::take(&mut current), quoted: was_quoted });
+                }
+                was_quoted = false;
+            }
+            c => current.push(c),
+        }
+    }
+    if !current.is_empty() {
+        out.push(Token { text: current, quoted: was_quoted });
+    }
+    out
+}
+
+/// `field:value`, `field>value`, `field>=value`, `field<value`, `field<=value`, `field:a..b`; tên
+/// trường là chữ thường, số, `_`.
+fn operator(body: &str) -> Option<(String, SearchOp)> {
+    let split = body.find([':', '>', '<'])?;
+    let field = &body[..split];
+    if field.is_empty() || !field.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+        return None;
+    }
+    let rest = &body[split..];
+    let (op, value): (fn(String) -> SearchOp, &str) = if let Some(value) = rest.strip_prefix(">=") {
+        (SearchOp::Ge, value)
+    } else if let Some(value) = rest.strip_prefix("<=") {
+        (SearchOp::Le, value)
+    } else if let Some(value) = rest.strip_prefix('>') {
+        (SearchOp::Gt, value)
+    } else if let Some(value) = rest.strip_prefix('<') {
+        (SearchOp::Lt, value)
+    } else {
+        let value = rest.strip_prefix(':').unwrap_or(rest);
+        if let Some((from, to)) = value.split_once("..") {
+            return Some((field.to_lowercase(), SearchOp::Range(from.to_owned(), to.to_owned())));
+        }
+        (SearchOp::Eq, value)
+    };
+    (!value.is_empty()).then(|| (field.to_lowercase(), op(value.to_owned())))
+}
+
 /// Một nguồn tìm module khai bằng [`StartContext::finder_source`](crate::module::StartContext).
 /// Nguồn tự áp phạm vi nút của người gọi và chỉ trả bản ghi người đó được xem.
 //
@@ -63,6 +239,29 @@ pub trait FinderSource: Send + Sync {
         query: &str,
         limit: u16,
     ) -> Result<Vec<Found>, Error>;
+
+    /// Nguồn áp được `scope=node|subtree` (bản ghi có cột nút). Mặc định: không.
+    fn scoped(&self) -> bool {
+        false
+    }
+
+    /// Trường lọc nguồn hiểu (bước 51 P9), vd `status`, `updated`. Mặc định: không trường nào.
+    fn fields(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    /// Tìm theo truy vấn đã phân tích; chỉ nhận bộ lọc của [`fields`](Self::fields). Mặc định: tìm
+    /// theo từ khoá như [`find`](Self::find) (nguồn chưa hiểu bộ lọc).
+    async fn find_query(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        target: OrgTarget,
+        query: &SearchQuery,
+        limit: u16,
+    ) -> Result<Vec<Found>, Error> {
+        self.find(tenant, principal, target, &query.text, limit).await
+    }
 }
 
 type Entry = (&'static str, Arc<dyn FinderSource>);
@@ -105,6 +304,8 @@ pub(crate) struct FindView {
     pub groups: Vec<FoundGroup>,
     /// Sources that did not answer in time or failed.
     pub incomplete: Vec<String>,
+    /// Parts of `q` no searched type understands (unknown fields, `-word`), left out of the search.
+    pub ignored: Vec<String>,
 }
 
 /// Records of one type.
@@ -130,10 +331,16 @@ pub(crate) struct FoundView {
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct FindQuery {
-    /// At least 2 characters; any case, with or without accents.
+    /// Words (at least 2 characters; any case, with or without accents) and operators:
+    /// `is:<type>` / `-is:<type>` (e.g. `is:entry`), `field:value`, `field>value`, `field<value`,
+    /// `field>=value`, `field<=value`, `field:from..to`, and `-` before a filter to exclude. Quote a
+    /// phrase to search it as written.
     q: Option<String>,
     /// The organization unit chosen; omitted: the whole tenant.
     org_id: Option<Uuid>,
+    /// `accessible` (the default: every unit you may see), `node` (only records of `org_id`) or
+    /// `subtree` (records of `org_id` and the units below it); the last two need `org_id`.
+    scope: Option<String>,
     /// At most this many records per type, 1 to 20. Defaults to 5.
     limit: Option<u16>,
 }
@@ -150,13 +357,21 @@ impl FindState {
         tenant: &TenantContext,
         principal: &Principal,
         org_id: Option<Uuid>,
-        query: &str,
+        query: &SearchQuery,
         limit: u16,
     ) -> Result<FindView, Error> {
         let target = OrgTarget::new(org_id.map_or(root_of(tenant.id()), OrgId::from_uuid), None);
         let read = tenant.database().read();
         let mut allowed = Vec::new();
         for (module, source) in self.sources.all() {
+            // Không từ khoá và nguồn không hiểu bộ lọc nào thì nguồn sẽ trả mọi thứ: bỏ qua.
+            let understood =
+                query.filters.iter().any(|filter| source.fields().contains(&filter.field.as_str()));
+            if !query.wants(source.kind())
+                || (query.text.chars().count() < MIN_QUERY && !understood)
+            {
+                continue;
+            }
             if self.entitlements.module_enabled(tenant.id(), module).await?
                 && principal.require_at(read, &source.permission(), target).await.is_ok()
             {
@@ -166,7 +381,7 @@ impl FindState {
         let answers = futures_util::future::join_all(allowed.iter().map(|source| async move {
             let found = tokio::time::timeout(
                 crate::ops::work::SOURCE_TIMEOUT,
-                source.find(tenant, principal, target, query, limit),
+                source.find_query(tenant, principal, target, query, limit),
             )
             .await;
             (source.kind(), found)
@@ -200,7 +415,16 @@ impl FindState {
                 }
             }
         }
-        Ok(FindView { groups, incomplete })
+        let mut ignored = query.ignored.clone();
+        for filter in &query.filters {
+            if !allowed.iter().any(|source| source.fields().contains(&filter.field.as_str())) {
+                ignored.push(filter.raw.clone());
+            }
+        }
+        if query.scope != SearchScope::Accessible && allowed.iter().any(|source| !source.scoped()) {
+            ignored.push("scope".to_owned());
+        }
+        Ok(FindView { groups, incomplete, ignored })
     }
 }
 
@@ -234,9 +458,11 @@ async fn find(
     Query(query): Query<FindQuery>,
 ) -> Result<Data<FindView>, Error> {
     let text = query.q.as_deref().map(str::trim).unwrap_or_default();
+    let mut parsed = SearchQuery::parse(text);
     let limit = query.limit.unwrap_or(5);
     let mut problems = Vec::new();
-    if text.chars().count() < MIN_QUERY {
+    // Chỉ có toán tử (vd `is:entry status:draft`) cũng được; chỉ từ khoá thì cần đủ dài.
+    if parsed.text.chars().count() < MIN_QUERY && parsed.filters.is_empty() {
         problems.push(
             FieldError::new("q", "too_short", "must be at least {min} characters")
                 .with_param("min", MIN_QUERY),
@@ -245,8 +471,62 @@ async fn find(
     if !(1..=20).contains(&limit) {
         problems.push(FieldError::new("limit", "invalid", "must be between 1 and 20"));
     }
+    let unit = query.org_id.map(OrgId::from_uuid);
+    parsed.scope = match (query.scope.as_deref(), unit) {
+        (None | Some("accessible"), _) => SearchScope::Accessible,
+        (Some("node"), Some(org)) => SearchScope::Node(org),
+        (Some("subtree"), Some(org)) => SearchScope::Subtree(org),
+        (Some("node" | "subtree"), None) => {
+            problems.push(FieldError::new("org_id", "required", "is required"));
+            SearchScope::Accessible
+        }
+        _ => {
+            problems.push(FieldError::new(
+                "scope",
+                "invalid",
+                "must be `accessible`, `node` or `subtree`",
+            ));
+            SearchScope::Accessible
+        }
+    };
     if !problems.is_empty() {
         return Err(Error::validation(problems));
     }
-    Ok(Data { data: state.find(&tenant, &principal, query.org_id, text, limit).await? })
+    Ok(Data { data: state.find(&tenant, &principal, query.org_id, &parsed, limit).await? })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn phan_tich_o_tim_co_toan_tu() {
+        let query = SearchQuery::parse(
+            r#"is:entry -is:media "Đà Lạt" status:draft -locale:en updated>2026-01-01 created:2026-01-01..2026-02-01 -spam x:"#,
+        );
+        assert_eq!(query.text, "Đà Lạt x:");
+        assert_eq!(
+            (query.kinds, query.excluded_kinds),
+            (vec!["entry".to_owned()], vec!["media".to_owned()])
+        );
+        assert_eq!(query.ignored, ["-spam"]);
+        let ops: Vec<(&str, &SearchOp, bool)> =
+            query.filters.iter().map(|f| (f.field.as_str(), &f.op, f.negated)).collect();
+        assert_eq!(
+            ops,
+            [
+                ("status", &SearchOp::Eq("draft".to_owned()), false),
+                ("locale", &SearchOp::Eq("en".to_owned()), true),
+                ("updated", &SearchOp::Gt("2026-01-01".to_owned()), false),
+                (
+                    "created",
+                    &SearchOp::Range("2026-01-01".to_owned(), "2026-02-01".to_owned()),
+                    false
+                ),
+            ]
+        );
+        let wants = SearchQuery::parse("is:entry");
+        assert!(wants.wants("content.entry") && !wants.wants("media.item"));
+        assert!(SearchQuery::parse("-is:item").wants("content.entry"));
+    }
 }

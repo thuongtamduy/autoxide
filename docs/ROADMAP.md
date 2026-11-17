@@ -196,7 +196,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [ ] Hộp việc (P2, P10): `WorkSource` tính từ dữ liệu, không bảng việc, không "Đã xử lý" (D-212); sắp theo
       gấp, hạn; số đếm cho menu (cache có khách trong khoá); nguồn chậm không hỏng hộp; khác hộp thư của
       `notifications`; khoá ổn định, "vì sao bạn thấy", hoãn / bỏ hoãn, giao; `SetupStep` đánh dấu bước chặn bán
-- [ ] Tìm (P3, P9): `FinderSource` gom theo loại, không dấu vẫn tìm, chỉ nguồn người gọi có quyền, áp phạm vi
+- [x] Tìm (P3, P9): `FinderSource` gom theo loại, không dấu vẫn tìm, chỉ nguồn người gọi có quyền, áp phạm vi
       nút; toán tử `is:`, `status:`, so sánh, phủ định; phạm vi `node | subtree | accessible`; `resolve` đổi
       mã (số đơn, mã vận đơn, ID) thành bản ghi người gọi được xem
 - [x] Số liệu tóm tắt (P4): `SummaryMetric` (tiền, số đếm, tỉ lệ) theo phạm vi nút, số nặng từ bảng dẫn xuất;

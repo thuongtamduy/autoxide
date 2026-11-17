@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Advanced search and open by code (step 51): `GET /api/v1/kernel/find?q=` understands `is:<type>`, `field:value`,
+  `>`, `<`, `>=`, `<=`, `from..to`, `-` to exclude and quoted phrases (`SearchQuery`), and `scope=node|subtree|accessible`;
+  parts no searched type understands come back in `ignored`. Posts and pages understand `status`, `kind`, `locale`,
+  `updated` and `created`. `GET /api/v1/kernel/resolve?code=` opens the first record a module recognises by its code
+  (`StartContext::code_resolver`; posts and pages by slug or address), with the same 404 for "none" and "not yours".
 - Bulk actions (step 51): modules declare actions on a list (`StartContext::bulk_action`, `bulk` module of the
   kernel); `POST /api/v1/kernel/bulk/{resource}/{action}` takes `ids` (up to 500) or a `filter` with
   `expected_count` (409 `kernel.bulk_count_changed` when the matches changed) and an `Idempotency-Key`, and runs
