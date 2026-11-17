@@ -56,6 +56,7 @@ pub(crate) fn routes(service: Arc<PlansService>) -> OpenApiRouter {
         .merge(crate::http_lifecycle::routes())
         .merge(crate::billing_profile::routes())
         .merge(crate::provisioning::routes())
+        .merge(crate::signup_http::routes())
         .with_state(service)
 }
 
@@ -145,6 +146,8 @@ pub(crate) struct PlanResponse {
     requires_kyc: bool,
     /// A new tenant on this plan starts with sample data.
     sample_data: bool,
+    /// New tenants may choose this plan when they sign up by themselves (`POST /signups`).
+    self_signup: bool,
     /// Modules turned on (modules that are always on are not listed).
     modules: Vec<String>,
     /// Features turned on.
@@ -178,6 +181,7 @@ impl From<PlanRow> for PlanResponse {
             placement: plan.placement,
             requires_kyc: plan.requires_kyc,
             sample_data: plan.sample_data,
+            self_signup: plan.self_signup,
             modules: row.grants.modules.into_iter().collect(),
             features: row.grants.features.into_iter().collect(),
             limits: row.grants.limits,
@@ -251,10 +255,15 @@ pub(crate) struct PlanRequest {
     /// `shared` (default) or `dedicated`.
     #[serde(default = "default_placement")]
     placement: String,
+    /// A new tenant must pass identity checks first (only through `POST /signups`).
     #[serde(default)]
     requires_kyc: bool,
     #[serde(default)]
     sample_data: bool,
+    /// New tenants may choose this plan when they sign up by themselves (an active base plan;
+    /// sign-up must be turned on with `AUTOXIDE_PLANS_SIGNUP`). Default `false`.
+    #[serde(default)]
+    self_signup: bool,
     /// Modules to turn on, by name (`GET /api/v1/kernel/modules`). A base plan must also turn on
     /// the modules they need (`requires`).
     #[serde(default)]
@@ -286,6 +295,7 @@ impl From<PlanRequest> for PlanInput {
             placement: input.placement,
             requires_kyc: input.requires_kyc,
             sample_data: input.sample_data,
+            self_signup: input.self_signup,
             modules: input.modules,
             features: input.features,
             limits: input.limits,

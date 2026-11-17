@@ -5907,6 +5907,7 @@
             "type": "integer"
           },
           "requires_kyc": {
+            "description": "A new tenant must pass identity checks first (only through `POST /signups`).",
             "type": "boolean"
           },
           "retention_days": {
@@ -5915,6 +5916,10 @@
             "type": "integer"
           },
           "sample_data": {
+            "type": "boolean"
+          },
+          "self_signup": {
+            "description": "New tenants may choose this plan when they sign up by themselves (an active base plan;\nsign-up must be turned on with `AUTOXIDE_PLANS_SIGNUP`). Default `false`.",
             "type": "boolean"
           },
           "status": {
@@ -6091,6 +6096,57 @@
       "output_schema": null,
       "permissions": [
         "plans.plans.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: list tenant sign-ups (people who signed up a new tenant by themselves), newest first, optionally by `status`; follow `pagination.next_cursor`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of sign-ups to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "Only sign-ups in this state: `pending_email`, `awaiting_kyc`, `provisioning`, `completed`,\n`rejected` or `expired`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "plans.list_signups",
+      "output_schema": null,
+      "permissions": [
+        "plans.subscriptions.read"
       ]
     },
     {
@@ -6391,6 +6447,10 @@
             "type": "integer"
           },
           "sample_data": {
+            "type": "boolean"
+          },
+          "self_signup": {
+            "description": "New tenants may choose this plan when they sign up by themselves.",
             "type": "boolean"
           },
           "status": {

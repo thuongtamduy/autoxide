@@ -1,4 +1,4 @@
-# Lộ trình — các bước đã xong (0–34)
+# Lộ trình — các bước đã xong (0–35)
 
 Chuyển nguyên văn từ `docs/ROADMAP.md` theo D-228 để lộ trình chỉ còn việc đang mở. Lịch sử từng bước
 xem `CHANGELOG.md` và `docs/DECISIONS.md`.
@@ -658,3 +658,35 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được quyền vào hỗ trợ và tự thu
       hồi lần cấp còn hạn (D-211), trừ yêu cầu của cơ quan có thẩm quyền (có audit) — D-313
 - [x] Tạo tài khoản từ số điện thoại đã xác thực: chuyển sang bước 45 (đặc tả 34 ghi "làm ở bước 45", D-316)
+
+## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
+
+Đặc tả: [`docs/steps/35-plans-subscriptions.md`](steps/35-plans-subscriptions.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Thiết kế: trụ 3. Bắt đầu SAU bước 34; mục tính tiền chờ `PaymentGateway` của bước 36, mục cấp phát
+chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh toán, hạn mức là dữ liệu, không phải code.
+
+- [x] Module khai tính năng (`Module::features`) và hạn mức (`Module::limits`), mặc định rỗng
+      (D-038); gói = tập module + tính năng + hạn mức + giá theo kỳ; dùng thử, gói thêm, ghi đè
+      riêng cho từng khách; API và tool MCP quản trị gói
+- [x] Kernel cưỡng chế theo khách: module chưa bật thì route, tool MCP, job, event của nó bị chặn
+      (`module_not_enabled`); `has_feature`; hạn mức giữ chỗ / trả lại nguyên tử; số đo dùng ghi
+      lại cho tính tiền; test đồng thời trên cả hai database
+- [x] Vòng đời thuê bao: dùng thử → đang dùng → quá hạn (ân hạn) → tạm khoá (chỉ đọc) → huỷ (cho
+      xuất dữ liệu) → xoá sau thời hạn lưu; thu hồi module giữ dữ liệu theo chính sách lưu; gia hạn
+      và nhắc nợ bằng job
+- [x] Tính tiền thuê bao SaaS: hoá đơn theo kỳ, đánh số tuần tự, thu qua `PaymentGateway` (bước 36)
+      bằng tài khoản của nhà vận hành nền tảng (D-345: kỳ mở → `dyn Invoices`, `POST /billing-periods/{id}/pay`
+      → `dyn Ledger::create_payment`, nghe `ledger.payment_succeeded` → kỳ đã trả)
+- [x] Cấp phát: khách tự đăng ký (kèm KYC khi gói yêu cầu, bước 37) → tạo khách → chọn vị trí dữ
+      liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng — phần nhân sự vận
+      hành (D-338): `POST /plans/provisionings`, `autoxide tenant create --plan`; khách tự đăng ký + KYC (D-349):
+      `POST /plans/signups`, `POST /plans/signups/confirm`, `GET /plans/signups/{id}?token=`, định danh qua `compliance`
+- [x] Đối chiếu thiết kế 2: xuất toàn bộ dữ liệu một khách bằng job khi huỷ thuê bao; `suspend` thuê bao
+      cho nhân sự nền tảng; hạn mức nút đếm mọi nút trừ gốc, hạn mức theo loại nút khai riêng; thông báo
+      của nền tảng tới quản trị mọi khách — đã làm (D-326, D-327, D-328, D-348): `suspend`, hạn mức nút trừ gốc, bộ lọc
+      `subscription_status` / `near_limit`, xuất dữ liệu khách bằng job; thông báo nền tảng `POST /notifications/platform-notices`
+      (job theo lô, in-app + email tới mọi quản trị viên), `plans` báo quản trị viên khi thuê bao quá hạn / tạm khoá / sắp chạm hạn mức
+- [x] Xoá hẳn khách khi thuê bao `deleted` (D-327, D-337): `POST /kernel/tenants/{id}/erase`, bảng giữ lại khai ở
+      `Module::retained_tables` (phần kế toán của bước 36); `plans` xoá khách khi hết thời hạn lưu
+- [x] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): hạn mức chia phần `Limit::per` (D-330)

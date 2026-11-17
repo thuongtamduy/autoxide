@@ -10065,6 +10065,10 @@
                 "description": "A new tenant on this plan starts with sample data.",
                 "type": "boolean"
               },
+              "self_signup": {
+                "description": "New tenants may choose this plan when they sign up by themselves (`POST /signups`).",
+                "type": "boolean"
+              },
               "status": {
                 "description": "`draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it).",
                 "type": "string"
@@ -10108,6 +10112,7 @@
               "placement",
               "requires_kyc",
               "sample_data",
+              "self_signup",
               "modules",
               "features",
               "limits",
@@ -11710,6 +11715,156 @@
               "excerpt",
               "term_ids",
               "model"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_SignupAccepted": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The answer to a sign-up: always the same.",
+            "properties": {
+              "accepted": {
+                "description": "Always `true`. Tell the person to open the link in the mail.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "accepted"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_SignupResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A tenant sign-up, as its applicant (with the token from the mail) or platform staff see it.",
+            "properties": {
+              "admin_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "confirmed_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "expires_at": {
+                "description": "Until when it waits for the mail link (`pending_email`) or the identity checks\n(`awaiting_kyc`).",
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kyc": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SignupKyc",
+                    "description": "Identity checks to do now: only in the answer of `POST /signups/confirm` while\n`awaiting_kyc`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "locale": {
+                "description": "Language of the mails: `en` or `vi`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "party_type": {
+                "description": "`individual`, `household_business` or `organization`.",
+                "type": "string"
+              },
+              "plan_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "price_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "provisioning_id": {
+                "description": "The provisioning creating the tenant (`GET /provisionings/{id}` for platform staff).",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "description": "Why it was rejected: `kyc_rejected`, `tenant_slug_taken`, or the code of the error that\nstopped the tenant from being created.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "slug": {
+                "description": "Short name of the new tenant.",
+                "type": "string"
+              },
+              "status": {
+                "description": "`pending_email` (waiting for the link in the mail), `awaiting_kyc` (waiting for identity\nchecks), `provisioning` (the tenant is being created), `completed` (see `tenant_id`; the\nadministrator got an invitation by mail), `rejected` (see `reason`) or `expired`.",
+                "example": "provisioning",
+                "type": "string"
+              },
+              "tenant_id": {
+                "description": "The new tenant, once `completed`.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tenant_name": {
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "email",
+              "tenant_name",
+              "slug",
+              "plan_id",
+              "party_type",
+              "expires_at",
+              "created_at",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -15070,6 +15225,10 @@
                   "description": "A new tenant on this plan starts with sample data.",
                   "type": "boolean"
                 },
+                "self_signup": {
+                  "description": "New tenants may choose this plan when they sign up by themselves (`POST /signups`).",
+                  "type": "boolean"
+                },
                 "status": {
                   "description": "`draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it).",
                   "type": "string"
@@ -15113,6 +15272,7 @@
                 "placement",
                 "requires_kyc",
                 "sample_data",
+                "self_signup",
                 "modules",
                 "features",
                 "limits",
@@ -27010,6 +27170,10 @@
                   "description": "A new tenant on this plan starts with sample data.",
                   "type": "boolean"
                 },
+                "self_signup": {
+                  "description": "New tenants may choose this plan when they sign up by themselves (`POST /signups`).",
+                  "type": "boolean"
+                },
                 "status": {
                   "description": "`draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it).",
                   "type": "string"
@@ -27053,6 +27217,7 @@
                 "placement",
                 "requires_kyc",
                 "sample_data",
+                "self_signup",
                 "modules",
                 "features",
                 "limits",
@@ -28152,6 +28317,142 @@
                 "started_at",
                 "last_active_at",
                 "expires_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_SignupResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A tenant sign-up, as its applicant (with the token from the mail) or platform staff see it.",
+              "properties": {
+                "admin_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "confirmed_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "expires_at": {
+                  "description": "Until when it waits for the mail link (`pending_email`) or the identity checks\n(`awaiting_kyc`).",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kyc": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SignupKyc",
+                      "description": "Identity checks to do now: only in the answer of `POST /signups/confirm` while\n`awaiting_kyc`."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "locale": {
+                  "description": "Language of the mails: `en` or `vi`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "party_type": {
+                  "description": "`individual`, `household_business` or `organization`.",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "price_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provisioning_id": {
+                  "description": "The provisioning creating the tenant (`GET /provisionings/{id}` for platform staff).",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "description": "Why it was rejected: `kyc_rejected`, `tenant_slug_taken`, or the code of the error that\nstopped the tenant from being created.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "slug": {
+                  "description": "Short name of the new tenant.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`pending_email` (waiting for the link in the mail), `awaiting_kyc` (waiting for identity\nchecks), `provisioning` (the tenant is being created), `completed` (see `tenant_id`; the\nadministrator got an invitation by mail), `rejected` (see `reason`) or `expired`.",
+                  "example": "provisioning",
+                  "type": "string"
+                },
+                "tenant_id": {
+                  "description": "The new tenant, once `completed`.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tenant_name": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "email",
+                "tenant_name",
+                "slug",
+                "plan_id",
+                "party_type",
+                "expires_at",
+                "created_at",
+                "updated_at"
               ],
               "type": "object"
             },
@@ -29661,6 +29962,7 @@
             "type": "integer"
           },
           "requires_kyc": {
+            "description": "A new tenant must pass identity checks first (only through `POST /signups`).",
             "type": "boolean"
           },
           "retention_days": {
@@ -29669,6 +29971,10 @@
             "type": "integer"
           },
           "sample_data": {
+            "type": "boolean"
+          },
+          "self_signup": {
+            "description": "New tenants may choose this plan when they sign up by themselves (an active base plan;\nsign-up must be turned on with `AUTOXIDE_PLANS_SIGNUP`). Default `false`.",
             "type": "boolean"
           },
           "status": {
@@ -29783,6 +30089,10 @@
             "description": "A new tenant on this plan starts with sample data.",
             "type": "boolean"
           },
+          "self_signup": {
+            "description": "New tenants may choose this plan when they sign up by themselves (`POST /signups`).",
+            "type": "boolean"
+          },
           "status": {
             "description": "`draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it).",
             "type": "string"
@@ -29826,6 +30136,7 @@
           "placement",
           "requires_kyc",
           "sample_data",
+          "self_signup",
           "modules",
           "features",
           "limits",
@@ -33184,6 +33495,271 @@
         },
         "required": [
           "value"
+        ],
+        "type": "object"
+      },
+      "SignupAccepted": {
+        "description": "The answer to a sign-up: always the same.",
+        "properties": {
+          "accepted": {
+            "description": "Always `true`. Tell the person to open the link in the mail.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "type": "object"
+      },
+      "SignupBody": {
+        "additionalProperties": false,
+        "description": "Sign up a new tenant.",
+        "properties": {
+          "accept_terms": {
+            "description": "Must be `true`: the person accepts the current terms of use and privacy policy of the\nplatform (`GET /api/v1/compliance/documents`). The acceptance is recorded when the email\nis confirmed.",
+            "type": "boolean"
+          },
+          "admin_name": {
+            "description": "Their name, up to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "challenge": {
+            "description": "The value of the `altcha` widget, when the server uses a challenge.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "description": "Email of the person signing up: they confirm it, then administer the new tenant.",
+            "example": "owner@acme.example",
+            "type": "string"
+          },
+          "form_token": {
+            "description": "Token from `GET /api/v1/antispam/token?scope=plans:signup`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Language of the mails: `en` (default) or `vi`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "party_type": {
+            "description": "Who signs up, for plans that need identity checks: `individual`, `household_business` or\n`organization` (default).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_code": {
+            "description": "Code of an active base plan open to sign-up (`self_signup` in `GET /catalog`).",
+            "example": "starter",
+            "type": "string"
+          },
+          "price_id": {
+            "description": "An active recurring price of that plan; default: none chosen yet.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "description": "Short name of the new tenant: 1 to 63 lower-case letters, digits and `-`.",
+            "example": "acme",
+            "type": "string"
+          },
+          "tenant_name": {
+            "description": "Name of the new tenant, 1 to 200 characters.",
+            "example": "Acme Ltd",
+            "type": "string"
+          },
+          "trap": {
+            "description": "The hidden trap field: people leave it empty.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "tenant_name",
+          "slug",
+          "plan_code",
+          "accept_terms"
+        ],
+        "type": "object"
+      },
+      "SignupConfirmBody": {
+        "additionalProperties": false,
+        "description": "The token from the confirmation mail.",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "SignupKyc": {
+        "description": "Where the applicant goes for the identity checks.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`redirect` (open `url`), `sdk` (start the provider's mobile SDK with `token`) or `pending`\n(nothing to do; the result comes later).",
+            "type": "string"
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "SignupResponse": {
+        "description": "A tenant sign-up, as its applicant (with the token from the mail) or platform staff see it.",
+        "properties": {
+          "admin_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirmed_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "Until when it waits for the mail link (`pending_email`) or the identity checks\n(`awaiting_kyc`).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kyc": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SignupKyc",
+                "description": "Identity checks to do now: only in the answer of `POST /signups/confirm` while\n`awaiting_kyc`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locale": {
+            "description": "Language of the mails: `en` or `vi`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "party_type": {
+            "description": "`individual`, `household_business` or `organization`.",
+            "type": "string"
+          },
+          "plan_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provisioning_id": {
+            "description": "The provisioning creating the tenant (`GET /provisionings/{id}` for platform staff).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why it was rejected: `kyc_rejected`, `tenant_slug_taken`, or the code of the error that\nstopped the tenant from being created.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "description": "Short name of the new tenant.",
+            "type": "string"
+          },
+          "status": {
+            "description": "`pending_email` (waiting for the link in the mail), `awaiting_kyc` (waiting for identity\nchecks), `provisioning` (the tenant is being created), `completed` (see `tenant_id`; the\nadministrator got an invitation by mail), `rejected` (see `reason`) or `expired`.",
+            "example": "provisioning",
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "The new tenant, once `completed`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "email",
+          "tenant_name",
+          "slug",
+          "plan_id",
+          "party_type",
+          "expires_at",
+          "created_at",
+          "updated_at"
         ],
         "type": "object"
       },
@@ -87371,7 +87947,7 @@
         ]
       },
       "post": {
-        "description": "Platform staff with `plans.provision`. Runs in the background: creates the tenant, puts it on the\nplan, adds the sample data of the modules the plan turns on (when asked) and invites the\nadministrator by email with the role `admin`. Follow it with `GET /provisionings/{id}`\n(`plans.subscriptions.read`). A plan that\nrequires identity checks cannot be provisioned yet (`plans.kyc_required`).",
+        "description": "Platform staff with `plans.provision`. Runs in the background: creates the tenant, puts it on the\nplan, adds the sample data of the modules the plan turns on (when asked) and invites the\nadministrator by email with the role `admin`. Follow it with `GET /provisionings/{id}`\n(`plans.subscriptions.read`). A plan that requires identity checks cannot be provisioned here\n(`plans.kyc_required`): the tenant signs up by itself (`POST /signups`) and passes them there.",
         "operationId": "plans_create_provisioning",
         "parameters": [
           {
@@ -87713,6 +88289,393 @@
         "x-permissions": [
           "plans.provision"
         ]
+      }
+    },
+    "/api/v1/plans/signups": {
+      "get": {
+        "description": "Platform staff with `plans.subscriptions.read`. Newest first; rows that ended (`expired`,\n`rejected`) are deleted 30 days later.",
+        "operationId": "plans_list_signups",
+        "parameters": [
+          {
+            "description": "Only sign-ups in this state: `pending_email`, `awaiting_kyc`, `provisioning`, `completed`,\n`rejected` or `expired`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SignupResponse"
+                }
+              }
+            },
+            "description": "One page of sign-ups, newest first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List tenant sign-ups.",
+        "tags": [
+          "plans"
+        ],
+        "x-permissions": [
+          "plans.subscriptions.read"
+        ]
+      },
+      "post": {
+        "description": "No sign-in needed; only when the server takes sign-ups (`AUTOXIDE_PLANS_SIGNUP`), on the platform\nhost, for plans marked `self_signup`. The answer is the same `202` whether the request is new,\nrepeats one still waiting (same email and slug: a new mail, the old link stops working), or was\ndropped by the anti-spam checks. A background job then mails a link valid 24 hours; the person\nopens it and the page sends the token to `POST /signups/confirm`. Send `form_token` (and\n`challenge` when the server uses one). Two people waiting for the same `slug`: the first to get\nto the provisioning keeps it, the other is `rejected` (`tenant_slug_taken`).",
+        "operationId": "plans_create_signup",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SignupAccepted"
+                }
+              }
+            },
+            "description": "Received; a confirmation mail follows."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "This server does not take sign-ups; code `plans.signup_disabled`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (e.g. `plan_code` not open to sign-up, `slug` taken, `accept_terms` not `true`); every problem in `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The anti-spam check cannot run; code `antispam.verifier_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Sign up a new tenant (public).",
+        "tags": [
+          "plans"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/plans/signups/confirm": {
+      "post": {
+        "description": "No sign-in needed. Records that the person accepted the current terms of use and privacy policy.\nWhen the plan needs identity checks the sign-up becomes `awaiting_kyc` and `kyc` says where to do\nthem (calling again while waiting starts new checks); otherwise the tenant is created in the\nbackground (`provisioning`, then `completed`, and the person gets an invitation to administer\nit). Calling again later answers the sign-up as it stands. Keep the token: it also reads the\nsign-up (`GET /signups/{id}?token=`).",
+        "operationId": "plans_confirm_signup",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupConfirmBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SignupResponse"
+                }
+              }
+            },
+            "description": "The sign-up after confirming it."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token is wrong, used up or expired (code `plans.signup_token_invalid`, `reason` `unknown` or `expired`): sign up again."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "This server does not take sign-ups; code `plans.signup_disabled`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Identity checks cannot start now (`plans.kyc_unavailable`, `compliance.verification_disabled`); try again later."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Confirm a tenant sign-up with the token from the mail (public).",
+        "tags": [
+          "plans"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/plans/signups/{id}": {
+      "get": {
+        "description": "No sign-in needed: the token from the confirmation mail is the key. Use it to follow a sign-up\nthrough the identity checks and the creation of the tenant.",
+        "operationId": "plans_get_signup",
+        "parameters": [
+          {
+            "description": "Id of the sign-up.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The token from the confirmation mail.",
+            "in": "query",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SignupResponse"
+                }
+              }
+            },
+            "description": "The sign-up."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No sign-up has this id and token (`plans.signup_not_found`), or the server does not take sign-ups (`plans.signup_disabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Get a tenant sign-up with the token from the mail (public).",
+        "tags": [
+          "plans"
+        ],
+        "x-public": true
       }
     },
     "/api/v1/plans/subscription": {

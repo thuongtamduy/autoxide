@@ -10,4 +10,5 @@ pub(crate) mod media;
 pub(crate) mod migrations;
 pub(crate) mod notifications;
 pub(crate) mod plans;
+pub(crate) mod signup;
 pub(crate) mod tenant_move;

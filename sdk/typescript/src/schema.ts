@@ -3514,6 +3514,8 @@ export type Data_PlanResponse = {
     retention_days: number;
     /** A new tenant on this plan starts with sample data. */
     sample_data: boolean;
+    /** New tenants may choose this plan when they sign up by themselves (`POST /signups`). */
+    self_signup: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
     /**
@@ -4033,6 +4035,58 @@ export type Data_SeoSuggestion = {
     model: string;
     /** Up to 5 existing categories or tags of the entry's language that fit; never new ones. */
     term_ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SignupAccepted = {
+  /** The answer to a sign-up: always the same. */
+  data: {
+    /** Always `true`. Tell the person to open the link in the mail. */
+    accepted: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SignupResponse = {
+  /** A tenant sign-up, as its applicant (with the token from the mail) or platform staff see it. */
+  data: {
+    admin_name?: string | null;
+    confirmed_at?: string | null;
+    created_at: string;
+    email: string;
+    /**
+     * Until when it waits for the mail link (`pending_email`) or the identity checks
+     * (`awaiting_kyc`).
+     */
+    expires_at: string;
+    id: string;
+    kyc?: SignupKyc | null;
+    /** Language of the mails: `en` or `vi`. */
+    locale?: string | null;
+    /** `individual`, `household_business` or `organization`. */
+    party_type: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** The provisioning creating the tenant (`GET /provisionings/{id}` for platform staff). */
+    provisioning_id?: string | null;
+    /**
+     * Why it was rejected: `kyc_rejected`, `tenant_slug_taken`, or the code of the error that
+     * stopped the tenant from being created.
+     */
+    reason?: string | null;
+    /** Short name of the new tenant. */
+    slug: string;
+    /**
+     * `pending_email` (waiting for the link in the mail), `awaiting_kyc` (waiting for identity
+     * checks), `provisioning` (the tenant is being created), `completed` (see `tenant_id`; the
+     * administrator got an invitation by mail), `rejected` (see `reason`) or `expired`.
+     */
+    status: string;
+    /** The new tenant, once `completed`. */
+    tenant_id?: string | null;
+    tenant_name: string;
+    updated_at: string;
   };
 };
 
@@ -5165,6 +5219,8 @@ export type Data_Vec_PlanResponse = {
     retention_days: number;
     /** A new tenant on this plan starts with sample data. */
     sample_data: boolean;
+    /** New tenants may choose this plan when they sign up by themselves (`POST /signups`). */
+    self_signup: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
     /**
@@ -9058,6 +9114,8 @@ export type Page_PlanResponse = {
     retention_days: number;
     /** A new tenant on this plan starts with sample data. */
     sample_data: boolean;
+    /** New tenants may choose this plan when they sign up by themselves (`POST /signups`). */
+    self_signup: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
     /**
@@ -9421,6 +9479,50 @@ export type Page_SessionResponse = {
      * none was sent.
      */
     user_agent?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SignupResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    admin_name?: string | null;
+    confirmed_at?: string | null;
+    created_at: string;
+    email: string;
+    /**
+     * Until when it waits for the mail link (`pending_email`) or the identity checks
+     * (`awaiting_kyc`).
+     */
+    expires_at: string;
+    id: string;
+    kyc?: SignupKyc | null;
+    /** Language of the mails: `en` or `vi`. */
+    locale?: string | null;
+    /** `individual`, `household_business` or `organization`. */
+    party_type: string;
+    plan_id: string;
+    price_id?: string | null;
+    /** The provisioning creating the tenant (`GET /provisionings/{id}` for platform staff). */
+    provisioning_id?: string | null;
+    /**
+     * Why it was rejected: `kyc_rejected`, `tenant_slug_taken`, or the code of the error that
+     * stopped the tenant from being created.
+     */
+    reason?: string | null;
+    /** Short name of the new tenant. */
+    slug: string;
+    /**
+     * `pending_email` (waiting for the link in the mail), `awaiting_kyc` (waiting for identity
+     * checks), `provisioning` (the tenant is being created), `completed` (see `tenant_id`; the
+     * administrator got an invitation by mail), `rejected` (see `reason`) or `expired`.
+     */
+    status: string;
+    /** The new tenant, once `completed`. */
+    tenant_id?: string | null;
+    tenant_name: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -9943,10 +10045,16 @@ export type PlanRequest = {
   placement?: string;
   /** 0 to 3650; default 7. */
   renewal_lead_days?: number;
+  /** A new tenant must pass identity checks first (only through `POST /signups`). */
   requires_kyc?: boolean;
   /** 0 to 3650; default 90. */
   retention_days?: number;
   sample_data?: boolean;
+  /**
+   * New tenants may choose this plan when they sign up by themselves (an active base plan;
+   * sign-up must be turned on with `AUTOXIDE_PLANS_SIGNUP`). Default `false`.
+   */
+  self_signup?: boolean;
   /** `draft` (default) or `active`. Retire a plan with `POST /plans/{id}/retire`. */
   status?: string;
   /** 0 to 3650; default 30. */
@@ -9990,6 +10098,8 @@ export type PlanResponse = {
   retention_days: number;
   /** A new tenant on this plan starts with sample data. */
   sample_data: boolean;
+  /** New tenants may choose this plan when they sign up by themselves (`POST /signups`). */
+  self_signup: boolean;
   /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
   status: string;
   /**
@@ -11172,6 +11282,104 @@ export type SettingResponse = {
 export type SettingValueRequest = {
   /** The value, checked by the setting (see its description). */
   value: unknown;
+};
+
+/** The answer to a sign-up: always the same. */
+export type SignupAccepted = {
+  /** Always `true`. Tell the person to open the link in the mail. */
+  accepted: boolean;
+};
+
+/** Sign up a new tenant. */
+export type SignupBody = {
+  /**
+   * Must be `true`: the person accepts the current terms of use and privacy policy of the
+   * platform (`GET /api/v1/compliance/documents`). The acceptance is recorded when the email
+   * is confirmed.
+   */
+  accept_terms: boolean;
+  /** Their name, up to 200 characters. */
+  admin_name?: string | null;
+  /** The value of the `altcha` widget, when the server uses a challenge. */
+  challenge?: string | null;
+  /** Email of the person signing up: they confirm it, then administer the new tenant. */
+  email: string;
+  /** Token from `GET /api/v1/antispam/token?scope=plans:signup`. */
+  form_token?: string | null;
+  /** Language of the mails: `en` (default) or `vi`. */
+  locale?: string | null;
+  /**
+   * Who signs up, for plans that need identity checks: `individual`, `household_business` or
+   * `organization` (default).
+   */
+  party_type?: string | null;
+  /** Code of an active base plan open to sign-up (`self_signup` in `GET /catalog`). */
+  plan_code: string;
+  /** An active recurring price of that plan; default: none chosen yet. */
+  price_id?: string | null;
+  /** Short name of the new tenant: 1 to 63 lower-case letters, digits and `-`. */
+  slug: string;
+  /** Name of the new tenant, 1 to 200 characters. */
+  tenant_name: string;
+  /** The hidden trap field: people leave it empty. */
+  trap?: string | null;
+};
+
+/** The token from the confirmation mail. */
+export type SignupConfirmBody = {
+  token: string;
+};
+
+/** Where the applicant goes for the identity checks. */
+export type SignupKyc = {
+  expires_at?: string | null;
+  /**
+   * `redirect` (open `url`), `sdk` (start the provider's mobile SDK with `token`) or `pending`
+   * (nothing to do; the result comes later).
+   */
+  kind: string;
+  token?: string | null;
+  url?: string | null;
+};
+
+/** A tenant sign-up, as its applicant (with the token from the mail) or platform staff see it. */
+export type SignupResponse = {
+  admin_name?: string | null;
+  confirmed_at?: string | null;
+  created_at: string;
+  email: string;
+  /**
+   * Until when it waits for the mail link (`pending_email`) or the identity checks
+   * (`awaiting_kyc`).
+   */
+  expires_at: string;
+  id: string;
+  kyc?: SignupKyc | null;
+  /** Language of the mails: `en` or `vi`. */
+  locale?: string | null;
+  /** `individual`, `household_business` or `organization`. */
+  party_type: string;
+  plan_id: string;
+  price_id?: string | null;
+  /** The provisioning creating the tenant (`GET /provisionings/{id}` for platform staff). */
+  provisioning_id?: string | null;
+  /**
+   * Why it was rejected: `kyc_rejected`, `tenant_slug_taken`, or the code of the error that
+   * stopped the tenant from being created.
+   */
+  reason?: string | null;
+  /** Short name of the new tenant. */
+  slug: string;
+  /**
+   * `pending_email` (waiting for the link in the mail), `awaiting_kyc` (waiting for identity
+   * checks), `provisioning` (the tenant is being created), `completed` (see `tenant_id`; the
+   * administrator got an invitation by mail), `rejected` (see `reason`) or `expired`.
+   */
+  status: string;
+  /** The new tenant, once `completed`. */
+  tenant_id?: string | null;
+  tenant_name: string;
+  updated_at: string;
 };
 
 /** A website menu as saved. */
@@ -18361,6 +18569,57 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/signups": {
+    /** List tenant sign-ups. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_SignupResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Sign up a new tenant (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: SignupBody;
+      responses: {
+        202: Data_SignupAccepted;
+        400: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/signups/confirm": {
+    /** Confirm a tenant sign-up with the token from the mail (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: SignupConfirmBody;
+      responses: {
+        200: Data_SignupResponse;
+        400: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/signups/{id}": {
+    /** Get a tenant sign-up with the token from the mail (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { token: string }; };
+      responses: {
+        200: Data_SignupResponse;
+        404: Problem;
         default: Problem;
       };
     };

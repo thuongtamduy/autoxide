@@ -1,5 +1,5 @@
 //! Tool MCP của module `plans`: cùng service, cùng permission với REST. Không có tool cho thanh
-//! toán hay đăng ký công khai.
+//! toán hay đăng ký công khai (chỉ danh sách đăng ký cho nhân sự nền tảng, chỉ đọc).
 
 use std::sync::Arc;
 
@@ -23,11 +23,26 @@ use crate::permissions::{
 };
 use crate::provisioning::ProvisioningResponse;
 use crate::service::{PlansService, subscription_not_found};
+use crate::signup_http::SignupResponse;
 
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListPlansInput {
     /// Maximum number of plans to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc`.
+    order: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListSignupsInput {
+    /// Only sign-ups in this state: `pending_email`, `awaiting_kyc`, `provisioning`, `completed`,
+    /// `rejected` or `expired`.
+    status: Option<String>,
+    /// Maximum number of sign-ups to return, 1 to 200. Defaults to 50.
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
     cursor: Option<String>,
@@ -73,6 +88,9 @@ pub(crate) struct UpdatePlanInput {
     requires_kyc: bool,
     #[serde(default)]
     sample_data: bool,
+    /// New tenants may choose this plan when they sign up by themselves.
+    #[serde(default)]
+    self_signup: bool,
     /// Modules to turn on.
     #[serde(default)]
     modules: Vec<String>,
@@ -101,6 +119,7 @@ impl From<UpdatePlanInput> for crate::service::PlanInput {
             placement: input.placement,
             requires_kyc: input.requires_kyc,
             sample_data: input.sample_data,
+            self_signup: input.self_signup,
             modules: input.modules,
             features: input.features,
             limits: input.limits,
@@ -166,6 +185,28 @@ pub(crate) struct ChangeInput {
 pub(crate) fn all(service: &Arc<PlansService>) -> Vec<Tool> {
     let mut tools = plan_tools(service);
     tools.extend(tenant_tools(service));
+    let signups = service.clone();
+    tools.push(
+        Tool::new(
+            "list_signups",
+            "Platform staff: list tenant sign-ups (people who signed up a new tenant by themselves), \
+             newest first, optionally by `status`; follow `pagination.next_cursor`.",
+            move |_: TenantContext, principal: Principal, input: ListSignupsInput| {
+                let service = signups.clone();
+                async move {
+                    operator(&principal, &SUBSCRIPTIONS_READ)?;
+                    let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                    let status = crate::signup_http::check_status(input.status)?;
+                    let page = service.list_signups(status, &page).await?;
+                    Ok::<Page<SignupResponse>, Error>(
+                        page.map(|row| SignupResponse::of(row, None)),
+                    )
+                }
+            },
+        )
+        .requires(SUBSCRIPTIONS_READ)
+        .read_only(),
+    );
     let change = service.clone();
     tools.push(
         Tool::new(
