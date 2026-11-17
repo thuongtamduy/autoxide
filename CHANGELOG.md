@@ -11,6 +11,18 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, notification templates written by the tenant (`docs/NOTIFICATIONS.md`): drafts checked against the variables
+  of the kind on save (syntax, unknown and required variables, every problem at once), publish into immutable versions (the
+  last 20 kept), rollback and unpublish, preview with sample data, test send to the caller only (verified email or own
+  inbox, 10 per hour), under `/api/v1/notifications/templates/{kind}/{channel}/{locale}/` (`draft`, `publish`, `versions`,
+  `rollback`, `published`, `preview`, `test-send`), `GET /kinds/{kind}/schema`, and mail branding `GET|PUT /branding`. Every
+  email now has an HTML part in a branded MJML layout (new library `mrml`) next to the plain-text part; the footer adds the
+  owner's legal name and address from the legal profile. Kinds may declare `variables` and `sample`. A published template
+  that fails with real data falls back to the default text (`error_code = template_fallback`). Permissions
+  `notifications.templates.read`, `notifications.branding.manage`; MCP tools `notifications.get_template_schema`,
+  `notifications.preview_template`, `notifications.update_template_draft`; events `notifications.template_published`,
+  `…template_rolled_back`, `…template_unpublished`, `…branding_updated`. The kernel template check no longer reports built-in
+  functions (`range`, `dict`…) as unknown variables. Decision D-365.
 - Step 37, reports of infringements and consumer complaints (Vietnam — E-commerce Law 2025, Intellectual Property Law, Decree
   85/2021/ND-CP, Consumer Protection Law 19/2023/QH15, Decree 55/2024/ND-CP; check the original texts; guide
   `docs/COMPLIANCE.md`): cases with intake from public forms with anti-spam tokens (`POST /api/v1/compliance/public/reports`,

@@ -5389,6 +5389,23 @@ export type Data_NewsletterSettingsResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_NotificationBranding = {
+  /** The branding of the tenant's HTML emails. */
+  data: {
+    /** `#rrggbb`: page background. */
+    background_color: string;
+    /** Shown at the top when there is no logo. */
+    brand_name?: string | null;
+    /** First footer line; the owner's legal name and address (legal profile) follow when set. */
+    footer_text?: string | null;
+    /** https URL of the logo image. */
+    logo_url?: string | null;
+    /** `#rrggbb`: top line and headings. */
+    primary_color: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_NotificationDeviceToken = {
   /** A registered mobile device (the token is never shown again). */
   data: {
@@ -5414,6 +5431,17 @@ export type Data_NotificationInboxItem = {
     /** When you read it; `null`: unread. */
     read_at?: string | null;
     title: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationKindSchema = {
+  /** The variables of a kind and sample data for previews. */
+  data: {
+    kind: string;
+    /** Sample values used by previews and test sends. */
+    sample: Record<string, unknown>;
+    variables: NotificationTemplateVariable[];
   };
 };
 
@@ -5492,6 +5520,62 @@ export type Data_NotificationTemplate = {
     title: string;
     updated_at: string;
     /** Approved Zalo ZNS template id (channel `zns`). */
+    zns_template_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationTemplateDraft = {
+  /** The draft of a template (not in use until published). */
+  data: {
+    body_html?: string | null;
+    body_text: string;
+    channel: string;
+    kind: string;
+    locale: string;
+    short: string;
+    subject: string;
+    updated_at: string;
+    zns_template_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationTemplatePreview = {
+  /** A rendered template. */
+  data: {
+    /** The complete HTML email in the branded layout (channel `email` only). */
+    html?: string | null;
+    short: string;
+    subject: string;
+    text: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationTemplateTestResult = {
+  /** Where the test went. */
+  data: {
+    /** `email` (your verified email) or `in_app` (your inbox). */
+    channel: NotificationChannel;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NotificationTemplateVersion = {
+  /** A published version of a template; it never changes. */
+  data: {
+    body_html?: string | null;
+    body_text: string;
+    channel: string;
+    kind: string;
+    /** This version is the one in use. */
+    live: boolean;
+    locale: string;
+    published_at: string;
+    short: string;
+    subject: string;
+    version: number;
     zns_template_id?: string | null;
   };
 };
@@ -7505,6 +7589,24 @@ export type Data_Vec_NotificationTemplate = {
     title: string;
     updated_at: string;
     /** Approved Zalo ZNS template id (channel `zns`). */
+    zns_template_id?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_NotificationTemplateVersion = {
+  data: {
+    body_html?: string | null;
+    body_text: string;
+    channel: string;
+    kind: string;
+    /** This version is the one in use. */
+    live: boolean;
+    locale: string;
+    published_at: string;
+    short: string;
+    subject: string;
+    version: number;
     zns_template_id?: string | null;
   }[];
 };
@@ -10683,6 +10785,32 @@ export type NewsletterText = {
   vi?: string | null;
 };
 
+/** The branding of the tenant's HTML emails. */
+export type NotificationBranding = {
+  /** `#rrggbb`: page background. */
+  background_color: string;
+  /** Shown at the top when there is no logo. */
+  brand_name?: string | null;
+  /** First footer line; the owner's legal name and address (legal profile) follow when set. */
+  footer_text?: string | null;
+  /** https URL of the logo image. */
+  logo_url?: string | null;
+  /** `#rrggbb`: top line and headings. */
+  primary_color: string;
+};
+
+/** New branding (replaces the whole branding; omitted fields go back to the defaults). */
+export type NotificationBrandingRequest = {
+  /** `#rrggbb`; default `#f4f5f7`. */
+  background_color?: string | null;
+  brand_name?: string | null;
+  footer_text?: string | null;
+  /** An https URL. */
+  logo_url?: string | null;
+  /** `#rrggbb`; default `#1f6feb`. */
+  primary_color?: string | null;
+};
+
 /** Group of a notification kind: decides whether preferences and consent apply. */
 export type NotificationCategory = "security" | "transactional" | "marketing";
 
@@ -10752,6 +10880,14 @@ export type NotificationKindPreference = {
   category: NotificationCategory;
   channels: NotificationChannelPreference[];
   kind: string;
+};
+
+/** The variables of a kind and sample data for previews. */
+export type NotificationKindSchema = {
+  kind: string;
+  /** Sample values used by previews and test sends. */
+  sample: Record<string, unknown>;
+  variables: NotificationTemplateVariable[];
 };
 
 /** One message of the send log (one notification on one channel). */
@@ -10885,6 +11021,59 @@ export type NotificationTemplate = {
   zns_template_id?: string | null;
 };
 
+/** The draft of a template (not in use until published). */
+export type NotificationTemplateDraft = {
+  body_html?: string | null;
+  body_text: string;
+  channel: string;
+  kind: string;
+  locale: string;
+  short: string;
+  subject: string;
+  updated_at: string;
+  zns_template_id?: string | null;
+};
+
+/**
+ * A template written with the template engine (`{{ name }}`, `{% if %}`, `{% for %}`). Only the
+ * variables of `GET /kinds/{kind}/schema` may be used; required ones must be used. Values put into
+ * `body_html` are always HTML-escaped.
+ */
+export type NotificationTemplateDraftRequest = {
+  /**
+   * HTML of the email body (`email` only), placed in the branded mail layout; omitted → made
+   * from `body_text`.
+   */
+  body_html?: string | null;
+  /** Plain text: the text part of the email and the inbox body. Required on `email` and `in_app`. */
+  body_text?: string;
+  /** Short text for SMS, ZNS and push. Required on `sms`, `zns`, `web_push`, `mobile_push`. */
+  short?: string;
+  /** Email subject, push and inbox title. Required on `email`, `in_app`, `web_push`, `mobile_push`. */
+  subject?: string;
+  /** Approved Zalo ZNS template id (channel `zns`). */
+  zns_template_id?: string | null;
+};
+
+/** A rendered template. */
+export type NotificationTemplatePreview = {
+  /** The complete HTML email in the branded layout (channel `email` only). */
+  html?: string | null;
+  short: string;
+  subject: string;
+  text: string;
+};
+
+/** What to preview. */
+export type NotificationTemplatePreviewRequest = {
+  /** Values to render with (only variables of the kind); omitted → the sample data of the kind. */
+  data?: Record<string, unknown> | null;
+  /** `draft` (default), `published` or `version`. */
+  source?: string | null;
+  /** With `source = version`. */
+  version?: number | null;
+};
+
 /**
  * A text to replace the default one. Use only the `{name}` values of the default text (and
  * `{link}`).
@@ -10893,6 +11082,51 @@ export type NotificationTemplateRequest = {
   body: string;
   short: string;
   title: string;
+  zns_template_id?: string | null;
+};
+
+/** Which version to use again. */
+export type NotificationTemplateRollbackRequest = {
+  /** A version listed by `GET …/versions`. */
+  version: number;
+};
+
+/** Which version to send as a test. */
+export type NotificationTemplateTestRequest = {
+  /** `draft` (default), `published` or `version`. */
+  source?: string | null;
+  /** With `source = version`. */
+  version?: number | null;
+};
+
+/** Where the test went. */
+export type NotificationTemplateTestResult = {
+  /** `email` (your verified email) or `in_app` (your inbox). */
+  channel: NotificationChannel;
+};
+
+/** A variable a template of this kind may use. */
+export type NotificationTemplateVariable = {
+  description: string;
+  /** Dotted path, used as `{{ path }}`; a parent allows every field below it. */
+  path: string;
+  /** The template must use it (on the main part of the channel). */
+  required: boolean;
+};
+
+/** A published version of a template; it never changes. */
+export type NotificationTemplateVersion = {
+  body_html?: string | null;
+  body_text: string;
+  channel: string;
+  kind: string;
+  /** This version is the one in use. */
+  live: boolean;
+  locale: string;
+  published_at: string;
+  short: string;
+  subject: string;
+  version: number;
   zns_template_id?: string | null;
 };
 
@@ -23061,6 +23295,30 @@ export interface paths {
       };
     };
   };
+  "/api/v1/notifications/branding": {
+    /** Show the branding of the tenant's HTML emails. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_NotificationBranding;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the branding of the tenant's HTML emails. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NotificationBrandingRequest;
+      responses: {
+        200: Data_NotificationBranding;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/notifications/kinds": {
     /** List the notification kinds. */
     get: {
@@ -23068,6 +23326,18 @@ export interface paths {
       responses: {
         200: Data_Vec_NotificationKindInfo;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/kinds/{kind}/schema": {
+    /** Show the template variables of a notification kind. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string }; };
+      responses: {
+        200: Data_NotificationKindSchema;
+        401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -23298,6 +23568,131 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates/{kind}/{channel}/{locale}/draft": {
+    /** Show the draft of a template. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; channel: string; locale: string }; };
+      responses: {
+        200: Data_NotificationTemplateDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Save the draft of a template. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      requestBody: NotificationTemplateDraftRequest;
+      responses: {
+        200: Data_NotificationTemplateDraft;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Throw the draft of a template away. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates/{kind}/{channel}/{locale}/preview": {
+    /** Preview a template. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      requestBody: NotificationTemplatePreviewRequest;
+      responses: {
+        200: Data_NotificationTemplatePreview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates/{kind}/{channel}/{locale}/publish": {
+    /** Publish the draft of a template. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      responses: {
+        200: Data_NotificationTemplateVersion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates/{kind}/{channel}/{locale}/published": {
+    /** Stop using the published template. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates/{kind}/{channel}/{locale}/rollback": {
+    /** Use an older published version of a template again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      requestBody: NotificationTemplateRollbackRequest;
+      responses: {
+        200: Data_NotificationTemplateVersion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates/{kind}/{channel}/{locale}/test-send": {
+    /** Send a template to yourself as a test. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
+      requestBody: NotificationTemplateTestRequest;
+      responses: {
+        200: Data_NotificationTemplateTestResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/notifications/templates/{kind}/{channel}/{locale}/versions": {
+    /** List the published versions of a template, newest first. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; channel: string; locale: string }; };
+      responses: {
+        200: Data_Vec_NotificationTemplateVersion;
+        401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };

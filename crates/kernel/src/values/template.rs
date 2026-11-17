@@ -324,7 +324,13 @@ impl TemplateEngine {
                 ]));
             }
         };
-        let used: BTreeSet<String> = template.undeclared_variables(true).into_iter().collect();
+        // Hàm dựng sẵn của môi trường (`range`, `dict`, `namespace`…) không phải biến của dữ liệu.
+        let globals: BTreeSet<&str> = env.globals().map(|(name, _)| name).collect();
+        let used: BTreeSet<String> = template
+            .undeclared_variables(true)
+            .into_iter()
+            .filter(|path| !globals.contains(path.split('.').next().unwrap_or_default()))
+            .collect();
         let mut problems = Vec::new();
         for path in &used {
             if !schema.allows(path) {
@@ -409,6 +415,13 @@ mod tests {
             Variable::optional("lines", "Lines"),
             Variable::optional("total", "Total"),
         ])
+    }
+
+    #[test]
+    fn ham_dung_san_khong_tinh_la_bien() {
+        let engine = TemplateEngine::default();
+        let source = "{% for i in range(3) %}{{ document.number }}{% endfor %}";
+        engine.validate("body", source, &schema()).unwrap();
     }
 
     #[test]

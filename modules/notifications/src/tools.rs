@@ -14,10 +14,14 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::api::Notification;
+use crate::custom::Source;
 use crate::http_admin::{MessageResponse, RecipientRequest};
 use crate::http_me::{InboxItem, KindResponse, describe_kind};
+use crate::http_templates::{
+    DraftRequest, DraftResponse, PreviewResponse, SchemaResponse, describe_schema, parse_source,
+};
 use crate::messages::MessageFilter;
-use crate::permissions::{MESSAGES_READ, SEND};
+use crate::permissions::{MESSAGES_READ, SEND, TEMPLATES_MANAGE, TEMPLATES_READ};
 use crate::service::NotificationsService;
 
 /// A notification to send (flat fields: give exactly one recipient).
@@ -84,6 +88,55 @@ pub(crate) struct ReadInput {
     id: Option<Uuid>,
 }
 
+/// Which template (kind, channel, language).
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SchemaInput {
+    /// Key of a declared kind (see `list_kinds`).
+    kind: String,
+}
+
+/// A template to preview.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PreviewInput {
+    kind: String,
+    /// One channel of the kind, e.g. `email`.
+    channel: String,
+    /// `en` or `vi`.
+    locale: String,
+    /// `draft` (default), `published` or `version`.
+    source: Option<String>,
+    /// With `source = version`.
+    version: Option<i32>,
+    /// Values to render with (only variables of the kind); omitted → the sample data.
+    #[schema(value_type = Option<Object>)]
+    data: Option<Value>,
+}
+
+/// A template draft to save.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DraftInput {
+    kind: String,
+    channel: String,
+    /// `en` or `vi`.
+    locale: String,
+    /// Email subject, push and inbox title.
+    #[serde(default)]
+    subject: String,
+    /// Plain text (email text part, inbox).
+    #[serde(default)]
+    body_text: String,
+    /// HTML of the email body (`email` only).
+    body_html: Option<String>,
+    /// SMS, ZNS and push text.
+    #[serde(default)]
+    short: String,
+    /// Approved Zalo ZNS template id.
+    zns_template_id: Option<String>,
+}
+
 /// What was marked read.
 #[derive(Debug, serde::Serialize)]
 pub(crate) struct Marked {
@@ -93,7 +146,59 @@ pub(crate) struct Marked {
 pub(crate) fn all(service: &Arc<NotificationsService>) -> Vec<Tool> {
     let (kinds, send, messages, inbox, read) =
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
+    let (schema, preview, draft) = (service.clone(), service.clone(), service.clone());
     vec![
+        Tool::new(
+            "get_template_schema",
+            "Show the variables a notification template of a kind may use (`{{ path }}`), which are \
+             required, and sample data.",
+            move |_tenant: TenantContext, _principal: Principal, input: SchemaInput| {
+                let service = schema.clone();
+                async move { describe_schema(&service, &input.kind) as Result<SchemaResponse, Error> }
+            },
+        )
+        .for_any_signed_in()
+        .read_only(),
+        Tool::new(
+            "preview_template",
+            "Render a notification template (the draft by default, or the published or an older \
+             version) with the sample data of the kind or your `data`. Nothing is sent.",
+            move |tenant: TenantContext, principal: Principal, input: PreviewInput| {
+                let service = preview.clone();
+                async move {
+                    crate::custom::require_read(&principal)?;
+                    let source: Source = parse_source(input.source.as_deref(), input.version)?;
+                    let target = (input.kind.as_str(), input.channel.as_str(), input.locale.as_str());
+                    let rendered =
+                        service.preview_template(&tenant, &principal, target, source, input.data).await?;
+                    Ok::<PreviewResponse, Error>(rendered.into())
+                }
+            },
+        )
+        .requires(TEMPLATES_READ)
+        .or_requires(TEMPLATES_MANAGE)
+        .read_only(),
+        Tool::new(
+            "update_template_draft",
+            "Save the draft of a notification template (template engine syntax: `{{ name }}`, \
+             `{% if %}`, `{% for %}`). Checked against the variables of the kind; every problem is \
+             reported at once. A draft is not used until a person publishes it over REST.",
+            move |tenant: TenantContext, principal: Principal, input: DraftInput| {
+                let service = draft.clone();
+                async move {
+                    let target = (input.kind.as_str(), input.channel.as_str(), input.locale.as_str());
+                    let row = service.put_draft(&tenant, &principal, target, DraftRequest {
+                        subject: input.subject,
+                        body_text: input.body_text,
+                        body_html: input.body_html,
+                        short: input.short,
+                        zns_template_id: input.zns_template_id,
+                    }.into()).await?;
+                    Ok::<DraftResponse, Error>(row.into())
+                }
+            },
+        )
+        .requires(TEMPLATES_MANAGE),
         Tool::new(
             "list_kinds",
             "List the notification kinds declared by modules: key, category (`security`, \

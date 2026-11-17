@@ -215,6 +215,9 @@ impl NotificationsService {
             }
         }
         let rendered = self.render(tenant, &kind, &row).await?;
+        if rendered.fallback {
+            self.mark_fallback(tenant, row.id).await?;
+        }
         let result = match channel {
             Channel::Email => self.send_email(tenant, &kind, &row, &rendered, at).await,
             Channel::Sms => self.send_sms(tenant, &kind, &row, &rendered, at).await,
@@ -301,10 +304,18 @@ impl NotificationsService {
         };
         let mut subject = rendered.title.clone();
         let mut text = rendered.body.clone();
+        // Phần HTML: của khách, hay sinh từ chữ thuần; link mở thành nút bấm.
+        let mut body_html =
+            rendered.html.clone().unwrap_or_else(|| crate::layout::text_to_html(&rendered.body));
         if let Some(link) = &row.link {
             text = format!("{text}\n\n{link}");
+            if rendered.html.is_none() {
+                let link = crate::layout::escape(link);
+                body_html.push_str(&format!("\n<p><a href=\"{link}\">{link}</a></p>"));
+            }
         }
         let mut headers = Vec::new();
+        let mut footer_html = None;
         if kind.category == Category::Marketing {
             let Some(page) = &self.config.unsubscribe_url else {
                 return Ok(Sent::Failed("unsubscribe_url_missing".to_owned()));
@@ -327,9 +338,13 @@ impl NotificationsService {
             subject =
                 format!("{}{subject}", self.marketing_label(tenant, Channel::Email, at).await?);
             text = format!("{text}\n\n--\n{}", footer.text);
+            footer_html = self.unsubscribe_footer_html(kind, &row.locale, Some(&url));
             headers.push(("List-Unsubscribe".to_owned(), format!("<{url}>")));
         }
+        let brand = self.brand(tenant).await?;
+        let html = crate::layout::mail_html(&brand, &subject, &body_html, footer_html.as_deref())?;
         let mut mail = Mail::new(address.clone(), subject, text)
+            .html(html)
             .dedupe_key(format!("notifications:{}", row.id));
         for (name, value) in headers {
             mail = mail.header(name, value);
@@ -376,18 +391,24 @@ impl NotificationsService {
         else {
             return Ok(Sent::Skipped(SkipReason::NoAddress));
         };
-        // Mã mẫu ZNS do khách đăng ký với Zalo: nằm ở mẫu thay thế của khách.
+        // Mã mẫu ZNS do khách đăng ký với Zalo: ở mẫu khách tự soạn đang dùng, hay mẫu thay thế cũ.
+        let live = self
+            .live_content(tenant, &row.kind, Channel::Zns.as_str(), &row.locale)
+            .await?
+            .and_then(|content| content.zns_template_id);
         let found = template::Entity::find()
             .scoped(tenant)
             .filter(template::Column::Kind.eq(row.kind.as_str()))
             .filter(template::Column::Channel.eq(Channel::Zns.as_str()))
             .all(tenant.database().read())
             .await?;
-        let chosen = found
-            .iter()
-            .find(|item| item.locale == row.locale)
-            .or_else(|| found.first())
-            .and_then(|item| item.zns_template_id.clone());
+        let chosen = live.or_else(|| {
+            found
+                .iter()
+                .find(|item| item.locale == row.locale)
+                .or_else(|| found.first())
+                .and_then(|item| item.zns_template_id.clone())
+        });
         let Some(template_id) = chosen else {
             return Ok(Sent::Failed("zns_template_missing".to_owned()));
         };

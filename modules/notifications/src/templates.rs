@@ -1,5 +1,5 @@
-//! Dựng nội dung tin từ mẫu và câu chữ thay thế của khách (`notifications_templates`). Mẫu chỉ là chữ
-//! với chỗ điền `{tên}`; bộ mẫu động có bản nháp / xuất bản (D-206) là giai đoạn sau.
+//! Dựng nội dung tin: mẫu khách tự soạn đang dùng (D-206, [`crate::custom`]), rồi câu chữ thay thế cũ
+//! của khách (`notifications_templates`, chỉ chỗ điền `{tên}`), rồi mẫu mặc định theo i18n.
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
@@ -22,6 +22,10 @@ pub(crate) struct Rendered {
     pub title: String,
     pub body: String,
     pub short: String,
+    /// Phần HTML do khách soạn (đã dựng, đã thoát giá trị; chưa đặt vào khung) — chỉ email.
+    pub html: Option<String>,
+    /// Mẫu của khách không dựng được lúc gửi: đã dùng mẫu mặc định (`template_fallback`).
+    pub fallback: bool,
 }
 
 /// Điền `params` vào `template` một lượt, từ trái sang phải (giá trị đã điền không bị thay tiếp).
@@ -106,6 +110,25 @@ impl NotificationsService {
         kind: &NotificationKind,
         row: &message::Model,
     ) -> Result<Rendered, Error> {
+        // Mẫu khách tự soạn đang dùng (ngoài transaction). Lỗi dựng → mẫu mặc định, không bỏ tin.
+        let mut fallback = false;
+        if let Some(content) =
+            self.live_content(tenant, &row.kind, &row.channel, &row.locale).await?
+        {
+            let context = crate::custom::send_context(&row.params, row.link.as_deref());
+            match self.render_parts(&content, &row.locale, &context) {
+                Ok(rendered) => return Ok(rendered),
+                Err(error) => {
+                    tracing::warn!(
+                        kind = row.kind.as_str(),
+                        channel = row.channel.as_str(),
+                        error_code = error.code(),
+                        "tenant template failed, using the default text"
+                    );
+                    fallback = true;
+                }
+            }
+        }
         let custom = template::Entity::find_by_id((
             tenant.id().as_uuid(),
             row.kind.clone(),
@@ -136,6 +159,29 @@ impl NotificationsService {
             title: pick("title", template.title, custom.as_ref().map(|row| row.title.as_str())),
             body: pick("body", template.body, custom.as_ref().map(|row| row.body.as_str())),
             short: pick("short", template.short, custom.as_ref().map(|row| row.short.as_str())),
+            html: None,
+            fallback,
+        })
+    }
+
+    /// Dựng các phần của mẫu khách tự soạn bằng bộ dựng của kernel.
+    fn render_parts(
+        &self,
+        content: &crate::custom::Content,
+        locale: &str,
+        context: &serde_json::Value,
+    ) -> Result<Rendered, Error> {
+        use autoxide_kernel::template::Output;
+        let engine = &self.templates;
+        Ok(Rendered {
+            title: engine.render(&content.subject, Output::Text, locale, context)?,
+            body: engine.render(&content.body_text, Output::Text, locale, context)?,
+            short: engine.render(&content.short, Output::Text, locale, context)?,
+            html: match &content.body_html {
+                Some(source) => Some(engine.render(source, Output::Html, locale, context)?),
+                None => None,
+            },
+            fallback: false,
         })
     }
 
@@ -155,7 +201,7 @@ impl NotificationsService {
     }
 
     /// Kiểm (loại, kênh, ngôn ngữ) của đường dẫn mẫu; trả loại và ngôn ngữ chuẩn.
-    fn template_target(
+    pub(crate) fn template_target(
         &self,
         kind: &str,
         channel: &str,

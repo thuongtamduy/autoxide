@@ -214,11 +214,14 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `newsletter.list_lists` | `newsletter.read` | read-only |
 | `newsletter.schedule_campaign` | `newsletter.send` | writes |
 | `newsletter.send_campaign` | `newsletter.send` | writes |
+| `notifications.get_template_schema` | — | read-only |
 | `notifications.list_kinds` | — | read-only |
 | `notifications.list_messages` | `notifications.messages.read` | read-only |
 | `notifications.list_my_inbox` | — | read-only |
 | `notifications.mark_inbox_read` | — | writes |
+| `notifications.preview_template` | `notifications.templates.read` or `notifications.templates.manage` | read-only |
 | `notifications.send_notification` | `notifications.send` | writes |
+| `notifications.update_template_draft` | `notifications.templates.manage` | writes |
 | `organizations.change_unit_status` | `organizations.units.manage` | destructive |
 | `organizations.create_unit` | `organizations.units.write` | writes |
 | `organizations.get_settings` | `organizations.units.read` | read-only |

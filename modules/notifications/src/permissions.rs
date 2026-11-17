@@ -24,7 +24,20 @@ pub(crate) const MESSAGES_READ: Permission = Permission::new(
 
 pub(crate) const TEMPLATES_MANAGE: Permission = Permission::new(
     "notifications.templates.manage",
-    "Replace the default texts of notification kinds for the tenant.",
+    "Replace the default texts of notification kinds for the tenant, and write, publish and roll back \
+     notification templates.",
+)
+.with_risk(Risk::Write);
+
+pub(crate) const TEMPLATES_READ: Permission = Permission::new(
+    "notifications.templates.read",
+    "See the notification templates of the tenant: drafts, published versions, previews and mail branding.",
+)
+.with_risk(Risk::Read);
+
+pub(crate) const BRANDING_MANAGE: Permission = Permission::new(
+    "notifications.branding.manage",
+    "Change the branding of the tenant's HTML emails (name, logo, colors, footer).",
 )
 .with_risk(Risk::Write);
 
@@ -35,5 +48,13 @@ pub(crate) const PLATFORM_NOTICES_SEND: Permission = Permission::new(
 .with_risk(Risk::Write);
 
 pub(crate) fn all() -> Vec<Permission> {
-    vec![SEND, SEND_MARKETING, MESSAGES_READ, TEMPLATES_MANAGE, PLATFORM_NOTICES_SEND]
+    vec![
+        SEND,
+        SEND_MARKETING,
+        MESSAGES_READ,
+        TEMPLATES_MANAGE,
+        TEMPLATES_READ,
+        BRANDING_MANAGE,
+        PLATFORM_NOTICES_SEND,
+    ]
 }

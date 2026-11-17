@@ -8971,3 +8971,40 @@ quyết khiếu nại. Chưa chắc: danh sách lý do được ẩn, thời h�
    sách `complaints.contact`), hạn xác nhận / phản hồi / quyết định từ `cases.deadlines` và đường dẫn điều kiện giao dịch chung.
 4. **Điều kiện giao dịch chung**: văn bản loại `general_conditions` đã có (D-347), công khai qua `/public/documents/general_conditions`,
    bước 45 gọi `AcceptanceGate` lúc thanh toán — không thêm gì mới.
+
+## D-365 · Mẫu thông báo khách tự soạn: nháp / xuất bản / quay lại, khung mail MJML (`mrml`), thương hiệu (bước 37, D-206) — 2026-11-17 — agent quyết
+
+Bối cảnh: mục "Mẫu mail, thông báo khách tự soạn" của bước 37; bộ dựng mẫu kernel đã có (D-351). Đặc tả: `docs/steps/37-compliance.md`
+mục 2 và phần B.
+
+1. **Thư viện khung mail: `mrml` 6.0.1** (MIT), chỉ feature `parse` + `render` (không loader nên `mj-include` không đọc file hay
+   mạng). `cargo deny check` xanh (license, lỗ hổng, nguồn). Ghi ở `STACK.md`. Khung nằm trong `notifications` (`layout.rs`) — chỉ
+   module này dựng mail HTML; `newsletter` giữ HTML chiến dịch như cũ.
+2. **Nội dung của khách không qua bộ phân tích MJML**: khung được dựng với chỗ giữ chỗ rồi thay bằng HTML đã dựng (giá trị đã thoát
+   bởi bộ dựng kernel). HTML khách viết sai không làm hỏng khung; giá trị thương hiệu được kiểm (màu `#rrggbb`, logo `https://`) rồi
+   thoát XML trước khi vào MJML. Không font ngoài (không tải Google Fonts), không chú thích.
+3. **Mọi email của `notifications` có HTML trong khung** (cả mẫu mặc định: HTML sinh từ chữ thuần) kèm bản chữ thuần.
+4. **Lưu trữ** (migration mới `m0009_create_template_versions`, không sửa migration cũ): `notifications_template_drafts` (một bản
+   nháp mỗi loại/kênh/ngôn ngữ), `notifications_template_versions` (bản đã xuất bản, chỉ ghi một lần, giữ 20 bản gần nhất),
+   `notifications_template_live` (bản đang dùng), `notifications_branding` (theo khách). Bảng câu thay thế cũ `notifications_templates`
+   và `PUT/DELETE /templates/{kind}/{channel}/{locale}` giữ nguyên hành vi (D-059). Thứ tự dựng lúc gửi: mẫu đã xuất bản đang dùng →
+   câu thay thế cũ → mẫu mặc định theo i18n. Lệch đặc tả: đặc tả gợi ý thêm cột `format` vào `notifications_templates`; tách bảng
+   đơn giản hơn và không đổi bảng cũ.
+5. **Quay lại** chỉ trỏ bản đang dùng về phiên bản cũ (bản đó không đổi, không tạo phiên bản mới, bản nháp giữ nguyên). Thêm `DELETE
+   …/published` để thôi dùng mẫu (đặc tả không nêu; cần để khách trở về mẫu mặc định).
+6. **Schema biến**: `NotificationKind::variables(&[Variable])` và `.sample(json)` (builder, không phá module cũ); không khai thì suy
+   ra từ chỗ điền `{tên}` của mẫu mặc định (không bắt buộc) cộng `link`. Biến bắt buộc chỉ đòi ở phần chính của kênh (email / hộp
+   thư: `body_text`; SMS / ZNS / đẩy: `short`). Ngữ cảnh lúc gửi = tham số của tin + `link`. Kernel sửa thêm: hàm dựng sẵn
+   (`range`, `dict`…) không tính là biến lạ khi kiểm.
+7. **Mẫu hỏng lúc gửi** (lưu được nhưng không dựng được với dữ liệu thật): dùng mẫu mặc định, tin vẫn gửi, `error_code =
+   template_fallback`. Tin quảng cáo: nhãn và chân thư huỷ nhận (chữ + HTML + `List-Unsubscribe`) do bộ gửi chèn, mẫu không gỡ được.
+8. **Gửi thử** chỉ tới chính người gọi: kênh `email` (email đã xác minh của họ) và `in_app` (hộp thư của họ); kênh khác 422
+   `notifications.test_send_unsupported`. Không nhận địa chỉ tuỳ ý; tối đa 10 lần / giờ (`notifications_throttle`, khoá `test:<user>`).
+9. **Permission**: thêm `notifications.templates.read` (`read` — xem nháp, phiên bản, xem trước, thương hiệu; để tool MCP chỉ đọc
+   `preview_template` có permission mức xem) và `notifications.branding.manage` (`write`). `notifications.templates.manage` gồm cả
+   xem. Thương hiệu theo khách, chưa theo nút (cài đặt kế thừa `storefront.*` của bước 55 chưa có); chân thư thêm tên + địa chỉ chủ
+   sở hữu từ `LegalProfiles` của `compliance` khi có.
+10. **MCP**: `get_template_schema`, `preview_template` (chỉ đọc), `update_template_draft`. Không có tool xuất bản: đặc tả đòi
+    `approval_required` cho key `agent` (P12 bước 51) mà kernel chưa có cơ chế đó — xuất bản qua REST.
+11. Event mới: `notifications.template_published`, `…template_rolled_back`, `…template_unpublished`, `…branding_updated`; lưu nháp phát
+    `…template_updated` với `draft: true`.
