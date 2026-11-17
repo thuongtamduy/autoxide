@@ -8138,3 +8138,19 @@ Hai yêu cầu của giao diện (`docs/prompts/web-build-api-gaps.md`).
    /auth/support-grants/allowed?tenant_id=` (cài đặt `auth.support_access` của khách) và
    `auth.support_access_max_hours` trong `GET /kernel/client-config`.
 
+## D-336 · Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17 — agent quyết
+
+1. `Tenant.read_only`, `CurrentTenant.read_only` và ba trường của `TenantExpanded` khai `required` (core luôn trả;
+   `TenantExpanded` có thể `null`). Thêm `required` vào schema câu trả lời không phá vỡ client.
+2. `PATCH /kernel/tenants/{id}` nhận ID hay slug (như `GET`, `…/settings`, `…/move`); slug lạ → `404
+   tenant_not_found` (trước: UUID sai → `400`).
+3. Mô tả 422 của `PATCH` nêu lỗi ô `read_only` / `status` cho khách nền tảng.
+4. Mục "Conventions" của OpenAPI nêu cách chọn khách và `tenant_required` / `tenant_not_found` / `tenant_mismatch`.
+5. Mô tả `comments.*` hết dấu cách thừa; test `mo_ta_cua_module_khong_co_dau_cach_thua` (crate `autoxide`) chặn ở mọi
+   module (cài đặt theo khách, theo nút, permission).
+6. Query bị `Query` của axum từ chối (thiếu tham số bắt buộc, sai kiểu) thành `422 validation_failed` kèm ô sai (đọc từ
+   câu của thư viện: "missing field `x`" → `required`; "x: …" → `invalid`; không rõ ô → `query`), ở lớp chuẩn hoá lỗi
+   của kernel — một chỗ cho mọi endpoint, không phải đổi extractor của từng handler. Đổi mã trạng thái 400 → 422 cho
+   lỗi này là sửa lỗi theo quy ước đã công bố ("lỗi kiểm dữ liệu liệt kê mọi trường một lần"); hai endpoint ghi `400`
+   cho tham số thiếu (`/kernel/domains/allowed`, tải bản xuất của `forms`) sửa mô tả theo.
+

@@ -229,7 +229,7 @@ async fn remove_domain(
     params(AllowedQuery),
     responses(
         (status = 200, description = "The domain is verified and its tenant is active.", body = Data<Allowed>),
-        (status = 400, description = "The `domain` parameter is missing; code `bad_request`.", body = Problem),
+        (status = 422, description = "The `domain` parameter is missing; code `validation_failed`, the field in `errors`.", body = Problem),
         (status = 404, description = "Not a verified domain of an active tenant; code `tenant_domain_not_found`.", body = Problem),
         (status = 429, description = "Too many requests from this address; code `rate_limited`.", body = Problem),
     )

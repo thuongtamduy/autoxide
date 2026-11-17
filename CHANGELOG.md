@@ -399,6 +399,14 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- A missing or ill-typed query parameter (e.g. `locale` of `GET /api/v1/content/public/posts`) answered `400
+  bad_request` with the library's raw English text; it now answers `422 validation_failed` with the field in
+  `errors`, translated like every other validation problem.
+- `PATCH /api/v1/kernel/tenants/{id}` takes the tenant's slug as well as its id, like the other tenant endpoints.
+- OpenAPI: `read_only` of tenants and the three fields of `TenantExpanded` are marked required (they are always
+  present); the "Conventions" section explains how the tenant of a request is chosen (`tenant_required`,
+  `tenant_not_found`, `tenant_mismatch`); descriptions of `comments.*` tenant settings no longer contain runs of
+  spaces.
 - Security: `GET /api/v1/auth/support-grants` and `DELETE /api/v1/auth/support-grants/{id}` checked only the
   permission, so the administrator of an ordinary tenant (who holds every permission) could list or revoke support
   grants of other tenants. They are now for platform staff in the platform tenant only, like granting

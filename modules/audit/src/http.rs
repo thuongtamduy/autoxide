@@ -133,10 +133,9 @@ pub(crate) enum AuditInclude {
     params(AuditFilter, PageQuery),
     responses(
         (status = 200, description = "One page of audit entries.", body = Page<AuditEntryResponse>),
-        (status = 400, description = "A filter has the wrong type, e.g. `actor_user_id` is not a UUID.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `audit.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A filter or paging parameter is invalid, e.g. `actor_user_id` is not a UUID; code `validation_failed`, every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_entries(
@@ -282,8 +281,10 @@ mod tests {
             let (status, denied) = get(&app, "/api/v1/audit", "nobody").await;
             assert_eq!(status, StatusCode::FORBIDDEN);
             assert_eq!(denied["code"], "permission_denied");
-            let (status, _) = get(&app, "/api/v1/audit?actor_user_id=not-a-uuid", "auditor").await;
-            assert_eq!(status, StatusCode::BAD_REQUEST);
+            let (status, bad) =
+                get(&app, "/api/v1/audit?actor_user_id=not-a-uuid", "auditor").await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(bad["errors"][0]["field"], "actor_user_id");
         })
         .await
         .unwrap();

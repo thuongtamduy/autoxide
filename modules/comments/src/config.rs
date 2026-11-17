@@ -205,29 +205,29 @@ pub(crate) const VERIFY_MAILS_PER_DAY: Setting = Setting::new(
 
 pub(crate) const TENANT_BANNED_WORDS: TenantSetting = TenantSetting::new(
     "comments.banned_words",
-    "Comma-separated words or phrases that make a comment refused (whole words, ignoring case      and accents), instead of the server's AUTOXIDE_COMMENTS_BANNED_WORDS. `-` means none.",
+    "Comma-separated words or phrases that make a comment refused (whole words, ignoring case and accents), instead of the server's AUTOXIDE_COMMENTS_BANNED_WORDS. `-` means none.",
 );
 
 pub(crate) const TENANT_SUSPECT_WORDS: TenantSetting = TenantSetting::new(
     "comments.suspect_words",
-    "Comma-separated words or phrases that hold a comment for approval, instead of the      server's AUTOXIDE_COMMENTS_SUSPECT_WORDS. `-` means none.",
+    "Comma-separated words or phrases that hold a comment for approval, instead of the server's AUTOXIDE_COMMENTS_SUSPECT_WORDS. `-` means none.",
 );
 
 pub(crate) const TENANT_MAX_LINKS: TenantSetting = TenantSetting::new(
     "comments.max_links",
-    "A comment with more links than this is held for approval (0 to 100), instead of the      server's AUTOXIDE_COMMENTS_MAX_LINKS.",
+    "A comment with more links than this is held for approval (0 to 100), instead of the server's AUTOXIDE_COMMENTS_MAX_LINKS.",
 )
 .checked(|raw| tenant_max_links(raw).map(|_| ()));
 
 pub(crate) const TENANT_GUEST_MODERATION: TenantSetting = TenantSetting::new(
     "comments.guest_moderation",
-    "When a guest's comment needs approval: `pre`, `first_time` or `post`, instead of the      server's AUTOXIDE_COMMENTS_GUEST_MODERATION. Overrides per target kind      (AUTOXIDE_COMMENTS_MODERATION_BY_TYPE) still apply.",
+    "When a guest's comment needs approval: `pre`, `first_time` or `post`, instead of the server's AUTOXIDE_COMMENTS_GUEST_MODERATION. Overrides per target kind (AUTOXIDE_COMMENTS_MODERATION_BY_TYPE) still apply.",
 )
 .checked(|raw| tenant_mode(raw).map(|_| ()));
 
 pub(crate) const TENANT_USER_MODERATION: TenantSetting = TenantSetting::new(
     "comments.user_moderation",
-    "When a signed-in user's comment needs approval: `pre`, `first_time` or `post`, instead of      the server's AUTOXIDE_COMMENTS_USER_MODERATION. Overrides per target kind      (AUTOXIDE_COMMENTS_MODERATION_BY_TYPE) still apply.",
+    "When a signed-in user's comment needs approval: `pre`, `first_time` or `post`, instead of the server's AUTOXIDE_COMMENTS_USER_MODERATION. Overrides per target kind (AUTOXIDE_COMMENTS_MODERATION_BY_TYPE) still apply.",
 )
 .checked(|raw| tenant_mode(raw).map(|_| ()));
 

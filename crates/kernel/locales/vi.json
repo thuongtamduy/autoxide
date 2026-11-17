@@ -16,6 +16,7 @@
   "field:does not match": "không khớp",
   "field:give both the access key and its secret, or neither": "phải có cả khoá truy cập lẫn secret của nó, hoặc không có cả hai",
   "field:has an invalid length": "có độ dài không hợp lệ",
+  "field:has an invalid value": "có giá trị không hợp lệ",
   "field:is not a node of this tenant's organization tree; send `null` to attach the domain to the tenant as a whole": "không phải một nút trong cây tổ chức của khách hàng này; gửi `null` để gắn tên miền với cả khách hàng",
   "field:is not valid": "không hợp lệ",
   "field:is not valid: {reason}": "không hợp lệ: {reason}",
@@ -23,6 +24,7 @@
   "field:is required": "là bắt buộc",
   "field:may contain only letters, digits, `-`, `_`, `.` and `/`": "chỉ được có chữ, số, `-`, `_`, `.` và `/`",
   "field:must be 1 to 200 characters long": "phải dài 1 đến 200 ký tự",
+  "field:must be 1 to 500 characters long": "phải dài 1 đến 500 ký tự",
   "field:must be 1 to 63 lower-case letters, digits and `-`, not starting or ending with `-`": "phải dài 1 đến 63 ký tự gồm chữ thường, số và `-`, không bắt đầu hay kết thúc bằng `-`",
   "field:must be 1 to 63 lower-case letters, digits and `-`, not starting or ending with `-`, and not `main`": "phải dài 1 đến 63 ký tự gồm chữ thường, số và `-`, không bắt đầu hay kết thúc bằng `-`, và không phải `main`",
   "field:must be 1 to 64 lower-case letters, digits, `_`, `-`, `.` or `:`, such as `forms:contact`": "phải dài 1 đến 64 ký tự gồm chữ thường, số, `_`, `-`, `.` hay `:`, ví dụ `forms:contact`",
@@ -83,6 +85,8 @@
   "kernel.export_not_ready": "Lượt xuất dữ liệu đang `{status}`: chỉ tải được lượt đã `ready`.",
   "kernel.export_storage_unavailable": "Xuất dữ liệu cần nơi lưu file; chưa cài module `files`.",
   "kernel.flag_limit_reached": "Bạn đã có {max} cờ giao diện, mức tối đa cho phép. Xoá các cờ không cần nữa bằng `DELETE /api/v1/me/flags/{key}` rồi thử lại.",
+  "kernel.migration_run_busy": "Đang có một lượt chạy migration (`{run}`); hãy chờ lượt đó xong.",
+  "kernel.migration_run_not_found": "Không có lượt chạy migration `{run}`.",
   "kernel.module_not_found": "Không có module nào tên `{name}` được cài. `GET /api/v1/kernel/modules` liệt kê các module đã cài.",
   "length_required": "Request cần header `content-length`.",
   "limit_exceeded": "Đã dùng hết hạn mức `{limit}` ({used}/{max}). Nâng gói hoặc giải phóng bớt.",
@@ -172,8 +176,5 @@
   "unavailable": "Máy chủ tạm thời không xử lý được request. Hãy thử lại sau.",
   "unsupported_media_type": "Kiểu nội dung không được hỗ trợ. Gửi JSON với `content-type: application/json`.",
   "uri_too_long": "Đường dẫn của request quá dài.",
-  "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì.",
-  "kernel.migration_run_busy": "Đang có một lượt chạy migration (`{run}`); hãy chờ lượt đó xong.",
-  "kernel.migration_run_not_found": "Không có lượt chạy migration `{run}`.",
-  "field:must be 1 to 500 characters long": "phải dài 1 đến 500 ký tự"
+  "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì."
 }

@@ -411,7 +411,7 @@ async fn xuat_csv_lon_qua_http() {
         let refused = app.get(&tampered).send().await.unwrap();
         assert_eq!((refused.status(), refused.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("forms.export_link_invalid")));
         let unsigned = app.get(&format!("/api/v1/forms/exports/{export}/file")).send().await.unwrap();
-        assert_eq!(unsigned.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(unsigned.status(), StatusCode::UNPROCESSABLE_ENTITY);
         let missing = send(&app, "GET", &format!("/forms/exports/{id}"), Some("admin"), &[], None).await;
         assert_eq!((missing.status(), missing.json()["code"].as_str()), (StatusCode::NOT_FOUND, Some("forms.export_not_found")));
     })

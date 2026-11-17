@@ -65,10 +65,9 @@ pub(crate) struct AllApiKeysQuery {
     params(AllApiKeysQuery, PageQuery),
     responses(
         (status = 200, description = "One page of keys.", body = Page<ManagedApiKeyResponse>),
-        (status = 400, description = "`user_id` is not a UUID.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.api_keys.manage`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A filter or paging parameter is invalid, e.g. `user_id` is not a UUID; code `validation_failed`, every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_all_api_keys(

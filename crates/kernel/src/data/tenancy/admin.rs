@@ -154,8 +154,9 @@ pub struct Tenant {
     #[schema(example = "active")]
     pub status: String,
     /// Read-only: its data can be read (and its users can sign in and export), but every change
-    /// is refused with `403 tenant_read_only`. Independent of `status`.
+    /// is refused with `403 tenant_read_only`. Independent of `status`. Always present.
     #[serde(default)]
+    #[schema(required = true)]
     pub read_only: bool,
     /// Parent tenant, when the tenant belongs to a chain.
     pub parent_id: Option<Uuid>,
@@ -169,21 +170,23 @@ pub struct Tenant {
     pub expanded: Option<TenantExpanded>,
 }
 
-/// Related records of a tenant, asked for with `expand`.
+/// Related records of a tenant, asked for with `expand`. All three fields are always present
+/// (`null` when not asked for or when there is nothing).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct TenantExpanded {
     /// The placement that keeps the tenant's data (`expand=placement`); `null` when not asked for.
+    #[schema(required = true)]
     pub placement: Option<Placement>,
     /// The tenant's subscription (`expand=subscription`), shaped like `GET
     /// /api/v1/plans/tenants/{tenant_id}/subscription` (`PlanSubscription`, with the plan's code
     /// and name, without add-ons). `null` when not asked for, when the tenant has no subscription,
     /// or without the plans module.
-    #[schema(value_type = Option<Object>)]
+    #[schema(value_type = Option<Object>, required = true)]
     pub subscription: Option<serde_json::Value>,
     /// The tenant's use of every limit (`expand=usage`), shaped like `GET
     /// /api/v1/plans/tenants/{tenant_id}/usage` (a list of `LimitUse`). `null` when not asked for
     /// or without the plans module.
-    #[schema(value_type = Option<Vec<Object>>)]
+    #[schema(value_type = Option<Vec<Object>>, required = true)]
     pub usage: Option<serde_json::Value>,
 }
 
@@ -195,7 +198,9 @@ pub struct CurrentTenant {
     pub name: String,
     pub status: String,
     /// Read-only: data can be read but every change is refused with `403 tenant_read_only`.
+    /// Always present.
     #[serde(default)]
+    #[schema(required = true)]
     pub read_only: bool,
     /// `single` (one tenant) or `multi` (many tenants on one installation).
     #[schema(example = "single")]
@@ -1005,7 +1010,7 @@ async fn get_tenant(
     extensions(("x-permissions" = json!(["kernel.tenants.manage"]))),
     operation_id = "update_tenant",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the tenant."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
+    params(("id" = String, Path, description = "Id or slug of the tenant."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
     request_body = TenantChanges,
     responses(
         (status = 200, description = "The tenant after the change.", body = Data<Tenant>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
@@ -1013,19 +1018,21 @@ async fn get_tenant(
         (status = 403, description = "Missing permission `kernel.tenants.manage` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
         (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
         (status = 412, description = "`If-Match` does not match: the record changed since you read it; code `precondition_failed`.", body = Problem),
-        (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid; every problem is listed in `errors` (code `validation_failed`). Making the platform tenant read-only or suspending it is refused this way, on the field `read_only` or `status`.", body = Problem),
     )
 )]
 async fn update_tenant(
     State(admin): State<Arc<TenantAdmin>>,
     principal: Principal,
-    Path(id): Path<Uuid>,
+    Path(id): Path<String>,
     if_match: IfMatch,
     crate::http::ValidJson(changes): crate::http::ValidJson<TenantChanges>,
 ) -> Result<Tagged<Tenant>, Error> {
     principal.require(&TENANTS_MANAGE)?;
     require_platform(&principal)?;
     let expected = if_match.expected()?;
+    // ID hay slug, như `GET /tenants/{id}`, `…/settings` và `…/move`.
+    let id = admin.get(&id).await?.id;
     let tenant = admin.update(Actor::from(&principal), id, changes, expected).await?;
     Ok(Tagged { version: tenant.updated_at, data: tenant })
 }

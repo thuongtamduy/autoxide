@@ -1154,8 +1154,11 @@ export type CurrentTenant = {
   name: string;
   /** Whether this is the platform tenant (the operator's own). */
   platform: boolean;
-  /** Read-only: data can be read but every change is refused with `403 tenant_read_only`. */
-  read_only?: boolean;
+  /**
+   * Read-only: data can be read but every change is refused with `403 tenant_read_only`.
+   * Always present.
+   */
+  read_only: boolean;
   slug: string;
   status: string;
 };
@@ -1712,8 +1715,11 @@ export type Data_CurrentTenant = {
     name: string;
     /** Whether this is the platform tenant (the operator's own). */
     platform: boolean;
-    /** Read-only: data can be read but every change is refused with `403 tenant_read_only`. */
-    read_only?: boolean;
+    /**
+     * Read-only: data can be read but every change is refused with `403 tenant_read_only`.
+     * Always present.
+     */
+    read_only: boolean;
     slug: string;
     status: string;
   };
@@ -3243,9 +3249,9 @@ export type Data_Tenant = {
     placement: string;
     /**
      * Read-only: its data can be read (and its users can sign in and export), but every change
-     * is refused with `403 tenant_read_only`. Independent of `status`.
+     * is refused with `403 tenant_read_only`. Independent of `status`. Always present.
      */
-    read_only?: boolean;
+    read_only: boolean;
     /** Short name: lower-case letters, digits and `-`; unique on the platform. */
     slug: string;
     /**
@@ -6924,9 +6930,9 @@ export type Page_Tenant = {
     placement: string;
     /**
      * Read-only: its data can be read (and its users can sign in and export), but every change
-     * is refused with `403 tenant_read_only`. Independent of `status`.
+     * is refused with `403 tenant_read_only`. Independent of `status`. Always present.
      */
-    read_only?: boolean;
+    read_only: boolean;
     /** Short name: lower-case letters, digits and `-`; unique on the platform. */
     slug: string;
     /**
@@ -8754,9 +8760,9 @@ export type Tenant = {
   placement: string;
   /**
    * Read-only: its data can be read (and its users can sign in and export), but every change
-   * is refused with `403 tenant_read_only`. Independent of `status`.
+   * is refused with `403 tenant_read_only`. Independent of `status`. Always present.
    */
-  read_only?: boolean;
+  read_only: boolean;
   /** Short name: lower-case letters, digits and `-`; unique on the platform. */
   slug: string;
   /**
@@ -8837,22 +8843,25 @@ export type TenantDomainRecord = {
   value: string;
 };
 
-/** Related records of a tenant, asked for with `expand`. */
+/**
+ * Related records of a tenant, asked for with `expand`. All three fields are always present
+ * (`null` when not asked for or when there is nothing).
+ */
 export type TenantExpanded = {
-  placement?: Placement | null;
+  placement: Placement | null;
   /**
    * The tenant's subscription (`expand=subscription`), shaped like `GET
    * /api/v1/plans/tenants/{tenant_id}/subscription` (`PlanSubscription`, with the plan's code
    * and name, without add-ons). `null` when not asked for, when the tenant has no subscription,
    * or without the plans module.
    */
-  subscription?: Record<string, unknown> | null;
+  subscription: Record<string, unknown> | null;
   /**
    * The tenant's use of every limit (`expand=usage`), shaped like `GET
    * /api/v1/plans/tenants/{tenant_id}/usage` (a list of `LimitUse`). `null` when not asked for
    * or without the plans module.
    */
-  usage?: Record<string, unknown>[] | null;
+  usage: Record<string, unknown>[] | null;
 };
 
 /** An export of all the data of a tenant. */
@@ -9561,7 +9570,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; include?: "actor"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_AuditEntryResponse;
-        400: Problem;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -9588,7 +9596,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_ManagedApiKeyResponse;
-        400: Problem;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -10242,7 +10249,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; role_id?: string; user_id?: string; inherited?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_MembershipRowResponse;
-        400: Problem;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -11941,9 +11947,9 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { export_id: string }; query: { expires: number; signature: string }; };
       responses: {
         200: string;
-        400: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -12150,8 +12156,8 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { domain: string }; };
       responses: {
         200: Data_AllowedTenantDomain;
-        400: Problem;
         404: Problem;
+        422: Problem;
         429: Problem;
         default: Problem;
       };
@@ -13540,7 +13546,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { parent_id?: string; type?: string; status?: "pending" | "active" | "suspended" | "archived"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_UnitResponse;
-        400: Problem;
         401: Problem;
         403: Problem;
         422: Problem;
