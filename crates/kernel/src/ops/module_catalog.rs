@@ -66,6 +66,8 @@ pub(crate) struct ModuleCatalog {
     exports: crate::ops::list_exports::ExportSources,
     /// Sổ hành động hàng loạt (bước 51 P8).
     bulk: crate::ops::bulk::BulkActions,
+    /// Sổ bộ nhận dạng mã (bước 51 P9).
+    resolvers: crate::ops::resolve::CodeResolvers,
     /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
     lists: crate::ops::list_exports::ListsHandle,
     /// Sổ điều hướng đã gom (bước 51 P1).
@@ -134,6 +136,10 @@ impl ModuleCatalog {
 
     pub(crate) fn bulk_actions(&self) -> crate::ops::bulk::BulkActions {
         self.bulk.clone()
+    }
+
+    pub(crate) fn code_resolvers(&self) -> crate::ops::resolve::CodeResolvers {
+        self.resolvers.clone()
     }
 
     pub(crate) fn lists(&self) -> crate::ops::list_exports::ListsHandle {

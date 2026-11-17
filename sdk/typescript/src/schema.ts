@@ -3049,6 +3049,8 @@ export type Data_FindView = {
   data: {
     /** One group per record type that found something, in the order modules start. */
     groups: FoundGroup[];
+    /** Parts of `q` no searched type understands (unknown fields, `-word`), left out of the search. */
+    ignored: string[];
     /** Sources that did not answer in time or failed. */
     incomplete: string[];
   };
@@ -4805,6 +4807,19 @@ export type Data_Resolution = {
     type: "redirect";
   } | {
     type: "gone";
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ResolvedView = {
+  /** The record a code opens. */
+  data: {
+    id: string;
+    kind: string;
+    /** Screen id of the navigation that opens the record. */
+    screen: string;
+    subtitle?: string | null;
+    title: string;
   };
 };
 
@@ -7179,6 +7194,8 @@ export type FileResponse = {
 export type FindView = {
   /** One group per record type that found something, in the order modules start. */
   groups: FoundGroup[];
+  /** Parts of `q` no searched type understands (unknown fields, `-word`), left out of the search. */
+  ignored: string[];
   /** Sources that did not answer in time or failed. */
   incomplete: string[];
 };
@@ -12789,6 +12806,16 @@ export type Resolution = {
   type: "redirect";
 } | {
   type: "gone";
+};
+
+/** The record a code opens. */
+export type ResolvedView = {
+  id: string;
+  kind: string;
+  /** Screen id of the navigation that opens the record. */
+  screen: string;
+  subtitle?: string | null;
+  title: string;
 };
 
 /** A revision: a full copy of the editable fields of an entry at one moment. */
@@ -18559,7 +18586,7 @@ export interface paths {
   "/api/v1/kernel/find": {
     /** Find records across modules. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; org_id?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; org_id?: string; scope?: string; limit?: number }; };
       responses: {
         200: Data_FindView;
         401: Problem;
@@ -18714,6 +18741,19 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/resolve": {
+    /** Open a record by its code. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { code?: string }; };
+      responses: {
+        200: Data_ResolvedView;
+        401: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
