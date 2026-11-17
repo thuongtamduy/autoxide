@@ -332,3 +332,97 @@ pub(crate) mod phone_challenge {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod legal_profile {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_legal_profiles")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// Nút sở hữu; nút gốc = cả khách.
+        pub org_id: Uuid,
+        /// `individual`, `household_business`, `organization`.
+        pub entity_type: String,
+        pub legal_name: String,
+        pub trade_name: Option<String>,
+        pub tax_code: Option<String>,
+        pub registration_number: Option<String>,
+        /// `YYYY-MM-DD`.
+        pub registration_issued_on: Option<String>,
+        pub registration_issued_by: Option<String>,
+        /// JSON `Address` của module `address`.
+        pub address: Option<String>,
+        pub representative_name: Option<String>,
+        pub representative_title: Option<String>,
+        pub phone: Option<String>,
+        pub email: Option<String>,
+        pub kyc_profile_id: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod website {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_websites")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// Nút của website; nút gốc = website của cả khách.
+        pub org_id: Uuid,
+        /// Chữ thường, tên quốc tế dạng punycode.
+        pub domain: String,
+        /// `website` hay `mobile_app`.
+        pub channel: String,
+        /// `sales` (thông báo, logo xanh) hay `platform` (đăng ký, logo đỏ).
+        pub website_kind: String,
+        /// `not_submitted`, `submitted`, `needs_supplement`, `notified`, `registered`, `rejected`,
+        /// `revoked`.
+        pub moit_status: String,
+        pub moit_reference: Option<String>,
+        pub submitted_at: Option<DateTimeUtc>,
+        pub decided_at: Option<DateTimeUtc>,
+        pub logo_link_url: Option<String>,
+        pub logo_image_url: Option<String>,
+        /// Phiên bản danh sách kiểm lúc nộp.
+        pub checklist_version: Option<i32>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod website_page {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_website_pages")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub tenant_id: Uuid,
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub website_id: Uuid,
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub page_kind: String,
+        /// `content.entry:<id>`.
+        pub resource: String,
+        pub linked_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

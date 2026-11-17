@@ -11,6 +11,24 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, website legal profile and the Ministry of Industry and Trade (Vietnam, Decree 52/2013 as amended by Decree
+  85/2021 — check the original texts; guide `docs/COMPLIANCE.md`): legal (owner) profiles per tenant and per unit
+  (`GET|POST /api/v1/compliance/legal-profiles`, `GET|PATCH /legal-profiles/{id}` with `ETag` / `If-Match`,
+  `GET /legal-profiles/{id}/template-variables`; address checked by `address`), websites by domain with kind
+  `sales` (notification, blue logo) or `platform` (registration, red logo) (`GET|POST /websites`,
+  `GET|PATCH /websites/{id}`), mandatory pages linked to a website (`PUT|DELETE /websites/{id}/pages/{page_kind}`),
+  a checklist that is versioned data (rules `moit.checklist.sales` / `moit.checklist.platform`;
+  `GET /websites/{id}/checklist`), a draft dossier filled from the data (`GET /websites/{id}/dossier`: declaration
+  fields, Markdown drafts of the declaration, service project plan and operating regulations), status and logo recorded
+  by hand (`POST /websites/{id}/status`; the logo code is parsed strictly and rebuilt), public
+  `GET /public/badge` and `GET /public/owner` for the interface. Permissions `compliance.legal.read`,
+  `compliance.legal.manage` (scoped by unit); events `compliance.legal_profile_updated`, `…website_created`,
+  `…website_updated`, `…website_status_changed`; MCP `compliance.legal_profiles`, `…websites`,
+  `…website_checklist`, `…website_dossier`, `…set_website_status`; contracts `ComplianceFacts` / `Fact` (other modules
+  answer checklist items) and `LegalProfiles` (template variables); `autoxide doctor` check
+  `compliance.moit_readiness` (warning only). Error codes `compliance.profile_not_found`, `compliance.profile_exists`,
+  `compliance.website_not_found`, `compliance.domain_taken`, `compliance.logo_snippet_invalid`. Selling before the
+  procedure is done is labelled, not blocked (D-358).
 - Step 37, account verification for posting (Vietnam, Decree 147/2024 — check the original text): verification levels
   `none` / `phone` / `identity` (identity = verified KYC profile). `GET /api/v1/compliance/me/verification`,
   `POST /me/phone-verifications` (6-digit SMS code through `dyn SmsSender`; Vietnamese mobile numbers only, from the

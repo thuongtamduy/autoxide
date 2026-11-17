@@ -330,6 +330,8 @@ mod tests {
                 ("tax.tax_rates", "warning"),
                 ("ledger.chain", "ok"),
                 ("ledger.balances", "ok"),
+                // Chưa có website nào có hồ sơ Bộ Công Thương (D-357): cảnh báo, không hỏng.
+                ("compliance.moit_readiness", "warning"),
             ] {
                 assert!(found.contains(&expected), "{expected:?} not in {found:?}");
             }
@@ -337,7 +339,7 @@ mod tests {
             let text = render(&lines, true);
             assert!(text.contains("→ Run `autoxide user create"), "{text}");
             assert!(
-                text.ends_with("No failed checks; 5 warning(s) to look at before going live.\n"),
+                text.ends_with("No failed checks; 6 warning(s) to look at before going live.\n"),
                 "{text}"
             );
             let _ = std::fs::remove_dir_all(dir);

@@ -16,9 +16,12 @@ use crate::api::{KycStatus, Subject};
 use crate::documents::NewVersion;
 use crate::http_kyc::ProfileResponse;
 use crate::http_legal::{DocumentResponse, VersionResponse, describe_document};
+use crate::http_moit::{LegalProfileResponse, WebsiteResponse, describe_website};
 use crate::http_verification::VerificationResponse;
-use crate::permissions::{DOCUMENTS_MANAGE, DOCUMENTS_READ, KYC_READ};
+use crate::permissions::{DOCUMENTS_MANAGE, DOCUMENTS_READ, KYC_READ, LEGAL_MANAGE, LEGAL_READ};
 use crate::service::ComplianceService;
+use crate::websites::StatusChange;
+use autoxide_kernel::version::IfMatch;
 
 /// Which profiles.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -58,7 +61,133 @@ pub(crate) struct Pending {
     version: VersionResponse,
 }
 
+/// One page of a list.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListInput {
+    /// Maximum number of items, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+}
+
+/// Which website.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WebsiteInput {
+    website_id: Uuid,
+}
+
+/// A status to record for a website.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WebsiteStatusInput {
+    website_id: Uuid,
+    /// `not_submitted`, `submitted`, `needs_supplement`, `notified` (sales website),
+    /// `registered` (marketplace), `rejected` or `revoked`.
+    status: String,
+    /// Number of the file at the ministry.
+    reference: Option<String>,
+    /// For `notified` / `registered`: the logo code the ministry gave, unchanged.
+    snippet: Option<String>,
+    /// The `ETag` read before (`"…"`), to avoid overwriting another change.
+    version: Option<String>,
+}
+
 pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
+    let mut tools = base(service);
+    tools.extend(moit(service));
+    tools
+}
+
+/// Tool của hồ sơ Bộ Công Thương: cùng service, cùng permission với REST.
+fn moit(service: &Arc<ComplianceService>) -> Vec<Tool> {
+    let (profiles, websites, checklist, dossier, status) =
+        (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
+    vec![
+        Tool::new(
+            "legal_profiles",
+            "List the legal (owner) profiles of the tenant and its units: what Vietnamese law \
+             requires a commerce website to show about its owner.",
+            move |tenant: TenantContext, principal: Principal, input: ListInput| {
+                let service = profiles.clone();
+                async move {
+                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let found = service.list_profiles_legal(&tenant, &principal, &page).await?;
+                    Ok::<Page<LegalProfileResponse>, Error>(found.map(LegalProfileResponse::from))
+                }
+            },
+        )
+        .requires(LEGAL_READ)
+        .read_only(),
+        Tool::new(
+            "websites",
+            "List the websites of the tenant with their kind (`sales` → notify the Ministry of \
+             Industry and Trade, `platform` → register) and status.",
+            move |tenant: TenantContext, principal: Principal, input: ListInput| {
+                let service = websites.clone();
+                async move {
+                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let found = service.list_websites(&tenant, &principal, &page).await?;
+                    Ok::<Page<WebsiteResponse>, Error>(found.map(|row| describe_website(row, None)))
+                }
+            },
+        )
+        .requires(LEGAL_READ)
+        .read_only(),
+        Tool::new(
+            "website_checklist",
+            "What a website still lacks before it is notified to / registered with the Ministry of \
+             Industry and Trade; each item is `met`, `missing`, `unknown` or `manual`, with what to do.",
+            move |tenant: TenantContext, principal: Principal, input: WebsiteInput| {
+                let service = checklist.clone();
+                async move { service.checklist(&tenant, &principal, input.website_id).await }
+            },
+        )
+        .requires(LEGAL_READ)
+        .read_only(),
+        Tool::new(
+            "website_dossier",
+            "The draft dossier of a website for the Ministry of Industry and Trade, filled from the \
+             tenant's data (declaration; for a marketplace a draft project plan and regulations). A \
+             person reviews it with a legal professional and submits it on online.gov.vn.",
+            move |tenant: TenantContext, principal: Principal, input: WebsiteInput| {
+                let service = dossier.clone();
+                async move { service.dossier(&tenant, &principal, input.website_id).await }
+            },
+        )
+        .requires(LEGAL_READ)
+        .read_only(),
+        Tool::new(
+            "set_website_status",
+            "Record what happened with a website's file at the Ministry of Industry and Trade \
+             (submitted, notified, registered…). `notified` / `registered` need the logo code the \
+             ministry gave.",
+            move |tenant: TenantContext, principal: Principal, input: WebsiteStatusInput| {
+                let service = status.clone();
+                async move {
+                    let expected = match input.version.as_deref() {
+                        Some(version) => IfMatch::from_value(version).expected()?,
+                        None => None,
+                    };
+                    let change = StatusChange {
+                        status: input.status,
+                        reference: input.reference,
+                        snippet: input.snippet,
+                        ..StatusChange::default()
+                    };
+                    let row = service
+                        .set_website_status(&tenant, &principal, input.website_id, expected, change)
+                        .await?;
+                    Ok::<WebsiteResponse, Error>(describe_website(row, None))
+                }
+            },
+        )
+        .requires(LEGAL_MANAGE),
+    ]
+}
+
+fn base(service: &Arc<ComplianceService>) -> Vec<Tool> {
     let (status, profiles, documents, publish, pending) =
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
     let account = service.clone();

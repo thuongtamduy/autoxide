@@ -2509,6 +2509,176 @@
         ],
         "type": "object"
       },
+      "ComplianceBadge": {
+        "description": "The ministry's logo for a website footer.",
+        "properties": {
+          "alt": {
+            "type": "string"
+          },
+          "color": {
+            "description": "`blue` or `red`.",
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "image_url": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "`sales` or `platform`.",
+            "type": "string"
+          },
+          "link_url": {
+            "type": "string"
+          },
+          "snippet": {
+            "description": "Ready-to-insert HTML, rebuilt from the checked addresses.",
+            "type": "string"
+          },
+          "status": {
+            "description": "`notified` (blue logo) or `registered` (red logo).",
+            "type": "string"
+          },
+          "website_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "website_id",
+          "domain",
+          "kind",
+          "status",
+          "color",
+          "link_url",
+          "image_url",
+          "alt",
+          "snippet"
+        ],
+        "type": "object"
+      },
+      "ComplianceChecklist": {
+        "description": "What a website still lacks before it is notified to, or registered with, the Ministry of\nIndustry and Trade (data: the rule `moit.checklist.<kind>` in force).",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceChecklistItem"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "description": "`sales` or `platform`.",
+            "type": "string"
+          },
+          "legal_basis": {
+            "type": "string"
+          },
+          "missing": {
+            "description": "Items `missing`.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "needs_legal_review": {
+            "type": "boolean"
+          },
+          "procedure": {
+            "description": "`notification` (sales website, blue logo) or `registration` (marketplace or other\nintermediary, red logo).",
+            "type": "string"
+          },
+          "rule_version": {
+            "description": "Version of the rule `moit.checklist.<kind>` used; `null` when no rule is in force.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "selling_before_done": {
+            "description": "Selling before the procedure is done is shown as \"required by law\" (`label`), not blocked:\nsee `selling_note` (decision D-358; check with a legal professional).",
+            "example": "label",
+            "type": "string"
+          },
+          "selling_note": {
+            "type": "string"
+          },
+          "status": {
+            "description": "Current status with the ministry.",
+            "type": "string"
+          },
+          "unknown": {
+            "description": "Items `unknown`.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "website_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "website_id",
+          "domain",
+          "kind",
+          "procedure",
+          "status",
+          "legal_basis",
+          "needs_legal_review",
+          "missing",
+          "unknown",
+          "selling_before_done",
+          "selling_note",
+          "items"
+        ],
+        "type": "object"
+      },
+      "ComplianceChecklistItem": {
+        "description": "One line of the checklist.",
+        "properties": {
+          "check": {
+            "description": "`profile_field`, `page`, `document`, `kyc`, `policy`, `fact` or `manual`.",
+            "type": "string"
+          },
+          "hint": {
+            "description": "What to do when it is not met.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "example": "page.return_policy",
+            "type": "string"
+          },
+          "legal_basis": {
+            "type": "string"
+          },
+          "needs_legal_review": {
+            "description": "Check against the original legal text before relying on it.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "`met`, `missing`, `unknown` (cannot be answered yet, e.g. no module answers this fact) or\n`manual` (a person checks it).",
+            "type": "string"
+          },
+          "title": {
+            "description": "`{\"en\": \"…\", \"vi\": \"…\"}`.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "check",
+          "status",
+          "legal_basis",
+          "needs_legal_review"
+        ],
+        "type": "object"
+      },
       "ComplianceConsent": {
         "description": "A consent, as it stands.",
         "properties": {
@@ -2730,6 +2900,70 @@
           "effective_from",
           "requires_reacceptance",
           "published_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceDossier": {
+        "description": "Draft dossier for the Ministry of Industry and Trade, filled from the tenant's data. A person\nsubmits it on online.gov.vn; have a legal professional review it first.",
+        "properties": {
+          "checklist": {
+            "$ref": "#/components/schemas/ComplianceChecklist"
+          },
+          "disclaimer": {
+            "type": "string"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceDossierDocument"
+            },
+            "type": "array"
+          },
+          "form": {
+            "description": "Fields of the declaration form (owner, website, identity verification, pages).",
+            "type": "object"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "website_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "website_id",
+          "generated_at",
+          "disclaimer",
+          "form",
+          "documents",
+          "checklist"
+        ],
+        "type": "object"
+      },
+      "ComplianceDossierDocument": {
+        "description": "A document of the dossier.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "format": {
+            "description": "Always `markdown`.",
+            "type": "string"
+          },
+          "key": {
+            "description": "`declaration`, `project_plan` or `platform_rules`.",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "format",
+          "body"
         ],
         "type": "object"
       },
@@ -2987,6 +3221,312 @@
         },
         "type": "object"
       },
+      "ComplianceLegalProfile": {
+        "description": "The legal owner of a website (a tenant, or a seller unit): the information Vietnamese law\nrequires a commerce website to show, and the declaration to the Ministry of Industry and Trade.",
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "description": "`individual`, `household_business` or `organization`.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kyc_profile_id": {
+            "description": "Identity verification (KYC) profile of the owner.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_name": {
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Organization unit it belongs to; the root unit (the tenant id) is the whole tenant.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_issued_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_issued_on": {
+            "description": "`YYYY-MM-DD`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_number": {
+            "description": "Business registration certificate number (an individual: identity document number).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "representative_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "representative_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_code": {
+            "description": "10 or 12 digits, or 10 digits, `-` and 3 digits.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trade_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "entity_type",
+          "legal_name",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceLegalProfileChange": {
+        "additionalProperties": false,
+        "description": "Changes to a legal profile: a field left out stays; `\"\"` clears a text, `null` clears\n`address` or `kyc_profile_id`.",
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AddressInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kyc_profile_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_issued_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_issued_on": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "representative_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "representative_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trade_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComplianceLegalProfileRequest": {
+        "additionalProperties": false,
+        "description": "A legal profile to create.",
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AddressInput",
+                "description": "Checked against the administrative units (module `address`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "description": "`individual`, `household_business` or `organization`.",
+            "example": "organization",
+            "type": "string"
+          },
+          "kyc_profile_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_name": {
+            "description": "Registered name, 1 to 200 characters.",
+            "example": "Cong ty TNHH Vi Du",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Organization unit (e.g. a seller); left out: the whole tenant. One profile per unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_issued_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_issued_on": {
+            "description": "`YYYY-MM-DD`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "representative_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "representative_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_code": {
+            "example": "0101234567",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trade_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "entity_type",
+          "legal_name"
+        ],
+        "type": "object"
+      },
       "ComplianceMyKyc": {
         "description": "Your verification profile, or none yet.",
         "properties": {
@@ -3136,6 +3676,81 @@
         ],
         "type": "object"
       },
+      "CompliancePublicOwner": {
+        "description": "The website owner's information for a footer (what the law requires a commerce website to show).",
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "description": "`individual`, `household_business` or `organization`.",
+            "type": "string"
+          },
+          "legal_name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_issued_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_issued_on": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "representative_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trade_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "entity_type",
+          "legal_name"
+        ],
+        "type": "object"
+      },
       "ComplianceRule": {
         "description": "A legal rule in force.",
         "properties": {
@@ -3259,6 +3874,256 @@
           "locale",
           "title",
           "body"
+        ],
+        "type": "object"
+      },
+      "ComplianceWebsite": {
+        "description": "A website (or mobile app) and its procedure with the Ministry of Industry and Trade.",
+        "properties": {
+          "channel": {
+            "description": "`website` or `mobile_app`.",
+            "type": "string"
+          },
+          "checklist_version": {
+            "description": "Checklist version when it was submitted.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decided_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "domain": {
+            "example": "shop.example",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`sales` (notify the ministry, blue logo) or `platform` (marketplace or other\nintermediary: register with the ministry, red logo).",
+            "type": "string"
+          },
+          "logo_image_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "logo_link_url": {
+            "description": "Logo link and image, once `notified` / `registered`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Organization unit of the website; the root unit (the tenant id) is the whole tenant.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "pages": {
+            "description": "Linked mandatory pages (only on `GET /websites/{id}`).",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceWebsitePage"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Number of the file at the ministry.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`not_submitted`, `submitted`, `needs_supplement`, `notified`, `registered`, `rejected` or\n`revoked`.",
+            "type": "string"
+          },
+          "submitted_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "domain",
+          "channel",
+          "kind",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceWebsiteChange": {
+        "additionalProperties": false,
+        "description": "Changes to a website; a field left out stays. Changing `kind` starts the procedure again.",
+        "properties": {
+          "channel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComplianceWebsitePage": {
+        "description": "A mandatory page linked to a website.",
+        "properties": {
+          "linked_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "page_kind": {
+            "description": "e.g. `return_policy`.",
+            "type": "string"
+          },
+          "resource": {
+            "description": "The linked object, e.g. `content.entry:<id>`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page_kind",
+          "resource",
+          "linked_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceWebsitePageRequest": {
+        "additionalProperties": false,
+        "description": "A page to link.",
+        "properties": {
+          "entry_id": {
+            "description": "A page (or post) of `content`; publish it so the checklist counts it.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id"
+        ],
+        "type": "object"
+      },
+      "ComplianceWebsiteRequest": {
+        "additionalProperties": false,
+        "description": "A website to add.",
+        "properties": {
+          "channel": {
+            "description": "`website` (default) or `mobile_app`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "domain": {
+            "description": "Domain name (international names in punycode).",
+            "example": "shop.example",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`sales` or `platform`.",
+            "example": "sales",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Organization unit (e.g. a seller's own site); left out: the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "domain",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "ComplianceWebsiteStatusRequest": {
+        "additionalProperties": false,
+        "description": "A status to record.",
+        "properties": {
+          "image_url": {
+            "description": "…and image.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "link_url": {
+            "description": "Instead of `snippet`: the logo's link…",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Number of the file at the ministry.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snippet": {
+            "description": "For `notified` / `registered`: the logo code the ministry gave, pasted unchanged. Only a\nlink to online.gov.vn around an image from online.gov.vn is accepted; it is rebuilt, never\nstored as sent.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`not_submitted`, `submitted`, `needs_supplement`, `notified` (sales website),\n`registered` (marketplace), `rejected` or `revoked`.",
+            "example": "submitted",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
         ],
         "type": "object"
       },
@@ -5658,6 +6523,150 @@
         ],
         "type": "object"
       },
+      "Data_ComplianceBadge": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The ministry's logo for a website footer.",
+            "properties": {
+              "alt": {
+                "type": "string"
+              },
+              "color": {
+                "description": "`blue` or `red`.",
+                "type": "string"
+              },
+              "domain": {
+                "type": "string"
+              },
+              "image_url": {
+                "type": "string"
+              },
+              "kind": {
+                "description": "`sales` or `platform`.",
+                "type": "string"
+              },
+              "link_url": {
+                "type": "string"
+              },
+              "snippet": {
+                "description": "Ready-to-insert HTML, rebuilt from the checked addresses.",
+                "type": "string"
+              },
+              "status": {
+                "description": "`notified` (blue logo) or `registered` (red logo).",
+                "type": "string"
+              },
+              "website_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "website_id",
+              "domain",
+              "kind",
+              "status",
+              "color",
+              "link_url",
+              "image_url",
+              "alt",
+              "snippet"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceChecklist": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What a website still lacks before it is notified to, or registered with, the Ministry of\nIndustry and Trade (data: the rule `moit.checklist.<kind>` in force).",
+            "properties": {
+              "domain": {
+                "type": "string"
+              },
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceChecklistItem"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "description": "`sales` or `platform`.",
+                "type": "string"
+              },
+              "legal_basis": {
+                "type": "string"
+              },
+              "missing": {
+                "description": "Items `missing`.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "needs_legal_review": {
+                "type": "boolean"
+              },
+              "procedure": {
+                "description": "`notification` (sales website, blue logo) or `registration` (marketplace or other\nintermediary, red logo).",
+                "type": "string"
+              },
+              "rule_version": {
+                "description": "Version of the rule `moit.checklist.<kind>` used; `null` when no rule is in force.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "selling_before_done": {
+                "description": "Selling before the procedure is done is shown as \"required by law\" (`label`), not blocked:\nsee `selling_note` (decision D-358; check with a legal professional).",
+                "example": "label",
+                "type": "string"
+              },
+              "selling_note": {
+                "type": "string"
+              },
+              "status": {
+                "description": "Current status with the ministry.",
+                "type": "string"
+              },
+              "unknown": {
+                "description": "Items `unknown`.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "website_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "website_id",
+              "domain",
+              "kind",
+              "procedure",
+              "status",
+              "legal_basis",
+              "needs_legal_review",
+              "missing",
+              "unknown",
+              "selling_before_done",
+              "selling_note",
+              "items"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceConsent": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -5845,6 +6854,53 @@
         ],
         "type": "object"
       },
+      "Data_ComplianceDossier": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Draft dossier for the Ministry of Industry and Trade, filled from the tenant's data. A person\nsubmits it on online.gov.vn; have a legal professional review it first.",
+            "properties": {
+              "checklist": {
+                "$ref": "#/components/schemas/ComplianceChecklist"
+              },
+              "disclaimer": {
+                "type": "string"
+              },
+              "documents": {
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceDossierDocument"
+                },
+                "type": "array"
+              },
+              "form": {
+                "description": "Fields of the declaration form (owner, website, identity verification, pages).",
+                "type": "object"
+              },
+              "generated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "website_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "website_id",
+              "generated_at",
+              "disclaimer",
+              "form",
+              "documents",
+              "checklist"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceKycProfile": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -6020,6 +7076,128 @@
         ],
         "type": "object"
       },
+      "Data_ComplianceLegalProfile": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The legal owner of a website (a tenant, or a seller unit): the information Vietnamese law\nrequires a commerce website to show, and the declaration to the Ministry of Industry and Trade.",
+            "properties": {
+              "address": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Address"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "entity_type": {
+                "description": "`individual`, `household_business` or `organization`.",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kyc_profile_id": {
+                "description": "Identity verification (KYC) profile of the owner.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "legal_name": {
+                "type": "string"
+              },
+              "org_id": {
+                "description": "Organization unit it belongs to; the root unit (the tenant id) is the whole tenant.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_issued_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_issued_on": {
+                "description": "`YYYY-MM-DD`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_number": {
+                "description": "Business registration certificate number (an individual: identity document number).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "representative_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "representative_title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tax_code": {
+                "description": "10 or 12 digits, or 10 digits, `-` and 3 digits.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "trade_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "entity_type",
+              "legal_name",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceMyKyc": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -6130,6 +7308,90 @@
         ],
         "type": "object"
       },
+      "Data_CompliancePublicOwner": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The website owner's information for a footer (what the law requires a commerce website to show).",
+            "properties": {
+              "address": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Address"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "entity_type": {
+                "description": "`individual`, `household_business` or `organization`.",
+                "type": "string"
+              },
+              "legal_name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_issued_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_issued_on": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_number": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "representative_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tax_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "trade_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "entity_type",
+              "legal_name"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceRulesImported": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -6144,6 +7406,148 @@
             },
             "required": [
               "imported"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceWebsite": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A website (or mobile app) and its procedure with the Ministry of Industry and Trade.",
+            "properties": {
+              "channel": {
+                "description": "`website` or `mobile_app`.",
+                "type": "string"
+              },
+              "checklist_version": {
+                "description": "Checklist version when it was submitted.",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "decided_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "domain": {
+                "example": "shop.example",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`sales` (notify the ministry, blue logo) or `platform` (marketplace or other\nintermediary: register with the ministry, red logo).",
+                "type": "string"
+              },
+              "logo_image_url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "logo_link_url": {
+                "description": "Logo link and image, once `notified` / `registered`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "org_id": {
+                "description": "Organization unit of the website; the root unit (the tenant id) is the whole tenant.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "pages": {
+                "description": "Linked mandatory pages (only on `GET /websites/{id}`).",
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceWebsitePage"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "reference": {
+                "description": "Number of the file at the ministry.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`not_submitted`, `submitted`, `needs_supplement`, `notified`, `registered`, `rejected` or\n`revoked`.",
+                "type": "string"
+              },
+              "submitted_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "domain",
+              "channel",
+              "kind",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceWebsitePage": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A mandatory page linked to a website.",
+            "properties": {
+              "linked_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "page_kind": {
+                "description": "e.g. `return_policy`.",
+                "type": "string"
+              },
+              "resource": {
+                "description": "The linked object, e.g. `content.entry:<id>`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "page_kind",
+              "resource",
+              "linked_at"
             ],
             "type": "object"
           }
@@ -14749,6 +16153,16 @@
             ],
             "type": "object"
           }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Value": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {}
         },
         "required": [
           "data"
@@ -26947,6 +28361,254 @@
                 "party_type",
                 "status",
                 "document_file_ids",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_ComplianceLegalProfile": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "The legal owner of a website (a tenant, or a seller unit): the information Vietnamese law\nrequires a commerce website to show, and the declaration to the Ministry of Industry and Trade.",
+              "properties": {
+                "address": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Address"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "entity_type": {
+                  "description": "`individual`, `household_business` or `organization`.",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kyc_profile_id": {
+                  "description": "Identity verification (KYC) profile of the owner.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "legal_name": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "Organization unit it belongs to; the root unit (the tenant id) is the whole tenant.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "phone": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "registration_issued_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "registration_issued_on": {
+                  "description": "`YYYY-MM-DD`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "registration_number": {
+                  "description": "Business registration certificate number (an individual: identity document number).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "representative_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "representative_title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tax_code": {
+                  "description": "10 or 12 digits, or 10 digits, `-` and 3 digits.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "trade_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "entity_type",
+                "legal_name",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_ComplianceWebsite": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A website (or mobile app) and its procedure with the Ministry of Industry and Trade.",
+              "properties": {
+                "channel": {
+                  "description": "`website` or `mobile_app`.",
+                  "type": "string"
+                },
+                "checklist_version": {
+                  "description": "Checklist version when it was submitted.",
+                  "format": "int32",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "decided_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "domain": {
+                  "example": "shop.example",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`sales` (notify the ministry, blue logo) or `platform` (marketplace or other\nintermediary: register with the ministry, red logo).",
+                  "type": "string"
+                },
+                "logo_image_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "logo_link_url": {
+                  "description": "Logo link and image, once `notified` / `registered`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "org_id": {
+                  "description": "Organization unit of the website; the root unit (the tenant id) is the whole tenant.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "pages": {
+                  "description": "Linked mandatory pages (only on `GET /websites/{id}`).",
+                  "items": {
+                    "$ref": "#/components/schemas/ComplianceWebsitePage"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "reference": {
+                  "description": "Number of the file at the ministry.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`not_submitted`, `submitted`, `needs_supplement`, `notified`, `registered`, `rejected` or\n`revoked`.",
+                  "type": "string"
+                },
+                "submitted_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "domain",
+                "channel",
+                "kind",
+                "status",
                 "created_at",
                 "updated_at"
               ],
@@ -55941,6 +57603,610 @@
         ]
       }
     },
+    "/api/v1/compliance/legal-profiles": {
+      "get": {
+        "description": "Requires `compliance.legal.read` (limited to the units in your scope).",
+        "operationId": "compliance_list_compliance_legal_profiles",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ComplianceLegalProfile"
+                }
+              }
+            },
+            "description": "One page of legal profiles."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the legal profiles you can see.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `compliance.legal.manage` on that unit. Every problem of the body is reported at once.",
+        "operationId": "compliance_create_compliance_legal_profile",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceLegalProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceLegalProfile"
+                }
+              }
+            },
+            "description": "The profile.",
+            "headers": {
+              "Location": {
+                "description": "Path of the profile.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.manage` (code `permission_denied`), or the unit is outside your scope (`org_out_of_scope`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such organization unit; code `site_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit already has a profile; code `compliance.profile_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create the legal profile of the tenant or of a unit.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/legal-profiles/{id}": {
+      "get": {
+        "description": "Requires `compliance.legal.read` on its unit. Sends an `ETag` to use in `If-Match`.",
+        "operationId": "compliance_get_compliance_legal_profile",
+        "parameters": [
+          {
+            "description": "Id of the profile.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceLegalProfile"
+                }
+              }
+            },
+            "description": "The profile.",
+            "headers": {
+              "ETag": {
+                "description": "Version, for `If-Match`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such profile in your scope; code `compliance.profile_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a legal profile.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `compliance.legal.manage` on its unit. Send `If-Match` with the `ETag` you read to\navoid overwriting someone else's change.",
+        "operationId": "compliance_update_compliance_legal_profile",
+        "parameters": [
+          {
+            "description": "Id of the profile.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`ETag` of the version you read.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceLegalProfileChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceLegalProfile"
+                }
+              }
+            },
+            "description": "The profile after the change.",
+            "headers": {
+              "ETag": {
+                "description": "New version.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such profile in your scope; code `compliance.profile_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Changed since you read it; code `precondition_failed`. Read it again."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a legal profile.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/legal-profiles/{id}/template-variables": {
+      "get": {
+        "description": "Requires `compliance.legal.read`. The values (`owner.*`, `contact.*`) fill the mandatory page\ntemplates of `content` (`POST /api/v1/content/templates/{key}/drafts`).",
+        "operationId": "compliance_get_compliance_legal_profile_variables",
+        "parameters": [
+          {
+            "description": "Id of the profile.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Value"
+                }
+              }
+            },
+            "description": "The variables."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such profile in your scope; code `compliance.profile_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the template variables of a legal profile.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.read"
+        ]
+      }
+    },
     "/api/v1/compliance/me/acceptances": {
       "post": {
         "description": "Any signed-in user. Accepting again changes nothing.",
@@ -57338,6 +59604,99 @@
         ]
       }
     },
+    "/api/v1/compliance/public/badge": {
+      "get": {
+        "description": "No sign-in (the tenant and website come from the domain, `?domain=` or `?site=`). Only a\nwebsite `notified` / `registered` has a logo; otherwise 404.",
+        "operationId": "compliance_get_public_compliance_badge",
+        "parameters": [
+          {
+            "description": "Domain of the website, when the interface does not call on that domain.",
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the logo text: `vi` (default) or `en`.",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceBadge"
+                }
+              }
+            },
+            "description": "The logo.",
+            "headers": {
+              "ETag": {
+                "description": "Version; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The website has no logo (yet); code `compliance.website_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Get the Ministry of Industry and Trade logo of a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/compliance/public/documents/{kind}": {
       "get": {
         "description": "No sign-in (the tenant comes from the domain). Shows the version in force, with its SHA-256.",
@@ -57407,6 +59766,81 @@
           }
         },
         "summary": "Get the current text of a legal document.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/compliance/public/owner": {
+      "get": {
+        "description": "No sign-in (the tenant and website come from the domain or `?site=`): the legal profile of the\nwebsite's unit, or of the nearest unit above with one.",
+        "operationId": "compliance_get_public_compliance_owner",
+        "parameters": [
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CompliancePublicOwner"
+                }
+              }
+            },
+            "description": "The owner.",
+            "headers": {
+              "ETag": {
+                "description": "Version; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No legal profile yet; code `compliance.profile_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Get the owner of the website being viewed.",
         "tags": [
           "compliance"
         ],
@@ -57589,6 +60023,1114 @@
         ],
         "x-permissions": [
           "compliance.rules.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/websites": {
+      "get": {
+        "description": "Requires `compliance.legal.read` (limited to the units in your scope).",
+        "operationId": "compliance_list_compliance_websites",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ComplianceWebsite"
+                }
+              }
+            },
+            "description": "One page of websites."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the websites you can see.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `compliance.legal.manage` on its unit. A sales website must be notified to the\nministry; a marketplace or other intermediary must be registered (check with a legal\nprofessional which applies).",
+        "operationId": "compliance_create_compliance_website",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceWebsiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceWebsite"
+                }
+              }
+            },
+            "description": "The website.",
+            "headers": {
+              "Location": {
+                "description": "Path of the website.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.manage` (code `permission_denied`), or the unit is outside your scope (`org_out_of_scope`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such organization unit; code `site_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The domain already has a website record; code `compliance.domain_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a website for the Ministry of Industry and Trade procedure.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/websites/{id}": {
+      "get": {
+        "description": "Requires `compliance.legal.read` on its unit. Sends an `ETag` to use in `If-Match`.",
+        "operationId": "compliance_get_compliance_website",
+        "parameters": [
+          {
+            "description": "Id of the website.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceWebsite"
+                }
+              }
+            },
+            "description": "The website.",
+            "headers": {
+              "ETag": {
+                "description": "Version, for `If-Match`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such website in your scope; code `compliance.website_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a website with its linked pages.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `compliance.legal.manage` on its unit. Send `If-Match` with the `ETag` you read.",
+        "operationId": "compliance_update_compliance_website",
+        "parameters": [
+          {
+            "description": "Id of the website.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`ETag` of the version you read.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceWebsiteChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceWebsite"
+                }
+              }
+            },
+            "description": "The website after the change.",
+            "headers": {
+              "ETag": {
+                "description": "New version.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such website in your scope; code `compliance.website_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The new domain already has a website record; code `compliance.domain_taken`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Changed since you read it; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/websites/{id}/checklist": {
+      "get": {
+        "description": "Requires `compliance.legal.read`. The checklist is data (rule `moit.checklist.<kind>` in\nforce); each item says `met`, `missing`, `unknown` or `manual`, with what to do.",
+        "operationId": "compliance_get_compliance_website_checklist",
+        "parameters": [
+          {
+            "description": "Id of the website.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceChecklist"
+                }
+              }
+            },
+            "description": "The checklist."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such website in your scope; code `compliance.website_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get what a website still lacks for the Ministry of Industry and Trade.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.read"
+        ]
+      }
+    },
+    "/api/v1/compliance/websites/{id}/dossier": {
+      "get": {
+        "description": "Requires `compliance.legal.read`. Filled from the real data: declaration fields, and for a\nmarketplace a draft service project plan and operating regulations (Markdown). A person submits\nit on online.gov.vn; have a legal professional review it first.",
+        "operationId": "compliance_get_compliance_website_dossier",
+        "parameters": [
+          {
+            "description": "Id of the website.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceDossier"
+                }
+              }
+            },
+            "description": "The dossier."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such website in your scope; code `compliance.website_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export the draft dossier of a website for the Ministry of Industry and Trade.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.read"
+        ]
+      }
+    },
+    "/api/v1/compliance/websites/{id}/pages/{page_kind}": {
+      "delete": {
+        "description": "Requires `compliance.legal.manage`. Unlinking a page not linked changes nothing.",
+        "operationId": "compliance_unlink_compliance_website_page",
+        "parameters": [
+          {
+            "description": "Id of the website.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Kind of mandatory page.",
+            "in": "path",
+            "name": "page_kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unlinked."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such website in your scope; code `compliance.website_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unlink a mandatory page from a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `compliance.legal.manage`. `page_kind`: `owner_info`, `privacy_policy`,\n`return_policy`, `shipping_policy`, `payment_policy`, `inspection_policy`, `complaint_policy`,\n`terms_of_use`, `general_conditions`, `platform_rules` or `seller_agreement`. Replaces the page\nlinked before.",
+        "operationId": "compliance_link_compliance_website_page",
+        "parameters": [
+          {
+            "description": "Id of the website.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Kind of mandatory page, e.g. `return_policy`.",
+            "in": "path",
+            "name": "page_kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceWebsitePageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceWebsitePage"
+                }
+              }
+            },
+            "description": "The link."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such website in your scope; code `compliance.website_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown `page_kind`, or `entry_id` is not a page of this tenant; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Link a mandatory page to a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/websites/{id}/status": {
+      "post": {
+        "description": "Requires `compliance.legal.manage`. A person submits on online.gov.vn (no public API), then\nrecords here what happened. `notified` / `registered` need the logo; another status removes it.",
+        "operationId": "compliance_set_compliance_website_status",
+        "parameters": [
+          {
+            "description": "Id of the website.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`ETag` of the version you read.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceWebsiteStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceWebsite"
+                }
+              }
+            },
+            "description": "The website after the change.",
+            "headers": {
+              "ETag": {
+                "description": "New version.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.legal.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such website in your scope; code `compliance.website_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Changed since you read it; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The logo code is not the ministry's (`compliance.logo_snippet_invalid`), or a value is invalid (every problem in `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record the status of a website with the Ministry of Industry and Trade.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.legal.manage"
         ]
       }
     },
