@@ -272,7 +272,7 @@ tính năng (`m0001_carts`, `m0002_checkout_orders`, …), mỗi cái có `down`
 | `orders_lines` | `id`, `tenant_id`, `order_id`, `parent_line_id` NULL (thành phần combo), `variant_id`, `product_id`, `category_id`, `seller_org_id`, `kind`, `snapshot` text (SKU, tên, thuộc tính, ảnh, `warranty_months`), `sale_mode` và `preorder_available_on` NULL (chụp lúc đặt, D-204), `advance_*` NULL (phần trả trước của dòng) và `preorder_commit_at` NULL (mốc chốt sản xuất / nhập hàng chụp lúc đặt) (D-232), `quantity`, `unit_price_*` (gồm thuế, trước giảm), `list_price_before_promo_*`, `discount_*`, `net_*` (gồm thuế, sau giảm), `tax_*`, `discounts` text (JSON dòng giảm kèm lý do, `funding` — ai trả, bao nhiêu — và nguồn `automatic` / `code` / `voucher` + id, D-222), `warehouse_org_id` NULL, `returned_quantity` INT default 0 | index (`tenant_id`, `order_id`), (`tenant_id`, `variant_id`, `order_id`), (`tenant_id`, `product_id`) |
 | `orders_line_taxes` | `tenant_id`, `line_id`, `tax_code`, `rate` VARCHAR(20) (chuỗi thập phân như `TaxEngine` trả, vd `"0.08"`), `base_*`, `amount_*` | pk (`tenant_id`, `line_id`, `tax_code`) |
 | `orders_status_history` | `id`, `tenant_id`, `order_id`, `from_status` NULL, `to_status`, `cause` (`buyer/staff/system/payment/shipping/channel`), `actor_id` NULL, `reason` NULL, `at` | index (`tenant_id`, `order_id`, `id`) — chỉ thêm |
-| `orders_payments` | `id`, `tenant_id`, `order_id`, `purpose` (`order` mặc định / `advance` / `balance` — trả trước, phần còn lại, D-232), `method` (`gateway/installment/vietqr/cod/cash/card_terminal/bank_transfer/channel/tender:<kind>`), `gateway` NULL, `external_id` NULL, `reference` (ref gửi đối tác), `amount_*`, `status` (`pending/succeeded/failed/expired/refunded_partial/refunded`), `action` text NULL (URL / payload QR), `installment` text NULL (đối tác, kỳ hạn), `succeeded_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `reference`); unique (`tenant_id`, `gateway`, `external_id`); index (`tenant_id`, `order_id`) |
+| `orders_payments` | `id`, `tenant_id`, `order_id`, `purpose` (`order` mặc định / `advance` / `balance` — trả trước, phần còn lại, D-232), `method` (`gateway/installment/vietqr/cod/cash/card_terminal/bank_transfer/channel/tender:<kind>`), `gateway` NULL, `external_id` NULL, `reference` (ref gửi đối tác), `amount_*`, `tendered_minor` NULL (tiền mặt khách đưa ở quầy, D-340), `status` (`pending/succeeded/failed/expired/refunded_partial/refunded`), `action` text NULL (URL / payload QR), `installment` text NULL (đối tác, kỳ hạn), `succeeded_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `reference`); unique (`tenant_id`, `gateway`, `external_id`); index (`tenant_id`, `order_id`) |
 | `orders_refunds` | `id`, `tenant_id`, `order_id`, `return_id` NULL, `payment_id`, `reference`, `reference_fingerprint`, `amount_*`, `status` (`pending/succeeded/failed/manual`), `external_id` NULL, `reason`, `created_by`, `created_at`, `updated_at` | unique (`tenant_id`, `reference`); index (`tenant_id`, `order_id`) |
 | `orders_advance_plans` | `tenant_id`, `order_id`, `advance_*` (tổng phải trả trước của các dòng đặt trước), `upfront_*` (phải trả lúc đặt = hàng sẵn + trả trước), `balance_*` (= tổng đơn − `upfront`), `balance_method` (`payment_link/cod`), `terms` text (JSON chụp điều kiện đã công bố lúc đặt: tỉ lệ / số tiền, trần, sàn, mốc chốt từng dòng, tỉ lệ và trần giữ lại khi người mua huỷ, hạn trả phần còn lại, việc làm khi quá hạn), `terms_sha256`, `status` (`awaiting_advance/advance_paid/balance_requested/balance_paid/balance_cod/balance_overdue/cancelled`), `balance_attempt` INT default 0, `balance_requested_at` NULL, `balance_due_at` NULL, `created_at`, `updated_at` (D-232) | pk (`tenant_id`, `order_id`); index (`tenant_id`, `status`, `balance_due_at`) |
 | `orders_completion_holds` | `tenant_id`, `order_id`, `reference`, `created_at` | pk (`tenant_id`, `order_id`, `reference`) |
@@ -523,6 +523,26 @@ diện và mẫu thông báo đều dùng `advance` / "trả trước", không d
   `Orders::delivered_lines(tenant, author.user_id(), variant_id)`; có ít nhất một dòng đã giao thì trả
   `verified_buyer`. Chỉ đọc bảng của `orders`.
 
+### POS: giỏ ở quầy (W-053 của giao diện, D-340)
+
+Màn bán tại quầy (quét mã vạch, giỏ có khách, mã giảm giá, tiền khách đưa và tiền thối) cần, ngoài
+`POST /pos/sales` cơ bản:
+
+- **Mã giảm giá** (`codes`): xét như lúc đặt hàng qua `Promotions::evaluate` (bước 43); mã không áp được
+  thì bỏ qua và trả trong `rejected_codes[{code, reason_code}]` (lý do theo `promotions.skip.*`), không chặn
+  cả đơn. `POST /pos/quote` tạm tính cùng logic, không ghi gì — quầy không cần `promotions.read`.
+- **Khách** (`customer_id`, tuỳ chọn; trống = khách lẻ): hồ sơ của `customers` (bước 47); giá và khuyến mại
+  theo nhóm của khách, tích điểm khi đơn `completed`, tên khách trên hoá đơn. `GET /pos/customers?q=` gọi
+  `customers::api` tìm theo SĐT / tên, trả `id`, tên, SĐT đã che, hạng, điểm — chỉ cần `orders.pos.sell`,
+  không cần `customers.read` (không trả email, địa chỉ, lịch sử).
+- **Tiền mặt**: dòng `payments` `method = cash` nhận `tendered` (số tiền khách đưa, ≥ `amount`); câu trả lời
+  có `change = tendered − amount` để in trên hoá đơn. Sổ cái chỉ ghi `amount`.
+- **Danh mục quầy** (`GET /pos/catalog`): giá của cửa hàng, tồn bán được (bước 42), `barcode` của biến thể
+  (bước 41) và nhóm hàng đầu tiên `category {id, name}`; tra một mã vạch bằng `?barcode=`.
+
+Không thêm trạng thái hay bảng: `codes`, `customer_id` đi theo đơn như kênh web; `tendered` / `change` lưu
+trong `orders_payments` (cột `tendered_minor` NULL).
+
 ### POS: đóng ca có chênh lệch (D-227)
 
 `close` tính `variance = counted − expected`; khác 0 thì bắt buộc `variance_reason` (danh sách
@@ -577,7 +597,10 @@ ghi theo luật 5 (`ValidJson`, service gom lỗi).
 | `POST /{id}/invoice` | `orders.manage` / `orders.buy` (của mình) | xin xuất hoá đơn (MST) khi `invoice_timing = on_request` |
 | `GET /returns` · `GET /returns/{id}` · `POST /returns/{id}/transitions` | `orders.returns.manage` | duyệt / từ chối (lý do thuộc `orders.return_rejected`) / nhận hàng (tình trạng từng dòng) / hoàn tiền / đóng |
 | `POST /pos/shifts` · `POST /pos/shifts/{id}/close` | `orders.pos.shift` | mở ca (tiền đầu ca), đóng ca (tiền đếm được, chênh lệch; lý do và ghi chú khi chênh lệch ≠ 0 — D-227) |
-| `POST /pos/sales` | `orders.pos.sell` (phạm vi `Unit` của cửa hàng) | `{shift_id, reference, lines, buyer?, payments[{method: cash/card_terminal/vietqr, amount, approval_code?}]}` → đơn `delivered` (hoàn tất bằng job như mọi đơn); trùng `reference` → 200 kết quả cũ |
+| `POST /pos/sales` | `orders.pos.sell` (phạm vi `Unit` của cửa hàng) | `{shift_id, reference, lines, customer_id?, codes?, payments[{method: cash/card_terminal/vietqr, amount, tendered?, approval_code?}]}` → đơn `delivered` (hoàn tất bằng job như mọi đơn); trùng `reference` → 200 kết quả cũ; trả kèm `rejected_codes`, `change` (mục "POS: giỏ ở quầy") |
+| `POST /pos/quote` | `orders.pos.sell` | tạm tính giỏ ở quầy: cùng thân với `POST /pos/sales` (không `payments`), không ghi gì; trả giá, giảm giá, `rejected_codes`, tổng |
+| `GET /pos/catalog` | `orders.pos.sell` | danh mục bán tại quầy của cửa hàng: giá của cửa hàng, tồn bán được, `barcode`, `category {id, name}`; lọc `q`, `barcode`, `category_id` |
+| `GET /pos/customers?q=` | `orders.pos.sell` | tìm khách theo SĐT / tên cho quầy (mục "POS: giỏ ở quầy") |
 | `POST /me/orders/{id}/lines/{line_id}/review` · `PUT …/review` | `orders.buy` | chỉ dòng đã giao; sửa trong `review_edit_days` |
 | `GET /public/products/{product_id}/reviews` · `GET …/reviews/media` | công khai | `Page` + thống kê sao; lọc `has_media`, `rating`, `sort=newest\|helpful`; `helpful_count`, `voted_by_me` khi đăng nhập; tóm tắt `approved` kèm nhãn AI; bộ sưu tập ảnh của người mua; ETag / cache như `content` |
 | `PUT /public/reviews/{id}/helpful` · `DELETE /public/reviews/{id}/helpful` | `orders.buy` | bỏ / rút phiếu "hữu ích"; trả `{helpful_count, voted_by_me}` (D-203) |

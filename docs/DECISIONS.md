@@ -8206,3 +8206,12 @@ gốc, không ở khách đang vào: `GET /auth/me` tìm tài khoản ở khách
 `home_tenant_id` (chỉ thêm trường, không phá vỡ). `GET /me/memberships` ở khách đang vào trả rỗng: quyền ở đó đến từ lần
 uỷ quyền / cấp hỗ trợ, không từ membership.
 
+## D-340 · Giỏ ở quầy bán (yêu cầu W-053 của giao diện) vào đặc tả bước 45 — 2026-11-17 — agent quyết
+
+Năm yêu cầu của PR #78 (mã giảm giá, khách, tiền khách đưa / tiền thối, tạm tính và tìm khách bằng quyền bán tại quầy,
+danh mục quầy có mã vạch và nhóm hàng) đều cần `orders` (bước 45) — chưa làm code, ghi vào đặc tả 45 mục "POS: giỏ ở
+quầy". Quyết định thiết kế: quầy chỉ cần `orders.pos.sell` — `POST /pos/quote` và `GET /pos/customers` là endpoint của
+`orders` gọi `promotions::api` / `customers::api`, không mở `POST /promotions/evaluate` hay danh sách khách cho người bán
+tại quầy (tìm khách chỉ trả tên, SĐT đã che, hạng, điểm — tối thiểu dữ liệu cá nhân, Luật 91/2025); mã không áp được thì
+bỏ qua kèm lý do, không chặn đơn; `tendered` lưu ở `orders_payments.tendered_minor`, sổ cái chỉ ghi `amount`.
+
