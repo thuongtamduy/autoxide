@@ -4961,6 +4961,20 @@ export type Data_SeoSuggestion = {
 };
 
 /** Envelope of a single result. */
+export type Data_SetupView = {
+  /** The setup checklist. */
+  data: {
+    /** Blocking steps not done yet. */
+    blocking_left: number;
+    done: number;
+    /** Steps that did not answer in time or failed (counted as not done). */
+    incomplete: string[];
+    steps: SetupStepView[];
+    total: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SignupAccepted = {
   /** The answer to a sign-up: always the same. */
   data: {
@@ -6742,6 +6756,18 @@ export type Data_WorkCounts = {
       [key: string]: number;
     };
     incomplete: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_WorkStateView = {
+  /** The state of a piece of work for you. */
+  data: {
+    /** Who it is assigned to. */
+    assignee_id?: string | null;
+    key: string;
+    /** Hidden from your inbox until then. */
+    snoozed_until?: string | null;
   };
 };
 
@@ -13112,6 +13138,30 @@ export type SettingValueRequest = {
   value: unknown;
 };
 
+/** One setup step. */
+export type SetupStepView = {
+  /** Selling cannot start before it is done. */
+  blocking: boolean;
+  /** Computed from the tenant's data. */
+  done: boolean;
+  id: string;
+  /** What to do, in the language of `Accept-Language`. */
+  label: string;
+  /** Screen id of the navigation where it is done. */
+  screen: string;
+};
+
+/** The setup checklist. */
+export type SetupView = {
+  /** Blocking steps not done yet. */
+  blocking_left: number;
+  done: number;
+  /** Steps that did not answer in time or failed (counted as not done). */
+  incomplete: string[];
+  steps: SetupStepView[];
+  total: number;
+};
+
 /** How urgent a piece of work is. */
 export type Severity = "blocking" | "attention" | "info";
 
@@ -14624,6 +14674,12 @@ export type WithholdingQuote = {
   total: Money;
 };
 
+/** Who should do the work. */
+export type WorkAssignRequest = {
+  /** A user who may see the work's source; `null` removes the assignment. */
+  user_id?: string | null;
+};
+
 /** Counts for the menu. */
 export type WorkCounts = {
   /** Pending work by source (the `counter` of navigation items); `work` is the total. */
@@ -14635,15 +14691,34 @@ export type WorkCounts = {
 
 /** One piece of work. */
 export type WorkItemView = {
+  /** Who it is assigned to (`POST /api/v1/me/work/{key}/assign`). */
+  assignee_id?: string | null;
   due_at?: string | null;
   /** Stable key, `<source>:<record id>`. */
   key: string;
   severity: Severity;
+  /** Hidden from your inbox until then (only with `include_snoozed=true`). */
+  snoozed_until?: string | null;
   source: string;
   /** Where to do it: the screen of `GET /api/v1/kernel/navigation` and the record. */
   target: WorkTarget;
   /** What to do, in the language of `Accept-Language`. */
   title: string;
+};
+
+/** When to show the work again. */
+export type WorkSnoozeRequest = {
+  /** A time in the future, at most a year away. */
+  until: string;
+};
+
+/** The state of a piece of work for you. */
+export type WorkStateView = {
+  /** Who it is assigned to. */
+  assignee_id?: string | null;
+  key: string;
+  /** Hidden from your inbox until then. */
+  snoozed_until?: string | null;
 };
 
 /** Where a piece of work is done. */
@@ -18795,6 +18870,17 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/setup": {
+    /** Get the setup checklist. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_SetupView;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/summary": {
     /** Get the summary figures. */
     get: {
@@ -19039,7 +19125,7 @@ export interface paths {
   "/api/v1/kernel/work": {
     /** List the work waiting for you. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; assigned?: string; include_snoozed?: boolean }; };
       responses: {
         200: Data_WorkView;
         401: Problem;
@@ -19051,7 +19137,7 @@ export interface paths {
   "/api/v1/kernel/work/counts": {
     /** Count the work waiting for you, by source. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; assigned?: string; include_snoozed?: boolean }; };
       responses: {
         200: Data_WorkCounts;
         401: Problem;
@@ -19714,6 +19800,44 @@ export interface paths {
         204: void;
         401: Problem;
         403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/work/{key}/assign": {
+    /** Assign a piece of work. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: WorkAssignRequest;
+      responses: {
+        200: Data_WorkStateView;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/work/{key}/snooze": {
+    /** Snooze a piece of work. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: WorkSnoozeRequest;
+      responses: {
+        200: Data_WorkStateView;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Stop snoozing a piece of work. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      responses: {
+        204: void;
+        401: Problem;
         404: Problem;
         default: Problem;
       };
