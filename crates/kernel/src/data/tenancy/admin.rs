@@ -69,17 +69,22 @@ pub trait TenantSeed: Send + Sync {
 /// Bộ gieo của một module, kèm tên module (để báo lỗi rõ module nào hỏng).
 pub(crate) type NamedSeed = (&'static str, Arc<dyn TenantSeed>);
 
-/// Bộ gieo của mọi module, theo thứ tự đăng ký; điền sau khi mọi module đã khởi động. Clone rẻ.
+/// Bộ gieo của mọi module (dữ liệu ban đầu, và dữ liệu mẫu khi cấp phát — `Module::sample_data`),
+/// theo thứ tự đăng ký; điền sau khi mọi module đã khởi động. Clone rẻ.
 #[derive(Clone, Default)]
-pub(crate) struct Seeds(Arc<OnceLock<Vec<NamedSeed>>>);
+pub(crate) struct Seeds(Arc<OnceLock<(Vec<NamedSeed>, Vec<NamedSeed>)>>);
 
 impl Seeds {
-    pub(crate) fn fill(&self, seeds: Vec<NamedSeed>) {
-        let _ = self.0.set(seeds);
+    pub(crate) fn fill(&self, seeds: Vec<NamedSeed>, samples: Vec<NamedSeed>) {
+        let _ = self.0.set((seeds, samples));
     }
 
     fn all(&self) -> &[NamedSeed] {
-        self.0.get().map_or(&[], Vec::as_slice)
+        self.0.get().map_or(&[], |(seeds, _)| seeds.as_slice())
+    }
+
+    fn samples(&self) -> &[NamedSeed] {
+        self.0.get().map_or(&[], |(_, samples)| samples.as_slice())
     }
 }
 
@@ -150,7 +155,8 @@ pub struct Tenant {
     pub slug: String,
     pub name: String,
     /// `provisioning`, `active`, `suspended` (every request is refused with
-    /// `403 tenant_suspended`), `maintenance` or `moving`.
+    /// `403 tenant_suspended`), `maintenance`, `moving` or `deleted` (its data was deleted; every
+    /// request answers `404 tenant_not_found`).
     #[schema(example = "active")]
     pub status: String,
     /// Read-only: its data can be read (and its users can sign in and export), but every change
@@ -666,6 +672,33 @@ impl TenantAdmin {
         })?;
         tracing::info!(tenant_id = %id, slug = %slug, "tenant created; provisioning");
         self.provision_id(actor, id).await
+    }
+
+    /// Module có dữ liệu mẫu cho khách mới (`Module::sample_data`), theo thứ tự đăng ký.
+    pub fn sample_modules(&self) -> Vec<&'static str> {
+        self.seeds.samples().iter().map(|(module, _)| *module).collect()
+    }
+
+    /// Gieo dữ liệu mẫu của các module `modules` (module không có dữ liệu mẫu bị bỏ qua) cho khách
+    /// `tenant` — cấp phát khách mới theo gói (bước 35). Chạy lại được. Trả các module đã gieo.
+    pub async fn seed_samples(
+        &self,
+        tenant: TenantId,
+        modules: &[&str],
+    ) -> Result<Vec<&'static str>, Error> {
+        let context = self.registry.tenant(tenant).await?;
+        let mut seeded = Vec::new();
+        for (module, seed) in self.seeds.samples() {
+            if !modules.contains(module) {
+                continue;
+            }
+            seed.seed(&context).await.map_err(|error| {
+                tracing::error!(module, tenant_id = %tenant, error = %error, "sample data failed");
+                error
+            })?;
+            seeded.push(*module);
+        }
+        Ok(seeded)
     }
 
     /// Cấp phát lại khách `id_or_slug` đang `provisioning` (chạy lại được).

@@ -18,7 +18,10 @@ use crate::http::{
     EntitlementsResponse, LimitUse, OverrideResponse, PlanRequest, PlanResponse,
     SubscriptionResponse, describe_entitlements, limit_uses, operator,
 };
-use crate::permissions::{PLANS_MANAGE, PLANS_READ, SUBSCRIPTIONS_MANAGE, SUBSCRIPTIONS_READ};
+use crate::permissions::{
+    PLANS_MANAGE, PLANS_READ, PROVISION, SUBSCRIPTIONS_MANAGE, SUBSCRIPTIONS_READ,
+};
+use crate::provisioning::ProvisioningResponse;
 use crate::service::{PlansService, subscription_not_found};
 
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -283,6 +286,7 @@ fn plan_tools(service: &Arc<PlansService>) -> Vec<Tool> {
 fn tenant_tools(service: &Arc<PlansService>) -> Vec<Tool> {
     let (entitlements, get, assign, set, usage) =
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
+    let (provision, provisioning) = (service.clone(), service.clone());
     vec![
         Tool::new(
             "get_entitlements",
@@ -377,5 +381,83 @@ fn tenant_tools(service: &Arc<PlansService>) -> Vec<Tool> {
         )
         .requires(SUBSCRIPTIONS_READ)
         .read_only(),
+        Tool::new(
+            "provision_tenant",
+            "Platform staff: create a tenant on a plan — the tenant, its subscription, sample data \
+             when asked, and an email invitation of its administrator with the role `admin`. Runs \
+             in the background; follow it with `get_provisioning`.",
+            move |_: TenantContext, principal: Principal, input: ProvisionInput| {
+                let service = provision.clone();
+                async move {
+                    operator(&principal, &PROVISION)?;
+                    let mut request = crate::api::ProvisionRequest::new(
+                        input.slug,
+                        input.name,
+                        input.plan_id,
+                        input.admin_email,
+                    );
+                    request.price_id = input.price_id;
+                    request.parent_id = input.parent_id;
+                    request.placement = input.placement;
+                    request.admin_name = input.admin_name;
+                    request.sample_data = input.sample_data;
+                    request.trial = input.trial.unwrap_or(true);
+                    let row =
+                        service.start_provisioning(Actor::from(&principal), request, true).await?;
+                    Ok::<_, Error>(ProvisioningResponse::from(row))
+                }
+            },
+        )
+        .requires(PROVISION),
+        Tool::new(
+            "get_provisioning",
+            "Platform staff: how far a tenant provisioning went — its steps, and the error when it \
+             failed.",
+            move |_: TenantContext, principal: Principal, input: ProvisioningId| {
+                let service = provisioning.clone();
+                async move {
+                    operator(&principal, &SUBSCRIPTIONS_READ)?;
+                    Ok::<_, Error>(ProvisioningResponse::from(
+                        service.provisioning(input.id).await?,
+                    ))
+                }
+            },
+        )
+        .requires(SUBSCRIPTIONS_READ)
+        .read_only(),
     ]
+}
+
+// Trường phẳng (client MCP không đọc `$ref`), như `ProvisioningRequest` của REST.
+/// A tenant to create on a plan.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProvisionInput {
+    /// Short name of the new tenant: 1 to 63 lower-case letters, digits and `-`.
+    slug: String,
+    /// Name of the new tenant, 1 to 200 characters.
+    name: String,
+    /// An active base plan.
+    plan_id: Uuid,
+    /// An active recurring price of that plan.
+    price_id: Option<Uuid>,
+    /// Parent tenant, for chains.
+    parent_id: Option<Uuid>,
+    /// Name of the placement for its data; required for a `dedicated` plan.
+    placement: Option<String>,
+    /// Who administers the new tenant (invited by email with the role `admin`).
+    admin_email: String,
+    /// Their name.
+    admin_name: Option<String>,
+    /// Add sample data of the modules the plan turns on; default: the plan's setting.
+    sample_data: Option<bool>,
+    /// Start with the plan's free trial; default `true`.
+    trial: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProvisioningId {
+    /// Id of the provisioning.
+    id: Uuid,
 }

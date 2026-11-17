@@ -96,6 +96,12 @@ impl NewInvitation {
         self.org_id = Some(org_id);
         self
     }
+
+    /// Tên hiển thị gợi ý cho người được mời.
+    pub fn named(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
 }
 
 /// Lời mời vừa tạo; mail đi trong ít phút (job).
@@ -105,6 +111,12 @@ pub struct InvitationSummary {
     pub id: Uuid,
     pub email: String,
     pub expires_at: DateTime<Utc>,
+}
+
+impl InvitationSummary {
+    pub fn new(id: Uuid, email: impl Into<String>, expires_at: DateTime<Utc>) -> Self {
+        InvitationSummary { id, email: email.into(), expires_at }
+    }
 }
 
 /// Mời người dùng qua email (D-312). Không kiểm permission — bên gọi chịu trách nhiệm (lệnh CLI

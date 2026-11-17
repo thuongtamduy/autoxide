@@ -39,6 +39,13 @@ pub(crate) const BILLING_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Money);
 
+pub(crate) const PROVISION: Permission = Permission::new(
+    "plans.provision",
+    "Platform staff: create a tenant on a plan (tenant, subscription, sample data, invitation of its \
+     administrator) and run a failed provisioning again.",
+)
+.with_risk(Risk::Money);
+
 pub(crate) fn all() -> Vec<Permission> {
     vec![
         PLANS_READ,
@@ -47,5 +54,6 @@ pub(crate) fn all() -> Vec<Permission> {
         SUBSCRIPTIONS_MANAGE,
         BILLING_READ,
         BILLING_MANAGE,
+        PROVISION,
     ]
 }

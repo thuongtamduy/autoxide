@@ -50,6 +50,26 @@ Prices never change: add a new one and deactivate the old one (`POST /prices/{id
 subscriptions keep their price until they change plan. A plan is never deleted, only retired
 (`POST /plans/{id}/retire`).
 
+## Create a tenant on a plan
+
+Platform staff with `plans.provision` create a tenant ready to use in one call: the tenant, its
+subscription, the sample data of the modules the plan turns on (when the plan or the request asks),
+and an email invitation of its administrator with the role `admin`.
+
+```bash
+curl -X POST https://api.example.com/api/v1/plans/provisionings \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"slug": "acme", "name": "Acme Ltd", "plan_id": "...", "admin_email": "owner@acme.example"}'
+```
+
+It runs in the background: follow it with `GET /api/v1/plans/provisionings/{id}` (`steps`, and
+`error` when it `failed`); fix the cause, then `POST …/retry` goes on from the last step done.
+From the server: `autoxide tenant create --slug acme --name "Acme Ltd" --plan <plan id>
+--admin-email owner@acme.example` does the same at once. A `dedicated` plan needs `placement`: a
+placement of kind `dedicated` added first with `autoxide placement add`. A plan that
+`requires_kyc` cannot be provisioned until identity checks exist (step 37); neither can tenants
+sign up by themselves yet.
+
 ## Put a tenant on a plan
 
 ```bash
@@ -86,7 +106,7 @@ Changes take effect at once on the server that made them and within
 | `past_due` | full (grace) | paid → `active`; `grace_days` pass → `suspended` |
 | `suspended` | read-only | paid → `active`; `suspend_days` pass → `canceled` |
 | `canceled` | read-only | resumed before `delete_after` → `active`; `retention_days` pass → `deleted` |
-| `deleted` | none | the tenant is suspended; its data is kept until you delete it |
+| `deleted` | none | the tenant and its data are deleted for good (accounting records modules must keep stay) |
 
 A job moves subscriptions every 5 minutes. `renewal_lead_days` before a period ends, the next
 billing period is opened and a reminder is mailed to the subscription's billing email
@@ -99,6 +119,10 @@ Until a payment provider is connected (step 36), billing periods are paid outsid
 check the bank transfer, then `POST /api/v1/plans/billing-periods/{id}/mark-paid`
 (`{"provider_reference": "..."}`); a past-due or suspended subscription becomes active again.
 `POST /billing-periods/{id}/void` cancels a period opened by mistake.
+
+Platform staff see a tenant's billing periods with `GET /api/v1/plans/tenants/{id}/billing-periods`
+and its billing profile (legal name, tax code, invoice email, address — the tenant sets it with
+`PUT /api/v1/plans/billing-profile`) with `GET /api/v1/plans/tenants/{id}/billing-profile`.
 
 To block a tenant completely (reads too), use `POST /api/v1/plans/tenants/{id}/subscription/suspend`
 with a reason; undo it with `PATCH /api/v1/kernel/tenants/{id}` (`"status": "active"`).
@@ -116,6 +140,12 @@ signing in). The first line describes the export; every other line is
 of uploaded files (their records are included; download them through the files API). When a
 subscription is canceled an export is started automatically. Exports are deleted after
 `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` (30).
+
+## Deleting a tenant
+
+`POST /api/v1/kernel/tenants/{id}/erase` (`kernel.tenants.delete`, with `{"confirm": "<slug>",
+"reason": "..."}`) deletes a suspended tenant and its data for good; it cannot be undone. A
+subscription that passes its retention period does this by itself.
 
 ## Settings
 

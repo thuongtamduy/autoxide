@@ -8173,3 +8173,27 @@ Thay phần "kernel chưa có lệnh xoá khách: khoá hẳn, giữ dữ liệu
 5. `plans`: thuê bao `canceled` hết thời hạn lưu → khoá khách (nếu chưa) → xoá → rồi mới thành `deleted`. Xoá hỏng
    giữa chừng thì thuê bao vẫn `canceled` tới hạn, lượt chạy sau thử lại (xoá chạy lại được).
 
+## D-338 · Cấp phát khách theo gói (phần nhân sự vận hành) — 2026-11-17 — agent quyết
+
+1. Bảng `plans_provisioning` (mặt điều khiển, migration `m0010_create_provisionings`, slug unique) và job
+   `plans.provision` (một lần thử). Bước: `created` → `tenant_created` → `subscribed` → `seeded` → `invited` → `done`;
+   mỗi bước xong ghi `step` và lịch sử `steps`; hỏng → `failed` kèm `error_code` / `error`, `retry` chạy tiếp từ bước
+   đã ghi. Đổi thứ tự so với đặc tả (gán gói TRƯỚC dữ liệu mẫu): dữ liệu mẫu chỉ cho module gói bật, nên phải có thuê
+   bao trước.
+2. Tạo khách qua `TenantAdmin::create` của kernel (không thêm cách tạo khách thứ hai). Kernel đã ghi khách mà gieo dữ
+   liệu ban đầu lỗi: lần chạy lại nhận khách `provisioning` cùng slug tạo sau lượt này rồi `provision` tiếp. Slug unique
+   trong bảng cấp phát và kiểm trước với sổ khách: hai lượt cùng slug không bao giờ cùng nhận một khách (test đồng thời).
+3. Migrate: không có bước riêng — kernel từ chối tạo khách vào placement chưa đủ migration
+   (`tenant_placement_behind`); nhân sự migrate trước bằng `POST /kernel/placements/migrations` (D-334). Gói
+   `dedicated`: nêu một placement `dedicated` đã thêm bằng CLI (URL có mật khẩu không đi qua API, đặc tả 33); tự tạo
+   database mới cho mỗi khách cần quyền quản trị database — không làm.
+4. Dữ liệu mẫu: `Module::sample_data() -> Option<Arc<dyn TenantSeed>>` (mặc định không có, D-038); kernel gom như
+   `seed_tenant` (`TenantAdmin::sample_modules`, `seed_samples`). Chưa module nào khai; module thương mại (41+) khai khi
+   làm.
+5. Mời quản trị viên qua `autoxide_auth::api::Invitations` (role `admin` mà `auth` gieo cho mọi khách mới); `plans`
+   phụ thuộc `autoxide-auth` (chỉ phần `api`). Thêm `NewInvitation::named`, `InvitationSummary::new` (cho bộ giả).
+6. CLI: `autoxide tenant create … --plan <id> --admin-email …` chạy hết các bước ngay qua `api::Provisioning` (không qua
+   job). Không đổi `autoxide tenant provision <slug>` (gieo lại khách tạo hỏng — việc khác).
+7. Chưa làm (chờ bước 37): khách tự đăng ký (`POST /signups`, xác nhận email, KYC, chấp nhận điều khoản); gói
+   `requires_kyc` trả `409 plans.kyc_required`.
+

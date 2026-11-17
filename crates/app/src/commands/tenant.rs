@@ -13,6 +13,8 @@ use autoxide_kernel::tenancy::{
     TenantMoves,
 };
 
+use autoxide_plans::api::{ProvisionRequest, Provisioning};
+
 use super::{EXIT_FAILURE, report_failure, report_invalid_configuration, run_with_observability};
 use crate::runtime::{self, Migrations};
 use crate::settings;
@@ -39,6 +41,26 @@ enum Action {
         /// Parent tenant (id), for chains.
         #[arg(long)]
         parent: Option<uuid::Uuid>,
+        /// Put the new tenant on this plan (id, see `GET /api/v1/plans/plans`) and provision it
+        /// fully: subscription, sample data, invitation of its administrator. Needs `--admin-email`.
+        #[arg(long, requires = "admin_email")]
+        plan: Option<uuid::Uuid>,
+        /// With `--plan`: a recurring price of the plan (id).
+        #[arg(long, requires = "plan")]
+        price: Option<uuid::Uuid>,
+        /// With `--plan`: who administers the tenant (invited by email with the role `admin`).
+        #[arg(long, requires = "plan")]
+        admin_email: Option<String>,
+        /// With `--plan`: the administrator's name.
+        #[arg(long, requires = "plan")]
+        admin_name: Option<String>,
+        /// With `--plan`: add the sample data of the modules the plan turns on (default: the
+        /// plan's setting).
+        #[arg(long, requires = "plan")]
+        sample_data: bool,
+        /// With `--plan`: no free trial.
+        #[arg(long, requires = "plan")]
+        no_trial: bool,
     },
     /// List the tenants, newest first.
     List,
@@ -96,10 +118,11 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
         let services =
             runtime.modules.api::<TenantAdmin>().zip(runtime.modules.api::<TenantMoves>());
+        let provisioning = runtime.modules.api::<dyn Provisioning>();
         let outcome = match services {
-            Some((admin, moves)) => {
-                execute(&admin, &moves, action).await.map_err(|error| super::describe_error(&error))
-            }
+            Some((admin, moves)) => execute(&admin, &moves, provisioning.as_deref(), action)
+                .await
+                .map_err(|error| super::describe_error(&error)),
             None => Err("the kernel did not start its tenant services".to_owned()),
         };
         runtime.database.close().await.map_err(|error| format!("database: {error}"))?;
@@ -121,9 +144,41 @@ pub fn run(arguments: &Arguments) -> ExitCode {
 async fn execute(
     admin: &TenantAdmin,
     moves: &TenantMoves,
+    provisioning: Option<&dyn Provisioning>,
     action: Action,
 ) -> Result<String, autoxide_kernel::error::Error> {
     match action {
+        Action::Create {
+            slug,
+            name,
+            placement,
+            parent,
+            plan: Some(plan),
+            price,
+            admin_email,
+            admin_name,
+            sample_data,
+            no_trial,
+        } => {
+            let provisioning = provisioning.ok_or_else(|| {
+                autoxide_kernel::error::Error::internal("the `plans` module is not installed")
+            })?;
+            let mut request =
+                ProvisionRequest::new(slug.clone(), name, plan, admin_email.unwrap_or_default());
+            request.price_id = price;
+            request.parent_id = parent;
+            request.placement = placement;
+            request.admin_name = admin_name;
+            request.sample_data = sample_data.then_some(true);
+            request.trial = !no_trial;
+            let done = provisioning.provision(request).await?;
+            let tenant = done.tenant_id.map(|id| id.to_string()).unwrap_or_default();
+            Ok(format!(
+                "Tenant `{slug}` ({tenant}) provisioned on the plan; the administrator is invited \
+                 by email (provisioning {}).",
+                done.id
+            ))
+        }
         Action::Move { tenant, abort: true, .. } => {
             let aborted = moves.abort(&tenant).await?;
             let mut report = format!(
@@ -176,7 +231,7 @@ async fn execute(
             ));
             Ok(lines.join("\n"))
         }
-        Action::Create { slug, name, placement, parent } => {
+        Action::Create { slug, name, placement, parent, .. } => {
             let input = NewTenant { slug, name, parent_id: parent, placement };
             Ok(line(&admin.create(Actor::system(), input).await?))
         }
@@ -326,7 +381,7 @@ mod tests {
             let runtime = runtime::start(settings, Migrations::RequireApplied).await.unwrap();
             let admin = runtime.modules.api::<TenantAdmin>().unwrap();
             let moves = runtime.modules.api::<TenantMoves>().unwrap();
-            let execute = async |action| execute(&admin, &moves, action).await;
+            let execute = async |action| execute(&admin, &moves, None, action).await;
             let listed = execute(Action::List).await.unwrap();
             assert!(listed.contains("default  active  placement=main"), "{listed}");
             let shown = execute(Action::Show { tenant: "default".to_owned() }).await.unwrap();
@@ -336,6 +391,12 @@ mod tests {
                 name: "Acme".to_owned(),
                 placement: None,
                 parent: None,
+                plan: None,
+                price: None,
+                admin_email: None,
+                admin_name: None,
+                sample_data: false,
+                no_trial: false,
             };
             assert_eq!(execute(create).await.unwrap_err().code(), "tenant_single_mode");
             let refused = execute(Action::Suspend { tenant: "default".to_owned() }).await;
@@ -375,12 +436,18 @@ mod tests {
             placements.up_all().await.unwrap();
             let admin = runtime.modules.api::<TenantAdmin>().unwrap();
             let moves = runtime.modules.api::<TenantMoves>().unwrap();
-            let execute = async |action| execute(&admin, &moves, action).await;
+            let execute = async |action| execute(&admin, &moves, None, action).await;
             let create = Action::Create {
                 slug: "acme".to_owned(),
                 name: "Acme".to_owned(),
                 placement: None,
                 parent: None,
+                plan: None,
+                price: None,
+                admin_email: None,
+                admin_name: None,
+                sample_data: false,
+                no_trial: false,
             };
             execute(create).await.unwrap();
             let action = |to: &str, keep_source: bool, dry_run: bool| Action::Move {

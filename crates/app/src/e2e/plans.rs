@@ -32,6 +32,7 @@ async fn app(test: &TestDatabase) -> TestApp {
             &[
                 "plans.plans.manage",
                 "plans.subscriptions.manage",
+                "plans.subscriptions.read",
                 "kernel.modules.read",
                 "kernel.tenants.read",
                 "kernel.tenants.manage",
@@ -441,6 +442,37 @@ async fn xoa_han_mot_khach_chi_khi_da_tam_khoa() {
             call(&app, Method::POST, "/api/v1/kernel/tenants/default/erase", "ops", Some(platform))
                 .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Cấp phát trọn gói qua `api::Provisioning` (đường của `autoxide tenant create --plan`) với module
+/// thật: khách mới có thuê bao, quản trị viên được mời với role `admin` của khách mới (D-338).
+#[tokio::test]
+async fn cap_phat_khach_moi_voi_module_that() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let body = json!({"code": "starter", "name": "Starter", "status": "active"});
+        let (status, plan) =
+            call(&app, Method::POST, "/api/v1/plans/plans", "ops", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{plan}");
+        let plan_id: uuid::Uuid = plan["data"]["id"].as_str().unwrap().parse().unwrap();
+        let provisioning = app.api::<dyn autoxide_plans::api::Provisioning>().unwrap();
+        let request = autoxide_plans::api::ProvisionRequest::new(
+            "gamma",
+            "Gamma Ltd",
+            plan_id,
+            "owner@gamma.example",
+        );
+        let done = provisioning.provision(request).await.unwrap();
+        assert_eq!((done.step.as_str(), done.status.as_str()), ("done", "done"));
+        let tenant = done.tenant_id.unwrap();
+        let uri = format!("/api/v1/plans/tenants/{tenant}/subscription");
+        let (status, sub) = call(&app, Method::GET, &uri, "ops", None).await;
+        assert_eq!(status, StatusCode::OK, "{sub}");
+        assert_eq!(sub["data"]["plan_code"], "starter");
+        assert_eq!(rows_of(&app, "auth_invitation", tenant).await, 1);
     })
     .await
     .unwrap();

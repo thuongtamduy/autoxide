@@ -293,6 +293,10 @@ impl Modules {
                 .iter()
                 .filter_map(|module| module.seed_tenant().map(|seed| (module.name(), seed)))
                 .collect(),
+            self.modules
+                .iter()
+                .filter_map(|module| module.sample_data().map(|seed| (module.name(), seed)))
+                .collect(),
         );
         let migrator = self.migrator().map_err(|error| ModuleError(error.to_string()))?;
         let placements = crate::tenancy::Placements::new(

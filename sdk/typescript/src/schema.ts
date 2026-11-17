@@ -2715,6 +2715,39 @@ export type Data_PreviewToken = {
 };
 
 /** Envelope of a single result. */
+export type Data_ProvisioningResponse = {
+  /** A request to create a tenant on a plan, and how far it went. */
+  data: {
+    admin_email: string;
+    admin_name?: string | null;
+    created_at: string;
+    error?: string | null;
+    /** Code of the error that stopped it, when `failed`. */
+    error_code?: string | null;
+    id: string;
+    parent_tenant_id?: string | null;
+    /** Name of the placement; `null`: `main`. */
+    placement?: string | null;
+    plan_id: string;
+    price_id?: string | null;
+    requested_by?: string | null;
+    sample_data: boolean;
+    slug: string;
+    /** `pending`, `running`, `failed` (see `error`; fix it, then `POST …/retry`) or `done`. */
+    status: string;
+    /** The last step done: `created`, `tenant_created`, `subscribed`, `seeded`, `invited`, `done`. */
+    step: string;
+    /** Every step done, oldest first. */
+    steps: ProvisioningStep[];
+    /** The new tenant, once created. */
+    tenant_id?: string | null;
+    tenant_name: string;
+    trial: boolean;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PublicAuthorPage = {
   /** An author as readers see them. */
   data: {
@@ -3256,7 +3289,8 @@ export type Data_Tenant = {
     slug: string;
     /**
      * `provisioning`, `active`, `suspended` (every request is refused with
-     * `403 tenant_suspended`), `maintenance` or `moving`.
+     * `403 tenant_suspended`), `maintenance`, `moving` or `deleted` (its data was deleted; every
+     * request answers `404 tenant_not_found`).
      */
     status: string;
     updated_at: string;
@@ -6535,6 +6569,40 @@ export type Page_PlanSubscription = {
 };
 
 /** One page of a list. */
+export type Page_ProvisioningResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    admin_email: string;
+    admin_name?: string | null;
+    created_at: string;
+    error?: string | null;
+    /** Code of the error that stopped it, when `failed`. */
+    error_code?: string | null;
+    id: string;
+    parent_tenant_id?: string | null;
+    /** Name of the placement; `null`: `main`. */
+    placement?: string | null;
+    plan_id: string;
+    price_id?: string | null;
+    requested_by?: string | null;
+    sample_data: boolean;
+    slug: string;
+    /** `pending`, `running`, `failed` (see `error`; fix it, then `POST …/retry`) or `done`. */
+    status: string;
+    /** The last step done: `created`, `tenant_created`, `subscribed`, `seeded`, `invited`, `done`. */
+    step: string;
+    /** Every step done, oldest first. */
+    steps: ProvisioningStep[];
+    /** The new tenant, once created. */
+    tenant_id?: string | null;
+    tenant_name: string;
+    trial: boolean;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PublicComment = {
   /** The items of this page, in the requested order. */
   data: {
@@ -6962,7 +7030,8 @@ export type Page_Tenant = {
     slug: string;
     /**
      * `provisioning`, `active`, `suspended` (every request is refused with
-     * `403 tenant_suspended`), `maintenance` or `moving`.
+     * `403 tenant_suspended`), `maintenance`, `moving` or `deleted` (its data was deleted; every
+     * request answers `404 tenant_not_found`).
      */
     status: string;
     updated_at: string;
@@ -7557,6 +7626,70 @@ export type ProfileRequest = {
    * moderators; no two users share a name.
    */
   display_name: string;
+};
+
+/** Create a tenant on a plan. */
+export type ProvisioningRequest = {
+  /** Who administers the new tenant: invited by email with the role `admin`. */
+  admin_email: string;
+  /** Their name, up to 200 characters. */
+  admin_name?: string | null;
+  /** Name of the new tenant, 1 to 200 characters. */
+  name: string;
+  /** Parent tenant, for chains. */
+  parent_id?: string | null;
+  /**
+   * Name of the placement for its data, of the plan's kind; default `main` for a `shared` plan.
+   * Required for a `dedicated` plan.
+   */
+  placement?: string | null;
+  /** An active base plan. */
+  plan_id: string;
+  /** An active recurring price of that plan. */
+  price_id?: string | null;
+  /** Add the sample data of the modules the plan turns on; default: the plan's `sample_data`. */
+  sample_data?: boolean | null;
+  /** Short name of the new tenant: 1 to 63 lower-case letters, digits and `-`. */
+  slug: string;
+  /** Start with the plan's free trial; default `true`. */
+  trial?: boolean;
+};
+
+/** A request to create a tenant on a plan, and how far it went. */
+export type ProvisioningResponse = {
+  admin_email: string;
+  admin_name?: string | null;
+  created_at: string;
+  error?: string | null;
+  /** Code of the error that stopped it, when `failed`. */
+  error_code?: string | null;
+  id: string;
+  parent_tenant_id?: string | null;
+  /** Name of the placement; `null`: `main`. */
+  placement?: string | null;
+  plan_id: string;
+  price_id?: string | null;
+  requested_by?: string | null;
+  sample_data: boolean;
+  slug: string;
+  /** `pending`, `running`, `failed` (see `error`; fix it, then `POST …/retry`) or `done`. */
+  status: string;
+  /** The last step done: `created`, `tenant_created`, `subscribed`, `seeded`, `invited`, `done`. */
+  step: string;
+  /** Every step done, oldest first. */
+  steps: ProvisioningStep[];
+  /** The new tenant, once created. */
+  tenant_id?: string | null;
+  tenant_name: string;
+  trial: boolean;
+  updated_at: string;
+};
+
+/** One step a provisioning went through. */
+export type ProvisioningStep = {
+  at: string;
+  /** `created`, `tenant_created`, `subscribed`, `seeded`, `invited` or `done`. */
+  step: string;
 };
 
 /** An author of an entry. */
@@ -8792,7 +8925,8 @@ export type Tenant = {
   slug: string;
   /**
    * `provisioning`, `active`, `suspended` (every request is refused with
-   * `403 tenant_suspended`), `maintenance` or `moving`.
+   * `403 tenant_suspended`), `maintenance`, `moving` or `deleted` (its data was deleted; every
+   * request answers `404 tenant_not_found`).
    */
   status: string;
   updated_at: string;
@@ -13962,6 +14096,60 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/provisionings": {
+    /** List tenant provisionings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ProvisioningResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a tenant on a plan. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ProvisioningRequest;
+      responses: {
+        201: Data_ProvisioningResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/provisionings/{id}": {
+    /** Get a tenant provisioning. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ProvisioningResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/provisionings/{id}/retry": {
+    /** Run a failed tenant provisioning again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ProvisioningResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };

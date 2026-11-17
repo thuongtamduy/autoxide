@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Create a tenant on a plan in one call: `POST /api/v1/plans/provisionings` (platform staff, new permission
+  `plans.provision`; MCP `plans.provision_tenant`, `plans.get_provisioning`) creates the tenant, its subscription, the
+  sample data of the modules the plan turns on, and invites its administrator; it runs in the background, failed
+  steps can be retried (`POST …/{id}/retry`), and `GET /api/v1/plans/provisionings` lists them. From the server:
+  `autoxide tenant create … --plan <id> --admin-email …`. Modules supply sample data with `Module::sample_data`.
+
 - Delete a tenant and its data for good: `POST /api/v1/kernel/tenants/{id}/erase` (platform staff with the new
   permission `kernel.tenants.delete`; the tenant must be suspended, and its slug sent again as `confirm`). Rows and
   files of the tenant are deleted, its domains released; the tenant stays listed with status `deleted` and requests

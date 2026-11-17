@@ -144,6 +144,10 @@ pub(crate) struct PlansService {
     pub exports: Option<Arc<autoxide_kernel::tenancy::TenantExports>>,
     /// Kiểm địa chỉ của hồ sơ xuất hoá đơn (module `address`); `None` thì không nhận địa chỉ.
     pub units: Option<Arc<dyn autoxide_address::api::AdministrativeUnits>>,
+    /// Hàng đợi job của module (cấp phát khách chạy nền).
+    pub jobs: autoxide_kernel::job::JobQueue,
+    /// Mời quản trị viên của khách mới (module `auth`); `None` thì bước mời báo lỗi.
+    pub invitations: Option<Arc<dyn autoxide_auth::api::Invitations>>,
 }
 
 /// Bộ nhớ đệm quyền dùng theo khách trong tiến trình (`AUTOXIDE_PLANS_CACHE_SECONDS`): quyền dùng

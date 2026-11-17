@@ -5,6 +5,7 @@
 mod billing;
 mod enforcement;
 mod lifecycle;
+mod provisioning;
 
 use std::sync::Arc;
 

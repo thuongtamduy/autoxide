@@ -26,6 +26,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         Box::new(CreateBillingPeriods),
         Box::new(CreateBillingProfiles),
+        Box::new(CreateProvisionings),
     ]
 }
 
@@ -438,5 +439,63 @@ impl MigrationTrait for CreateBillingProfiles {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("plans_billing_profile").to_owned()).await
+    }
+}
+
+/// Lượt cấp phát khách mới theo gói (bước 35 mục 5).
+struct CreateProvisionings;
+
+impl MigrationName for CreateProvisionings {
+    fn name(&self) -> &str {
+        "m0010_create_provisionings"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateProvisionings {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("plans_provisioning")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid_null("tenant_id"))
+                    .col(schema::string_len("slug", 63))
+                    .col(schema::string_len("tenant_name", 200))
+                    .col(schema::uuid_null("parent_tenant_id"))
+                    .col(schema::uuid("plan_id"))
+                    .col(schema::uuid_null("price_id"))
+                    .col(schema::string_len_null("placement", 63))
+                    .col(schema::string_len("admin_email", 254))
+                    .col(schema::string_len_null("admin_name", 200))
+                    .col(schema::boolean("sample_data"))
+                    .col(schema::boolean("trial"))
+                    // `created`, `tenant_created`, `subscribed`, `seeded`, `invited`, `done`.
+                    .col(schema::string_len("step", 16))
+                    // `pending`, `running`, `failed`, `done`.
+                    .col(schema::string_len("status", 16))
+                    .col(schema::string_len_null("error_code", 100))
+                    .col(schema::text_null("error"))
+                    .col(schema::text("steps"))
+                    .col(schema::uuid_null("requested_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(manager, "plans_provisioning", "plans_provisioning_slug_unique", &["slug"], true)
+            .await?;
+        index(
+            manager,
+            "plans_provisioning",
+            "plans_provisioning_status_idx",
+            &["status", "id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager.drop_table(Table::drop().table("plans_provisioning").to_owned()).await
     }
 }

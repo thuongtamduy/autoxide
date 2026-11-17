@@ -4971,6 +4971,35 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Platform staff: how far a tenant provisioning went — its steps, and the error when it failed.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Id of the provisioning.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "plans.get_provisioning",
+      "output_schema": null,
+      "permissions": [
+        "plans.subscriptions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Platform staff: get a tenant's subscription and add-ons.",
       "input_schema": {
         "additionalProperties": false,
@@ -5063,6 +5092,95 @@
       "output_schema": null,
       "permissions": [
         "plans.subscriptions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Platform staff: create a tenant on a plan — the tenant, its subscription, sample data when asked, and an email invitation of its administrator with the role `admin`. Runs in the background; follow it with `get_provisioning`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A tenant to create on a plan.",
+        "properties": {
+          "admin_email": {
+            "description": "Who administers the new tenant (invited by email with the role `admin`).",
+            "type": "string"
+          },
+          "admin_name": {
+            "description": "Their name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Name of the new tenant, 1 to 200 characters.",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "Parent tenant, for chains.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "description": "Name of the placement for its data; required for a `dedicated` plan.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_id": {
+            "description": "An active base plan.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_id": {
+            "description": "An active recurring price of that plan.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sample_data": {
+            "description": "Add sample data of the modules the plan turns on; default: the plan's setting.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "slug": {
+            "description": "Short name of the new tenant: 1 to 63 lower-case letters, digits and `-`.",
+            "type": "string"
+          },
+          "trial": {
+            "description": "Start with the plan's free trial; default `true`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "plan_id",
+          "admin_email"
+        ],
+        "type": "object"
+      },
+      "name": "plans.provision_tenant",
+      "output_schema": null,
+      "permissions": [
+        "plans.provision"
       ]
     },
     {
