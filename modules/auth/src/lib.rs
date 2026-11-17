@@ -92,6 +92,23 @@ struct AuthModule {
 }
 
 impl Module for AuthModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default()
+            .group(NavGroup::new("organization", "Organization", "sitemap", 90))
+            .group(NavGroup::new("customers", "Customers", "users", 60))
+            .group(NavGroup::new("settings", "Settings", "gear", 110))
+            .item(
+                NavItem::new("organization.access", "organization", "People and roles", 20)
+                    .permissions(&[crate::permissions::USERS_READ, crate::permissions::ROLES_READ]),
+            )
+            .item(
+                NavItem::new("customers.accounts", "customers", "Buyer accounts", 10)
+                    .permissions(&[crate::permissions::CUSTOMERS_READ]),
+            )
+            .item(NavItem::new("settings.api_keys", "settings", "API keys", 20))
+    }
+
     fn name(&self) -> &'static str {
         "auth"
     }

@@ -36,6 +36,8 @@
   "text:Create, rename and delete the unit types of the tenant (store, warehouse, region…).": "Tạo, đổi tên và xoá loại nút của khách hàng (cửa hàng, kho, vùng…).",
   "text:Create, rename and move organization units in your scope. A new unit waits for approval unless you can also manage units there.": "Tạo, đổi tên và dời các nút tổ chức trong phạm vi của bạn. Nút mới chờ duyệt, trừ khi bạn cũng có quyền quản lý nút ở đó.",
   "text:Edit the public profile of the organization units in your scope: whether websites show them, display name, address, opening hours, pickup, cover image.": "Sửa hồ sơ công khai của các nút tổ chức trong phạm vi của bạn: website có hiện không, tên hiển thị, địa chỉ, giờ mở cửa, nhận hàng tại quầy, ảnh bìa.",
+  "text:Organization": "Tổ chức",
+  "text:Organization tree": "Cây tổ chức",
   "text:See the organization units in your scope and their unit types.": "Xem các nút tổ chức trong phạm vi của bạn và loại nút của chúng.",
   "text:Set and clear the settings of the organization units in your scope (time zone, currency, language…); units below inherit them unless they set their own.": "Đặt và bỏ cài đặt của các nút tổ chức trong phạm vi của bạn (múi giờ, tiền tệ, ngôn ngữ…); các nút bên dưới kế thừa, trừ khi tự đặt.",
   "text:The public profile of a unit changed (shown on websites: name, address, opening hours, pickup).": "Hồ sơ công khai của một nút thay đổi (hiện trên website: tên, địa chỉ, giờ mở cửa, nhận hàng tại quầy)."

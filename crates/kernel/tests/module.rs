@@ -293,6 +293,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/domains/{id}/verify".to_owned(),
                     "/modules".to_owned(),
                     "/modules/{name}".to_owned(),
+                    "/navigation".to_owned(),
                     "/ops/alerts".to_owned(),
                     "/placements".to_owned(),
                     "/placements/migrations".to_owned(),

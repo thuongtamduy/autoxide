@@ -32,6 +32,7 @@ use crate::i18n::Translations;
 use crate::job::{JobQueue, JobRegistration, Schedule};
 use crate::privacy::{PersonalData, PersonalDataExport};
 
+pub mod navigation;
 mod registry;
 
 pub use registry::{ModuleError, Modules};
@@ -228,6 +229,13 @@ pub trait Module: Send + Sync {
     /// (`storage`); kernel thêm tiền tố `<module>.`. Bước kiểm chỉ đọc, hoặc dọn thứ đã ghi thử.
     fn checks(&self) -> Vec<crate::doctor::Check> {
         Vec::new()
+    }
+
+    /// Nhóm phân hệ và mục menu của module cho giao diện (bước 51 P1). Kernel gom lúc khởi động
+    /// (nhóm trùng phải khai giống hệt) và lọc theo khách, gói, permission ở
+    /// `GET /api/v1/kernel/navigation`. Mặc định: không có.
+    fn navigation(&self) -> navigation::Navigation {
+        navigation::Navigation::default()
     }
 
     /// Lệnh quản trị của module cho `autoxide task` (D-169): việc người vận hành chạy tay,

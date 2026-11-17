@@ -92,13 +92,18 @@
   "text:An override of a tenant was removed (`tenant_id`, `override`).": "Một ghi đè của khách hàng đã bị gỡ (`tenant_id`, `override`).",
   "text:An override was set for a tenant (`tenant_id`, `override`).": "Một ghi đè vừa được đặt cho khách hàng (`tenant_id`, `override`).",
   "text:Change, cancel or resume the subscription of your tenant, and set its billing profile.": "Đổi, huỷ hay tiếp tục thuê bao của khách mình, và đặt hồ sơ xuất hoá đơn.",
+  "text:Plan and subscription": "Gói và thuê bao",
+  "text:Plans": "Gói",
+  "text:Platform": "Nền tảng",
   "text:Platform staff: create a tenant on a plan (tenant, subscription, sample data, invitation of its administrator) and run a failed provisioning again.": "Nhân sự nền tảng: tạo khách theo gói (khách, thuê bao, dữ liệu mẫu, lời mời quản trị viên) và chạy lại lượt cấp phát hỏng.",
   "text:Platform staff: create and change plans and their prices, mark the default plan, retire plans.": "Nhân sự nền tảng: tạo và sửa gói cùng giá, đặt gói mặc định, ngừng bán gói.",
   "text:Platform staff: put a tenant on a plan, add add-ons, set overrides, cancel or suspend a subscription, record a payment made outside the system.": "Nhân sự nền tảng: gán gói cho khách hàng, thêm gói thêm, đặt ghi đè, huỷ hay tạm khoá thuê bao, ghi nhận khoản thanh toán làm ngoài hệ thống.",
   "text:Platform staff: see every plan, including drafts and retired plans, with their prices.": "Nhân sự nền tảng: xem mọi gói, kể cả gói nháp và gói đã ngừng bán, cùng giá.",
   "text:Platform staff: see the subscription, usage, overrides, billing periods and billing profile of every tenant.": "Nhân sự nền tảng: xem thuê bao, lượng dùng, ghi đè, kỳ thanh toán và hồ sơ xuất hoá đơn của mọi khách.",
   "text:See the subscription of your tenant, its usage, billing periods and billing profile.": "Xem thuê bao của khách mình, lượng dùng, kỳ thanh toán và hồ sơ xuất hoá đơn.",
+  "text:Settings": "Cài đặt",
   "text:Someone asked to sign up a new tenant and was sent a confirmation mail (`signup_id`, `plan_id`).": "Có người xin đăng ký khách mới và đã được gửi thư xác nhận (`signup_id`, `plan_id`).",
+  "text:Subscriptions": "Thuê bao",
   "text:The status of a subscription changed (`tenant_id`, `from`, `to`).": "Trạng thái thuê bao đã đổi (`tenant_id`, `from`, `to`).",
   "text:What a tenant may use changed because of its subscription, add-ons or overrides (`tenant_id`). Read `GET /api/v1/plans/entitlements` again.": "Quyền dùng của khách hàng đã đổi do thuê bao, gói thêm hay ghi đè (`tenant_id`). Đọc lại `GET /api/v1/plans/entitlements`."
 }

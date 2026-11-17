@@ -60,6 +60,27 @@ struct PlansModule {
 }
 
 impl Module for PlansModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default()
+            .group(NavGroup::new("settings", "Settings", "gear", 110))
+            .group(NavGroup::new("platform", "Platform", "server", 200).platform())
+            .item(NavItem::new("settings.plan", "settings", "Plan and subscription", 30))
+            .item(
+                NavItem::new("platform.plans", "platform", "Plans", 20).permissions(&[
+                    crate::permissions::PLANS_READ,
+                    crate::permissions::PLANS_MANAGE,
+                ]),
+            )
+            .item(
+                NavItem::new("platform.subscriptions", "platform", "Subscriptions", 30)
+                    .permissions(&[
+                        crate::permissions::SUBSCRIPTIONS_READ,
+                        crate::permissions::BILLING_READ,
+                    ]),
+            )
+    }
+
     fn name(&self) -> &'static str {
         "plans"
     }

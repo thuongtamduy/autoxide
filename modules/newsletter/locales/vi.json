@@ -1,6 +1,7 @@
 {
   "field:is required": "là bắt buộc",
   "field:must be `en` or `vi`": "phải là `en` hay `vi`",
+  "field:must be `true` or `false`": "phải là `true` hay `false`",
   "field:must be a UUID": "phải là một UUID",
   "field:must be at most {attributes_max} bytes of JSON": "phải tối đa {attributes_max} byte JSON",
   "field:must be at most {html_max} bytes": "phải tối đa {html_max} byte",
@@ -59,12 +60,13 @@
   "text:Every recipient of a campaign was handled; counts by delivery status.": "Đã xử lý xong mọi người nhận của một chiến dịch; số đếm theo trạng thái gửi.",
   "text:Everything about a subscriber was deleted (by an admin or a data subject request); the address is not in the payload.": "Mọi dữ liệu về một người đăng ký đã bị xoá (bởi quản trị viên hay theo yêu cầu của chủ thể dữ liệu); nội dung event không có địa chỉ.",
   "text:Export or erase everything the newsletter holds about an email address.": "Xuất hay xoá mọi thứ bản tin giữ về một địa chỉ email.",
+  "text:Marketing": "Tiếp thị",
+  "text:Newsletter": "Bản tin",
   "text:Read lists, subscribers (personal data), campaigns with their progress, and suppressions.": "Xem danh sách, người đăng ký (dữ liệu cá nhân), chiến dịch và tiến độ, và danh sách không gửi.",
   "text:Send, schedule, pause, resume and cancel campaigns, send test mails, and set a list to send new posts automatically (`new_posts: send`).": "Gửi, hẹn giờ, tạm dừng, tiếp tục và huỷ chiến dịch, gửi thư thử, và đặt danh sách tự gửi bài mới (`new_posts: send`).",
   "text:Sending resumed with the recipients left.": "Tiếp tục gửi cho những người nhận còn lại.",
   "text:Sending was paused.": "Việc gửi đã tạm dừng.",
   "text:Someone asked to join a list that needs confirming; a confirmation mail may be on its way. No address in the payload.": "Có người xin tham gia một danh sách cần xác nhận; thư xác nhận có thể đang được gửi. Nội dung event không có địa chỉ.",
   "text:Subscribers were imported into lists; counts only.": "Người đăng ký được nhập vào danh sách; chỉ có số đếm.",
-  "text:The daily job deleted subscriptions left unconfirmed too long.": "Việc chạy hằng ngày đã xoá các lượt đăng ký chưa xác nhận quá lâu.",
-  "field:must be `true` or `false`": "phải là `true` hay `false`"
+  "text:The daily job deleted subscriptions left unconfirmed too long.": "Việc chạy hằng ngày đã xoá các lượt đăng ký chưa xác nhận quá lâu."
 }

@@ -41,11 +41,13 @@
   "text:A browser or a mobile device was registered for push notifications (`id`, `user_id`, `channel`).": "Một trình duyệt hay thiết bị di động vừa đăng ký nhận thông báo đẩy (`id`, `user_id`, `channel`).",
   "text:A person changed which notifications they get (`user_id`, `changes`).": "Một người vừa đổi loại thông báo mình nhận (`user_id`, `changes`).",
   "text:A replaced text was removed; the default text applies again (`kind`, `channel`, `locale`).": "Câu chữ thay thế vừa bị gỡ; câu mặc định dùng lại (`kind`, `channel`, `locale`).",
+  "text:Notification templates": "Mẫu thông báo",
   "text:Platform staff queued a notice to the admins of every tenant (`notice_id`, `category`).": "Nhân sự nền tảng vừa xếp hàng một thông báo tới quản trị viên của mọi khách (`notice_id`, `category`).",
   "text:Platform staff: send a notice to the admins of every tenant (in-app and email).": "Nhân sự nền tảng: gửi thông báo tới quản trị viên của mọi khách (trong ứng dụng và email).",
   "text:Replace the default texts of notification kinds for the tenant.": "Thay câu chữ mặc định của các loại thông báo cho khách.",
   "text:See the send log of notifications (addresses of recipients included).": "Xem nhật ký gửi thông báo (có cả địa chỉ người nhận).",
   "text:Send advertising notifications (only to people who consented, inside the allowed hours); needs `notifications.send` too.": "Gửi thông báo quảng cáo (chỉ tới người đã đồng ý, trong khung giờ cho phép); cần cả `notifications.send`.",
   "text:Send security and transactional notifications of a declared kind to people of the tenant.": "Gửi thông báo bảo mật và giao dịch thuộc một loại đã khai tới người của khách.",
+  "text:Settings": "Cài đặt",
   "text:The text of a notification kind was replaced for the tenant (`kind`, `channel`, `locale`).": "Câu chữ của một loại thông báo vừa được thay cho khách (`kind`, `channel`, `locale`)."
 }

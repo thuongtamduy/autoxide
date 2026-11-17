@@ -56,6 +56,14 @@ struct Running {
 }
 
 impl Module for WebhooksModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("settings", "Settings", "gear", 110)).item(
+            NavItem::new("settings.webhooks", "settings", "Webhooks", 50)
+                .permissions(&[crate::permissions::WEBHOOKS_MANAGE]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "webhooks"
     }

@@ -26,6 +26,12 @@ endpoints are marked deprecated with a sunset date first.
   `ledger.payout_sent`, `ledger.payout_failed`, `ledger.hold_released`; MCP tools `ledger.flow_settings`,
   `ledger.holds`, `ledger.release_hold`, `ledger.payouts`, `ledger.create_payout`, `ledger.create_vietqr_payment`.
   The testkit has `FakePayoutGateway` and `FakeBankFeed`. Real bank feeds and payout partners are separate modules.
+- Navigation for admin interfaces (step 51): `GET /api/v1/kernel/navigation?org_id=` and MCP `kernel.navigation`
+  return the groups and screens modules declare (`Module::navigation`), filtered by the modules on for the tenant,
+  the caller's permissions at the unit and the plan (`locked` screens need a feature the plan lacks), with labels
+  in the caller's language and an `ETag`. Every module declares its screens; platform groups only show to
+  platform staff.
+
 - Tenants sign up by themselves (step 35): `POST /api/v1/plans/signups` (no sign-in, anti-spam form token, always
   `202`), a mail with a link valid 24 hours, `POST /signups/confirm` (records acceptance of the platform's terms of use
   and privacy policy in `compliance`), identity checks through `compliance` for plans that `requires_kyc`, then the

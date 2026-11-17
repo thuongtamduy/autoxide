@@ -68,6 +68,14 @@ struct NotificationsModule {
 }
 
 impl Module for NotificationsModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("settings", "Settings", "gear", 110)).item(
+            NavItem::new("settings.notifications", "settings", "Notification templates", 60)
+                .permissions(&[crate::permissions::TEMPLATES_MANAGE]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "notifications"
     }

@@ -234,7 +234,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       công khai (`Resource.image` và `resolve_many` đã có, D-238). `content` không biết khái niệm sản phẩm
 - [ ] Tham chiếu ngược "đang dùng ở đâu" (D-267): module khai tham chiếu tới đối tượng khác qua sổ đối tượng
       (bài, trang, menu, sản phẩm trỏ tới tệp media…); `GET /media/{id}/usages` và tương tự cho loại khác.
-- [ ] Sổ điều hướng (P1): `Module::navigation` (nhóm, mục, permission, tính năng, nguồn số đếm, thứ tự); nhóm
+- [x] Sổ điều hướng (P1): `Module::navigation` (nhóm, mục, permission, tính năng, nguồn số đếm, thứ tự); nhóm
       trùng phải khai giống nhau; menu ẩn khi module chưa bật hay thiếu permission, **khoá (vẫn hiện) khi
       thiếu tính năng của gói**; nhãn theo i18n; ETag; tool MCP
 - [ ] Hộp việc (P2, P10): `WorkSource` tính từ dữ liệu, không bảng việc, không "Đã xử lý" (D-212); sắp theo

@@ -88,6 +88,8 @@
   "text:Close accounting periods of the books in your scope (cannot be undone).": "Khoá kỳ kế toán của các sổ trong phạm vi của bạn (không hoàn tác được).",
   "text:Create payments through the payment partners for the units in your scope.": "Tạo thanh toán qua đối tác thanh toán cho các nút trong phạm vi của bạn.",
   "text:Held seller money became available (`hold_id`, `org_id`, `seller_org_id`, `amount`, `source_module`, `source_id`).": "Tiền tạm giữ của người bán đã chuyển sang khả dụng (`hold_id`, `org_id`, `seller_org_id`, `amount`, `source_module`, `source_id`).",
+  "text:Finance": "Tài chính",
+  "text:Ledger": "Sổ cái",
   "text:Open books and accounts, set account floors, names and codes, close accounts, in your scope.": "Mở sổ và tài khoản, đặt sàn, tên, mã tài khoản, đóng tài khoản, trong phạm vi của bạn.",
   "text:Pay sellers in your scope their available balance through the payout partner.": "Chi trả số dư khả dụng cho người bán trong phạm vi của bạn qua đối tác chi hộ.",
   "text:Post manual entries to the books of the units in your scope.": "Ghi bút toán thủ công vào sổ của các nút trong phạm vi của bạn.",

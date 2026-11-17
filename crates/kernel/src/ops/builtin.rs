@@ -30,6 +30,8 @@ pub(crate) struct KernelModule {
     public_url: PublicUrl,
     /// Sổ module, do `Modules::start` điền sau khi mọi module khởi động.
     catalog: ModuleCatalog,
+    /// Quyền dùng theo gói (bước 35); có sau `start` (sổ điều hướng lọc theo đó).
+    entitlements: Option<crate::entitlement::EntitlementsHandle>,
     /// Cảnh báo vận hành (bước kiểm của mọi module, giữ kết quả một phút).
     alerts: Arc<crate::ops::alerts::Alerts>,
     /// Cấu hình cho giao diện của mọi module (D-271), điền cùng lúc với sổ module.
@@ -101,6 +103,7 @@ impl KernelModule {
             admin: None,
             public_url: PublicUrl::default(),
             alerts: Arc::new(crate::ops::alerts::Alerts::new(catalog.clone())),
+            entitlements: None,
             catalog,
             client_configs,
             database: None,
@@ -126,9 +129,45 @@ impl KernelModule {
             translations: self.translations.clone(),
         })
     }
+
+    /// Có sau `start` (cần quyền dùng theo gói).
+    fn navigation_state(&self) -> Option<crate::ops::navigation::NavigationState> {
+        Some(crate::ops::navigation::NavigationState {
+            catalog: self.catalog.clone(),
+            entitlements: self.entitlements.clone()?,
+            translations: self.translations.clone(),
+        })
+    }
 }
 
 impl Module for KernelModule {
+    fn navigation(&self) -> crate::module::navigation::Navigation {
+        use crate::module::navigation::{NavGroup, NavItem, Navigation};
+        use crate::tenancy::{PLACEMENTS_READ, TENANTS_READ};
+        Navigation::default()
+            .group(NavGroup::new("home", "Home", "home", 10))
+            .group(NavGroup::new("settings", "Settings", "gear", 110))
+            .group(NavGroup::new("platform", "Platform", "server", 200).platform())
+            .item(NavItem::new("home.dashboard", "home", "Overview", 10))
+            .item(NavItem::new("home.work", "home", "Work and activity", 20).counter("work"))
+            .item(NavItem::new("settings.general", "settings", "General", 10).permissions(&[
+                crate::ops::module_catalog::MODULES_READ,
+                crate::tenancy::SETTINGS_MANAGE,
+            ]))
+            .item(
+                NavItem::new("platform.tenants", "platform", "Tenants", 10)
+                    .permissions(&[TENANTS_READ]),
+            )
+            .item(
+                NavItem::new("platform.fleet", "platform", "Databases", 40)
+                    .permissions(&[PLACEMENTS_READ]),
+            )
+            .item(
+                NavItem::new("platform.health", "platform", "Health", 50)
+                    .permissions(&[TENANTS_READ]),
+            )
+    }
+
     fn name(&self) -> &'static str {
         NAME
     }
@@ -258,6 +297,9 @@ impl Module for KernelModule {
             .merge(crate::ops::client_config::routes(self.client_configs.clone()))
             .merge(crate::ops::whats_new::routes())
             .merge(crate::ops::alerts::routes(self.alerts.clone()));
+        if let Some(state) = self.navigation_state() {
+            routes = routes.merge(crate::ops::navigation::routes(state));
+        }
         if let (Some(settings), Some(registry)) = (&self.settings, &self.registry) {
             routes =
                 routes.merge(crate::tenancy::settings::routes(settings.clone(), registry.clone()));
@@ -297,6 +339,9 @@ impl Module for KernelModule {
 
     fn tools(&self) -> Vec<crate::mcp::Tool> {
         let mut tools = self.catalog_state().map_or_else(Vec::new, module_catalog::tools);
+        if let Some(state) = self.navigation_state() {
+            tools.extend(crate::ops::navigation::tools(state));
+        }
         if let Some(settings) = &self.settings {
             tools.extend(crate::tenancy::settings::tools(settings.clone()));
         }
@@ -366,6 +411,7 @@ impl Module for KernelModule {
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         self.database = Some(context.database().clone());
         self.translations = context.translations().clone();
+        self.entitlements = Some(context.entitlements());
         let flags = Arc::new(UserFlags::new(self.max_flags));
         context.personal_data(flags.clone())?;
         self.flags.fill(flags);
