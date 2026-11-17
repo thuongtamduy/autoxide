@@ -426,3 +426,209 @@ pub(crate) mod website_page {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+// ---- Dữ liệu cá nhân (D-360) -------------------------------------------------------------------
+
+pub(crate) mod purpose {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_purposes")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub key: String,
+        /// `service`, `marketing`, `analytics`, `legal`, `kyc`.
+        pub category: String,
+        /// `consent`, `contract`, `legal_obligation`, `vital_interest`, `public_interest`.
+        pub legal_basis: String,
+        /// JSON: mảng tên loại dữ liệu (vd `["email", "name"]`).
+        pub data_categories: String,
+        /// JSON: mảng bên nhận (`{"name", "country"}`).
+        pub recipients: String,
+        /// JSON: `{"en": …, "vi": …}`.
+        pub description: String,
+        /// Thời hạn lưu viết bằng chữ (vd "until the account is deleted").
+        pub retention: Option<String>,
+        pub active: bool,
+        pub updated_by: Option<Uuid>,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod incident {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_incidents")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub title: String,
+        pub description: String,
+        /// `low`, `medium`, `high`, `critical`.
+        pub severity: String,
+        /// `open`, `contained`, `reported`, `closed`.
+        pub status: String,
+        pub detected_at: DateTimeUtc,
+        /// `detected_at` + giờ của quy tắc `privacy.incident`.
+        pub report_due_at: DateTimeUtc,
+        /// Mốc nhắc (giờ sau khi phát hiện) đã gửi gần nhất; 0 khi chưa nhắc.
+        pub reminded_hours: i32,
+        pub authority_notified_at: Option<DateTimeUtc>,
+        pub authority_reference: Option<String>,
+        pub subjects_notified_at: Option<DateTimeUtc>,
+        /// JSON: mảng loại dữ liệu bị ảnh hưởng.
+        pub data_categories: String,
+        pub affected_count: Option<i64>,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod incident_entry {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_incident_entries")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub incident_id: Uuid,
+        pub body: String,
+        pub author_user_id: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod subject_request {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_subject_requests")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// `access`, `erasure`, `rectification`, `objection`, `restriction`, `withdrawal`.
+        pub kind: String,
+        /// `email`, `post`, `phone`, `authority`, `other`.
+        pub channel: String,
+        /// `email`, `phone` hay `user`.
+        pub subject_kind: String,
+        /// Email / số đã chuẩn hoá / ID người dùng.
+        pub subject: String,
+        pub received_at: DateTimeUtc,
+        pub due_at: DateTimeUtc,
+        /// `received`, `in_progress`, `fulfilled`, `rejected`.
+        pub status: String,
+        pub reason: Option<String>,
+        pub notes: Option<String>,
+        pub handled_by: Option<Uuid>,
+        pub closed_at: Option<DateTimeUtc>,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+// ---- Mã theo dõi quảng cáo và đồng ý cookie (D-235, D-361) --------------------------------------
+
+pub(crate) mod tracking_tag {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_tracking_tags")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// Nút của website (gốc = cả khách).
+        pub org_id: Uuid,
+        /// Khoá nhà cung cấp cho sẵn (`ga4`, `gtm`, `google_ads`, `meta`, `tiktok`, `zalo`).
+        pub provider: String,
+        pub tracking_id: String,
+        /// `active` hay `paused`.
+        pub status: String,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod cookie_setting {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_cookie_settings")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub tenant_id: Uuid,
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub org_id: Uuid,
+        pub enabled: bool,
+        /// JSON: nhóm tuỳ chọn khách bật (`preferences`, `analytics`, `marketing`).
+        pub categories: String,
+        pub policy_version: i32,
+        /// SHA-256 của (nhóm hiệu lực, nhà cung cấp đang bật): đổi thì tăng `policy_version`.
+        pub signature: String,
+        /// `bottom`, `top` hay `center`.
+        pub position: String,
+        pub updated_by: Option<Uuid>,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod cookie_consent {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_cookie_consents")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub org_id: Uuid,
+        /// Mã ngẫu nhiên do giao diện tạo, giữ trong cookie cần thiết.
+        pub consent_id: String,
+        /// JSON: nhóm người xem đã chọn.
+        pub categories: String,
+        pub policy_version: i32,
+        /// Băm khối IP (`ip_hash::fingerprint`), không giữ IP thô.
+        pub ip_hash: Option<String>,
+        pub user_id: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

@@ -19,10 +19,14 @@ Module gồm:
 | Xác thực tài khoản đăng nội dung (số điện thoại / định danh) | `/me/verification`, `/me/phone-verifications…` |
 | Văn bản pháp lý có phiên bản và bằng chứng chấp nhận | `/documents…`, `/me/acceptances`, `/public/documents/{kind}` |
 | Sổ đồng ý | `/me/consents` |
+| **Dữ liệu cá nhân**: mục đích và căn cứ xử lý, thời hạn lưu, sổ hoạt động xử lý, nơi lưu dữ liệu | `/purposes…`, `/retention`, `/processing-register`, `/residency`, `/public/purposes` |
+| **Sự cố dữ liệu cá nhân** (72 giờ) và **yêu cầu của chủ thể dữ liệu** qua kênh khác | `/incidents…`, `/subject-requests…` |
+| **Mã theo dõi quảng cáo và đồng ý cookie** | `/tracking-tags…`, `/cookie-settings/{org_id}`, `/public/consent-config`, `/public/cookie-consents` |
 | Quy tắc pháp lý có ngày hiệu lực, chính sách của khách | `/rules`, `/policies…` |
 | **Hồ sơ pháp lý website và Bộ Công Thương** | `/legal-profiles…`, `/websites…`, `/public/badge`, `/public/owner` |
 
-Hướng dẫn này nói về phần cuối, cùng mẫu trang bắt buộc của `content` đi kèm.
+Hướng dẫn này nói về thủ tục với Bộ Công Thương cùng mẫu trang bắt buộc của `content`, rồi dữ liệu cá nhân
+(kèm sổ tay sự cố 72 giờ) và mã theo dõi quảng cáo với đồng ý cookie.
 
 ## Thủ tục với Bộ Công Thương
 
@@ -173,3 +177,147 @@ POST /api/v1/content/templates/{key}/drafts
   thiếu biến bắt buộc thì trả `content.template_variables_missing` (422) liệt kê đủ một lần.
 - Kết quả là trang **nháp** (`content.write`); duyệt, đăng, rồi gắn vào website.
 - Mẫu nào cũng mở đầu bằng "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng".
+
+## Dữ liệu cá nhân
+
+Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định 356/2025/NĐ-CP (hiệu lực từ 01/01/2026 — đối chiếu văn
+bản gốc cùng người có chuyên môn pháp lý). Mỗi khách là bên kiểm soát dữ liệu của chính mình.
+
+### Mục đích và căn cứ xử lý
+
+`GET /purposes` (`compliance.privacy.read`) liệt kê mục đích xử lý: mặc định của quy tắc
+`privacy.default_purposes` (`service`, `marketing`, `analytics`, `legal`) gộp với mục đích riêng của khách.
+`POST /purposes` thêm, `PATCH /purposes/{key}` sửa (sửa mục mặc định thì lưu bản của khách) — cả hai cần
+`compliance.privacy.manage`. Mỗi mục đích có `category`, `legal_basis` (`consent`, `contract`,
+`legal_obligation`, `vital_interest`, `public_interest`), loại dữ liệu, bên nhận (tên, nước) và mô tả theo
+ngôn ngữ. `GET /public/purposes` (không cần đăng nhập) liệt kê mục đích đang dùng cho thông báo về quyền riêng
+tư; nhà cung cấp mã theo dõi đang bật hiện ở đó như bên nhận, kèm nước nhận dữ liệu.
+
+### Thời hạn lưu
+
+Mỗi module khai dữ liệu cá nhân nó giữ và giữ bao lâu (`Module::retention`, đọc từ cấu hình của module). `GET
+/retention` liệt kê, mỗi mục so với quy tắc `privacy.retention_limits`: `ok`, `exceeds_limit` hay
+`forever_not_allowed` (chỉ `accounting` — bằng chứng luật buộc giữ — được giữ mãi). Giới hạn đi kèm là mặc định
+thận trọng, không phải con số của luật. `autoxide doctor` cảnh báo (`compliance.retention`) khi có mục không
+`ok`; hạ cấu hình ghi ở `setting`.
+
+### Sổ hoạt động xử lý
+
+`GET /processing-register` trả mục đích, căn cứ, loại dữ liệu, bên nhận, thời hạn lưu và nơi lưu dữ liệu — đầu
+vào cho hồ sơ đánh giá tác động xử lý dữ liệu cá nhân; mẫu hồ sơ chính thức cần người có chuyên môn pháp lý.
+
+### Nơi lưu dữ liệu
+
+Có thể buộc một khách lưu dữ liệu ở một nước (Luật An ninh mạng 116/2025/QH15, NĐ 53/2022/NĐ-CP — ai bắt buộc
+lưu tại Việt Nam cần đối chiếu pháp lý):
+
+```bash
+autoxide placement country main VN          # ghi nước đặt máy chủ của một vị trí dữ liệu
+```
+
+```http
+PUT /api/v1/compliance/residency
+{"tenant_id": "…", "data_residency": "VN"}
+```
+
+Chỉ nhân sự nền tảng có `compliance.privacy.manage` đặt được. Bị từ chối (`tenant_residency_violation`, 409)
+khi vị trí dữ liệu của khách không ở nước đó hoặc chưa rõ nước; sau này dời khách sang vị trí ở nước khác cũng bị
+từ chối cùng mã, đổi nước của vị trí dữ liệu cũng vậy. `GET /residency` cho xem trạng thái của khách; `autoxide
+doctor` cảnh báo (`compliance.data_residency`) khách nào chưa đáp ứng.
+
+### Sự cố dữ liệu cá nhân: sổ tay 72 giờ
+
+Báo cáo gửi cơ quan có hạn **72 giờ kể từ khi phát hiện** (quy tắc `privacy.incident`, dữ liệu có ngày hiệu lực).
+Làm ngay khi nghi có sự cố:
+
+1. **Ghi ngay** — `POST /incidents` với `title`, `severity` (`low`…`critical`) và `detected_at` (lúc phát hiện,
+   không phải lúc bắt đầu). Kết quả có `report_due_at`. Cần `compliance.incidents.manage`.
+2. **Đặt người nhận nhắc** — chính sách `incident.alert_emails` của khách (`PUT /policies/incident.alert_emails`
+   với danh sách địa chỉ). Một job 15 phút một lần gửi mail ở mốc 24, 48, 60, 68 giờ và ở mốc hạn (mỗi mốc một
+   lần), và phát `compliance.incident_deadline_near`.
+3. **Khoanh vùng và ghi lại** — `PATCH /incidents/{id}` với `status: "contained"`, loại dữ liệu và số người;
+   mỗi phát hiện, mỗi việc đã làm thêm bằng `POST /incidents/{id}/entries` (nhật ký chỉ thêm).
+4. **Soạn thông báo** — `GET /incidents/{id}/draft?audience=authority&locale=vi` (và `audience=subjects` cho
+   người bị ảnh hưởng). Đây là bản nháp điền từ sự cố và chính sách `privacy.contact`: điền phần còn thiếu, nhờ
+   duyệt, rồi tự gửi.
+5. **Ghi đã báo** — `PATCH /incidents/{id}` với `authority_notified_at` và `authority_reference` (sự cố thành
+   `reported`), rồi `subjects_notified_at` khi đã báo người bị ảnh hưởng; cuối cùng `closed`.
+
+`GET /incidents?overdue=true` liệt kê sự cố quá hạn, `autoxide doctor` (`compliance.privacy_deadlines`) cảnh
+báo chúng. Hướng dẫn triển khai trỏ về đây ([DEPLOY.vi.md](DEPLOY.vi.md)).
+
+### Yêu cầu của chủ thể dữ liệu qua kênh khác
+
+Yêu cầu người dùng tự làm trong tài khoản (xuất, xoá) chạy ngay. Yêu cầu nhận qua email, thư, điện thoại hay từ
+cơ quan được ghi sổ để không bị sót:
+
+- `POST /subject-requests` với `kind` (`access`, `erasure`, `rectification`, `objection`, `restriction`,
+  `withdrawal`), `channel` (`email`, `post`, `phone`, `authority`, `other`), `subject` (ID người dùng, địa chỉ
+  email hay số điện thoại) và `received_at`. `due_at` lấy từ quy tắc `privacy.subject_requests` hiệu lực lúc
+  nhận (mặc định 72 giờ — cần đối chiếu văn bản gốc).
+- `POST /subject-requests/{id}/fulfil`: `access` của người dùng trả dữ liệu cá nhân của mọi module (gửi cho
+  người đó; không lưu lại); `erasure` / `withdrawal` của email hay số điện thoại xoá giá trị đó khỏi sổ đồng ý
+  (khoá băm và bản ghi giữ làm bằng chứng, để không gửi lại). Xoá cả tài khoản là `DELETE
+  /api/v1/auth/users/{id}`.
+- `PATCH /subject-requests/{id}` đặt `in_progress` hay `rejected` (kèm `reason`). `GET
+  /subject-requests?overdue=true` liệt kê yêu cầu trễ hạn. Mọi endpoint cần `compliance.privacy.manage`.
+
+Khi tài khoản bị xoá (`auth.user_deleted`), `compliance` xoá số điện thoại đã xác thực và mã đang chờ của người
+đó, gỡ người dùng khỏi bằng chứng đồng ý cookie; bằng chứng đồng ý, văn bản đã chấp nhận và kết quả định danh giữ
+trong thời gian luật yêu cầu. Bản xuất dữ liệu cá nhân của người dùng (`GET /api/v1/auth/me/export`) có phần của
+`compliance`.
+
+## Mã theo dõi quảng cáo và đồng ý cookie
+
+Khách gắn mã đo của nền tảng quảng cáo mà không phải dán script, và mã chỉ chạy sau khi người xem đồng ý. (Luật
+Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP, Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15 —
+cookie đo lường có cần đồng ý không, và hồ sơ đánh giá tác động khi chuyển dữ liệu ra nước ngoài, cần đối chiếu
+pháp lý; thiết kế chọn cách hiểu chặt: hỏi trước.)
+
+### Nhà cung cấp và mã
+
+`GET /tracking-providers` liệt kê nhà cung cấp cho sẵn; khách chỉ điền mã ID:
+
+| `provider` | Tên | Nhóm | Dạng mã | Dữ liệu đi tới |
+| --- | --- | --- | --- | --- |
+| `ga4` | Google Analytics 4 | `analytics` | `G-XXXXXXXXXX` | US |
+| `gtm` | Google Tag Manager | `marketing` | `GTM-XXXXXXX` | US |
+| `google_ads` | Google Ads | `marketing` | `AW-123456789` | US |
+| `meta` | Meta Pixel | `marketing` | chữ số | US |
+| `tiktok` | TikTok Pixel | `marketing` | chữ và số | SG |
+| `zalo` | Zalo Ads Pixel | `marketing` | chữ số | VN |
+
+`POST /tracking-tags {org_id, provider, tracking_id}`, `PATCH /tracking-tags/{id}` (`status`: `active` /
+`paused`), `DELETE /tracking-tags/{id}` — cần `compliance.tracking.manage` trên nút của website. Mã sai dạng trả
+`compliance.tracking_id_invalid` kèm dạng mong đợi; nhà cung cấp lạ trả `compliance.tracking_provider_unknown`.
+
+### Banner
+
+`PUT /cookie-settings/{org_id}` đặt `enabled`, các nhóm tuỳ chọn được hỏi `categories` (`preferences`,
+`analytics`, `marketing`; `necessary` luôn bật và không mang mã nào) và `position`. Nhóm của mã đang bật luôn được
+hỏi. Đổi nhóm hay nhà cung cấp đang bật thì tăng `policy_version`: người xem được hỏi lại. `GET
+/cookie-consents/stats?org_id=` cho số gộp 30 ngày gần nhất, không bao giờ trả bản ghi riêng.
+
+### Cho giao diện
+
+```http
+GET  /api/v1/compliance/public/consent-config?granted=analytics&locale=vi
+POST /api/v1/compliance/public/cookie-consents
+{"consent_id": "<ngẫu nhiên, giữ trong cookie cần thiết>", "categories": ["analytics"], "policy_version": 3}
+```
+
+Hợp đồng với giao diện:
+
+- **Không tải gì trước khi đồng ý.** Không có `granted` thì cấu hình không trả mã nào; có thì chỉ mã đang bật của
+  các nhóm đó. Đọc lựa chọn của người xem từ cookie cần thiết của bạn rồi gửi lên.
+- **Từ chối dễ như đồng ý.** Hiện `texts.reject_all` nổi bật ngang `texts.accept_all`, ngay lớp đầu; không nhóm nào
+  được chọn sẵn (`preselected: false`). `texts.legal` không đổi được.
+- **Ghi lựa chọn** bằng `POST /public/cookie-consents` (không cần đăng nhập; giới hạn theo khối mạng bằng
+  `AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR`). Lưu mã ngẫu nhiên, nhóm, phiên bản và bản băm của khối
+  mạng — không bao giờ lưu IP thô — trong số ngày của `privacy.consent_proof_days`. Người xem đã đăng nhập thì lựa
+  chọn đi vào cả sổ đồng ý (mục đích `analytics` / `marketing`, phạm vi `website:<id nút>`). `policy_version` cũ
+  trả `compliance.cookie_policy_changed` (409): hiện lại banner.
+- **Không làm chậm trang.** Tải mã `async`, sau khi trang đã hiện (`loading: after_consent_deferred`); thêm
+  `csp_hosts` vào Content-Security-Policy; không tải mã ở trang đăng nhập và trang tài khoản; ở trang thanh toán
+  chỉ gửi sự kiện chuyển đổi chuẩn (`view_item`, `add_to_cart`, `begin_checkout`, `purchase`).
+- Chưa làm gửi chuyển đổi từ máy chủ tới nền tảng quảng cáo (cần đối chiếu riêng về chuyển dữ liệu cá nhân).

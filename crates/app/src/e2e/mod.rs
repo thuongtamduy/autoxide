@@ -14,5 +14,6 @@ pub(crate) mod moit;
 pub(crate) mod notifications;
 pub(crate) mod plans;
 pub(crate) mod posting_verification;
+pub(crate) mod privacy;
 pub(crate) mod signup;
 pub(crate) mod tenant_move;

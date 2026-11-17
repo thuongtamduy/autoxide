@@ -38,6 +38,12 @@ pub(crate) const OTP_PER_IP_PER_HOUR: Setting = Setting::new(
 )
 .with_default("20");
 
+pub(crate) const COOKIE_CONSENTS_PER_IP_PER_HOUR: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR",
+    "Cookie consent records accepted from one network block (IP /24 or /64) per hour, 1 to 100000.",
+)
+.with_default("60");
+
 /// Giới hạn của mã một lần xác thực số điện thoại.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Otp {
@@ -65,11 +71,13 @@ impl Default for Otp {
 pub(crate) struct Config {
     pub callback_retention_days: i64,
     pub otp: Otp,
+    /// `AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR`.
+    pub cookie_consents_per_hour: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { callback_retention_days: 90, otp: Otp::default() }
+        Config { callback_retention_days: 90, otp: Otp::default(), cookie_consents_per_hour: 60 }
     }
 }
 
@@ -84,7 +92,10 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Config, Invalid> {
         reader.get_with(&OTP_PER_USER_PER_DAY, |raw| parse_in_range(raw, 1u32, 1000));
     let per_ip_per_hour =
         reader.get_with(&OTP_PER_IP_PER_HOUR, |raw| parse_in_range(raw, 1u32, 10_000));
+    let cookie_consents_per_hour =
+        reader.get_with(&COOKIE_CONSENTS_PER_IP_PER_HOUR, |raw| parse_in_range(raw, 1u32, 100_000));
     Ok(Config {
+        cookie_consents_per_hour: cookie_consents_per_hour?,
         callback_retention_days: callback_retention_days?,
         otp: Otp {
             ttl_seconds: ttl_seconds?,

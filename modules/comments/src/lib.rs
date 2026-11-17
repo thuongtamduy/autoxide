@@ -104,6 +104,37 @@ impl Module for CommentsModule {
         Ok(())
     }
 
+    // Thời hạn lưu dữ liệu cá nhân (bước 37 C5, D-360), đọc từ cấu hình đang có.
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        let Some(config) = &self.config else {
+            return Vec::new();
+        };
+        vec![
+            RetentionPolicy::new(
+                "comments.published",
+                "Comments that were shown (author, text); kept until a moderator or the author \
+                 deletes them, or the account is deleted.",
+                DataCategory::Basic,
+                Keep::UntilDeleted,
+            ),
+            RetentionPolicy::new(
+                "comments.unpublished",
+                "Comments never shown (waiting for approval or spam).",
+                DataCategory::Basic,
+                Keep::Days(config.retention_days),
+            )
+            .setting(config::RETENTION_DAYS.name),
+            RetentionPolicy::new(
+                "comments.ip_hashes",
+                "Hashed network address of comments and guest reports.",
+                DataCategory::Security,
+                Keep::Days(config.ip_retention_days),
+            )
+            .setting(config::IP_RETENTION_DAYS.name),
+        ]
+    }
+
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
         config::tenant_settings()
     }

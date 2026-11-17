@@ -52,6 +52,7 @@ pub struct Modules {
     apis: Apis,
     /// Phần dữ liệu cá nhân các module đăng ký lúc khởi động.
     personal_data: PersonalDataExport,
+    retention: crate::privacy::RetentionCatalog,
     /// Loại đối tượng các module đăng ký lúc khởi động.
     resources: crate::resource::ResourceDirectory,
     /// Event vòng đời các module khai (`Module::resource_events`), đã kiểm.
@@ -193,6 +194,7 @@ impl Modules {
                 translations,
                 wake: Arc::new(tokio::sync::Notify::new()),
                 personal_data: PersonalDataExport::default(),
+                retention: crate::privacy::RetentionCatalog::default(),
                 resources: crate::resource::ResourceDirectory::default(),
                 resource_events,
                 verification: crate::access::PostingVerification::default(),
@@ -258,6 +260,16 @@ impl Modules {
         let setup = self.catalog.setup_steps();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
+        // Gọi sau `configure` của mọi module: thời hạn đọc từ cấu hình.
+        self.retention = crate::privacy::RetentionCatalog::new(
+            self.modules
+                .iter()
+                .flat_map(|module| {
+                    let name = module.name();
+                    module.retention().into_iter().map(move |policy| (name, policy))
+                })
+                .collect(),
+        );
         for module in &mut self.modules {
             let name = module.name();
             let mut context = StartContext {
@@ -269,6 +281,7 @@ impl Modules {
                 wake: &self.wake,
                 apis: &mut apis,
                 personal_data: &self.personal_data,
+                retention: &self.retention,
                 resources: &self.resources,
                 work: &work,
                 finders: &finders,
@@ -359,6 +372,11 @@ impl Modules {
         T: ?Sized + Send + Sync + 'static,
     {
         self.apis.get()
+    }
+
+    /// Sổ thời hạn lưu của mọi module (đủ sau `start`).
+    pub fn retention(&self) -> crate::privacy::RetentionCatalog {
+        self.retention.clone()
     }
 
     /// Sổ dữ liệu cá nhân các module đã đăng ký lúc [`start`](Self::start).

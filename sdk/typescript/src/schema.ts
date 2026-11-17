@@ -1045,6 +1045,52 @@ export type ComplianceConsent = {
   withdrawn_at?: string | null;
 };
 
+/** A consent category of the banner. */
+export type ComplianceConsentCategory = {
+  description: string;
+  /** `necessary`, `preferences`, `analytics` or `marketing`. */
+  key: string;
+  /** Always `false`: no box is ticked beforehand. */
+  preselected: boolean;
+  /** Providers that load when the category is accepted (names and countries, no IDs). */
+  providers: ComplianceConsentProvider[];
+  /** `true` only for `necessary` (always on, no tracking tag). */
+  required: boolean;
+  title: string;
+};
+
+/** The cookie banner and the tags to load. */
+export type ComplianceConsentConfig = {
+  categories: ComplianceConsentCategory[];
+  /** Hosts of every active provider of the website, for the Content-Security-Policy. */
+  csp_hosts: string[];
+  /** `false`: show no banner and load no tag. */
+  enabled: boolean;
+  /**
+   * How to load tags: `after_consent_deferred` — after consent, `async`, after the page has
+   * rendered; never on sign-in or account pages.
+   */
+  loading: string;
+  /** Store it with the visitor's choice; ask again when it changes. */
+  policy_version: number;
+  /** `bottom`, `top` or `center`. */
+  position: string;
+  /** Tags to load now: only the active tags of the categories in `granted`; empty by default. */
+  tags: ComplianceTagToLoad[];
+  /**
+   * `title`, `body`, `accept_all`, `reject_all` (show it as prominently as `accept_all`),
+   * `customize`, `save`, `legal_title`, `legal`.
+   */
+  texts: Record<string, unknown>;
+};
+
+/** A provider listed in a category. */
+export type ComplianceConsentProvider = {
+  country: string;
+  key: string;
+  name: string;
+};
+
 /** A consent to give or withdraw. */
 export type ComplianceConsentRequest = {
   channel?: string;
@@ -1056,6 +1102,77 @@ export type ComplianceConsentRequest = {
   text?: string | null;
   /** Version of that sentence. */
   text_version?: string | null;
+};
+
+/** How many accepted a category. */
+export type ComplianceCookieCategoryCount = {
+  category: string;
+  count: number;
+};
+
+/** A visitor's choice to record. */
+export type ComplianceCookieConsentRequest = {
+  /** Categories accepted; an empty list rejects all (`necessary` is always on). */
+  categories: string[];
+  /**
+   * A random value (16 to 64 letters, digits, `-`, `_`) the interface creates and keeps in a
+   * necessary cookie.
+   */
+  consent_id: string;
+  /** The `policy_version` of the banner shown. */
+  policy_version: number;
+};
+
+/** The cookie banner of a website. */
+export type ComplianceCookieSettings = {
+  /** Optional categories the tenant turned on. */
+  categories: string[];
+  /**
+   * Categories the banner asks about: those turned on plus those of active tags (`necessary` is
+   * always there and not listed).
+   */
+  effective_categories: string[];
+  /** `false`: no banner and no tag ever loads. */
+  enabled: boolean;
+  org_id: string;
+  /**
+   * Version of the cookie policy; changes when categories or active providers change, and
+   * visitors are asked again. `0` until the banner is set.
+   */
+  policy_version: number;
+  /** `bottom`, `top` or `center`. */
+  position: string;
+  updated_at: string;
+};
+
+/** Cookie banner settings to save. */
+export type ComplianceCookieSettingsRequest = {
+  /** Optional categories to ask about: `preferences`, `analytics`, `marketing`. */
+  categories?: string[] | null;
+  enabled?: boolean | null;
+  /** `bottom`, `top` or `center`. */
+  position?: string | null;
+};
+
+/** Consent counts of a website. */
+export type ComplianceCookieStats = {
+  /** Choices that accepted each category. */
+  accepted: ComplianceCookieCategoryCount[];
+  org_id: string;
+  /** Start of the period (the last 30 days). */
+  since: string;
+  /** Choices recorded. */
+  total: number;
+};
+
+/** A party that receives personal data. */
+export type ComplianceDataRecipient = {
+  /** Country that receives the data (ISO 3166-1 alpha-2); data sent abroad when not `VN`. */
+  country?: string | null;
+  /** Who, e.g. `Google Analytics 4`. */
+  name: string;
+  /** Where it comes from: `purpose` (set on the purpose) or `tracking` (an active tag). */
+  source?: string;
 };
 
 /** A legal document of the tenant. */
@@ -1121,6 +1238,84 @@ export type ComplianceDossierDocument = {
   format: string;
   /** `declaration`, `project_plan` or `platform_rules`. */
   key: string;
+  title: string;
+};
+
+/** A personal data breach. */
+export type ComplianceIncident = {
+  affected_count?: number | null;
+  authority_notified_at?: string | null;
+  authority_reference?: string | null;
+  created_at: string;
+  data_categories: string[];
+  description: string;
+  /** When it was detected; the reporting deadline counts from here. */
+  detected_at: string;
+  /** The log (`GET /incidents/{id}` only; absent in lists). */
+  entries?: ComplianceIncidentEntry[] | null;
+  id: string;
+  /** `true` while not reported and past `report_due_at`. */
+  overdue: boolean;
+  /** Report to the authority before this time (72 hours by default, legal rule `privacy.incident`). */
+  report_due_at: string;
+  /** `low`, `medium`, `high` or `critical`. */
+  severity: string;
+  /** `open`, `contained`, `reported` or `closed`. */
+  status: string;
+  subjects_notified_at?: string | null;
+  title: string;
+  updated_at: string;
+};
+
+/** Changes to a breach (absent fields stay as they are). */
+export type ComplianceIncidentChange = {
+  affected_count?: number | null;
+  /** When the authority was notified (moves an open breach to `reported`). */
+  authority_notified_at?: string | null;
+  /** Reference of the report at the authority. */
+  authority_reference?: string | null;
+  data_categories?: string[] | null;
+  description?: string | null;
+  severity?: string | null;
+  /** `open`, `contained`, `reported` (sets `authority_notified_at` to now if absent) or `closed`. */
+  status?: string | null;
+  /** When the people affected were told. */
+  subjects_notified_at?: string | null;
+  title?: string | null;
+};
+
+/** A draft notification. */
+export type ComplianceIncidentDraft = {
+  audience: string;
+  /** Reminder that a legal professional must review it. */
+  disclaimer: string;
+  locale: string;
+  subject: string;
+  text: string;
+};
+
+/** A line of the log of a breach. */
+export type ComplianceIncidentEntry = {
+  author_user_id?: string | null;
+  body: string;
+  created_at: string;
+  id: string;
+};
+
+/** A line to add to the log. */
+export type ComplianceIncidentEntryRequest = {
+  body: string;
+};
+
+/** A personal data breach to record. */
+export type ComplianceIncidentRequest = {
+  affected_count?: number | null;
+  data_categories?: string[];
+  description?: string;
+  /** When it was detected (not in the future); defaults to now. */
+  detected_at?: string | null;
+  /** `low`, `medium`, `high` or `critical`. */
+  severity: string;
   title: string;
 };
 
@@ -1328,6 +1523,20 @@ export type CompliancePolicyRequest = {
   value: unknown;
 };
 
+/** The register of processing activities. */
+export type ComplianceProcessingRegister = {
+  /** The `privacy.contact` policy of the tenant, if set. */
+  contact?: Record<string, unknown> | null;
+  /** Name of the tenant (the data controller). */
+  controller: string;
+  /** Reminder that a legal professional should review it. */
+  disclaimer: string;
+  generated_at: string;
+  purposes: CompliancePurpose[];
+  residency: ComplianceResidency;
+  retention: ComplianceRetentionItem[];
+};
+
 /** The website owner's information for a footer (what the law requires a commerce website to show). */
 export type CompliancePublicOwner = {
   address?: Address | null;
@@ -1342,6 +1551,103 @@ export type CompliancePublicOwner = {
   representative_name?: string | null;
   tax_code?: string | null;
   trade_name?: string | null;
+};
+
+/** A processing purpose, with its legal basis. */
+export type CompliancePurpose = {
+  active: boolean;
+  /** `service`, `marketing`, `analytics`, `legal` or `kyc`. */
+  category: string;
+  /** Kinds of personal data processed, e.g. `["email", "name"]`. */
+  data_categories: string[];
+  /** Description by language, e.g. `{"en": "…", "vi": "…"}`. */
+  description: Record<string, unknown>;
+  /** e.g. `marketing`. */
+  key: string;
+  /** `consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`. */
+  legal_basis: string;
+  /** Who receives the data. */
+  recipients: ComplianceDataRecipient[];
+  /** How long the data is kept, in words. */
+  retention?: string | null;
+  /** `default` (from the legal rules) or `tenant` (added or changed by the tenant). */
+  source: string;
+};
+
+/** Changes to a processing purpose (absent fields stay as they are). */
+export type CompliancePurposeChange = {
+  active?: boolean | null;
+  category?: string | null;
+  data_categories?: string[] | null;
+  description?: Record<string, unknown> | null;
+  legal_basis?: string | null;
+  recipients?: ComplianceDataRecipient[] | null;
+  /** How long the data is kept, in words; `null` clears it. */
+  retention?: string | null;
+};
+
+/** A processing purpose to add. */
+export type CompliancePurposeRequest = {
+  active?: boolean | null;
+  /** `service`, `marketing`, `analytics`, `legal` or `kyc`. */
+  category: string;
+  data_categories?: string[];
+  /** Description by language, e.g. `{"en": "…", "vi": "…"}`. */
+  description: Record<string, unknown>;
+  /**
+   * Lower-case letters, digits and `_`, e.g. `loyalty`. A key of the default purposes overrides
+   * that default.
+   */
+  key: string;
+  /** `consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`. */
+  legal_basis: string;
+  recipients?: ComplianceDataRecipient[];
+  retention?: string | null;
+};
+
+/** Where the tenant's data is kept. */
+export type ComplianceResidency = {
+  /** `true` when there is no requirement or the placement is in the required country. */
+  compliant: boolean;
+  /** Country the tenant must keep its data in (ISO 3166-1 alpha-2, e.g. `VN`); `null` when free. */
+  data_residency?: string | null;
+  /** The placement (database) that keeps the data. */
+  placement: string;
+  /** Country of that placement; `null` when unknown. */
+  placement_country?: string | null;
+  tenant_id: string;
+};
+
+/** Where a tenant must keep its data. */
+export type ComplianceResidencyRequest = {
+  /** Two-letter country code (e.g. `VN`: keep the data in Vietnam), or `null` for no requirement. */
+  data_residency?: string | null;
+  /** The tenant; defaults to the caller's (the platform tenant). */
+  tenant_id?: string | null;
+};
+
+/** A kind of personal data and how long it is kept. */
+export type ComplianceRetentionItem = {
+  /** `basic`, `sensitive`, `security` or `accounting`. */
+  category: DataCategory;
+  /** Days, when `keep` is `days`. */
+  days?: number | null;
+  description: string;
+  /** `days`, `until_deleted` or `forever`. */
+  keep: string;
+  /** Longest the legal rule `privacy.retention_limits` allows for the category, in days. */
+  limit_days?: number | null;
+  /** Module that keeps the data. */
+  module: string;
+  /** `<module>.<kind>`, e.g. `forms.submissions`. */
+  name: string;
+  /** Server setting that sets it, if any. */
+  setting?: string | null;
+  /**
+   * `ok`, `exceeds_limit` (kept longer than the limit) or `forever_not_allowed` (kept forever
+   * although the category should not be).
+   */
+  status: string;
 };
 
 /** A legal rule in force. */
@@ -1366,6 +1672,128 @@ export type ComplianceRulesImported = {
 export type ComplianceRulesRequest = {
   /** A rules pack in the format of `modules/compliance/rules/vn.json`. */
   pack: Record<string, unknown>;
+};
+
+/** A request of a data subject received through another channel. */
+export type ComplianceSubjectRequest = {
+  /** `email`, `post`, `phone`, `authority` or `other`. */
+  channel: string;
+  closed_at?: string | null;
+  created_at: string;
+  /** Answer before this time (legal rule `privacy.subject_requests`). */
+  due_at: string;
+  handled_by?: string | null;
+  id: string;
+  /** `access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`. */
+  kind: string;
+  notes?: string | null;
+  /** `true` while not done and past `due_at`. */
+  overdue: boolean;
+  reason?: string | null;
+  received_at: string;
+  /** `received`, `in_progress`, `fulfilled` or `rejected`. */
+  status: string;
+  /** The user id, email address or phone number (E.164) of the person. */
+  subject: string;
+  /** `user`, `email` or `phone`. */
+  subject_kind: string;
+  updated_at: string;
+};
+
+/** A status change. */
+export type ComplianceSubjectRequestChange = {
+  notes?: string | null;
+  reason?: string | null;
+  /** `in_progress` or `rejected` (needs `reason`). */
+  status?: string | null;
+};
+
+/** How a request was fulfilled. */
+export type ComplianceSubjectRequestFulfil = {
+  notes?: string | null;
+};
+
+/** A request to record. */
+export type ComplianceSubjectRequestRequest = {
+  /** `email`, `post`, `phone`, `authority` or `other`. */
+  channel: string;
+  /** `access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`. */
+  kind: string;
+  notes?: string | null;
+  /** When it was received (not in the future); defaults to now. The due date counts from here. */
+  received_at?: string | null;
+  /** The person: a user id, an email address or a phone number. */
+  subject: string;
+};
+
+/** The result of fulfilling a request. */
+export type ComplianceSubjectRequestResult = {
+  /** For `erasure` / `withdrawal`: records erased or emptied. */
+  erased?: number | null;
+  /** For `access`: the person's data by module — send it to them; it is not stored. */
+  export?: Record<string, unknown> | null;
+  /** What a person still has to do, if anything. */
+  next_steps?: string | null;
+  request: ComplianceSubjectRequest;
+};
+
+/** A tag to load now. */
+export type ComplianceTagToLoad = {
+  category: string;
+  provider: string;
+  /**
+   * Script to load (`async`, after the page has rendered); `null` when the interface builds it
+   * from the provider's guide.
+   */
+  script?: string | null;
+  tracking_id: string;
+};
+
+/** A built-in tracking provider. */
+export type ComplianceTrackingProvider = {
+  /** Consent category it needs: `analytics` or `marketing`. */
+  category: string;
+  /** Country that receives the data (ISO 3166-1 alpha-2). */
+  country: string;
+  /** Hosts to allow in the Content-Security-Policy when it loads. */
+  csp_hosts: string[];
+  /** Form of the tracking ID, e.g. `G-XXXXXXXXXX`. */
+  example: string;
+  /** Key to use in `provider`, e.g. `ga4`. */
+  key: string;
+  name: string;
+};
+
+/** A tracking tag of a website. */
+export type ComplianceTrackingTag = {
+  /** Consent category it needs. */
+  category: string;
+  created_at: string;
+  id: string;
+  /** The unit of the website (the root unit is the whole tenant). */
+  org_id: string;
+  provider: string;
+  /** `active` or `paused`. */
+  status: string;
+  tracking_id: string;
+  updated_at: string;
+};
+
+/** Changes to a tag. */
+export type ComplianceTrackingTagChange = {
+  /** `active` or `paused`. */
+  status?: string | null;
+  tracking_id?: string | null;
+};
+
+/** A tag to add. */
+export type ComplianceTrackingTagRequest = {
+  /** The unit of the website; defaults to the root unit (the whole tenant). */
+  org_id?: string | null;
+  /** `ga4`, `gtm`, `google_ads`, `meta`, `tiktok` or `zalo`. */
+  provider: string;
+  /** The ID the provider gave, e.g. `G-XXXXXXXXXX`. */
+  tracking_id: string;
 };
 
 /** How far an account is verified for posting content; `identity` includes `phone`. */
@@ -1839,6 +2267,9 @@ export type CustomerResponse = {
   name: string;
   updated_at: string;
 };
+
+/** Kind of personal data (Vietnam, Personal Data Protection Law 91/2025/QH15). */
+export type DataCategory = "basic" | "sensitive" | "security" | "accounting";
 
 /** Envelope of a single result. */
 export type Data_AcceptedResponse = {
@@ -2470,6 +2901,73 @@ export type Data_ComplianceConsent = {
 };
 
 /** Envelope of a single result. */
+export type Data_ComplianceConsentConfig = {
+  /** The cookie banner and the tags to load. */
+  data: {
+    categories: ComplianceConsentCategory[];
+    /** Hosts of every active provider of the website, for the Content-Security-Policy. */
+    csp_hosts: string[];
+    /** `false`: show no banner and load no tag. */
+    enabled: boolean;
+    /**
+     * How to load tags: `after_consent_deferred` — after consent, `async`, after the page has
+     * rendered; never on sign-in or account pages.
+     */
+    loading: string;
+    /** Store it with the visitor's choice; ask again when it changes. */
+    policy_version: number;
+    /** `bottom`, `top` or `center`. */
+    position: string;
+    /** Tags to load now: only the active tags of the categories in `granted`; empty by default. */
+    tags: ComplianceTagToLoad[];
+    /**
+     * `title`, `body`, `accept_all`, `reject_all` (show it as prominently as `accept_all`),
+     * `customize`, `save`, `legal_title`, `legal`.
+     */
+    texts: Record<string, unknown>;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceCookieSettings = {
+  /** The cookie banner of a website. */
+  data: {
+    /** Optional categories the tenant turned on. */
+    categories: string[];
+    /**
+     * Categories the banner asks about: those turned on plus those of active tags (`necessary` is
+     * always there and not listed).
+     */
+    effective_categories: string[];
+    /** `false`: no banner and no tag ever loads. */
+    enabled: boolean;
+    org_id: string;
+    /**
+     * Version of the cookie policy; changes when categories or active providers change, and
+     * visitors are asked again. `0` until the banner is set.
+     */
+    policy_version: number;
+    /** `bottom`, `top` or `center`. */
+    position: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceCookieStats = {
+  /** Consent counts of a website. */
+  data: {
+    /** Choices that accepted each category. */
+    accepted: ComplianceCookieCategoryCount[];
+    org_id: string;
+    /** Start of the period (the last 30 days). */
+    since: string;
+    /** Choices recorded. */
+    total: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceDocument = {
   /** A legal document of the tenant. */
   data: {
@@ -2523,6 +3021,59 @@ export type Data_ComplianceDossier = {
     form: Record<string, unknown>;
     generated_at: string;
     website_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceIncident = {
+  /** A personal data breach. */
+  data: {
+    affected_count?: number | null;
+    authority_notified_at?: string | null;
+    authority_reference?: string | null;
+    created_at: string;
+    data_categories: string[];
+    description: string;
+    /** When it was detected; the reporting deadline counts from here. */
+    detected_at: string;
+    /** The log (`GET /incidents/{id}` only; absent in lists). */
+    entries?: ComplianceIncidentEntry[] | null;
+    id: string;
+    /** `true` while not reported and past `report_due_at`. */
+    overdue: boolean;
+    /** Report to the authority before this time (72 hours by default, legal rule `privacy.incident`). */
+    report_due_at: string;
+    /** `low`, `medium`, `high` or `critical`. */
+    severity: string;
+    /** `open`, `contained`, `reported` or `closed`. */
+    status: string;
+    subjects_notified_at?: string | null;
+    title: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceIncidentDraft = {
+  /** A draft notification. */
+  data: {
+    audience: string;
+    /** Reminder that a legal professional must review it. */
+    disclaimer: string;
+    locale: string;
+    subject: string;
+    text: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceIncidentEntry = {
+  /** A line of the log of a breach. */
+  data: {
+    author_user_id?: string | null;
+    body: string;
+    created_at: string;
+    id: string;
   };
 };
 
@@ -2645,6 +3196,23 @@ export type Data_CompliancePolicy = {
 };
 
 /** Envelope of a single result. */
+export type Data_ComplianceProcessingRegister = {
+  /** The register of processing activities. */
+  data: {
+    /** The `privacy.contact` policy of the tenant, if set. */
+    contact?: Record<string, unknown> | null;
+    /** Name of the tenant (the data controller). */
+    controller: string;
+    /** Reminder that a legal professional should review it. */
+    disclaimer: string;
+    generated_at: string;
+    purposes: CompliancePurpose[];
+    residency: ComplianceResidency;
+    retention: ComplianceRetentionItem[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CompliancePublicOwner = {
   /** The website owner's information for a footer (what the law requires a commerce website to show). */
   data: {
@@ -2664,10 +3232,111 @@ export type Data_CompliancePublicOwner = {
 };
 
 /** Envelope of a single result. */
+export type Data_CompliancePurpose = {
+  /** A processing purpose, with its legal basis. */
+  data: {
+    active: boolean;
+    /** `service`, `marketing`, `analytics`, `legal` or `kyc`. */
+    category: string;
+    /** Kinds of personal data processed, e.g. `["email", "name"]`. */
+    data_categories: string[];
+    /** Description by language, e.g. `{"en": "…", "vi": "…"}`. */
+    description: Record<string, unknown>;
+    /** e.g. `marketing`. */
+    key: string;
+    /** `consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`. */
+    legal_basis: string;
+    /** Who receives the data. */
+    recipients: ComplianceDataRecipient[];
+    /** How long the data is kept, in words. */
+    retention?: string | null;
+    /** `default` (from the legal rules) or `tenant` (added or changed by the tenant). */
+    source: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceResidency = {
+  /** Where the tenant's data is kept. */
+  data: {
+    /** `true` when there is no requirement or the placement is in the required country. */
+    compliant: boolean;
+    /** Country the tenant must keep its data in (ISO 3166-1 alpha-2, e.g. `VN`); `null` when free. */
+    data_residency?: string | null;
+    /** The placement (database) that keeps the data. */
+    placement: string;
+    /** Country of that placement; `null` when unknown. */
+    placement_country?: string | null;
+    tenant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceRulesImported = {
   /** How many rules were new. */
   data: {
     imported: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceSubjectRequest = {
+  /** A request of a data subject received through another channel. */
+  data: {
+    /** `email`, `post`, `phone`, `authority` or `other`. */
+    channel: string;
+    closed_at?: string | null;
+    created_at: string;
+    /** Answer before this time (legal rule `privacy.subject_requests`). */
+    due_at: string;
+    handled_by?: string | null;
+    id: string;
+    /** `access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`. */
+    kind: string;
+    notes?: string | null;
+    /** `true` while not done and past `due_at`. */
+    overdue: boolean;
+    reason?: string | null;
+    received_at: string;
+    /** `received`, `in_progress`, `fulfilled` or `rejected`. */
+    status: string;
+    /** The user id, email address or phone number (E.164) of the person. */
+    subject: string;
+    /** `user`, `email` or `phone`. */
+    subject_kind: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceSubjectRequestResult = {
+  /** The result of fulfilling a request. */
+  data: {
+    /** For `erasure` / `withdrawal`: records erased or emptied. */
+    erased?: number | null;
+    /** For `access`: the person's data by module — send it to them; it is not stored. */
+    export?: Record<string, unknown> | null;
+    /** What a person still has to do, if anything. */
+    next_steps?: string | null;
+    request: ComplianceSubjectRequest;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceTrackingTag = {
+  /** A tracking tag of a website. */
+  data: {
+    /** Consent category it needs. */
+    category: string;
+    created_at: string;
+    id: string;
+    /** The unit of the website (the root unit is the whole tenant). */
+    org_id: string;
+    provider: string;
+    /** `active` or `paused`. */
+    status: string;
+    tracking_id: string;
+    updated_at: string;
   };
 };
 
@@ -5840,6 +6509,55 @@ export type Data_Vec_CompliancePolicy = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CompliancePurpose = {
+  data: {
+    active: boolean;
+    /** `service`, `marketing`, `analytics`, `legal` or `kyc`. */
+    category: string;
+    /** Kinds of personal data processed, e.g. `["email", "name"]`. */
+    data_categories: string[];
+    /** Description by language, e.g. `{"en": "…", "vi": "…"}`. */
+    description: Record<string, unknown>;
+    /** e.g. `marketing`. */
+    key: string;
+    /** `consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`. */
+    legal_basis: string;
+    /** Who receives the data. */
+    recipients: ComplianceDataRecipient[];
+    /** How long the data is kept, in words. */
+    retention?: string | null;
+    /** `default` (from the legal rules) or `tenant` (added or changed by the tenant). */
+    source: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ComplianceRetentionItem = {
+  data: {
+    /** `basic`, `sensitive`, `security` or `accounting`. */
+    category: DataCategory;
+    /** Days, when `keep` is `days`. */
+    days?: number | null;
+    description: string;
+    /** `days`, `until_deleted` or `forever`. */
+    keep: string;
+    /** Longest the legal rule `privacy.retention_limits` allows for the category, in days. */
+    limit_days?: number | null;
+    /** Module that keeps the data. */
+    module: string;
+    /** `<module>.<kind>`, e.g. `forms.submissions`. */
+    name: string;
+    /** Server setting that sets it, if any. */
+    setting?: string | null;
+    /**
+     * `ok`, `exceeds_limit` (kept longer than the limit) or `forever_not_allowed` (kept forever
+     * although the category should not be).
+     */
+    status: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ComplianceRule = {
   data: {
     body: Record<string, unknown>;
@@ -5851,6 +6569,23 @@ export type Data_Vec_ComplianceRule = {
     /** Check against the original text before relying on it. */
     needs_legal_review: boolean;
     version: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ComplianceTrackingProvider = {
+  data: {
+    /** Consent category it needs: `analytics` or `marketing`. */
+    category: string;
+    /** Country that receives the data (ISO 3166-1 alpha-2). */
+    country: string;
+    /** Hosts to allow in the Content-Security-Policy when it loads. */
+    csp_hosts: string[];
+    /** Form of the tracking ID, e.g. `G-XXXXXXXXXX`. */
+    example: string;
+    /** Key to use in `provider`, e.g. `ga4`. */
+    key: string;
+    name: string;
   }[];
 };
 
@@ -6209,6 +6944,11 @@ export type Data_Vec_Placement = {
   data: {
     /** `sqlite` or `postgres`. */
     backend: string;
+    /**
+     * Country of the servers (ISO 3166-1 alpha-2), for tenants that must keep their data in one
+     * country; `null` when unknown. Set with `autoxide placement country`.
+     */
+    country_code?: string | null;
     created_at: string;
     id: string;
     /** `shared` (many tenants) or `dedicated` (one tenant). */
@@ -9853,6 +10593,36 @@ export type Page_ComplianceAcceptance = {
 };
 
 /** One page of a list. */
+export type Page_ComplianceIncident = {
+  /** The items of this page, in the requested order. */
+  data: {
+    affected_count?: number | null;
+    authority_notified_at?: string | null;
+    authority_reference?: string | null;
+    created_at: string;
+    data_categories: string[];
+    description: string;
+    /** When it was detected; the reporting deadline counts from here. */
+    detected_at: string;
+    /** The log (`GET /incidents/{id}` only; absent in lists). */
+    entries?: ComplianceIncidentEntry[] | null;
+    id: string;
+    /** `true` while not reported and past `report_due_at`. */
+    overdue: boolean;
+    /** Report to the authority before this time (72 hours by default, legal rule `privacy.incident`). */
+    report_due_at: string;
+    /** `low`, `medium`, `high` or `critical`. */
+    severity: string;
+    /** `open`, `contained`, `reported` or `closed`. */
+    status: string;
+    subjects_notified_at?: string | null;
+    title: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ComplianceKycProfile = {
   /** The items of this page, in the requested order. */
   data: {
@@ -9910,6 +10680,55 @@ export type Page_ComplianceLegalProfile = {
     /** 10 or 12 digits, or 10 digits, `-` and 3 digits. */
     tax_code?: string | null;
     trade_name?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceSubjectRequest = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `email`, `post`, `phone`, `authority` or `other`. */
+    channel: string;
+    closed_at?: string | null;
+    created_at: string;
+    /** Answer before this time (legal rule `privacy.subject_requests`). */
+    due_at: string;
+    handled_by?: string | null;
+    id: string;
+    /** `access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`. */
+    kind: string;
+    notes?: string | null;
+    /** `true` while not done and past `due_at`. */
+    overdue: boolean;
+    reason?: string | null;
+    received_at: string;
+    /** `received`, `in_progress`, `fulfilled` or `rejected`. */
+    status: string;
+    /** The user id, email address or phone number (E.164) of the person. */
+    subject: string;
+    /** `user`, `email` or `phone`. */
+    subject_kind: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceTrackingTag = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Consent category it needs. */
+    category: string;
+    created_at: string;
+    id: string;
+    /** The unit of the website (the root unit is the whole tenant). */
+    org_id: string;
+    provider: string;
+    /** `active` or `paused`. */
+    status: string;
+    tracking_id: string;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -11793,6 +12612,11 @@ export type PersonalDataResponse = Record<string, unknown> & {
 export type Placement = {
   /** `sqlite` or `postgres`. */
   backend: string;
+  /**
+   * Country of the servers (ISO 3166-1 alpha-2), for tenants that must keep their data in one
+   * country; `null` when unknown. Set with `autoxide placement country`.
+   */
+  country_code?: string | null;
   created_at: string;
   id: string;
   /** `shared` (many tenants) or `dedicated` (one tenant). */
@@ -16324,6 +17148,45 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/cookie-consents/stats": {
+    /** Get cookie consent counts of a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      responses: {
+        200: Data_ComplianceCookieStats;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/cookie-settings/{org_id}": {
+    /** Get the cookie banner settings of a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_ComplianceCookieSettings;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Set the cookie banner of a website. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: ComplianceCookieSettingsRequest;
+      responses: {
+        200: Data_ComplianceCookieSettings;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/documents": {
     /** List the legal documents of the tenant. */
     get: {
@@ -16400,6 +17263,87 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/incidents": {
+    /** List personal data breaches. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; overdue?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceIncident;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Record a personal data breach. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceIncidentRequest;
+      responses: {
+        201: Data_ComplianceIncident;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/incidents/{id}": {
+    /** Get a personal data breach with its log. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceIncident;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a personal data breach. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceIncidentChange;
+      responses: {
+        200: Data_ComplianceIncident;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/incidents/{id}/draft": {
+    /** Get a draft notification of a personal data breach. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { audience: string; locale?: string }; };
+      responses: {
+        200: Data_ComplianceIncidentDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/incidents/{id}/entries": {
+    /** Add a line to the log of a personal data breach. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceIncidentEntryRequest;
+      responses: {
+        201: Data_ComplianceIncidentEntry;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
@@ -16810,6 +17754,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/processing-register": {
+    /** Get the register of processing activities. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_ComplianceProcessingRegister;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/public/badge": {
     /** Get the Ministry of Industry and Trade logo of a website. */
     get: {
@@ -16817,6 +17773,30 @@ export interface paths {
       responses: {
         200: Data_ComplianceBadge;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/public/consent-config": {
+    /** Get the cookie banner and the tags to load, for a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { granted?: string; locale?: string; site?: string }; };
+      responses: {
+        200: Data_ComplianceConsentConfig;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/public/cookie-consents": {
+    /** Record a visitor's cookie choice (anonymous proof of consent). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string }; };
+      requestBody: ComplianceCookieConsentRequest;
+      responses: {
+        204: void;
+        409: Problem;
+        422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -16843,6 +17823,94 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/public/purposes": {
+    /** List the processing purposes, for the public privacy notice. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CompliancePurpose;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/purposes": {
+    /** List the processing purposes of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CompliancePurpose;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a processing purpose. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CompliancePurposeRequest;
+      responses: {
+        201: Data_CompliancePurpose;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/purposes/{key}": {
+    /** Change a processing purpose. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: CompliancePurposeChange;
+      responses: {
+        200: Data_CompliancePurpose;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/residency": {
+    /** Get where the tenant's data is kept. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_ComplianceResidency;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Set where a tenant must keep its data. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceResidencyRequest;
+      responses: {
+        200: Data_ComplianceResidency;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/retention": {
+    /** List how long each kind of personal data is kept. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ComplianceRetentionItem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/rules": {
     /** List the legal rules (every version). */
     get: {
@@ -16863,6 +17931,153 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/subject-requests": {
+    /** List the requests of data subjects received through other channels. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; overdue?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceSubjectRequest;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Record a request of a data subject received by email, post, phone or from an authority. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceSubjectRequestRequest;
+      responses: {
+        201: Data_ComplianceSubjectRequest;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/subject-requests/{id}": {
+    /** Get a request of a data subject. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceSubjectRequest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the status of a request of a data subject, or add notes. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceSubjectRequestChange;
+      responses: {
+        200: Data_ComplianceSubjectRequest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/subject-requests/{id}/fulfil": {
+    /** Fulfil a request of a data subject. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceSubjectRequestFulfil;
+      responses: {
+        200: Data_ComplianceSubjectRequestResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/tracking-providers": {
+    /** List the built-in tracking providers. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ComplianceTrackingProvider;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/tracking-tags": {
+    /** List the tracking tags of websites. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceTrackingTag;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a tracking tag to a website. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceTrackingTagRequest;
+      responses: {
+        201: Data_ComplianceTrackingTag;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/tracking-tags/{id}": {
+    /** Get a tracking tag. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceTrackingTag;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Pause, resume or change the ID of a tracking tag. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceTrackingTagChange;
+      responses: {
+        200: Data_ComplianceTrackingTag;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a tracking tag. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

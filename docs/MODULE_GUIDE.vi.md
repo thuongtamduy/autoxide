@@ -355,7 +355,11 @@ Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu 
   trong `Module::start` bằng `context.personal_data(…)`; phần đó có mặt trong
   `GET /api/v1/auth/me/export` dưới tên module;
 - đăng ký nhận `privacy::USER_DELETED` trong `Module::subscriptions` và xoá các dòng của
-  người đó khi nhận (`privacy::deleted_user(event)` cho id). Có thể nhận hai lần.
+  người đó khi nhận (`privacy::deleted_user(event)` cho id). Có thể nhận hai lần;
+- khai mỗi loại dữ liệu cá nhân giữ bao lâu trong `Module::retention` (danh sách
+  `privacy::RetentionPolicy` — tên `<module>.<loại>`, `DataCategory`, `Keep::Days(n)` /
+  `UntilDeleted` / `Forever`, và biến cấu hình đặt nó), đọc từ cấu hình của module. Module
+  `compliance` liệt kê chúng ở `GET /api/v1/compliance/retention`, so với giới hạn pháp lý.
 
 ### Tiền và số dư
 

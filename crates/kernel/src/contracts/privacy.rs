@@ -92,6 +92,94 @@ fn poisoned() -> Error {
     Error::internal("the personal data registry is unusable after a panic")
 }
 
+// --- Thời hạn lưu theo loại dữ liệu (bước 37, D-360) -------------------------------------------
+
+// Loại dữ liệu cá nhân theo Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (cần đối chiếu văn bản gốc).
+/// Kind of personal data (Vietnam, Personal Data Protection Law 91/2025/QH15).
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum DataCategory {
+    /// Basic personal data (name, email, phone number, address…).
+    Basic,
+    /// Sensitive personal data (identity documents, biometrics, location…).
+    Sensitive,
+    /// Security traces (sessions, tokens, sign-in logs, hashed IP addresses).
+    Security,
+    /// Accounting records and legal proof the law requires to keep.
+    Accounting,
+}
+
+impl DataCategory {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DataCategory::Basic => "basic",
+            DataCategory::Sensitive => "sensitive",
+            DataCategory::Security => "security",
+            DataCategory::Accounting => "accounting",
+        }
+    }
+}
+
+/// Giữ bao lâu.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Keep {
+    /// Xoá sau số ngày này.
+    Days(u32),
+    /// Giữ tới khi người dùng (hay khách) xoá.
+    UntilDeleted,
+    /// Giữ mãi (chỉ hợp với chứng từ / bằng chứng luật buộc giữ).
+    Forever,
+}
+
+/// Một loại dữ liệu module giữ và thời hạn lưu của nó (`Module::retention`). `keep` đọc từ cấu
+/// hình đang có của module (gọi sau `configure`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RetentionPolicy {
+    /// `<module>.<loại>`, vd `auth.sessions`.
+    pub name: &'static str,
+    /// Mô tả tiếng Anh cho người đọc API (`GET /api/v1/compliance/retention`).
+    pub description: &'static str,
+    pub category: DataCategory,
+    pub keep: Keep,
+    /// Biến cấu hình đặt thời hạn này, nếu có.
+    pub setting: Option<&'static str>,
+}
+
+impl RetentionPolicy {
+    pub fn new(
+        name: &'static str,
+        description: &'static str,
+        category: DataCategory,
+        keep: Keep,
+    ) -> Self {
+        RetentionPolicy { name, description, category, keep, setting: None }
+    }
+
+    #[must_use]
+    pub fn setting(mut self, name: &'static str) -> Self {
+        self.setting = Some(name);
+        self
+    }
+}
+
+/// Sổ thời hạn lưu của mọi module (gom một lần lúc khởi động, sau `configure`). Clone rẻ.
+#[derive(Clone, Debug, Default)]
+pub struct RetentionCatalog(Arc<Vec<(&'static str, RetentionPolicy)>>);
+
+impl RetentionCatalog {
+    /// Sổ từ (tên module, thời hạn); kernel dựng, test dựng tay.
+    pub fn new(policies: Vec<(&'static str, RetentionPolicy)>) -> Self {
+        RetentionCatalog(Arc::new(policies))
+    }
+
+    /// Mọi mục, theo thứ tự đăng ký module.
+    pub fn all(&self) -> &[(&'static str, RetentionPolicy)] {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,6 +210,36 @@ mod tests {
         let data = early.export(&crate::tenancy::test_tenant(), Uuid::now_v7()).await.unwrap();
         assert_eq!(data.keys().copied().collect::<Vec<_>>(), vec!["auth", "notes"]);
         assert_eq!(data["notes"][0]["title"], "a");
+    }
+
+    #[test]
+    fn catalog_thoi_han_luu_gom_moi_module() {
+        let catalog = RetentionCatalog::new(vec![
+            (
+                "auth",
+                RetentionPolicy::new(
+                    "auth.sessions",
+                    "Sessions.",
+                    DataCategory::Security,
+                    Keep::Days(30),
+                )
+                .setting("AUTOXIDE_AUTH_SESSION_DAYS"),
+            ),
+            (
+                "notes",
+                RetentionPolicy::new(
+                    "notes.notes",
+                    "Notes.",
+                    DataCategory::Basic,
+                    Keep::UntilDeleted,
+                ),
+            ),
+        ]);
+        let clone = catalog.clone();
+        assert_eq!(clone.all().len(), 2);
+        assert_eq!(clone.all()[0].1.setting, Some("AUTOXIDE_AUTH_SESSION_DAYS"));
+        assert_eq!(clone.all()[1].0, "notes");
+        assert_eq!(DataCategory::Sensitive.as_str(), "sensitive");
     }
 
     #[tokio::test]

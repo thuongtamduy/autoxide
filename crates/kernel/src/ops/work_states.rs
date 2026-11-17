@@ -364,7 +364,7 @@ pub(crate) struct CreateWorkStates;
 
 impl MigrationName for CreateWorkStates {
     fn name(&self) -> &str {
-        "m0021_create_work_states"
+        "m0022_create_work_states"
     }
 }
 

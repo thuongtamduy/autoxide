@@ -116,6 +116,8 @@ pub(super) mod tenant {
         pub updated_at: DateTimeUtc,
         /// Chỉ đọc: đọc được, mọi lệnh ghi bị chặn (`tenant_read_only`); độc lập với `status`.
         pub read_only: bool,
+        /// Nước khách buộc lưu dữ liệu (ISO 3166-1 alpha-2), `None` khi không buộc (D-360).
+        pub data_residency: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -141,6 +143,8 @@ pub(super) mod placement {
         pub schema_checked_at: Option<DateTimeUtc>,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
+        /// Nước đặt máy chủ (ISO 3166-1 alpha-2), `None` khi chưa ghi (D-360).
+        pub country_code: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -230,6 +234,10 @@ pub struct Placement {
     /// The placement's own file storage; `null` when its tenants' files are kept in the
     /// platform's storage (the `files` module settings). Set with `autoxide placement storage`.
     pub storage: Option<PlacementStorage>,
+    /// Country of the servers (ISO 3166-1 alpha-2), for tenants that must keep their data in one
+    /// country; `null` when unknown. Set with `autoxide placement country`.
+    #[serde(default)]
+    pub country_code: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -661,6 +669,7 @@ impl TenantAdmin {
             created_at: Set(now),
             updated_at: Set(now),
             read_only: Set(false),
+            data_residency: Set(None),
         };
         // Hai yêu cầu cùng slug cùng lúc: khoá unique của bảng chặn bên sau.
         row.insert(self.control().write()).await.map_err(|error| {
@@ -889,6 +898,7 @@ pub(super) async fn describe_placement(
         backend: row.backend,
         schema_state: row.schema_state,
         storage,
+        country_code: row.country_code,
         created_at: row.created_at,
     }
 }

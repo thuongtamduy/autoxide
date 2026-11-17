@@ -129,6 +129,10 @@ impl Placements {
         Placements { registry, migrator }
     }
 
+    pub(super) fn registry(&self) -> &DatabaseRegistry {
+        &self.registry
+    }
+
     async fn rows(&self) -> Result<Vec<placement::Model>, Error> {
         Ok(placement::Entity::find()
             .filter(placement::Column::Id.ne(MAIN_PLACEMENT.as_uuid()))
@@ -275,6 +279,7 @@ impl Placements {
             schema_checked_at: Set(None),
             created_at: Set(at),
             updated_at: Set(at),
+            country_code: Set(None),
         };
         // Hai lệnh cùng tên cùng lúc: khoá unique của bảng chặn bên sau.
         let inserted = model.insert(self.registry.control().write()).await.map_err(|error| {

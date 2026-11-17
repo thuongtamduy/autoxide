@@ -227,6 +227,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::views::CreateSavedViews),
             // File của job (bản xuất danh sách, bước 51 P16).
             Box::new(crate::job::runs::AddJobFiles),
+            // Nơi lưu dữ liệu theo khách (bước 37, D-360): nước của placement, yêu cầu của khách.
+            Box::new(crate::tenancy::residency::AddDataResidency),
             // Hoãn / giao việc của hộp việc (bước 51 P10).
             Box::new(crate::ops::work_states::CreateWorkStates),
         ]

@@ -616,6 +616,20 @@ after it, the tenant works from the new placement and only the old copy waits to
   that stopped it. A move started over the API is retried by its job; starting another run while
   one is running answers `tenant_move_running`.
 
+**Data residency.** Record where each placement's servers are with `autoxide placement country
+<name> VN` (`-` for unknown; `autoxide placement list` shows it). A tenant that must keep its data in
+one country (set by platform staff with `PUT /api/v1/compliance/residency`) cannot move to a placement
+in another country or of unknown country: the move answers `tenant_residency_violation`. See
+[COMPLIANCE.md](COMPLIANCE.md#data-residency).
+
+## Personal data breaches
+
+When personal data may have leaked (a stolen backup, an exposed database, a wrong mail sent), the report
+to the authority is due **72 hours after detection** in Vietnam. Record the breach in the API at once
+(`POST /api/v1/compliance/incidents`), set the tenant policy `incident.alert_emails` so reminders reach
+people, and follow the runbook in [COMPLIANCE.md](COMPLIANCE.md#personal-data-breaches-the-72-hour-runbook).
+`autoxide doctor` warns when a breach is past its deadline.
+
 ## Running several servers
 
 With PostgreSQL, run as many `app` processes as you need behind the reverse proxy: they
@@ -664,3 +678,5 @@ send requests, and the drain would only delay the stop.
 - [ ] SMTP configured, so password reset and email verification work
 - [ ] Backups taken on a schedule and copied to another machine; a restore tried once
 - [ ] `/health/ready` watched by your monitoring
+- [ ] Placement countries recorded (`autoxide placement country`) when tenants must keep data in Vietnam,
+      and `incident.alert_emails` set for the 72-hour breach reminders
