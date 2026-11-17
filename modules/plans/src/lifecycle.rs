@@ -197,14 +197,34 @@ impl PlansService {
                 .await?;
                 true
             }
+            // Hết thời hạn lưu: xoá khách TRƯỚC (ngoài transaction này — database khác, file), rồi
+            // mới thành `deleted`; xoá hỏng thì thuê bao vẫn `canceled` tới hạn, lượt sau thử lại.
             "canceled" if sub.delete_after.is_some_and(|after| after <= at) => {
-                self.move_to(&transaction, sub, "deleted", at, |_| {}).await?;
                 deleted = true;
-                true
+                false
             }
             _ => false,
         };
         transaction.commit().await?;
+        if deleted {
+            // Khoá hẳn khách (mọi máy chủ ngừng phục vụ) rồi xoá dữ liệu qua kernel (D-337) — bảng
+            // kế toán module khai giữ lại thì còn.
+            self.erase_tenant(tenant).await?;
+            let transaction = self.databases.control().begin_write().await?;
+            if let Some(sub) = rows::lock_one(
+                &transaction,
+                subscription::Entity::find()
+                    .filter(subscription::Column::TenantId.eq(tenant.as_uuid())),
+            )
+            .await?
+                && sub.status == "canceled"
+            {
+                self.move_to(&transaction, sub, "deleted", at, |_| {}).await?;
+            }
+            transaction.commit().await?;
+            self.cache.forget(tenant);
+            return Ok(true);
+        }
         if changed {
             self.cache.forget(tenant);
         }
@@ -216,12 +236,6 @@ impl PlansService {
             .map(|row| row.status);
         if changed && status.as_deref() == Some("canceled") {
             self.offer_export(tenant).await;
-        }
-        if deleted {
-            // Kernel chưa có lệnh xoá khách: khoá hẳn khách, giữ dữ liệu (D-327).
-            let reason = "Subscription deleted after its retention period";
-            self.suspend_tenant(Actor::system(), tenant, reason).await?;
-            tracing::warn!(tenant_id = %tenant, "subscription deleted after its retention; the tenant is suspended and its data kept until it is deleted");
         }
         Ok(changed)
     }
@@ -496,7 +510,15 @@ impl PlansService {
             else {
                 continue;
             };
-            let Some(email) = sub.billing_email.clone() else {
+            // Email riêng của thuê bao, không có thì email của hồ sơ xuất hoá đơn.
+            let email = match sub.billing_email.clone() {
+                Some(email) => Some(email),
+                None => self
+                    .billing_profile(TenantId::from_uuid(sub.tenant_id))
+                    .await?
+                    .map(|profile| profile.email),
+            };
+            let Some(email) = email else {
                 continue;
             };
             let Some(key) = self.reminder_due(&period, at) else {
@@ -903,6 +925,30 @@ impl PlansService {
         }
         transaction.commit().await?;
         self.cache.forget(tenant);
+        Ok(())
+    }
+
+    /// Khoá rồi xoá hẳn khách `tenant` (thuê bao hết thời hạn lưu dữ liệu).
+    async fn erase_tenant(&self, tenant: TenantId) -> Result<(), Error> {
+        let Some(admin) = self.tenants.clone() else {
+            return Err(Error::internal("the kernel did not provide the tenant service"));
+        };
+        let reason = "Subscription deleted after its retention period";
+        let id = tenant.as_uuid().to_string();
+        let current = match admin.get(&id).await {
+            Ok(found) => found,
+            // Khách đã không còn trong sổ: không còn gì để xoá.
+            Err(error) if error.code() == "tenant_not_found" => return Ok(()),
+            Err(error) => return Err(error),
+        };
+        match current.status.as_str() {
+            // Lượt trước đã xoá xong nhưng chưa kịp ghi `deleted` cho thuê bao.
+            "deleted" => return Ok(()),
+            "suspended" => {}
+            _ => self.suspend_tenant(Actor::system(), tenant, reason).await?,
+        }
+        let erased = admin.erase(Actor::system(), &id, reason).await?;
+        tracing::warn!(tenant_id = %tenant, rows = erased.rows, files = erased.files, "subscription deleted after its retention; the tenant's data is deleted");
         Ok(())
     }
 

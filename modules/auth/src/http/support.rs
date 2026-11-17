@@ -26,6 +26,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(list_support_access))
         .routes(routes!(revoke_support_access))
         .routes(routes!(list_support_grants, grant_support))
+        .routes(routes!(support_allowed))
         .routes(routes!(revoke_support_grant))
 }
 
@@ -113,6 +114,25 @@ pub(crate) struct TenantQuery {
     tenant_id: Uuid,
 }
 
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct GrantsQuery {
+    /// Only the grants for this tenant; leave out for every tenant (the newest 200).
+    tenant_id: Option<Uuid>,
+}
+
+/// Whether a tenant lets platform staff in for support.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct SupportAllowedResponse {
+    tenant_id: Uuid,
+    /// The tenant's setting `auth.support_access`: `false` means only a `legal_request` grant can
+    /// be made (a `support` one is refused with `auth.support_access_disabled`).
+    support_access: bool,
+}
+
+/// How many grants the list of every tenant returns at most.
+const ALL_TENANTS_LIMIT: u64 = 200;
+
 /// Câu trả lời kèm tên nhân sự (một câu cho mọi dòng).
 async fn described(
     state: &HttpState,
@@ -192,30 +212,66 @@ async fn revoke_support_access(
     Ok(Data { data: described_one(&state, row).await? })
 }
 
-/// List the support access grants for a tenant (platform).
+/// List the support access grants (platform).
 ///
-/// Requires `auth.support.grant`, in the platform tenant.
+/// Requires `auth.support.grant`, in the platform tenant. With `tenant_id`, every grant for that
+/// tenant; without it, the newest 200 grants for any tenant.
 #[utoipa::path(
     get,
     path = "/support-grants",
     extensions(("x-permissions" = json!(["auth.support.grant"]))),
     operation_id = "list_support_grants",
     security(("bearer" = [])),
-    params(TenantQuery),
+    params(GrantsQuery),
     responses(
         (status = 200, description = "The grants, newest first.", body = Data<Vec<SupportGrantResponse>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.support.grant`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission (`permission_denied`), or not called in the platform tenant (`auth.support_platform_only`).", body = Problem),
     )
 )]
 async fn list_support_grants(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
-    Query(query): Query<TenantQuery>,
+    Query(query): Query<GrantsQuery>,
 ) -> Result<Data<Vec<SupportGrantResponse>>, Error> {
     principal.require(&SUPPORT_GRANT)?;
-    let rows = state.support.for_tenant(TenantId::from_uuid(query.tenant_id)).await?;
+    state.support.require_platform(&principal)?;
+    let rows = match query.tenant_id {
+        Some(tenant) => state.support.for_tenant(TenantId::from_uuid(tenant)).await?,
+        None => state.support.grants(None, Some(ALL_TENANTS_LIMIT)).await?,
+    };
     Ok(Data { data: described(&state, rows).await? })
+}
+
+/// Tell whether a tenant lets platform staff in for support (platform).
+///
+/// Requires `auth.support.grant`, in the platform tenant. Read it before granting: a tenant that
+/// turned the setting `auth.support_access` off accepts only `legal_request` grants.
+#[utoipa::path(
+    get,
+    path = "/support-grants/allowed",
+    extensions(("x-permissions" = json!(["auth.support.grant"]))),
+    operation_id = "get_support_allowed",
+    security(("bearer" = [])),
+    params(TenantQuery),
+    responses(
+        (status = 200, description = "The tenant's choice.", body = Data<SupportAllowedResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission (`permission_denied`), or not called in the platform tenant (`auth.support_platform_only`).", body = Problem),
+        (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
+    )
+)]
+async fn support_allowed(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    Query(query): Query<TenantQuery>,
+) -> Result<Data<SupportAllowedResponse>, Error> {
+    principal.require(&SUPPORT_GRANT)?;
+    state.support.require_platform(&principal)?;
+    let allowed = state.support.allowed(TenantId::from_uuid(query.tenant_id)).await?;
+    Ok(Data {
+        data: SupportAllowedResponse { tenant_id: query.tenant_id, support_access: allowed },
+    })
 }
 
 /// Grant platform staff time-limited access to a tenant's data (platform).
@@ -272,7 +328,7 @@ async fn grant_support(
     responses(
         (status = 200, description = "The grant, revoked.", body = Data<SupportGrantResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.support.grant`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission (`permission_denied`), or not called in the platform tenant (`auth.support_platform_only`).", body = Problem),
         (status = 404, description = "No grant with this id for this tenant; code `auth.support_grant_not_found`.", body = Problem),
     )
 )]
@@ -283,6 +339,7 @@ async fn revoke_support_grant(
     Query(query): Query<TenantQuery>,
 ) -> Result<Data<SupportGrantResponse>, Error> {
     principal.require(&SUPPORT_GRANT)?;
+    state.support.require_platform(&principal)?;
     let target = TenantId::from_uuid(query.tenant_id);
     let row = state.support.revoke(target, &principal, id, false).await?;
     Ok(Data { data: described_one(&state, row).await? })

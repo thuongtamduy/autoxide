@@ -83,13 +83,14 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
 - [ ] Tính tiền thuê bao SaaS: hoá đơn theo kỳ, đánh số tuần tự, thu qua `PaymentGateway` (bước 36)
       bằng tài khoản của nhà vận hành nền tảng
 - [ ] Cấp phát: khách tự đăng ký (kèm KYC khi gói yêu cầu, bước 37) → tạo khách → chọn vị trí dữ
-      liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng
+      liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng — đã làm phần nhân sự vận
+      hành (D-338): `POST /plans/provisionings`, `autoxide tenant create --plan`; còn: khách tự đăng ký + KYC (chờ 37)
 - [ ] Đối chiếu thiết kế 2: xuất toàn bộ dữ liệu một khách bằng job khi huỷ thuê bao; `suspend` thuê bao
       cho nhân sự nền tảng; hạn mức nút đếm mọi nút trừ gốc, hạn mức theo loại nút khai riêng; thông báo
       của nền tảng tới quản trị mọi khách — đã làm (D-326, D-327, D-328): `suspend`, hạn mức nút trừ gốc, bộ lọc
       `subscription_status` / `near_limit`, xuất dữ liệu khách bằng job; còn: thông báo nền tảng (chờ `notifications`, bước 37)
-- [ ] Xoá hẳn khách khi thuê bao `deleted` (D-327): kernel chưa có lệnh xoá khách — thêm lệnh xoá (giữ phần kế toán theo
-      bước 36), rồi `plans` gọi thay vì chỉ khoá hẳn
+- [x] Xoá hẳn khách khi thuê bao `deleted` (D-327, D-337): `POST /kernel/tenants/{id}/erase`, bảng giữ lại khai ở
+      `Module::retained_tables` (phần kế toán của bước 36); `plans` xoá khách khi hết thời hạn lưu
 - [x] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): hạn mức chia phần `Limit::per` (D-330)
 
 ## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)

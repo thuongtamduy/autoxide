@@ -13,7 +13,7 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use tower_http::catch_panic::ResponseForPanic;
 
-use crate::error::{Error, ErrorKind};
+use crate::error::{Error, ErrorKind, FieldError};
 use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
 
 /// Thân lỗi dạng chữ dài hơn mức này thì không chép vào `detail`.
@@ -37,6 +37,13 @@ pub(super) async fn normalize(response: Response) -> Response {
         }
         _ => default_detail(status).to_owned(),
     };
+    // Query sai (thiếu tham số bắt buộc, sai kiểu) do `Query` của axum từ chối: trả như mọi lỗi
+    // kiểm dữ liệu — `422 validation_failed` kèm ô sai trong `errors`, dịch theo ngôn ngữ.
+    if status == StatusCode::BAD_REQUEST
+        && let Some(rest) = detail.strip_prefix(QUERY_REJECTION)
+    {
+        return Error::validation(vec![query_problem(rest)]).into_response();
+    }
 
     let problem = Problem {
         type_uri: "about:blank".to_owned(),
@@ -56,6 +63,31 @@ pub(super) async fn normalize(response: Response) -> Response {
     parts.headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(PROBLEM_CONTENT_TYPE));
     let body = serde_json::to_vec(&problem).unwrap_or_default();
     Response::from_parts(parts, Body::from(body))
+}
+
+/// Đầu câu `Query` của axum viết khi không đọc được query string.
+const QUERY_REJECTION: &str = "Failed to deserialize query string: ";
+
+/// Ô sai từ câu của thư viện: "missing field `locale`" → `locale` bắt buộc; "limit: invalid digit…"
+/// → `limit` sai; không rõ ô nào → `query`.
+fn query_problem(text: &str) -> FieldError {
+    if let Some(name) = text
+        .split("missing field `")
+        .nth(1)
+        .and_then(|rest| rest.split('`').next())
+        .filter(|name| !name.is_empty())
+    {
+        return FieldError::new(name.to_owned(), "required", "is required");
+    }
+    match text.split_once(": ") {
+        Some((path, _))
+            if !path.is_empty()
+                && path.chars().all(|c| c.is_ascii_alphanumeric() || "_.[]".contains(c)) =>
+        {
+            FieldError::new(path.to_owned(), "invalid", "has an invalid value")
+        }
+        _ => FieldError::new("query", "invalid", "has an invalid value"),
+    }
 }
 
 fn content_type(response: &Response) -> Option<&str> {

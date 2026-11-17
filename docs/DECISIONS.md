@@ -8112,3 +8112,97 @@ Hai yêu cầu của giao diện (`docs/prompts/web-build-api-gaps.md`).
    định `AllowEnforceValue` của `PublicKeyCredentialCreationOptions::passkey`). Lý do: authenticator không hỗ trợ phần mở
    rộng (Chromium ảo, một số thiết bị) từ chối hẳn khi bị ép. Đăng nhập bằng passkey vẫn luôn đòi xác minh người dùng.
 5. Mô tả `TenantMovePlan.files`: `0` cả khi khách không có file nào.
+
+## D-335 · Bước 35, đợt cho giao diện: hồ sơ xuất hoá đơn, màn của nhân sự nền tảng, quyền vào hỗ trợ — 2026-11-17 — agent quyết
+
+1. **Hồ sơ xuất hoá đơn** (`plans_billing_profile`, mặt điều khiển, migration `m0009_create_billing_profiles`):
+   `GET/PUT /api/v1/plans/billing-profile` (khách, `plans.billing.read` / `.manage`), `GET
+   /plans/tenants/{tenant_id}/billing-profile` (nhân sự nền tảng). `PUT` thay cả hồ sơ; mã số thuế Việt Nam 10 chữ số
+   hay `10 chữ số-3 chữ số` (đơn vị phụ thuộc, Luật Quản lý thuế 38/2019 và Thông tư 105/2020/TT-BTC — cần đối chiếu văn
+   bản gốc nếu có thay đổi); địa chỉ kiểm qua `AdministrativeUnits` của `address` (không có `address`: không nhận địa
+   chỉ). Event `plans.billing_profile_updated` chỉ mang `tenant_id`, không mang email / số điện thoại. Mail nhắc thanh
+   toán gửi về email của hồ sơ khi thuê bao không có `billing_email` riêng. Bên mua của hoá đơn SaaS (bước 36) lấy từ đây.
+2. **Màn của nhân sự nền tảng**: `GET /plans/tenants/{id}/billing-periods` (cho "đánh dấu đã thu"), `GET
+   /plans/tenants/{id}/entitlements`, `GET /plans/overrides` (mọi khách, lọc `tenant_id` / `kind` / `key` / `active`,
+   theo trang), `subscriber_count` của gói (thuê bao chưa huỷ, gói chính hay gói thêm; hai câu `GROUP BY`; `null` ở
+   catalog công khai), `plan_code` / `plan_name` trong thuê bao (cả gói đã ngừng bán), `GET /plans/subscriptions` lọc
+   `tenant_id`. Lịch sử thuê bao không thêm bảng: event `plans.*` mang chủ thể `plans.subscription:<tenant_id>`, đọc qua
+   `GET /api/v1/audit?subject=…`.
+3. **`expand=subscription,usage` của `GET /kernel/tenants`** trước đây luôn `null`: thêm `Entitlements::describe_tenants`
+   (mặc định rỗng, D-038) — kernel hỏi bên cung cấp cho cả trang một lần; `plans` đọc thuê bao (hai câu) và lượng dùng
+   (một câu) cho cả trang, quyền dùng từng khách qua bộ nhớ đệm. Kernel chỉ chuyển JSON, không biết hình dạng.
+4. **Quyền vào hỗ trợ**: sửa lỗ — `GET /auth/support-grants` và `DELETE /auth/support-grants/{id}` chỉ kiểm permission,
+   mà role `admin` của khách nào cũng có mọi permission, nên quản trị một khách thường xem / thu hồi được lần cấp của khách
+   khác. Nay kiểm thêm khách nền tảng (`auth.support_platform_only`) như `POST`. `tenant_id` của danh sách thành tuỳ chọn
+   (bỏ: 200 lần cấp mới nhất mọi khách — giữ hình dạng `Data<Vec>` để không phá vỡ API). Thêm `GET
+   /auth/support-grants/allowed?tenant_id=` (cài đặt `auth.support_access` của khách) và
+   `auth.support_access_max_hours` trong `GET /kernel/client-config`.
+
+## D-336 · Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17 — agent quyết
+
+1. `Tenant.read_only`, `CurrentTenant.read_only` và ba trường của `TenantExpanded` khai `required` (core luôn trả;
+   `TenantExpanded` có thể `null`). Thêm `required` vào schema câu trả lời không phá vỡ client.
+2. `PATCH /kernel/tenants/{id}` nhận ID hay slug (như `GET`, `…/settings`, `…/move`); slug lạ → `404
+   tenant_not_found` (trước: UUID sai → `400`).
+3. Mô tả 422 của `PATCH` nêu lỗi ô `read_only` / `status` cho khách nền tảng.
+4. Mục "Conventions" của OpenAPI nêu cách chọn khách và `tenant_required` / `tenant_not_found` / `tenant_mismatch`.
+5. Mô tả `comments.*` hết dấu cách thừa; test `mo_ta_cua_module_khong_co_dau_cach_thua` (crate `autoxide`) chặn ở mọi
+   module (cài đặt theo khách, theo nút, permission).
+6. Query bị `Query` của axum từ chối (thiếu tham số bắt buộc, sai kiểu) thành `422 validation_failed` kèm ô sai (đọc từ
+   câu của thư viện: "missing field `x`" → `required`; "x: …" → `invalid`; không rõ ô → `query`), ở lớp chuẩn hoá lỗi
+   của kernel — một chỗ cho mọi endpoint, không phải đổi extractor của từng handler. Đổi mã trạng thái 400 → 422 cho
+   lỗi này là sửa lỗi theo quy ước đã công bố ("lỗi kiểm dữ liệu liệt kê mọi trường một lần"); hai endpoint ghi `400`
+   cho tham số thiếu (`/kernel/domains/allowed`, tải bản xuất của `forms`) sửa mô tả theo.
+
+## D-337 · Xoá hẳn khách — 2026-11-17 — agent quyết
+
+Thay phần "kernel chưa có lệnh xoá khách: khoá hẳn, giữ dữ liệu" của D-327.
+
+1. `TenantAdmin::erase` (+ `POST /api/v1/kernel/tenants/{id}/erase`, permission mới `kernel.tenants.delete`
+   rủi ro `destructive`, khách nền tảng; thân `{confirm: <slug>, reason}`). Không có tool MCP: việc không hoàn tác được
+   không giao cho agent.
+2. Chỉ xoá khách `suspended` (`409 tenant_not_suspended`): bước khoá cho mọi máy chủ ngừng phục vụ (TTL cache khách)
+   và là lúc xuất dữ liệu lần cuối. Không xoá khách nền tảng.
+3. Xoá mọi dòng `tenant_id = X` của mọi bảng cấp khách hàng ở database của khách (kể cả outbox, hàng đợi job) trong
+   một transaction, trừ bảng khai ở `Module::retained_tables` (mới, mặc định rỗng — D-038) cho chứng từ kế toán (Luật
+   Kế toán 88/2015, Điều 41; D-190; bước 36 khai). Xoá file dưới `tenants/<id>/` ở nơi lưu chung và nơi lưu riêng
+   của placement; xoá tên miền và lượt xuất của khách ở mặt điều khiển.
+4. Giữ dòng `kernel_tenants` với trạng thái mới `deleted` (bia mộ): bảng mặt điều khiển của module khác (thuê bao, kỳ
+   thanh toán của `plans` — sổ sách của nhà vận hành) vẫn trỏ được; slug không dùng lại; request tới khách nhận `404
+   tenant_not_found`; `PATCH` khách đã xoá cũng vậy. Event `kernel.tenant_deleted` ghi ở khách nền tảng.
+5. `plans`: thuê bao `canceled` hết thời hạn lưu → khoá khách (nếu chưa) → xoá → rồi mới thành `deleted`. Xoá hỏng
+   giữa chừng thì thuê bao vẫn `canceled` tới hạn, lượt chạy sau thử lại (xoá chạy lại được).
+
+## D-338 · Cấp phát khách theo gói (phần nhân sự vận hành) — 2026-11-17 — agent quyết
+
+1. Bảng `plans_provisioning` (mặt điều khiển, migration `m0010_create_provisionings`, slug unique) và job
+   `plans.provision` (một lần thử). Bước: `created` → `tenant_created` → `subscribed` → `seeded` → `invited` → `done`;
+   mỗi bước xong ghi `step` và lịch sử `steps`; hỏng → `failed` kèm `error_code` / `error`, `retry` chạy tiếp từ bước
+   đã ghi. Đổi thứ tự so với đặc tả (gán gói TRƯỚC dữ liệu mẫu): dữ liệu mẫu chỉ cho module gói bật, nên phải có thuê
+   bao trước.
+2. Tạo khách qua `TenantAdmin::create` của kernel (không thêm cách tạo khách thứ hai). Kernel đã ghi khách mà gieo dữ
+   liệu ban đầu lỗi: lần chạy lại nhận khách `provisioning` cùng slug tạo sau lượt này rồi `provision` tiếp. Slug unique
+   trong bảng cấp phát và kiểm trước với sổ khách: hai lượt cùng slug không bao giờ cùng nhận một khách (test đồng thời).
+3. Migrate: không có bước riêng — kernel từ chối tạo khách vào placement chưa đủ migration
+   (`tenant_placement_behind`); nhân sự migrate trước bằng `POST /kernel/placements/migrations` (D-334). Gói
+   `dedicated`: nêu một placement `dedicated` đã thêm bằng CLI (URL có mật khẩu không đi qua API, đặc tả 33); tự tạo
+   database mới cho mỗi khách cần quyền quản trị database — không làm.
+4. Dữ liệu mẫu: `Module::sample_data() -> Option<Arc<dyn TenantSeed>>` (mặc định không có, D-038); kernel gom như
+   `seed_tenant` (`TenantAdmin::sample_modules`, `seed_samples`). Chưa module nào khai; module thương mại (41+) khai khi
+   làm.
+5. Mời quản trị viên qua `autoxide_auth::api::Invitations` (role `admin` mà `auth` gieo cho mọi khách mới); `plans`
+   phụ thuộc `autoxide-auth` (chỉ phần `api`). Thêm `NewInvitation::named`, `InvitationSummary::new` (cho bộ giả).
+6. CLI: `autoxide tenant create … --plan <id> --admin-email …` chạy hết các bước ngay qua `api::Provisioning` (không qua
+   job). Không đổi `autoxide tenant provision <slug>` (gieo lại khách tạo hỏng — việc khác).
+7. Chưa làm (chờ bước 37): khách tự đăng ký (`POST /signups`, xác nhận email, KYC, chấp nhận điều khoản); gói
+   `requires_kyc` trả `409 plans.kyc_required`.
+
+## D-339 · `GET /auth/me` ở khách đang vào — 2026-11-17 — agent quyết
+
+Người vào khách khác qua uỷ quyền (D-310), quyền hỗ trợ (D-313) hay header của nhân sự nền tảng có tài khoản ở khách
+gốc, không ở khách đang vào: `GET /auth/me` tìm tài khoản ở khách của request nên trả `401 auth.invalid_token`, và
+`GET /me/memberships` trả `404`. Nay `MeResponse::load` đọc tài khoản ở khách gốc (`Principal::operator_from`), còn
+`permissions` / `all_permissions` vẫn là của khách đang vào (principal đã mang); thêm `tenant_id`, `access`,
+`home_tenant_id` (chỉ thêm trường, không phá vỡ). `GET /me/memberships` ở khách đang vào trả rỗng: quyền ở đó đến từ lần
+uỷ quyền / cấp hỗ trợ, không từ membership.
+

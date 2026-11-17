@@ -22,7 +22,7 @@ use validator::Validate;
 use crate::entity::billing_period;
 use crate::http::{AddonItem, SubscriptionResponse, operator};
 use crate::lifecycle::ChangeInput;
-use crate::permissions::{BILLING_MANAGE, BILLING_READ, SUBSCRIPTIONS_MANAGE};
+use crate::permissions::{BILLING_MANAGE, BILLING_READ, SUBSCRIPTIONS_MANAGE, SUBSCRIPTIONS_READ};
 use crate::service::{PlansService, subscription_not_found};
 
 pub(crate) fn routes() -> OpenApiRouter<Arc<PlansService>> {
@@ -34,6 +34,7 @@ pub(crate) fn routes() -> OpenApiRouter<Arc<PlansService>> {
         .routes(routes!(suspend_tenant))
         .routes(routes!(list_billing_periods))
         .routes(routes!(get_billing_period))
+        .routes(routes!(tenant_billing_periods))
         .routes(routes!(mark_paid))
         .routes(routes!(void_period))
 }
@@ -347,6 +348,33 @@ async fn list_billing_periods(
 ) -> Result<Data<Vec<BillingPeriodResponse>>, Error> {
     principal.require(&BILLING_READ)?;
     let rows = service.billing_periods(tenant.id()).await?;
+    Ok(Data { data: rows.into_iter().map(BillingPeriodResponse::from).collect() })
+}
+
+/// List a tenant's billing periods.
+///
+/// Platform staff with `plans.subscriptions.read`. Newest first, at most 200. Record a payment
+/// checked by hand with `POST /billing-periods/{id}/mark-paid`.
+#[utoipa::path(
+    get,
+    path = "/tenants/{tenant_id}/billing-periods",
+    extensions(("x-permissions" = json!(["plans.subscriptions.read"]))),
+    operation_id = "list_tenant_billing_periods",
+    security(("bearer" = [])),
+    params(("tenant_id" = Uuid, Path, description = "Id of the tenant.")),
+    responses(
+        (status = 200, description = "The billing periods, newest first.", body = Data<Vec<BillingPeriodResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`).", body = Problem),
+    )
+)]
+async fn tenant_billing_periods(
+    State(service): State<Arc<PlansService>>,
+    principal: Principal,
+    Path(tenant_id): Path<Uuid>,
+) -> Result<Data<Vec<BillingPeriodResponse>>, Error> {
+    operator(&principal, &SUBSCRIPTIONS_READ)?;
+    let rows = service.billing_periods(TenantId::from_uuid(tenant_id)).await?;
     Ok(Data { data: rows.into_iter().map(BillingPeriodResponse::from).collect() })
 }
 

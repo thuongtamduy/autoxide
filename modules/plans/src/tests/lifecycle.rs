@@ -12,7 +12,7 @@ use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 
 #[derive(Default)]
-struct Outbox(Mutex<Vec<Mail>>);
+pub(super) struct Outbox(pub(super) Mutex<Vec<Mail>>);
 
 #[async_trait::async_trait]
 impl Mailer for Outbox {
@@ -43,7 +43,7 @@ async fn app(test: &TestDatabase, mails: &Arc<Outbox>) -> TestApp {
         .unwrap()
 }
 
-async fn call(
+pub(super) async fn call(
     app: &TestApp,
     method: Method,
     uri: &str,
@@ -59,14 +59,25 @@ async fn call(
     (answer.status(), body)
 }
 
-async fn ok(app: &TestApp, method: Method, uri: &str, who: &str, body: Option<Value>) -> Value {
+pub(super) async fn ok(
+    app: &TestApp,
+    method: Method,
+    uri: &str,
+    who: &str,
+    body: Option<Value>,
+) -> Value {
     let (status, body) = call(app, method.clone(), uri, who, body).await;
     assert!(status.is_success(), "{method} {uri}: {status} {body}");
     body
 }
 
 /// Gói `code` giá `amount` VND mỗi tháng (0: không giá), dùng thử `trial` ngày.
-async fn priced(app: &TestApp, code: &str, amount: i64, trial: i32) -> (String, Option<String>) {
+pub(super) async fn priced(
+    app: &TestApp,
+    code: &str,
+    amount: i64,
+    trial: i32,
+) -> (String, Option<String>) {
     let body = json!({"code": code, "name": code, "status": "active", "trial_days": trial, "grace_days": 7, "suspend_days": 30, "retention_days": 90});
     let plan = ok(app, Method::POST, "/plans/plans", "ops", Some(body)).await;
     let id = plan["data"]["id"].as_str().unwrap().to_owned();
@@ -90,7 +101,7 @@ async fn assign(app: &TestApp, plan: &(String, Option<String>), trial: bool) -> 
     ok(app, Method::PUT, &format!("/plans/tenants/{tenant}/subscription"), "ops", Some(body)).await
 }
 
-async fn sql(app: &TestApp, text: &str) {
+pub(super) async fn sql(app: &TestApp, text: &str) {
     use sea_orm::{ConnectionTrait, Statement};
     let control = app.registry().control().write();
     control
@@ -105,7 +116,7 @@ async fn status(app: &TestApp) -> String {
 }
 
 /// Chạy worker tới khi hết job (mỗi lượt chạy tối đa 4 job mỗi module; `plans` có 5 lịch).
-async fn tick(app: &TestApp) {
+pub(super) async fn tick(app: &TestApp) {
     // Lịch chỉ xếp một job mỗi khung giờ: xoá job đã xong để lượt này xếp lại (thời gian giả).
     sql(app, "DELETE FROM plans_jobs").await;
     let worker = app.modules().worker(4).unwrap();
@@ -206,13 +217,18 @@ async fn tam_khoa_qua_han_thanh_huy_roi_qua_thoi_han_luu_thanh_xoa() {
             ok(&app, Method::GET, &format!("/plans/tenants/{tenant}/subscription"), "ops", None)
                 .await;
         assert_eq!(sub["data"]["status"], "deleted");
-        // Khách bị khoá hẳn, dữ liệu giữ lại.
+        // Khách bị xoá hẳn (D-337): request tới khách nhận `tenant_not_found`; sổ khách giữ dòng
+        // `deleted`; thuê bao (sổ sách của nhà vận hành) vẫn còn, như đã đọc ở trên.
         let (code, body) = call(&app, Method::GET, "/plans/entitlements", "owner", None).await;
         assert_eq!(
             (code, body["code"].as_str()),
-            (StatusCode::FORBIDDEN, Some("tenant_suspended")),
+            (StatusCode::NOT_FOUND, Some("tenant_not_found")),
             "{body}"
         );
+        let row = ok(&app, Method::GET, &format!("/kernel/tenants/{tenant}"), "ops", None).await;
+        assert_eq!(row["data"]["status"], "deleted");
+        // Lượt chạy sau không làm gì thêm.
+        tick(&app).await;
     })
     .await
     .unwrap();

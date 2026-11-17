@@ -73,6 +73,14 @@ language; English (`en`) by default and for unsupported languages. Responses car
 `Content-Language`. Codes never change with the language.
 - **Rate limits**: too many requests from one address are answered with `429` (code \
 `rate_limited`) and a `Retry-After` header giving the seconds to wait.
+- **Which tenant**: on a server with many tenants, a request is served for the tenant of its \
+credential (the token or API key); without one, for the tenant named in the header \
+`Autoxide-Tenant: <slug or id>`, else for the tenant whose verified domain is in `Host` (behind \
+a trusted proxy, `X-Forwarded-Host` or `Forwarded`). A tenant endpoint that cannot tell answers \
+`400` with code `tenant_required` (for example a domain not bound to any tenant); a header naming \
+no tenant answers `404` with code `tenant_not_found`; a header or domain of another tenant than \
+the credential's answers `403` with code `tenant_mismatch`. A server with one tenant ignores \
+both.
 - **Tenant state**: any endpoint of a tenant may answer `403` with code `tenant_suspended` (the \
 tenant is suspended: nothing works, reads included), `403` with code `tenant_read_only` (the \
 tenant can only read for now: `GET` works, as do sign-in, exports and links from mails; other \

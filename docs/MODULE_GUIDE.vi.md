@@ -137,6 +137,11 @@ dẹp quét mọi khách dùng `enqueue_database` và một index `_sweep_idx`.
 bộ đếm) do `Module::seed_tenant` tạo — một `TenantSeed` chạy khi tạo khách. Nó phải chạy lại được:
 `autoxide tenant provision` làm lại lần tạo khách hỏng giữa chừng.
 
+**Khi khách bị xoá hẳn.** Xoá hẳn một khách (`POST /api/v1/kernel/tenants/{id}/erase`, hay khi thuê
+bao hết thời hạn lưu) xoá mọi dòng của khách trong mọi bảng cấp khách hàng, cùng file của khách.
+Bảng luật buộc giữ (chứng từ kế toán: ít nhất 10 năm ở Việt Nam) khai ở `Module::retained_tables`;
+dòng của nó còn lại.
+
 **Cấu hình theo khách.** Cấu hình khách tự đổi được khai ở `Module::tenant_settings` (tên
 `<module>.<khoá>`) và đọc bằng `context.require::<dyn TenantSettings>()`; khách chưa đặt thì dùng
 cấu hình của máy chủ. Cấu hình kết nối tới dịch vụ đối tác thuộc `CONNECTION_GROUP` và được lưu

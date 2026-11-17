@@ -11,6 +11,31 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Create a tenant on a plan in one call: `POST /api/v1/plans/provisionings` (platform staff, new permission
+  `plans.provision`; MCP `plans.provision_tenant`, `plans.get_provisioning`) creates the tenant, its subscription, the
+  sample data of the modules the plan turns on, and invites its administrator; it runs in the background, failed
+  steps can be retried (`POST …/{id}/retry`), and `GET /api/v1/plans/provisionings` lists them. From the server:
+  `autoxide tenant create … --plan <id> --admin-email …`. Modules supply sample data with `Module::sample_data`.
+
+- Delete a tenant and its data for good: `POST /api/v1/kernel/tenants/{id}/erase` (platform staff with the new
+  permission `kernel.tenants.delete`; the tenant must be suspended, and its slug sent again as `confirm`). Rows and
+  files of the tenant are deleted, its domains released; the tenant stays listed with status `deleted` and requests
+  to it answer `404 tenant_not_found`. Tables modules must keep (accounting records) are declared with
+  `Module::retained_tables`. A subscription that reaches the end of its retention period now deletes the tenant this
+  way (it was only suspended).
+
+- Billing profile of a tenant (legal name, tax code, email for invoices, phone, address):
+  `GET/PUT /api/v1/plans/billing-profile`, and `GET /api/v1/plans/tenants/{tenant_id}/billing-profile` for platform
+  staff. Billing reminders go to its email when the subscription has no `billing_email`.
+- For platform staff: `GET /api/v1/plans/tenants/{tenant_id}/billing-periods`, `GET
+  /api/v1/plans/tenants/{tenant_id}/entitlements`, `GET /api/v1/plans/overrides` (every tenant), `subscriber_count` on
+  plans, `tenant_id` filter on `GET /api/v1/plans/subscriptions`. Subscriptions include `plan_code` and `plan_name`.
+- `GET /api/v1/kernel/tenants?expand=subscription,usage` now fills `subscription` and `usage` when the `plans` module
+  is installed (they were always `null`).
+- `GET /api/v1/auth/support-grants` without `tenant_id` lists the newest grants of every tenant;
+  `GET /api/v1/auth/support-grants/allowed?tenant_id=` tells whether a tenant lets platform staff in;
+  `GET /api/v1/kernel/client-config` has `auth.support_access_max_hours`.
+
 - `POST /api/v1/kernel/placements/migrations` (platform staff, MCP `kernel.migrate_placements`): migrate the tenant
   databases from the API — `dry_run` lists the pending migrations, otherwise a run goes on in the background
   (`GET …/migrations/{id}`, `GET …/migrations`). One run at a time.
@@ -387,6 +412,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- `GET /api/v1/auth/me` in a tenant entered through a delegation or a support grant answered `401`: it now returns
+  the account and the permissions you have in that tenant, with `tenant_id`, `access` (`direct`, `delegation`,
+  `support`) and `home_tenant_id`; `GET /api/v1/auth/me/memberships` returns an empty list there instead of `404`.
+- A missing or ill-typed query parameter (e.g. `locale` of `GET /api/v1/content/public/posts`) answered `400
+  bad_request` with the library's raw English text; it now answers `422 validation_failed` with the field in
+  `errors`, translated like every other validation problem.
+- `PATCH /api/v1/kernel/tenants/{id}` takes the tenant's slug as well as its id, like the other tenant endpoints.
+- OpenAPI: `read_only` of tenants and the three fields of `TenantExpanded` are marked required (they are always
+  present); the "Conventions" section explains how the tenant of a request is chosen (`tenant_required`,
+  `tenant_not_found`, `tenant_mismatch`); descriptions of `comments.*` tenant settings no longer contain runs of
+  spaces.
+- Security: `GET /api/v1/auth/support-grants` and `DELETE /api/v1/auth/support-grants/{id}` checked only the
+  permission, so the administrator of an ordinary tenant (who holds every permission) could list or revoke support
+  grants of other tenants. They are now for platform staff in the platform tenant only, like granting
+  (`403 auth.support_platform_only`).
 - Adding a passkey failed on authenticators without the `credProtect` extension (the server required it): it is now
   asked for but not enforced. Signing in with a passkey still always verifies the user.
 - `GET /api/v1/kernel/modules/{name}` answered 500 for modules with data upgrades (`auth`, `webhooks`).

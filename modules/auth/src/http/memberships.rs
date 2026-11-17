@@ -223,10 +223,9 @@ async fn replace_user_memberships(
     params(MembershipsQuery, PageQuery),
     responses(
         (status = 200, description = "One page of memberships.", body = Page<MembershipRowResponse>),
-        (status = 400, description = "A filter has the wrong type, e.g. `org_id` is not a UUID.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A filter or paging parameter is invalid, e.g. `org_id` is not a UUID; code `validation_failed`, every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_memberships(
@@ -306,7 +305,7 @@ impl From<crate::role::MemberCount> for MemberCountResponse {
     operation_id = "get_my_memberships",
     security(("bearer" = [])),
     responses(
-        (status = 200, description = "One entry per unit, sorted by unit id.", body = Data<Vec<MembershipResponse>>),
+        (status = 200, description = "One entry per unit, sorted by unit id. Empty in a tenant entered through a delegation or a support grant: what you may do there is in `GET /api/v1/auth/me`.", body = Data<Vec<MembershipResponse>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
     )
 )]
@@ -315,6 +314,11 @@ async fn get_my_memberships(
     tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<Vec<MembershipResponse>>, Error> {
+    // Đang vào khách khác (uỷ quyền, hỗ trợ): không có membership ở khách đó — quyền đến từ lần
+    // uỷ quyền / cấp hỗ trợ (`GET /me` cho permission và `access`).
+    if principal.operator_from().is_some() {
+        return Ok(Data { data: Vec::new() });
+    }
     let list = state.roles.memberships(&tenant, principal.user_id()).await?;
     memberships(&state, &tenant, list).await
 }

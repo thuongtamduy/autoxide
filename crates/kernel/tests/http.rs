@@ -195,12 +195,21 @@ async fn khong_co_route_va_sai_method_cung_la_problem_details() {
 }
 
 #[tokio::test]
-async fn tham_so_query_sai_kieu_la_problem_details_co_mo_ta() {
-    let response = send(app(), get("/api/v1/notes/typed?size=big")).await;
-
-    let problem = problem(response, 400, "bad_request").await;
-    // Câu mô tả của thư viện được giữ lại để client biết sửa gì.
-    assert!(problem.detail.contains("size"), "{problem:?}");
+async fn tham_so_query_sai_kieu_hay_thieu_la_loi_kiem_du_lieu() {
+    // Sai kiểu và thiếu tham số bắt buộc: `422 validation_failed` như mọi lỗi kiểm dữ liệu, ô sai
+    // nằm trong `errors` (không phải câu thô của thư viện).
+    for (uri, code) in
+        [("/api/v1/notes/typed?size=big", "invalid"), ("/api/v1/notes/typed", "required")]
+    {
+        let response = send(app(), get(uri)).await;
+        let problem = problem(response, 422, "validation_failed").await;
+        assert_eq!(problem.errors.len(), 1, "{uri}: {problem:?}");
+        assert_eq!(
+            (problem.errors[0].field.as_str(), problem.errors[0].code.as_str()),
+            ("size", code),
+            "{uri}"
+        );
+    }
 }
 
 #[tokio::test]

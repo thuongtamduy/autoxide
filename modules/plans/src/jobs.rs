@@ -73,6 +73,10 @@ pub(crate) fn registrations(service: &Arc<PlansService>) -> Vec<JobRegistration>
         JobRegistration::new(LIFECYCLE, Arc::new(Lifecycle(service.clone()))),
         JobRegistration::new(RENEWALS, Arc::new(Renewals(service.clone()))),
         JobRegistration::new(REMINDERS, Arc::new(Reminders(service.clone()))),
+        JobRegistration::new(
+            crate::provisioning::PROVISION_JOB,
+            Arc::new(crate::provisioning::ProvisionRunner(service.clone())),
+        ),
     ]
 }
 

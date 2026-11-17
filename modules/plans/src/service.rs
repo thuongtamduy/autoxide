@@ -62,6 +62,8 @@ pub(crate) struct PlanRow {
     pub plan: plan::Model,
     pub grants: Grants,
     pub prices: Vec<price::Model>,
+    /// Số khách đang dùng gói (chỉ cho nhà vận hành; `None` ở catalog công khai).
+    pub subscribers: Option<i64>,
 }
 
 /// Một giá mới của gói.
@@ -92,6 +94,8 @@ pub(crate) struct AssignInput {
 pub(crate) struct SubscriptionRow {
     pub subscription: subscription::Model,
     pub addons: Vec<addon::Model>,
+    /// Mã và tên của gói chính (kể cả gói đã ngừng bán).
+    pub plan: Option<(String, String)>,
 }
 
 /// Một ghi đè mới.
@@ -105,11 +109,21 @@ pub(crate) struct OverrideInput {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
+/// Lọc danh sách ghi đè của mọi khách.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct OverrideFilter {
+    pub tenant_id: Option<Uuid>,
+    pub kind: Option<String>,
+    pub key: Option<String>,
+    pub active: Option<bool>,
+}
+
 /// Lọc danh sách thuê bao.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct SubscriptionFilter {
     pub status: Option<String>,
     pub plan_id: Option<Uuid>,
+    pub tenant_id: Option<Uuid>,
 }
 
 pub(crate) struct PlansService {
@@ -128,6 +142,12 @@ pub(crate) struct PlansService {
     pub reminder_days: Vec<u32>,
     /// Xuất dữ liệu khách của kernel: tự xin một lượt khi thuê bao bị huỷ (D-328).
     pub exports: Option<Arc<autoxide_kernel::tenancy::TenantExports>>,
+    /// Kiểm địa chỉ của hồ sơ xuất hoá đơn (module `address`); `None` thì không nhận địa chỉ.
+    pub units: Option<Arc<dyn autoxide_address::api::AdministrativeUnits>>,
+    /// Hàng đợi job của module (cấp phát khách chạy nền).
+    pub jobs: autoxide_kernel::job::JobQueue,
+    /// Mời quản trị viên của khách mới (module `auth`); `None` thì bước mời báo lỗi.
+    pub invitations: Option<Arc<dyn autoxide_auth::api::Invitations>>,
 }
 
 /// Bộ nhớ đệm quyền dùng theo khách trong tiến trình (`AUTOXIDE_PLANS_CACHE_SECONDS`): quyền dùng
@@ -202,9 +222,11 @@ impl PlansService {
             fetch_page(plan::Entity::find(), plan::Column::Id, |row| row.id, page, read).await?;
         let ids: Vec<Uuid> = page.data.iter().map(|row| row.id).collect();
         let mut details = self.details(&ids, false).await?;
+        let counts = self.subscriber_counts(&ids).await?;
         Ok(page.map(|plan| {
             let (grants, prices) = details.remove(&plan.id).unwrap_or_default();
-            PlanRow { plan, grants, prices }
+            let subscribers = Some(counts.get(&plan.id).copied().unwrap_or(0));
+            PlanRow { plan, grants, prices, subscribers }
         }))
     }
 
@@ -221,7 +243,7 @@ impl PlansService {
             .into_iter()
             .map(|plan| {
                 let (grants, prices) = details.remove(&plan.id).unwrap_or_default();
-                PlanRow { plan, grants, prices }
+                PlanRow { plan, grants, prices, subscribers: None }
             })
             .collect())
     }
@@ -232,7 +254,50 @@ impl PlansService {
             .await?
             .ok_or_else(|| plan_not_found(id))?;
         let (grants, prices) = self.details(&[id], false).await?.remove(&id).unwrap_or_default();
-        Ok(PlanRow { plan, grants, prices })
+        let subscribers = Some(self.subscriber_counts(&[id]).await?.get(&id).copied().unwrap_or(0));
+        Ok(PlanRow { plan, grants, prices, subscribers })
+    }
+
+    /// Số khách đang dùng mỗi gói `ids`: thuê bao chưa huỷ có gói chính là nó, cộng thuê bao chưa
+    /// huỷ giữ nó làm gói thêm. Hai câu `GROUP BY`, không phụ thuộc số gói.
+    async fn subscriber_counts(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, i64>, Error> {
+        use sea_orm::{QuerySelect, QueryTrait};
+        let mut counts: HashMap<Uuid, i64> = HashMap::new();
+        if ids.is_empty() {
+            return Ok(counts);
+        }
+        let read = self.control().read();
+        let live = ["trialing", "active", "past_due", "suspended"];
+        let base: Vec<(Uuid, i64)> = subscription::Entity::find()
+            .select_only()
+            .column(subscription::Column::PlanId)
+            .column_as(subscription::Column::Id.count(), "subscribers")
+            .filter(subscription::Column::PlanId.is_in(ids.iter().copied()))
+            .filter(subscription::Column::Status.is_in(live))
+            .group_by(subscription::Column::PlanId)
+            .into_tuple()
+            .all(read)
+            .await?;
+        // Gói thêm: chỉ của khách còn thuê bao chưa huỷ.
+        let live_tenants = subscription::Entity::find()
+            .select_only()
+            .column(subscription::Column::TenantId)
+            .filter(subscription::Column::Status.is_in(live))
+            .into_query();
+        let addons: Vec<(Uuid, i64)> = addon::Entity::find()
+            .select_only()
+            .column(addon::Column::PlanId)
+            .column_as(addon::Column::TenantId.count(), "subscribers")
+            .filter(addon::Column::PlanId.is_in(ids.iter().copied()))
+            .filter(addon::Column::TenantId.in_subquery(live_tenants))
+            .group_by(addon::Column::PlanId)
+            .into_tuple()
+            .all(read)
+            .await?;
+        for (id, count) in base.into_iter().chain(addons) {
+            *counts.entry(id).or_default() += count;
+        }
+        Ok(counts)
     }
 
     /// Module, tính năng, hạn mức và giá của các gói `ids` (ba + một câu, không phụ thuộc số gói).
@@ -666,14 +731,18 @@ impl PlansService {
             .order_by_asc(addon::Column::PlanId)
             .all(read)
             .await?;
-        Ok(Some(SubscriptionRow { subscription, addons }))
+        let plan = plan::Entity::find_by_id(subscription.plan_id)
+            .one(read)
+            .await?
+            .map(|row| (row.code, row.name));
+        Ok(Some(SubscriptionRow { subscription, addons, plan }))
     }
 
     pub(crate) async fn list_subscriptions(
         &self,
         filter: &SubscriptionFilter,
         page: &PageRequest,
-    ) -> Result<Page<subscription::Model>, Error> {
+    ) -> Result<Page<SubscriptionRow>, Error> {
         let mut select = subscription::Entity::find();
         if let Some(status) = &filter.status {
             select = select.filter(subscription::Column::Status.eq(status.clone()));
@@ -681,8 +750,56 @@ impl PlansService {
         if let Some(plan_id) = filter.plan_id {
             select = select.filter(subscription::Column::PlanId.eq(plan_id));
         }
-        fetch_page(select, subscription::Column::Id, |row| row.id, page, self.control().read())
-            .await
+        if let Some(tenant_id) = filter.tenant_id {
+            select = select.filter(subscription::Column::TenantId.eq(tenant_id));
+        }
+        let read = self.control().read();
+        let page = fetch_page(select, subscription::Column::Id, |row| row.id, page, read).await?;
+        let names = self.plan_names(page.data.iter().map(|row| row.plan_id)).await?;
+        Ok(page.map(|subscription| {
+            let plan = names.get(&subscription.plan_id).cloned();
+            SubscriptionRow { subscription, addons: Vec::new(), plan }
+        }))
+    }
+
+    /// Thuê bao (không kèm gói thêm) của các khách `tenants`, kèm mã và tên gói (hai câu).
+    pub(crate) async fn subscriptions_of(
+        &self,
+        tenants: &[TenantId],
+    ) -> Result<Vec<SubscriptionRow>, Error> {
+        if tenants.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = subscription::Entity::find()
+            .filter(subscription::Column::TenantId.is_in(tenants.iter().map(|id| id.as_uuid())))
+            .all(self.control().read())
+            .await?;
+        let names = self.plan_names(rows.iter().map(|row| row.plan_id)).await?;
+        Ok(rows
+            .into_iter()
+            .map(|subscription| {
+                let plan = names.get(&subscription.plan_id).cloned();
+                SubscriptionRow { subscription, addons: Vec::new(), plan }
+            })
+            .collect())
+    }
+
+    /// Mã và tên của các gói `ids` (một câu).
+    pub(crate) async fn plan_names(
+        &self,
+        ids: impl IntoIterator<Item = Uuid>,
+    ) -> Result<HashMap<Uuid, (String, String)>, Error> {
+        let ids: std::collections::BTreeSet<Uuid> = ids.into_iter().collect();
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(plan::Entity::find()
+            .filter(plan::Column::Id.is_in(ids))
+            .all(self.control().read())
+            .await?
+            .into_iter()
+            .map(|row| (row.id, (row.code, row.name)))
+            .collect())
     }
 
     /// Nhà vận hành gán gói cho khách `tenant`: lần đầu tạo thuê bao (dùng thử khi gói có và khách
@@ -850,6 +967,38 @@ impl PlansService {
             .order_by_asc(grant::Column::Id)
             .all(self.control().read())
             .await?)
+    }
+
+    /// Ghi đè của mọi khách (nhà vận hành), theo trang; `active`: chỉ cái còn hiệu lực lúc `at`
+    /// (`true`) hay chỉ cái đã hết hạn (`false`).
+    pub(crate) async fn all_overrides(
+        &self,
+        filter: &OverrideFilter,
+        at: DateTime<Utc>,
+        page: &PageRequest,
+    ) -> Result<Page<grant::Model>, Error> {
+        let mut select = grant::Entity::find();
+        if let Some(tenant_id) = filter.tenant_id {
+            select = select.filter(grant::Column::TenantId.eq(tenant_id));
+        }
+        if let Some(kind) = &filter.kind {
+            select = select.filter(grant::Column::Kind.eq(kind.clone()));
+        }
+        if let Some(key) = &filter.key {
+            select = select.filter(grant::Column::Key.eq(key.clone()));
+        }
+        match filter.active {
+            Some(true) => {
+                select = select.filter(
+                    sea_orm::Condition::any()
+                        .add(grant::Column::ExpiresAt.is_null())
+                        .add(grant::Column::ExpiresAt.gt(at)),
+                );
+            }
+            Some(false) => select = select.filter(grant::Column::ExpiresAt.lte(at)),
+            None => {}
+        }
+        fetch_page(select, grant::Column::Id, |row| row.id, page, self.control().read()).await
     }
 
     /// Đặt (hay thay) ghi đè `kind` / `key` cho khách `tenant`.

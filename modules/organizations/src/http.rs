@@ -250,10 +250,9 @@ pub(crate) struct UpdateUnitTypeRequest {
     params(UnitsQuery, PageQuery),
     responses(
         (status = 200, description = "One page of units.", body = Page<UnitResponse>),
-        (status = 400, description = "A filter has the wrong type, e.g. `parent_id` is not a UUID.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `organizations.units.read`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A filter or paging parameter is invalid, e.g. `parent_id` is not a UUID; code `validation_failed`, every problem in `errors`.", body = Problem),
     )
 )]
 async fn list_units(

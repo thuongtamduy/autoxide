@@ -274,6 +274,33 @@ pub trait Entitlements: Send + Sync {
     async fn tenants_near_limit(&self) -> Result<Vec<TenantId>, Error> {
         Ok(Vec::new())
     }
+
+    /// Thuê bao (`subscription`) và lượng dùng (`usage`) của các khách `tenants`, cho `expand` của
+    /// danh sách khách — cả trang một lần. Khách không có thì không có trong kết quả. Mặc định: rỗng.
+    async fn describe_tenants(
+        &self,
+        tenants: &[TenantId],
+        subscription: bool,
+        usage: bool,
+    ) -> Result<BTreeMap<TenantId, TenantPlanView>, Error> {
+        let _ = (tenants, subscription, usage);
+        Ok(BTreeMap::new())
+    }
+}
+
+/// Thuê bao và lượng dùng của một khách, ở dạng JSON của module cung cấp (kernel không biết
+/// hình dạng cụ thể — chỉ chuyển cho `expand` của `GET /api/v1/kernel/tenants`).
+#[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
+pub struct TenantPlanView {
+    pub subscription: Option<serde_json::Value>,
+    pub usage: Option<serde_json::Value>,
+}
+
+impl TenantPlanView {
+    pub fn new(subscription: Option<serde_json::Value>, usage: Option<serde_json::Value>) -> Self {
+        TenantPlanView { subscription, usage }
+    }
 }
 
 /// Tay cầm kernel đưa cho MỌI module lúc `start`. Trỏ tới `dyn Entitlements` khi có module công
@@ -424,6 +451,21 @@ impl EntitlementsHandle {
         match self.provider.get() {
             Some(provider) => provider.tenants_with_status(status).await,
             None => Ok(Vec::new()),
+        }
+    }
+
+    /// Xem [`Entitlements::describe_tenants`]; không có bên cung cấp: rỗng.
+    pub async fn describe_tenants(
+        &self,
+        tenants: &[TenantId],
+        subscription: bool,
+        usage: bool,
+    ) -> Result<BTreeMap<TenantId, TenantPlanView>, Error> {
+        match self.provider.get() {
+            Some(provider) if !tenants.is_empty() && (subscription || usage) => {
+                provider.describe_tenants(tenants, subscription, usage).await
+            }
+            _ => Ok(BTreeMap::new()),
         }
     }
 

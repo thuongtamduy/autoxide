@@ -296,6 +296,8 @@ struct Setup {
     migrator: Migrator,
     /// Quản lý placement (migrate placement bằng API, D-334).
     placements: super::Placements,
+    /// Bảng giữ lại khi xoá hẳn khách (`Module::retained_tables`, D-337).
+    retained: Vec<&'static str>,
 }
 
 impl MoveSetup {
@@ -305,8 +307,14 @@ impl MoveSetup {
         control_plane: Vec<&'static str>,
         migrator: Migrator,
         placements: super::Placements,
+        retained: Vec<&'static str>,
     ) {
-        let _ = self.0.set(Setup { modules, control_plane, migrator, placements });
+        let _ = self.0.set(Setup { modules, control_plane, migrator, placements, retained });
+    }
+
+    /// Bảng mọi module khai giữ lại khi xoá hẳn khách.
+    pub(crate) fn retained(&self) -> Result<Vec<&'static str>, Error> {
+        Ok(self.get()?.retained.clone())
     }
 
     /// Quản lý placement, sau khi mọi module đã khởi động.

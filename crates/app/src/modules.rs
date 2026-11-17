@@ -65,6 +65,39 @@ mod tests {
         TestDatabase, schema_ownership_violations, schema_snapshot, schema_tenancy_violations,
     };
 
+    /// Mô tả do module khai (cài đặt theo khách, cài đặt theo nút, permission) hiện nguyên văn ở
+    /// API: không được có chuỗi dấu cách liền nhau giữa câu — dấu vết của chuỗi xuống dòng mà thiếu
+    /// `\` trong mã nguồn.
+    #[test]
+    fn mo_ta_cua_module_khong_co_dau_cach_thua() {
+        let mut bad = Vec::new();
+        for module in super::all() {
+            let texts = module
+                .tenant_settings()
+                .iter()
+                .map(|setting| (setting.name().to_owned(), setting.description()))
+                .chain(
+                    module
+                        .org_settings()
+                        .iter()
+                        .map(|setting| (setting.key().to_owned(), setting.description())),
+                )
+                .chain(
+                    module
+                        .permissions()
+                        .iter()
+                        .map(|permission| (permission.name().to_owned(), permission.description())),
+                )
+                .collect::<Vec<_>>();
+            for (name, text) in texts {
+                if text.contains("  ") || text.contains('\n') {
+                    bad.push(format!("{}: {name}", module.name()));
+                }
+            }
+        }
+        assert!(bad.is_empty(), "descriptions with repeated spaces: {bad:?}");
+    }
+
     /// Chạy mọi migration của chương trình trên một database trống rồi hỏi chính
     /// database: mỗi bảng có thuộc đúng một module không, có foreign key nào xuyên
     /// module không, bảng cấp khách hàng có `tenant_id` đúng luật không. Gate chạy bài này

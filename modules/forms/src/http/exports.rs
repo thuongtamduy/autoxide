@@ -178,7 +178,7 @@ pub(crate) struct DownloadQuery {
     params(("export_id" = Uuid, Path, description = "Id of the export."), DownloadQuery),
     responses(
         (status = 200, description = "The CSV file.", body = String, content_type = "text/csv", headers(("Content-Disposition" = String, description = "`attachment` with the file name `<key>-submissions.csv`."))),
-        (status = 400, description = "`expires` or `signature` is missing or not well formed.", body = Problem),
+        (status = 422, description = "`expires` or `signature` is missing or not well formed; code `validation_failed`, the field in `errors`.", body = Problem),
         (status = 403, description = "The link is wrong or has expired; code `forms.export_link_invalid`. Get a new one from `GET /api/v1/forms/exports/{export_id}`.", body = Problem),
         (status = 404, description = "The export or its file was deleted; code `forms.export_not_found`.", body = Problem),
     )

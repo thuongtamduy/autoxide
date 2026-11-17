@@ -29,7 +29,15 @@ async fn app(test: &TestDatabase) -> TestApp {
         .user(
             "ops",
             1,
-            &["plans.plans.manage", "plans.subscriptions.manage", "kernel.modules.read"],
+            &[
+                "plans.plans.manage",
+                "plans.subscriptions.manage",
+                "plans.subscriptions.read",
+                "kernel.modules.read",
+                "kernel.tenants.read",
+                "kernel.tenants.manage",
+                "kernel.tenants.delete",
+            ],
         )
         .user_in("acme", "owner", 2, &OWNER)
         .tenant("beta")
@@ -351,6 +359,120 @@ async fn han_muc_theo_loai_nut() {
         let (_, module) =
             call(&app, Method::GET, "/api/v1/kernel/modules/organizations", "ops", None).await;
         assert_eq!(module["data"]["limits"][0]["parts"], "unit type", "{module}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Đếm dòng của khách `tenant` trong bảng `table` (database chung của test).
+async fn rows_of(app: &TestApp, table: &str, tenant: uuid::Uuid) -> i64 {
+    let database = app.database().write();
+    let backend = database.get_database_backend();
+    let row = database
+        .query_one_raw(sea_orm::Statement::from_sql_and_values(
+            backend,
+            format!("SELECT COUNT(*) AS n FROM {table} WHERE tenant_id = $1"),
+            [tenant.into()],
+        ))
+        .await
+        .unwrap()
+        .unwrap();
+    row.try_get::<i64>("", "n").unwrap()
+}
+
+/// Xoá hẳn một khách (D-337): chỉ khi đã tạm khoá, xác nhận bằng slug; dữ liệu và file của khách
+/// mất, khách khác không bị đụng, sổ khách giữ dòng `deleted`, request tới khách nhận 404.
+#[tokio::test]
+async fn xoa_han_mot_khach_chi_khi_da_tam_khoa() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let acme = app.tenant("acme").await.unwrap().id().as_uuid();
+        let beta = app.tenant("beta").await.unwrap().id().as_uuid();
+        let body = json!({"code": "store", "name": "Store"});
+        let (status, _) =
+            call(&app, Method::POST, "/api/v1/organizations/unit-types", "owner", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED);
+        // Một file của khách: bản xuất dữ liệu.
+        let base = format!("/api/v1/kernel/tenants/{acme}/exports");
+        let (status, _) = call(&app, Method::POST, &base, "owner", None).await;
+        assert_eq!(status, StatusCode::CREATED);
+        drain(&app).await;
+        let types = "organizations_unit_type";
+        assert!(rows_of(&app, types, acme).await > 0);
+        let beta_before = rows_of(&app, types, beta).await;
+
+        let erase = format!("/api/v1/kernel/tenants/{acme}/erase");
+        let body = json!({"confirm": "acme", "reason": "Asked to close the account"});
+        let (status, refused) = call(&app, Method::POST, &erase, "ops", Some(body.clone())).await;
+        assert_eq!(
+            (status, refused["code"].as_str()),
+            (StatusCode::CONFLICT, Some("tenant_not_suspended"))
+        );
+        let suspend = json!({"status": "suspended", "reason": "Closing"});
+        let uri = format!("/api/v1/kernel/tenants/{acme}");
+        let (status, _) = call(&app, Method::PATCH, &uri, "ops", Some(suspend)).await;
+        assert_eq!(status, StatusCode::OK);
+        let wrong = json!({"confirm": "beta", "reason": "Asked to close the account"});
+        let (status, refused) = call(&app, Method::POST, &erase, "ops", Some(wrong)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        assert_eq!(refused["errors"][0]["field"], "confirm");
+        let (status, refused) = call(&app, Method::POST, &erase, "owner", Some(body.clone())).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
+
+        let (status, erased) = call(&app, Method::POST, &erase, "ops", Some(body.clone())).await;
+        assert_eq!(status, StatusCode::OK, "{erased}");
+        assert!(erased["data"]["rows"].as_u64().unwrap() > 0);
+        assert!(erased["data"]["files"].as_u64().unwrap() >= 1, "{erased}");
+        assert_eq!(rows_of(&app, types, acme).await, 0);
+        assert_eq!(rows_of(&app, types, beta).await, beta_before);
+        assert_eq!(rows_of(&app, "kernel_tenant_exports", acme).await, 0);
+
+        let (_, row) = call(&app, Method::GET, &uri, "ops", None).await;
+        assert_eq!(row["data"]["status"], "deleted");
+        let (status, gone) =
+            call(&app, Method::GET, "/api/v1/organizations/unit-types", "owner", None).await;
+        assert_eq!(
+            (status, gone["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("tenant_not_found"))
+        );
+        let (status, _) = call(&app, Method::POST, &erase, "ops", Some(body)).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let platform = json!({"confirm": "default", "reason": "No"});
+        let (status, refused) =
+            call(&app, Method::POST, "/api/v1/kernel/tenants/default/erase", "ops", Some(platform))
+                .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Cấp phát trọn gói qua `api::Provisioning` (đường của `autoxide tenant create --plan`) với module
+/// thật: khách mới có thuê bao, quản trị viên được mời với role `admin` của khách mới (D-338).
+#[tokio::test]
+async fn cap_phat_khach_moi_voi_module_that() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let body = json!({"code": "starter", "name": "Starter", "status": "active"});
+        let (status, plan) =
+            call(&app, Method::POST, "/api/v1/plans/plans", "ops", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{plan}");
+        let plan_id: uuid::Uuid = plan["data"]["id"].as_str().unwrap().parse().unwrap();
+        let provisioning = app.api::<dyn autoxide_plans::api::Provisioning>().unwrap();
+        let request = autoxide_plans::api::ProvisionRequest::new(
+            "gamma",
+            "Gamma Ltd",
+            plan_id,
+            "owner@gamma.example",
+        );
+        let done = provisioning.provision(request).await.unwrap();
+        assert_eq!((done.step.as_str(), done.status.as_str()), ("done", "done"));
+        let tenant = done.tenant_id.unwrap();
+        let uri = format!("/api/v1/plans/tenants/{tenant}/subscription");
+        let (status, sub) = call(&app, Method::GET, &uri, "ops", None).await;
+        assert_eq!(status, StatusCode::OK, "{sub}");
+        assert_eq!(sub["data"]["plan_code"], "starter");
+        assert_eq!(rows_of(&app, "auth_invitation", tenant).await, 1);
     })
     .await
     .unwrap();

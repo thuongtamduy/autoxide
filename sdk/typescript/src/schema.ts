@@ -307,6 +307,35 @@ export type BillingPeriodResponse = {
   tenant_id: string;
 };
 
+/** The whole billing profile; it replaces the one there is. */
+export type BillingProfileRequest = {
+  address?: AddressInput | null;
+  /** Where invoices and billing reminders go. */
+  email: string;
+  /** Legal name, 1 to 200 characters. */
+  legal_name: string;
+  /** Up to 20 characters. */
+  phone?: string | null;
+  /** Tax code: 10 digits, or 10 digits, `-` and 3 digits; leave out for a person without one. */
+  tax_code?: string | null;
+};
+
+/** Who the platform invoices: your tenant's legal details. */
+export type BillingProfileResponse = {
+  address?: Address | null;
+  /** Where invoices and billing reminders go. */
+  email: string;
+  /** Legal name of the business or person invoiced. */
+  legal_name: string;
+  phone?: string | null;
+  /** Tax code (Vietnam: 10 digits, or 10 digits, a dash and 3 digits for a branch). */
+  tax_code?: string | null;
+  tenant_id: string;
+  updated_at: string;
+  /** User who last changed it. */
+  updated_by?: string | null;
+};
+
 /**
  * A mark of a `text` node: `bold`, `italic`, `underline`, `strike`, `code`, or `link`
  * (`attrs.href`: `http://`, `https://`, `mailto:` or a path starting with `/`).
@@ -504,6 +533,11 @@ export type ClientConfigResponse = {
      * show "create an account".
      */
     self_registration: boolean;
+    /**
+     * Longest support access to a tenant that platform staff can be granted, in hours
+     * (`AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS`; `hours` of `POST /api/v1/auth/support-grants`).
+     */
+    support_access_max_hours: number;
   };
   /** Content settings an interface needs. */
   content: {
@@ -1120,8 +1154,11 @@ export type CurrentTenant = {
   name: string;
   /** Whether this is the platform tenant (the operator's own). */
   platform: boolean;
-  /** Read-only: data can be read but every change is refused with `403 tenant_read_only`. */
-  read_only?: boolean;
+  /**
+   * Read-only: data can be read but every change is refused with `403 tenant_read_only`.
+   * Always present.
+   */
+  read_only: boolean;
   slug: string;
   status: string;
 };
@@ -1311,6 +1348,25 @@ export type Data_BillingPeriodResponse = {
     /** `open`, `paid` or `void`. */
     status: string;
     tenant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BillingProfileResponse = {
+  /** Who the platform invoices: your tenant's legal details. */
+  data: {
+    address?: Address | null;
+    /** Where invoices and billing reminders go. */
+    email: string;
+    /** Legal name of the business or person invoiced. */
+    legal_name: string;
+    phone?: string | null;
+    /** Tax code (Vietnam: 10 digits, or 10 digits, a dash and 3 digits for a branch). */
+    tax_code?: string | null;
+    tenant_id: string;
+    updated_at: string;
+    /** User who last changed it. */
+    updated_by?: string | null;
   };
 };
 
@@ -1659,8 +1715,11 @@ export type Data_CurrentTenant = {
     name: string;
     /** Whether this is the platform tenant (the operator's own). */
     platform: boolean;
-    /** Read-only: data can be read but every change is refused with `403 tenant_read_only`. */
-    read_only?: boolean;
+    /**
+     * Read-only: data can be read but every change is refused with `403 tenant_read_only`.
+     * Always present.
+     */
+    read_only: boolean;
     slug: string;
     status: string;
   };
@@ -2125,6 +2184,12 @@ export type Data_MeResponse = {
   /** The signed-in user and what they may do. */
   data: {
     /**
+     * How you are in that tenant: `direct` (your own tenant), `delegation` (a parent tenant's
+     * delegation, `GET /api/v1/auth/me/tenants`) or `support` (platform staff with a support
+     * grant).
+     */
+    access: string;
+    /**
      * `true` when a role grants every permission (the `admin` role); `permissions`
      * is then empty.
      */
@@ -2142,6 +2207,11 @@ export type Data_MeResponse = {
      * password through `POST /api/v1/auth/password-reset`.
      */
     has_password: boolean;
+    /**
+     * With `delegation` or `support`: the tenant your account belongs to (the profile fields
+     * above are of that account); `null` when `direct`.
+     */
+    home_tenant_id?: string | null;
     id: string;
     /**
      * Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
@@ -2159,6 +2229,8 @@ export type Data_MeResponse = {
     pending_email?: PendingEmail | null;
     /** Permissions granted by the user's roles, sorted by name. */
     permissions: string[];
+    /** The tenant of this request. `permissions` and `all_permissions` are what you may do here. */
+    tenant_id: string;
     /** Preferred IANA time zone; `null`: not set. */
     time_zone?: string | null;
   };
@@ -2441,6 +2513,8 @@ export type Data_OverrideResponse = {
     /** With `limit`: the new maximum; `null` is unlimited. */
     max_value?: number | null;
     reason: string;
+    /** The tenant it applies to. */
+    tenant_id: string;
   };
 };
 
@@ -2518,6 +2592,11 @@ export type Data_PlanResponse = {
     sample_data: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
+    /**
+     * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+     * platform staff: `null` in the public catalog.
+     */
+    subscriber_count?: number | null;
     /** Days a suspended (read-only) subscription waits before it is canceled. */
     suspend_days: number;
     /** Days of free trial for a tenant that never had one; 0 for none. */
@@ -2540,7 +2619,11 @@ export type Data_PlanSubscription = {
     delete_after?: string | null;
     grace_ends_at?: string | null;
     id: string;
+    /** Code of the plan (also when it is no longer sold). */
+    plan_code?: string | null;
     plan_id: string;
+    /** Name of the plan (also when it is no longer sold). */
+    plan_name?: string | null;
     price_id?: string | null;
     /** Plan the subscription moves to when the period ends (after a downgrade). */
     scheduled_plan_id?: string | null;
@@ -2641,6 +2724,39 @@ export type Data_PreviewToken = {
     expires_at: string;
     /** Give it to `GET /api/v1/content/public/preview?token=…`. */
     token: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ProvisioningResponse = {
+  /** A request to create a tenant on a plan, and how far it went. */
+  data: {
+    admin_email: string;
+    admin_name?: string | null;
+    created_at: string;
+    error?: string | null;
+    /** Code of the error that stopped it, when `failed`. */
+    error_code?: string | null;
+    id: string;
+    parent_tenant_id?: string | null;
+    /** Name of the placement; `null`: `main`. */
+    placement?: string | null;
+    plan_id: string;
+    price_id?: string | null;
+    requested_by?: string | null;
+    sample_data: boolean;
+    slug: string;
+    /** `pending`, `running`, `failed` (see `error`; fix it, then `POST …/retry`) or `done`. */
+    status: string;
+    /** The last step done: `created`, `tenant_created`, `subscribed`, `seeded`, `invited`, `done`. */
+    step: string;
+    /** Every step done, oldest first. */
+    steps: ProvisioningStep[];
+    /** The new tenant, once created. */
+    tenant_id?: string | null;
+    tenant_name: string;
+    trial: boolean;
+    updated_at: string;
   };
 };
 
@@ -3089,6 +3205,19 @@ export type Data_SubscriberResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportAllowedResponse = {
+  /** Whether a tenant lets platform staff in for support. */
+  data: {
+    /**
+     * The tenant's setting `auth.support_access`: `false` means only a `legal_request` grant can
+     * be made (a `support` one is refused with `auth.support_access_disabled`).
+     */
+    support_access: boolean;
+    tenant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportGrantResponse = {
   /** A time-limited access of platform staff to a tenant's data. */
   data: {
@@ -3166,14 +3295,15 @@ export type Data_Tenant = {
     placement: string;
     /**
      * Read-only: its data can be read (and its users can sign in and export), but every change
-     * is refused with `403 tenant_read_only`. Independent of `status`.
+     * is refused with `403 tenant_read_only`. Independent of `status`. Always present.
      */
-    read_only?: boolean;
+    read_only: boolean;
     /** Short name: lower-case letters, digits and `-`; unique on the platform. */
     slug: string;
     /**
      * `provisioning`, `active`, `suspended` (every request is refused with
-     * `403 tenant_suspended`), `maintenance` or `moving`.
+     * `403 tenant_suspended`), `maintenance`, `moving` or `deleted` (its data was deleted; every
+     * request answers `404 tenant_not_found`).
      */
     status: string;
     updated_at: string;
@@ -3213,6 +3343,23 @@ export type Data_TenantDomain = {
     /** When the status last changed; a `pending` domain fails 7 days after it. */
     updated_at: string;
     verified_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TenantErasure = {
+  /** What deleting a tenant removed. */
+  data: {
+    /** Files deleted. */
+    files: number;
+    /** Tables kept, as modules require (accounting records must be kept for years). */
+    retained_tables: string[];
+    /** Total rows deleted. */
+    rows: number;
+    slug: string;
+    /** Rows deleted, per table (tables with none are left out). */
+    tables: TenantTableRows[];
+    tenant_id: string;
   };
 };
 
@@ -3833,6 +3980,8 @@ export type Data_Vec_OverrideResponse = {
     /** With `limit`: the new maximum; `null` is unlimited. */
     max_value?: number | null;
     reason: string;
+    /** The tenant it applies to. */
+    tenant_id: string;
   }[];
 };
 
@@ -3911,6 +4060,11 @@ export type Data_Vec_PlanResponse = {
     sample_data: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
+    /**
+     * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+     * platform staff: `null` in the public catalog.
+     */
+    subscriber_count?: number | null;
     /** Days a suspended (read-only) subscription waits before it is canceled. */
     suspend_days: number;
     /** Days of free trial for a tenant that never had one; 0 for none. */
@@ -4543,6 +4697,14 @@ export type EntryTerms = {
   term_ids: string[];
 };
 
+/** Delete a tenant for good. */
+export type EraseRequest = {
+  /** The tenant's slug again, to confirm. */
+  confirm: string;
+  /** Why, 1 to 500 characters (kept in the audit log of the platform). */
+  reason: string;
+};
+
 /** Result of erasing an email address. */
 export type ErasedResponse = {
   /** Submissions deleted. */
@@ -4973,6 +5135,12 @@ export type MatchedBy = "meaning" | "text";
 /** The signed-in user and what they may do. */
 export type MeResponse = {
   /**
+   * How you are in that tenant: `direct` (your own tenant), `delegation` (a parent tenant's
+   * delegation, `GET /api/v1/auth/me/tenants`) or `support` (platform staff with a support
+   * grant).
+   */
+  access: string;
+  /**
    * `true` when a role grants every permission (the `admin` role); `permissions`
    * is then empty.
    */
@@ -4990,6 +5158,11 @@ export type MeResponse = {
    * password through `POST /api/v1/auth/password-reset`.
    */
   has_password: boolean;
+  /**
+   * With `delegation` or `support`: the tenant your account belongs to (the profile fields
+   * above are of that account); `null` when `direct`.
+   */
+  home_tenant_id?: string | null;
   id: string;
   /**
    * Preferred language (`en` or `vi`) for mails sent later; `null`: the language of each
@@ -5007,6 +5180,8 @@ export type MeResponse = {
   pending_email?: PendingEmail | null;
   /** Permissions granted by the user's roles, sorted by name. */
   permissions: string[];
+  /** The tenant of this request. `permissions` and `all_permissions` are what you may do here. */
+  tenant_id: string;
   /** Preferred IANA time zone; `null`: not set. */
   time_zone?: string | null;
 };
@@ -5603,6 +5778,8 @@ export type OverrideResponse = {
   /** With `limit`: the new maximum; `null` is unlimited. */
   max_value?: number | null;
   reason: string;
+  /** The tenant it applies to. */
+  tenant_id: string;
 };
 
 /** One page of a list. */
@@ -6279,6 +6456,30 @@ export type Page_MembershipRowResponse = {
 };
 
 /** One page of a list. */
+export type Page_OverrideResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** User who set it. */
+    created_by?: string | null;
+    /** With `module` / `feature`. */
+    enabled?: boolean | null;
+    /** The override no longer applies from this time. */
+    expires_at?: string | null;
+    id: string;
+    key: string;
+    /** `module`, `feature` or `limit`. */
+    kind: string;
+    /** With `limit`: the new maximum; `null` is unlimited. */
+    max_value?: number | null;
+    reason: string;
+    /** The tenant it applies to. */
+    tenant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PasskeyResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -6341,6 +6542,11 @@ export type Page_PlanResponse = {
     sample_data: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
+    /**
+     * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+     * platform staff: `null` in the public catalog.
+     */
+    subscriber_count?: number | null;
     /** Days a suspended (read-only) subscription waits before it is canceled. */
     suspend_days: number;
     /** Days of free trial for a tenant that never had one; 0 for none. */
@@ -6364,7 +6570,11 @@ export type Page_PlanSubscription = {
     delete_after?: string | null;
     grace_ends_at?: string | null;
     id: string;
+    /** Code of the plan (also when it is no longer sold). */
+    plan_code?: string | null;
     plan_id: string;
+    /** Name of the plan (also when it is no longer sold). */
+    plan_name?: string | null;
     price_id?: string | null;
     /** Plan the subscription moves to when the period ends (after a downgrade). */
     scheduled_plan_id?: string | null;
@@ -6379,6 +6589,40 @@ export type Page_PlanSubscription = {
     trial_ends_at?: string | null;
     /** The tenant already had its free trial. */
     trial_used: boolean;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ProvisioningResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    admin_email: string;
+    admin_name?: string | null;
+    created_at: string;
+    error?: string | null;
+    /** Code of the error that stopped it, when `failed`. */
+    error_code?: string | null;
+    id: string;
+    parent_tenant_id?: string | null;
+    /** Name of the placement; `null`: `main`. */
+    placement?: string | null;
+    plan_id: string;
+    price_id?: string | null;
+    requested_by?: string | null;
+    sample_data: boolean;
+    slug: string;
+    /** `pending`, `running`, `failed` (see `error`; fix it, then `POST …/retry`) or `done`. */
+    status: string;
+    /** The last step done: `created`, `tenant_created`, `subscribed`, `seeded`, `invited`, `done`. */
+    step: string;
+    /** Every step done, oldest first. */
+    steps: ProvisioningStep[];
+    /** The new tenant, once created. */
+    tenant_id?: string | null;
+    tenant_name: string;
+    trial: boolean;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -6805,14 +7049,15 @@ export type Page_Tenant = {
     placement: string;
     /**
      * Read-only: its data can be read (and its users can sign in and export), but every change
-     * is refused with `403 tenant_read_only`. Independent of `status`.
+     * is refused with `403 tenant_read_only`. Independent of `status`. Always present.
      */
-    read_only?: boolean;
+    read_only: boolean;
     /** Short name: lower-case letters, digits and `-`; unique on the platform. */
     slug: string;
     /**
      * `provisioning`, `active`, `suspended` (every request is refused with
-     * `403 tenant_suspended`), `maintenance` or `moving`.
+     * `403 tenant_suspended`), `maintenance`, `moving` or `deleted` (its data was deleted; every
+     * request answers `404 tenant_not_found`).
      */
     status: string;
     updated_at: string;
@@ -7181,6 +7426,11 @@ export type PlanResponse = {
   sample_data: boolean;
   /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
   status: string;
+  /**
+   * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+   * platform staff: `null` in the public catalog.
+   */
+  subscriber_count?: number | null;
   /** Days a suspended (read-only) subscription waits before it is canceled. */
   suspend_days: number;
   /** Days of free trial for a tenant that never had one; 0 for none. */
@@ -7200,7 +7450,11 @@ export type PlanSubscription = {
   delete_after?: string | null;
   grace_ends_at?: string | null;
   id: string;
+  /** Code of the plan (also when it is no longer sold). */
+  plan_code?: string | null;
   plan_id: string;
+  /** Name of the plan (also when it is no longer sold). */
+  plan_name?: string | null;
   price_id?: string | null;
   /** Plan the subscription moves to when the period ends (after a downgrade). */
   scheduled_plan_id?: string | null;
@@ -7398,6 +7652,70 @@ export type ProfileRequest = {
    * moderators; no two users share a name.
    */
   display_name: string;
+};
+
+/** Create a tenant on a plan. */
+export type ProvisioningRequest = {
+  /** Who administers the new tenant: invited by email with the role `admin`. */
+  admin_email: string;
+  /** Their name, up to 200 characters. */
+  admin_name?: string | null;
+  /** Name of the new tenant, 1 to 200 characters. */
+  name: string;
+  /** Parent tenant, for chains. */
+  parent_id?: string | null;
+  /**
+   * Name of the placement for its data, of the plan's kind; default `main` for a `shared` plan.
+   * Required for a `dedicated` plan.
+   */
+  placement?: string | null;
+  /** An active base plan. */
+  plan_id: string;
+  /** An active recurring price of that plan. */
+  price_id?: string | null;
+  /** Add the sample data of the modules the plan turns on; default: the plan's `sample_data`. */
+  sample_data?: boolean | null;
+  /** Short name of the new tenant: 1 to 63 lower-case letters, digits and `-`. */
+  slug: string;
+  /** Start with the plan's free trial; default `true`. */
+  trial?: boolean;
+};
+
+/** A request to create a tenant on a plan, and how far it went. */
+export type ProvisioningResponse = {
+  admin_email: string;
+  admin_name?: string | null;
+  created_at: string;
+  error?: string | null;
+  /** Code of the error that stopped it, when `failed`. */
+  error_code?: string | null;
+  id: string;
+  parent_tenant_id?: string | null;
+  /** Name of the placement; `null`: `main`. */
+  placement?: string | null;
+  plan_id: string;
+  price_id?: string | null;
+  requested_by?: string | null;
+  sample_data: boolean;
+  slug: string;
+  /** `pending`, `running`, `failed` (see `error`; fix it, then `POST …/retry`) or `done`. */
+  status: string;
+  /** The last step done: `created`, `tenant_created`, `subscribed`, `seeded`, `invited`, `done`. */
+  step: string;
+  /** Every step done, oldest first. */
+  steps: ProvisioningStep[];
+  /** The new tenant, once created. */
+  tenant_id?: string | null;
+  tenant_name: string;
+  trial: boolean;
+  updated_at: string;
+};
+
+/** One step a provisioning went through. */
+export type ProvisioningStep = {
+  at: string;
+  /** `created`, `tenant_created`, `subscribed`, `seeded`, `invited` or `done`. */
+  step: string;
 };
 
 /** An author of an entry. */
@@ -8509,6 +8827,16 @@ export type SubscriptionResponse = {
 /** Where a subscriber stands on one list. */
 export type SubscriptionStatus = "unconfirmed" | "confirmed" | "unsubscribed";
 
+/** Whether a tenant lets platform staff in for support. */
+export type SupportAllowedResponse = {
+  /**
+   * The tenant's setting `auth.support_access`: `false` means only a `legal_request` grant can
+   * be made (a `support` one is refused with `auth.support_access_disabled`).
+   */
+  support_access: boolean;
+  tenant_id: string;
+};
+
 /** A new support access grant. */
 export type SupportGrantRequest = {
   /**
@@ -8616,14 +8944,15 @@ export type Tenant = {
   placement: string;
   /**
    * Read-only: its data can be read (and its users can sign in and export), but every change
-   * is refused with `403 tenant_read_only`. Independent of `status`.
+   * is refused with `403 tenant_read_only`. Independent of `status`. Always present.
    */
-  read_only?: boolean;
+  read_only: boolean;
   /** Short name: lower-case letters, digits and `-`; unique on the platform. */
   slug: string;
   /**
    * `provisioning`, `active`, `suspended` (every request is refused with
-   * `403 tenant_suspended`), `maintenance` or `moving`.
+   * `403 tenant_suspended`), `maintenance`, `moving` or `deleted` (its data was deleted; every
+   * request answers `404 tenant_not_found`).
    */
   status: string;
   updated_at: string;
@@ -8699,19 +9028,39 @@ export type TenantDomainRecord = {
   value: string;
 };
 
-/** Related records of a tenant, asked for with `expand`. */
+/** What deleting a tenant removed. */
+export type TenantErasure = {
+  /** Files deleted. */
+  files: number;
+  /** Tables kept, as modules require (accounting records must be kept for years). */
+  retained_tables: string[];
+  /** Total rows deleted. */
+  rows: number;
+  slug: string;
+  /** Rows deleted, per table (tables with none are left out). */
+  tables: TenantTableRows[];
+  tenant_id: string;
+};
+
+/**
+ * Related records of a tenant, asked for with `expand`. All three fields are always present
+ * (`null` when not asked for or when there is nothing).
+ */
 export type TenantExpanded = {
-  placement?: Placement | null;
+  placement: Placement | null;
   /**
-   * The tenant's subscription (`expand=subscription`). Always `null` for now: subscriptions
-   * come with the plans module (step 35); without it no tenant has one.
+   * The tenant's subscription (`expand=subscription`), shaped like `GET
+   * /api/v1/plans/tenants/{tenant_id}/subscription` (`PlanSubscription`, with the plan's code
+   * and name, without add-ons). `null` when not asked for, when the tenant has no subscription,
+   * or without the plans module.
    */
-  subscription?: Record<string, unknown> | null;
+  subscription: Record<string, unknown> | null;
   /**
-   * The tenant's use of its plan's limits (`expand=usage`). Always `null` for now, like
-   * `subscription`.
+   * The tenant's use of every limit (`expand=usage`), shaped like `GET
+   * /api/v1/plans/tenants/{tenant_id}/usage` (a list of `LimitUse`). `null` when not asked for
+   * or without the plans module.
    */
-  usage?: Record<string, unknown> | null;
+  usage: Record<string, unknown>[] | null;
 };
 
 /** An export of all the data of a tenant. */
@@ -9420,7 +9769,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; include?: "actor"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_AuditEntryResponse;
-        400: Problem;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -9447,7 +9795,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_ManagedApiKeyResponse;
-        400: Problem;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -10101,7 +10448,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; role_id?: string; user_id?: string; inherited?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_MembershipRowResponse;
-        400: Problem;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -10290,9 +10636,9 @@ export interface paths {
     };
   };
   "/api/v1/auth/support-grants": {
-    /** List the support access grants for a tenant (platform). */
+    /** List the support access grants (platform). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id?: string }; };
       responses: {
         200: Data_Vec_SupportGrantResponse;
         401: Problem;
@@ -10309,6 +10655,19 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-grants/allowed": {
+    /** Tell whether a tenant lets platform staff in for support (platform). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id: string }; };
+      responses: {
+        200: Data_SupportAllowedResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -11787,9 +12146,9 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { export_id: string }; query: { expires: number; signature: string }; };
       responses: {
         200: string;
-        400: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -11996,8 +12355,8 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { domain: string }; };
       responses: {
         200: Data_AllowedTenantDomain;
-        400: Problem;
         404: Problem;
+        422: Problem;
         429: Problem;
         default: Problem;
       };
@@ -12228,6 +12587,22 @@ export interface paths {
         403: Problem;
         404: Problem;
         412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/erase": {
+    /** Delete a tenant and its data for good. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: EraseRequest;
+      responses: {
+        200: Data_TenantErasure;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
@@ -13386,7 +13761,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { parent_id?: string; type?: string; status?: "pending" | "active" | "suspended" | "archived"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_UnitResponse;
-        400: Problem;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -13600,6 +13974,31 @@ export interface paths {
       };
     };
   };
+  "/api/v1/plans/billing-profile": {
+    /** Get your tenant's billing profile. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_BillingProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Set your tenant's billing profile. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: BillingProfileRequest;
+      responses: {
+        200: Data_BillingProfileResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/plans/catalog": {
     /** List the plans on sale, with their prices. */
     get: {
@@ -13617,6 +14016,18 @@ export interface paths {
       responses: {
         200: Data_EntitlementsResponse;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/overrides": {
+    /** List the overrides of every tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id?: string; kind?: string; key?: string; active?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_OverrideResponse;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -13715,6 +14126,60 @@ export interface paths {
       };
     };
   };
+  "/api/v1/plans/provisionings": {
+    /** List tenant provisionings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ProvisioningResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a tenant on a plan. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ProvisioningRequest;
+      responses: {
+        201: Data_ProvisioningResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/provisionings/{id}": {
+    /** Get a tenant provisioning. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ProvisioningResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/provisionings/{id}/retry": {
+    /** Run a failed tenant provisioning again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ProvisioningResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/plans/subscription": {
     /** Get your tenant's subscription. */
     get: {
@@ -13776,11 +14241,49 @@ export interface paths {
   "/api/v1/plans/subscriptions": {
     /** List the subscriptions of every tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; plan_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; plan_id?: string; tenant_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_PlanSubscription;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/billing-periods": {
+    /** List a tenant's billing periods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_Vec_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/billing-profile": {
+    /** Get a tenant's billing profile. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_BillingProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/entitlements": {
+    /** Get what a tenant may use now. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_EntitlementsResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

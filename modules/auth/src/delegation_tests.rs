@@ -143,6 +143,12 @@ async fn uy_quyen_cha_vao_con_va_audit_hai_phia() {
         let (_, tenants) = call(&chain, "GET", "/me/tenants", &chain.agent, None, None).await;
         let access: Vec<(&str, &str)> = tenants["data"].as_array().unwrap().iter().map(|t| (t["slug"].as_str().unwrap(), t["access"].as_str().unwrap())).collect();
         assert_eq!(access, [("parent", "direct"), ("child", "delegation")]);
+        // Ở khách con: `GET /me` biết người dùng được làm gì ở đây và vào bằng uỷ quyền.
+        let (status, me) = call(&chain, "GET", "/me", &chain.agent, Some("child"), None).await;
+        assert_eq!(status, StatusCode::OK, "{me}");
+        assert_eq!((me["data"]["access"].as_str(), me["data"]["home_tenant_id"].clone()), (Some("delegation"), json!(chain.parent.id().as_uuid())));
+        assert_eq!(me["data"]["tenant_id"], json!(chain.child.id().as_uuid()));
+        assert!(me["data"]["permissions"].as_array().unwrap().iter().any(|p| p == "auth.customers.read"), "{me}");
 
         // Thay đổi ở khách con mang đường vào (audit của con thấy); việc cấp ghi ở khách cha.
         let path = format!("/customers/{}", buyer.id);

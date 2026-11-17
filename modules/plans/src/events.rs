@@ -36,5 +36,6 @@ events! {
     BILLING_PERIOD_OPENED, BillingPeriodOpened, "plans.billing_period_opened", "A billing period was opened (`tenant_id`, `kind`, `reference`, `amount`, `currency`, `due_at`).";
     BILLING_PERIOD_PAID, BillingPeriodPaid, "plans.billing_period_paid", "A billing period was paid (`tenant_id`, `reference`, `amount`, `currency`).";
     BILLING_PERIOD_VOIDED, BillingPeriodVoided, "plans.billing_period_voided", "A billing period was voided (`tenant_id`, `reference`).";
+    BILLING_PROFILE_UPDATED, BillingProfileUpdated, "plans.billing_profile_updated", "A tenant set its billing profile (`tenant_id`); read it with `GET /api/v1/plans/tenants/{tenant_id}/billing-profile`.";
     ENTITLEMENTS_CHANGED, EntitlementsChanged, "plans.entitlements_changed", "What a tenant may use changed because of its subscription, add-ons or overrides (`tenant_id`). Read `GET /api/v1/plans/entitlements` again.";
 }

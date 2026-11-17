@@ -160,6 +160,23 @@ async fn ho_tro_het_han_thi_mat_quyen() {
         assert_eq!(status, StatusCode::OK, "{listed}");
         let (_, tenants) = call(&setup, "GET", "/me/tenants", &setup.agent, None, None).await;
         assert_eq!(tenants["data"][1]["access"], "support", "{tenants}");
+        // Ở khách đang vào: `GET /me` trả tài khoản (của khách nền tảng) và permission ở khách
+        // này, kèm cách vào; membership ở khách này: rỗng.
+        let (status, me) = call(&setup, "GET", "/me", &setup.agent, Some("shop"), None).await;
+        assert_eq!(status, StatusCode::OK, "{me}");
+        assert_eq!(me["data"]["email"], "agent@platform.example");
+        assert_eq!(me["data"]["access"], "support");
+        assert_eq!(me["data"]["tenant_id"], json!(setup.shop.id().as_uuid()));
+        assert!(me["data"]["home_tenant_id"].is_string(), "{me}");
+        assert_eq!(me["data"]["permissions"], json!(["auth.customers.read"]));
+        let (status, mine) =
+            call(&setup, "GET", "/me/memberships", &setup.agent, Some("shop"), None).await;
+        assert_eq!((status, mine["data"].clone()), (StatusCode::OK, json!([])), "{mine}");
+        let (_, own) = call(&setup, "GET", "/me", &setup.agent, None, None).await;
+        assert_eq!(
+            (own["data"]["access"].as_str(), own["data"]["home_tenant_id"].clone()),
+            (Some("direct"), Value::Null)
+        );
 
         // Khách thấy lần cấp và lần vào đầu, trong audit của mình.
         let (_, seen) = call(&setup, "GET", "/support-access", &setup.shop_admin, None, None).await;
@@ -333,6 +350,59 @@ async fn khach_tat_ho_tro_chi_con_yeu_cau_co_tham_quyen() {
         let entered = support.enter(&agent, &setup.shop).await.unwrap().unwrap();
         assert_eq!(entered.access().as_str(), "support");
         assert!(entered.allows("auth.customers.read"));
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn chi_nhan_su_nen_tang_xem_va_thu_hoi_lan_cap() {
+    TestDatabase::run(async |test| {
+        let (setup, _) = setup(test).await;
+        let shop = setup.shop.id().as_uuid();
+        let (status, granted) = call(
+            &setup,
+            "POST",
+            "/support-grants",
+            &setup.platform_admin,
+            None,
+            Some(grant_body(&setup, "support", 2)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{granted}");
+        let id = granted["data"]["id"].as_str().unwrap().to_owned();
+
+        // Quản trị của khách thường có mọi permission (kể cả `auth.support.grant`) nhưng không phải
+        // nhân sự nền tảng: không xem, không thu hồi, không dò cài đặt của khách khác.
+        for (method, path) in [
+            ("GET", "/support-grants".to_owned()),
+            ("GET", format!("/support-grants?tenant_id={shop}")),
+            ("GET", format!("/support-grants/allowed?tenant_id={shop}")),
+            ("DELETE", format!("/support-grants/{id}?tenant_id={shop}")),
+        ] {
+            let (status, body) = call(&setup, method, &path, &setup.shop_admin, None, None).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{method} {path}: {body}");
+            assert_eq!(body["code"], "auth.support_platform_only");
+        }
+
+        // Nhân sự nền tảng: danh sách mọi khách (không cần `tenant_id`), và biết trước khách có cho
+        // vào để hỗ trợ không.
+        let (status, all) =
+            call(&setup, "GET", "/support-grants", &setup.platform_admin, None, None).await;
+        assert_eq!(status, StatusCode::OK, "{all}");
+        assert_eq!(all["data"][0]["id"], id.as_str());
+        let path = format!("/support-grants/allowed?tenant_id={shop}");
+        let (status, allowed) = call(&setup, "GET", &path, &setup.platform_admin, None, None).await;
+        assert_eq!(status, StatusCode::OK, "{allowed}");
+        assert_eq!(allowed["data"], json!({"tenant_id": shop, "support_access": true}));
+        let unknown = uuid::Uuid::now_v7();
+        let path = format!("/support-grants/allowed?tenant_id={unknown}");
+        let (status, _) = call(&setup, "GET", &path, &setup.platform_admin, None, None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+
+        // Trần thời hạn có trong cấu hình cho giao diện.
+        let config = setup.app.get("/api/v1/kernel/client-config").send().await.unwrap().json();
+        assert!(config["data"]["auth"]["support_access_max_hours"].as_u64().is_some(), "{config}");
     })
     .await
     .unwrap();

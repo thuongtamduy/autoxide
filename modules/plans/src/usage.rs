@@ -507,6 +507,32 @@ impl PlansService {
     }
 }
 
+impl PlansService {
+    /// Như [`usage`](Self::usage) cho nhiều khách một lần (một câu).
+    pub(crate) async fn usage_of_many(
+        &self,
+        tenants: &[TenantId],
+        at: DateTime<Utc>,
+    ) -> Result<BTreeMap<TenantId, Usage>, Error> {
+        let mut found: BTreeMap<TenantId, Usage> = BTreeMap::new();
+        if tenants.is_empty() {
+            return Ok(found);
+        }
+        let rows = usage::Entity::find()
+            .filter(usage::Column::TenantId.is_in(tenants.iter().map(|id| id.as_uuid())))
+            .filter(usage::Column::PeriodStart.is_in([NO_PERIOD.to_owned(), month_start(at)]))
+            .all(self.databases.control().read())
+            .await?;
+        for row in rows {
+            found
+                .entry(TenantId::from_uuid(row.tenant_id))
+                .or_default()
+                .insert(row.limit_key, row.used);
+        }
+        Ok(found)
+    }
+}
+
 fn usage_filter(tenant: Uuid, key: &str, period: &str) -> sea_orm::Condition {
     sea_orm::Condition::all()
         .add(usage::Column::TenantId.eq(tenant))

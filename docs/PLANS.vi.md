@@ -44,6 +44,25 @@ Thêm giá bằng `POST /api/v1/plans/plans/{id}/prices`
 Giá không sửa: thêm giá mới rồi tắt giá cũ (`POST /prices/{id}/deactivate`); thuê bao giữ giá cũ tới
 khi đổi gói. Gói không bao giờ bị xoá, chỉ ngừng bán (`POST /plans/{id}/retire`).
 
+## Tạo khách theo gói
+
+Nhân sự nền tảng có `plans.provision` tạo một khách dùng được ngay trong một lệnh gọi: khách, thuê
+bao, dữ liệu mẫu của các module gói bật (khi gói hay yêu cầu nêu), và lời mời qua email cho quản trị
+viên với role `admin`.
+
+```bash
+curl -X POST https://api.example.com/api/v1/plans/provisionings \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"slug": "acme", "name": "Acme Ltd", "plan_id": "...", "admin_email": "owner@acme.example"}'
+```
+
+Việc chạy nền: theo dõi bằng `GET /api/v1/plans/provisionings/{id}` (`steps`, và `error` khi
+`failed`); sửa nguyên nhân rồi `POST …/retry` chạy tiếp từ bước đã xong. Trên máy chủ:
+`autoxide tenant create --slug acme --name "Acme Ltd" --plan <id gói> --admin-email
+owner@acme.example` làm như vậy ngay. Gói `dedicated` cần `placement`: một placement loại `dedicated`
+thêm trước bằng `autoxide placement add`. Gói `requires_kyc` chưa cấp phát được tới khi có xác thực
+danh tính (bước 37); khách tự đăng ký cũng vậy.
+
 ## Gán gói cho khách
 
 ```bash
@@ -80,7 +99,7 @@ Thay đổi có hiệu lực ngay ở máy chủ làm thay đổi, và sau tối
 | `past_due` | đầy đủ (ân hạn) | trả → `active`; quá `grace_days` → `suspended` |
 | `suspended` | chỉ đọc | trả → `active`; quá `suspend_days` → `canceled` |
 | `canceled` | chỉ đọc | tiếp tục trước `delete_after` → `active`; quá `retention_days` → `deleted` |
-| `deleted` | không | khách bị khoá; dữ liệu giữ tới khi bạn xoá |
+| `deleted` | không | khách và dữ liệu bị xoá hẳn (giữ chứng từ kế toán module phải lưu) |
 
 Một job chuyển trạng thái mỗi 5 phút. Trước khi hết kỳ `renewal_lead_days`, kỳ thanh toán kế được lập
 và mail nhắc gửi tới email thanh toán của thuê bao (`AUTOXIDE_PLANS_REMINDER_DAYS`, mặc định `7,1`),
@@ -91,6 +110,10 @@ gửi lại khi quá hạn và mỗi 3 ngày trong thời gian ân hạn.
 Tới khi nối cổng thanh toán (bước 36), kỳ thanh toán được trả ngoài hệ thống: kiểm chuyển khoản rồi
 `POST /api/v1/plans/billing-periods/{id}/mark-paid` (`{"provider_reference": "..."}`); thuê bao quá hạn
 hay tạm khoá thành đang dùng lại. `POST /billing-periods/{id}/void` huỷ kỳ lập nhầm.
+
+Nhân sự nền tảng xem kỳ thanh toán của một khách bằng `GET /api/v1/plans/tenants/{id}/billing-periods`
+và hồ sơ xuất hoá đơn (tên pháp lý, mã số thuế, email nhận hoá đơn, địa chỉ — khách tự đặt bằng
+`PUT /api/v1/plans/billing-profile`) bằng `GET /api/v1/plans/tenants/{id}/billing-profile`.
 
 Muốn chặn hẳn một khách (cả đọc), dùng `POST /api/v1/plans/tenants/{id}/subscription/suspend` kèm lý
 do; mở lại bằng `PATCH /api/v1/kernel/tenants/{id}` (`"status": "active"`).
@@ -106,6 +129,12 @@ rồi `GET …/exports/{export_id}` tới khi `ready`, rồi `GET …/exports/{e
 `{"table": "...", "row": {...}}`. Bản băm mật khẩu và secret bị bỏ ra, nội dung file đã tải lên cũng
 không có (có dòng ghi của chúng; tải từng file qua API của module file). Thuê bao bị huỷ thì một lượt
 xuất tự bắt đầu. Bản xuất bị xoá sau `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` (30) ngày.
+
+## Xoá hẳn một khách
+
+`POST /api/v1/kernel/tenants/{id}/erase` (`kernel.tenants.delete`, thân `{"confirm": "<slug>",
+"reason": "..."}`) xoá hẳn một khách đang tạm khoá cùng dữ liệu của nó; không hoàn tác được. Thuê bao
+quá thời hạn lưu tự làm việc này.
 
 ## Cấu hình
 

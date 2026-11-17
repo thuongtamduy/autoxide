@@ -69,17 +69,22 @@ pub trait TenantSeed: Send + Sync {
 /// Bộ gieo của một module, kèm tên module (để báo lỗi rõ module nào hỏng).
 pub(crate) type NamedSeed = (&'static str, Arc<dyn TenantSeed>);
 
-/// Bộ gieo của mọi module, theo thứ tự đăng ký; điền sau khi mọi module đã khởi động. Clone rẻ.
+/// Bộ gieo của mọi module (dữ liệu ban đầu, và dữ liệu mẫu khi cấp phát — `Module::sample_data`),
+/// theo thứ tự đăng ký; điền sau khi mọi module đã khởi động. Clone rẻ.
 #[derive(Clone, Default)]
-pub(crate) struct Seeds(Arc<OnceLock<Vec<NamedSeed>>>);
+pub(crate) struct Seeds(Arc<OnceLock<(Vec<NamedSeed>, Vec<NamedSeed>)>>);
 
 impl Seeds {
-    pub(crate) fn fill(&self, seeds: Vec<NamedSeed>) {
-        let _ = self.0.set(seeds);
+    pub(crate) fn fill(&self, seeds: Vec<NamedSeed>, samples: Vec<NamedSeed>) {
+        let _ = self.0.set((seeds, samples));
     }
 
     fn all(&self) -> &[NamedSeed] {
-        self.0.get().map_or(&[], Vec::as_slice)
+        self.0.get().map_or(&[], |(seeds, _)| seeds.as_slice())
+    }
+
+    fn samples(&self) -> &[NamedSeed] {
+        self.0.get().map_or(&[], |(_, samples)| samples.as_slice())
     }
 }
 
@@ -150,12 +155,14 @@ pub struct Tenant {
     pub slug: String,
     pub name: String,
     /// `provisioning`, `active`, `suspended` (every request is refused with
-    /// `403 tenant_suspended`), `maintenance` or `moving`.
+    /// `403 tenant_suspended`), `maintenance`, `moving` or `deleted` (its data was deleted; every
+    /// request answers `404 tenant_not_found`).
     #[schema(example = "active")]
     pub status: String,
     /// Read-only: its data can be read (and its users can sign in and export), but every change
-    /// is refused with `403 tenant_read_only`. Independent of `status`.
+    /// is refused with `403 tenant_read_only`. Independent of `status`. Always present.
     #[serde(default)]
+    #[schema(required = true)]
     pub read_only: bool,
     /// Parent tenant, when the tenant belongs to a chain.
     pub parent_id: Option<Uuid>,
@@ -169,18 +176,23 @@ pub struct Tenant {
     pub expanded: Option<TenantExpanded>,
 }
 
-/// Related records of a tenant, asked for with `expand`.
+/// Related records of a tenant, asked for with `expand`. All three fields are always present
+/// (`null` when not asked for or when there is nothing).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct TenantExpanded {
     /// The placement that keeps the tenant's data (`expand=placement`); `null` when not asked for.
+    #[schema(required = true)]
     pub placement: Option<Placement>,
-    /// The tenant's subscription (`expand=subscription`). Always `null` for now: subscriptions
-    /// come with the plans module (step 35); without it no tenant has one.
-    #[schema(value_type = Option<Object>)]
+    /// The tenant's subscription (`expand=subscription`), shaped like `GET
+    /// /api/v1/plans/tenants/{tenant_id}/subscription` (`PlanSubscription`, with the plan's code
+    /// and name, without add-ons). `null` when not asked for, when the tenant has no subscription,
+    /// or without the plans module.
+    #[schema(value_type = Option<Object>, required = true)]
     pub subscription: Option<serde_json::Value>,
-    /// The tenant's use of its plan's limits (`expand=usage`). Always `null` for now, like
-    /// `subscription`.
-    #[schema(value_type = Option<Object>)]
+    /// The tenant's use of every limit (`expand=usage`), shaped like `GET
+    /// /api/v1/plans/tenants/{tenant_id}/usage` (a list of `LimitUse`). `null` when not asked for
+    /// or without the plans module.
+    #[schema(value_type = Option<Vec<Object>>, required = true)]
     pub usage: Option<serde_json::Value>,
 }
 
@@ -192,7 +204,9 @@ pub struct CurrentTenant {
     pub name: String,
     pub status: String,
     /// Read-only: data can be read but every change is refused with `403 tenant_read_only`.
+    /// Always present.
     #[serde(default)]
+    #[schema(required = true)]
     pub read_only: bool,
     /// `single` (one tenant) or `multi` (many tenants on one installation).
     #[schema(example = "single")]
@@ -346,6 +360,8 @@ pub struct TenantAdmin {
     outbox: Outbox,
     /// Thuê bao, hạn mức (module `plans`, bước 35): bộ lọc `subscription_status`, `near_limit`.
     entitlements: crate::entitlement::EntitlementsHandle,
+    /// Bảng của các module (xoá hẳn khách, D-337); `None` khi chưa gắn.
+    setup: Option<super::moves::MoveSetup>,
 }
 
 impl std::fmt::Debug for TenantAdmin {
@@ -367,7 +383,25 @@ pub(super) fn is_slug(slug: &str) -> bool {
 
 impl TenantAdmin {
     pub(crate) fn new(registry: DatabaseRegistry, seeds: Seeds, outbox: Outbox) -> Self {
-        TenantAdmin { registry, seeds, outbox, entitlements: Default::default() }
+        TenantAdmin { registry, seeds, outbox, entitlements: Default::default(), setup: None }
+    }
+
+    /// Bảng của các module, cho xoá hẳn khách (D-337).
+    pub(crate) fn with_setup(mut self, setup: super::moves::MoveSetup) -> Self {
+        self.setup = Some(setup);
+        self
+    }
+
+    pub(super) fn setup(&self) -> Result<&super::moves::MoveSetup, Error> {
+        self.setup.as_ref().ok_or_else(|| Error::internal("tenant deletion is not set up"))
+    }
+
+    pub(super) fn registry(&self) -> &DatabaseRegistry {
+        &self.registry
+    }
+
+    pub(super) fn outbox(&self) -> &Outbox {
+        &self.outbox
     }
 
     /// Thuê bao và hạn mức cho bộ lọc của danh sách khách (bước 35).
@@ -423,7 +457,7 @@ impl TenantAdmin {
                 problems.push(FieldError::new(
                     "status",
                     "invalid",
-                    "must be one of provisioning, active, suspended, maintenance, moving",
+                    "must be one of provisioning, active, suspended, maintenance, moving, deleted",
                 ));
             }
             select = select.filter(tenant::Column::Status.eq(status.as_str()));
@@ -524,12 +558,22 @@ impl TenantAdmin {
                 }
             }
         }
+        // Thuê bao và lượng dùng: hỏi module `plans` (qua tay cầm quyền dùng) cho cả trang một lần.
+        let ids: Vec<TenantId> = rows.data.iter().map(|row| TenantId::from_uuid(row.id)).collect();
+        let mut plans = self
+            .entitlements
+            .describe_tenants(&ids, expand.contains(&"subscription"), expand.contains(&"usage"))
+            .await?;
         Ok(rows.map(|row| {
             let placement = described.get(&row.placement_id).cloned();
+            let view = plans.remove(&TenantId::from_uuid(row.id)).unwrap_or_default();
             let mut tenant = describe(row, &placements);
             if !expand.is_empty() {
-                tenant.expanded =
-                    Some(TenantExpanded { placement, subscription: None, usage: None });
+                tenant.expanded = Some(TenantExpanded {
+                    placement,
+                    subscription: view.subscription,
+                    usage: view.usage,
+                });
             }
             tenant
         }))
@@ -630,6 +674,33 @@ impl TenantAdmin {
         self.provision_id(actor, id).await
     }
 
+    /// Module có dữ liệu mẫu cho khách mới (`Module::sample_data`), theo thứ tự đăng ký.
+    pub fn sample_modules(&self) -> Vec<&'static str> {
+        self.seeds.samples().iter().map(|(module, _)| *module).collect()
+    }
+
+    /// Gieo dữ liệu mẫu của các module `modules` (module không có dữ liệu mẫu bị bỏ qua) cho khách
+    /// `tenant` — cấp phát khách mới theo gói (bước 35). Chạy lại được. Trả các module đã gieo.
+    pub async fn seed_samples(
+        &self,
+        tenant: TenantId,
+        modules: &[&str],
+    ) -> Result<Vec<&'static str>, Error> {
+        let context = self.registry.tenant(tenant).await?;
+        let mut seeded = Vec::new();
+        for (module, seed) in self.seeds.samples() {
+            if !modules.contains(module) {
+                continue;
+            }
+            seed.seed(&context).await.map_err(|error| {
+                tracing::error!(module, tenant_id = %tenant, error = %error, "sample data failed");
+                error
+            })?;
+            seeded.push(*module);
+        }
+        Ok(seeded)
+    }
+
     /// Cấp phát lại khách `id_or_slug` đang `provisioning` (chạy lại được).
     pub async fn provision(&self, actor: Actor, id_or_slug: &str) -> Result<Tenant, Error> {
         let row = match id_or_slug.parse::<Uuid>() {
@@ -681,6 +752,9 @@ impl TenantAdmin {
         expected: Option<DateTime<Utc>>,
     ) -> Result<Tenant, Error> {
         let row = self.find(id).await?;
+        if row.status == TenantStatus::Deleted.as_str() {
+            return Err(errors::tenant_not_found(&id.to_string()));
+        }
         if expected.is_some_and(|expected| expected != row.updated_at) {
             return Err(crate::version::changed());
         }
@@ -992,7 +1066,7 @@ async fn get_tenant(
     extensions(("x-permissions" = json!(["kernel.tenants.manage"]))),
     operation_id = "update_tenant",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the tenant."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
+    params(("id" = String, Path, description = "Id or slug of the tenant."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
     request_body = TenantChanges,
     responses(
         (status = 200, description = "The tenant after the change.", body = Data<Tenant>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
@@ -1000,19 +1074,21 @@ async fn get_tenant(
         (status = 403, description = "Missing permission `kernel.tenants.manage` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
         (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
         (status = 412, description = "`If-Match` does not match: the record changed since you read it; code `precondition_failed`.", body = Problem),
-        (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid; every problem is listed in `errors` (code `validation_failed`). Making the platform tenant read-only or suspending it is refused this way, on the field `read_only` or `status`.", body = Problem),
     )
 )]
 async fn update_tenant(
     State(admin): State<Arc<TenantAdmin>>,
     principal: Principal,
-    Path(id): Path<Uuid>,
+    Path(id): Path<String>,
     if_match: IfMatch,
     crate::http::ValidJson(changes): crate::http::ValidJson<TenantChanges>,
 ) -> Result<Tagged<Tenant>, Error> {
     principal.require(&TENANTS_MANAGE)?;
     require_platform(&principal)?;
     let expected = if_match.expected()?;
+    // ID hay slug, như `GET /tenants/{id}`, `…/settings` và `…/move`.
+    let id = admin.get(&id).await?.id;
     let tenant = admin.update(Actor::from(&principal), id, changes, expected).await?;
     Ok(Tagged { version: tenant.updated_at, data: tenant })
 }
@@ -1049,6 +1125,7 @@ pub(crate) fn routes(admin: Arc<TenantAdmin>) -> OpenApiRouter {
         .routes(routes!(list_tenants, create_tenant))
         .routes(routes!(get_tenant, update_tenant))
         .routes(routes!(list_placements))
+        .merge(super::erasure::routes())
         .with_state(admin)
 }
 

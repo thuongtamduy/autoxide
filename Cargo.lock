@@ -805,6 +805,8 @@ name = "autoxide-plans"
 version = "0.14.0"
 dependencies = [
  "async-trait",
+ "autoxide-address",
+ "autoxide-auth",
  "autoxide-kernel",
  "autoxide-testkit",
  "axum",

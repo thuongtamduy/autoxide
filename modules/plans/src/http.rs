@@ -31,8 +31,8 @@ use crate::permissions::{
     BILLING_READ, PLANS_MANAGE, PLANS_READ, SUBSCRIPTIONS_MANAGE, SUBSCRIPTIONS_READ,
 };
 use crate::service::{
-    AssignInput, OverrideInput, PlanInput, PlanRow, PlansService, PriceInput, SubscriptionFilter,
-    SubscriptionRow, now, subscription_not_found,
+    AssignInput, OverrideFilter, OverrideInput, PlanInput, PlanRow, PlansService, PriceInput,
+    SubscriptionFilter, SubscriptionRow, now, subscription_not_found,
 };
 
 pub(crate) fn routes(service: Arc<PlansService>) -> OpenApiRouter {
@@ -48,10 +48,14 @@ pub(crate) fn routes(service: Arc<PlansService>) -> OpenApiRouter {
         .routes(routes!(own_usage))
         .routes(routes!(list_subscriptions))
         .routes(routes!(tenant_subscription, assign_subscription))
+        .routes(routes!(all_overrides))
+        .routes(routes!(tenant_entitlements))
         .routes(routes!(list_overrides, set_override))
         .routes(routes!(remove_override))
         .routes(routes!(tenant_usage))
         .merge(crate::http_lifecycle::routes())
+        .merge(crate::billing_profile::routes())
+        .merge(crate::provisioning::routes())
         .with_state(service)
 }
 
@@ -148,6 +152,9 @@ pub(crate) struct PlanResponse {
     /// Limits by key; `null` means unlimited. A limit not listed is 0.
     limits: BTreeMap<String, Option<i64>>,
     prices: Vec<PriceResponse>,
+    /// Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+    /// platform staff: `null` in the public catalog.
+    subscriber_count: Option<i64>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -175,6 +182,7 @@ impl From<PlanRow> for PlanResponse {
             features: row.grants.features.into_iter().collect(),
             limits: row.grants.limits,
             prices: row.prices.into_iter().map(PriceResponse::from).collect(),
+            subscriber_count: row.subscribers,
             created_at: plan.created_at,
             updated_at: plan.updated_at,
         }
@@ -377,6 +385,10 @@ pub(crate) struct SubscriptionResponse {
     id: Uuid,
     tenant_id: Uuid,
     plan_id: Uuid,
+    /// Code of the plan (also when it is no longer sold).
+    plan_code: Option<String>,
+    /// Name of the plan (also when it is no longer sold).
+    plan_name: Option<String>,
     price_id: Option<Uuid>,
     /// `trialing`, `active`, `past_due` (unpaid, in the grace period), `suspended` (read-only),
     /// `canceled` (read-only, data kept until `delete_after`) or `deleted`.
@@ -404,10 +416,14 @@ pub(crate) struct SubscriptionResponse {
 impl From<SubscriptionRow> for SubscriptionResponse {
     fn from(row: SubscriptionRow) -> Self {
         let sub = row.subscription;
+        let (plan_code, plan_name) =
+            row.plan.map_or((None, None), |(code, name)| (Some(code), Some(name)));
         SubscriptionResponse {
             id: sub.id,
             tenant_id: sub.tenant_id,
             plan_id: sub.plan_id,
+            plan_code,
+            plan_name,
             price_id: sub.price_id,
             status: sub.status,
             current_period_start: sub.current_period_start,
@@ -469,6 +485,8 @@ impl From<AssignRequest> for AssignInput {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct OverrideResponse {
     id: Uuid,
+    /// The tenant it applies to.
+    tenant_id: Uuid,
     /// `module`, `feature` or `limit`.
     kind: String,
     key: String,
@@ -488,6 +506,7 @@ impl From<grant::Model> for OverrideResponse {
     fn from(row: grant::Model) -> Self {
         OverrideResponse {
             id: row.id,
+            tenant_id: row.tenant_id,
             kind: row.kind,
             key: row.key,
             enabled: row.enabled,
@@ -539,6 +558,22 @@ pub(crate) struct SubscriptionsQuery {
     status: Option<String>,
     /// Only subscriptions on this plan.
     plan_id: Option<Uuid>,
+    /// Only the subscription of this tenant.
+    tenant_id: Option<Uuid>,
+}
+
+/// Filters of the list of every tenant's overrides.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct OverridesQuery {
+    /// Only the overrides of this tenant.
+    tenant_id: Option<Uuid>,
+    /// Only `module`, `feature` or `limit` overrides.
+    kind: Option<String>,
+    /// Only overrides of this module, feature or limit key.
+    key: Option<String>,
+    /// `true`: only overrides that still apply; `false`: only expired ones.
+    active: Option<bool>,
 }
 
 // ---- Dựng câu trả lời quyền dùng ------------------------------------------------------------
@@ -580,6 +615,16 @@ pub(crate) async fn limit_uses(
 ) -> Result<Vec<LimitUse>, Error> {
     let snapshot = service.snapshot(tenant).await?;
     let used = service.usage(tenant, now()).await?;
+    Ok(limit_uses_of(service, &snapshot, &used))
+}
+
+/// Lượng dùng từng hạn mức, từ quyền dùng và lượng đã đọc sẵn (dùng chung cho một khách và cho cả
+/// trang khách của `expand=usage`).
+pub(crate) fn limit_uses_of(
+    service: &PlansService,
+    snapshot: &autoxide_kernel::entitlement::TenantEntitlements,
+    used: &crate::usage::Usage,
+) -> Vec<LimitUse> {
     let mut uses = Vec::new();
     for found in service.entitlements.catalog().limits() {
         let key = found.limit.key();
@@ -602,7 +647,7 @@ pub(crate) async fn limit_uses(
             uses.push(limit_use(part, kind, max, used.get(part).copied().unwrap_or(0)));
         }
     }
-    Ok(uses)
+    uses
 }
 
 fn limit_use(key: &str, kind: &str, max: Option<i64>, used: i64) -> LimitUse {
@@ -917,7 +962,7 @@ async fn own_usage(
     security(("bearer" = [])),
     params(SubscriptionsQuery, PageQuery),
     responses(
-        (status = 200, description = "One page of subscriptions, newest first (without add-ons).", body = Page<SubscriptionResponse>),
+        (status = 200, description = "One page of subscriptions, newest first (without add-ons), with the plan's code and name.", body = Page<SubscriptionResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`).", body = Problem),
     )
@@ -929,9 +974,13 @@ async fn list_subscriptions(
     Query(page): Query<PageQuery>,
 ) -> Result<Page<SubscriptionResponse>, Error> {
     operator(&principal, &SUBSCRIPTIONS_READ)?;
-    let filter = SubscriptionFilter { status: filter.status, plan_id: filter.plan_id };
+    let filter = SubscriptionFilter {
+        status: filter.status,
+        plan_id: filter.plan_id,
+        tenant_id: filter.tenant_id,
+    };
     let page = service.list_subscriptions(&filter, &PageRequest::try_from(page)?).await?;
-    Ok(page.map(|subscription| SubscriptionRow { subscription, addons: Vec::new() }.into()))
+    Ok(page.map(SubscriptionResponse::from))
 }
 
 /// Get a tenant's subscription.
@@ -1106,4 +1155,68 @@ async fn tenant_usage(
 ) -> Result<Data<Vec<LimitUse>>, Error> {
     operator(&principal, &SUBSCRIPTIONS_READ)?;
     Ok(Data { data: limit_uses(&service, TenantId::from_uuid(tenant_id)).await? })
+}
+
+/// List the overrides of every tenant.
+///
+/// Platform staff with `plans.subscriptions.read`. To list one tenant's, filter by `tenant_id` or
+/// use `GET /tenants/{tenant_id}/overrides`.
+#[utoipa::path(
+    get,
+    path = "/overrides",
+    extensions(("x-permissions" = json!(["plans.subscriptions.read"]))),
+    operation_id = "list_all_overrides",
+    security(("bearer" = [])),
+    params(OverridesQuery, PageQuery),
+    responses(
+        (status = 200, description = "One page of overrides, newest first.", body = Page<OverrideResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`).", body = Problem),
+    )
+)]
+async fn all_overrides(
+    State(service): State<Arc<PlansService>>,
+    principal: Principal,
+    Query(filter): Query<OverridesQuery>,
+    Query(page): Query<PageQuery>,
+) -> Result<Page<OverrideResponse>, Error> {
+    operator(&principal, &SUBSCRIPTIONS_READ)?;
+    let filter = OverrideFilter {
+        tenant_id: filter.tenant_id,
+        kind: filter.kind,
+        key: filter.key,
+        active: filter.active,
+    };
+    let page = service.all_overrides(&filter, now(), &PageRequest::try_from(page)?).await?;
+    Ok(page.map(OverrideResponse::from))
+}
+
+/// Get what a tenant may use now.
+///
+/// Platform staff with `plans.subscriptions.read`. The same as the tenant sees with
+/// `GET /entitlements`: modules, features, limits with their use, and whether its data is read-only.
+#[utoipa::path(
+    get,
+    path = "/tenants/{tenant_id}/entitlements",
+    extensions(("x-permissions" = json!(["plans.subscriptions.read"]))),
+    operation_id = "get_tenant_entitlements",
+    security(("bearer" = [])),
+    params(("tenant_id" = Uuid, Path, description = "Id of the tenant.")),
+    responses(
+        (status = 200, description = "What the tenant may use now.", body = Data<EntitlementsResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Not platform staff (`tenant_platform_only`) or missing `plans.subscriptions.read` (`permission_denied`).", body = Problem),
+        (status = 404, description = "No such tenant; code `tenant_not_found`.", body = Problem),
+    )
+)]
+async fn tenant_entitlements(
+    State(service): State<Arc<PlansService>>,
+    principal: Principal,
+    Path(tenant_id): Path<Uuid>,
+) -> Result<Data<EntitlementsResponse>, Error> {
+    operator(&principal, &SUBSCRIPTIONS_READ)?;
+    let tenant = TenantId::from_uuid(tenant_id);
+    // Khách phải có thật (404 của kernel), không trả "không giới hạn" cho ID bịa.
+    service.databases.tenant(tenant).await?;
+    Ok(Data { data: describe_entitlements(&service, tenant).await? })
 }

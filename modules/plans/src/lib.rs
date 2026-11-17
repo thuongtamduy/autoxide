@@ -6,6 +6,7 @@
 //! module này vào bản một khách không đổi gì.
 
 pub mod api;
+mod billing_profile;
 mod config;
 mod entity;
 mod events;
@@ -17,6 +18,7 @@ mod merge;
 mod migration;
 mod permissions;
 mod provider;
+mod provisioning;
 mod service;
 mod tools;
 mod usage;
@@ -77,6 +79,8 @@ impl Module for PlansModule {
             "plans_reservation",
             "plans_usage_record",
             "plans_billing_period",
+            "plans_billing_profile",
+            "plans_provisioning",
         ]
     }
 
@@ -113,8 +117,14 @@ impl Module for PlansModule {
             translations: context.translations().clone(),
             reminder_days: config.reminder_days.clone(),
             exports: context.require::<autoxide_kernel::tenancy::TenantExports>().ok(),
+            units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
+            jobs: context.jobs(),
+            invitations: context.require::<dyn autoxide_auth::api::Invitations>().ok(),
         });
         self.service = Some(service.clone());
+        context.provide::<dyn api::Provisioning>(Arc::new(provisioning::Provisioner(
+            service.clone(),
+        )))?;
         context.provide::<dyn autoxide_kernel::entitlement::Entitlements>(Arc::new(
             provider::Provider(service),
         ))

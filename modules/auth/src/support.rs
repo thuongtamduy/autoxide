@@ -120,6 +120,26 @@ impl SupportService {
         Ok(())
     }
 
+    /// Việc của nhân sự nền tảng: người gọi phải ở chính khách nền tảng (không qua header "vào"
+    /// khách khác). Chỉ kiểm permission là chưa đủ — role `admin` của khách nào cũng có mọi
+    /// permission, kể cả `auth.support.grant`.
+    pub(crate) fn require_platform(&self, principal: &Principal) -> Result<(), Error> {
+        if principal.tenant_id() != self.platform().id() || principal.operator_from().is_some() {
+            return Err(Error::forbidden(
+                "auth.support_platform_only",
+                "Only platform staff, in the platform tenant, can grant support access.",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Khách `target` có cho nhân sự nền tảng vào để hỗ trợ không — để màn cấp quyền biết trước,
+    /// thay vì chỉ biết khi bị từ chối `auth.support_access_disabled`.
+    pub(crate) async fn allowed(&self, target: TenantId) -> Result<bool, Error> {
+        let target = self.databases.tenant(target).await?;
+        self.allows_support(&target).await
+    }
+
     /// Cấp quyền vào (người gọi ở khách nền tảng, đã có `auth.support.grant`).
     pub(crate) async fn grant(
         &self,
@@ -127,12 +147,7 @@ impl SupportService {
         input: NewSupportGrant,
     ) -> Result<SupportGrant, Error> {
         let platform = self.platform();
-        if principal.tenant_id() != platform.id() || principal.operator_from().is_some() {
-            return Err(Error::forbidden(
-                "auth.support_platform_only",
-                "Only platform staff, in the platform tenant, can grant support access.",
-            ));
-        }
+        self.require_platform(principal)?;
         let reason = input.reason.trim().to_owned();
         let mut problems = Vec::new();
         if !(10..=500).contains(&reason.chars().count()) {
@@ -267,11 +282,24 @@ impl SupportService {
 
     /// Mọi lần cấp cho khách `target` (mới nhất trước) — cho quản trị của khách và của nền tảng.
     pub(crate) async fn for_tenant(&self, target: TenantId) -> Result<Vec<SupportGrant>, Error> {
+        self.grants(Some(target), None).await
+    }
+
+    /// Lần cấp mới nhất trước, của khách `target` (`None`: mọi khách), tối đa `limit`.
+    pub(crate) async fn grants(
+        &self,
+        target: Option<TenantId>,
+        limit: Option<u64>,
+    ) -> Result<Vec<SupportGrant>, Error> {
+        use sea_orm::QuerySelect as _;
         let platform = self.platform();
-        Ok(entity::Entity::find()
-            .filter(entity::Column::TargetTenantId.eq(target.as_uuid()))
-            .scoped(&platform)
+        let mut select = entity::Entity::find().scoped(&platform);
+        if let Some(target) = target {
+            select = select.filter(entity::Column::TargetTenantId.eq(target.as_uuid()));
+        }
+        Ok(select
             .order_by_desc(entity::Column::Id)
+            .limit(limit)
             .all(platform.database().read())
             .await?)
     }

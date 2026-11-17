@@ -21,6 +21,10 @@ struct AuthClientConfig {
     /// `true` when people can create their own account (`AUTOXIDE_AUTH_SELF_REGISTRATION`):
     /// show "create an account".
     self_registration: bool,
+    /// Longest support access to a tenant that platform staff can be granted, in hours
+    /// (`AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS`; `hours` of `POST /api/v1/auth/support-grants`).
+    #[schema(example = 72)]
+    support_access_max_hours: u32,
 }
 
 pub(crate) fn section(config: &AuthConfig) -> Result<Option<ClientSection>, Error> {
@@ -28,6 +32,7 @@ pub(crate) fn section(config: &AuthConfig) -> Result<Option<ClientSection>, Erro
         login_link: config.login_link,
         passkeys: config.passkey.is_some(),
         self_registration: config.self_registration,
+        support_access_max_hours: config.support_max_hours,
     };
     ClientSection::new(&section).map(Some)
 }

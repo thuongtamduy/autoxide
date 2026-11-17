@@ -168,6 +168,16 @@ pub(crate) struct MeResponse {
     /// are left out of `permissions` until you turn on an authenticator app
     /// (`POST /api/v1/auth/me/mfa/totp`) or add a passkey.
     mfa_required: bool,
+    /// The tenant of this request. `permissions` and `all_permissions` are what you may do here.
+    tenant_id: Uuid,
+    /// How you are in that tenant: `direct` (your own tenant), `delegation` (a parent tenant's
+    /// delegation, `GET /api/v1/auth/me/tenants`) or `support` (platform staff with a support
+    /// grant).
+    #[schema(example = "direct")]
+    access: String,
+    /// With `delegation` or `support`: the tenant your account belongs to (the profile fields
+    /// above are of that account); `null` when `direct`.
+    home_tenant_id: Option<Uuid>,
 }
 
 /// An email change waiting for its confirmation link.
@@ -188,13 +198,19 @@ impl MeResponse {
         tenant: &TenantContext,
         principal: &Principal,
     ) -> Result<Self, Error> {
+        // Đang vào khách khác (uỷ quyền, hỗ trợ): tài khoản nằm ở khách gốc; permission là của
+        // khách đang vào (principal đã mang sẵn).
+        let home = match principal.operator_from() {
+            Some(home) => state.support.databases.tenant(home).await?,
+            None => tenant.clone(),
+        };
         let account = state
             .users
-            .own_account(tenant, principal.user_id())
+            .own_account(&home, principal.user_id())
             .await?
             .ok_or_else(crate::token::invalid_token)?;
         let user = account.user;
-        let pending = state.verifications.pending_change(tenant, &user).await?;
+        let pending = state.verifications.pending_change(&home, &user).await?;
         Ok(MeResponse {
             id: user.id,
             email: user.email,
@@ -208,6 +224,9 @@ impl MeResponse {
             locale: user.locale,
             time_zone: user.time_zone,
             mfa_required: account.mfa_pending,
+            tenant_id: tenant.id().as_uuid(),
+            access: principal.access().as_str().to_owned(),
+            home_tenant_id: principal.operator_from().map(|home| home.as_uuid()),
         })
     }
 }
@@ -367,7 +386,7 @@ async fn logout(
     operation_id = "me",
     security(("bearer" = [])),
     responses(
-        (status = 200, description = "The user the access token belongs to, with the permissions of their roles.", body = Data<MeResponse>),
+        (status = 200, description = "The user the access token belongs to, with the permissions of their roles in the tenant of the request — also in a tenant entered through a delegation or a support grant (`access`, `home_tenant_id`).", body = Data<MeResponse>),
         (status = 401, description = "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`; get a new one with `POST /api/v1/auth/refresh`). Without a usable refresh token, sign in with `POST /api/v1/auth/login`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
     )
