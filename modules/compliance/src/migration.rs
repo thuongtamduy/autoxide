@@ -32,6 +32,13 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(MoitWebsites),
         Box::new(Privacy),
         Box::new(Tracking),
+        Box::new(Cases),
+        // Bảng `compliance_antispam_nonces`: nonce của token form của hai kênh báo công khai (D-363).
+        autoxide_kernel::antispam::antispam_migration("m0016_create_antispam_nonces", "compliance"),
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0017_tenancy_antispam_nonces",
+            vec![autoxide_kernel::antispam::tenant_table("compliance")],
+        ),
     ]
 }
 
@@ -898,6 +905,158 @@ impl MigrationTrait for Tracking {
                 "compliance_cookie_consents",
                 "compliance_cookie_settings",
                 "compliance_tracking_tags",
+            ],
+        )
+        .await
+    }
+}
+
+/// Vụ việc (bước 37, D-363): báo vi phạm sở hữu trí tuệ / hàng giả / hàng cấm, khiếu nại của người
+/// tiêu dùng, người bị phản ánh, lưu vết (chỉ thêm) và sổ cung cấp thông tin cho cơ quan có thẩm quyền.
+struct Cases;
+
+impl MigrationName for Cases {
+    fn name(&self) -> &str {
+        "m0015_cases"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for Cases {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_cases")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("kind", 24))
+                    .col(schema::string_len("target", 200))
+                    .col(schema::uuid_null("respondent_org_id"))
+                    .col(schema::string_len("reporter_kind", 16))
+                    .col(schema::uuid_null("reporter_user_id"))
+                    .col(schema::string_len_null("reporter_name", 200))
+                    .col(schema::string_len_null("reporter_email", 320))
+                    .col(schema::string_len_null("reporter_phone", 32))
+                    .col(schema::string_len("channel", 16))
+                    .col(schema::text("claim"))
+                    .col(schema::text("rights"))
+                    .col(schema::string_len("status", 24))
+                    .col(schema::boolean("restricted"))
+                    .col(schema::string_len("decision", 24))
+                    .col(schema::text_null("decision_reason"))
+                    .col(schema::timestamp_with_time_zone("ack_due_at"))
+                    .col(schema::timestamp_with_time_zone_null("acknowledged_at"))
+                    .col(schema::timestamp_with_time_zone("respond_by"))
+                    .col(schema::timestamp_with_time_zone("decide_by"))
+                    .col(schema::timestamp_with_time_zone_null("decided_at"))
+                    .col(schema::uuid_null("decided_by"))
+                    .col(schema::string_len("tracking_hash", 64))
+                    .col(schema::string_len_null("spam_reason", 100))
+                    .col(schema::string_len("overdue_notified", 16))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        for (name, columns) in [
+            ("compliance_cases_due_idx", &["tenant_id", "status", "decide_by"][..]),
+            ("compliance_cases_target_idx", &["tenant_id", "target"][..]),
+            ("compliance_cases_respondent_idx", &["tenant_id", "respondent_org_id", "id"][..]),
+            ("compliance_cases_list_idx", &["tenant_id", "id"][..]),
+            // Job nhắc hạn quét mọi khách của một database.
+            ("compliance_cases_sweep_idx", &["status", "decide_by"][..]),
+        ] {
+            index(manager, "compliance_cases", name, columns, false).await?;
+        }
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_case_respondents")
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("case_id"))
+                    .col(schema::uuid("user_id"))
+                    .primary_key(Index::create().col("tenant_id").col("case_id").col("user_id"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_case_respondents",
+            "compliance_case_respondents_user_idx",
+            &["tenant_id", "user_id", "case_id"],
+            false,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_case_entries")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("case_id"))
+                    .col(schema::string_len("kind", 16))
+                    .col(schema::string_len("author_kind", 16))
+                    .col(schema::uuid_null("author_user_id"))
+                    .col(schema::text("body"))
+                    .col(schema::text("files"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_case_entries",
+            "compliance_case_entries_case_idx",
+            &["tenant_id", "case_id", "id"],
+            false,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_disclosures")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid_null("case_id"))
+                    .col(schema::string_len("authority", 200))
+                    .col(schema::string_len("request_reference", 100))
+                    .col(schema::text("legal_basis"))
+                    .col(schema::timestamp_with_time_zone("requested_at"))
+                    .col(schema::string_len("subject", 64))
+                    .col(schema::text("fields"))
+                    .col(schema::uuid("disclosed_by"))
+                    .col(schema::timestamp_with_time_zone("disclosed_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_disclosures",
+            "compliance_disclosures_at_idx",
+            &["tenant_id", "disclosed_at"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "compliance_disclosures",
+            "compliance_disclosures_list_idx",
+            &["tenant_id", "id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        drop_all(
+            manager,
+            &[
+                "compliance_disclosures",
+                "compliance_case_entries",
+                "compliance_case_respondents",
+                "compliance_cases",
             ],
         )
         .await

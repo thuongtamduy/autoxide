@@ -90,6 +90,31 @@
       "needs_legal_review": true
     },
     {
+      "key": "cases.deadlines",
+      "version": 1,
+      "effective_from": "2024-07-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {
+        "utc_offset_minutes": 420,
+        "ack_hours": 24,
+        "authority_decide_hours": 24,
+        "kinds": {
+          "ip_infringement": {"respond_working_days": 5, "decide_working_days": 10},
+          "counterfeit": {"respond_working_days": 3, "decide_working_days": 7},
+          "prohibited_goods": {"respond_working_days": 2, "decide_working_days": 5},
+          "consumer_complaint": {"respond_working_days": 3, "decide_working_days": 7},
+          "other": {"respond_working_days": 5, "decide_working_days": 15}
+        },
+        "holidays": [
+          "2026-01-01", "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20",
+          "2026-04-27", "2026-04-30", "2026-05-01", "2026-09-01", "2026-09-02",
+          "2027-01-01", "2027-04-30", "2027-05-03", "2027-09-02", "2027-09-03"
+        ]
+      },
+      "legal_basis": "Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15 và NĐ 55/2024/NĐ-CP (tiếp nhận, giải quyết khiếu nại; mặc định 7 ngày làm việc), Luật Thương mại điện tử 2025, Luật Sở hữu trí tuệ, NĐ 85/2021/NĐ-CP (gỡ khi cơ quan có thẩm quyền yêu cầu; mặc định 24 giờ). Số ngày cho báo vi phạm sở hữu trí tuệ / hàng giả / hàng cấm là mặc định thận trọng. Ngày lễ theo Bộ luật Lao động 2019 Điều 112; Tết âm lịch, Giỗ Tổ và ngày nghỉ bù nhập tay theo thông báo hằng năm — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý.",
+      "needs_legal_review": true
+    },
+    {
       "key": "notifications.send_windows",
       "version": 1,
       "effective_from": "2020-10-01T00:00:00+07:00",

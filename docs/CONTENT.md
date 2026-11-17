@@ -253,6 +253,15 @@ items with `noindex: true`; `content_modified_at` is `lastmod`; `translations` g
 `hreflang` alternates). Build RSS, Atom or JSON Feed from `/public/feed`, using each post's
 `id` (never changes) as the item id.
 
+### Hidden by a case (451)
+
+When the `compliance` module handles a report of an infringement (counterfeit, intellectual property…)
+about an entry and hides it, `content` receives the event `compliance.target_restricted`: the published
+entry answers **451** `content.restricted` at `GET /public/resolve` (answer 451 to the reader), and is
+left out of `/public/posts`, the sitemap, the feed, search and other modules (resource directory). It
+stays hidden when published again. `compliance.target_restored` shows it as before. See
+[`COMPLIANCE.md`](COMPLIANCE.md#reports-of-infringements-and-consumer-complaints).
+
 ## Draft preview
 
 Editors can show a draft to someone without an account:

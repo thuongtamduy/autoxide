@@ -244,6 +244,14 @@ giả (kể cả khi xoá tài khoản) sẽ làm mới mọi trang đang hiện
 RSS, Atom hay JSON Feed từ `/public/feed`, dùng `id` của bài (không bao giờ đổi) làm ID của mục
 trong feed.
 
+### Bị ẩn vì vụ việc (451)
+
+Khi module `compliance` xử lý một báo vi phạm (hàng giả, sở hữu trí tuệ…) về một mục và ẩn nó, `content`
+nhận event `compliance.target_restricted`: mục đã đăng trả **451** `content.restricted` ở
+`GET /public/resolve` (trả 451 cho người đọc), và vắng khỏi `/public/posts`, sitemap, feed, tìm kiếm và
+module khác (sổ đối tượng). Đăng lại vẫn giữ ẩn. `compliance.target_restored` hiện lại như cũ. Xem
+[`COMPLIANCE.vi.md`](COMPLIANCE.vi.md#báo-vi-phạm-và-khiếu-nại-của-người-tiêu-dùng).
+
 ## Xem trước bản nháp
 
 Người biên tập có thể cho một người không có tài khoản xem bản nháp:

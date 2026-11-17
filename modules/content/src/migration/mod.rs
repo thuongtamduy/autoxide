@@ -11,6 +11,7 @@ mod m0013_site_paths;
 mod m0014_redirect_search;
 mod m0015_review_index;
 mod m0016_ai_assisted;
+mod m0017_restriction;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -146,5 +147,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0015_review_index::Migration),
         // Nhãn "viết từ gợi ý của AI" (Luật 134/2025/QH15, bước 37, D-362).
         Box::new(m0016_ai_assisted::Migration),
+        // Mục bị ẩn tạm vì vụ việc của `compliance` (bước 37, D-363).
+        Box::new(m0017_restriction::Migration),
     ]
 }

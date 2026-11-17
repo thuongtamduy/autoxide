@@ -211,3 +211,21 @@ impl crate::api::ComplianceFacts for Provider {
         self.0.facts.register(key, fact)
     }
 }
+
+#[async_trait::async_trait]
+impl crate::api::ModerationPolicy for Provider {
+    async fn hide_reasons(&self, tenant: TenantId, surface: &str) -> Result<Vec<String>, Error> {
+        let tenant = self.0.tenant(tenant).await?;
+        Ok(self.0.hide_reasons(&tenant, surface).await?.0)
+    }
+
+    async fn check_hide_reason(
+        &self,
+        tenant: TenantId,
+        surface: &str,
+        reason: &str,
+    ) -> Result<(), Error> {
+        let tenant = self.0.tenant(tenant).await?;
+        self.0.check_hide_reason(&tenant, surface, reason).await
+    }
+}

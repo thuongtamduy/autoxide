@@ -502,6 +502,7 @@ impl ContentService {
             noindex: version.noindex,
             ai_generated: version.ai_generated,
             ai_assisted: version.ai_assisted,
+            restricted_at: version.restricted_at,
             ai_reviewed_by,
             ai_reviewed_at: ai_reviewed_by.map(|_| now),
             published_at: published_at.or(old.as_ref().map(|old| old.published_at)).unwrap_or(now),

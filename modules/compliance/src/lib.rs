@@ -12,12 +12,16 @@
 //! pháp lý trước khi chạy thật.
 
 pub mod api;
+mod cases;
 mod checklist;
 mod config;
 mod consents;
+mod consumer;
+mod disclosures;
 mod documents;
 mod entity;
 mod events;
+mod http_cases;
 mod http_kyc;
 mod http_legal;
 mod http_moit;
@@ -34,6 +38,7 @@ mod provider;
 mod service;
 mod subject_requests;
 mod tools;
+mod tools_cases;
 mod tools_privacy;
 mod tracking;
 mod verification;
@@ -41,6 +46,8 @@ mod websites;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_cases;
 #[cfg(test)]
 mod tests_moit;
 #[cfg(test)]
@@ -96,6 +103,7 @@ impl Module for ComplianceModule {
                 crate::permissions::PRIVACY_READ,
                 crate::permissions::RULES_READ,
                 crate::permissions::LEGAL_READ,
+                crate::permissions::CASES_READ,
             ]),
         )
     }
@@ -117,9 +125,11 @@ impl Module for ComplianceModule {
         vec!["compliance_rules"]
     }
 
-    // Bằng chứng chấp nhận và đồng ý phải giữ để chứng minh, kể cả khi xoá hẳn khách.
+    // Bằng chứng chấp nhận và đồng ý phải giữ để chứng minh, kể cả khi xoá hẳn khách; sổ cung cấp
+    // thông tin cho cơ quan cũng vậy.
     fn retained_tables(&self) -> Vec<&'static str> {
         vec![
+            "compliance_disclosures",
             "compliance_documents",
             "compliance_document_versions",
             "compliance_acceptances",
@@ -164,6 +174,9 @@ impl Module for ComplianceModule {
             personal_data: context.personal_data_export(),
             retention: context.retention_catalog(),
             cookie_consents_per_hour: self.config.cookie_consents_per_hour,
+            guard: (*context.require::<autoxide_kernel::antispam::SpamGuard>()?).clone(),
+            public_reports_per_hour: self.config.public_reports_per_hour,
+            case_tracking_url: self.config.case_tracking_url.clone(),
         });
         self.service = Some(service.clone());
         context.personal_data(Arc::new(privacy::CompliancePersonalData(service.clone())))?;
@@ -175,6 +188,7 @@ impl Module for ComplianceModule {
         context.provide::<dyn api::AccountVerification>(provider.clone())?;
         context.provide::<dyn api::LegalProfiles>(provider.clone())?;
         context.provide::<dyn api::ComplianceFacts>(provider.clone())?;
+        context.provide::<dyn api::ModerationPolicy>(provider.clone())?;
         // Bộ hỏi "đã xác thực để đăng nội dung chưa" của kernel (D-202) — `comments` hỏi qua nó.
         context.posting_verifier(provider.clone())?;
         context.provide::<dyn api::ComplianceRules>(provider)
@@ -182,7 +196,8 @@ impl Module for ComplianceModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
-            http_kyc::routes(service.clone())
+            http_cases::routes(service.clone())
+                .merge(http_kyc::routes(service.clone()))
                 .merge(http_legal::routes(service.clone()))
                 .merge(http_moit::routes(service.clone()))
                 .merge(http_privacy::routes(service.clone()))
@@ -234,6 +249,10 @@ impl Module for ComplianceModule {
     fn jobs(&self) -> Vec<JobRegistration> {
         self.service.clone().map_or_else(Vec::new, |service| {
             vec![
+                JobRegistration::new(
+                    cases::CASE_DEADLINES,
+                    Arc::new(cases::DeadlinesJob(service.clone())),
+                ),
                 JobRegistration::new(kyc::KYC_PROCESS, Arc::new(kyc::ProcessJob(service.clone()))),
                 JobRegistration::new(kyc::KYC_EXPIRY, Arc::new(kyc::ExpiryJob(service.clone()))),
                 JobRegistration::new(
@@ -262,6 +281,7 @@ impl Module for ComplianceModule {
                 tracking::CONSENT_PROOF_PURGE,
                 Duration::from_secs(86_400),
             ),
+            Schedule::new(cases::CASE_DEADLINES, cases::CASE_DEADLINES, Duration::from_secs(3_600)),
             Schedule::new(RULES_REFRESH, RULES_REFRESH, Duration::from_secs(3_600))
                 .on_control_only(),
         ]
@@ -318,6 +338,14 @@ impl Module for ComplianceModule {
                  kept for the days of the legal rule `privacy.consent_proof_days`.",
                 DataCategory::Accounting,
                 Keep::Days(1825),
+            ),
+            RetentionPolicy::new(
+                "compliance.cases",
+                "Reports of infringements and consumer complaints with the reporter's name and \
+                 contact, the log and the record of disclosures to authorities, kept to answer \
+                 later disputes and inspections.",
+                DataCategory::Basic,
+                Keep::UntilDeleted,
             ),
         ]
     }

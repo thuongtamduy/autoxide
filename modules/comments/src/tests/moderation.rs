@@ -801,3 +801,63 @@ async fn hanh_dong_hang_loat_cua_binh_luan() {
     .await
     .unwrap();
 }
+
+/// Vụ việc của `compliance` ẩn bình luận rồi hiện lại đúng trạng thái cũ (bước 37, D-363); nhận lại
+/// cùng event không hỏng gì; người kiểm duyệt không đổi được bình luận đang bị ẩn; sổ đối tượng
+/// biết tác giả.
+#[tokio::test]
+async fn vu_viec_an_roi_hien_lai_binh_luan() {
+    TestDatabase::run(async |test| {
+        let h = service(test, open_config()).await;
+        let client = visitor("203.0.113.9");
+        let posted =
+            as_guest(&h.service, &client, guest("Ada", "Hàng này là hàng giả")).await.unwrap();
+        let id = posted.comment.row.id;
+        assert_eq!(counts(&h.database, POST).await, (1, 0));
+        let resolver = crate::restriction::CommentResolver;
+        use autoxide_kernel::resource::ResourceResolver;
+        let found = resolver.resolve(&h.tenant, &id.to_string()).await.unwrap().unwrap();
+        assert!(found.public);
+
+        let notice = autoxide_kernel::moderation::Restriction::new(
+            uuid::Uuid::now_v7(),
+            format!("comments.comment:{id}"),
+            "other",
+        );
+        let listener = crate::restriction::Listener(h.service.clone());
+        let restrict = delivered(
+            &h.database,
+            autoxide_kernel::moderation::TARGET_RESTRICTED,
+            None,
+            serde_json::to_value(&notice).unwrap(),
+        );
+        listener.handle(&restrict).await.unwrap();
+        listener.handle(&restrict).await.unwrap();
+        let row = comment::Entity::find_by_id(id).one(h.database.read()).await.unwrap().unwrap();
+        assert_eq!(
+            (row.status.as_str(), row.restricted_status.as_deref()),
+            ("rejected", Some("published"))
+        );
+        assert_eq!(counts(&h.database, POST).await, (0, 0));
+        let error = h
+            .service
+            .set_status(&h.tenant, &admin(), id, Status::Published, None)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "comments.restricted");
+
+        let restore = delivered(
+            &h.database,
+            autoxide_kernel::moderation::TARGET_RESTORED,
+            None,
+            serde_json::to_value(&notice).unwrap(),
+        );
+        listener.handle(&restore).await.unwrap();
+        listener.handle(&restore).await.unwrap();
+        let row = comment::Entity::find_by_id(id).one(h.database.read()).await.unwrap().unwrap();
+        assert_eq!((row.status.as_str(), row.restricted_status), ("published", None));
+        assert_eq!(counts(&h.database, POST).await, (1, 0));
+    })
+    .await
+    .unwrap();
+}

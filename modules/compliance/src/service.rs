@@ -61,6 +61,12 @@ pub(crate) struct ComplianceService {
     pub retention: autoxide_kernel::privacy::RetentionCatalog,
     /// `AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR`.
     pub cookie_consents_per_hour: u32,
+    /// Chống spam cho hai kênh báo công khai (D-119, D-363).
+    pub guard: autoxide_kernel::antispam::SpamGuard,
+    /// `AUTOXIDE_COMPLIANCE_PUBLIC_REPORTS_PER_IP_PER_HOUR`.
+    pub public_reports_per_hour: u32,
+    /// `AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL`.
+    pub case_tracking_url: Option<String>,
 }
 
 /// Duyệt hay quyết định cần phiên đăng nhập của người, không nhận API key.
@@ -368,6 +374,7 @@ impl ComplianceService {
                         .all(|item| item.as_str().is_some_and(autoxide_kernel::email::is_valid))
             }),
             "complaints.contact" | "privacy.contact" => value.is_object(),
+            "cases.auto_restrict" => value.is_boolean(),
             _ => {
                 return Err(Error::not_found(
                     "compliance.policy_unknown",

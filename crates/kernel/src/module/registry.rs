@@ -566,10 +566,13 @@ impl Modules {
         for module in &self.modules {
             for subscription in module.subscriptions() {
                 let event = subscription.event();
-                // `privacy::USER_DELETED` là hợp đồng của kernel: module dọn dữ liệu được
-                // đăng ký nhận nó kể cả khi chưa cài module quản lý tài khoản nào.
+                // `privacy::USER_DELETED` và `moderation::TARGET_*` là hợp đồng của kernel: module
+                // dọn dữ liệu / sở hữu đích được đăng ký nhận chúng kể cả khi chưa cài module quản
+                // lý tài khoản / xử lý vụ việc nào.
                 let known = event == Subscription::ALL
                     || event == crate::privacy::USER_DELETED
+                    || event == crate::moderation::TARGET_RESTRICTED
+                    || event == crate::moderation::TARGET_RESTORED
                     || self.events.contains(event);
                 if !known {
                     problems.push(format!(

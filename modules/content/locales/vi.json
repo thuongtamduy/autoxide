@@ -21,6 +21,7 @@
   "content.redirect_exists": "Đã có chuyển hướng từ địa chỉ này; hãy sửa chuyển hướng đó.",
   "content.redirect_loop": "Chuyển hướng này sẽ tạo vòng lặp hoặc chuỗi quá 10 lần chuyển.",
   "content.redirect_not_found": "Không có chuyển hướng `{id}`.",
+  "content.restricted": "Nội dung tạm ẩn do có phản ánh vi phạm đang được xử lý.",
   "content.revision_not_found": "Mục này không có revision `{id}`.",
   "content.schedule_conflict": "Mục này đã có một lịch `{action}` đang chờ. Hãy huỷ lịch đó trước.",
   "content.schedule_not_found": "Không có lịch `{id}`.",

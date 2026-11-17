@@ -8900,3 +8900,74 @@ một câu theo gợi ý có phải gắn không). Chọn cách hiểu rộng: c
    after). Hợp đồng `autoxide_media::api::MediaRef` thêm `alt_ai_assisted`; ảnh của bài công khai (`PublicMedia`) trả
    `alt_ai_assisted` chỉ khi ảnh dùng alt của thư viện — alt đặt trên bài đi theo `ai_assisted` của bài.
 5. Bài đánh giá (bước 45) và trang dựng từ khối (bước 67) dùng cùng quy ước khi có.
+
+## D-363 · Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Thương mại điện tử 2025 (nghĩa vụ của sàn khi có
+phản ánh vi phạm, cung cấp thông tin người bán cho cơ quan), Luật Sở hữu trí tuệ, NĐ 85/2021/NĐ-CP (gỡ khi cơ quan có thẩm quyền
+yêu cầu — mặc định dữ liệu 24 giờ), Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (cung cấp dữ liệu cá nhân theo yêu cầu của cơ quan).
+Chưa chắc: thời hạn xử lý báo vi phạm sở hữu trí tuệ / hàng giả của bên tư (để số ngày mặc định thận trọng trong quy tắc
+`cases.deadlines`, `needs_legal_review: true`); danh sách ngày lễ âm lịch nhập tay mỗi năm.
+
+1. **Ẩn đích bằng hợp đồng kernel, không bằng trait của `compliance`**: `autoxide_kernel::moderation` có `TARGET_RESTRICTED` /
+   `TARGET_RESTORED` (tên event của `compliance`), payload `Restriction {case_id, target, case_kind}` và hàm `restriction(&Delivered)`.
+   Như `privacy::USER_DELETED`, kernel cho module đăng ký nhận hai event này kể cả khi chưa cài `compliance` (sổ module kiểm event
+   có người khai). Lý do: `compliance` đăng ký TRƯỚC `content` / `comments` (họ cần `LegalProfiles`), nên không `require` được trait
+   của họ; event đi qua outbox cùng transaction với thay đổi vụ việc (luật kiến trúc 3), bên nhận idempotent. Không thêm hook vào
+   `Module` (không cần D-038).
+2. **`content`**: cột `restricted_at` ở `content_entries` và `content_published` (migration `m0017_restriction`; ở cả bản nháp để
+   đăng lại vẫn giữ ẩn). `GET /public/resolve` trả **451** `content.restricted` (kernel thêm `ErrorKind::UnavailableForLegalReasons`,
+   RFC 7725); danh sách, sitemap, feed, bản dịch, tìm kiếm, sổ đối tượng bỏ mục bị ẩn. **`comments`**: cột `restricted_status`
+   (migration `m0015_restriction`) nhớ trạng thái cũ, bình luận thành `rejected` (lý do giữ `compliance`), hiện lại trả đúng trạng thái
+   cũ; người kiểm duyệt không đổi được bình luận đang ẩn (`comments.restricted`, 409); `comments` đăng ký loại `comments.comment`
+   trong sổ đối tượng (tác giả là chủ) để vụ việc kiểm đích. Đích chỉ hiện lại khi không còn vụ nào khác đang ẩn cùng đích.
+3. **Bảng** (migration `compliance.m0015_cases`): `compliance_cases` theo đặc tả, đổi: `respondent_org_id` UUID NULL thay cho
+   `respondent_org_key` (không nằm trong unique nên NULL được; lọc phạm vi bằng `Principal::scope_condition`), thêm `channel`,
+   `decision_reason`, `acknowledged_at`, `spam_reason`, `overdue_notified`, `created_by`; `compliance_case_respondents` (PK `tenant_id`,
+   `case_id`, `user_id`) giữ chủ đối tượng lấy từ sổ đối tượng lúc tiếp nhận; `compliance_case_entries` (chỉ thêm);
+   `compliance_disclosures`. Thêm `compliance_antispam_nonces` (token form, D-119).
+4. **Luồng**: tiếp nhận → `awaiting_response` khi biết bên bị phản ánh, không thì `under_review`; lớp chống spam giữ lại → `received`
+   (không tự ẩn, không gửi thư; việc đầu tiên của người xử lý nhả nó). Việc đầu tiên của người xử lý ghi `acknowledged_at`. Phản hồi
+   của bên bị phản ánh trước `respond_by` → `under_review`; sau hạn hay đã quyết → `compliance.response_closed`. Quyết định
+   (`upheld` / `partially_upheld` giữ hay đặt ẩn, `rejected` hiện lại) cần phiên người (`compliance.session_required`). Đóng
+   (`POST /cases/{id}/close`, `withdrawn` khi người báo rút) — thêm so với đặc tả để kết thúc vụ spam / trùng.
+5. **Tự ẩn**: yêu cầu của cơ quan (`reporter_kind = authority`) ẩn ngay và `decide_by` = giờ của quy tắc (24); báo
+   `ip_infringement` / `counterfeit` ẩn ngay khi chính sách mới `cases.auto_restrict` là `true` (mặc định không).
+6. **Hạn**: quy tắc mới `cases.deadlines` (ngày làm việc theo loại, giờ xác nhận, giờ với cơ quan, ngày lễ, `utc_offset_minutes`
+   420); tính ngày làm việc trong Rust rồi lưu mốc UTC. Lịch hằng giờ `compliance.case_deadlines` (event `compliance.case_overdue`,
+   thư tới `email` của chính sách `complaints.contact`, mỗi mốc `ack` / `decide` một lần bằng UPDATE có điều kiện; dọn nonce của
+   token form).
+7. **Người báo**: kênh công khai dùng `SpamGuard` như `forms` (phạm vi `compliance:reports` / `compliance:complaints`; giới hạn theo
+   khối mạng và email `AUTOXIDE_COMPLIANCE_PUBLIC_REPORTS_PER_IP_PER_HOUR`, mặc định 5); trả lời như nhau khi bị bỏ. Mã tra cứu ngẫu
+   nhiên trả một lần, chỉ lưu SHA-256; `GET /public/cases/{id}?token=` sai mã → 404. Thư báo đã nhận dùng
+   `AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL` (`{case}`, `{token}`).
+8. **Bên bị phản ánh**: chủ đối tượng (sổ đối tượng) và người có permission mới `compliance.cases.respond` (theo nút) trên
+   `respondent_org_id`. **Không gửi thư cho bên bị phản ánh**: `compliance` không có địa chỉ của người dùng (không phụ thuộc `auth`,
+   D-046; `notifications` đăng ký sau nên không dùng `Notifier` — D-348); event `compliance.case_opened` mang
+   `respondent_user_ids`, giao diện hiện qua `GET /respondent/cases`. Lệch đặc tả, ghi ở đây.
+9. **Cung cấp thông tin cho cơ quan**: `POST /disclosures` trả giá trị một lần từ dữ liệu `compliance` giữ (hồ sơ pháp lý, hồ sơ
+   định danh, số đã xác thực), chỉ lưu TÊN trường; cần phiên người. Permission `compliance.disclosures.manage` (`sensitive_data`).
+   `compliance_disclosures` vào `retained_tables`.
+10. Permission: `compliance.cases.read` (đọc), `compliance.cases.handle` (`write`), `compliance.cases.respond` (theo nút, `write`),
+    `compliance.disclosures.manage`. Event: `compliance.case_opened`, `…case_updated`, `…case_decided`, `…case_overdue`,
+    `…target_restricted`, `…target_restored`, `…disclosure_recorded` (không email, số, tên người báo). MCP: `list_cases`, `get_case`
+    (đọc), `add_case_note`, `restrict_case_target`; không có tool quyết định hay cung cấp thông tin. Mã lỗi:
+    `compliance.case_not_found`, `compliance.case_state_invalid`, `compliance.response_closed`. Xoá tài khoản bỏ liên kết và cách
+    liên lạc của người báo, bỏ người đó khỏi bên bị phản ánh.
+
+## D-364 · Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15 và NĐ
+55/2024/NĐ-CP (hiệu lực 01/7/2024): không chặn / ẩn đánh giá trái quy định, công khai điều kiện giao dịch chung, tiếp nhận và giải
+quyết khiếu nại. Chưa chắc: danh sách lý do được ẩn, thời hạn phản hồi khiếu nại (mặc định dữ liệu 7 ngày làm việc).
+
+1. **Trait `ModerationPolicy`** (`compliance::api`): `hide_reasons(tenant, surface)`, `check_hide_reason(tenant, surface, reason)` →
+   `compliance.hide_reason_not_allowed` (422, kèm `allowed`). Danh sách là quy tắc có sẵn `moderation.hide_reasons` (`reasons`; thêm
+   `surfaces.<nơi>` khi một nơi cần danh sách riêng). Công khai `GET /public/moderation-reasons?surface=`. Bước 45 (đánh giá) dùng; module
+   ẩn ghi lý do trong event của chính nó.
+2. **`comments` chưa dùng `ModerationPolicy`**: bình luận không phải đánh giá sau mua, `comments` đăng ký trước `compliance` (không
+   `require` được), và đổi luồng kiểm duyệt có sẵn là thay đổi phá vỡ (D-059). Khi cần, thêm qua kernel như `PostingVerifier` (D-202).
+3. **Kênh khiếu nại** = vụ việc `consumer_complaint` (D-363) qua `POST /public/complaints`; `GET /public/complaints` trả liên hệ (chính
+   sách `complaints.contact`), hạn xác nhận / phản hồi / quyết định từ `cases.deadlines` và đường dẫn điều kiện giao dịch chung.
+4. **Điều kiện giao dịch chung**: văn bản loại `general_conditions` đã có (D-347), công khai qua `/public/documents/general_conditions`,
+   bước 45 gọi `AcceptanceGate` lúc thanh toán — không thêm gì mới.

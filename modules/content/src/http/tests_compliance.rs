@@ -149,3 +149,73 @@ async fn bo_ai_assisted_can_content_publish() {
     .await
     .unwrap();
 }
+
+/// Event ẩn / hiện của `compliance` (hợp đồng `autoxide_kernel::moderation`), giao thẳng cho bên nghe.
+async fn deliver(app: &TestApp, name: &'static str, entry: &str) {
+    let tenant = app.tenant("default").await.unwrap();
+    let notice = autoxide_kernel::moderation::Restriction::new(
+        uuid::Uuid::now_v7(),
+        format!("content.entry:{entry}"),
+        "counterfeit",
+    );
+    let event = autoxide_kernel::event::Delivered::new(
+        tenant,
+        "compliance",
+        name,
+        serde_json::to_value(notice).unwrap(),
+    );
+    use autoxide_kernel::event::EventHandler;
+    crate::restriction::Listener.handle(&event).await.unwrap();
+}
+
+/// Bước 37 (D-363): mục bị ẩn vì vụ việc trả 451 và vắng khỏi danh sách, sitemap; hiện lại thì như
+/// cũ; nhận lại cùng event không hỏng gì.
+#[tokio::test]
+async fn nhan_lai_event_an_khong_hong() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let created = send(
+            &app,
+            Method::POST,
+            "/entries",
+            Some("editor"),
+            None,
+            Some(json!({"kind": "post", "title": "Hang gia"})),
+        )
+        .await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let etag = version(&app, &id).await;
+        let published = send(
+            &app,
+            Method::POST,
+            &format!("/entries/{id}/publish"),
+            Some("editor"),
+            Some(&etag),
+            None,
+        )
+        .await;
+        assert_eq!(published.status(), StatusCode::OK, "{}", published.text());
+        let path = "/public/resolve?locale=en&path=/blog/hang-gia";
+        assert_eq!(send(&app, Method::GET, path, None, None, None).await.status(), StatusCode::OK);
+
+        let restricted = autoxide_kernel::moderation::TARGET_RESTRICTED;
+        deliver(&app, restricted, &id).await;
+        deliver(&app, restricted, &id).await;
+        let hidden = send(&app, Method::GET, path, None, None, None).await;
+        assert_eq!(hidden.status(), StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS, "{}", hidden.text());
+        assert_eq!(hidden.json()["code"], "content.restricted");
+        let posts = send(&app, Method::GET, "/public/posts?locale=en", None, None, None).await;
+        assert_eq!(posts.json()["data"], json!([]));
+        let sitemap = send(&app, Method::GET, "/public/sitemap", None, None, None).await;
+        assert_eq!(sitemap.json()["data"], json!([]));
+
+        let restored = autoxide_kernel::moderation::TARGET_RESTORED;
+        deliver(&app, restored, &id).await;
+        deliver(&app, restored, &id).await;
+        assert_eq!(send(&app, Method::GET, path, None, None, None).await.status(), StatusCode::OK);
+        let posts = send(&app, Method::GET, "/public/posts?locale=en", None, None, None).await;
+        assert_eq!(posts.json()["data"].as_array().unwrap().len(), 1);
+    })
+    .await
+    .unwrap();
+}

@@ -330,6 +330,7 @@ pub(crate) async fn resolution(
         (status = 200, description = "What lives at the address: `type` is `entry`, `redirect` or `gone`.", body = Data<Resolution>, headers(("ETag" = String, description = "Fingerprint of the whole answer (for an entry, including its terms, authors and translations); send it in `If-None-Match` to get 304."))),
         (status = 404, description = "Nothing at this address; code `content.not_found`.", body = Problem),
         (status = 422, description = "The language is not supported or the path is malformed; see `errors`.", body = Problem),
+        (status = 451, description = "Hidden for now while a report of an infringement is handled (module `compliance`); code `content.restricted`. Answer 451 to the reader and leave the page out of caches.", body = Problem),
     )
 )]
 pub(crate) async fn resolve(

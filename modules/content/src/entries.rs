@@ -938,6 +938,7 @@ impl ContentService {
         // chủ đặt khi nó dịch).
         candidate.ai_generated = false;
         candidate.ai_assisted = false;
+        candidate.restricted_at = None;
         candidate.review_requested_at = None;
         candidate.review_requested_by = None;
         candidate.translated_from_revision_id = None;
@@ -1027,6 +1028,7 @@ pub(crate) fn blank(
         created_by_api_key_id: None,
         ai_generated: false,
         ai_assisted: false,
+        restricted_at: None,
         review_requested_at: None,
         review_requested_by: None,
         translated_from_revision_id: None,

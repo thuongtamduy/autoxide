@@ -6,6 +6,7 @@ mod m0008_name_key_lookalikes;
 mod m0009_questions;
 mod m0010_add_format;
 mod m0012_target_ids;
+mod m0015_restriction;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -97,5 +98,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "comments"),
+        // Bình luận bị ẩn tạm vì vụ việc của `compliance` (bước 37, D-363).
+        Box::new(m0015_restriction::Migration),
     ]
 }

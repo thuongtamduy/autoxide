@@ -4,6 +4,7 @@
 
 pub(crate) mod access;
 pub(crate) mod billing;
+pub(crate) mod cases;
 pub(crate) mod guides;
 pub(crate) mod invoices;
 pub(crate) mod invoices_print;

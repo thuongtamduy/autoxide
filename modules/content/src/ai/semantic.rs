@@ -527,6 +527,7 @@ impl ContentService {
                     .scoped(tenant)
                     .select_only()
                     .column(published::Column::EntryId)
+                    .filter(published::Column::RestrictedAt.is_null())
                     .filter(published::Column::Locale.eq(locale))
                     .filter(autoxide_kernel::search::contains(published::Column::SearchKey, q));
                 if let Some(kind) = kind {
@@ -693,6 +694,8 @@ impl ContentService {
             Scope::Published => published::Entity::find()
                 .scoped(tenant)
                 .filter(published::Column::EntryId.is_in(ids.to_vec()))
+                // Mục bị ẩn vì vụ việc (D-363) không hiện trong tìm kiếm công khai.
+                .filter(published::Column::RestrictedAt.is_null())
                 .all(read)
                 .await?
                 .into_iter()

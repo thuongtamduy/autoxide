@@ -632,3 +632,131 @@ pub(crate) mod cookie_consent {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+// ---- Vụ việc: báo vi phạm, khiếu nại, cung cấp thông tin cho cơ quan (D-363) --------------------
+
+pub(crate) mod case {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_cases")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// `ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint`, `other`.
+        pub kind: String,
+        /// Đích `<module>.<loại>:<id>` hay `''`.
+        pub target: String,
+        /// Nút bị phản ánh (người bán trên sàn); `None`: không nêu.
+        pub respondent_org_id: Option<Uuid>,
+        /// `guest`, `user`, `rights_holder`, `authority`.
+        pub reporter_kind: String,
+        pub reporter_user_id: Option<Uuid>,
+        pub reporter_name: Option<String>,
+        pub reporter_email: Option<String>,
+        pub reporter_phone: Option<String>,
+        /// Kênh tiếp nhận: `public`, `staff`.
+        pub channel: String,
+        pub claim: String,
+        /// JSON: văn bằng, link chứng cứ.
+        pub rights: String,
+        /// `received`, `under_review`, `awaiting_response`, `decided`, `closed`, `withdrawn`.
+        pub status: String,
+        pub restricted: bool,
+        /// `upheld`, `rejected`, `partially_upheld` hay `''`.
+        pub decision: String,
+        pub decision_reason: Option<String>,
+        pub ack_due_at: DateTimeUtc,
+        pub acknowledged_at: Option<DateTimeUtc>,
+        pub respond_by: DateTimeUtc,
+        pub decide_by: DateTimeUtc,
+        pub decided_at: Option<DateTimeUtc>,
+        pub decided_by: Option<Uuid>,
+        /// SHA-256 của mã tra cứu trả cho người báo (chỉ lưu băm).
+        pub tracking_hash: String,
+        /// Lớp chống spam giữ lại (lý do); `None`: bình thường.
+        pub spam_reason: Option<String>,
+        /// Mốc quá hạn đã nhắc: `''`, `ack`, `decide`.
+        pub overdue_notified: String,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod case_respondent {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_case_respondents")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub tenant_id: Uuid,
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub case_id: Uuid,
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub user_id: Uuid,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod case_entry {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_case_entries")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub case_id: Uuid,
+        /// `note`, `status`, `response`, `evidence`, `restriction`, `decision`, `disclosure`.
+        pub kind: String,
+        /// `staff`, `reporter`, `respondent`, `system`.
+        pub author_kind: String,
+        pub author_user_id: Option<Uuid>,
+        pub body: String,
+        /// JSON: ID file (module `files`).
+        pub files: String,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod disclosure {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_disclosures")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub case_id: Option<Uuid>,
+        pub authority: String,
+        pub request_reference: String,
+        pub legal_basis: String,
+        pub requested_at: DateTimeUtc,
+        /// `org:<id>` hay `user:<id>`.
+        pub subject: String,
+        /// JSON: TÊN trường đã cung cấp, không giá trị.
+        pub fields: String,
+        pub disclosed_by: Uuid,
+        pub disclosed_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

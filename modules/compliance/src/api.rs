@@ -430,3 +430,23 @@ pub trait LegalProfiles: Send + Sync {
 /// Event phát khi trạng thái thông báo / đăng ký Bộ Công Thương của một website đổi (payload
 /// `website_id`, `domain`, `kind`, `status`, `previous_status`).
 pub const WEBSITE_STATUS_CHANGED: &str = "compliance.website_status_changed";
+
+/// Luật kiểm duyệt nội dung của người tiêu dùng (bước 37, D-364; Luật Bảo vệ quyền lợi người tiêu
+/// dùng 19/2023/QH15, NĐ 55/2024/NĐ-CP — cần đối chiếu văn bản gốc): nền tảng không ẩn đánh giá trái
+/// quy định. Module ẩn đánh giá / nội dung của người mua (vd bước 45) hỏi trước khi ẩn và ghi lý do
+/// vào event của chính nó. Danh sách lý do là quy tắc `moderation.hide_reasons` (dữ liệu có ngày hiệu
+/// lực).
+#[async_trait::async_trait]
+pub trait ModerationPolicy: Send + Sync {
+    /// Các mã lý do được ẩn ở nơi `surface` (vd `reviews`, `comments`).
+    async fn hide_reasons(&self, tenant: TenantId, surface: &str) -> Result<Vec<String>, Error>;
+
+    /// `reason` có được phép ở `surface` không; không → `compliance.hide_reason_not_allowed`
+    /// (422, kèm `allowed`).
+    async fn check_hide_reason(
+        &self,
+        tenant: TenantId,
+        surface: &str,
+        reason: &str,
+    ) -> Result<(), Error>;
+}
