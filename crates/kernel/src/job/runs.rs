@@ -137,6 +137,52 @@ pub async fn set_result<C: ConnectionTrait>(
     Ok(())
 }
 
+/// File job vừa ghi (bản xuất danh sách, P16).
+pub(crate) async fn set_file<C: ConnectionTrait>(
+    connection: &C,
+    id: Uuid,
+    file: &JobFile,
+) -> Result<(), Error> {
+    let update = SqlQuery::update()
+        .table(Alias::new(TABLE))
+        .value(Alias::new("file_name"), file.name.clone())
+        .value(Alias::new("file_size"), file.size)
+        .value(Alias::new("file_expires_at"), file.expires_at)
+        .value(Alias::new("updated_at"), crate::job::queue::now())
+        .and_where(Expr::col(Alias::new("id")).eq(id))
+        .to_owned();
+    connection.execute(&update).await?;
+    Ok(())
+}
+
+/// Bỏ file đã xoá khỏi dòng của job `id`.
+pub(crate) async fn clear_file<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<(), Error> {
+    let update = SqlQuery::update()
+        .table(Alias::new(TABLE))
+        .value(Alias::new("file_name"), Option::<String>::None)
+        .value(Alias::new("file_size"), Option::<i64>::None)
+        .value(Alias::new("file_expires_at"), Option::<DateTime<Utc>>::None)
+        .and_where(Expr::col(Alias::new("id")).eq(id))
+        .to_owned();
+    connection.execute(&update).await?;
+    Ok(())
+}
+
+/// (khách, job) có file hết hạn trước `at` trong database này, tối đa 500 mỗi lượt.
+pub(crate) async fn expired_files(
+    database: &crate::database::Database,
+    at: DateTime<Utc>,
+) -> Result<Vec<(Uuid, Uuid)>, Error> {
+    let select = SqlQuery::select()
+        .columns(["tenant_id", "id"])
+        .from(Alias::new(TABLE))
+        .and_where(Expr::col(Alias::new("file_expires_at")).lte(at))
+        .limit(500)
+        .to_owned();
+    let rows = database.read().query_all(&select).await?;
+    rows.iter().map(|row| Ok((row.try_get("", "tenant_id")?, row.try_get("", "id")?))).collect()
+}
+
 /// Worker gọi khi job `id` chạy xong (`error` `None`) hay hỏng hẳn; job không theo dõi thì không
 /// có dòng nào và lệnh không đổi gì.
 pub(crate) async fn finish<C: ConnectionTrait>(
@@ -177,8 +223,23 @@ pub(crate) struct JobRunView {
     pub result: Option<Value>,
     /// Why it failed, when `failed`.
     pub error: Option<String>,
+    /// The file the job wrote (a list export), until it expires.
+    pub file: Option<JobFile>,
     pub created_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
+}
+
+/// A file written by a job.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct JobFile {
+    /// Where to download it (signed in, as the job's requester or with `kernel.jobs.read`).
+    pub url: String,
+    /// File name without extension.
+    pub name: String,
+    /// Size in bytes.
+    pub size: i64,
+    /// When it is deleted.
+    pub expires_at: DateTime<Utc>,
 }
 
 /// How far a job is.
@@ -204,8 +265,12 @@ fn view(row: &sea_orm::QueryResult) -> Result<JobRunView, Error> {
     let done: Option<i64> = row.try_get("", "progress_done")?;
     let total: Option<i64> = row.try_get("", "progress_total")?;
     let result: Option<String> = row.try_get("", "result")?;
+    let file_name: Option<String> = row.try_get("", "file_name")?;
+    let file_size: Option<i64> = row.try_get("", "file_size")?;
+    let file_expires: Option<DateTime<Utc>> = row.try_get("", "file_expires_at")?;
+    let id: Uuid = row.try_get("", "id")?;
     Ok(JobRunView {
-        id: row.try_get("", "id")?,
+        id,
         module: row.try_get("", "module")?,
         kind: row.try_get("", "kind")?,
         label: row.try_get("", "label")?,
@@ -215,12 +280,21 @@ fn view(row: &sea_orm::QueryResult) -> Result<JobRunView, Error> {
         progress: done.zip(total).map(|(done, total)| JobProgress { done, total }),
         result: result.and_then(|text| serde_json::from_str(&text).ok()),
         error: row.try_get("", "error")?,
+        file: match (file_name, file_size, file_expires) {
+            (Some(name), Some(size), Some(expires_at)) => Some(JobFile {
+                url: format!("{}/kernel/jobs/{id}/file", crate::http::API_PREFIX),
+                name,
+                size,
+                expires_at,
+            }),
+            _ => None,
+        },
         created_at: row.try_get("", "created_at")?,
         finished_at: row.try_get("", "finished_at")?,
     })
 }
 
-const COLUMNS: [&str; 13] = [
+const COLUMNS: [&str; 16] = [
     "id",
     "module",
     "kind",
@@ -234,6 +308,9 @@ const COLUMNS: [&str; 13] = [
     "error",
     "created_at",
     "finished_at",
+    "file_name",
+    "file_size",
+    "file_expires_at",
 ];
 
 #[derive(Clone)]
@@ -308,7 +385,7 @@ async fn list_jobs(
     Ok(Data { data: rows.iter().map(view).collect::<Result<_, _>>()? })
 }
 
-async fn find(
+pub(crate) async fn find(
     tenant: &TenantContext,
     principal: &Principal,
     id: Uuid,
@@ -471,5 +548,65 @@ impl MigrationTrait for CreateJobRuns {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table(Alias::new(TABLE)).to_owned()).await
+    }
+}
+
+/// Migration thêm cột file của job (bước 51 P16): tên, kích thước, hạn giữ; index để job dọn tìm
+/// file hết hạn.
+pub(crate) struct AddJobFiles;
+
+impl MigrationName for AddJobFiles {
+    fn name(&self) -> &str {
+        "m0020_job_run_files"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddJobFiles {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // SQLite chỉ thêm một cột mỗi lệnh `ALTER TABLE`.
+        for column in [
+            schema::string_len_null("file_name", 200),
+            schema::big_integer_null("file_size"),
+            schema::timestamp_with_time_zone_null("file_expires_at"),
+        ] {
+            let mut column = column;
+            manager
+                .alter_table(
+                    Table::alter().table(Alias::new(TABLE)).add_column(&mut column).to_owned(),
+                )
+                .await?;
+        }
+        manager
+            .create_index(
+                Index::create()
+                    .name("kernel_job_runs_file_sweep_idx")
+                    .table(Alias::new(TABLE))
+                    .col(Alias::new("file_expires_at"))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("kernel_job_runs_file_sweep_idx")
+                    .table(Alias::new(TABLE))
+                    .to_owned(),
+            )
+            .await?;
+        for column in ["file_expires_at", "file_size", "file_name"] {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Alias::new(TABLE))
+                        .drop_column(Alias::new(column))
+                        .to_owned(),
+                )
+                .await?;
+        }
+        Ok(())
     }
 }

@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- List exports (step 51): modules declare exportable lists (`StartContext::export_source`, `list_exports`
+  module of the kernel); `POST /api/v1/kernel/exports {resource, params, columns}` checks the filters against
+  the list's schema and writes a CSV file (protected against CSV injection, `autoxide_kernel::csv`) in a background
+  job that reads with the requester's permissions; download it from `GET /api/v1/kernel/jobs/{id}/file` until
+  it expires (`AUTOXIDE_JOBS_FILE_RETENTION_DAYS`, 7 days by default). Posts and pages can be exported.
 - Filter schemas and saved views (step 51): every list endpoint carries `x-autoxide-list` (its id) and
   `x-autoxide-filters` (name, type, allowed values and operator of each filter) in the API document, generated
   from its own query parameters. `GET/POST /api/v1/me/views` and `PATCH/DELETE /api/v1/me/views/{id}` save list

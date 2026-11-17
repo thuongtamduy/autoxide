@@ -2872,6 +2872,7 @@ export type Data_JobRunView = {
     created_at: string;
     /** Why it failed, when `failed`. */
     error?: string | null;
+    file?: JobFile | null;
     finished_at?: string | null;
     id: string;
     kind: string;
@@ -5352,6 +5353,7 @@ export type Data_Vec_JobRunView = {
     created_at: string;
     /** Why it failed, when `failed`. */
     error?: string | null;
+    file?: JobFile | null;
     finished_at?: string | null;
     id: string;
     kind: string;
@@ -7198,6 +7200,18 @@ export type InvoicesTemplateVariable = {
   required: boolean;
 };
 
+/** A file written by a job. */
+export type JobFile = {
+  /** When it is deleted. */
+  expires_at: string;
+  /** File name without extension. */
+  name: string;
+  /** Size in bytes. */
+  size: number;
+  /** Where to download it (signed in, as the job's requester or with `kernel.jobs.read`). */
+  url: string;
+};
+
 /** How far a job is. */
 export type JobProgress = {
   done: number;
@@ -7209,6 +7223,7 @@ export type JobRunView = {
   created_at: string;
   /** Why it failed, when `failed`. */
   error?: string | null;
+  file?: JobFile | null;
   finished_at?: string | null;
   id: string;
   kind: string;
@@ -8543,6 +8558,18 @@ export type NavItemView = {
 export type NavigationView = {
   /** Groups in display order; a group without any visible item is left out. */
   groups: NavGroupView[];
+};
+
+/** A list to export. */
+export type NewExport = {
+  /** The columns to write, in order; omitted: every column of the export. */
+  columns?: string[];
+  /** Only `csv`, the default. */
+  format?: string | null;
+  /** Filters and order of the list, checked like a saved view (see `x-autoxide-filters`). */
+  params?: Record<string, unknown>;
+  /** The list, as `x-autoxide-list` of its endpoint, e.g. `content.list_content_entries`. */
+  resource: string;
 };
 
 /** What happens when a post is published (by the `content` module). */
@@ -17639,6 +17666,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/exports": {
+    /** Export a list. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewExport;
+      responses: {
+        201: Data_JobRunView;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/exports/download": {
     /** Download a data export with a link. */
     get: {
@@ -17681,6 +17723,18 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_JobRunView;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/jobs/{id}/file": {
+    /** Download the file of a job. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
         401: Problem;
         404: Problem;
         default: Problem;

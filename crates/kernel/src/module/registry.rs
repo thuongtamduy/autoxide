@@ -252,6 +252,7 @@ impl Modules {
         let work = self.catalog.work_sources();
         let finders = self.catalog.finder_sources();
         let metrics = self.catalog.summary_metrics();
+        let exports = self.catalog.export_sources();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         for module in &mut self.modules {
@@ -269,6 +270,7 @@ impl Modules {
                 work: &work,
                 finders: &finders,
                 metrics: &metrics,
+                exports: &exports,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,
@@ -628,7 +630,9 @@ impl Modules {
                 catalog: self.permissions.clone(),
                 translations: self.translations.clone(),
             };
-            let views = crate::ops::views::ViewsState { lists: crate::ops::views::schemas(lists) };
+            let schemas = crate::ops::views::schemas(lists);
+            self.catalog.lists().fill(schemas.clone());
+            let views = crate::ops::views::ViewsState { lists: schemas };
             let me = crate::user_flags::routes(flags)
                 .merge(crate::ops::my_permissions::routes(mine))
                 .merge(crate::ops::views::routes(views));
@@ -909,6 +913,7 @@ mod tests {
                 "AUTOXIDE_HTTP_PUBLIC_URL",
                 "AUTOXIDE_USER_FLAGS_MAX",
                 "AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS",
+                "AUTOXIDE_JOBS_FILE_RETENTION_DAYS",
                 "AUTOXIDE_TEMPLATE_MAX_BYTES",
             ]
             .contains(name)

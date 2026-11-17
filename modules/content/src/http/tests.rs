@@ -776,3 +776,70 @@ async fn view_da_luu_kiem_theo_schema_bo_loc() {
     .await
     .unwrap();
 }
+
+/// Xuất danh sách theo bộ lọc (bước 51 P16): job của kernel đọc bài bằng chính bộ lọc của danh
+/// sách, ghi CSV chống CSV injection, người yêu cầu tải về; cột lạ là 422, thiếu quyền là 403.
+#[tokio::test]
+async fn xuat_danh_sach_bai_theo_bo_loc() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let storage: Arc<dyn autoxide_kernel::storage::Storage> =
+            Arc::new(autoxide_testkit::MemoryStorage::new());
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["content.read", "content.write"])
+            .user("nobody", 2, &[])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .provide::<dyn autoxide_kernel::storage::Storage>(storage)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        for (kind, title) in [("post", "=cmd|'/c calc'!A1"), ("post", "Bài hai"), ("page", "Giới thiệu")] {
+            let created = send(&app, "POST", "/entries", Some("admin"), &[], Some(json!({"kind": kind, "title": title}))).await;
+            assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        }
+        let export = |who: &str, body: Value| {
+            app.request(Method::POST, "/api/v1/kernel/exports").token(who).json(body).send()
+        };
+        let resource = "content.list_content_entries";
+        let bad = export("admin", json!({"resource": resource, "columns": ["title", "secret"]}))
+            .await
+            .unwrap();
+        assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", bad.json());
+        assert_eq!(bad.json()["errors"][0]["field"], "columns");
+        let denied = export("nobody", json!({"resource": resource})).await.unwrap();
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+
+        let queued = export(
+            "admin",
+            json!({"resource": resource, "params": {"kind": "post", "order": "asc"}, "columns": ["title", "kind"]}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(queued.status(), StatusCode::CREATED, "{}", queued.json());
+        let id = queued.json()["data"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(queued.json()["data"]["status"], "queued");
+        let worker = app.modules().worker(2).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+
+        let job = app.get(&format!("/api/v1/kernel/jobs/{id}")).token("admin").send().await.unwrap().json();
+        assert_eq!(job["data"]["status"], "succeeded", "{job}");
+        assert_eq!(job["data"]["result"]["rows"], 2);
+        let url = job["data"]["file"]["url"].as_str().unwrap().to_owned();
+        let file = app.get(&url).token("admin").send().await.unwrap();
+        assert_eq!(file.status(), StatusCode::OK);
+        let csv = file.text();
+        assert_eq!(
+            csv,
+            "\u{feff}\"title\",\"kind\"\r\n\"'=cmd|'/c calc'!A1\",\"post\"\r\n\"Bài hai\",\"post\"\r\n"
+        );
+        let other = app.get(&url).token("nobody").send().await.unwrap();
+        assert_eq!(other.status(), StatusCode::NOT_FOUND, "job của người khác");
+    })
+    .await
+    .unwrap();
+}
