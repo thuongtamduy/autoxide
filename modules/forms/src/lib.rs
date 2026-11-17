@@ -18,6 +18,7 @@ mod retention;
 mod service;
 mod submissions;
 mod tools;
+mod work;
 
 #[cfg(test)]
 mod tests;
@@ -83,7 +84,7 @@ impl Module for FormsModule {
     }
 
     fn events(&self) -> Vec<EventInfo> {
-        events::all()
+        events::with_activity()
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -117,6 +118,8 @@ impl Module for FormsModule {
         };
         let service = Arc::new(FormsService::new(parts, config));
         context.personal_data(service.clone())?;
+        context.work_source(Arc::new(work::NewSubmissions))?;
+        context.summary_metric(Arc::new(work::NewSubmissions))?;
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())

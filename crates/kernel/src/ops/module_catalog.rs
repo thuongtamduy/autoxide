@@ -56,6 +56,12 @@ pub(crate) struct ModuleCatalog {
     /// Bước kiểm (`autoxide doctor`) của mọi module, kèm tên module: cảnh báo vận hành
     /// (`GET /kernel/ops/alerts`) chạy lại chúng.
     checks: Arc<OnceLock<Vec<(&'static str, crate::doctor::Check)>>>,
+    /// Sổ nguồn việc của hộp việc (bước 51 P2): module đăng ký lúc khởi động.
+    work: crate::ops::work::WorkSources,
+    /// Sổ nguồn tìm xuyên phân hệ (bước 51 P3).
+    finders: crate::ops::find::FinderSources,
+    /// Sổ số liệu tóm tắt (bước 51 P4).
+    metrics: crate::ops::summary::SummaryMetrics,
     /// Sổ điều hướng đã gom (bước 51 P1).
     navigation: Arc<OnceLock<crate::module::navigation::NavigationCatalog>>,
 }
@@ -102,6 +108,18 @@ impl ModuleCatalog {
             .flat_map(|module| module.checks().into_iter().map(|check| (module.name(), check)))
             .collect();
         let _ = self.checks.set(checks);
+    }
+
+    pub(crate) fn work_sources(&self) -> crate::ops::work::WorkSources {
+        self.work.clone()
+    }
+
+    pub(crate) fn finder_sources(&self) -> crate::ops::find::FinderSources {
+        self.finders.clone()
+    }
+
+    pub(crate) fn summary_metrics(&self) -> crate::ops::summary::SummaryMetrics {
+        self.metrics.clone()
     }
 
     pub(crate) fn fill_navigation(&self, navigation: crate::module::navigation::NavigationCatalog) {

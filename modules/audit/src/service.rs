@@ -23,6 +23,15 @@ pub(crate) struct Filter {
 pub(crate) struct AuditService {
     /// Sổ đối tượng của kernel: tên người làm (`auth.user`) không cần biết module `auth`.
     resources: autoxide_kernel::resource::ResourceDirectory,
+    /// Event của mọi module: câu hoạt động và permission để thấy nó (bước 51 P5).
+    events: autoxide_kernel::event::EventCatalog,
+    translations: autoxide_kernel::i18n::Translations,
+}
+
+/// Một dòng hoạt động đã dựng câu.
+pub(crate) struct ActivityLine {
+    pub row: entity::Model,
+    pub sentence: String,
 }
 
 /// Loại đối tượng "tài khoản người dùng" trong sổ đối tượng (module `auth` đăng ký; không có
@@ -31,7 +40,76 @@ const USER_KIND: &str = "auth.user";
 
 impl AuditService {
     pub(crate) fn new(resources: autoxide_kernel::resource::ResourceDirectory) -> Self {
-        AuditService { resources }
+        AuditService {
+            resources,
+            events: autoxide_kernel::event::EventCatalog::default(),
+            translations: autoxide_kernel::i18n::Translations::default(),
+        }
+    }
+
+    pub(crate) fn with_events(
+        mut self,
+        events: autoxide_kernel::event::EventCatalog,
+        translations: autoxide_kernel::i18n::Translations,
+    ) -> Self {
+        self.events = events;
+        self.translations = translations;
+        self
+    }
+
+    /// Hoạt động gần đây (bước 51 P5): chỉ event có câu hoạt động mà người gọi có permission để
+    /// thấy, mới nhất trước, câu đã dịch theo `language` và điền tên người làm, trường của dữ liệu.
+    pub(crate) async fn recent_activity(
+        &self,
+        tenant: &TenantContext,
+        principal: &autoxide_kernel::access::Principal,
+        limit: u32,
+        language: autoxide_kernel::i18n::Language,
+    ) -> Result<Vec<ActivityLine>, Error> {
+        let mut sentences = std::collections::HashMap::new();
+        for event in self.events.iter() {
+            if let Some((sentence, reader)) = event.activity_line()
+                && principal.require(&reader).is_ok()
+            {
+                sentences.insert(event.name(), sentence);
+            }
+        }
+        if sentences.is_empty() {
+            return Ok(Vec::new());
+        }
+        let actions: Vec<&str> = sentences.keys().copied().collect();
+        let page = PageRequest::first(limit, autoxide_kernel::pagination::Order::Desc);
+        let select = Entity::find().filter(Column::Action.is_in(actions)).scoped(tenant);
+        let rows = fetch_page(select, Column::Id, |row| row.id, &page, tenant.database().read())
+            .await?
+            .data;
+        let ids: Vec<uuid::Uuid> = rows.iter().filter_map(|row| row.actor_user_id).collect();
+        let names = self.actor_names(tenant, &ids).await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let template = sentences.get(row.action.as_str()).copied().unwrap_or_default();
+                let mut sentence = self.translations.describe(template, language);
+                let actor = row
+                    .actor_user_id
+                    .and_then(|id| names.get(&id).cloned())
+                    .unwrap_or_else(|| "—".to_owned());
+                sentence = sentence.replace("{actor}", &actor);
+                for side in [&row.after, &row.before] {
+                    let Some(Ok(serde_json::Value::Object(fields))) =
+                        side.as_deref().map(serde_json::from_str::<serde_json::Value>)
+                    else {
+                        continue;
+                    };
+                    for (key, value) in fields {
+                        if let serde_json::Value::String(text) = value {
+                            sentence = sentence.replace(&format!("{{{key}}}"), &text);
+                        }
+                    }
+                }
+                ActivityLine { row, sentence }
+            })
+            .collect())
     }
 
     /// Tên hiển thị của những người `ids`, theo lô (một lần tra cho cả trang). Chương trình không

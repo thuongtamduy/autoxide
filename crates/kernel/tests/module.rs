@@ -291,6 +291,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/domains/allowed".to_owned(),
                     "/domains/{id}".to_owned(),
                     "/domains/{id}/verify".to_owned(),
+                    "/find".to_owned(),
                     "/modules".to_owned(),
                     "/modules/{name}".to_owned(),
                     "/navigation".to_owned(),
@@ -300,6 +301,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/placements/migrations/{id}".to_owned(),
                     "/settings".to_owned(),
                     "/settings/{name}".to_owned(),
+                    "/summary".to_owned(),
                     "/tenant".to_owned(),
                     "/tenants".to_owned(),
                     "/tenants/{id}".to_owned(),
@@ -308,7 +310,9 @@ async fn module_nhan_database_va_khai_route() {
                     "/tenants/{id}/moves/{move_id}".to_owned(),
                     "/tenants/{id}/settings".to_owned(),
                     "/tenants/{id}/settings/{name}".to_owned(),
-                    "/whats-new".to_owned()
+                    "/whats-new".to_owned(),
+                    "/work".to_owned(),
+                    "/work/counts".to_owned()
                 ],
                 vec!["/token".to_owned()],
                 vec![],

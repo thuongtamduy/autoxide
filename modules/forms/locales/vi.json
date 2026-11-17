@@ -64,6 +64,7 @@
   "text:A form changed (a new `version` when its fields changed).": "Một biểu mẫu được sửa (có `version` mới khi các ô thay đổi).",
   "text:A form was created.": "Một biểu mẫu được tạo.",
   "text:A form was deleted, with all its submissions.": "Một biểu mẫu bị xoá, kèm mọi bài nộp của nó.",
+  "text:A new submission came in": "Có bài nộp mới",
   "text:A submission reached the inbox: sent and accepted, or moved out of spam. Spam never raises it. No answers in the payload.": "Một bài nộp vào hộp thư: được gửi và nhận, hoặc được đưa ra khỏi spam. Spam không bao giờ phát event này. Nội dung event không có câu trả lời.",
   "text:A submission was deleted by hand.": "Một bài nộp bị xoá bằng tay.",
   "text:A submission was marked read, archived, spam or not spam.": "Một bài nộp được đánh dấu đã đọc, lưu trữ, spam hay không phải spam.",
@@ -73,7 +74,11 @@
   "text:Forms": "Biểu mẫu",
   "text:Mark submissions read, archived, spam or not spam, and delete single submissions.": "Đánh dấu bài nộp đã đọc, lưu trữ, spam hay không phải spam, và xoá từng bài nộp.",
   "text:Marketing": "Tiếp thị",
+  "text:New form submissions": "Bài nộp mới",
   "text:Read forms and their submissions (personal data).": "Xem biểu mẫu và bài nộp (dữ liệu cá nhân).",
+  "text:Read the new submission to {form}": "Đọc bài nộp mới của {form}",
   "text:Send form submissions without the anti-spam checks for anonymous visitors — for a website server's own API key; still limited per account.": "Gửi bài nộp biểu mẫu mà không qua kiểm chống spam dành cho khách vãng lai — cho API key riêng của máy chủ website; vẫn bị giới hạn theo tài khoản.",
-  "text:The daily job deleted submissions past their retention time.": "Việc chạy hằng ngày đã xoá các bài nộp quá hạn lưu."
+  "text:Submissions with the status `new` now, in the forms you may review at the chosen unit; spam is not counted.": "Bài nộp đang ở trạng thái `new` lúc này, trong các biểu mẫu bạn được duyệt ở nút đang chọn; không tính bài rác.",
+  "text:The daily job deleted submissions past their retention time.": "Việc chạy hằng ngày đã xoá các bài nộp quá hạn lưu.",
+  "text:{actor} created the form “{name}”": "{actor} tạo biểu mẫu “{name}”"
 }

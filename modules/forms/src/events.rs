@@ -57,3 +57,19 @@ pub(crate) fn form_subject(id: uuid::Uuid) -> Option<String> {
 pub(crate) fn submission_subject(id: uuid::Uuid) -> Option<String> {
     Some(format!("forms.submission:{id}"))
 }
+
+/// Event của module, kèm câu "hoạt động gần đây" (bước 51 P5) cho những event người dùng cần thấy.
+pub(crate) fn with_activity() -> Vec<EventInfo> {
+    all()
+        .into_iter()
+        .map(|event| match event.name() {
+            "forms.form_created" => {
+                event.activity("{actor} created the form “{name}”", crate::permissions::FORMS_READ)
+            }
+            "forms.submission_received" => {
+                event.activity("A new submission came in", crate::permissions::FORMS_READ)
+            }
+            _ => event,
+        })
+        .collect()
+}

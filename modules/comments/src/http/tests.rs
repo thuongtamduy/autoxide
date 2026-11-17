@@ -646,3 +646,52 @@ async fn hai_khach_khong_ro_ri_token_mail_mang_khach() {
     .await
     .unwrap();
 }
+
+/// Bước 51 P2: bình luận chờ duyệt hiện trong hộp việc của người duyệt (`comments.pending`) và tự
+/// hết khi đã duyệt.
+#[tokio::test]
+async fn binh_luan_cho_duyet_vao_hop_viec() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let token = form_token(&app).await;
+        let held = send(
+            &app,
+            "POST",
+            "/comments/public/comments",
+            None,
+            &[],
+            Some(comment(&token, "Ada", "ada@example.com", "Hay quá")),
+        )
+        .await;
+        assert_eq!(held.status(), StatusCode::CREATED, "{}", held.json());
+        let id = held.json()["data"]["id"].as_str().unwrap().to_owned();
+
+        let work = app.get("/api/v1/kernel/work").token("admin").send().await.unwrap().json();
+        let items = work["data"]["items"].as_array().unwrap();
+        assert_eq!(items.len(), 1, "{work}");
+        assert_eq!(items[0]["key"], format!("comments.pending:{id}"));
+        assert_eq!(items[0]["title"], "Approve or reject the comment of Ada");
+        let counts =
+            app.get("/api/v1/kernel/work/counts").token("admin").send().await.unwrap().json();
+        assert_eq!(counts["data"]["counts"]["comments.pending"], 1);
+        let reader = app.get("/api/v1/kernel/work").token("reader").send().await.unwrap().json();
+        assert_eq!(reader["data"]["items"], json!([]), "chỉ người duyệt được thấy");
+
+        let read = send(&app, "GET", &format!("/comments/{id}"), Some("admin"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let approved = send(
+            &app,
+            "PATCH",
+            &format!("/comments/{id}"),
+            Some("admin"),
+            &[("if-match", &etag)],
+            Some(json!({"status": "published"})),
+        )
+        .await;
+        assert_eq!(approved.status(), StatusCode::OK, "{}", approved.json());
+        let work = app.get("/api/v1/kernel/work").token("admin").send().await.unwrap().json();
+        assert_eq!(work["data"]["items"], json!([]), "duyệt rồi thì việc tự hết");
+    })
+    .await
+    .unwrap();
+}

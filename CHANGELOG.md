@@ -38,6 +38,23 @@ endpoints are marked deprecated with a sunset date first.
     deleted tenants, deletes expired documents — never one still inside its retention period.
   - Guide `docs/MONEY.md` (and `MONEY.vi.md`): ledger, payments, flow modes, VietQR, documents, exchange rates,
     printing, exports, retention, writing partner connectors.
+- Summary figures (step 51): modules declare figures with a mandatory definition (`StartContext::summary_metric`);
+  `GET /api/v1/kernel/summary?group=` returns those the caller may see, each with how it is computed in the
+  caller's language. Figures: comments waiting, new submissions, entries waiting for a review, media items,
+  newsletter subscribers, addresses never mailed.
+- Recent activity (step 51): events can carry a readable sentence (`EventInfo::activity`); `GET
+  /api/v1/audit/activity` lists them, translated, for callers who may read that kind of record — no `audit.read`
+  needed.
+
+- Search across modules (step 51): modules declare finders for their record types
+  (`StartContext::finder_source`); `GET /api/v1/kernel/find?q=` returns matches grouped by type (posts and pages,
+  media, staff), with or without accents, only from types the caller may read at the chosen unit.
+
+- Work inbox (step 51): modules declare work sources computed from their data (`StartContext::work_source`);
+  `GET /api/v1/kernel/work` lists the work from the sources the caller may see, most urgent first (a slow or
+  failing source is skipped and named in `incomplete`), `GET /api/v1/kernel/work/counts` counts it by source for
+  menu counters. Sources: comments waiting for approval, new form submissions, entries waiting for a review.
+
 - Money flows in the ledger (step 36): units choose how money flows — `self_collect`, `partner_collect` (a licensed
   partner collects for the marketplace) or `split_at_gateway` — with `GET|PUT /api/v1/ledger/flow-settings/{org_id}`
   (inherited down the tree; where cash on delivery goes, never to the marketplace operator). Modules record sales,
