@@ -110,6 +110,14 @@ impl Modules {
             reason_lists.extend(lists);
         }
         catalog.reason_codes().fill(reason_lists);
+        // Câu khách đổi được (bước 51 P21).
+        let mut texts = Vec::new();
+        for module in &modules {
+            let declared = module.overridable_texts();
+            crate::ops::texts::check(module.name(), &declared, &mut problems);
+            texts.extend(declared);
+        }
+        catalog.text_overrides().fill(texts);
         let client_configs = crate::ops::client_config::ClientConfigs::default();
         let user_flags = crate::user_flags::Handle::default();
         let keys = crate::secret::KeyConfig::default();
@@ -269,6 +277,7 @@ impl Modules {
         let reasons = self.catalog.reason_codes();
         let probes = self.catalog.connection_probes();
         let taggables = self.catalog.taggables();
+        let texts = self.catalog.text_overrides();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         // Gọi sau `configure` của mọi module: thời hạn đọc từ cấu hình.
@@ -304,6 +313,7 @@ impl Modules {
                 reasons: &reasons,
                 probes: &probes,
                 taggables: &taggables,
+                texts: &texts,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,
@@ -964,6 +974,7 @@ mod tests {
                 "AUTOXIDE_USER_FLAGS_MAX",
                 "AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS",
                 "AUTOXIDE_JOBS_FILE_RETENTION_DAYS",
+                "AUTOXIDE_TEXT_OVERRIDES_UI_MAX",
                 "AUTOXIDE_TEMPLATE_MAX_BYTES",
             ]
             .contains(name)

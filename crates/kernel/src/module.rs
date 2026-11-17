@@ -253,6 +253,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Câu khách đổi được (bước 51 P21, D-235): thuật ngữ và câu hướng tới người dùng cuối, khoá
+    /// `<module>.<…>`, câu tiếng Anh mặc định. Mã lỗi và câu của lỗi không bao giờ đổi được. Khách
+    /// đổi qua `/api/v1/kernel/texts`; module đọc bằng `TextOverrides::text`. Mặc định: không có.
+    fn overridable_texts(&self) -> Vec<crate::ops::texts::OverridableText> {
+        Vec::new()
+    }
+
     /// Lệnh quản trị của module cho `autoxide task` (D-169): việc người vận hành chạy tay,
     /// vd làm lại dữ liệu dẫn xuất sau khi đổi cấu hình. Gọi sau `start`. Tên khai ngắn
     /// (`refresh_variants`); kernel thêm tiền tố `<module>.`.
@@ -310,6 +317,7 @@ pub struct StartContext<'a> {
     reasons: &'a crate::ops::reasons::ReasonCodes,
     probes: &'a crate::ops::connections::ConnectionProbes,
     taggables: &'a crate::ops::tags::Taggables,
+    texts: &'a crate::ops::texts::TextOverrides,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -506,6 +514,11 @@ impl StartContext<'_> {
     /// tượng); `write`: permission ghi bản ghi — cần để gắn / gỡ nhãn.
     pub fn taggable(&mut self, kind: &'static str, write: Permission) -> Result<(), Error> {
         self.taggables.register(self.module, kind, write)
+    }
+
+    /// Câu khách đã đổi (bước 51 P21): tra trước câu mặc định.
+    pub fn text_overrides(&self) -> crate::ops::texts::TextOverrides {
+        self.texts.clone()
     }
 
     /// Ghi lần dùng / lỗi cuối của kết nối ra ngoài (hiện ở `GET /api/v1/kernel/settings`).

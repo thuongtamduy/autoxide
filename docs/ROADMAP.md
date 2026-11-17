@@ -240,7 +240,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [x] Nhãn gắn bản ghi (P20, D-235): nhãn nội bộ dùng chung mọi loại bản ghi, lọc `tags_any` / `tags_all`, gắn
       hàng loạt, gộp nhãn, event cho tự động hoá — xong (17/11) trừ gắn hàng loạt: thao tác hàng loạt (P8) chưa nhận
       tham số (nhãn nào), làm khi thêm tham số cho `BulkAction`
-- [ ] Đổi câu chữ hiển thị theo khách (P21, D-235): chỉ câu module cho đổi và không gian `ui.*`, giữ chỗ điền, không
+- [x] Đổi câu chữ hiển thị theo khách (P21, D-235): chỉ câu module cho đổi và không gian `ui.*`, giữ chỗ điền, không
       đổi mã lỗi và câu pháp lý, đọc qua cache không query
 - [ ] Nhập dữ liệu (P17, D-220): không làm ở kernel — `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
       xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
