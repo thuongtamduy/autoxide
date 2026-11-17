@@ -16,6 +16,7 @@ use crate::api::{KycStatus, Subject};
 use crate::documents::NewVersion;
 use crate::http_kyc::ProfileResponse;
 use crate::http_legal::{DocumentResponse, VersionResponse, describe_document};
+use crate::http_verification::VerificationResponse;
 use crate::permissions::{DOCUMENTS_MANAGE, DOCUMENTS_READ, KYC_READ};
 use crate::service::ComplianceService;
 
@@ -60,7 +61,24 @@ pub(crate) struct Pending {
 pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
     let (status, profiles, documents, publish, pending) =
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
+    let account = service.clone();
     vec![
+        Tool::new(
+            "account_verification",
+            "Your account verification level for posting content (Vietnam, Decree 147/2024): \
+             `none`, `phone` (mobile number confirmed by SMS code) or `identity` (identity \
+             verified), with the verified number masked. Codes are sent and confirmed only through \
+             REST (`POST /api/v1/compliance/me/phone-verifications`).",
+            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+                let service = account.clone();
+                async move {
+                    let found = service.verification(&tenant, principal.user_id()).await?;
+                    Ok::<VerificationResponse, Error>(found.into())
+                }
+            },
+        )
+        .for_any_signed_in()
+        .read_only(),
         Tool::new(
             "verification_status",
             "Your identity verification (KYC) status: `none`, `pending`, `in_review`, \

@@ -426,6 +426,11 @@ impl InvoicesService {
                 created_by: Set(actor.user_id),
                 created_at: Set(at),
                 updated_at: Set(at),
+                exchange_rate: Set(None),
+                exchange_rate_id: Set(None),
+                base_currency: Set(None),
+                base_total_minor: Set(None),
+                buyer_purged_at: Set(None),
             })
             .exec_with_returning(&transaction)
             .await?;

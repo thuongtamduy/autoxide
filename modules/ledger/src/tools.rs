@@ -17,7 +17,7 @@ use validator::Validate;
 
 use crate::api::{Entry, LineAccount, NewEntry, NewLine, Side};
 use crate::http::{TrialBalanceResponse, describe_trial};
-use crate::permissions::{POST, READ, RECONCILE};
+use crate::permissions::{POST, READ, RECONCILE, SETTINGS_MANAGE};
 use crate::service::{EntryFilter, LedgerService};
 
 /// Which account and day.
@@ -168,6 +168,7 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
     let (balance, entries, trial, post) =
         (service.clone(), service.clone(), service.clone(), service.clone());
     let (payment, exceptions, resolve) = (service.clone(), service.clone(), service.clone());
+    let (rate, record) = (service.clone(), service.clone());
     vec![
         Tool::new(
             "payment",
@@ -340,5 +341,61 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
             },
         )
         .requires(POST),
+        Tool::new(
+            "exchange_rate",
+            "The exchange rate in force on a day for a currency pair (1 base = rate quote): the latest \
+             rate on or before that day, a rate entered by hand first.",
+            move |tenant: TenantContext, principal: Principal, input: RateLookupInput| {
+                let service = rate.clone();
+                async move { service.effective_rate(&tenant, &principal, &input.base, &input.quote, input.on).await }
+            },
+        )
+        .requires(READ)
+        .read_only(),
+        Tool::new(
+            "record_exchange_rate",
+            "Record an exchange rate by hand for the whole tenant, used from its day until a later \
+             rate of the pair. Recorded rates are never changed.",
+            move |tenant: TenantContext, principal: Principal, input: RateRecordInput| {
+                let service = record.clone();
+                async move {
+                    let rate = autoxide_kernel::decimal::parse(&input.rate)?;
+                    let input = crate::fx::RateInput {
+                        base: input.base,
+                        quote: input.quote,
+                        rate,
+                        effective_date: input.effective_date,
+                    };
+                    Ok::<_, Error>(service.record_rate(&tenant, &principal, input).await?.into_inner())
+                }
+            },
+        )
+        .requires(SETTINGS_MANAGE),
     ]
+}
+
+/// A currency pair and day.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RateLookupInput {
+    /// e.g. `USD`.
+    base: String,
+    /// e.g. `VND`.
+    quote: String,
+    /// The day, `YYYY-MM-DD`.
+    on: NaiveDate,
+}
+
+/// An exchange rate to record.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RateRecordInput {
+    /// e.g. `USD`.
+    base: String,
+    /// e.g. `VND`.
+    quote: String,
+    /// Units of `quote` for one `base`, decimal string, e.g. `"25345.5"`.
+    rate: String,
+    /// First day the rate is used, `YYYY-MM-DD`.
+    effective_date: NaiveDate,
 }

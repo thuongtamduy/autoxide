@@ -187,7 +187,7 @@ impl LedgerService {
                 ],
             )
             .source_id(id.to_string());
-            let draft = draft_for(entry, book.clone(), day, None, None)?;
+            let draft = draft_for(entry, book.clone(), day, None, None, None)?;
             // Số dư khả dụng có sàn 0: không đủ → `ledger.insufficient_balance`, cả lượt chi bỏ.
             write_in(&transaction, tenant, actor, &draft, outbox).await?;
             let saved = payout::Entity::insert(payout::ActiveModel {
@@ -300,7 +300,7 @@ impl LedgerService {
                             ],
                         )
                         .source_id(id.to_string());
-                        let draft = draft_for(entry, book.clone(), day, None, None)?;
+                        let draft = draft_for(entry, book.clone(), day, None, None, None)?;
                         write_in(&transaction, tenant, Actor::system(), &draft, outbox).await?;
                         let reason: String = reason.chars().take(200).collect();
                         active.status = Set("failed".to_owned());

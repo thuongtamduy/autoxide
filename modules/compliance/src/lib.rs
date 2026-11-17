@@ -5,6 +5,8 @@
 //! - Quy tắc pháp lý là dữ liệu có ngày hiệu lực (gói `rules/vn.json`, nhập vào mặt điều khiển).
 //! - Văn bản pháp lý có phiên bản, bằng chứng chấp nhận ([`api::AcceptanceGate`]).
 //! - Sổ đồng ý theo mục đích ([`api::ConsentLedger`]).
+//! - Xác thực tài khoản đăng nội dung (NĐ 147/2024, D-356): số điện thoại bằng mã SMS một lần, mức
+//!   định danh từ KYC ([`api::AccountVerification`], [`api::PostingGate`], `PostingVerifier` của kernel).
 //!
 //! Mọi căn cứ pháp lý ghi trong quy tắc và D-347 đều cần đối chiếu văn bản gốc / người có chuyên môn
 //! pháp lý trước khi chạy thật.
@@ -17,15 +19,19 @@ mod entity;
 mod events;
 mod http_kyc;
 mod http_legal;
+mod http_verification;
 mod kyc;
 mod migration;
 mod permissions;
 mod provider;
 mod service;
 mod tools;
+mod verification;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_verification;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -46,12 +52,12 @@ use crate::service::ComplianceService;
 const RULES_REFRESH: &str = "compliance.rules_refresh";
 
 pub fn module() -> impl Module {
-    ComplianceModule { service: None, callback_retention_days: 90 }
+    ComplianceModule { service: None, config: config::Config::default() }
 }
 
 struct ComplianceModule {
     service: Option<Arc<ComplianceService>>,
-    callback_retention_days: i64,
+    config: config::Config,
 }
 
 struct RulesRefreshJob(Arc<ComplianceService>);
@@ -105,7 +111,7 @@ impl Module for ComplianceModule {
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
-        self.callback_retention_days = config::read(reader)?;
+        self.config = config::read(reader)?;
         Ok(())
     }
 
@@ -127,19 +133,28 @@ impl Module for ComplianceModule {
             outbox: context.outbox()?,
             jobs: context.jobs(),
             verifier: context.require::<dyn autoxide_kernel::identity::IdentityVerifier>().ok(),
-            callback_retention_days: self.callback_retention_days,
+            callback_retention_days: self.config.callback_retention_days,
+            sms: context.require::<dyn autoxide_kernel::sms::SmsSender>().ok(),
+            secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
+            otp: self.config.otp,
         });
         self.service = Some(service.clone());
         let provider = Arc::new(provider::Provider(service));
         context.provide::<dyn api::KycGate>(provider.clone())?;
         context.provide::<dyn api::AcceptanceGate>(provider.clone())?;
         context.provide::<dyn api::ConsentLedger>(provider.clone())?;
+        context.provide::<dyn api::PostingGate>(provider.clone())?;
+        context.provide::<dyn api::AccountVerification>(provider.clone())?;
+        // Bộ hỏi "đã xác thực để đăng nội dung chưa" của kernel (D-202) — `comments` hỏi qua nó.
+        context.posting_verifier(provider.clone())?;
         context.provide::<dyn api::ComplianceRules>(provider)
     }
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
-            http_kyc::routes(service.clone()).merge(http_legal::routes(service))
+            http_kyc::routes(service.clone())
+                .merge(http_legal::routes(service.clone()))
+                .merge(http_verification::routes(service))
         })
     }
 

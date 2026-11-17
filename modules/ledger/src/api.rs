@@ -5,6 +5,7 @@
 //! Sổ cái chỉ ghi **nghĩa vụ** (D-187): không có tài khoản ví, không giữ tiền của người mua. Số dư
 //! suy từ bút toán; bút toán chỉ thêm, sửa sai bằng bút toán đảo.
 
+use autoxide_kernel::decimal::DecimalString;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::{Currency, Money};
@@ -200,6 +201,10 @@ pub struct NewEntry {
     pub source_id: Option<String>,
     pub reference: String,
     pub lines: Vec<NewLine>,
+    /// Tỉ giá quy đổi sang tiền hạch toán của sổ (1 tiền của bút toán = `exchange_rate` tiền của sổ),
+    /// khi bút toán khác tiền của sổ. Bỏ trống: lấy tỉ giá hiệu lực ngày hạch toán
+    /// ([`Ledger::exchange_rate`]). Chứng từ ngoại tệ truyền đúng tỉ giá đã chụp trên chứng từ.
+    pub exchange_rate: Option<rust_decimal::Decimal>,
 }
 
 impl NewEntry {
@@ -220,6 +225,7 @@ impl NewEntry {
             source_id: None,
             reference: reference.into(),
             lines,
+            exchange_rate: None,
         }
     }
 
@@ -232,6 +238,13 @@ impl NewEntry {
     #[must_use]
     pub fn source_id(mut self, id: impl Into<String>) -> Self {
         self.source_id = Some(id.into());
+        self
+    }
+
+    /// Quy đổi sang tiền của sổ bằng đúng tỉ giá `rate` (ảnh chụp trên chứng từ).
+    #[must_use]
+    pub fn exchange_rate(mut self, rate: rust_decimal::Decimal) -> Self {
+        self.exchange_rate = Some(rate);
         self
     }
 }
@@ -746,6 +759,95 @@ impl NewTransferPayment {
     }
 }
 
+/// An exchange rate in force from a day: 1 `base` = `rate` `quote`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerExchangeRate)]
+pub struct ExchangeRate {
+    pub id: Uuid,
+    /// ISO 4217 code, e.g. `USD`.
+    pub base: String,
+    /// ISO 4217 code, e.g. `VND`.
+    pub quote: String,
+    /// Units of `quote` for one unit of `base`, as a decimal string, e.g. `"25345.5"`.
+    pub rate: DecimalString,
+    /// First day the rate is used; it stays in force until a later rate of the same pair.
+    pub effective_date: NaiveDate,
+    /// `manual` (entered by a person) or `provider:<name>` (fetched from a rate source).
+    pub source: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Dòng sổ nhật ký chung cần đọc (xuất kế toán): một khoảng ngày, một sổ hay mọi sổ.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct JournalQuery {
+    /// Chỉ sổ của nút này; bỏ trống: mọi sổ của khách.
+    pub book: Option<OrgId>,
+    /// Ngày hạch toán từ (gồm).
+    pub from: NaiveDate,
+    /// Ngày hạch toán tới (gồm).
+    pub to: NaiveDate,
+    /// Trang (theo ID dòng tăng dần).
+    pub page: autoxide_kernel::pagination::PageRequest,
+}
+
+impl JournalQuery {
+    pub fn new(from: NaiveDate, to: NaiveDate) -> Self {
+        JournalQuery {
+            book: None,
+            from,
+            to,
+            page: autoxide_kernel::pagination::PageRequest::first(
+                500,
+                autoxide_kernel::pagination::Order::Asc,
+            ),
+        }
+    }
+
+    #[must_use]
+    pub fn book(mut self, org: OrgId) -> Self {
+        self.book = Some(org);
+        self
+    }
+
+    #[must_use]
+    pub fn page(mut self, page: autoxide_kernel::pagination::PageRequest) -> Self {
+        self.page = page;
+        self
+    }
+}
+
+/// One line of the general journal, with its entry and account.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerJournalLine)]
+pub struct JournalLine {
+    pub line_id: Uuid,
+    pub entry_id: Uuid,
+    /// The unit the book belongs to.
+    pub org_id: Uuid,
+    pub effective_date: NaiveDate,
+    pub posted_at: DateTime<Utc>,
+    pub description: String,
+    pub source_module: String,
+    pub source_kind: String,
+    pub source_id: Option<String>,
+    pub reference: String,
+    pub reverses_entry_id: Option<Uuid>,
+    pub line_no: i32,
+    pub account_id: Uuid,
+    pub purpose: String,
+    pub counterparty_kind: Option<String>,
+    pub counterparty_id: Option<String>,
+    /// Account number for accounting software: the account's own code, or the Vietnamese chart of
+    /// accounts mapping of its purpose (`data/vn-accounts.json`), or the purpose itself.
+    pub account_code: String,
+    pub side: Side,
+    pub amount: Money,
+    /// The amount in the book currency.
+    pub base_amount: Money,
+    pub exchange_rate: Option<String>,
+}
+
 /// Ghi và đọc sổ cái.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
@@ -866,4 +968,25 @@ pub trait Ledger: Send + Sync {
         actor: Actor,
         payment: NewTransferPayment,
     ) -> Result<Submitted<Payment>, Error>;
+
+    /// Tỉ giá 1 `base` = ? `quote` hiệu lực ngày `on` (D-237): tỉ giá có ngày hiệu lực gần nhất
+    /// ≤ `on`; cùng ngày thì tỉ giá nhập tay trước tỉ giá của nguồn. Chưa có: `None`. Đọc, không
+    /// gọi trong transaction ghi. `invoices`, báo cáo gộp (38) và đa tiền tệ (63) đọc qua đây.
+    async fn exchange_rate(
+        &self,
+        tenant: &TenantContext,
+        base: Currency,
+        quote: Currency,
+        on: NaiveDate,
+    ) -> Result<Option<ExchangeRate>, Error>;
+
+    /// Tiền hạch toán của sổ của nút `org` (sổ chưa mở: tiền mặc định của nút, hay VND).
+    async fn book_currency(&self, tenant: &TenantContext, org: OrgId) -> Result<Currency, Error>;
+
+    /// Một trang sổ nhật ký chung (dòng bút toán kèm bút toán và tài khoản) cho xuất kế toán.
+    async fn journal(
+        &self,
+        tenant: &TenantContext,
+        query: JournalQuery,
+    ) -> Result<autoxide_kernel::pagination::Page<JournalLine>, Error>;
 }

@@ -2475,6 +2475,40 @@
         ],
         "type": "object"
       },
+      "ComplianceAccountVerification": {
+        "description": "How far your account is verified, for posting content (Vietnam, Decree 147/2024/ND-CP).",
+        "properties": {
+          "identity_verified_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "level": {
+            "$ref": "#/components/schemas/ComplianceVerificationLevel",
+            "description": "`none`, `phone` (a mobile number confirmed with a code) or `identity` (identity verified; it\nincludes `phone`)."
+          },
+          "phone": {
+            "description": "The verified phone number, masked (e.g. `+8491****678`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone_verified_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "level"
+        ],
+        "type": "object"
+      },
       "ComplianceConsent": {
         "description": "A consent, as it stands.",
         "properties": {
@@ -3001,6 +3035,73 @@
         ],
         "type": "object"
       },
+      "CompliancePhoneConfirmRequest": {
+        "additionalProperties": false,
+        "description": "A code to confirm.",
+        "properties": {
+          "code": {
+            "description": "The 6-digit code from the SMS.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "CompliancePhoneVerification": {
+        "description": "A one-time code sent by SMS.",
+        "properties": {
+          "attempts": {
+            "description": "Wrong codes entered so far.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "confirmed": {
+            "description": "`true` once the code was used.",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "phone": {
+            "description": "The number the code went to, masked.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "phone",
+          "expires_at",
+          "attempts",
+          "confirmed",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "CompliancePhoneVerificationRequest": {
+        "additionalProperties": false,
+        "description": "A phone number to verify.",
+        "properties": {
+          "phone": {
+            "description": "A mobile number, e.g. `0912 345 678` or `+84912345678`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone"
+        ],
+        "type": "object"
+      },
       "CompliancePolicy": {
         "description": "A compliance policy of the tenant.",
         "properties": {
@@ -3108,6 +3209,15 @@
           "pack"
         ],
         "type": "object"
+      },
+      "ComplianceVerificationLevel": {
+        "description": "How far an account is verified for posting content; `identity` includes `phone`.",
+        "enum": [
+          "none",
+          "phone",
+          "identity"
+        ],
+        "type": "string"
       },
       "ComplianceVersionRequest": {
         "additionalProperties": false,
@@ -5505,6 +5615,49 @@
         ],
         "type": "object"
       },
+      "Data_ComplianceAccountVerification": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "How far your account is verified, for posting content (Vietnam, Decree 147/2024/ND-CP).",
+            "properties": {
+              "identity_verified_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "level": {
+                "$ref": "#/components/schemas/ComplianceVerificationLevel",
+                "description": "`none`, `phone` (a mobile number confirmed with a code) or `identity` (identity verified; it\nincludes `phone`)."
+              },
+              "phone": {
+                "description": "The verified phone number, masked (e.g. `+8491****678`).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone_verified_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "level"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceConsent": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -5890,6 +6043,54 @@
             },
             "required": [
               "status"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CompliancePhoneVerification": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A one-time code sent by SMS.",
+            "properties": {
+              "attempts": {
+                "description": "Wrong codes entered so far.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "confirmed": {
+                "description": "`true` once the code was used.",
+                "type": "boolean"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "phone": {
+                "description": "The number the code went to, masked.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "phone",
+              "expires_at",
+              "attempts",
+              "confirmed",
+              "created_at"
             ],
             "type": "object"
           }
@@ -7337,6 +7538,63 @@
         ],
         "type": "object"
       },
+      "Data_InvoicesArchive": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An archive copy of the tenant's accounting records.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "manifest_sha256": {
+                "description": "SHA-256 of `manifest.json`, which lists the SHA-256 of every file.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "description": "`manual` or `tenant_deleted`.",
+                "type": "string"
+              },
+              "retain_until": {
+                "description": "Keep the archive at least until this day.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`ready` or `failed`.",
+                "type": "string"
+              },
+              "storage_prefix": {
+                "description": "Where the files are in the shared file storage (outside the tenant's folder).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "reason",
+              "storage_prefix",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_InvoicesDocument": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -7347,6 +7605,17 @@
                 "type": [
                   "string",
                   "null"
+                ]
+              },
+              "base_total": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money",
+                    "description": "The total in the book currency, converted with `exchange_rate`."
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "buyer": {
@@ -7365,6 +7634,21 @@
               },
               "einvoice_provider": {
                 "description": "E-invoice: provider, its reference and number, tax authority code, lookup code.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "exchange_rate": {
+                "description": "For a document in a foreign currency: the rate used at issue (1 `currency` = `exchange_rate`\nof the book currency), kept as issued; `null` in the book currency or while a draft.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "exchange_rate_id": {
+                "description": "Id of the ledger exchange rate used.",
+                "format": "uuid",
                 "type": [
                   "string",
                   "null"
@@ -7543,6 +7827,91 @@
         ],
         "type": "object"
       },
+      "Data_InvoicesExport": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An accounting export.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "format": {
+                "description": "`csv` or `xlsx`.",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "Only the book of this unit; `null`: every book of the tenant.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "period_from": {
+                "format": "date",
+                "type": "string"
+              },
+              "period_to": {
+                "format": "date",
+                "type": "string"
+              },
+              "profile": {
+                "type": "string"
+              },
+              "row_count": {
+                "description": "Rows in the file, without the header row.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "size": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`pending`, `running`, `ready` (download it) or `failed` (ask for a new one).",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "profile",
+              "format",
+              "period_from",
+              "period_to",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_InvoicesMandate": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -7675,6 +8044,138 @@
               "status",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InvoicesTemplate": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A print template of a document kind and language.",
+            "properties": {
+              "body": {
+                "description": "The template (Jinja syntax; see `GET /api/v1/invoices/template-defaults`).",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "locale": {
+                "description": "`en` or `vi`.",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The unit the template is for; `null`: every unit of the tenant.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "version": {
+                "description": "Goes up by one on each change.",
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "locale",
+              "version",
+              "body",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InvoicesTemplateDefaults": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The built-in print template and the variables templates may use.",
+            "properties": {
+              "body": {
+                "description": "The built-in template, for every kind and language (words come from `labels`).",
+                "type": "string"
+              },
+              "filters": {
+                "description": "Filters: `money` (an `{amount, currency}` value), `number` (a decimal string), `date`\n(`YYYY-MM-DD`) format in the language of the print; built-in Jinja filters and tests work too.\nThere is no `safe` filter: every value is HTML-escaped.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "kinds": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "locales": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "variables": {
+                "items": {
+                  "$ref": "#/components/schemas/InvoicesTemplateVariable"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "body",
+              "variables",
+              "kinds",
+              "locales",
+              "filters"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InvoicesTemplatePreview": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The HTML a template gives.",
+            "properties": {
+              "html": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "html"
             ],
             "type": "object"
           }
@@ -8227,6 +8728,59 @@
               "status",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerExchangeRate": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An exchange rate in force from a day: 1 `base` = `rate` `quote`.",
+            "properties": {
+              "base": {
+                "description": "ISO 4217 code, e.g. `USD`.",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "effective_date": {
+                "description": "First day the rate is used; it stays in force until a later rate of the same pair.",
+                "format": "date",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "quote": {
+                "description": "ISO 4217 code, e.g. `VND`.",
+                "type": "string"
+              },
+              "rate": {
+                "$ref": "#/components/schemas/DecimalString",
+                "description": "Units of `quote` for one unit of `base`, as a decimal string, e.g. `\"25345.5\"`."
+              },
+              "source": {
+                "description": "`manual` (entered by a person) or `provider:<name>` (fetched from a rate source).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "base",
+              "quote",
+              "rate",
+              "effective_date",
+              "source",
+              "created_at"
             ],
             "type": "object"
           }
@@ -15077,6 +15631,41 @@
         ],
         "type": "object"
       },
+      "Data_Vec_InvoicesExportProfile": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "An export profile (file layout).",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "formats": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "formats"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_JobRunView": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -15157,6 +15746,62 @@
                 "kind",
                 "label",
                 "status",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_LedgerExchangeRate": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "An exchange rate in force from a day: 1 `base` = `rate` `quote`.",
+              "properties": {
+                "base": {
+                  "description": "ISO 4217 code, e.g. `USD`.",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "effective_date": {
+                  "description": "First day the rate is used; it stays in force until a later rate of the same pair.",
+                  "format": "date",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "quote": {
+                  "description": "ISO 4217 code, e.g. `VND`.",
+                  "type": "string"
+                },
+                "rate": {
+                  "$ref": "#/components/schemas/DecimalString",
+                  "description": "Units of `quote` for one unit of `base`, as a decimal string, e.g. `\"25345.5\"`."
+                },
+                "source": {
+                  "description": "`manual` (entered by a person) or `provider:<name>` (fetched from a rate source).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "base",
+                "quote",
+                "rate",
+                "effective_date",
+                "source",
                 "created_at"
               ],
               "type": "object"
@@ -19622,6 +20267,54 @@
         ],
         "type": "object"
       },
+      "InvoicesArchive": {
+        "description": "An archive copy of the tenant's accounting records.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "description": "SHA-256 of `manifest.json`, which lists the SHA-256 of every file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "`manual` or `tenant_deleted`.",
+            "type": "string"
+          },
+          "retain_until": {
+            "description": "Keep the archive at least until this day.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`ready` or `failed`.",
+            "type": "string"
+          },
+          "storage_prefix": {
+            "description": "Where the files are in the shared file storage (outside the tenant's folder).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "reason",
+          "storage_prefix",
+          "created_at"
+        ],
+        "type": "object"
+      },
       "InvoicesBuyer": {
         "description": "The buyer printed on a document (a copy taken when the document is written).",
         "properties": {
@@ -19682,6 +20375,17 @@
               "null"
             ]
           },
+          "base_total": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "The total in the book currency, converted with `exchange_rate`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "buyer": {
             "$ref": "#/components/schemas/InvoicesBuyer"
           },
@@ -19698,6 +20402,21 @@
           },
           "einvoice_provider": {
             "description": "E-invoice: provider, its reference and number, tax authority code, lookup code.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exchange_rate": {
+            "description": "For a document in a foreign currency: the rate used at issue (1 `currency` = `exchange_rate`\nof the book currency), kept as issued; `null` in the book currency or while a draft.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exchange_rate_id": {
+            "description": "Id of the ledger exchange rate used.",
+            "format": "uuid",
             "type": [
               "string",
               "null"
@@ -19992,6 +20711,145 @@
           "currency",
           "lines",
           "reference"
+        ],
+        "type": "object"
+      },
+      "InvoicesExport": {
+        "description": "An accounting export.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "format": {
+            "description": "`csv` or `xlsx`.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Only the book of this unit; `null`: every book of the tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "period_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "period_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "row_count": {
+            "description": "Rows in the file, without the header row.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "size": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `running`, `ready` (download it) or `failed` (ask for a new one).",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "profile",
+          "format",
+          "period_from",
+          "period_to",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "InvoicesExportProfile": {
+        "description": "An export profile (file layout).",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "formats"
+        ],
+        "type": "object"
+      },
+      "InvoicesExportRequest": {
+        "additionalProperties": false,
+        "description": "An export to make.",
+        "properties": {
+          "format": {
+            "description": "`csv` (UTF-8 with BOM, opens in Excel) or `xlsx`.",
+            "type": "string"
+          },
+          "from": {
+            "description": "First day, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Only the book (or documents) of this unit; omit for the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "profile": {
+            "description": "See `GET /api/v1/invoices/export-profiles`.",
+            "example": "generic_journal",
+            "type": "string"
+          },
+          "to": {
+            "description": "Last day, `YYYY-MM-DD`; at most 366 days after `from`.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "format",
+          "from",
+          "to"
         ],
         "type": "object"
       },
@@ -20390,6 +21248,208 @@
           "kind",
           "symbol",
           "year"
+        ],
+        "type": "object"
+      },
+      "InvoicesTemplate": {
+        "description": "A print template of a document kind and language.",
+        "properties": {
+          "body": {
+            "description": "The template (Jinja syntax; see `GET /api/v1/invoices/template-defaults`).",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit the template is for; `null`: every unit of the tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "description": "Goes up by one on each change.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "locale",
+          "version",
+          "body",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "InvoicesTemplateChange": {
+        "additionalProperties": false,
+        "description": "A new body for a print template.",
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
+      "InvoicesTemplateDefaults": {
+        "description": "The built-in print template and the variables templates may use.",
+        "properties": {
+          "body": {
+            "description": "The built-in template, for every kind and language (words come from `labels`).",
+            "type": "string"
+          },
+          "filters": {
+            "description": "Filters: `money` (an `{amount, currency}` value), `number` (a decimal string), `date`\n(`YYYY-MM-DD`) format in the language of the print; built-in Jinja filters and tests work too.\nThere is no `safe` filter: every value is HTML-escaped.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "locales": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "variables": {
+            "items": {
+              "$ref": "#/components/schemas/InvoicesTemplateVariable"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "body",
+          "variables",
+          "kinds",
+          "locales",
+          "filters"
+        ],
+        "type": "object"
+      },
+      "InvoicesTemplatePreview": {
+        "description": "The HTML a template gives.",
+        "properties": {
+          "html": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "html"
+        ],
+        "type": "object"
+      },
+      "InvoicesTemplatePreviewRequest": {
+        "additionalProperties": false,
+        "description": "A template body to try.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "document_id": {
+            "description": "A document to print with it; omit to use a built-in sample document.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "locale",
+          "body"
+        ],
+        "type": "object"
+      },
+      "InvoicesTemplateRequest": {
+        "additionalProperties": false,
+        "description": "A print template to save.",
+        "properties": {
+          "body": {
+            "description": "The template, at most `AUTOXIDE_TEMPLATE_MAX_BYTES` bytes.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Document kind, e.g. `retail_receipt`, `delivery_note`, `goods_receipt`, `cash_receipt`.",
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit; omit for every unit of the tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "locale",
+          "body"
+        ],
+        "type": "object"
+      },
+      "InvoicesTemplateVariable": {
+        "description": "A variable a print template may use.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "description": "Dotted path, e.g. `document.number`; a declared object allows all its fields.",
+            "type": "string"
+          },
+          "required": {
+            "description": "The template must use it.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "required",
+          "description"
         ],
         "type": "object"
       },
@@ -21289,6 +22349,113 @@
           "status",
           "created_at",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "LedgerExchangeRate": {
+        "description": "An exchange rate in force from a day: 1 `base` = `rate` `quote`.",
+        "properties": {
+          "base": {
+            "description": "ISO 4217 code, e.g. `USD`.",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "effective_date": {
+            "description": "First day the rate is used; it stays in force until a later rate of the same pair.",
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "quote": {
+            "description": "ISO 4217 code, e.g. `VND`.",
+            "type": "string"
+          },
+          "rate": {
+            "$ref": "#/components/schemas/DecimalString",
+            "description": "Units of `quote` for one unit of `base`, as a decimal string, e.g. `\"25345.5\"`."
+          },
+          "source": {
+            "description": "`manual` (entered by a person) or `provider:<name>` (fetched from a rate source).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "base",
+          "quote",
+          "rate",
+          "effective_date",
+          "source",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "LedgerExchangeRateFetch": {
+        "additionalProperties": false,
+        "description": "Rates to fetch from a rate source.",
+        "properties": {
+          "base": {
+            "description": "Currency to price, e.g. `USD`.",
+            "example": "USD",
+            "type": "string"
+          },
+          "on": {
+            "description": "The day, `YYYY-MM-DD`; omit for today in the tenant's time zone.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "description": "Name of the rate source set up on this server; omit when there is only one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "base"
+        ],
+        "type": "object"
+      },
+      "LedgerExchangeRateRequest": {
+        "additionalProperties": false,
+        "description": "An exchange rate to record.",
+        "properties": {
+          "base": {
+            "description": "ISO 4217 code of the currency being priced, e.g. `USD`.",
+            "example": "USD",
+            "type": "string"
+          },
+          "effective_date": {
+            "description": "First day the rate is used, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          },
+          "quote": {
+            "description": "ISO 4217 code of the currency the price is in, e.g. `VND`.",
+            "example": "VND",
+            "type": "string"
+          },
+          "rate": {
+            "description": "Units of `quote` for one unit of `base`, as a decimal string (never a JSON number).",
+            "example": "25345.5",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base",
+          "quote",
+          "rate",
+          "effective_date"
         ],
         "type": "object"
       },
@@ -27138,6 +28305,71 @@
         ],
         "type": "object"
       },
+      "Page_InvoicesArchive": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "An archive copy of the tenant's accounting records.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "manifest_sha256": {
+                  "description": "SHA-256 of `manifest.json`, which lists the SHA-256 of every file.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "description": "`manual` or `tenant_deleted`.",
+                  "type": "string"
+                },
+                "retain_until": {
+                  "description": "Keep the archive at least until this day.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`ready` or `failed`.",
+                  "type": "string"
+                },
+                "storage_prefix": {
+                  "description": "Where the files are in the shared file storage (outside the tenant's folder).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "reason",
+                "storage_prefix",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_InvoicesDocument": {
         "description": "One page of a list.",
         "properties": {
@@ -27150,6 +28382,17 @@
                   "type": [
                     "string",
                     "null"
+                  ]
+                },
+                "base_total": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money",
+                      "description": "The total in the book currency, converted with `exchange_rate`."
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
                 "buyer": {
@@ -27168,6 +28411,21 @@
                 },
                 "einvoice_provider": {
                   "description": "E-invoice: provider, its reference and number, tax authority code, lookup code.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "exchange_rate": {
+                  "description": "For a document in a foreign currency: the rate used at issue (1 `currency` = `exchange_rate`\nof the book currency), kept as issued; `null` in the book currency or while a draft.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "exchange_rate_id": {
+                  "description": "Id of the ledger exchange rate used.",
+                  "format": "uuid",
                   "type": [
                     "string",
                     "null"
@@ -27352,6 +28610,99 @@
         ],
         "type": "object"
       },
+      "Page_InvoicesExport": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "An accounting export.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "format": {
+                  "description": "`csv` or `xlsx`.",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "Only the book of this unit; `null`: every book of the tenant.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "period_from": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "period_to": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "profile": {
+                  "type": "string"
+                },
+                "row_count": {
+                  "description": "Rows in the file, without the header row.",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "size": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`pending`, `running`, `ready` (download it) or `failed` (ask for a new one).",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "profile",
+                "format",
+                "period_from",
+                "period_to",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_InvoicesMandate": {
         "description": "One page of a list.",
         "properties": {
@@ -27492,6 +28843,74 @@
                 "symbol",
                 "year",
                 "status",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InvoicesTemplate": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A print template of a document kind and language.",
+              "properties": {
+                "body": {
+                  "description": "The template (Jinja syntax; see `GET /api/v1/invoices/template-defaults`).",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "locale": {
+                  "description": "`en` or `vi`.",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The unit the template is for; `null`: every unit of the tenant.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "version": {
+                  "description": "Goes up by one on each change.",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "locale",
+                "version",
+                "body",
                 "created_at",
                 "updated_at"
               ],
@@ -28001,6 +29420,67 @@
                 "status",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_LedgerExchangeRate": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "An exchange rate in force from a day: 1 `base` = `rate` `quote`.",
+              "properties": {
+                "base": {
+                  "description": "ISO 4217 code, e.g. `USD`.",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "effective_date": {
+                  "description": "First day the rate is used; it stays in force until a later rate of the same pair.",
+                  "format": "date",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "quote": {
+                  "description": "ISO 4217 code, e.g. `VND`.",
+                  "type": "string"
+                },
+                "rate": {
+                  "$ref": "#/components/schemas/DecimalString",
+                  "description": "Units of `quote` for one unit of `base`, as a decimal string, e.g. `\"25345.5\"`."
+                },
+                "source": {
+                  "description": "`manual` (entered by a person) or `provider:<name>` (fetched from a rate source).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "base",
+                "quote",
+                "rate",
+                "effective_date",
+                "source",
+                "created_at"
               ],
               "type": "object"
             },
@@ -56078,6 +57558,486 @@
         "x-permissions": []
       }
     },
+    "/api/v1/compliance/me/phone": {
+      "delete": {
+        "description": "Any signed-in user. Calling it again does nothing. Places that need phone verification refuse\nyour posts until you verify a number again.",
+        "operationId": "compliance_remove_my_phone",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed (or there was none)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove your verified phone number.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/compliance/me/phone-verifications": {
+      "post": {
+        "description": "Any signed-in user. Sends a 6-digit one-time code by SMS to a Vietnamese mobile number; confirm\nit with `POST /me/phone-verifications/{id}/confirm` before `expires_at`. Limited per number,\nper account and per address.",
+        "operationId": "compliance_start_phone_verification",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompliancePhoneVerificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CompliancePhoneVerification"
+                }
+              }
+            },
+            "description": "The code was sent.",
+            "headers": {
+              "Location": {
+                "description": "Path of the verification.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The number is verified for another account; code `compliance.phone_in_use`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a phone number (`errors`), or not an accepted mobile number; code `compliance.phone_not_allowed`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many codes asked for; code `compliance.otp_throttled`, wait `Retry-After` seconds."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Sending SMS is not set up (code `sms_disabled`) or the provider failed; try again later."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a code to verify a phone number.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/compliance/me/phone-verifications/{id}": {
+      "get": {
+        "description": "Any signed-in user; only their own.",
+        "operationId": "compliance_get_phone_verification",
+        "parameters": [
+          {
+            "description": "Verification ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CompliancePhoneVerification"
+                }
+              }
+            },
+            "description": "The verification."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such verification of yours; code `compliance.challenge_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one of your phone verifications.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/compliance/me/phone-verifications/{id}/confirm": {
+      "post": {
+        "description": "Any signed-in user; only their own verification. A code works once, before it expires, and\nonly a few wrong tries are allowed. The number then becomes your verified phone (replacing an\nearlier one).",
+        "operationId": "compliance_confirm_phone_verification",
+        "parameters": [
+          {
+            "description": "Verification ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompliancePhoneConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceAccountVerification"
+                }
+              }
+            },
+            "description": "Your verification after the confirmation."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such verification of yours; code `compliance.challenge_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The number was verified for another account meanwhile; code `compliance.phone_in_use`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Wrong, used or expired code; code `compliance.otp_invalid`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many wrong codes; code `compliance.otp_attempts_exceeded` — ask for a new code."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm a phone number with the code.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/compliance/me/verification": {
+      "get": {
+        "description": "Any signed-in user. `identity` comes from a verified KYC profile (`/me/kyc`); `phone` from\n`POST /me/phone-verifications`.",
+        "operationId": "compliance_get_my_account_verification",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceAccountVerification"
+                }
+              }
+            },
+            "description": "Your verification."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get your account verification level.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/compliance/policies": {
       "get": {
         "description": "Requires `compliance.policies.manage`.",
@@ -67031,6 +68991,231 @@
         ]
       }
     },
+    "/api/v1/invoices/archives": {
+      "get": {
+        "description": "Requires `invoices.archive`.",
+        "operationId": "invoices_list_invoice_archives",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InvoicesArchive"
+                }
+              }
+            },
+            "description": "One page of archives."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.archive`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List archive copies of the accounting records.",
+        "tags": [
+          "invoices"
+        ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "invoices.list_invoice_archives",
+        "x-permissions": [
+          "invoices.archive"
+        ]
+      },
+      "post": {
+        "description": "Requires `invoices.archive`. Writes the general journal (`ledger/journal.csv`), every document\n(`documents.jsonl`) and `manifest.json` (SHA-256 of each file) to the shared file storage, outside\nthe tenant's folder: the copy stays after the tenant is deleted. Accounting records must be kept\nat least 10 years (Accounting Law 88/2015, Article 41).",
+        "operationId": "invoices_create_invoice_archive",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesArchive"
+                }
+              }
+            },
+            "description": "The archive.",
+            "headers": {
+              "Location": {
+                "description": "Path of the archive list.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.archive`; code `permission_denied`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No file storage is set up; code `invoices.storage_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Make an archive copy of the accounting records.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.archive"
+        ]
+      }
+    },
     "/api/v1/invoices/documents": {
       "get": {
         "description": "Requires `invoices.read`.",
@@ -68241,6 +70426,141 @@
         ]
       }
     },
+    "/api/v1/invoices/documents/{id}/render": {
+      "get": {
+        "description": "Requires `invoices.read` on the unit. HTML comes from the unit's template, the tenant's template\nor the built-in one, for the document's kind and language. PDF has a fixed layout built from the\nsame data (title, parties, lines, totals, signatures) with fonts that carry Vietnamese marks;\ntemplates change the HTML only — print the HTML from a browser for a PDF in your own layout.",
+        "operationId": "invoices_render_invoice_document",
+        "parameters": [
+          {
+            "description": "Id of the document.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`html` (default) or `pdf`.",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`en` or `vi`; default the language of `Accept-Language` (English when none matches).",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "items": {
+                    "format": "int32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The print: `text/html` or `application/pdf`.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "`inline` with a file name such as `retail_receipt-12.pdf`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such document in your scope; code `invoices.document_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`format` or `locale` is invalid, or the saved template fails while printing (`template.render_failed`, `template.limit_exceeded`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Print a document as HTML or PDF.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.read"
+        ]
+      }
+    },
     "/api/v1/invoices/documents/{id}/replace": {
       "post": {
         "description": "Requires `invoices.correct` on the unit. Writes a draft linked to the document; issuing the draft\nmarks the document `replaced` and reverses its booking.",
@@ -68393,6 +70713,536 @@
         ],
         "x-permissions": [
           "invoices.correct"
+        ]
+      }
+    },
+    "/api/v1/invoices/export-profiles": {
+      "get": {
+        "description": "Requires `invoices.export`.",
+        "operationId": "invoices_list_invoice_export_profiles",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_InvoicesExportProfile"
+                }
+              }
+            },
+            "description": "The profiles."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.export`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the export profiles.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.export"
+        ]
+      }
+    },
+    "/api/v1/invoices/exports": {
+      "get": {
+        "description": "Requires `invoices.export`.",
+        "operationId": "invoices_list_invoice_exports",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InvoicesExport"
+                }
+              }
+            },
+            "description": "One page of exports."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.export`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List accounting exports.",
+        "tags": [
+          "invoices"
+        ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "invoices.list_invoice_exports",
+        "x-permissions": [
+          "invoices.export"
+        ]
+      },
+      "post": {
+        "description": "Requires `invoices.export`. The file is made by a background job: follow the `Location` until\n`status` is `ready`, then download it. For the accountant's software: account numbers follow the\naccount's own code or the Vietnamese chart of accounts (needs checking by an accountant).",
+        "operationId": "invoices_create_invoice_export",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoicesExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesExport"
+                }
+              }
+            },
+            "description": "Asked for; the job makes the file shortly.",
+            "headers": {
+              "Location": {
+                "description": "Path of the export.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.export`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No file storage is set up; code `invoices.storage_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export the general journal or the documents of a period.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.export"
+        ]
+      }
+    },
+    "/api/v1/invoices/exports/{id}": {
+      "get": {
+        "description": "Requires `invoices.export`.",
+        "operationId": "invoices_get_invoice_export",
+        "parameters": [
+          {
+            "description": "Id of the export.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesExport"
+                }
+              }
+            },
+            "description": "The export."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.export`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such export; code `invoices.export_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an accounting export.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.export"
+        ]
+      }
+    },
+    "/api/v1/invoices/exports/{id}/download": {
+      "get": {
+        "description": "Requires `invoices.export`.",
+        "operationId": "invoices_download_invoice_export",
+        "parameters": [
+          {
+            "description": "Id of the export.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "items": {
+                    "format": "int32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The file (`text/csv` or the XLSX type).",
+            "headers": {
+              "Content-Disposition": {
+                "description": "`attachment` with a file name such as `generic_journal-2026-01-01-2026-01-31.csv`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.export`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such export; code `invoices.export_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The file is not ready (`invoices.export_not_ready`, its status in the message)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Download the file of an accounting export.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.export"
         ]
       }
     },
@@ -69107,6 +71957,769 @@
         ],
         "x-permissions": [
           "invoices.series_manage"
+        ]
+      }
+    },
+    "/api/v1/invoices/template-defaults": {
+      "get": {
+        "description": "Requires `invoices.read`. Templates use Jinja syntax (`{{ … }}`, `{% if %}`, `{% for %}`), run in\na sandbox (no files, no network, no other templates), with limits on size, steps and output.",
+        "operationId": "invoices_get_invoice_template_defaults",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesTemplateDefaults"
+                }
+              }
+            },
+            "description": "The built-in template and the variables."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the built-in print template and the variables templates may use.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.read"
+        ]
+      }
+    },
+    "/api/v1/invoices/templates": {
+      "get": {
+        "description": "Requires `invoices.read`. Documents without a template of their own use the tenant's, or the\nbuilt-in one (`GET /api/v1/invoices/template-defaults`).",
+        "operationId": "invoices_list_invoice_templates",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InvoicesTemplate"
+                }
+              }
+            },
+            "description": "One page of templates."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the print templates of the tenant.",
+        "tags": [
+          "invoices"
+        ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "invoices.list_invoice_templates",
+        "x-permissions": [
+          "invoices.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `invoices.templates_manage` on the unit (on the tenant's root for a template of every\nunit). The template may use only the variables of `GET /api/v1/invoices/template-defaults` and\nmust use `document.number`; every value it prints is HTML-escaped. One template per unit, kind\nand language.",
+        "operationId": "invoices_create_invoice_template",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoicesTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesTemplate"
+                }
+              }
+            },
+            "description": "The template.",
+            "headers": {
+              "Location": {
+                "description": "Path of the template.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.templates_manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit is outside your scope; code `invoices.template_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit has a template for this kind and language; code `invoices.template_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`. Problems in `body` have the code `template.syntax_error`, `template.unknown_variable` or `template.required_variable_missing` and give the line and column; a template that is too long has the code `template.limit_exceeded`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save a print template.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.templates_manage"
+        ]
+      }
+    },
+    "/api/v1/invoices/templates/preview": {
+      "post": {
+        "description": "Requires `invoices.templates_manage` (and `invoices.read` on the document's unit when\n`document_id` is given). Checked like a saved template.",
+        "operationId": "invoices_preview_invoice_template",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoicesTemplatePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesTemplatePreview"
+                }
+              }
+            },
+            "description": "The HTML."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.templates_manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such document in your scope; code `invoices.document_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid, or the template fails while printing (`template.render_failed`, `template.limit_exceeded`); every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Try a print template without saving it.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.templates_manage"
+        ]
+      }
+    },
+    "/api/v1/invoices/templates/{id}": {
+      "delete": {
+        "description": "Requires `invoices.templates_manage` on the template's unit. Documents then print with the\ntenant's template or the built-in one.",
+        "operationId": "invoices_delete_invoice_template",
+        "parameters": [
+          {
+            "description": "Id of the template.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.templates_manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such template in your scope; code `invoices.template_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a print template.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.templates_manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `invoices.read`.",
+        "operationId": "invoices_get_invoice_template",
+        "parameters": [
+          {
+            "description": "Id of the template.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesTemplate"
+                }
+              }
+            },
+            "description": "The template."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such template; code `invoices.template_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a print template.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.read"
+        ]
+      },
+      "put": {
+        "description": "Requires `invoices.templates_manage` on the template's unit. Checked like a new template;\n`version` goes up by one.",
+        "operationId": "invoices_update_invoice_template",
+        "parameters": [
+          {
+            "description": "Id of the template.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoicesTemplateChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesTemplate"
+                }
+              }
+            },
+            "description": "The template after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.templates_manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such template in your scope; code `invoices.template_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`. Problems in `body` have the code `template.syntax_error`, `template.unknown_variable` or `template.required_variable_missing` and give the line and column; a template that is too long has the code `template.limit_exceeded`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a print template.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.templates_manage"
         ]
       }
     },
@@ -76133,6 +79746,531 @@
         ],
         "x-permissions": [
           "ledger.reconcile"
+        ]
+      }
+    },
+    "/api/v1/ledger/exchange-rates": {
+      "get": {
+        "description": "Requires `ledger.read`. Oldest first by default (`order=desc` for newest first).",
+        "operationId": "ledger_list_ledger_exchange_rates",
+        "parameters": [
+          {
+            "description": "Only rates of this base currency, e.g. `USD`.",
+            "in": "query",
+            "name": "base",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only rates into this currency, e.g. `VND`.",
+            "in": "query",
+            "name": "quote",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerExchangeRate"
+                }
+              }
+            },
+            "description": "One page of exchange rates."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List recorded exchange rates.",
+        "tags": [
+          "ledger"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only rates of this base currency, e.g. `USD`.",
+            "kind": "string",
+            "name": "base",
+            "operator": "eq"
+          },
+          {
+            "description": "Only rates into this currency, e.g. `VND`.",
+            "kind": "string",
+            "name": "quote",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "ledger.list_ledger_exchange_rates",
+        "x-permissions": [
+          "ledger.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `ledger.settings_manage` for the whole tenant (rates are shared by every unit). The rate\nis used from `effective_date` until a later rate of the same pair. Recorded rates are never\nchanged: documents and entries keep the rate they used. Sending the same rate again returns it\n(200); a different rate for the same pair and day is refused.",
+        "operationId": "ledger_record_ledger_exchange_rate",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerExchangeRateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerExchangeRate"
+                }
+              }
+            },
+            "description": "The same rate was recorded before."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerExchangeRate"
+                }
+              }
+            },
+            "description": "The rate.",
+            "headers": {
+              "Location": {
+                "description": "Path of the rate list.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.settings_manage` for the whole tenant (`permission_denied` or `org_out_of_scope`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another rate is recorded for this pair and day; code `ledger.exchange_rate_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record an exchange rate by hand.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.settings_manage"
+        ]
+      }
+    },
+    "/api/v1/ledger/exchange-rates/effective": {
+      "get": {
+        "description": "Requires `ledger.read`. The rate with the latest `effective_date` on or before `on`; on the same\nday a rate entered by hand wins over a fetched one. This is the rate foreign-currency documents\nand entries of that day use (they keep a copy of it).",
+        "operationId": "ledger_get_ledger_effective_exchange_rate",
+        "parameters": [
+          {
+            "description": "e.g. `USD`.",
+            "in": "query",
+            "name": "base",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "e.g. `VND`.",
+            "in": "query",
+            "name": "quote",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The day, `YYYY-MM-DD`.",
+            "in": "query",
+            "name": "on",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerExchangeRate"
+                }
+              }
+            },
+            "description": "The rate in force."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rate of this pair on or before that day; code `ledger.exchange_rate_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A currency code is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the exchange rate in force on a day.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      }
+    },
+    "/api/v1/ledger/exchange-rates/fetch": {
+      "post": {
+        "description": "Requires `ledger.settings_manage` for the whole tenant. Asks the source for the rates of `base`\non that day and records them (source `provider:<name>`); rates already recorded are kept.",
+        "operationId": "ledger_fetch_ledger_exchange_rates",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerExchangeRateFetch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_LedgerExchangeRate"
+                }
+              }
+            },
+            "description": "The rates recorded from the source."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.settings_manage` for the whole tenant (`permission_denied` or `org_out_of_scope`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`base` is invalid, or no such rate source is set up (`ledger.rate_source_not_configured`)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The rate source did not answer; try again later (`payment.provider_unavailable`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch exchange rates from a rate source.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.settings_manage"
         ]
       }
     },

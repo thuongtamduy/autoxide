@@ -43,6 +43,9 @@ allow = [
   # BSD Zero Clause: thoáng hơn MIT, không bắt ghi tên tác giả (quoted_printable,
   # bộ mã hoá nội dung mail của lettre). D-061.
   "0BSD",
+  # BSD 2-Clause: như BSD-3-Clause, bỏ điều khoản cấm dùng tên tác giả (arrayref, qua tiny-skia-path của
+  # krilla — PDF mẫu in chứng từ). D-353.
+  "BSD-2-Clause",
 ]
 confidence-threshold = 0.9
 

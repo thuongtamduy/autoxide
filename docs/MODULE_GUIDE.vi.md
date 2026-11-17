@@ -407,6 +407,21 @@ Module giữ số tiền, số dư hay giao dịch dùng các công cụ của k
 - **Không bao giờ sửa hay xoá một giao dịch.** Sửa sai bằng một giao dịch đảo mới
   (`amount.checked_neg()`) trỏ tới giao dịch nó đảo; nhờ vậy số dư luôn giải thích được bằng
   lịch sử.
+- **Kế toán đi qua sổ cái, không qua bảng số dư của riêng bạn.** Ý nghĩa kế toán của một lần
+  bán, một khoản phí hay một lần chi trả (phải thu, doanh thu, GTGT, khoản phải trả người bán)
+  ghi bằng `dyn autoxide_ledger::api::Ledger::post` (hay `settle` cho dòng tiền), kèm `reference`
+  ổn định. Bút toán ngoại tệ được quy đổi theo tỉ giá của ngày đó; truyền tỉ giá đã báo cho khách
+  bằng `NewEntry::exchange_rate`. Đọc tỉ giá bằng `Ledger::exchange_rate` — không tự giữ bảng tỉ
+  giá. Bảng số dư riêng chỉ dành cho thứ không phải kế toán (tồn kho, điểm, hạn mức). Xem
+  [MONEY.vi.md](MONEY.vi.md).
+- **Số không nhảy** (số hoá đơn, số đơn, số phiếu) lấy bằng
+  `autoxide_kernel::numbering::next(&transaction, tenant, scope)` trong chính transaction ghi bản
+  ghi: rollback thì số không bị tiêu.
+- **Chứng từ in ra** (phiếu giao hàng, phiếu nhập, phiếu thu) là chứng từ của module `invoices`:
+  lập bằng `dyn Invoices::create_document` và in bằng `Invoices::render` (HTML theo mẫu của khách,
+  hay PDF). Mẫu khách tự soạn cho việc khác (mail, thông báo) đi qua
+  `autoxide_kernel::template::TemplateEngine` (`context.require::<TemplateEngine>()`): khai
+  `TemplateSchema`, gọi `validate` khi lưu và `render` khi in — không dùng ngôn ngữ mẫu nào khác.
 
 ### Tính năng và hạn mức (gói)
 

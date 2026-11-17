@@ -1,0 +1,28 @@
+{
+  "source": "Default account numbers of the Vietnamese enterprise accounting regime for the basic ledger purposes, used when exporting the general journal to accounting software. Based on Circular 99/2025/TT-BTC (replacing Circular 200/2014, in force from 2026-01-01) and Circular 133/2016/TT-BTC for small and medium enterprises. Needs checking against the original circulars and by an accountant before use; a tenant can set its own code on each account (external_code).",
+  "checked_on": "2026-11-17",
+  "accounts": {
+    "cash.bank": "1121",
+    "cash.on_hand": "1111",
+    "clearing.gateway": "1388",
+    "clearing.carrier_cod": "1388",
+    "receivable.customer": "131",
+    "receivable.seller": "1388",
+    "payable.seller_held": "3388",
+    "payable.seller_available": "3388",
+    "payable.supplier": "331",
+    "revenue.sales": "5111",
+    "revenue.platform_fee": "5113",
+    "revenue.shipping": "5113",
+    "expense.gateway_fee": "6427",
+    "tax.vat_output": "33311",
+    "tax.vat_input": "1331",
+    "tax.excise_payable": "3332",
+    "tax.withheld_vat": "3388",
+    "tax.withheld_pit": "3335",
+    "liability.customer_credit": "3388",
+    "equity.opening": "4111",
+    "fx.gain_loss": "515",
+    "rounding": "711"
+  }
+}

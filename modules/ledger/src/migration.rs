@@ -20,6 +20,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         Box::new(CreatePayments),
         Box::new(CreateFlows),
+        Box::new(CreateExchangeRates),
     ]
 }
 
@@ -910,5 +911,67 @@ impl MigrationTrait for CreateFlows {
             manager.drop_table(Table::drop().table(table).to_owned()).await?;
         }
         Ok(())
+    }
+}
+
+/// Tỉ giá có ngày hiệu lực theo cặp tiền (bước 36 mục 10, D-237, D-352) và index đọc sổ nhật ký chung
+/// theo ngày (xuất kế toán).
+struct CreateExchangeRates;
+
+impl MigrationName for CreateExchangeRates {
+    fn name(&self) -> &str {
+        "m0009_create_exchange_rates"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateExchangeRates {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("ledger_fx_rates")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("base", 3))
+                    .col(schema::string_len("quote", 3))
+                    // Chữ thập phân chuẩn hoá (`decimal::to_column`), không dùng kiểu số của database.
+                    .col(schema::string_len("rate", 40))
+                    .col(schema::date("effective_date"))
+                    // `manual` hay `provider:<tên>`.
+                    .col(schema::string_len("source", 64))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "ledger_fx_rates",
+            "ledger_fx_rates_key_idx",
+            &["tenant_id", "base", "quote", "effective_date", "source"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_lines",
+            "ledger_lines_journal_idx",
+            &["tenant_id", "effective_date", "id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ledger_lines_journal_idx")
+                    .table(Alias::new("ledger_lines"))
+                    .to_owned(),
+            )
+            .await?;
+        manager.drop_table(Table::drop().table("ledger_fx_rates").to_owned()).await
     }
 }

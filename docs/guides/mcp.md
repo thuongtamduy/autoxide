@@ -102,6 +102,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `comments.queue` | `comments.read` | read-only |
 | `comments.set_target_state` | `comments.manage` | writes |
 | `comments.unanswered` | `comments.read` | read-only |
+| `compliance.account_verification` | — | read-only |
 | `compliance.documents` | `compliance.documents.read` | read-only |
 | `compliance.kyc_profiles` | `compliance.kyc.read` | read-only |
 | `compliance.pending_acceptances` | — | read-only |
@@ -135,9 +136,12 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
 | `invoices.create_draft` | `invoices.write` | writes |
+| `invoices.create_export` | `invoices.export` | writes |
 | `invoices.document` | `invoices.read` | read-only |
 | `invoices.documents` | `invoices.read` | read-only |
+| `invoices.export` | `invoices.export` | read-only |
 | `invoices.issue` | `invoices.issue` | writes |
+| `invoices.print` | `invoices.read` | read-only |
 | `kernel.add_domain` | `kernel.domains.manage` | writes |
 | `kernel.current_tenant` | — | read-only |
 | `kernel.export_tenant` | `kernel.data.export` | writes |
@@ -160,11 +164,13 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `ledger.create_vietqr_payment` | `ledger.payments_create` | writes |
 | `ledger.entries` | `ledger.read` | read-only |
 | `ledger.exceptions` | `ledger.read` | read-only |
+| `ledger.exchange_rate` | `ledger.read` | read-only |
 | `ledger.flow_settings` | `ledger.read` | read-only |
 | `ledger.holds` | `ledger.read` | read-only |
 | `ledger.payment` | `ledger.read` | read-only |
 | `ledger.payouts` | `ledger.read` | read-only |
 | `ledger.post_entry` | `ledger.post` | writes |
+| `ledger.record_exchange_rate` | `ledger.settings_manage` | writes |
 | `ledger.release_hold` | `ledger.holds_release` | writes |
 | `ledger.resolve_exception` | `ledger.reconcile` | writes |
 | `ledger.trial_balance` | `ledger.read` | read-only |

@@ -8540,3 +8540,153 @@ Bối cảnh: bước 36 còn thiếu dòng tiền theo chế độ, chi trả, 
 
 Chỉ có bản giả: bộ nối ngân hàng / dịch vụ đọc sao kê (Casso, SePay…) và đối tác chi hộ thật cần hợp đồng và khoá API — dừng hỏi
 chủ dự án khi làm (D-191).
+
+## D-351 · Bộ dựng mẫu của kernel `autoxide_kernel::template` dùng `minijinja` (bước 37 mục 2, phần kernel) — 2026-11-17 — agent quyết
+
+Bối cảnh: mẫu in chứng từ (bước 36) và mẫu mail / thông báo khách tự soạn (bước 37, D-206) cần MỘT ngôn ngữ mẫu cho cả dự
+án; mẫu do khách sửa là dữ liệu không tin cậy (server-side template injection nếu không có hộp cát).
+
+1. **Thư viện `minijinja` 3.1** (Apache-2.0, chỉ phụ thuộc `serde`) thay `liquid`: có sẵn giới hạn bước chạy (`fuel`, cũng
+   chặn bộ nhớ), giới hạn đệ quy, tự thoát HTML theo callback, liệt kê biến mẫu dùng (`undeclared_variables`) để kiểm theo
+   schema, lỗi có dòng / cột. Tắt feature mặc định: không `multi_template` (`include` / `extends` / `import` là lỗi cú pháp,
+   không có loader → không đọc file), không `macros`; bật `builtins`, `serde`, `fuel`, `debug` (chỉ để lỗi cú pháp có
+   vị trí; hàm `debug()` bị gỡ). Bộ lọc `safe` bị gỡ: không có đường nào biến dữ liệu thành HTML không thoát.
+2. **API**: `TemplateEngine` (module kernel công bố, module lấy bằng `context.require::<TemplateEngine>()`),
+   `validate(field, source, &TemplateSchema)` và `render(source, Output::Html|Text, locale, &json)`; bộ lọc `money`, `number`,
+   `date` theo ngôn ngữ. `TemplateSchema` là danh sách đường dẫn chấm (`document.number`) kèm cờ bắt buộc.
+3. **Giới hạn**: `AUTOXIDE_TEMPLATE_MAX_BYTES` (mặc định 65 536, 1 024–1 048 576), fuel 2 000 000, độ sâu 50, kết quả 4 MiB
+   → `template.limit_exceeded` (422). Lỗi lúc chạy khác → `template.render_failed` (422).
+4. **Lỗi khi lưu gom một lần** (D-083): `validation_failed` với từng `errors[]` mang `code` `template.syntax_error`,
+   `template.unknown_variable` (kèm dòng, cột của lần dùng đầu) hay `template.required_variable_missing`.
+5. Chưa làm ở đây (phần còn lại của mục bước 37): khung mail MJML (`mrml`), bản chữ thuần, endpoint nháp / đăng của
+   `notifications` / `newsletter` — dùng lại bộ dựng này.
+
+## D-352 · Tỉ giá có ngày hiệu lực trong `ledger`; bút toán và chứng từ ngoại tệ giữ ảnh chụp tỉ giá (bước 36 mục 10) — 2026-11-17 — agent quyết
+
+1. Bảng `ledger_fx_rates` (cấp khách, giữ khi xoá khách): `base`, `quote`, `rate` (chữ thập phân, `rust_decimal`, không số
+   thực), `effective_date`, `source` (`manual` / `provider:<tên>`); unique (khách, cặp, ngày, nguồn). 1 `base` = `rate`
+   `quote`. Tỉ giá hiệu lực ngày X = dòng có ngày muộn nhất ≤ X; cùng ngày thì `manual` thắng. Tỉ giá đã ghi không sửa:
+   gửi lại cùng giá trị → 200 bản cũ, khác giá trị → 409 `ledger.exchange_rate_exists`.
+2. API: `GET|POST /ledger/exchange-rates`, `GET /exchange-rates/effective?base&quote&on`, `POST /exchange-rates/fetch`; ghi cần
+   `ledger.settings_manage` ở gốc khách (tỉ giá dùng chung cả khách); tool MCP `ledger.exchange_rate`,
+   `ledger.record_exchange_rate`. Kernel thêm trait `ExchangeRateSource` + `QuotedRate`; testkit `FakeExchangeRateSource`.
+   `dyn Ledger` thêm `exchange_rate`, `book_currency`, `journal`.
+3. **Bút toán ngoại tệ** (trước đây bị chặn bằng `ledger.exchange_rate_missing`): tỉ giá lấy TRƯỚC transaction — từ
+   `NewEntry::exchange_rate` (ảnh chụp của bên gọi) hay tỉ giá hiệu lực ngày hạch toán; mỗi dòng lưu `exchange_rate` và
+   `base_minor`. Quy đổi TỔNG mỗi bên một lần (`HalfUp`) rồi chia về dòng bằng `Money::allocate` → cân ở cả tiền gốc và
+   tiền sổ. Bút toán đảo dùng tỉ giá của bút toán gốc. Dấu vân tay `reference` chỉ thêm tỉ giá khi bên gọi truyền (bút
+   toán cũ giữ dấu vân tay). Thanh toán, VietQR, dòng tiền vẫn chỉ nhận tiền của sổ (ngoài phạm vi, bước 63).
+4. **Chứng từ ngoại tệ** (`invoices`, migration mới): khi phát hành, tiền của chứng từ khác tiền sổ người bán → lấy tỉ giá
+   ngày lập qua `dyn Ledger` (ngoài transaction), lưu `exchange_rate`, `exchange_rate_id`, `base_currency`,
+   `base_total_minor`; không có → `invoices.rate_missing`; bút toán phát hành dùng đúng tỉ giá đó.
+5. Khác đặc tả: chưa có lịch `ledger.fetch_exchange_rates` hằng ngày — chưa có nguồn thật và chưa có cấu hình "khách nào
+   cần cặp nào"; lấy bằng `POST /exchange-rates/fetch` (lịch của khách gọi được). Thêm lịch khi có bộ nối nguồn thật.
+   Căn cứ: Luật Kế toán 88/2015/QH13 Điều 11 (ngoại tệ quy đổi ra đồng Việt Nam) — cần đối chiếu văn bản gốc.
+
+## D-353 · Mẫu in chứng từ: HTML từ mẫu của khách, PDF bố cục cố định bằng `krilla`; in qua `dyn Invoices::render` (bước 36 mục 11) — 2026-11-17 — agent quyết
+
+1. **Ranh giới**: mẫu in nằm ở `invoices` (nơi giữ chứng từ). Phiếu giao hàng, phiếu nhập, phiếu thu của module sau (đơn
+   hàng, kho) là chứng từ của `invoices` (lập qua `Invoices::create_document`) và in qua `Invoices::render(tenant, id,
+   RenderFormat, locale)` — một chỗ giữ mẫu theo khách. Không có trait "in bất kỳ thứ gì" riêng: thứ chung là bộ dựng mẫu
+   của kernel (D-351).
+2. **View model cố định** (hợp đồng biến): `document`, `seller`, `buyer`, `lines`, `totals`, `taxes`, `labels`, `locale`; bắt
+   buộc `document.number`. Bảng `invoices_templates` (khách, nút — UUID nil = cả khách —, loại, ngôn ngữ, `version`). Chọn
+   mẫu: của nút → của khách → mặc định `modules/invoices/templates/document.html` (MỘT mẫu cho mọi loại, chữ theo
+   `templates/labels.<en|vi>.json`). Permission mới `invoices.templates_manage`.
+3. **PDF**: không thư viện thuần Rust nào dựng HTML/CSS đủ tốt (`printpdf` HTML còn non; `typst` nặng và là ngôn ngữ mẫu thứ
+   hai). Chọn `krilla` 0.8 (MIT / Apache-2.0, không feature nào) + `skrifa` (tra glyph, đo chữ — `simple-text` của krilla kéo
+   `rustybuzz` / `ttf-parser`, `cargo deny` báo ngừng bảo trì; mỗi ký tự một glyph là đủ cho chữ Latin có dấu, không kerning)
+   — `deny.toml` nhận thêm license BSD-2-Clause (`arrayref` qua `tiny-skia-path`, thoáng như BSD-3-Clause): bố cục A4 cố định từ CÙNG view model
+   (tiêu đề, hai bên, bảng dòng có xuống dòng / sang trang / lặp tiêu đề, tổng, chỗ ký, số trang), font Liberation Sans
+   2.1.5 (OFL 1.1, đủ dấu tiếng Việt) nhúng nguyên bản (~0,8 MB binary). Giới hạn: mẫu của khách chỉ đổi HTML; muốn PDF
+   theo mẫu riêng thì in HTML từ trình duyệt. PDF dựng ở `spawn_blocking`. Không cache PDF trong `Storage` (dựng lại rẻ,
+   tránh thêm vòng đời file) — khác đặc tả.
+4. MCP `invoices.print` trả HTML (PDF chỉ qua REST).
+
+## D-354 · Xuất dữ liệu kế toán: ba hồ sơ, CSV tự viết + `rust_xlsxwriter`, chưa có hồ sơ riêng của hãng (bước 36 mục 12) — 2026-11-17 — agent quyết
+
+1. `POST /invoices/exports` → dòng `invoices_exports` + job `invoices.build_export` cùng transaction → file ở nơi lưu của khách
+   (`invoices/exports/<id>.<csv|xlsx>`) → `GET /exports/{id}/download`; event `invoices.export_ready`. Permission mới
+   `invoices.export` (không theo nút, dữ liệu nhạy cảm); kỳ tối đa 366 ngày. Tool MCP `invoices.create_export`, `invoices.export`.
+2. Hồ sơ: `generic_journal` (mỗi dòng bút toán một hàng, cột Nợ / Có, tiền sổ, đối tượng, số chứng từ nguồn của `invoices`),
+   `vn_double_entry` (cặp TK Nợ / TK Có / Số tiền — ghép dần nợ với có, tổng các cặp = tổng bút toán), `generic_documents`.
+   Số hiệu tài khoản: `external_code` → ánh xạ `modules/ledger/data/vn-accounts.json` (TT 99/2025/TT-BTC, TT 133/2016/TT-BTC —
+   cần kế toán đối chiếu) → mục đích.
+3. **Phần mềm cụ thể**: mẫu nhập của MISA (SME / AMIS), Fast… được tải bên trong từng phần mềm, đổi theo phiên bản và không
+   công bố cột đầy đủ công khai; trợ giúp của MISA xác nhận có bước "ghép cột" khi nhập chứng từ nghiệp vụ khác. Vì vậy chưa
+   thêm hồ sơ riêng của hãng (chưa đối chiếu được — **cần kiểm** khi có mẫu thật); `vn_double_entry` là hình dạng để ghép cột.
+4. CSV tự viết (BOM UTF-8, RFC 4180, CRLF, chặn CSV injection như `forms`); XLSX bằng `rust_xlsxwriter` 0.102 (không feature).
+   Ô số của XLSX là số thực 64 bit theo định dạng Excel: ghi số chỉ khi |x| < 2^53 đơn vị nhỏ nhất (đúng tuyệt đối), lớn hơn
+   ghi chữ — ngoại lệ duy nhất của luật "không f64", chỉ ở định dạng file đầu ra, không tính toán.
+5. Dựng cả file trong bộ nhớ (XLSX buộc vậy); sổ đọc qua `dyn Ledger::journal` từng trang 500 dòng (index mới
+   `ledger_lines_journal_idx`). Kỳ quá lớn tốn RAM — đo khi có dữ liệu thật, cần thì chuyển CSV sang ghi theo luồng.
+
+## D-355 · Lưu trữ 10 năm: bản lưu trữ ngoài thư mục khách, dọn chứng từ hết hạn (bước 36 mục 7, phần còn lại) — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Kế toán 88/2015/QH13 Điều 41 (lưu chứng từ, sổ ≥ 10
+năm); NĐ 174/2016/NĐ-CP Điều 12 (tính từ khi kết thúc kỳ kế toán năm); Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 + NĐ 356/2025
+(giữ khi có nghĩa vụ pháp lý khác).
+
+1. Đã có trước: `retention_until` (31/12 năm lập + 10), chặn xoá (`invoices.retention_hold`), `Module::retained_tables` khi xoá
+   hẳn khách (D-337), khoá sổ theo kỳ (D-342). Thêm: `invoices_archives` cũng là bảng giữ lại.
+2. **Bản lưu trữ** (`Invoices::archive`, `POST|GET /invoices/archives`, permission mới `invoices.archive`): `ledger/journal.csv`,
+   `documents.jsonl`, `manifest.json` (SHA-256, cỡ, số dòng từng file; băm của manifest lưu ở dòng `invoices_archives`) ghi vào
+   nơi lưu CHUNG dưới `archives/<khách>/<id>/` — ngoài `tenants/<khách>/` mà xoá hẳn khách dọn. Khác đặc tả: `invoices_archives`
+   là bảng cấp khách (giữ khi xoá khách) thay vì bảng mặt điều khiển — dòng nằm cạnh chứng từ nó lưu, không cần bảng mặt điều
+   khiển có `tenant_id`; bỏ `accounts.csv` / `seals.csv` (sổ nhật ký đã mang số hiệu tài khoản; chuỗi băm còn nguyên trong
+   database giữ lại) và XML/PDF của nhà cung cấp (tải lại được từ nhà cung cấp).
+3. **Job `invoices.purge_expired`** (hằng ngày, mọi database; một lịch mới): (a) chứng từ quá `retention_until` → ẩn danh ảnh
+   chụp người mua cá nhân (chỉ còn `kind`), đánh dấu `buyer_purged_at`; người mua tổ chức giữ nguyên; (b) khách đã xoá hẳn →
+   tạo bản lưu trữ nếu chưa có (lỗi thì không xoá gì), rồi xoá chứng từ quá hạn và chứng từ nháp (điều kiện lặp lại trong chính
+   câu `DELETE`). Chứng từ còn hạn không bao giờ bị chạm.
+4. Sổ cái (`ledger_*`) của khách đã xoá **giữ nguyên** sau 10 năm: chuỗi băm không cắt được từng phần; xoá cả sổ khi mọi bút
+   toán quá hạn là việc sau (cần quyết thêm về chứng cứ chuỗi).
+5. `USER_DELETED` không áp cho chứng từ: chứng từ không mang ID người dùng (người mua là ảnh chụp tên / mã số thuế), nên không có
+   gì để xoá theo tài khoản; dữ liệu người mua cá nhân được ẩn danh khi hết hạn lưu như trên.
+
+## D-356 · Xác thực tài khoản đăng nội dung: số điện thoại bằng mã SMS một lần, mức định danh từ KYC, bộ hỏi `PostingVerifier` thật cho `comments` (bước 37 mục NĐ 147/2024) — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Nghị định 147/2024/NĐ-CP về quản lý, cung cấp, sử dụng
+dịch vụ Internet và thông tin trên mạng (hiệu lực 25/12/2024): tài khoản đăng thông tin (bình luận, livestream…) trên mạng xã
+hội phải xác thực bằng số điện thoại di động Việt Nam (hoặc định danh điện tử). Website bán hàng / hỏi đáp sản phẩm có thuộc
+phạm vi hay không chưa chắc, nên mọi thứ là cấu hình theo khách (D-202).
+
+1. **Mức xác thực** `VerificationLevel { None, Phone, Identity }` (`Identity` bao `Phone`). `Phone`: số di động đã xác nhận
+   bằng mã một lần. `Identity`: hồ sơ KYC của chính người dùng đang `verified` và chưa hết hạn — **đọc thẳng từ hồ sơ KYC**
+   mỗi lần hỏi, không chép `identity_verified_at` / `identity_profile_id` sang `compliance_account_verifications` như đặc tả
+   phác thảo: một nguồn sự thật, thu hồi hay hết hạn KYC có hiệu lực ngay, không cần đồng bộ.
+2. **Bảng** (migration mới `m0009_account_verification`, `m0010_create_throttle`, `m0011_tenancy_throttle`):
+   `compliance_account_verifications` (PK `tenant_id`,`user_id`; `phone_key` = SHA-256 của số, `''` khi chưa có) và
+   `compliance_phone_challenges` (mã lưu bằng SHA-256 của pepper riêng của khách — `SecretKey::derive_for(tenant,
+   "compliance.otp")` — cùng ID lượt và mã; thêm index (`tenant_id`,`phone`,`id`) cho bước khoá ở mục 4).
+3. **Gửi mã** (`POST /me/phone-verifications`): chuẩn hoá `PhoneNumber::parse(raw, "84")` → quy tắc
+   `posting.phone_countries` hiệu lực (thêm **phiên bản 2** của quy tắc, không sửa bản 1: `mobile.84` = 9 chữ số, đầu 3/5/7/8/9
+   — số cố định bị từ chối) → chưa có `dyn SmsSender` thì `sms_disabled` (503) → số đã xác thực cho đủ tài khoản thì
+   `compliance.phone_in_use` sớm → throttle theo số / giờ, tài khoản / ngày, IP / giờ (`compliance_throttle`, mã
+   `compliance.otp_throttled`) → lưu bản băm → **gửi SMS đồng bộ ngoài transaction, chờ tối đa 10 giây** (lỗi → xoá lượt, trả
+   lỗi của nhà cung cấp / `compliance.sms_timeout`). Theo đặc tả, **không** gửi qua job: bảng job đọc được qua API quản trị và
+   dead-letter queue, mã không được nằm ở đó. Tin viết tiếng Việt không dấu (SMS brandname tính tiền theo bảng mã; bản Unicode
+   đắt và dễ bị cắt) — câu cố định trong code, chưa qua i18n vì tin SMS chưa có hệ mẫu tin; làm khi có bộ nối SMS thật.
+4. **Xác nhận** (`POST /me/phone-verifications/{id}/confirm`): trong một transaction ghi, `rows::lock` **mọi lượt của cùng số**
+   theo ID (Postgres `FOR UPDATE`, SQLite vốn một bên ghi) — hai lần xác nhận cùng lượt, hay hai tài khoản cùng nhận một số khi
+   chỉ được một, nối đuôi nhau và bên sau đọc lại thấy kết quả bên trước. Rồi: hết hạn / đã dùng → `compliance.otp_invalid`;
+   quá `AUTOXIDE_COMPLIANCE_OTP_MAX_ATTEMPTS` → `compliance.otp_attempts_exceeded` (429); so băm hằng thời gian (sai → cộng lần
+   sai, commit); `posting.max_accounts_per_phone` (mặc định 1) → `compliance.phone_in_use`; `UPDATE … WHERE consumed_at IS NULL`
+   phải đổi đúng một dòng; ghi số đã xác thực + event `compliance.phone_verified` (chỉ `user_id`) cùng transaction.
+   `DELETE /me/phone` gỡ số (event `compliance.phone_removed`). Lượt cũ hơn 24 giờ xoá trong job hằng ngày
+   `compliance.kyc_expiry` (không thêm lịch `compliance.challenges_purge` riêng như đặc tả — cùng nhịp, đỡ một lịch).
+5. **Hợp đồng** `autoxide_compliance::api`: `AccountVerification { level, verified_phone }`, `PostingGate::check(tenant,
+   principal?, PostingSurface)` đọc chính sách `posting.comments|reviews|livestream` (mặc định `none`; khách vãng lai chỉ qua
+   khi `none`; thiếu mức → `compliance.verification_required`, 403).
+6. **Bộ hỏi của kernel cho `comments`** (D-202): `compliance` đăng ký `PostingVerifier`; "đã xác thực" = đạt
+   `max(posting.comments, phone)` — loại đích trong `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` vẫn cần ít nhất số điện thoại khi
+   khách để `none`. Kernel thêm `PostingVerifier::required_everywhere` (mặc định `false`, D-038) và `comments` hỏi nó: khách đặt
+   `posting.comments` khác `none` thì **mọi** loại đích của bình luận cần xác thực (đặc tả C2). Chưa cài `compliance` thì hành
+   vi như trước D-202.
+7. Cấu hình mới: `AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS` (300), `…_OTP_MAX_ATTEMPTS` (5), `…_OTP_PER_PHONE_PER_HOUR` (3),
+   `…_OTP_PER_USER_PER_DAY` (10), `…_OTP_PER_IP_PER_HOUR` (20, thêm so với đặc tả để chặn một máy tạo nhiều tài khoản xin mã).
+   Tool MCP `compliance.account_verification` (đọc mức của chính mình); gửi / nhập mã chỉ qua REST — việc tương tác của người
+   dùng, agent không có mã.
+8. **Chưa làm:** bộ nối nhà cung cấp SMS brandname thật (chỉ có `FakeSmsSender` của testkit; chủ dự án chọn nhà cung cấp,
+   cấp tài khoản và đăng ký brandname); nghe `auth.user_deleted` để xoá số của người đã xoá tài khoản và xuất số trong dữ liệu cá
+   nhân — làm cùng mục "Dữ liệu cá nhân" của bước 37.

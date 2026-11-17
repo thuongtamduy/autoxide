@@ -57,6 +57,33 @@ product, `verified_buyer` for someone who received it); show your own label for 
   verification (`comments.verification_required`, 403). With no such module installed, every
   signed-in account counts as verified.
 
+## Verified accounts (Vietnam, Decree 147/2024)
+
+The `compliance` module keeps account verification and answers the question for this module:
+
+- **Levels:** `none`, `phone` (a Vietnamese mobile number confirmed with a 6-digit code sent by SMS)
+  and `identity` (a verified identity profile, `GET /api/v1/compliance/me/kyc`; it includes `phone`).
+  A user sees their level with `GET /api/v1/compliance/me/verification` (MCP
+  `compliance.account_verification`).
+- **Verifying a phone:** `POST /api/v1/compliance/me/phone-verifications {"phone": "0912 345 678"}`
+  sends the code (landlines and foreign numbers get `compliance.phone_not_allowed`), then
+  `POST /api/v1/compliance/me/phone-verifications/{id}/confirm {"code": "123456"}`. A code works
+  once, expires (`AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, 5 minutes) and allows a few wrong tries
+  (`AUTOXIDE_COMPLIANCE_OTP_MAX_ATTEMPTS`); codes per number, account and address are limited. One
+  number verifies one account unless the tenant raises the `posting.max_accounts_per_phone` policy
+  (`compliance.phone_in_use`). `DELETE /api/v1/compliance/me/phone` removes the number. Sending
+  needs an SMS provider; without one the server answers `sms_disabled` (503). No real SMS
+  provider ships yet — install a connector module for yours.
+- **How the two settings combine:**
+  - Kinds in `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` need at least `phone`, or the level of the
+    tenant's `posting.comments` policy when that is higher (`identity`).
+  - When the tenant sets `posting.comments` to `phone` or `identity`
+    (`PUT /api/v1/compliance/policies/posting.comments`, permission `compliance.policies.manage`),
+    **every** kind needs that level, and guests can no longer comment anywhere.
+  - `posting.comments` = `none` (the default) leaves other kinds as they are.
+  - A refused post answers `comments.verification_required` (403); send the user to verify, then
+    post again.
+
 ## The website
 
 1. `GET /api/v1/comments/public/settings` — limits and switches (guests allowed, edit minutes,

@@ -35,6 +35,8 @@ pub(crate) struct LedgerService {
     pub payout_gateways: Vec<Arc<dyn autoxide_kernel::payment::PayoutGateway>>,
     /// Nguồn biến động số dư ngân hàng (`StartContext::contribute`).
     pub bank_feeds: Vec<Arc<dyn autoxide_kernel::payment::BankFeed>>,
+    /// Nguồn tỉ giá (`StartContext::contribute`, D-237).
+    pub rate_sources: Vec<Arc<dyn autoxide_kernel::payment::ExchangeRateSource>>,
     /// Engine thuế (module `tax`, đăng ký trước) cho khấu trừ thay; không có thì không khấu trừ được.
     pub tax: Option<Arc<dyn autoxide_tax::api::TaxEngine>>,
     pub jobs: autoxide_kernel::job::JobQueue,
@@ -286,6 +288,18 @@ impl LedgerService {
     async fn default_currency(&self, tenant: &TenantContext, org: OrgId) -> Currency {
         let code = self.setting(tenant, org, "organizations.currency").await;
         code.and_then(|code| Currency::parse(&code).ok()).unwrap_or(Currency::VND)
+    }
+
+    /// Tiền hạch toán của sổ của `org` (chưa mở: tiền mặc định của nút).
+    pub(crate) async fn book_currency(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+    ) -> Result<Currency, Error> {
+        match Self::find_book(tenant.database().read(), tenant, org).await? {
+            Some(book) => Currency::parse(&book.base_currency),
+            None => Ok(self.default_currency(tenant, org).await),
+        }
     }
 
     // ---- Sổ ------------------------------------------------------------------------------------

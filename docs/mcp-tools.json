@@ -1531,6 +1531,24 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Your account verification level for posting content (Vietnam, Decree 147/2024): `none`, `phone` (mobile number confirmed by SMS code) or `identity` (identity verified), with the verified number masked. Codes are sent and confirmed only through REST (`POST /api/v1/compliance/me/phone-verifications`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "compliance.account_verification",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the legal documents of the tenant (terms of use, privacy policy…) with their current version number.",
       "input_schema": {
         "additionalProperties": false,
@@ -3162,6 +3180,60 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask for an accounting export of a period (general journal or documents, CSV or XLSX) for the accountant's software; a background job makes the file.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An export to make.",
+        "properties": {
+          "format": {
+            "description": "`csv` or `xlsx`.",
+            "type": "string"
+          },
+          "from": {
+            "description": "First day, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Only this unit's book or documents; omit for the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "profile": {
+            "description": "`generic_journal`, `vn_double_entry` or `generic_documents`.",
+            "type": "string"
+          },
+          "to": {
+            "description": "Last day, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "format",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "invoices.create_export",
+      "output_schema": null,
+      "permissions": [
+        "invoices.export"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -3261,6 +3333,35 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "The status of an accounting export; once `ready`, download it from `GET /api/v1/invoices/exports/{id}/download`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which export.",
+        "properties": {
+          "export_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "export_id"
+        ],
+        "type": "object"
+      },
+      "name": "invoices.export",
+      "output_schema": null,
+      "permissions": [
+        "invoices.export"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -3285,6 +3386,42 @@
       "output_schema": null,
       "permissions": [
         "invoices.issue"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Print a document as HTML with its print template (the unit's, the tenant's or the built-in one) in `en` or `vi`. For a PDF use `GET /api/v1/invoices/documents/{id}/render?format=pdf`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which document to print.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` (default) or `vi`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "type": "object"
+      },
+      "name": "invoices.print",
+      "output_schema": null,
+      "permissions": [
+        "invoices.read"
       ]
     },
     {
@@ -4117,6 +4254,46 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "The exchange rate in force on a day for a currency pair (1 base = rate quote): the latest rate on or before that day, a rate entered by hand first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A currency pair and day.",
+        "properties": {
+          "base": {
+            "description": "e.g. `USD`.",
+            "type": "string"
+          },
+          "on": {
+            "description": "The day, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          },
+          "quote": {
+            "description": "e.g. `VND`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base",
+          "quote",
+          "on"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.exchange_rate",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "The money-flow mode in force for a unit (self collect, partner collect, split at the gateway), its partners, hold days and where cash on delivery goes.",
       "input_schema": {
         "additionalProperties": false,
@@ -4371,6 +4548,51 @@
       "output_schema": null,
       "permissions": [
         "ledger.post"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Record an exchange rate by hand for the whole tenant, used from its day until a later rate of the pair. Recorded rates are never changed.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An exchange rate to record.",
+        "properties": {
+          "base": {
+            "description": "e.g. `USD`.",
+            "type": "string"
+          },
+          "effective_date": {
+            "description": "First day the rate is used, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          },
+          "quote": {
+            "description": "e.g. `VND`.",
+            "type": "string"
+          },
+          "rate": {
+            "description": "Units of `quote` for one `base`, decimal string, e.g. `\"25345.5\"`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base",
+          "quote",
+          "rate",
+          "effective_date"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.record_exchange_rate",
+      "output_schema": null,
+      "permissions": [
+        "ledger.settings_manage"
       ]
     },
     {

@@ -99,6 +99,18 @@ uuid = { version = "1.29", features = ["serde", "v7"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
 # Số thập phân cho TÍNH tiền, thuế, tỉ giá (D-322); tiền LƯU vẫn là số nguyên `Money`.
 rust_decimal = { version = "1.43", default-features = false, features = ["std"] }
+# Bộ dựng mẫu cho mẫu do khách tự soạn (mẫu in, mail, thông báo — D-351): cú pháp Jinja, hộp cát,
+# giới hạn bước chạy (`fuel`). Bỏ feature mặc định: không `multi_template` (không include / extends /
+# loader → không đọc file), không `macros`; `debug` chỉ để lỗi cú pháp có cột (hàm `debug()` bị gỡ).
+minijinja = { version = "3.1.0", default-features = false, features = ["builtins", "debug", "serde", "fuel"] }
+# PDF của mẫu in chứng từ (D-353): thuần Rust, nhúng (tập con) font TrueType có dấu tiếng Việt. Không bật
+# feature nào: không ảnh raster, không `simple-text` (kéo `rustybuzz` / `ttf-parser` đã ngừng bảo trì) —
+# glyph dựng bằng `skrifa`.
+krilla = { version = "0.8.2", default-features = false }
+# Tra glyph và đo bề rộng chữ cho PDF (cùng phiên bản krilla đã kéo vào).
+skrifa = "0.42"
+# File Excel (.xlsx) của bản xuất kế toán (D-354). Không bật feature nào (không serde, không polars).
+rust_xlsxwriter = { version = "0.102.0", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["std"] }
 clap = { version = "4.6", features = ["derive", "env"] }
 # Trait có hàm `async` dùng được qua `dyn` (hợp đồng giữa các module). Rust chưa

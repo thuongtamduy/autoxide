@@ -21,6 +21,48 @@ endpoints are marked deprecated with a sunset date first.
   who asked and the last error (your own jobs, or every job with `kernel.jobs.read`), and `POST
   /api/v1/kernel/jobs/{id}/retry` (`kernel.jobs.manage`) runs a failed job again and records an audit event. The
   CSV export of form submissions is tracked.
+- Step 37, account verification for posting (Vietnam, Decree 147/2024 — check the original text): verification levels
+  `none` / `phone` / `identity` (identity = verified KYC profile). `GET /api/v1/compliance/me/verification`,
+  `POST /me/phone-verifications` (6-digit SMS code through `dyn SmsSender`; Vietnamese mobile numbers only, from the
+  new version 2 of the `posting.phone_countries` rule; limited per number, account and IP), `GET
+  /me/phone-verifications/{id}`, `POST /me/phone-verifications/{id}/confirm` (single use, expiry, attempt limit,
+  `posting.max_accounts_per_phone`), `DELETE /me/phone`; MCP `compliance.account_verification`; events
+  `compliance.phone_verified`, `compliance.phone_removed`; new contracts `AccountVerification` and `PostingGate`
+  (policies `posting.comments|reviews|livestream`). Error codes `compliance.verification_required`,
+  `compliance.otp_invalid`, `compliance.otp_attempts_exceeded`, `compliance.otp_throttled`,
+  `compliance.phone_not_allowed`, `compliance.phone_in_use`, `compliance.challenge_not_found`,
+  `compliance.sms_timeout`. Settings `AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, `…_OTP_MAX_ATTEMPTS`,
+  `…_OTP_PER_PHONE_PER_HOUR`, `…_OTP_PER_USER_PER_DAY`, `…_OTP_PER_IP_PER_HOUR`. `compliance` now registers the
+  kernel's `PostingVerifier`, so `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` checks real phone / identity verification,
+  and a tenant's `posting.comments` policy other than `none` makes every comment target need it (kernel:
+  `PostingVerifier::required_everywhere`, default `false`). No real SMS provider connector yet (test fake only).
+- Step 36 finished — exchange rates, printing, accounting exports, record keeping:
+  - Exchange rates with effective dates per currency pair in the ledger: `GET|POST /api/v1/ledger/exchange-rates`,
+    `GET /exchange-rates/effective?base=&quote=&on=`, `POST /exchange-rates/fetch` (new kernel trait
+    `ExchangeRateSource`, testkit `FakeExchangeRateSource`), MCP `ledger.exchange_rate`, `ledger.record_exchange_rate`.
+    Entries in a currency other than the book's are converted with the rate of their day (or the rate the caller
+    passes, `NewEntry::exchange_rate`) and keep it on every line; foreign-currency documents keep the rate of their
+    issue date (`exchange_rate`, `exchange_rate_id`, `base_total`; `invoices.rate_missing` without one).
+    `dyn Ledger` gains `exchange_rate`, `book_currency` and `journal`.
+  - Kernel template engine `autoxide_kernel::template` (`minijinja`, sandboxed: no files or other templates, limits
+    on size, steps and output, HTML-escaped values, no `safe` filter, variable check on save with every problem at
+    once — `template.syntax_error`, `template.unknown_variable`, `template.required_variable_missing`,
+    `template.limit_exceeded`); new setting `AUTOXIDE_TEMPLATE_MAX_BYTES`.
+  - Print templates per tenant, unit, document kind and language: `GET|POST /api/v1/invoices/templates`,
+    `GET|PUT|DELETE /templates/{id}`, `POST /templates/preview`, `GET /template-defaults`; print with
+    `GET /documents/{id}/render?format=html|pdf&locale=vi|en` (PDF in a fixed A4 layout with an embedded font for
+    Vietnamese), `Invoices::render` for other modules, MCP `invoices.print`. New permission `invoices.templates_manage`.
+  - Accounting exports of a period as CSV or XLSX (`generic_journal`, `vn_double_entry`, `generic_documents`):
+    `GET /export-profiles`, `GET|POST /exports`, `GET /exports/{id}`, `GET /exports/{id}/download`, job
+    `invoices.build_export`, event `invoices.export_ready`, MCP `invoices.create_export`, `invoices.export`, permission
+    `invoices.export`. Account numbers follow the Vietnamese chart of accounts (`modules/ledger/data/vn-accounts.json`,
+    to be checked by an accountant).
+  - Record keeping: `POST|GET /invoices/archives` (permission `invoices.archive`) writes the journal, every document
+    and a SHA-256 manifest outside the tenant's folder so it outlives tenant deletion; the daily job
+    `invoices.purge_expired` removes consumer buyers' personal data from documents past their retention date and, for
+    deleted tenants, deletes expired documents — never one still inside its retention period.
+  - Guide `docs/MONEY.md` (and `MONEY.vi.md`): ledger, payments, flow modes, VietQR, documents, exchange rates,
+    printing, exports, retention, writing partner connectors.
 - Summary figures (step 51): modules declare figures with a mandatory definition (`StartContext::summary_metric`);
   `GET /api/v1/kernel/summary?group=` returns those the caller may see, each with how it is computed in the
   caller's language. Figures: comments waiting, new submissions, entries waiting for a review, media items,

@@ -42,6 +42,8 @@ pub(crate) struct KernelModule {
     database: Option<crate::database::Database>,
     /// `AUTOXIDE_USER_FLAGS_MAX`; có sau `configure`.
     max_flags: u64,
+    /// Bộ dựng mẫu dùng chung (`AUTOXIDE_TEMPLATE_MAX_BYTES`, D-351); công bố lúc `start`.
+    templates: crate::template::TemplateEngine,
     /// Service cờ theo người dùng, dùng chung với `Modules::routes`; điền lúc `start`.
     flags: user_flags::Handle,
     /// Sổ cấu hình theo khách của mọi module (điền khi dựng `Modules`).
@@ -111,6 +113,7 @@ impl KernelModule {
             client_configs,
             database: None,
             max_flags: 500,
+            templates: crate::template::TemplateEngine::default(),
             flags,
             translations: crate::i18n::Translations::default(),
         }
@@ -247,6 +250,7 @@ impl Module for KernelModule {
         let previous = crate::secret::read_previous(reader);
         let public_url = crate::public_url::read_setting(reader);
         let max_flags = user_flags::read_setting(reader);
+        let template_bytes = crate::template::read_setting(reader);
         let export_days = reader.get_with(&crate::tenancy::exports::EXPORT_RETENTION_DAYS, |raw| {
             crate::config::parse_in_range(raw, 1i64, 365)
         });
@@ -256,6 +260,7 @@ impl Module for KernelModule {
         self.keys.set(secret?, previous?);
         self.public_url = public_url?;
         self.max_flags = max_flags?;
+        self.templates = crate::template::TemplateEngine::new(template_bytes?);
         self.export_days = export_days?;
         Ok(())
     }
@@ -509,6 +514,7 @@ impl Module for KernelModule {
         )));
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
+        context.provide::<crate::template::TemplateEngine>(Arc::new(self.templates.clone()))?;
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))
     }
 }

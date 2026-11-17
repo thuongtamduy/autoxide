@@ -566,3 +566,29 @@ pub(crate) mod bank_transaction {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod fx_rate {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_fx_rates")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// 1 `base` = `rate` `quote`.
+        pub base: String,
+        pub quote: String,
+        /// Chữ thập phân chuẩn hoá.
+        pub rate: String,
+        pub effective_date: Date,
+        /// `manual` hay `provider:<tên>`.
+        pub source: String,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
