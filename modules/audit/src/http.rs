@@ -108,6 +108,9 @@ pub(crate) struct AuditFilter {
     action: Option<String>,
     /// Only changes in this module, e.g. `auth`.
     module: Option<String>,
+    /// Only changes made by this kind of actor: `user`, `system` or `public` (see `actor_kind`).
+    #[param(example = "user")]
+    actor_kind: Option<String>,
     /// `actor`: add `actor_name`, the display name of who made each change, in the same answer.
     #[param(inline)]
     include: Option<AuditInclude>,
@@ -147,11 +150,22 @@ async fn list_entries(
 ) -> Result<Page<AuditEntryResponse>, Error> {
     principal.require(&AUDIT_READ)?;
     let with_actor = matches!(filter.include, Some(AuditInclude::Actor));
+    let actor_kind = filter.actor_kind.map(|kind| kind.trim().to_owned());
+    if let Some(kind) = &actor_kind
+        && !["user", "system", "public"].contains(&kind.as_str())
+    {
+        return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
+            "actor_kind",
+            "invalid",
+            "must be `user`, `system` or `public`",
+        )]));
+    }
     let filter = Filter {
         actor_user_id: filter.actor_user_id,
         subject: filter.subject,
         action: filter.action,
         module: filter.module,
+        actor_kind,
     };
     let page = service.list(&tenant, filter, &PageRequest::try_from(page)?).await?;
     if !with_actor {
@@ -265,6 +279,15 @@ mod tests {
             let (_, by_subject) = get(&app, "/api/v1/audit?subject=auth.user:2", "auditor").await;
             assert_eq!(by_subject["data"][0]["actor_user_id"], json!(bob));
             assert_eq!(by_subject["data"][0]["actor_kind"], "user");
+            let (_, users) = get(&app, "/api/v1/audit?actor_kind=user", "auditor").await;
+            assert_eq!(users["data"].as_array().unwrap().len(), 3);
+            let (_, system) = get(&app, "/api/v1/audit?actor_kind=system", "auditor").await;
+            assert_eq!(system["data"], json!([]));
+            let (status, bad) = get(&app, "/api/v1/audit?actor_kind=robot", "auditor").await;
+            assert_eq!(
+                (status, bad["errors"][0]["field"].as_str()),
+                (StatusCode::UNPROCESSABLE_ENTITY, Some("actor_kind"))
+            );
             let (_, paged) = get(&app, "/api/v1/audit?limit=2", "auditor").await;
             assert!(paged["pagination"]["next_cursor"].is_string());
 

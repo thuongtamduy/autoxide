@@ -3,7 +3,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
 use crate::entity::{self, Column, Entity};
@@ -15,6 +15,8 @@ pub(crate) struct Filter {
     pub subject: Option<String>,
     pub action: Option<String>,
     pub module: Option<String>,
+    /// `user`, `system` hay `public` (đã kiểm ở handler).
+    pub actor_kind: Option<String>,
 }
 
 // Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
@@ -69,6 +71,20 @@ impl AuditService {
         }
         if let Some(module) = filter.module {
             select = select.filter(Column::Module.eq(module));
+        }
+        if let Some(kind) = filter.actor_kind {
+            // Dòng ghi trước khi có cột `actor_kind` (NULL) hiểu theo `actor_user_id`, như khi trả về.
+            let legacy = match kind.as_str() {
+                "user" => Some(Column::ActorUserId.is_not_null()),
+                "system" => Some(Column::ActorUserId.is_null()),
+                _ => None,
+            };
+            let mut condition = Condition::any().add(Column::ActorKind.eq(kind));
+            if let Some(legacy) = legacy {
+                condition =
+                    condition.add(Condition::all().add(Column::ActorKind.is_null()).add(legacy));
+            }
+            select = select.filter(condition);
         }
         fetch_page(select.scoped(tenant), Column::Id, |row| row.id, page, tenant.database().read())
             .await

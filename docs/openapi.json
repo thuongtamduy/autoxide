@@ -36012,6 +36012,16 @@
             }
           },
           {
+            "description": "Only changes made by this kind of actor: `user`, `system` or `public` (see `actor_kind`).",
+            "example": "user",
+            "in": "query",
+            "name": "actor_kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "`actor`: add `actor_name`, the display name of who made each change, in the same answer.",
             "in": "query",
             "name": "include",
@@ -78323,6 +78333,21 @@
             "required": false,
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "description": "`created_at` (the default), `email` or `status`; the direction is `order`. Keep the same\n`sort` while following `next_cursor`.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "description": "How to sort subscribers; the direction is `order`.",
+              "enum": [
+                "created_at",
+                "email",
+                "status"
+              ],
+              "type": "string"
             }
           },
           {

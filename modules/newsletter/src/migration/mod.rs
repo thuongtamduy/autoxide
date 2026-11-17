@@ -3,6 +3,7 @@
 
 mod m0001_create_newsletter;
 mod m0009_delivery_unsubscribed;
+mod m0012_subscriber_sort;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -102,5 +103,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "newsletter"),
+        // Sắp người đăng ký theo email / trạng thái như nhau trên hai database (W-058 của giao diện).
+        Box::new(m0012_subscriber_sort::Migration),
     ]
 }
