@@ -303,6 +303,7 @@ impl Modules {
         }
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
         self.orgs.fill(apis.get::<dyn crate::tenancy::OrgNodes>());
+        self.catalog.history().fill(apis.get::<dyn crate::resource::RecordHistory>());
         self.entitlements.fill(apis.get::<dyn crate::entitlement::Entitlements>());
         self.entitlements.catalog().fill(apis.required(), counters);
         // Nơi lưu chung và bộ mở nơi lưu riêng của placement (module `files` công bố).
@@ -660,6 +661,10 @@ impl Modules {
             let me = crate::user_flags::routes(flags)
                 .merge(crate::ops::my_permissions::routes(mine))
                 .merge(crate::ops::views::routes(views))
+                .merge(crate::ops::can::routes(crate::ops::can::CanState {
+                    permissions: self.permissions.clone(),
+                    entitlements: self.entitlements.clone(),
+                }))
                 .merge(crate::ops::work_states::routes(crate::ops::work_states::WorkStatesState {
                     sources: self.catalog.work_sources(),
                     entitlements: self.entitlements.clone(),

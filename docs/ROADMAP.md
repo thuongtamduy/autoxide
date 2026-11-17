@@ -205,9 +205,10 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       mã (số đơn, mã vận đơn, ID) thành bản ghi người gọi được xem
 - [x] Số liệu tóm tắt (P4): `SummaryMetric` (tiền, số đếm, tỉ lệ) theo phạm vi nút, số nặng từ bảng dẫn xuất;
       `definition` (i18n key, mặc định `None`) trả đã dịch, gate kiểm mọi số liệu khai và có bản dịch (D-207)
-- [ ] Hoạt động (P5, P13): câu đọc được theo i18n key trên `EventInfo`, chỉ bản ghi người gọi đọc được ở nút
+- [x] Hoạt động (P5, P13): câu đọc được theo i18n key trên `EventInfo`, chỉ bản ghi người gọi đọc được ở nút
       của nó; dòng hoạt động và ghi chú nội bộ trên mọi bản ghi theo loại của sổ đối tượng (D-123), nhắc @
-      có thông báo; một chỗ dùng chung thay cho mỗi module tự làm ghi chú
+      có thông báo; một chỗ dùng chung thay cho mỗi module tự làm ghi chú — xong (17/11): `/kernel/records/{kind}/{id}/
+      notes|activity`; nhắc @ phát event `kernel.record_note_added` (module `notifications` đăng ký nhận để gửi)
 - [x] Schema bộ lọc mỗi danh sách công bố trong OpenAPI (máy, agent dựng chip lọc) và view đã lưu `/me/views`
       (P7): tham số, sắp xếp, cột, nhóm, mật độ; phạm vi cá nhân / nút / khách; bộ lọc nội dung `review`,
       `scheduled`, `ai_generated`, `missing_locale`, `missing_alt`
@@ -216,7 +217,10 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       quả từng bản ghi, tiến độ qua SSE; xuất danh sách theo bộ lọc thành CSV qua job
 - [ ] Giải thích quyền (P11): `POST /me/can` nhiều cặp (permission, nút), lý do `missing_permission` /
       `module_not_enabled` / `feature_not_in_plan` / `quota_exceeded` — giao diện hiện vì sao bị khoá, ai cấp
-      được, nâng gói mở gì
+      được, nâng gói mở gì — **một phần** (17/11): `POST /me/can` với `unknown_permission`, `module_not_enabled`
+      (`required_module`), `missing_permission`, cùng hàm kiểm với request thật. Còn: `feature_not_in_plan` /
+      `quota_exceeded` (permission chưa gắn tính năng, hạn mức), `upgrade_to` (sổ gói của `plans`), `grantors`
+      (cần bộ xác thực liệt kê người cấp được)
 - [ ] Agent là người dùng thật (P12): API key `agent`; `ActorKind` chung cho audit, nhật ký, event (D-224);
       lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) agent gọi trả `202 approval_required`, yêu cầu
       duyệt có hạn, đủ duyệt / từ chối / event / tool MCP, như nhau REST và MCP; việc chờ vào hộp việc

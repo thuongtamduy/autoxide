@@ -62,6 +62,68 @@
         ],
         "type": "string"
       },
+      "ActivityItem": {
+        "description": "One line of a record's activity: a note, or an event recorded about it.",
+        "properties": {
+          "action": {
+            "description": "With `event`: its name, e.g. `content.entry_published`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`note` or `event`.",
+            "example": "event",
+            "type": "string"
+          },
+          "mentions": {
+            "description": "With `note`: users it mentions.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "text": {
+            "description": "With `event`: what happened, in the language of `Accept-Language`, when the event has a\nreadable sentence; with `note`: the note.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "at"
+        ],
+        "type": "object"
+      },
       "ActivityResponse": {
         "description": "One line of recent activity.",
         "properties": {
@@ -1382,6 +1444,80 @@
           "cancelled"
         ],
         "type": "string"
+      },
+      "CanAnswer": {
+        "description": "The answer to one question.",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permission": {
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why not: `unknown_permission`, `module_not_enabled` (the tenant's plan does not include the\nmodule) or `missing_permission` (none of your roles grants it at this unit).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required_module": {
+            "description": "With `module_not_enabled`: the module the plan must include.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "permission",
+          "allowed"
+        ],
+        "type": "object"
+      },
+      "CanCheck": {
+        "description": "One question: may I use `permission` at `org_id`?",
+        "properties": {
+          "org_id": {
+            "description": "The organization unit; omitted: the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permission": {
+            "example": "content.publish",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permission"
+        ],
+        "type": "object"
+      },
+      "CanRequest": {
+        "description": "The questions.",
+        "properties": {
+          "checks": {
+            "description": "1 to 50 questions.",
+            "items": {
+              "$ref": "#/components/schemas/CanCheck"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "checks"
+        ],
+        "type": "object"
       },
       "CancelRequest": {
         "additionalProperties": false,
@@ -16000,6 +16136,51 @@
         ],
         "type": "object"
       },
+      "Data_RecordNote": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An internal note on a record.",
+            "properties": {
+              "author_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "mentions": {
+                "description": "Users the note mentions.",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "author_id",
+              "body",
+              "mentions",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_RecoveryCodesResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -18657,6 +18838,80 @@
         ],
         "type": "object"
       },
+      "Data_Vec_ActivityItem": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "One line of a record's activity: a note, or an event recorded about it.",
+              "properties": {
+                "action": {
+                  "description": "With `event`: its name, e.g. `content.entry_published`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actor_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actor_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`note` or `event`.",
+                  "example": "event",
+                  "type": "string"
+                },
+                "mentions": {
+                  "description": "With `note`: users it mentions.",
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "text": {
+                  "description": "With `event`: what happened, in the language of `Accept-Language`, when the event has a\nreadable sentence; with `note`: the note.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_ActivityResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -18874,6 +19129,55 @@
                 "status",
                 "due_at",
                 "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CanAnswer": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "The answer to one question.",
+              "properties": {
+                "allowed": {
+                  "type": "boolean"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "permission": {
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "Why not: `unknown_permission`, `module_not_enabled` (the tenant's plan does not include the\nmodule) or `missing_permission` (none of your roles grants it at this unit).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "required_module": {
+                  "description": "With `module_not_enabled`: the module the plan must include.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "permission",
+                "allowed"
               ],
               "type": "object"
             },
@@ -21072,6 +21376,54 @@
                 "opening_hours",
                 "special_days",
                 "pickup"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_RecordNote": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "An internal note on a record.",
+              "properties": {
+                "author_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "mentions": {
+                  "description": "Users the note mentions.",
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "id",
+                "author_id",
+                "body",
+                "mentions",
+                "created_at"
               ],
               "type": "object"
             },
@@ -29403,6 +29755,27 @@
           "send"
         ],
         "type": "string"
+      },
+      "NewRecordNote": {
+        "description": "A note to write.",
+        "properties": {
+          "body": {
+            "description": "1 to 5000 characters.",
+            "type": "string"
+          },
+          "mentions": {
+            "description": "Up to 20 users to notify; each must be able to read the record.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
       },
       "NewTenant": {
         "additionalProperties": false,
@@ -40749,6 +41122,42 @@
         },
         "required": [
           "expires_at"
+        ],
+        "type": "object"
+      },
+      "RecordNote": {
+        "description": "An internal note on a record.",
+        "properties": {
+          "author_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mentions": {
+            "description": "Users the note mentions.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "author_id",
+          "body",
+          "mentions",
+          "created_at"
         ],
         "type": "object"
       },
@@ -85287,6 +85696,442 @@
         ]
       }
     },
+    "/api/v1/kernel/records/{kind}/{id}/activity": {
+      "get": {
+        "description": "Requires being able to read the record. Its internal notes and the events recorded about it\n(when the program keeps an audit log), newest first.",
+        "operationId": "kernel_get_record_activity",
+        "parameters": [
+          {
+            "description": "Type of the record, e.g. `content.entry`.",
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the record.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "At most this many lines, 1 to 200. Defaults to 50.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ActivityItem"
+                }
+              }
+            },
+            "description": "The activity."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such record you may read; code `kernel.record_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`limit` is not between 1 and 200; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the activity of a record.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/records/{kind}/{id}/notes": {
+      "get": {
+        "description": "Requires being able to read the record (`<module>.read` of the module that owns `kind`). Newest\nfirst, at most 200.",
+        "operationId": "kernel_list_record_notes",
+        "parameters": [
+          {
+            "description": "Type of the record, e.g. `content.entry`.",
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the record.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_RecordNote"
+                }
+              }
+            },
+            "description": "The notes."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such record you may read; code `kernel.record_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the notes of a record.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      },
+      "post": {
+        "description": "Requires being able to read the record. An internal note, seen by everyone who can read the\nrecord; `mentions` notify users (each must be able to read the record), through the event\n`kernel.record_note_added`.",
+        "operationId": "kernel_create_record_note",
+        "parameters": [
+          {
+            "description": "Type of the record, e.g. `content.entry`.",
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the record.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewRecordNote"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RecordNote"
+                }
+              }
+            },
+            "description": "Written.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such record you may read; code `kernel.record_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Empty or too long, or a mentioned user cannot read the record; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Write a note on a record.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/records/{kind}/{id}/notes/{note_id}": {
+      "delete": {
+        "description": "Only the note's author, who must still be able to read the record.",
+        "operationId": "kernel_delete_record_note",
+        "parameters": [
+          {
+            "description": "Type of the record, e.g. `content.entry`.",
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the record.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the note.",
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such record you may read, or no note of yours with this id; code `kernel.record_not_found` or `kernel.note_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete your note on a record.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/kernel/resolve": {
       "get": {
         "description": "Any signed-in user. Asks the modules' code readers (order numbers, tracking numbers, invoice\nnumbers, page addresses…), among those the caller has permission for, and answers the first\nrecord found. No record and no permission answer the same 404, so a code never reveals that a\nrecord exists.",
@@ -93401,6 +94246,101 @@
           "ledger"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/me/can": {
+      "post": {
+        "description": "Any signed-in user. For each `{permission, org_id}` (up to 50), says whether you may use it\nthere and, when not, the reason — the same checks a real request makes, in the same order: the\nmodule must be in the tenant's plan, then one of your roles must grant the permission at that\nunit. Use it to show why a button is disabled instead of hiding it.",
+        "operationId": "me_check_my_permissions",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CanAnswer"
+                }
+              }
+            },
+            "description": "One answer per question, in order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No question or more than 50; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask what you may do, and why not.",
+        "tags": [
+          "me"
+        ],
+        "x-permissions": []
       }
     },
     "/api/v1/me/flags": {

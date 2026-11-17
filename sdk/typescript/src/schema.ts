@@ -25,6 +25,25 @@ export type AcceptedResponse = {
 /** What a schedule does: `publish` or `unpublish`. */
 export type Action = "publish" | "unpublish";
 
+/** One line of a record's activity: a note, or an event recorded about it. */
+export type ActivityItem = {
+  /** With `event`: its name, e.g. `content.entry_published`. */
+  action?: string | null;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  at: string;
+  id: string;
+  /** `note` or `event`. */
+  kind: string;
+  /** With `note`: users it mentions. */
+  mentions?: string[] | null;
+  /**
+   * With `event`: what happened, in the language of `Accept-Language`, when the event has a
+   * readable sentence; with `note`: the note.
+   */
+  text?: string | null;
+};
+
 /** One line of recent activity. */
 export type ActivityResponse = {
   /** The event, `<module>.<what_happened>`. */
@@ -510,6 +529,33 @@ export type CampaignResponse = {
 
 /** Where a campaign is. */
 export type CampaignStatus = "draft" | "scheduled" | "sending" | "paused" | "sent" | "cancelled";
+
+/** The answer to one question. */
+export type CanAnswer = {
+  allowed: boolean;
+  org_id?: string | null;
+  permission: string;
+  /**
+   * Why not: `unknown_permission`, `module_not_enabled` (the tenant's plan does not include the
+   * module) or `missing_permission` (none of your roles grants it at this unit).
+   */
+  reason?: string | null;
+  /** With `module_not_enabled`: the module the plan must include. */
+  required_module?: string | null;
+};
+
+/** One question: may I use `permission` at `org_id`? */
+export type CanCheck = {
+  /** The organization unit; omitted: the whole tenant. */
+  org_id?: string | null;
+  permission: string;
+};
+
+/** The questions. */
+export type CanRequest = {
+  /** 1 to 50 questions. */
+  checks: CanCheck[];
+};
 
 /** Cancel your tenant's subscription. */
 export type CancelRequest = {
@@ -5429,6 +5475,19 @@ export type Data_ReauthResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_RecordNote = {
+  /** An internal note on a record. */
+  data: {
+    author_id: string;
+    body: string;
+    created_at: string;
+    id: string;
+    /** Users the note mentions. */
+    mentions: string[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RecoveryCodesResponse = {
   /** One-time recovery codes. Shown only once. */
   data: {
@@ -6354,6 +6413,27 @@ export type Data_Value = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_ActivityItem = {
+  data: {
+    /** With `event`: its name, e.g. `content.entry_published`. */
+    action?: string | null;
+    actor_id?: string | null;
+    actor_name?: string | null;
+    at: string;
+    id: string;
+    /** `note` or `event`. */
+    kind: string;
+    /** With `note`: users it mentions. */
+    mentions?: string[] | null;
+    /**
+     * With `event`: what happened, in the language of `Accept-Language`, when the event has a
+     * readable sentence; with `note`: the note.
+     */
+    text?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ActivityResponse = {
   data: {
     /** The event, `<module>.<what_happened>`. */
@@ -6417,6 +6497,22 @@ export type Data_Vec_BillingPeriodResponse = {
     /** `open`, `paid` or `void`. */
     status: string;
     tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CanAnswer = {
+  data: {
+    allowed: boolean;
+    org_id?: string | null;
+    permission: string;
+    /**
+     * Why not: `unknown_permission`, `module_not_enabled` (the tenant's plan does not include the
+     * module) or `missing_permission` (none of your roles grants it at this unit).
+     */
+    reason?: string | null;
+    /** With `module_not_enabled`: the module the plan must include. */
+    required_module?: string | null;
   }[];
 };
 
@@ -7110,6 +7206,18 @@ export type Data_Vec_PublicProfileResponse = {
     unit_type: string;
     /** `null` until the profile is first saved. */
     updated_at?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_RecordNote = {
+  data: {
+    author_id: string;
+    body: string;
+    created_at: string;
+    id: string;
+    /** Users the note mentions. */
+    mentions: string[];
   }[];
 };
 
@@ -9895,6 +10003,14 @@ export type NewExport = {
 
 /** What happens when a post is published (by the `content` module). */
 export type NewPosts = "off" | "draft" | "send";
+
+/** A note to write. */
+export type NewRecordNote = {
+  /** 1 to 5000 characters. */
+  body: string;
+  /** Up to 20 users to notify; each must be able to read the record. */
+  mentions?: string[];
+};
 
 /** A new tenant. */
 export type NewTenant = {
@@ -13522,6 +13638,16 @@ export type ReauthResponse = {
    * `null` with `email_link`: the token is in the mail.
    */
   reauth_token?: string | null;
+};
+
+/** An internal note on a record. */
+export type RecordNote = {
+  author_id: string;
+  body: string;
+  created_at: string;
+  id: string;
+  /** Users the note mentions. */
+  mentions: string[];
 };
 
 /** One-time recovery codes. Shown only once. */
@@ -20035,6 +20161,55 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/records/{kind}/{id}/activity": {
+    /** Get the activity of a record. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number }; };
+      responses: {
+        200: Data_Vec_ActivityItem;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/records/{kind}/{id}/notes": {
+    /** List the notes of a record. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; };
+      responses: {
+        200: Data_Vec_RecordNote;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Write a note on a record. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; id: string }; };
+      requestBody: NewRecordNote;
+      responses: {
+        201: Data_RecordNote;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/records/{kind}/{id}/notes/{note_id}": {
+    /** Delete your note on a record. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; id: string; note_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/resolve": {
     /** Open a record by its code. */
     get: {
@@ -20918,6 +21093,19 @@ export interface paths {
         200: Data_LedgerWebhookReceipt;
         401: Problem;
         413: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/can": {
+    /** Ask what you may do, and why not. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CanRequest;
+      responses: {
+        200: Data_Vec_CanAnswer;
+        401: Problem;
         422: Problem;
         default: Problem;
       };
