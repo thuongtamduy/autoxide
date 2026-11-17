@@ -66,6 +66,21 @@ struct ContentModule {
 }
 
 impl Module for ContentModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default()
+            .group(NavGroup::new("content", "Content", "file", 50))
+            .item(
+                NavItem::new("content.entries", "content", "Posts and pages", 10)
+                    .permissions(&[crate::permissions::CONTENT_READ])
+                    .counter("content.review"),
+            )
+            .item(
+                NavItem::new("content.structure", "content", "Categories and redirects", 20)
+                    .permissions(&[crate::permissions::CONTENT_READ]),
+            )
+    }
+
     fn name(&self) -> &'static str {
         "content"
     }

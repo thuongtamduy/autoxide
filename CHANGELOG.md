@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Navigation for admin interfaces (step 51): `GET /api/v1/kernel/navigation?org_id=` and MCP `kernel.navigation`
+  return the groups and screens modules declare (`Module::navigation`), filtered by the modules on for the tenant,
+  the caller's permissions at the unit and the plan (`locked` screens need a feature the plan lacks), with labels
+  in the caller's language and an `ETag`. Every module declares its screens; platform groups only show to
+  platform staff.
+
 - Entries embed records of other modules (step 51): a body node `embed` with `kind` and `id` (e.g. a product) is
   checked when saved (the type must be registered, the record must exist); public reads return `embeds` keyed
   by `<kind>:<id>` with the title, summary, path and image of each record that is still public.

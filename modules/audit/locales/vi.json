@@ -1,5 +1,7 @@
 {
   "audit.entry_not_found": "Không có dòng audit `{id}`.",
   "field:must be `user`, `system` or `public`": "phải là `user`, `system` hoặc `public`",
-  "text:Read the audit log: who changed what, when, before and after. The before and after values hold the data of every module (draft content, private media details, user names and emails), so this amounts to reading everything.": "Xem nhật ký audit: ai đổi gì, lúc nào, trước và sau. Giá trị trước và sau chứa dữ liệu của mọi module (bản nháp, thông tin media riêng tư, tên và email người dùng), nên có quyền này là đọc được mọi thứ."
+  "text:Audit log": "Nhật ký audit",
+  "text:Read the audit log: who changed what, when, before and after. The before and after values hold the data of every module (draft content, private media details, user names and emails), so this amounts to reading everything.": "Xem nhật ký audit: ai đổi gì, lúc nào, trước và sau. Giá trị trước và sau chứa dữ liệu của mọi module (bản nháp, thông tin media riêng tư, tên và email người dùng), nên có quyền này là đọc được mọi thứ.",
+  "text:Settings": "Cài đặt"
 }

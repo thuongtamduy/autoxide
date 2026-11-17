@@ -171,6 +171,10 @@ pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
     found.extend(call_arguments(text, "EventInfo::new(", 1));
     // Câu kết quả kiểm SEO của `content` (câu mẫu, D-264).
     found.extend(call_arguments(text, "Finding::new(", 3));
+    // Nhãn của sổ điều hướng (bước 51 P1): nhóm, mục, nhóm con trong hàng tab.
+    found.extend(call_arguments(text, "NavGroup::new(", 1));
+    found.extend(call_arguments(text, "NavItem::new(", 2));
+    found.extend(call_arguments(text, ".section(", 0));
     found.retain(
         |(_, site)| !matches!(site, FieldMessage::Built(expression) if expression.starts_with('$')),
     );

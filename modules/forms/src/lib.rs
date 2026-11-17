@@ -61,6 +61,15 @@ struct FormsModule {
 }
 
 impl Module for FormsModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("marketing", "Marketing", "megaphone", 40)).item(
+            NavItem::new("marketing.forms", "marketing", "Forms", 20)
+                .permissions(&[crate::permissions::FORMS_READ, crate::permissions::FORMS_EXPORT])
+                .counter("forms.new_submissions"),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "forms"
     }

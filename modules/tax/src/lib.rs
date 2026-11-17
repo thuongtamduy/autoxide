@@ -56,6 +56,14 @@ impl JobHandler for ImportBundled {
 }
 
 impl Module for TaxModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("finance", "Finance", "wallet", 80)).item(
+            NavItem::new("finance.tax", "finance", "Tax", 30)
+                .permissions(&[crate::permissions::READ]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "tax"
     }

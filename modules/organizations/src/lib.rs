@@ -48,6 +48,16 @@ struct OrganizationsModule {
 }
 
 impl Module for OrganizationsModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default()
+            .group(NavGroup::new("organization", "Organization", "sitemap", 90))
+            .item(
+                NavItem::new("organization.tree", "organization", "Organization tree", 10)
+                    .permissions(&[crate::permissions::UNITS_READ]),
+            )
+    }
+
     fn name(&self) -> &'static str {
         "organizations"
     }

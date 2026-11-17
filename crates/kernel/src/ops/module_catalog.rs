@@ -56,6 +56,8 @@ pub(crate) struct ModuleCatalog {
     /// Bước kiểm (`autoxide doctor`) của mọi module, kèm tên module: cảnh báo vận hành
     /// (`GET /kernel/ops/alerts`) chạy lại chúng.
     checks: Arc<OnceLock<Vec<(&'static str, crate::doctor::Check)>>>,
+    /// Sổ điều hướng đã gom (bước 51 P1).
+    navigation: Arc<OnceLock<crate::module::navigation::NavigationCatalog>>,
 }
 
 /// Một module trong sổ: phần khai báo (không đổi lúc chạy) và migrator riêng của nó để đọc
@@ -100,6 +102,15 @@ impl ModuleCatalog {
             .flat_map(|module| module.checks().into_iter().map(|check| (module.name(), check)))
             .collect();
         let _ = self.checks.set(checks);
+    }
+
+    pub(crate) fn fill_navigation(&self, navigation: crate::module::navigation::NavigationCatalog) {
+        let _ = self.navigation.set(navigation);
+    }
+
+    /// Sổ điều hướng (rỗng trước khi mọi module khởi động).
+    pub(crate) fn navigation(&self) -> Option<&crate::module::navigation::NavigationCatalog> {
+        self.navigation.get()
     }
 
     /// Bước kiểm của mọi module (rỗng trước khi mọi module khởi động).

@@ -3744,6 +3744,34 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get the screens of the admin interface you may use in this tenant, grouped as in the side bar: `locked` screens need a feature the plan lacks. Use it to tell a person where to go.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Where the caller works.",
+        "properties": {
+          "org_id": {
+            "description": "The organization unit chosen; omitted: the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.navigation",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false

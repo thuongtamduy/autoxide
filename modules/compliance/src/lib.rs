@@ -64,6 +64,18 @@ impl JobHandler for RulesRefreshJob {
 }
 
 impl Module for ComplianceModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("compliance", "Compliance", "shield", 100)).item(
+            NavItem::new("compliance.overview", "compliance", "Compliance", 10).permissions(&[
+                crate::permissions::KYC_READ,
+                crate::permissions::DOCUMENTS_READ,
+                crate::permissions::PRIVACY_READ,
+                crate::permissions::RULES_READ,
+            ]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "compliance"
     }

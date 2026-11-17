@@ -62,6 +62,14 @@ impl JobHandler for SealEntries {
 }
 
 impl Module for LedgerModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("finance", "Finance", "wallet", 80)).item(
+            NavItem::new("finance.ledger", "finance", "Ledger", 10)
+                .permissions(&[crate::permissions::READ]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "ledger"
     }

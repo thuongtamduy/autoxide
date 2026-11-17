@@ -152,6 +152,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
 | `kernel.migrate_placements` | `kernel.tenants.operate` | writes |
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
+| `kernel.navigation` | — | read-only |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
 | `ledger.balance` | `ledger.read` | read-only |
