@@ -7,8 +7,8 @@
 //! - `POST /api/v1/me/work/{key}/assign {user_id}` (`null` bỏ giao) — người nhận phải có permission
 //!   của nguồn việc (hỏi bộ xác thực, `Authenticator::principal_of`).
 //!
-//! Không có "Đã xử lý": việc tự hết khi dữ liệu không còn khớp (D-212). Dòng hết hạn hoãn và không
-//! còn giao dọn bằng job hằng ngày.
+//! Không có "Đã xử lý": việc tự hết khi dữ liệu không còn khớp (D-212). Dòng hoãn đã hết hạn của
+//! khách được dọn mỗi lần có người hoãn việc (không cần job riêng).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -29,15 +29,12 @@ use crate::access::{Authenticator, Principal};
 use crate::entitlement::EntitlementsHandle;
 use crate::error::{Error, FieldError};
 use crate::http::ValidJson;
-use crate::job::{JobContext, JobHandler};
 use crate::migration::prelude::*;
 use crate::ops::work::WorkSources;
 use crate::response::{Data, Problem};
 use crate::tenancy::TenantContext;
 
 const TABLE: &str = "kernel_work_states";
-/// Loại job dọn trạng thái việc đã hết (hằng ngày, mỗi database dữ liệu).
-pub(crate) const CLEAN_WORK_STATES: &str = "kernel.clean_work_states";
 /// Hoãn tối đa chừng này ngày.
 const MAX_SNOOZE_DAYS: i64 = 365;
 
@@ -253,6 +250,13 @@ async fn snooze_work(
             "must be in the future, at most a year away",
         )]));
     }
+    let expired = SqlQuery::delete()
+        .from_table(Alias::new(TABLE))
+        .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
+        .and_where(Expr::col(Alias::new("snoozed_until")).lte(now))
+        .and_where(Expr::col(Alias::new("assignee_id")).is_null())
+        .to_owned();
+    tenant.database().write().execute(&expired).await?;
     upsert(
         tenant.database().write(),
         &tenant,
@@ -355,31 +359,6 @@ pub(crate) fn routes(state: WorkStatesState) -> OpenApiRouter {
         .with_state(Arc::new(state))
 }
 
-/// Bộ chạy job dọn dòng hoãn đã hết (dòng giao giữ tới khi bỏ giao hay việc hết và người dùng bỏ).
-pub(crate) struct CleanRunner;
-
-#[async_trait::async_trait]
-impl JobHandler for CleanRunner {
-    async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        let delete = SqlQuery::delete()
-            .from_table(Alias::new(TABLE))
-            .and_where(Expr::col(Alias::new("snoozed_until")).lte(now()))
-            .and_where(Expr::col(Alias::new("assignee_id")).is_null())
-            .to_owned();
-        job.database.write().execute(&delete).await?;
-        Ok(())
-    }
-}
-
-/// Lịch dọn hằng ngày, ở mọi database dữ liệu.
-pub(crate) fn schedule() -> crate::job::Schedule {
-    crate::job::Schedule::new(
-        CLEAN_WORK_STATES,
-        CLEAN_WORK_STATES,
-        std::time::Duration::from_secs(86_400),
-    )
-}
-
 /// Migration tạo bảng `kernel_work_states` (cấp khách hàng, mọi database dữ liệu).
 pub(crate) struct CreateWorkStates;
 
@@ -418,12 +397,13 @@ impl MigrationTrait for CreateWorkStates {
                     .to_owned(),
             )
             .await?;
-        // Job dọn quét cả database theo hạn hoãn.
+        // Dọn dòng hoãn hết hạn của một khách.
         manager
             .create_index(
                 Index::create()
-                    .name("kernel_work_states_snooze_sweep_idx")
+                    .name("kernel_work_states_snooze_idx")
                     .table(Alias::new(TABLE))
+                    .col(Alias::new("tenant_id"))
                     .col(Alias::new("snoozed_until"))
                     .to_owned(),
             )

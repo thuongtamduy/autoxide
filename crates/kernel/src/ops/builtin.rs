@@ -463,10 +463,6 @@ impl Module for KernelModule {
                 }),
             ));
             jobs.push(crate::job::JobRegistration::new(
-                crate::ops::work_states::CLEAN_WORK_STATES,
-                Arc::new(crate::ops::work_states::CleanRunner),
-            ));
-            jobs.push(crate::job::JobRegistration::new(
                 crate::ops::bulk::BULK,
                 Arc::new(crate::ops::bulk::BulkRunner { actions: self.catalog.bulk_actions() }),
             ));
@@ -514,9 +510,6 @@ impl Module for KernelModule {
         };
         if self.live_exports().is_some() {
             schedules.push(crate::tenancy::exports::schedule());
-        }
-        if self.registry.is_some() {
-            schedules.push(crate::ops::work_states::schedule());
         }
         if self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some()) {
             schedules.push(crate::ops::list_exports::schedule());
