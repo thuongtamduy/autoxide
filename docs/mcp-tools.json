@@ -2891,6 +2891,254 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Write a draft document; taxes are computed from the tax categories. A draft has no number until it is issued.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A draft to write.",
+        "properties": {
+          "buyer_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "buyer_email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "buyer_kind": {
+            "description": "`consumer` (default) or `business`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "buyer_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "buyer_tax_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "description": "e.g. `VND`.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "e.g. `vat_invoice`, `sales_invoice`, `retail_receipt`.",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "additionalProperties": false,
+              "description": "One line of a draft.",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "description": "Decimal string, default `\"1\"`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tax_category": {
+                  "description": "Tax category, required on sales documents, e.g. `vat.standard`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit_price": {
+                  "description": "Decimal string in the document currency, e.g. `\"150000\"`.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "description",
+                "unit_price"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The unit; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of the draft: the same reference and content returns the same draft.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "currency",
+          "lines",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "name": "invoices.create_draft",
+      "output_schema": null,
+      "permissions": [
+        "invoices.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "An accounting document with its lines, status, number and e-invoice codes.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which document.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "type": "object"
+      },
+      "name": "invoices.document",
+      "output_schema": null,
+      "permissions": [
+        "invoices.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List accounting documents (invoices, receipts, notes) in your scope with their lines.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which documents.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of documents, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only documents written by this unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_module": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "invoices.documents",
+      "output_schema": null,
+      "permissions": [
+        "invoices.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Issue a draft: gives it the next number of its series (no gaps), books the sale and sends the e-invoice. Issuing again returns the same number.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which document.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "type": "object"
+      },
+      "name": "invoices.issue",
+      "output_schema": null,
+      "permissions": [
+        "invoices.issue"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Add a domain (e.g. `shop.example`) to the current tenant. Returns it `pending` with the DNS TXT record to set; then call `kernel.verify_domain`. Adding a domain the tenant already has returns it unchanged.",
       "input_schema": {
         "additionalProperties": false,

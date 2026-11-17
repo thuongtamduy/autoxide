@@ -2137,6 +2137,95 @@ export type Data_InvitationResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_InvoicesDocument = {
+  /** An accounting document (invoice, receipt, note…). */
+  data: {
+    authority_code?: string | null;
+    buyer: InvoicesBuyer;
+    created_at: string;
+    currency: string;
+    /** For an adjustment: `increase` or `decrease`. */
+    direction: string;
+    /** E-invoice: provider, its reference and number, tax authority code, lookup code. */
+    einvoice_provider?: string | null;
+    id: string;
+    issue_date?: string | null;
+    issued_at?: string | null;
+    kind: string;
+    lines: InvoicesLine[];
+    lookup_code?: string | null;
+    /** Number in the series; `null` while a draft. */
+    number?: number | null;
+    /** The seller the document is written for, under a mandate. */
+    on_behalf_of_org_id?: string | null;
+    /** The unit that writes the document. */
+    org_id: string;
+    prices_include_tax: boolean;
+    provider_number?: number | null;
+    provider_ref?: string | null;
+    reference: string;
+    rejection_reason?: string | null;
+    related_document_id?: string | null;
+    /** `adjustment` or `replacement` of `related_document_id`. */
+    relation?: string | null;
+    /** Kept at least until this day (Accounting Law 88/2015, Article 41). */
+    retention_until?: string | null;
+    /** Copy of the seller taken at issue (legal name, tax code, address). */
+    seller: Record<string, unknown>;
+    series_id?: string | null;
+    source_id?: string | null;
+    source_module: string;
+    /** `draft`, `issued`, `submitting`, `accepted`, `rejected`, `cancelled`, `replaced` or `adjusted`. */
+    status: string;
+    subtotal: Money;
+    /** Series symbol, e.g. `1C26TAA`. */
+    symbol?: string | null;
+    tax: Money;
+    total: Money;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InvoicesMandate = {
+  /** A mandate to issue invoices on behalf of a seller. */
+  data: {
+    /** The unit that issues for the seller (e.g. the marketplace). */
+    agent_org_id: string;
+    created_at: string;
+    /** The signed mandate (file in the `files` module). */
+    document_file_id?: string | null;
+    id: string;
+    kinds: string[];
+    /** The seller who gives the mandate. */
+    principal_org_id: string;
+    revoked_at?: string | null;
+    /** `active` or `revoked`. */
+    status: string;
+    valid_from: string;
+    valid_to?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InvoicesSeries = {
+  /** A document series (symbol) of a unit. */
+  data: {
+    created_at: string;
+    /** E-invoice provider; `null`: internal documents only. */
+    einvoice_provider?: string | null;
+    id: string;
+    kind: string;
+    org_id: string;
+    /** `active` or `inactive`. */
+    status: string;
+    symbol: string;
+    updated_at: string;
+    year: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LedgerAccountResponse = {
   /** A ledger account: one purpose, for one counterparty, in one currency, in one book. */
   data: {
@@ -5389,6 +5478,228 @@ export type InvitationResponse = {
   status: string;
 };
 
+/** An adjustment to write. */
+export type InvoicesAdjustRequest = {
+  buyer?: InvoicesBuyer | null;
+  /** `increase` or `decrease` of the amounts. */
+  direction: string;
+  /** Lines of the difference. */
+  lines: InvoicesLineInput[];
+  reference: string;
+};
+
+/** The buyer printed on a document (a copy taken when the document is written). */
+export type InvoicesBuyer = {
+  /** One line, up to 400 characters. */
+  address?: string | null;
+  email?: string | null;
+  /** `consumer` or `business`. */
+  kind?: string;
+  /** Up to 200 characters. */
+  name?: string | null;
+  /** 10 or 13 digits (`0101234567-001`), or a 12-digit personal id used as tax code. */
+  tax_code?: string | null;
+};
+
+/** Why the document is cancelled. */
+export type InvoicesCancelRequest = {
+  /** 1 to 500 characters. */
+  reason: string;
+};
+
+/** An accounting document (invoice, receipt, note…). */
+export type InvoicesDocument = {
+  authority_code?: string | null;
+  buyer: InvoicesBuyer;
+  created_at: string;
+  currency: string;
+  /** For an adjustment: `increase` or `decrease`. */
+  direction: string;
+  /** E-invoice: provider, its reference and number, tax authority code, lookup code. */
+  einvoice_provider?: string | null;
+  id: string;
+  issue_date?: string | null;
+  issued_at?: string | null;
+  kind: string;
+  lines: InvoicesLine[];
+  lookup_code?: string | null;
+  /** Number in the series; `null` while a draft. */
+  number?: number | null;
+  /** The seller the document is written for, under a mandate. */
+  on_behalf_of_org_id?: string | null;
+  /** The unit that writes the document. */
+  org_id: string;
+  prices_include_tax: boolean;
+  provider_number?: number | null;
+  provider_ref?: string | null;
+  reference: string;
+  rejection_reason?: string | null;
+  related_document_id?: string | null;
+  /** `adjustment` or `replacement` of `related_document_id`. */
+  relation?: string | null;
+  /** Kept at least until this day (Accounting Law 88/2015, Article 41). */
+  retention_until?: string | null;
+  /** Copy of the seller taken at issue (legal name, tax code, address). */
+  seller: Record<string, unknown>;
+  series_id?: string | null;
+  source_id?: string | null;
+  source_module: string;
+  /** `draft`, `issued`, `submitting`, `accepted`, `rejected`, `cancelled`, `replaced` or `adjusted`. */
+  status: string;
+  subtotal: Money;
+  /** Series symbol, e.g. `1C26TAA`. */
+  symbol?: string | null;
+  tax: Money;
+  total: Money;
+  updated_at: string;
+};
+
+/** Changes to a draft. Omitted fields stay; a rejected e-invoice may only change `buyer`. */
+export type InvoicesDocumentChange = {
+  buyer?: InvoicesBuyer | null;
+  issue_date?: string | null;
+  /** Replaces every line. */
+  lines?: InvoicesLineInput[] | null;
+  prices_include_tax?: boolean | null;
+  series_id?: string | null;
+};
+
+/** A draft document to write. */
+export type InvoicesDocumentRequest = {
+  buyer?: InvoicesBuyer;
+  currency: string;
+  /** Planned issue day; default the day it is issued. */
+  issue_date?: string | null;
+  /**
+   * `vat_invoice`, `sales_invoice`, `cash_register_invoice`, `retail_receipt`, `delivery_note`,
+   * `goods_receipt`, `cash_receipt`, `cash_payment` or `withholding_certificate`.
+   */
+  kind: string;
+  lines: InvoicesLineInput[];
+  /** The seller it is written for, under a mandate (`POST /mandates`). */
+  on_behalf_of_org_id?: string | null;
+  /** The unit that writes it; default the tenant's root. */
+  org_id?: string | null;
+  /** Line prices include taxes; default `false`. */
+  prices_include_tax?: boolean;
+  /** Your id of this document: sending it again returns the same draft. */
+  reference: string;
+  /** Series; default the only active series of the unit for this kind and year. */
+  series_id?: string | null;
+  /** Id of your source document (order…). */
+  source_id?: string | null;
+};
+
+/** One line of a document. */
+export type InvoicesLine = {
+  description: string;
+  discount: Money;
+  item_ref?: string | null;
+  kind: string;
+  line_no: number;
+  /** Amount before taxes. */
+  net: Money;
+  quantity: string;
+  /** VAT rate applied, e.g. `"8"`; `null` when not taxed. */
+  rate_percent?: string | null;
+  tax: Money;
+  tax_category?: string | null;
+  total: Money;
+  unit?: string | null;
+  unit_price: Money;
+};
+
+/** One line of a document to write. */
+export type InvoicesLineInput = {
+  /** 1 to 500 characters. */
+  description: string;
+  discount?: Money | null;
+  /** Your id of the item (product code…). */
+  item_ref?: string | null;
+  /** `goods`, `service` or `note` (text only, no amount). */
+  kind?: string;
+  quantity?: DecimalString | null;
+  /** Tax category (`GET /api/v1/tax/categories`), required on sales documents. */
+  tax_category?: string | null;
+  /** Unit, e.g. `pcs`, `month`. */
+  unit?: string | null;
+  unit_price?: Money | null;
+};
+
+/** A mandate to issue invoices on behalf of a seller. */
+export type InvoicesMandate = {
+  /** The unit that issues for the seller (e.g. the marketplace). */
+  agent_org_id: string;
+  created_at: string;
+  /** The signed mandate (file in the `files` module). */
+  document_file_id?: string | null;
+  id: string;
+  kinds: string[];
+  /** The seller who gives the mandate. */
+  principal_org_id: string;
+  revoked_at?: string | null;
+  /** `active` or `revoked`. */
+  status: string;
+  valid_from: string;
+  valid_to?: string | null;
+};
+
+/** A mandate to record. */
+export type InvoicesMandateRequest = {
+  /** The unit receiving it. */
+  agent_org_id: string;
+  document_file_id?: string | null;
+  /** Kinds of invoice, e.g. `["vat_invoice"]`. */
+  kinds: string[];
+  /** The seller giving the mandate. */
+  principal_org_id: string;
+  valid_from: string;
+  valid_to?: string | null;
+};
+
+/** A replacement to write. */
+export type InvoicesReplaceRequest = {
+  buyer?: InvoicesBuyer | null;
+  /** Every line of the new document. */
+  lines: InvoicesLineInput[];
+  reference: string;
+};
+
+/** A document series (symbol) of a unit. */
+export type InvoicesSeries = {
+  created_at: string;
+  /** E-invoice provider; `null`: internal documents only. */
+  einvoice_provider?: string | null;
+  id: string;
+  kind: string;
+  org_id: string;
+  /** `active` or `inactive`. */
+  status: string;
+  symbol: string;
+  updated_at: string;
+  year: number;
+};
+
+/** A change of series status. */
+export type InvoicesSeriesChange = {
+  /** `active` or `inactive`. */
+  status: string;
+};
+
+/** A series to create. */
+export type InvoicesSeriesRequest = {
+  /** E-invoice provider set up on this server; omit for internal documents. */
+  einvoice_provider?: string | null;
+  /** Document kind, e.g. `vat_invoice`. */
+  kind: string;
+  /** The unit; default the tenant's root. */
+  org_id?: string | null;
+  /** Symbol registered with the tax authority, 1 to 16 letters and digits. */
+  symbol: string;
+  /** Year the numbers run in. */
+  year: number;
+};
+
 /** What an entry is. */
 export type Kind = "post" | "page";
 
@@ -7119,6 +7430,98 @@ export type Page_InvitationResponse = {
      * accepted; resend it.
      */
     status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InvoicesDocument = {
+  /** The items of this page, in the requested order. */
+  data: {
+    authority_code?: string | null;
+    buyer: InvoicesBuyer;
+    created_at: string;
+    currency: string;
+    /** For an adjustment: `increase` or `decrease`. */
+    direction: string;
+    /** E-invoice: provider, its reference and number, tax authority code, lookup code. */
+    einvoice_provider?: string | null;
+    id: string;
+    issue_date?: string | null;
+    issued_at?: string | null;
+    kind: string;
+    lines: InvoicesLine[];
+    lookup_code?: string | null;
+    /** Number in the series; `null` while a draft. */
+    number?: number | null;
+    /** The seller the document is written for, under a mandate. */
+    on_behalf_of_org_id?: string | null;
+    /** The unit that writes the document. */
+    org_id: string;
+    prices_include_tax: boolean;
+    provider_number?: number | null;
+    provider_ref?: string | null;
+    reference: string;
+    rejection_reason?: string | null;
+    related_document_id?: string | null;
+    /** `adjustment` or `replacement` of `related_document_id`. */
+    relation?: string | null;
+    /** Kept at least until this day (Accounting Law 88/2015, Article 41). */
+    retention_until?: string | null;
+    /** Copy of the seller taken at issue (legal name, tax code, address). */
+    seller: Record<string, unknown>;
+    series_id?: string | null;
+    source_id?: string | null;
+    source_module: string;
+    /** `draft`, `issued`, `submitting`, `accepted`, `rejected`, `cancelled`, `replaced` or `adjusted`. */
+    status: string;
+    subtotal: Money;
+    /** Series symbol, e.g. `1C26TAA`. */
+    symbol?: string | null;
+    tax: Money;
+    total: Money;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InvoicesMandate = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The unit that issues for the seller (e.g. the marketplace). */
+    agent_org_id: string;
+    created_at: string;
+    /** The signed mandate (file in the `files` module). */
+    document_file_id?: string | null;
+    id: string;
+    kinds: string[];
+    /** The seller who gives the mandate. */
+    principal_org_id: string;
+    revoked_at?: string | null;
+    /** `active` or `revoked`. */
+    status: string;
+    valid_from: string;
+    valid_to?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InvoicesSeries = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** E-invoice provider; `null`: internal documents only. */
+    einvoice_provider?: string | null;
+    id: string;
+    kind: string;
+    org_id: string;
+    /** `active` or `inactive`. */
+    status: string;
+    symbol: string;
+    updated_at: string;
+    year: number;
   }[];
   pagination: Pagination;
 };
@@ -13574,6 +13977,231 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/documents": {
+    /** List documents in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; kind?: string; status?: string; source_module?: string; source_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Write a draft document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InvoicesDocumentRequest;
+      responses: {
+        200: Data_InvoicesDocument;
+        201: Data_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/documents/{id}": {
+    /** Get a document with its lines. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a draft. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InvoicesDocumentChange;
+      responses: {
+        200: Data_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a draft. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/documents/{id}/adjust": {
+    /** Write an adjustment of an issued document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InvoicesAdjustRequest;
+      responses: {
+        200: Data_InvoicesDocument;
+        201: Data_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/documents/{id}/cancel": {
+    /** Cancel an issued document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InvoicesCancelRequest;
+      responses: {
+        200: Data_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/documents/{id}/einvoice": {
+    /** Download the e-invoice file from the provider. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { format?: string }; };
+      responses: {
+        200: Blob;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/documents/{id}/issue": {
+    /** Issue a document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/documents/{id}/replace": {
+    /** Write a replacement of an issued document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InvoicesReplaceRequest;
+      responses: {
+        200: Data_InvoicesDocument;
+        201: Data_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/mandates": {
+    /** List the mandates of sellers in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_InvoicesMandate;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Record a mandate to issue invoices on behalf of a seller. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InvoicesMandateRequest;
+      responses: {
+        201: Data_InvoicesMandate;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/mandates/{id}/revoke": {
+    /** Revoke a mandate. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvoicesMandate;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/series": {
+    /** List the series in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_InvoicesSeries;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a series. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InvoicesSeriesRequest;
+      responses: {
+        201: Data_InvoicesSeries;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/series/{id}": {
+    /** Retire or reuse a series. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InvoicesSeriesChange;
+      responses: {
+        200: Data_InvoicesSeries;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
