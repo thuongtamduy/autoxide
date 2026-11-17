@@ -8244,3 +8244,37 @@ Bước 36 mục 3 (ROADMAP mục "Engine thuế").
    48/2024/QH15; nghị quyết giảm 2% GTGT tới 31/12/2026; Luật Thuế TTĐB 66/2025/QH15 (nhóm mẫu); NĐ 117/2025/NĐ-CP
    (khấu trừ thay của sàn); NĐ 123/2020/NĐ-CP sửa bởi NĐ 70/2025/NĐ-CP (máy tính tiền, ngưỡng 1 tỷ đ/năm).
 
+
+## D-342 · Module `ledger` lõi — sổ cái kép, khoá sổ, chuỗi băm — 2026-11-17 — agent quyết
+
+Bước 36 mục 4 (ROADMAP mục "Module `ledger`", nửa "khoá sổ" của mục lưu trữ).
+
+1. **Bảng** (cấp khách, giữ khi xoá hẳn khách — `Module::retained_tables`, Luật Kế toán 88/2015 Điều 41):
+   `ledger_books` (một sổ mỗi nút), `ledger_accounts` (khoá tự nhiên: sổ, mục đích, đối tượng, loại tiền; đối tượng
+   không có thì chuỗi rỗng để unique chạy như nhau trên hai database), `ledger_account_balances`, `ledger_entries`,
+   `ledger_lines`, `ledger_periods`, `ledger_period_balances`, `ledger_chain_heads`, `ledger_entry_seals`. Foreign key
+   chỉ trong module. Thêm so với đặc tả: `org_id` chép vào tài khoản và bút toán (lọc theo phạm vi nút không cần join),
+   `closed_through` trên sổ; bỏ `updated_at` của bảng số dư (đổi bằng `rows::adjust`, không cập nhật cột khác).
+2. **Khoá khi ghi**: bút toán giữ **khoá chia sẻ trên dòng sổ** (`rows::lock_one_shared`), khoá kỳ giữ **khoá độc
+   quyền trên dòng sổ** — thay cho khoá dòng kỳ của đặc tả, vì kỳ là tháng tạo khi có bút toán đầu tiên: khoá dòng kỳ
+   không chặn được bút toán vào một tháng "hở" (chưa có dòng kỳ) nằm trước kỳ vừa khoá. Sổ giữ `closed_through` (ngày
+   cuối kỳ khoá gần nhất): bút toán mang ngày ≤ đó → `ledger.period_closed`. Thứ tự: dòng cây tổ chức (kiểm
+   `require_write_at`, chỉ đường REST / MCP) → sổ (chia sẻ) → kỳ → mở tài khoản theo thứ tự khoá → số dư theo
+   `account_id` tăng dần (`rows::adjust` với sàn của tài khoản).
+3. **Chỉ thêm**: không `UPDATE` / `DELETE` trên bút toán và dòng; sửa bằng bút toán đảo (unique
+   `(tenant_id, reverses_entry_id)`, đảo hai lần → `ledger.already_reversed`). `reference` duy nhất theo
+   `(tenant_id, source_module)` qua `reference::submit_once`.
+4. **Kỳ** là tháng dương lịch; khoá kỳ cần kỳ trước đã khoá (`ledger.period_order`) và kỳ đã hết theo múi giờ của nút
+   (`ledger.period_not_ended`); ghi ảnh chụp số dư cuối kỳ; không mở lại. Số dư tại ngày = ảnh chụp kỳ khoá gần nhất +
+   tổng dòng sau đó, tổng bằng `CAST(SUM(…) AS BIGINT)`.
+5. **Chuỗi băm** `ledger-v1` (job `ledger.seal_entries` mỗi 10 giây trên mọi database): băm bút toán + dòng, không băm
+   `tenant_id`; doctor `ledger.chain` báo bút toán / dấu đầu tiên bị sửa, xoá, và bút toán chưa niêm phong quá 10 phút;
+   doctor `ledger.balances` so bảng số dư với tổng dòng.
+6. **Ngoại tệ** chưa có ở mục này: bút toán khác tiền hạch toán của sổ → `ledger.exchange_rate_missing` cho tới khi có
+   tỉ giá (mục 9). Tiền hạch toán mặc định và "hôm nay" lấy từ cài đặt `organizations.currency` /
+   `organizations.timezone` của nút qua `dyn OrgDirectory` (không có thì VND, UTC).
+7. Mục đích ngoài bộ cơ bản (`<module>.<tên>`) phải mở bằng `Ledger::open_account` / `POST /accounts` kèm bên thường;
+   ghi theo khoá chỉ tự mở được mục đích cơ bản.
+8. Job niêm phong tìm bút toán chưa niêm phong bằng `NOT IN (SELECT entry_id FROM ledger_entry_seals)` — quét cả
+   bảng bút toán mỗi 10 giây. Chưa đo là chậm nên giữ cách đơn giản; bài đo `POST /ledger/entries` của mục 13 đo cả
+   job này, chậm thì thêm mốc (`sealed_through` trên đầu chuỗi) thay vì quét hết.

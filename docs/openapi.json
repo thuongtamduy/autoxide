@@ -5813,6 +5813,404 @@
         ],
         "type": "object"
       },
+      "Data_LedgerAccountResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A ledger account: one purpose, for one counterparty, in one currency, in one book.",
+            "properties": {
+              "balance": {
+                "$ref": "#/components/schemas/Money",
+                "description": "Current balance on the normal side (entries dated in the future included)."
+              },
+              "book_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "counterparty": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/LedgerCounterparty"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "currency": {
+                "example": "VND",
+                "type": "string"
+              },
+              "external_code": {
+                "description": "Account number in the accounting software; `null`: from the mapping of the book.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "floor": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money",
+                    "description": "The balance may not go below this; `null`: no limit."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "normal_side": {
+                "$ref": "#/components/schemas/LedgerSide",
+                "description": "The side that increases the balance."
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "purpose": {
+                "description": "E.g. `revenue.sales`, `payable.seller_held`, or `<module>.<name>`.",
+                "example": "revenue.sales",
+                "type": "string"
+              },
+              "status": {
+                "description": "`active` or `closed` (takes no new entries).",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "book_id",
+              "org_id",
+              "purpose",
+              "currency",
+              "normal_side",
+              "status",
+              "balance",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerBalanceResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The balance of an account.",
+            "properties": {
+              "account_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "as_of": {
+                "description": "The day asked for; `null`: now.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "balance": {
+                "$ref": "#/components/schemas/Money",
+                "description": "Balance on the normal side of the account."
+              }
+            },
+            "required": [
+              "account_id",
+              "balance"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerBookResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A book: the ledger of one organization unit (an accounting entity).",
+            "properties": {
+              "base_currency": {
+                "description": "Accounting currency of the book.",
+                "example": "VND",
+                "type": "string"
+              },
+              "closed_through": {
+                "description": "Last day of the latest closed period: no entry may be dated on or before it.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "fiscal_year_start_month": {
+                "description": "First month of the fiscal year, 1 to 12.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The unit that keeps the book.",
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "base_currency",
+              "fiscal_year_start_month",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerEntry": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A ledger entry.",
+            "properties": {
+              "actor_user_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "book_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "effective_date": {
+                "description": "Accounting day, `YYYY-MM-DD`.",
+                "format": "date",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lines": {
+                "items": {
+                  "$ref": "#/components/schemas/LedgerEntryLine"
+                },
+                "type": "array"
+              },
+              "org_id": {
+                "description": "The unit the book belongs to.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "period_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "posted_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "reversed_by_entry_id": {
+                "description": "The entry that reverses this one, if any.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reverses_entry_id": {
+                "description": "The entry this one reverses.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_kind": {
+                "type": "string"
+              },
+              "source_module": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "book_id",
+              "org_id",
+              "period_id",
+              "effective_date",
+              "posted_at",
+              "description",
+              "source_module",
+              "source_kind",
+              "reference",
+              "lines"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerPeriodResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An accounting period (a calendar month).",
+            "properties": {
+              "book_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "closed_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "closed_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ends_on": {
+                "format": "date",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "starts_on": {
+                "format": "date",
+                "type": "string"
+              },
+              "status": {
+                "description": "`open` or `closed`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "book_id",
+              "starts_on",
+              "ends_on",
+              "status"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_LedgerTrialBalanceResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A trial balance.",
+            "properties": {
+              "accounts": {
+                "items": {
+                  "$ref": "#/components/schemas/LedgerTrialBalanceRow"
+                },
+                "type": "array"
+              },
+              "book_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "from": {
+                "format": "date",
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "to": {
+                "format": "date",
+                "type": "string"
+              },
+              "totals": {
+                "items": {
+                  "$ref": "#/components/schemas/LedgerTrialBalanceTotal"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "book_id",
+              "org_id",
+              "from",
+              "to",
+              "accounts",
+              "totals"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_LibrarySummaryResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -14729,6 +15127,780 @@
         ],
         "type": "object"
       },
+      "LedgerAccountChange": {
+        "additionalProperties": false,
+        "description": "Changes to an account. Omitted fields stay; `null` clears.",
+        "properties": {
+          "external_code": {
+            "description": "Account number in the accounting software, up to 32 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "floor": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Must not be above the current balance; `null` removes the limit."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`active` or `closed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "LedgerAccountLine": {
+        "description": "One line on an account.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "base_amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "effective_date": {
+            "format": "date",
+            "type": "string"
+          },
+          "entry_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "exchange_rate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "line_no": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "side": {
+            "$ref": "#/components/schemas/LedgerSide"
+          }
+        },
+        "required": [
+          "id",
+          "entry_id",
+          "line_no",
+          "side",
+          "amount",
+          "base_amount",
+          "effective_date"
+        ],
+        "type": "object"
+      },
+      "LedgerAccountRequest": {
+        "additionalProperties": false,
+        "description": "An account to open.",
+        "properties": {
+          "counterparty_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "counterparty_kind": {
+            "description": "Kind of counterparty, with `counterparty_id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "example": "VND",
+            "type": "string"
+          },
+          "floor": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Lowest balance allowed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "description": "Up to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "normal_side": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LedgerSide",
+                "description": "Required for a purpose outside the basic set."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "org_id": {
+            "description": "The unit of the book; default the tenant's root. The book is opened if missing.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purpose": {
+            "description": "A basic purpose (`cash.bank`, `revenue.sales`…) or `<module>.<name>`.",
+            "example": "cash.bank",
+            "type": "string"
+          }
+        },
+        "required": [
+          "purpose",
+          "currency"
+        ],
+        "type": "object"
+      },
+      "LedgerAccountResponse": {
+        "description": "A ledger account: one purpose, for one counterparty, in one currency, in one book.",
+        "properties": {
+          "balance": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Current balance on the normal side (entries dated in the future included)."
+          },
+          "book_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "counterparty": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LedgerCounterparty"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currency": {
+            "example": "VND",
+            "type": "string"
+          },
+          "external_code": {
+            "description": "Account number in the accounting software; `null`: from the mapping of the book.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "floor": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "The balance may not go below this; `null`: no limit."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "normal_side": {
+            "$ref": "#/components/schemas/LedgerSide",
+            "description": "The side that increases the balance."
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "purpose": {
+            "description": "E.g. `revenue.sales`, `payable.seller_held`, or `<module>.<name>`.",
+            "example": "revenue.sales",
+            "type": "string"
+          },
+          "status": {
+            "description": "`active` or `closed` (takes no new entries).",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "book_id",
+          "org_id",
+          "purpose",
+          "currency",
+          "normal_side",
+          "status",
+          "balance",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "LedgerBalanceResponse": {
+        "description": "The balance of an account.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "as_of": {
+            "description": "The day asked for; `null`: now.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Balance on the normal side of the account."
+          }
+        },
+        "required": [
+          "account_id",
+          "balance"
+        ],
+        "type": "object"
+      },
+      "LedgerBookRequest": {
+        "additionalProperties": false,
+        "description": "A book to open.",
+        "properties": {
+          "base_currency": {
+            "description": "Accounting currency; default the unit's setting `organizations.currency`, else `VND`.",
+            "example": "VND",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fiscal_year_start_month": {
+            "description": "First month of the fiscal year, 1 to 12; default 1.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The unit; default the tenant's root unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "LedgerBookResponse": {
+        "description": "A book: the ledger of one organization unit (an accounting entity).",
+        "properties": {
+          "base_currency": {
+            "description": "Accounting currency of the book.",
+            "example": "VND",
+            "type": "string"
+          },
+          "closed_through": {
+            "description": "Last day of the latest closed period: no entry may be dated on or before it.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fiscal_year_start_month": {
+            "description": "First month of the fiscal year, 1 to 12.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit that keeps the book.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "base_currency",
+          "fiscal_year_start_month",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "LedgerCounterparty": {
+        "description": "The other party an account is kept for (a seller, a customer, a carrier…).",
+        "properties": {
+          "id": {
+            "description": "Id of the party in its own module.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`org`, `customer`, `carrier`, `partner`, or `<module>.<kind>`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object"
+      },
+      "LedgerEntry": {
+        "description": "A ledger entry.",
+        "properties": {
+          "actor_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "book_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "effective_date": {
+            "description": "Accounting day, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryLine"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The unit the book belongs to.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "period_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "posted_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "reversed_by_entry_id": {
+            "description": "The entry that reverses this one, if any.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reverses_entry_id": {
+            "description": "The entry this one reverses.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_kind": {
+            "type": "string"
+          },
+          "source_module": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "book_id",
+          "org_id",
+          "period_id",
+          "effective_date",
+          "posted_at",
+          "description",
+          "source_module",
+          "source_kind",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "LedgerEntryLine": {
+        "description": "One line of an entry.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "base_amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "The amount in the book currency."
+          },
+          "exchange_rate": {
+            "description": "Rate used to convert to the book currency; `null` when the same currency.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "line_no": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "side": {
+            "$ref": "#/components/schemas/LedgerSide"
+          }
+        },
+        "required": [
+          "line_no",
+          "account_id",
+          "side",
+          "amount",
+          "base_amount"
+        ],
+        "type": "object"
+      },
+      "LedgerEntryRequest": {
+        "additionalProperties": false,
+        "description": "A manual entry to post.",
+        "properties": {
+          "description": {
+            "description": "Fixed text, 1 to 200 characters. It is kept for good in the hash chain: no names, emails or\nphone numbers.",
+            "example": "Opening balance",
+            "type": "string"
+          },
+          "effective_date": {
+            "description": "Accounting day; default today in the unit's time zone. Must be in an open period.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "description": "Two or more lines; debits must equal credits.",
+            "items": {
+              "$ref": "#/components/schemas/LedgerLineRequest"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "Unit of the book; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this entry (1 to 100 visible ASCII characters): sending it again returns the\nentry already posted.",
+            "example": "JE-2026-0001",
+            "type": "string"
+          },
+          "source_id": {
+            "description": "Id of the source document.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_kind": {
+            "description": "Kind of source document, e.g. `manual`, `opening`; default `manual`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "description",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "LedgerLineRequest": {
+        "additionalProperties": false,
+        "description": "One line of a manual entry.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Greater than zero; every line in the same currency as its account."
+          },
+          "side": {
+            "$ref": "#/components/schemas/LedgerSide"
+          }
+        },
+        "required": [
+          "account_id",
+          "side",
+          "amount"
+        ],
+        "type": "object"
+      },
+      "LedgerPeriodResponse": {
+        "description": "An accounting period (a calendar month).",
+        "properties": {
+          "book_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "closed_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closed_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ends_on": {
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "starts_on": {
+            "format": "date",
+            "type": "string"
+          },
+          "status": {
+            "description": "`open` or `closed`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "book_id",
+          "starts_on",
+          "ends_on",
+          "status"
+        ],
+        "type": "object"
+      },
+      "LedgerReversalRequest": {
+        "additionalProperties": false,
+        "description": "A reversal.",
+        "properties": {
+          "effective_date": {
+            "description": "Accounting day of the reversal; default today in the unit's time zone (an open period).",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of the reversal: sending it again returns the reversal already posted.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference"
+        ],
+        "type": "object"
+      },
+      "LedgerSide": {
+        "description": "Debit or credit.",
+        "enum": [
+          "debit",
+          "credit"
+        ],
+        "type": "string"
+      },
+      "LedgerTrialBalanceResponse": {
+        "description": "A trial balance.",
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerTrialBalanceRow"
+            },
+            "type": "array"
+          },
+          "book_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "type": "string"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerTrialBalanceTotal"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "book_id",
+          "org_id",
+          "from",
+          "to",
+          "accounts",
+          "totals"
+        ],
+        "type": "object"
+      },
+      "LedgerTrialBalanceRow": {
+        "description": "One account in a trial balance.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "closing": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Balance at the end of `to`."
+          },
+          "counterparty": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LedgerCounterparty"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "credit": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Credits dated in the range."
+          },
+          "debit": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Debits dated in the range."
+          },
+          "external_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "normal_side": {
+            "$ref": "#/components/schemas/LedgerSide"
+          },
+          "opening": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Balance at the end of the day before `from`."
+          },
+          "purpose": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "purpose",
+          "normal_side",
+          "opening",
+          "debit",
+          "credit",
+          "closing"
+        ],
+        "type": "object"
+      },
+      "LedgerTrialBalanceTotal": {
+        "description": "Debits and credits in one currency: always equal.",
+        "properties": {
+          "credit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "debit": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "currency",
+          "debit",
+          "credit"
+        ],
+        "type": "object"
+      },
       "LibrarySummaryResponse": {
         "description": "Totals of the media library.",
         "properties": {
@@ -18415,6 +19587,413 @@
                 "status",
                 "expires_at",
                 "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_LedgerAccountLine": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "One line on an account.",
+              "properties": {
+                "amount": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "base_amount": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "effective_date": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "entry_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "exchange_rate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "line_no": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "side": {
+                  "$ref": "#/components/schemas/LedgerSide"
+                }
+              },
+              "required": [
+                "id",
+                "entry_id",
+                "line_no",
+                "side",
+                "amount",
+                "base_amount",
+                "effective_date"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_LedgerAccountResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A ledger account: one purpose, for one counterparty, in one currency, in one book.",
+              "properties": {
+                "balance": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "Current balance on the normal side (entries dated in the future included)."
+                },
+                "book_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "counterparty": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LedgerCounterparty"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "currency": {
+                  "example": "VND",
+                  "type": "string"
+                },
+                "external_code": {
+                  "description": "Account number in the accounting software; `null`: from the mapping of the book.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "floor": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money",
+                      "description": "The balance may not go below this; `null`: no limit."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "normal_side": {
+                  "$ref": "#/components/schemas/LedgerSide",
+                  "description": "The side that increases the balance."
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "purpose": {
+                  "description": "E.g. `revenue.sales`, `payable.seller_held`, or `<module>.<name>`.",
+                  "example": "revenue.sales",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`active` or `closed` (takes no new entries).",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "book_id",
+                "org_id",
+                "purpose",
+                "currency",
+                "normal_side",
+                "status",
+                "balance",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_LedgerBookResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A book: the ledger of one organization unit (an accounting entity).",
+              "properties": {
+                "base_currency": {
+                  "description": "Accounting currency of the book.",
+                  "example": "VND",
+                  "type": "string"
+                },
+                "closed_through": {
+                  "description": "Last day of the latest closed period: no entry may be dated on or before it.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "fiscal_year_start_month": {
+                  "description": "First month of the fiscal year, 1 to 12.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The unit that keeps the book.",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "base_currency",
+                "fiscal_year_start_month",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_LedgerEntry": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A ledger entry.",
+              "properties": {
+                "actor_user_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "book_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "effective_date": {
+                  "description": "Accounting day, `YYYY-MM-DD`.",
+                  "format": "date",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "$ref": "#/components/schemas/LedgerEntryLine"
+                  },
+                  "type": "array"
+                },
+                "org_id": {
+                  "description": "The unit the book belongs to.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "period_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "posted_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "reversed_by_entry_id": {
+                  "description": "The entry that reverses this one, if any.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reverses_entry_id": {
+                  "description": "The entry this one reverses.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source_kind": {
+                  "type": "string"
+                },
+                "source_module": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "book_id",
+                "org_id",
+                "period_id",
+                "effective_date",
+                "posted_at",
+                "description",
+                "source_module",
+                "source_kind",
+                "reference",
+                "lines"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_LedgerPeriodResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "An accounting period (a calendar month).",
+              "properties": {
+                "book_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "closed_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "closed_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ends_on": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "starts_on": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`open` or `closed`.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "book_id",
+                "starts_on",
+                "ends_on",
+                "status"
               ],
               "type": "object"
             },
@@ -55503,6 +57082,2047 @@
         ],
         "x-permissions": [
           "kernel.tenants.manage"
+        ]
+      }
+    },
+    "/api/v1/ledger/accounts": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit.",
+        "operationId": "ledger_list_ledger_accounts",
+        "parameters": [
+          {
+            "description": "The book (required).",
+            "in": "query",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this purpose.",
+            "in": "query",
+            "name": "purpose",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this kind of counterparty (`org`, `customer`…).",
+            "in": "query",
+            "name": "counterparty_kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this counterparty.",
+            "in": "query",
+            "name": "counterparty_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerAccountResponse"
+                }
+              }
+            },
+            "description": "One page of accounts with their balances."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such book in your scope; code `ledger.book_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the accounts of a book.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `ledger.accounts_manage` on the unit. The same purpose, counterparty and currency\nagain gives back the existing account (`200`).",
+        "operationId": "ledger_open_ledger_account",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerAccountResponse"
+                }
+              }
+            },
+            "description": "The account existed already."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerAccountResponse"
+                }
+              }
+            },
+            "description": "The new account.",
+            "headers": {
+              "Location": {
+                "description": "Path of the new account.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.accounts_manage` (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (e.g. `normal_side` missing for a module purpose); every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open an account.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.accounts_manage"
+        ]
+      }
+    },
+    "/api/v1/ledger/accounts/{id}": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit.",
+        "operationId": "ledger_get_ledger_account",
+        "parameters": [
+          {
+            "description": "Id of the account.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerAccountResponse"
+                }
+              }
+            },
+            "description": "The account."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such account in your scope; code `ledger.account_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an account with its balance.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `ledger.accounts_manage` on the book's unit. Purpose, counterparty and currency never\nchange.",
+        "operationId": "ledger_update_ledger_account",
+        "parameters": [
+          {
+            "description": "Id of the account.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerAccountChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerAccountResponse"
+                }
+              }
+            },
+            "description": "The account after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.accounts_manage` (`permission_denied`) or the unit is frozen (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such account in your scope; code `ledger.account_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (e.g. the floor is above the balance); every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change an account: name, floor, external code, status.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.accounts_manage"
+        ]
+      }
+    },
+    "/api/v1/ledger/accounts/{id}/balance": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit.",
+        "operationId": "ledger_get_ledger_account_balance",
+        "parameters": [
+          {
+            "description": "Id of the account.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "End of this day, `YYYY-MM-DD`; omit for the current balance.",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerBalanceResponse"
+                }
+              }
+            },
+            "description": "The balance."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such account in your scope; code `ledger.account_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`as_of` is not a date; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the balance of an account, now or at the end of a day.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      }
+    },
+    "/api/v1/ledger/accounts/{id}/lines": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit.",
+        "operationId": "ledger_list_ledger_account_lines",
+        "parameters": [
+          {
+            "description": "Id of the account.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerAccountLine"
+                }
+              }
+            },
+            "description": "One page of lines, newest first by default."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such account in your scope; code `ledger.account_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the entry lines on an account.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      }
+    },
+    "/api/v1/ledger/books": {
+      "get": {
+        "description": "Requires `ledger.read`.",
+        "operationId": "ledger_list_ledger_books",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerBookResponse"
+                }
+              }
+            },
+            "description": "One page of books."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the books in your scope.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `ledger.accounts_manage` on the unit. A unit has at most one book; modules that post\nentries open it on first use.",
+        "operationId": "ledger_create_ledger_book",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerBookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerBookResponse"
+                }
+              }
+            },
+            "description": "The book.",
+            "headers": {
+              "Location": {
+                "description": "Path of the new book.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.accounts_manage` (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit already has a book; code `ledger.book_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open the book of a unit.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.accounts_manage"
+        ]
+      }
+    },
+    "/api/v1/ledger/books/{id}": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit.",
+        "operationId": "ledger_get_ledger_book",
+        "parameters": [
+          {
+            "description": "Id of the book.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerBookResponse"
+                }
+              }
+            },
+            "description": "The book."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such book in your scope; code `ledger.book_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a book.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      }
+    },
+    "/api/v1/ledger/entries": {
+      "get": {
+        "description": "Requires `ledger.read`. Each entry comes with its lines.",
+        "operationId": "ledger_list_ledger_entries",
+        "parameters": [
+          {
+            "description": "Only the book of this unit.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only entries written by this module (`ledger` for manual entries, `orders`…).",
+            "in": "query",
+            "name": "source_module",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only entries for this source document.",
+            "in": "query",
+            "name": "source_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only entries dated on or after this day.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only entries dated on or before this day.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerEntry"
+                }
+              }
+            },
+            "description": "One page of entries."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List entries in your scope.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `ledger.post` on the book's unit. Entries are never changed or deleted: correct one\nwith `POST /entries/{id}/reverse`. Send the same `reference` and content again to get the entry\nalready posted (`200`).",
+        "operationId": "ledger_post_ledger_entry",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerEntry"
+                }
+              }
+            },
+            "description": "The entry was posted before with this `reference` and content."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerEntry"
+                }
+              }
+            },
+            "description": "The entry.",
+            "headers": {
+              "Location": {
+                "description": "Path of the new entry.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.post` (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "An account is not in this book; code `ledger.account_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The day is in a closed period (`ledger.period_closed`), an account is closed (`ledger.account_closed`) or would go below its floor (`ledger.insufficient_balance`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Debits differ from credits (`ledger.unbalanced`), currencies differ (`ledger.currency_mixed`), not the book currency (`ledger.exchange_rate_missing`), the reference was used for other content (`reference_reused`), or a value is invalid."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Post a manual entry.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.post"
+        ]
+      }
+    },
+    "/api/v1/ledger/entries/{id}": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit.",
+        "operationId": "ledger_get_ledger_entry",
+        "parameters": [
+          {
+            "description": "Id of the entry.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerEntry"
+                }
+              }
+            },
+            "description": "The entry."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such entry in your scope; code `ledger.entry_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an entry with its lines.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      }
+    },
+    "/api/v1/ledger/entries/{id}/reverse": {
+      "post": {
+        "description": "Requires `ledger.reverse` on the book's unit. Posts a new entry with debits and credits swapped,\ndated in an open period. An entry is reversed at most once (a reversal may itself be reversed).",
+        "operationId": "ledger_reverse_ledger_entry",
+        "parameters": [
+          {
+            "description": "Id of the entry to reverse.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerReversalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerEntry"
+                }
+              }
+            },
+            "description": "The reversal was posted before with this `reference`."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerEntry"
+                }
+              }
+            },
+            "description": "The reversal.",
+            "headers": {
+              "Location": {
+                "description": "Path of the reversal.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.reverse` (`permission_denied`) or the unit is frozen (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such entry in your scope; code `ledger.entry_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Already reversed (`ledger.already_reversed`), the day is in a closed period (`ledger.period_closed`), an account is closed or would go below its floor."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid, or the reference was used for other content (`reference_reused`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reverse an entry.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.reverse"
+        ]
+      }
+    },
+    "/api/v1/ledger/periods": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit. A period exists once an entry is dated in it.",
+        "operationId": "ledger_list_ledger_periods",
+        "parameters": [
+          {
+            "description": "The book (required).",
+            "in": "query",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerPeriodResponse"
+                }
+              }
+            },
+            "description": "One page of periods."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such book in your scope; code `ledger.book_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the periods of a book.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
+        ]
+      }
+    },
+    "/api/v1/ledger/periods/{id}/close": {
+      "post": {
+        "description": "Requires `ledger.periods_close` on the book's unit. The period must have ended and every\nearlier period be closed. Closing records each account's closing balance; no entry can be dated\nin it afterwards. Cannot be undone; closing a closed period again returns it.",
+        "operationId": "ledger_close_ledger_period",
+        "parameters": [
+          {
+            "description": "Id of the period.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerPeriodResponse"
+                }
+              }
+            },
+            "description": "The closed period."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.periods_close` (`permission_denied`) or the unit is frozen (`org_frozen`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such period in your scope; code `ledger.period_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "An earlier period is open (`ledger.period_order`) or the period has not ended (`ledger.period_not_ended`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close a period.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.periods_close"
+        ]
+      }
+    },
+    "/api/v1/ledger/trial-balance": {
+      "get": {
+        "description": "Requires `ledger.read` on the book's unit. Per account: opening balance, debits, credits and\nclosing balance; per currency, total debits equal total credits.",
+        "operationId": "ledger_get_ledger_trial_balance",
+        "parameters": [
+          {
+            "description": "The book.",
+            "in": "query",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day, `YYYY-MM-DD`.",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day, `YYYY-MM-DD`.",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerTrialBalanceResponse"
+                }
+              }
+            },
+            "description": "The trial balance."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such book in your scope; code `ledger.book_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A parameter is invalid (e.g. `from` after `to`); every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the trial balance of a book for a range of days.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.read"
         ]
       }
     },

@@ -3414,6 +3414,248 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "The balance of a ledger account, now or at the end of a day.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which account and day.",
+        "properties": {
+          "account_id": {
+            "description": "Id of the account.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "as_of": {
+            "description": "End of this day, `YYYY-MM-DD`; omit for the current balance.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "account_id"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.balance",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List ledger entries in your scope with their lines, newest first; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which entries.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "Only entries dated on or after this day.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of entries, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only the book of this unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_id": {
+            "description": "Only entries for this source document.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_module": {
+            "description": "Only entries written by this module (`ledger` for manual entries).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Only entries dated on or before this day.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "ledger.entries",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Post a manual double entry (debits equal credits). Entries are never changed: correct one by reversing it. The same reference and content again returns the entry already posted.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A manual entry.",
+        "properties": {
+          "currency": {
+            "description": "Currency code of every line, e.g. `VND`.",
+            "type": "string"
+          },
+          "description": {
+            "description": "Fixed text, 1 to 200 characters, without personal data (kept for good).",
+            "type": "string"
+          },
+          "effective_date": {
+            "description": "Accounting day `YYYY-MM-DD`; default today. Must be in an open period.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "description": "Two or more lines; debits must equal credits.",
+            "items": {
+              "additionalProperties": false,
+              "description": "One line of an entry.",
+              "properties": {
+                "account_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "amount": {
+                  "description": "Amount as a decimal string in the entry currency, e.g. `\"150000\"`; greater than zero.",
+                  "type": "string"
+                },
+                "side": {
+                  "description": "`debit` or `credit`.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "account_id",
+                "side",
+                "amount"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "Unit of the book; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this entry: sending it again returns the entry already posted.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "reference",
+          "currency",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.post_entry",
+      "output_schema": null,
+      "permissions": [
+        "ledger.post"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "The trial balance of a book for a range of days: opening balance, debits, credits and closing balance per account.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which book and days.",
+        "properties": {
+          "from": {
+            "description": "First day, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Unit of the book; default the tenant's root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Last day, `YYYY-MM-DD`.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.trial_balance",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Get a media item: name, type, size, image width and height, texts, visibility, and the `url` of its content.",
       "input_schema": {
         "additionalProperties": false,

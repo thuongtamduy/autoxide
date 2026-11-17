@@ -11,6 +11,17 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `ledger` (step 36): a double-entry ledger. Each organization unit keeps a book; accounts by purpose
+  (`cash.bank`, `revenue.sales`, `payable.seller_held`… or `<module>.<name>`), per counterparty and currency, with an
+  optional floor; entries are append-only (debits equal credits, one currency) and corrected by reversing them
+  (`POST /api/v1/ledger/entries/{id}/reverse`); balances stay exact under concurrent writes on SQLite and Postgres.
+  Monthly periods close for good (`POST /api/v1/ledger/periods/{id}/close`) with closing balances kept, balances at a
+  day (`GET /api/v1/ledger/accounts/{id}/balance?as_of=`) and a trial balance (`GET /api/v1/ledger/trial-balance`).
+  Entries are sealed in a hash chain; `autoxide doctor` reports a changed or removed entry (`ledger.chain`) and
+  balances that differ from their lines (`ledger.balances`). Ledger tables are kept when a tenant is deleted for good
+  (accounting records). MCP `ledger.balance`, `ledger.entries`, `ledger.trial_balance`, `ledger.post_entry`. Other
+  modules post through `autoxide_ledger::api::Ledger`.
+
 - New module `tax` (step 36): taxes from data. Tax categories and rates with effective dates, withholding rates
   for platforms and rules come in a tax data pack; the Vietnam pack ships with the server (VAT 0/5/10%, the 8% rate
   until 2026-12-31, a special consumption tax sample, marketplace withholding for household businesses — every rate
