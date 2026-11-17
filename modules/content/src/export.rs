@@ -62,3 +62,41 @@ impl ExportSource for Entries {
         ExportPage::from_json(&rows, &COLUMNS, page.pagination.next_cursor)
     }
 }
+
+/// Lưu trữ hàng loạt bài viết / trang (bước 51 P8): cùng hàm, cùng kiểm quyền với
+/// `POST /entries/{id}/archive`, không kiểm phiên bản (người dùng đã chọn từ danh sách). Bài đã lưu
+/// trữ thì bỏ qua, nên job chạy lại không làm hai lần.
+pub(crate) struct Archive(pub(crate) Arc<ContentService>);
+
+#[async_trait::async_trait]
+impl autoxide_kernel::bulk::BulkAction for Archive {
+    fn info(&self) -> autoxide_kernel::bulk::BulkInfo {
+        autoxide_kernel::bulk::BulkInfo::new(
+            "content.list_content_entries",
+            "archive",
+            "Archive posts and pages",
+        )
+    }
+
+    fn permission(&self) -> Permission {
+        crate::permissions::CONTENT_PUBLISH
+    }
+
+    async fn apply(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: &str,
+    ) -> Result<autoxide_kernel::bulk::BulkOutcome, Error> {
+        // Id không phải UUID thì như không có bài nào mang id đó.
+        let id = id
+            .parse::<uuid::Uuid>()
+            .map_err(|_| crate::service::entry_not_found(uuid::Uuid::nil()))?;
+        let entry = self.0.get(tenant, principal, id).await?;
+        if entry.status == "archived" {
+            return Ok(autoxide_kernel::bulk::BulkOutcome::Skipped("already_archived"));
+        }
+        self.0.archive(tenant, principal, id, None).await?;
+        Ok(autoxide_kernel::bulk::BulkOutcome::Done)
+    }
+}

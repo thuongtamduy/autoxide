@@ -3,6 +3,7 @@
 
 pub(crate) mod alerts;
 pub(crate) mod builtin;
+pub mod bulk;
 pub(crate) mod client_config;
 pub mod doctor;
 pub mod find;

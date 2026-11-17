@@ -7,6 +7,7 @@
 //! module đăng ký SAU module `mail`; đích được kiểm qua sổ đối tượng của kernel (D-123) nên đăng
 //! ký SAU module sở hữu đích (`content`). Hướng dẫn dùng: `docs/COMMENTS.md`.
 
+mod bulk;
 mod config;
 mod entity;
 mod events;
@@ -135,6 +136,9 @@ impl Module for CommentsModule {
         context.personal_data(service.clone())?;
         context.work_source(Arc::new(work::Pending))?;
         context.summary_metric(Arc::new(work::Pending))?;
+        for action in bulk::actions(&service) {
+            context.bulk_action(action)?;
+        }
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())

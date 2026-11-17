@@ -288,6 +288,7 @@ pub struct StartContext<'a> {
     finders: &'a crate::ops::find::FinderSources,
     metrics: &'a crate::ops::summary::SummaryMetrics,
     exports: &'a crate::ops::list_exports::ExportSources,
+    bulk: &'a crate::ops::bulk::BulkActions,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -436,6 +437,14 @@ impl StartContext<'_> {
         source: Arc<dyn crate::ops::list_exports::ExportSource>,
     ) -> Result<(), Error> {
         self.exports.register(self.module, source)
+    }
+
+    /// Đăng ký hành động hàng loạt (bước 51 P8) trên một danh sách `<module>.<operation id>`.
+    pub fn bulk_action(
+        &mut self,
+        action: Arc<dyn crate::ops::bulk::BulkAction>,
+    ) -> Result<(), Error> {
+        self.bulk.register(self.module, action)
     }
 
     /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do

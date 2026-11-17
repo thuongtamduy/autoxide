@@ -24,7 +24,7 @@ pub use data::{
     database, migration, numbering, pagination, reference, rows, search, tenancy, transfer, version,
 };
 pub(crate) use ops::{builtin, module_catalog, user_flags};
-pub use ops::{doctor, find, list_exports, logging, metrics, summary, task, telemetry, work};
+pub use ops::{bulk, doctor, find, list_exports, logging, metrics, summary, task, telemetry, work};
 pub use security::{
     access, antispam, entitlement, idempotency, ip_hash, secret, throttle, tls, tokens,
 };

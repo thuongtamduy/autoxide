@@ -64,6 +64,8 @@ pub(crate) struct ModuleCatalog {
     metrics: crate::ops::summary::SummaryMetrics,
     /// Sổ danh sách xuất được (bước 51 P16).
     exports: crate::ops::list_exports::ExportSources,
+    /// Sổ hành động hàng loạt (bước 51 P8).
+    bulk: crate::ops::bulk::BulkActions,
     /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
     lists: crate::ops::list_exports::ListsHandle,
     /// Sổ điều hướng đã gom (bước 51 P1).
@@ -128,6 +130,10 @@ impl ModuleCatalog {
 
     pub(crate) fn export_sources(&self) -> crate::ops::list_exports::ExportSources {
         self.exports.clone()
+    }
+
+    pub(crate) fn bulk_actions(&self) -> crate::ops::bulk::BulkActions {
+        self.bulk.clone()
     }
 
     pub(crate) fn lists(&self) -> crate::ops::list_exports::ListsHandle {

@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Bulk actions (step 51): modules declare actions on a list (`StartContext::bulk_action`, `bulk` module of the
+  kernel); `POST /api/v1/kernel/bulk/{resource}/{action}` takes `ids` (up to 500) or a `filter` with
+  `expected_count` (409 `kernel.bulk_count_changed` when the matches changed) and an `Idempotency-Key`, and runs
+  the action in a background job with the requester's permissions; the job's result lists what happened to each
+  record; `dry_run` lists the records it would act on without doing anything. Posts and pages can be archived,
+  comments approved, rejected, marked as spam or deleted, and newsletter subscribers blocked, unblocked or deleted
+  in bulk.
 - List exports (step 51): modules declare exportable lists (`StartContext::export_source`, `list_exports`
   module of the kernel); `POST /api/v1/kernel/exports {resource, params, columns}` checks the filters against
   the list's schema and writes a CSV file (protected against CSV injection, `autoxide_kernel::csv`) in a background

@@ -203,7 +203,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [x] Schema bộ lọc mỗi danh sách công bố trong OpenAPI (máy, agent dựng chip lọc) và view đã lưu `/me/views`
       (P7): tham số, sắp xếp, cột, nhóm, mật độ; phạm vi cá nhân / nút / khách; bộ lọc nội dung `review`,
       `scheduled`, `ai_generated`, `missing_locale`, `missing_alt`
-- [ ] Job và hàng loạt (P8, P15, P16; D-213): job API chung (danh sách, tiến độ, file, chạy lại có audit);
+- [x] Job và hàng loạt (P8, P15, P16; D-213): job API chung (danh sách, tiến độ, file, chạy lại có audit);
       module khai hành động hàng loạt, nhận `ids[]` hoặc `filter` + `expected_count`, `Idempotency-Key`, kết
       quả từng bản ghi, tiến độ qua SSE; xuất danh sách theo bộ lọc thành CSV qua job
 - [ ] Giải thích quyền (P11): `POST /me/can` nhiều cặp (permission, nút), lý do `missing_permission` /

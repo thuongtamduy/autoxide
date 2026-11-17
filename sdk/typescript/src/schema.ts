@@ -439,6 +439,27 @@ export type BounceRequest = {
   type: BounceKind;
 };
 
+/** What a bulk request would act on. */
+export type BulkPreview = {
+  count: number;
+  ids: string[];
+};
+
+/** Records to act on: either `ids`, or `filter` with `expected_count`. */
+export type BulkRequest = {
+  /**
+   * `true`: only say which records would be acted on (`200` with `count` and `ids`); nothing is
+   * queued or changed.
+   */
+  dry_run?: boolean;
+  /** How many records the caller saw matching `filter`; required with it, unless `dry_run`. */
+  expected_count?: number | null;
+  /** Filters of the list (see `x-autoxide-filters`): every matching record. */
+  filter?: Record<string, unknown> | null;
+  /** Up to 500 record ids. */
+  ids?: string[] | null;
+};
+
 /** A campaign mail exactly as subscribers get it. */
 export type CampaignPreviewResponse = {
   /**
@@ -1726,6 +1747,15 @@ export type Data_BounceOutcome = {
   data: {
     /** The address is (now or already) suppressed. */
     suppressed: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BulkPreview = {
+  /** What a bulk request would act on. */
+  data: {
+    count: number;
+    ids: string[];
   };
 };
 
@@ -17570,6 +17600,23 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/bulk/{resource}/{action}": {
+    /** Run an action on many records. */
+    post: {
+      parameters: { header: { "Idempotency-Key": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { resource: string; action: string }; };
+      requestBody: BulkRequest;
+      responses: {
+        200: Data_BulkPreview;
+        201: Data_JobRunView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

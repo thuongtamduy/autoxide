@@ -286,6 +286,7 @@ async fn module_nhan_database_va_khai_route() {
             paths,
             [
                 vec![
+                    "/bulk/{resource}/{action}".to_owned(),
                     "/client-config".to_owned(),
                     "/domains".to_owned(),
                     "/domains/allowed".to_owned(),
