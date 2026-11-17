@@ -77,7 +77,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Mọi form quản trị người dùng | `detail` của `auth.password_already_set`, `auth.invalid_verification_token` đang nhắc tên endpoint (câu cho máy) | mới (cùng loại với `auth.wrong_password`) | Hiện nguyên câu của core |
 | [ ] | Lời mời | `GET/POST /auth/invitations`, `DELETE /{id}`, `POST /{id}/resend`; trả kèm tên role và người mời | 34 | Dữ liệu mẫu (`src/sample/org.ts`) |
 | [ ] | Uỷ quyền | `GET/POST/DELETE /auth/delegations`; danh sách khách con | 34 (khách con: 33) | Dữ liệu mẫu (`src/sample/org.ts`) |
-| [ ] | Hồ sơ công khai | Hồ sơ công khai của nút (`PATCH /organizations/units/{id}`), giờ mở cửa theo ngày và ngày nghỉ, danh mục tỉnh / xã | 34 (D-200, `address`) | Dữ liệu mẫu (`src/sample/org.ts`); cùng một giờ cho mọi ngày |
+| [x] | Hồ sơ công khai | Hồ sơ công khai của nút (`PATCH /organizations/units/{id}`), giờ mở cửa theo ngày và ngày nghỉ, danh mục tỉnh / xã | 34 (D-200, `address`) | **Đã nối** (17/11, W-045 của web): `GET/PATCH …/units/{id}/public-profile`, trạng thái công khai theo `GET /public/stores`, tỉnh / xã từ `address`; form sửa một khung giờ chung cho mọi ngày |
 | [ ] | Quyền vào hỗ trợ | `GET /auth/support-access`, cài đặt `auth.support_access` | 34 | Dữ liệu mẫu (`src/sample/org.ts`) |
 | [ ] | Quyền vào hỗ trợ | Khách tự thu hồi một lần cấp quyền vào hỗ trợ (bước 34 chỉ cho nhà vận hành thu hồi) | mới | Dữ liệu mẫu (`src/sample/org.ts`), ghi "theo API đề xuất" |
 
@@ -179,13 +179,13 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 
 | | Màn | Cần | Bước | Giao diện đang làm gì |
 |---|---|---|---|---|
-| [ ] | Cây tổ chức | `GET /organizations/units` (`unit_type`, `code`, `status`), `GET /unit-types` | 34 | Dữ liệu mẫu (`src/sample/org.ts`) |
-| [ ] | Cây tổ chức | `POST /organizations/units` (nút `pending` khi thiếu `units.manage`), `POST /units/{id}/status` | 34 | Dữ liệu mẫu |
-| [ ] | Cây tổ chức | `GET /auth/memberships?org_id=` kèm tên, email người dùng, tên role, độ sâu rộng nhất của role | 34 (phần kèm tên và độ sâu: mới) | Dữ liệu mẫu (`src/sample/org-tree.ts`) |
-| [ ] | Cây tổ chức | `include_inherited=true` cho memberships: thêm người ở nút cha có độ sâu `subtree` / `tenant` | mới | Dữ liệu mẫu |
-| [ ] | Cây tổ chức | Số người làm được ở mỗi nút | mới | Tính từ memberships mẫu |
-| [ ] | Cây tổ chức | `GET /organizations/settings`, `GET/PUT/DELETE /units/{id}/settings/{key}` | 34 | Dữ liệu mẫu |
-| [ ] | Cây tổ chức | Yêu cầu tách nhánh từ phía khách: `GET/POST /organizations/units/{id}/split-requests` | mới (bước 38 chỉ có CLI) | Dữ liệu mẫu |
+| [x] | Cây tổ chức | `GET /organizations/units` (`unit_type`, `code`, `status`), `GET /unit-types` | 34 | **Đã nối** (17/11, W-045 của web); cây cũng dùng cho bộ chọn nút góc trên trái (lọc `owner_org`, tạo mới với `org_id`) |
+| [x] | Cây tổ chức | `POST /organizations/units` (nút `pending` khi thiếu `units.manage`), `POST /units/{id}/status` | 34 | **Đã nối** (17/11): thêm nút con, Hoàn tác = lưu trữ, duyệt nút chờ |
+| [x] | Cây tổ chức | `GET /auth/memberships?org_id=` kèm tên, email người dùng, tên role, độ sâu rộng nhất của role | 34 (phần kèm tên và độ sâu: mới) | **Đã nối** (17/11). Phần "mới" chưa có, giao diện tự ghép: đọc từng người bằng `GET /auth/users/{id}` (N lời gọi mỗi màn), độ sâu tính từ `grants` của role. Có `include=user` thì bớt được N lời gọi — không gấp |
+| [x] | Cây tổ chức | `include_inherited=true` cho memberships: thêm người ở nút cha có độ sâu `subtree` / `tenant` | mới | **Đã có** dưới tên `inherited=true`; đã nối (17/11). Tham số chưa có mô tả trong OpenAPI — xem mục "Core trả khác mô tả OpenAPI" |
+| [ ] | Cây tổ chức | Số người làm được ở mỗi nút | mới | Tính từ `GET /auth/memberships` (đọc hết, tối đa 2.000 dòng) — đúng nhưng tốn với khách lớn; nên có số đếm ở `GET /organizations/units` |
+| [x] | Cây tổ chức | `GET /organizations/settings`, `GET/PUT/DELETE /units/{id}/settings/{key}` | 34 | **Đã nối** (17/11). Sổ cài đặt chưa nói dạng giá trị (chuỗi, danh sách, đúng sai): giao diện đoán theo giá trị đang có và mặc định; có trường `type` / JSON Schema thì làm được ô nhập đúng loại |
+| [ ] | Cây tổ chức | Yêu cầu tách nhánh từ phía khách: `GET/POST /organizations/units/{id}/split-requests` | mới (bước 38 chỉ có CLI) | Đã bỏ nút khỏi màn (17/11) tới khi có API |
 | [ ] | Cây tổ chức | `POST /auth/invitations` (mời vào một nút) | 34 | Dữ liệu mẫu |
 | [ ] | Tuân thủ | `GET /compliance/rules?as_of=` kèm lịch sử phiên bản | 37 | Dữ liệu mẫu (`src/sample/compliance-rules.ts`) |
 | [ ] | Tuân thủ › Website | `GET /compliance/websites`, `GET …/{id}/checklist`, `GET …/{id}/dossier`, `POST …/{id}/status` (số hồ sơ, ngày nộp; kết quả: link và ảnh logo) | 37 (ngày nộp: mới) | Dữ liệu mẫu (`src/sample/compliance.ts`) |
@@ -441,7 +441,7 @@ thì chỉ thay phần đọc. Ba nguồn đọc API thật (bình luận chờ 
 | [ ] | Tuỳ chọn thông báo | `GET/PUT /me/notification-preferences` theo loại việc và kênh | 37, 52 | Tab chỉ hiện khi bật dữ liệu mẫu |
 | [ ] | Ngôn ngữ ưa dùng | Lưu ngôn ngữ của người dùng ở core (`/me`) để email và thông báo theo đó | 52 | Chỉ nhớ bằng cookie của trình duyệt |
 
-## Core trả khác mô tả OpenAPI (gặp khi nối, 16/11/2026)
+## Core trả khác mô tả OpenAPI (gặp khi nối, 16–17/11/2026)
 
 Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc giá trị cho khớp nhau.
 
@@ -459,6 +459,7 @@ Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc gi�
 | [ ] | Mô tả của `TenantSettingState.description` (D-296) | — | vài mô tả có chuỗi nhiều dấu cách liền nhau giữa câu (vd `comments.banned_words`: "ignoring case      and accents") — do xuống dòng trong chuỗi nguồn |
 | [ ] | Chọn khách của endpoint công khai (core nhiều khách), mục "Conventions" | chỉ nêu `tenant_suspended`, `tenant_read_only`, `tenant_maintenance` | tên miền chưa gắn khách nào: `400 tenant_required`; `Autoxide-Tenant` trỏ tới khách không có: `404 tenant_not_found`. Client (website bán hàng) phải rẽ nhánh theo hai mã này (web trả 404 cho cả trang, W-038 của web) — nên ghi vào "Conventions" cùng cách core chọn khách (credential, `Autoxide-Tenant`, tên miền / `X-Forwarded-Host` từ proxy tin cậy) |
 | [ ] | Thiếu tham số query bắt buộc (vd `locale` của `GET /content/public/posts`) | `422` "A parameter is invalid; see `errors`" (và Conventions: lỗi kiểm dữ liệu liệt kê mọi trường một lần) | `400 bad_request`, `detail` là thông báo thô của thư viện bằng tiếng Anh ("Failed to deserialize query string: missing field `locale`"), không có `errors`, không theo `Accept-Language`. Giá trị sai (vd `limit=abc`) thì đúng `422 validation_failed` — nên trả cùng dạng cho tham số thiếu |
+| [ ] | `GET /auth/memberships`, tham số `inherited` (gặp 17/11) | không có mô tả | mã nguồn: "với `org_id` và `inherited=true` thì tính cả membership ở các nút trên (đánh dấu `inherited`)". Thiếu mô tả nên client dễ gọi thiếu: người được gán ở nút cha không hiện ở nút con — nên chép câu đó vào mô tả tham số |
 
 ## Website bán hàng (`apps/storefront`, W-026 của web)
 
@@ -467,7 +468,8 @@ giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi c�
 
 | [ ] | Màn | Cần | Bước | Website đang làm gì |
 |---|---|---|---|---|
-| [ ] | Chân trang, đầu trang | Hồ sơ công khai của khách: tên, thông tin pháp lý (mã số doanh nghiệp, địa chỉ), logo đã thông báo Bộ Công Thương, cấu hình giao diện (kiểu `market` / `minimal` / `luxe`) | 34 (+ 55) | Ô `[…]`; kiểu giao diện đặt bằng biến `AUTOXIDE_STOREFRONT_THEME` |
+| [ ] | Chân trang, đầu trang | Hồ sơ công khai của khách: tên, thông tin pháp lý (mã số doanh nghiệp, địa chỉ), logo đã thông báo Bộ Công Thương, cấu hình giao diện (kiểu `market` / `minimal` / `luxe`) | 34 (+ 55) | **Tên đã nối** (17/11): hồ sơ công khai của nút gốc trong `GET /public/stores`. Còn thiếu: thông tin pháp lý và logo Bộ Công Thương (ô `[…]`), kiểu giao diện (biến `AUTOXIDE_STOREFRONT_THEME`) |
+| [ ] | Chân trang, đầu trang | Hồ sơ của **website đang được gọi**: nút mà tên miền hay `?site=` chọn (D-305) | mới | `GET /public/stores` chỉ liệt kê cửa hàng, không nói website này là nút nào: tên miền gắn với một cửa hàng con vẫn hiện tên của nút gốc. Đề xuất `GET /organizations/public/site` (hồ sơ công khai của nút website, kèm pháp lý, logo) |
 | [x] | `/blog` | Danh sách danh mục và thẻ công khai của `content` (kèm số bài) | mới | Gom chủ đề từ các bài trên trang đang xem — **đã có** (16/11): `GET /api/v1/content/public/terms?locale=&taxonomy=` trả danh mục / thẻ có bài đã đăng, kèm `posts`; bài của một thẻ: `GET /public/posts?term_id=` |
 | [ ] | Bài viết | Nhúng bản ghi trong nội dung (khối sản phẩm trong bài) | 51 | Khối "sản phẩm nhắc tới trong bài" là dữ liệu mẫu |
 | [x] | Menu | Bộ biểu tượng của menu có biểu tượng ngành hàng (chảo, nồi, dao…) | mới (`menus`) | Dùng biểu tượng chung — **không cần core đổi** (16/11): mục menu đã có `icon` (chuỗi tự do); bộ biểu tượng ngành hàng là tài nguyên của giao diện, website ánh xạ tên → biểu tượng |
@@ -480,7 +482,7 @@ giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi c�
 | [ ] | Sản phẩm | Phí và ngày giao theo tỉnh khi chưa có giỏ, kèm giờ chốt đơn trong ngày | 44 (mới) | Dữ liệu mẫu, giờ chốt 16:00 — đã thêm vào lộ trình bước 44 (16/11) |
 | [ ] | Khuyến mại | Số thông báo Sở Công Thương và trần giảm theo luật trong `GET /public/promotions` | 43 (mới) | Dữ liệu mẫu — đã thêm vào lộ trình bước 43 (16/11) |
 | [ ] | Tài khoản người mua | Đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay passkey | 47 (mới) | Mẫu: số điện thoại + mã cố định, không nhận mật khẩu — đã thêm vào lộ trình bước 47 (16/11) |
-| [ ] | Đặt hàng | Endpoint công khai cho đơn vị hành chính của module `address` (tỉnh, phường) | D-193 (mới) | Dữ liệu mẫu — đã có trong lộ trình bước 34 (dòng `address`: endpoint công khai tỉnh, xã theo tỉnh) |
+| [x] | Đặt hàng | Endpoint công khai cho đơn vị hành chính của module `address` (tỉnh, phường) | D-193 (mới) | **Đã có** (bước 34); trang quản trị đã dùng (hồ sơ công khai). Ô địa chỉ khi đặt hàng của website còn dùng mẫu: việc của web, đợt sau |
 | [ ] | Giỏ, đặt hàng | Báo giá giỏ trả thêm: số điểm tối đa dùng được, cách trả dùng được cho giỏ (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán | 45 (mới) | Dữ liệu mẫu — đã thêm vào lộ trình bước 45 (16/11) |
 | [ ] | Đơn của tôi | `return_until`, `buyer_cancel_until` có sẵn trong đơn | 45 (mới) | Tự tính hạn 7 ngày — đã thêm vào lộ trình bước 45 (16/11) |
 | [ ] | Gian hàng người bán | Catalog công khai lọc theo người bán và đường dẫn trang sản phẩm cho hàng người bán; hồ sơ người bán có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn, trạng thái tạm ngừng | 41, 46 (mới) | Dữ liệu mẫu; hàng người bán mở ở gian hàng — đã thêm vào lộ trình bước 41, 46 (16/11) |
