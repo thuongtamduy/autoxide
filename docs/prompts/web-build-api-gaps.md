@@ -256,10 +256,10 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 | [ ] | Mọi màn | Sổ điều hướng của core có khái niệm không gian (khách / nền tảng) | 51 |
 | [x] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 — Đã nối (W-027 của web): màn Khách hàng và Đội database đọc API thật, ghép với dữ liệu mẫu cho trường core chưa có. Đã nối thêm lọc `read_only`, `placement_kind`, `schema_state` và `expand=placement` (D-296, W-035 của web) |
 | [ ] | Khách hàng | Trường của khách `business_model`, `primary_domain`; của placement `pending_migrations`, `location` | mới |
-| [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới — hợp đồng đã có (`expand=usage`, `near_limit`, D-296) nhưng trả `null` / rỗng tới bước 35; giao diện nối khi có dữ liệu |
+| [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới — `near_limit` và `subscription_status` **đã nối** (17/11, W-048 của web). **Còn thiếu:** `expand=subscription,usage` vẫn luôn `null` dù đã có module `plans`; giao diện đọc `GET /plans/subscriptions` riêng và gọi `GET /plans/tenants/{id}/usage` cho từng khách gần chạm |
 | [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) — `PATCH {status}` đã nối (W-027 của web); `reason` để ghi audit vẫn thiếu |
 | [x] | Chi tiết khách | Dời khách chung ↔ riêng qua API: `POST /kernel/tenants/{id}/move` `{to, dry_run}` | mới (33 mới có CLI) — **đã nối** (16/11, W-032): chạy thử, dời ngay khi `ready`, theo dõi `GET …/moves/{id}` |
-| [ ] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | mới (33 mới có CLI) |
+| [x] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | **Đã nối** (17/11, W-048 của web): xuất, danh sách, tải qua `…/content` (máy chủ của giao diện chuyển tiếp) |
 | [ ] | Chi tiết khách | Quyền dùng của một khách bất kỳ: `GET /plans/tenants/{id}/entitlements` | mới |
 | [ ] | Chi tiết khách, Thuê bao | Lịch sử thuê bao; đặt / bỏ chỉ đọc; kỳ thanh toán theo khách cho nhà vận hành | mới — **đặt / bỏ chỉ đọc đã nối** (cờ của nhà vận hành, D-296, W-035 của web); lịch sử thuê bao và kỳ thanh toán chờ bước 35 |
 | [x] | Thuê bao | `GET /plans/subscriptions`, `PUT` / `cancel` thuê bao của khách, `POST /billing-periods/{id}/mark-paid` | 35 — **Đã nối** (17/11, W-047 của web): danh sách, gán gói, huỷ, khoá hẳn. "Đánh dấu đã thu" chưa nối: nhân sự nền tảng chưa đọc được kỳ thanh toán của một khách (dòng "kỳ thanh toán theo khách" ở trên) |
@@ -270,8 +270,8 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 | [ ] | Đội database | Migrate bằng job, chạy thử trước: `POST /kernel/placements/migrations` `{placement_id?, dry_run}` | mới (33 mới có CLI) |
 | [ ] | Sức khoẻ | `GET /kernel/ops/backlog`, `/ops/backups` | 39 |
 | [ ] | Sức khoẻ | Cảnh báo đang bật kèm câu "làm gì": `GET /kernel/ops/alerts` | mới |
-| [ ] | Vào dữ liệu khách | `GET/POST/DELETE /auth/support-grants` | 34 |
-| [ ] | Vào dữ liệu khách | Nhà vận hành đọc cài đặt `auth.support_access` của khách; danh sách nhân sự nền tảng | mới |
+| [x] | Vào dữ liệu khách | `GET/POST/DELETE /auth/support-grants` | 34 — **Đã nối** (17/11, W-048 của web): màn "Vào dữ liệu khách" và khối ở chi tiết khách. **Còn thiếu:** (a) `GET` bắt buộc `tenant_id`, nên màn chung gọi từng khách — xin cho bỏ `tenant_id` (mọi khách, theo trang, mới trước); (b) trần thời hạn `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` chưa có trong API — xin đưa vào `GET /kernel/client-config` (giao diện đang đặt sẵn 1, 4, 8 giờ) |
+| [ ] | Vào dữ liệu khách | Nhà vận hành đọc cài đặt `auth.support_access` của khách; danh sách nhân sự nền tảng | mới — danh sách nhân sự: giao diện dùng `GET /auth/users` của khách nền tảng. **Còn thiếu:** nhân sự không biết trước khách đã tắt hỗ trợ, chỉ biết khi bị từ chối `auth.support_access_disabled` |
 
 ## Tiếp thị › Khuyến mại (`/marketing/promotions`), Bán hàng › Vận chuyển (`/sales/shipping`)
 
@@ -444,6 +444,7 @@ thì chỉ thay phần đọc. Ba nguồn đọc API thật (bình luận chờ 
 | [ ] | Đã ghim | `GET/PUT/DELETE /me/pins` | chưa có trong lộ trình | Tab chỉ hiện khi bật dữ liệu mẫu |
 | [ ] | Tuỳ chọn thông báo | `GET/PUT /me/notification-preferences` theo loại việc và kênh | 37, 52 | Tab chỉ hiện khi bật dữ liệu mẫu |
 | [ ] | Ngôn ngữ ưa dùng | Lưu ngôn ngữ của người dùng ở core (`/me`) để email và thông báo theo đó | 52 | Chỉ nhớ bằng cookie của trình duyệt |
+| [ ] | Thẻ gói, khoá theo gói | `GET /plans/entitlements` (gói, hạn mức kèm mức dùng, `features`); thuê bao kèm tên gói | 35 (tên gói: mới) | **Đã nối** (17/11, W-048 của web): thẻ "Gói của bạn" ở Tổng quan; nút tạo API key và AI của bài viết khoá kèm nhãn "Cần gói cao hơn" khi gói chưa có `auth.api_keys` / `content.ai_suggestions`. **Còn thiếu:** `GET /plans/subscription` không kèm tên gói và `GET /plans/catalog` chỉ có gói đang bán, nên khách dùng gói đã ngừng bán không thấy tên gói của mình |
 
 ## Core trả khác mô tả OpenAPI (gặp khi nối, 16–17/11/2026)
 
