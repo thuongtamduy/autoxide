@@ -57,6 +57,8 @@
   "text:A target stopped taking comments (by hand, or because its owner archived or deleted it); `hidden: true` also hides its comments.": "Một đích ngừng nhận bình luận (bằng tay, hoặc vì chủ của nó lưu trữ hay xoá nó); `hidden: true` thì ẩn luôn bình luận.",
   "text:A target takes comments again.": "Một đích nhận bình luận trở lại.",
   "text:An author changed a comment (it may be held for approval again).": "Người viết sửa bình luận (nó có thể bị giữ lại chờ duyệt lần nữa).",
+  "text:Approve or reject a comment": "Duyệt hay từ chối một bình luận",
+  "text:Approve or reject the comment of {author}": "Duyệt hay từ chối bình luận của {author}",
   "text:Approve, reject or mark comments as spam, and delete them for good.": "Duyệt, từ chối hay đánh dấu spam bình luận, và xoá hẳn chúng.",
   "text:Archived.": "Đã lưu trữ.",
   "text:Ban and unban people, open, close and hide targets.": "Cấm và bỏ cấm người dùng; mở, đóng và ẩn đích bình luận.",

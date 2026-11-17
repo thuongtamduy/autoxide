@@ -17,6 +17,7 @@ mod config;
 mod entity;
 mod entries;
 mod events;
+mod find;
 mod http;
 mod migration;
 mod permissions;
@@ -26,6 +27,7 @@ mod resource;
 mod service;
 mod taxonomy;
 mod tools;
+mod work;
 
 #[cfg(test)]
 mod tests;
@@ -182,6 +184,8 @@ impl Module for ContentModule {
             .with_resources(context.resources()),
         );
         context.personal_data(service.clone())?;
+        context.work_source(Arc::new(work::Review))?;
+        context.finder_source(Arc::new(find::Entries))?;
         context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;
         context.resource_type(resource::TERM, Arc::new(resource::TermResolver(service.clone())))?;
         // Menu cũ cho module `menus` nhập sang (D-238).

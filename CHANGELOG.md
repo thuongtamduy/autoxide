@@ -11,6 +11,15 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Search across modules (step 51): modules declare finders for their record types
+  (`StartContext::finder_source`); `GET /api/v1/kernel/find?q=` returns matches grouped by type (posts and pages,
+  media, staff), with or without accents, only from types the caller may read at the chosen unit.
+
+- Work inbox (step 51): modules declare work sources computed from their data (`StartContext::work_source`);
+  `GET /api/v1/kernel/work` lists the work from the sources the caller may see, most urgent first (a slow or
+  failing source is skipped and named in `incomplete`), `GET /api/v1/kernel/work/counts` counts it by source for
+  menu counters. Sources: comments waiting for approval, new form submissions, entries waiting for a review.
+
 - Money flows in the ledger (step 36): units choose how money flows — `self_collect`, `partner_collect` (a licensed
   partner collects for the marketplace) or `split_at_gateway` — with `GET|PUT /api/v1/ledger/flow-settings/{org_id}`
   (inherited down the tree; where cash on delivery goes, never to the marketplace operator). Modules record sales,

@@ -20,6 +20,7 @@ mod delegation_tests;
 mod doctor;
 mod email_report;
 mod events;
+mod find;
 mod http;
 mod invitation;
 mod login_link;
@@ -153,6 +154,7 @@ impl Module for AuthModule {
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        context.finder_source(Arc::new(find::Users))?;
         let config = self
             .config
             .clone()

@@ -284,6 +284,8 @@ pub struct StartContext<'a> {
     apis: &'a mut Apis,
     personal_data: &'a PersonalDataExport,
     resources: &'a crate::resource::ResourceDirectory,
+    work: &'a crate::ops::work::WorkSources,
+    finders: &'a crate::ops::find::FinderSources,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -399,6 +401,22 @@ impl StartContext<'_> {
         resolver: Arc<dyn crate::resource::ResourceResolver>,
     ) -> Result<(), Error> {
         self.resources.register(self.module, kind, resolver)
+    }
+
+    /// Đăng ký nguồn việc của hộp việc (bước 51 P2); id phải là `<module>.<việc>`.
+    pub fn work_source(
+        &mut self,
+        source: Arc<dyn crate::ops::work::WorkSource>,
+    ) -> Result<(), Error> {
+        self.work.register(self.module, source)
+    }
+
+    /// Đăng ký nguồn tìm xuyên phân hệ (bước 51 P3); loại phải là `<module>.<loại>`.
+    pub fn finder_source(
+        &mut self,
+        source: Arc<dyn crate::ops::find::FinderSource>,
+    ) -> Result<(), Error> {
+        self.finders.register(self.module, source)
     }
 
     /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do

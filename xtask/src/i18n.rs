@@ -175,6 +175,8 @@ pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
     found.extend(call_arguments(text, "NavGroup::new(", 1));
     found.extend(call_arguments(text, "NavItem::new(", 2));
     found.extend(call_arguments(text, ".section(", 0));
+    // Tiêu đề việc của hộp việc (bước 51 P2).
+    found.extend(call_arguments(text, "WorkItem::new(", 2));
     found.retain(
         |(_, site)| !matches!(site, FieldMessage::Built(expression) if expression.starts_with('$')),
     );

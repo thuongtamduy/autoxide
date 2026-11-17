@@ -2443,6 +2443,17 @@ export type Data_FileResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_FindView = {
+  /** Records found, by type. */
+  data: {
+    /** One group per record type that found something, in the order modules start. */
+    groups: FoundGroup[];
+    /** Sources that did not answer in time or failed. */
+    incomplete: string[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_FolderResponse = {
   /** A media folder. Folders nest; names are unique (ignoring case) within a parent. */
   data: {
@@ -5811,6 +5822,29 @@ export type Data_WithholdingQuote = {
   };
 };
 
+/** Envelope of a single result. */
+export type Data_WorkCounts = {
+  /** Counts for the menu. */
+  data: {
+    /** Pending work by source (the `counter` of navigation items); `work` is the total. */
+    counts: {
+      [key: string]: number;
+    };
+    incomplete: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_WorkView = {
+  /** The inbox. */
+  data: {
+    /** Sources that did not answer in time or failed: the list may miss their work. */
+    incomplete: string[];
+    /** Most urgent first (`blocking`, `attention`, `info`), then soonest due. */
+    items: WorkItemView[];
+  };
+};
+
 /** A decimal number written as a string, like "12.5" or "-0.08": a dot before the fraction, no thousands separators, no exponent, at most 28 digits. */
 export type DecimalString = string;
 
@@ -6245,6 +6279,14 @@ export type FileResponse = {
   size: number;
 };
 
+/** Records found, by type. */
+export type FindView = {
+  /** One group per record type that found something, in the order modules start. */
+  groups: FoundGroup[];
+  /** Sources that did not answer in time or failed. */
+  incomplete: string[];
+};
+
 /** How serious a finding is. */
 export type FindingLevel = "error" | "warning";
 
@@ -6325,6 +6367,21 @@ export type FormTokenResponse = {
  * `markdown` (a small part of Markdown: bold, italics, links, quotes, code).
  */
 export type Format = "text" | "markdown";
+
+/** Records of one type. */
+export type FoundGroup = {
+  items: FoundView[];
+  kind: string;
+};
+
+/** One record found. */
+export type FoundView = {
+  id: string;
+  /** Screen id of the navigation that opens the record. */
+  screen: string;
+  subtitle?: string | null;
+  title: string;
+};
 
 /** Health of the service. */
 export type Health = {
@@ -11670,6 +11727,9 @@ export type SettingValueRequest = {
   value: unknown;
 };
 
+/** How urgent a piece of work is. */
+export type Severity = "blocking" | "attention" | "info";
+
 /** The answer to a sign-up: always the same. */
 export type SignupAccepted = {
   /** Always `true`. Tell the person to open the link in the mail. */
@@ -13159,6 +13219,43 @@ export type WithholdingQuote = {
   components: TaxComponent[];
   snapshot: Record<string, unknown>;
   total: Money;
+};
+
+/** Counts for the menu. */
+export type WorkCounts = {
+  /** Pending work by source (the `counter` of navigation items); `work` is the total. */
+  counts: {
+    [key: string]: number;
+  };
+  incomplete: string[];
+};
+
+/** One piece of work. */
+export type WorkItemView = {
+  due_at?: string | null;
+  /** Stable key, `<source>:<record id>`. */
+  key: string;
+  severity: Severity;
+  source: string;
+  /** Where to do it: the screen of `GET /api/v1/kernel/navigation` and the record. */
+  target: WorkTarget;
+  /** What to do, in the language of `Accept-Language`. */
+  title: string;
+};
+
+/** Where a piece of work is done. */
+export type WorkTarget = {
+  record_id: string;
+  /** Screen id of the navigation, e.g. `marketing.comments`. */
+  screen: string;
+};
+
+/** The inbox. */
+export type WorkView = {
+  /** Sources that did not answer in time or failed: the list may miss their work. */
+  incomplete: string[];
+  /** Most urgent first (`blocking`, `attention`, `info`), then soonest due. */
+  items: WorkItemView[];
 };
 
 export interface paths {
@@ -16539,6 +16636,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/find": {
+    /** Find records across modules. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; org_id?: string; limit?: number }; };
+      responses: {
+        200: Data_FindView;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/modules": {
     /** List the installed modules. */
     get: {
@@ -16902,6 +17011,29 @@ export interface paths {
       responses: {
         200: Data_Vec_Release;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/work": {
+    /** List the work waiting for you. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number }; };
+      responses: {
+        200: Data_WorkView;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/work/counts": {
+    /** Count the work waiting for you, by source. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number }; };
+      responses: {
+        200: Data_WorkCounts;
+        401: Problem;
         default: Problem;
       };
     };
