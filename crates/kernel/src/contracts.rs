@@ -5,6 +5,7 @@
 
 pub mod ai;
 pub mod mail;
+pub mod payment;
 pub mod privacy;
 pub mod resource;
 pub mod storage;

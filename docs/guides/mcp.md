@@ -147,7 +147,10 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
 | `ledger.balance` | `ledger.read` | read-only |
 | `ledger.entries` | `ledger.read` | read-only |
+| `ledger.exceptions` | `ledger.read` | read-only |
+| `ledger.payment` | `ledger.read` | read-only |
 | `ledger.post_entry` | `ledger.post` | writes |
+| `ledger.resolve_exception` | `ledger.reconcile` | writes |
 | `ledger.trial_balance` | `ledger.read` | read-only |
 | `media.get` | `media.read` | read-only |
 | `media.list` | `media.read` | read-only |

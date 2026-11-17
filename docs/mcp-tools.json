@@ -3523,6 +3523,81 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Differences between the book and the payment partners that wait for a person (amount mismatches, unknown or missing transactions, late payments).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which items.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open` (default), `resolved` or `ignored`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "ledger.exceptions",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "A payment collected through a payment partner, with its status and refunded amount.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which payment.",
+        "properties": {
+          "payment_id": {
+            "description": "Id of the payment.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_id"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.payment",
+      "output_schema": null,
+      "permissions": [
+        "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -3602,6 +3677,56 @@
       "output_schema": null,
       "permissions": [
         "ledger.post"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Resolve a difference: `match` records the money the partner collected for a payment, `ignore` closes it, `refunded_outside` notes it was refunded outside Autoxide.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "How to resolve an item.",
+        "properties": {
+          "action": {
+            "description": "`match` (record the money for `payment_id`), `ignore` or `refunded_outside`.",
+            "type": "string"
+          },
+          "exception_id": {
+            "description": "Id of the item.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "note": {
+            "description": "Up to 500 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payment_id": {
+            "description": "With `match`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "exception_id",
+          "action"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.resolve_exception",
+      "output_schema": null,
+      "permissions": [
+        "ledger.reconcile"
       ]
     },
     {

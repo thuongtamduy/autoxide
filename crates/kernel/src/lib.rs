@@ -17,7 +17,7 @@ mod ops;
 mod security;
 mod values;
 
-pub use contracts::{ai, mail, privacy, resource, storage};
+pub use contracts::{ai, mail, payment, privacy, resource, storage};
 pub use data::{
     database, migration, numbering, pagination, reference, rows, search, tenancy, transfer, version,
 };

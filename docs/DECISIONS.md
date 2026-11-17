@@ -8278,3 +8278,31 @@ Bước 36 mục 4 (ROADMAP mục "Module `ledger`", nửa "khoá sổ" của m�
 8. Job niêm phong tìm bút toán chưa niêm phong bằng `NOT IN (SELECT entry_id FROM ledger_entry_seals)` — quét cả
    bảng bút toán mỗi 10 giây. Chưa đo là chậm nên giữ cách đơn giản; bài đo `POST /ledger/entries` của mục 13 đo cả
    job này, chậm thì thêm mốc (`sealed_through` trên đầu chuỗi) thay vì quét hết.
+
+## D-343 · Thanh toán qua đối tác trong `ledger` — 2026-11-17 — agent quyết
+
+Bước 36 mục 5 (ROADMAP mục "Trait `PaymentGateway`…").
+
+1. **Kernel** `autoxide_kernel::payment`: trait `PaymentGateway` (tạo lượt thu, hoàn, trạng thái, kiểm webhook trên
+   thân thô, sao kê) + kiểu dữ liệu `#[non_exhaustive]` có hàm dựng, và bốn mã lỗi `payment.*`. Bộ nối đối tác là module
+   riêng góp bằng `StartContext::contribute` (nhiều đối tác cùng chạy); `ledger` lấy bằng `contributions` lúc khởi động.
+   Testkit có `FakePaymentGateway` (ký webhook, giả lỗi mạng, sao kê dựng sẵn). `PayoutGateway`, `BankFeed`,
+   `ExchangeRateSource` thêm khi làm mục chi trả, VietQR, tỉ giá.
+2. **Thanh toán nằm trong `ledger`** (không tách module `payments`): mọi đồng tiền qua đối tác phải thành bút toán trong
+   cùng module. Bảng mới: `ledger_payments`, `ledger_refunds`, `ledger_gateway_events`, `ledger_statement_lines`,
+   `ledger_exceptions` (unique `dedupe_key`: chạy lại đối soát không mở trùng), `ledger_reconciliations`; đều giữ khi
+   xoá khách.
+3. **Không gọi mạng trong transaction**: ghi `pending` → commit → gọi đối tác → ghi kết quả. Đối tác không trả lời thì
+   giữ `pending`; gửi lại cùng `reference` gọi lại đối tác với cùng `payment_id` (đối tác chống trùng theo mã đơn).
+4. **Webhook**: kiểm chữ ký trước khi lưu (sai → 401, chỉ log và số đo `ledger_webhook_rejected_total`), lưu nguyên văn
+   + thông báo đã kiểm, xếp job `ledger.process_gateway_event` trong cùng transaction (unique theo mã thông báo). Trạng
+   thái chỉ đi tới (`pending → succeeded`); thông báo thất bại đến muộn bị bỏ qua.
+5. **Bút toán** (chế độ tự thu, trước khi có mục 6): đã thu → Nợ `clearing.gateway[partner]` / Có
+   `receivable.customer`; hoàn → ngược lại; phí trong sao kê → Nợ `expense.gateway_fee` / Có `clearing.gateway`. Doanh
+   thu và thuế ghi lúc lập chứng từ. Bút toán ghi TRƯỚC khi đổi trạng thái, theo `reference` ổn định
+   (`payment:{id}:captured`, `refund:{id}`, `fee:{provider}:{line}`) — job chạy lại không ghi trùng.
+6. **Hoàn tiền** giữ chỗ bằng `rows::adjust` trên `refunded_minor` (trần = số đã thu) trong transaction tạo lượt hoàn:
+   hoàn đồng thời không vượt; đối tác từ chối thì trả lại chỗ.
+7. **Đối soát**: sao kê có tiền mà sổ còn `pending` / `expired` (webhook lạc) → ghi như đã thu; lệch số →
+   `needs_review` + `amount_mismatch`; giao dịch lạ → `unknown_in_statement`; sổ đã thu mà sao kê không có →
+   `missing_in_statement`; tiền về sau khi hết hạn → vẫn ghi + `late_payment`. Xử lý tay `match` đi cùng đường ghi sổ.

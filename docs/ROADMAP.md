@@ -105,9 +105,10 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 - [x] Module `ledger`: tài khoản theo khách / nút / người bán, bút toán nợ = có, chỉ thêm, đảo
       bút toán để sửa, số dư suy từ bút toán, khoá dòng khi ghi đồng thời; test đồng thời trên cả
       hai database (D-342; kèm kỳ tháng, khoá sổ, chuỗi băm, doctor `ledger.chain` / `ledger.balances`)
-- [ ] Trait `PaymentGateway`, `PayoutGateway` trong kernel (như `TextModel`); nhận webhook của đối
+- [x] Trait `PaymentGateway`, `PayoutGateway` trong kernel (như `TextModel`); nhận webhook của đối
       tác: kiểm chữ ký, ghi nguyên văn, xử lý qua job, không trùng (mã tham chiếu D-184); đối soát
-      định kỳ sổ cái với sao kê đối tác; một bộ cài đặt giả cho test
+      định kỳ sổ cái với sao kê đối tác; một bộ cài đặt giả cho test (D-343; `PayoutGateway` đi cùng
+      mục chi trả)
 - [ ] Ba chế độ dòng tiền theo khách / sàn: tự thu, thu hộ qua đối tác, chia tại cổng — mỗi chế độ
       sinh đúng bút toán (phải trả người bán, phí, thuế khấu trừ, tạm giữ tới hết hạn đổi trả)
 - [x] Engine thuế: nhóm hàng hoá, biểu thuế theo vùng thuế với ngày hiệu lực, giá gồm / chưa gồm
