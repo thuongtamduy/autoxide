@@ -253,6 +253,7 @@ impl Modules {
         let finders = self.catalog.finder_sources();
         let metrics = self.catalog.summary_metrics();
         let exports = self.catalog.export_sources();
+        let bulk = self.catalog.bulk_actions();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         for module in &mut self.modules {
@@ -271,6 +272,7 @@ impl Modules {
                 finders: &finders,
                 metrics: &metrics,
                 exports: &exports,
+                bulk: &bulk,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,

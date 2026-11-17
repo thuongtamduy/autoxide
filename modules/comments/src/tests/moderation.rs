@@ -772,3 +772,32 @@ async fn duyet_trong_luc_don_thi_khong_xoa() {
     .await
     .unwrap();
 }
+
+/// Thao tác hàng loạt (bước 51 P8): duyệt bình luận đã duyệt thì bỏ qua (job chạy lại không làm
+/// hai lần), spam đổi trạng thái, xoá hẳn xoá; id lạ là `comments.not_found`.
+#[tokio::test]
+async fn hanh_dong_hang_loat_cua_binh_luan() {
+    TestDatabase::run(async |test| {
+        let h = service(test, open_config()).await;
+        let posted =
+            as_guest(&h.service, &visitor("203.0.113.5"), guest("Ada", "Ý kiến")).await.unwrap();
+        let id = posted.comment.row.id.to_string();
+        let actions = crate::bulk::actions(&h.service);
+        let named =
+            |name: &str| actions.iter().find(|action| action.info().action == name).unwrap();
+        let tenant = &h.tenant;
+        let moderator = admin();
+        let approve = named("approve").apply(tenant, &moderator, &id).await.unwrap();
+        assert_eq!(approve, autoxide_kernel::bulk::BulkOutcome::Skipped("unchanged"));
+        let spam = named("spam").apply(tenant, &moderator, &id).await.unwrap();
+        assert_eq!(spam, autoxide_kernel::bulk::BulkOutcome::Done);
+        let row = h.service.find(tenant, posted.comment.row.id).await.unwrap();
+        assert_eq!(row.status, "spam");
+        let unknown = named("delete").apply(tenant, &moderator, "x").await.unwrap_err();
+        assert_eq!(unknown.code(), "comments.not_found");
+        named("delete").apply(tenant, &moderator, &id).await.unwrap();
+        assert!(h.service.find(tenant, posted.comment.row.id).await.is_err());
+    })
+    .await
+    .unwrap();
+}

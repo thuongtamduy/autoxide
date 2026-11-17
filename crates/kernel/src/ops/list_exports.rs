@@ -212,7 +212,7 @@ impl ExportSources {
         Ok(())
     }
 
-    fn find(&self, resource: &str) -> Option<Entry> {
+    pub(crate) fn find(&self, resource: &str) -> Option<Entry> {
         self.entries
             .read()
             .unwrap_or_else(PoisonError::into_inner)
@@ -231,7 +231,7 @@ impl ListsHandle {
         let _ = self.0.set(lists);
     }
 
-    fn get(&self) -> ListSchemas {
+    pub(crate) fn get(&self) -> ListSchemas {
         self.0.get().cloned().unwrap_or_default()
     }
 }

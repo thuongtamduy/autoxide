@@ -346,6 +346,13 @@ impl Module for KernelModule {
                     registry: registry.clone(),
                 },
             ));
+            routes = routes.merge(crate::ops::bulk::routes(crate::ops::bulk::BulkState {
+                actions: self.catalog.bulk_actions(),
+                sources: self.catalog.export_sources(),
+                lists: self.catalog.lists(),
+                jobs: jobs.clone(),
+                entitlements: entitlements.clone(),
+            }));
         }
         if let Some(entitlements) = &self.entitlements {
             let state = crate::ops::work::WorkState::new(
@@ -439,6 +446,10 @@ impl Module for KernelModule {
                     registry: registry.clone(),
                     retention_days: self.job_file_days,
                 }),
+            ));
+            jobs.push(crate::job::JobRegistration::new(
+                crate::ops::bulk::BULK,
+                Arc::new(crate::ops::bulk::BulkRunner { actions: self.catalog.bulk_actions() }),
             ));
             jobs.push(crate::job::JobRegistration::new(
                 crate::ops::list_exports::CLEAN_FILES,

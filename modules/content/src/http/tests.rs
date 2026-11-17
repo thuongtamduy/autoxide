@@ -843,3 +843,96 @@ async fn xuat_danh_sach_bai_theo_bo_loc() {
     .await
     .unwrap();
 }
+
+/// Thao tác hàng loạt (bước 51 P8): lưu trữ theo `ids` có kết quả từng bài (bài đã lưu trữ bị bỏ
+/// qua, id lạ thất bại kèm `code`); chọn theo bộ lọc mà số khớp khác `expected_count` thì 409;
+/// thiếu `Idempotency-Key` là 422.
+#[tokio::test]
+async fn luu_tru_hang_loat_co_ket_qua_tung_bai() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let mut ids = Vec::new();
+        for title in ["Một", "Hai", "Ba"] {
+            let created = send(
+                &app,
+                "POST",
+                "/entries",
+                Some("admin"),
+                &[],
+                Some(json!({"kind": "post", "title": title})),
+            )
+            .await;
+            ids.push(created.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        let bulk = |who: &str, key: Option<&str>, body: Value| {
+            let mut request = app
+                .request(Method::POST, "/api/v1/kernel/bulk/content.list_content_entries/archive")
+                .token(who)
+                .json(body);
+            if let Some(key) = key {
+                request = request.header("idempotency-key", key);
+            }
+            request.send()
+        };
+        let no_key = bulk("admin", None, json!({"ids": [ids[0]]})).await.unwrap();
+        assert_eq!(no_key.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", no_key.json());
+        let denied = bulk("reader", Some(&Uuid::now_v7().to_string()), json!({"ids": [ids[0]]}))
+            .await
+            .unwrap();
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        let changed = bulk(
+            "admin",
+            Some(&Uuid::now_v7().to_string()),
+            json!({"filter": {"kind": "post"}, "expected_count": 2}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            (changed.status(), changed.json()["code"].as_str()),
+            (StatusCode::CONFLICT, Some("kernel.bulk_count_changed"))
+        );
+
+        let preview = bulk("admin", None, json!({"filter": {"kind": "post"}, "dry_run": true}))
+            .await
+            .unwrap();
+        assert_eq!(preview.status(), StatusCode::OK, "{}", preview.json());
+        assert_eq!(preview.json()["data"]["count"], 3);
+        let first = bulk("admin", Some(&Uuid::now_v7().to_string()), json!({"ids": [ids[0]]}))
+            .await
+            .unwrap();
+        assert_eq!(first.status(), StatusCode::CREATED, "{}", first.json());
+        let worker = app.modules().worker(2).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        let unknown = Uuid::now_v7().to_string();
+        let queued = bulk(
+            "admin",
+            Some(&Uuid::now_v7().to_string()),
+            json!({"ids": [ids[0], ids[1], unknown]}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(queued.status(), StatusCode::CREATED, "{}", queued.json());
+        let job_id = queued.json()["data"]["id"].as_str().unwrap().to_owned();
+        while worker.run_once().await.unwrap() > 0 {}
+        let job = app
+            .get(&format!("/api/v1/kernel/jobs/{job_id}"))
+            .token("admin")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        let result = &job["data"]["result"];
+        assert_eq!(
+            (result["ok"].as_u64(), result["skipped"].as_u64(), result["failed"].as_u64()),
+            (Some(1), Some(1), Some(1)),
+            "{job}"
+        );
+        assert_eq!(result["items"][0]["code"], "already_archived");
+        assert_eq!(result["items"][2]["code"], "content.not_found");
+        let third =
+            send(&app, "GET", &format!("/entries/{}", ids[2]), Some("admin"), &[], None).await;
+        assert_eq!(third.json()["data"]["status"], "draft", "bài không được chọn giữ nguyên");
+    })
+    .await
+    .unwrap();
+}

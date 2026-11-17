@@ -9,6 +9,7 @@
 use autoxide_kernel::access::Permission;
 use autoxide_kernel::ai::TextModel;
 use autoxide_kernel::antispam::AntispamConfig;
+use autoxide_kernel::bulk::BulkAction;
 use autoxide_kernel::config::Config;
 use autoxide_kernel::csv::line;
 use autoxide_kernel::database::Database;

@@ -628,3 +628,75 @@ async fn sap_nguoi_dang_ky_theo_email_va_trang_thai() {
     .await
     .unwrap();
 }
+
+/// Thao tác hàng loạt (bước 51 P8): chặn nhiều người đăng ký qua `POST /kernel/bulk/…`; chặn lại
+/// người đã bị chặn thì bỏ qua; thiếu `newsletter.manage` là 403.
+#[tokio::test]
+async fn chan_hang_loat_nguoi_dang_ky() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let http = &app.http;
+        let list =
+            send(http, "POST", "/newsletter/lists", Some("admin"), &[], Some(list_body())).await;
+        assert_eq!(list.status(), StatusCode::CREATED, "{}", list.json());
+        for email in ["a@example.com", "b@example.com"] {
+            let added = send(
+                http,
+                "POST",
+                "/newsletter/public/subscribe",
+                Some("website"),
+                &[],
+                Some(json!({"email": email, "lists": ["weekly"]})),
+            )
+            .await;
+            assert_eq!(added.status(), StatusCode::ACCEPTED, "{}", added.json());
+        }
+        app.work().await;
+        let listed = send(http, "GET", "/newsletter/subscribers", Some("reader"), &[], None).await;
+        let ids: Vec<String> = listed.json()["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["id"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ids.len(), 2, "{}", listed.json());
+        let path = "/kernel/bulk/newsletter.list_newsletter_subscribers/block";
+        let denied = send(
+            http,
+            "POST",
+            path,
+            Some("reader"),
+            &[("idempotency-key", &uuid::Uuid::now_v7().to_string())],
+            Some(json!({"ids": ids})),
+        )
+        .await;
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        for _ in 0..2 {
+            let queued = send(
+                http,
+                "POST",
+                path,
+                Some("writer"),
+                &[("idempotency-key", &uuid::Uuid::now_v7().to_string())],
+                Some(json!({"ids": ids})),
+            )
+            .await;
+            assert_eq!(queued.status(), StatusCode::CREATED, "{}", queued.json());
+            app.work().await;
+        }
+        let blocked =
+            send(http, "GET", "/newsletter/subscribers?blocked=true", Some("reader"), &[], None)
+                .await;
+        assert_eq!(blocked.json()["data"].as_array().unwrap().len(), 2, "{}", blocked.json());
+        let jobs =
+            send(http, "GET", "/kernel/jobs?kind=kernel.bulk", Some("writer"), &[], None).await;
+        assert_eq!(
+            jobs.json()["data"][0]["result"]["skipped"],
+            2,
+            "lần hai không làm lại: {}",
+            jobs.json()
+        );
+    })
+    .await
+    .unwrap();
+}
