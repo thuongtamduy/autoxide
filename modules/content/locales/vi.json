@@ -96,6 +96,7 @@
   "field:must be at most {max} characters": "phải dài tối đa {max} ký tự",
   "field:must be at most {max} characters long": "phải dài tối đa {max} ký tự",
   "field:must be comma-separated language codes like `en` or `pt-BR`": "phải là các mã ngôn ngữ cách nhau bằng dấu phẩy, như `en` hay `pt-BR`",
+  "field:must be comma-separated tag ids": "phải là các ID nhãn cách nhau bằng dấu phẩy",
   "field:must be in the future": "phải là thời điểm trong tương lai",
   "field:must be lower-case letters and digits in groups joined by `-`, at most 100 characters": "phải là các nhóm chữ thường và số nối bằng `-`, tối đa 100 ký tự",
   "field:must be lower-case letters and digits joined by `-`": "phải là chữ thường và số nối bằng `-`",

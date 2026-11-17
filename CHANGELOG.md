@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Internal tags on records (step 51): modules make a record type taggable (`StartContext::taggable`);
+  `/api/v1/kernel/tags` lists, creates, renames, merges and deletes the tenant's tags (`kernel.tags.manage`), and
+  `PUT /api/v1/kernel/records/{kind}/{id}/tags` sets a record's tags (writing the record is needed; creating tags
+  there can be restricted with the tenant setting `kernel.tags.restricted`). Names are unique ignoring case and
+  accents; at most 50 tags per record; event `kernel.record_tags_changed`. Posts and pages carry `tags` and filter
+  on `tags_any` / `tags_all`.
 - Tenant lists of reasons (step 51): modules declare lists of reason codes (`Module::reason_lists`);
   `GET /api/v1/kernel/reasons/{list}` merges them with the tenant's own labels, order, codes turned off and codes
   added with `PUT /api/v1/kernel/reasons/{list}/{code}` (`kernel.reasons.manage`); codes required by law stay on;

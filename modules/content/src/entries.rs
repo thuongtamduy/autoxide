@@ -202,6 +202,9 @@ pub(crate) struct EntryFilter {
     pub owner_org: Option<Uuid>,
     /// Chỉ mục hiện trên website của nút này: nút đó và các nút cấp trên (bộ lọc quản trị `site`).
     pub site: Option<Uuid>,
+    /// Nhãn nội bộ (bước 51 P20): có một trong / có mọi nhãn này.
+    pub tags_any: Vec<Uuid>,
+    pub tags_all: Vec<Uuid>,
 }
 
 impl ContentService {
@@ -457,6 +460,15 @@ impl ContentService {
         }
         if let Some(ai) = filter.ai_generated {
             select = select.filter(Column::AiGenerated.eq(ai));
+        }
+        if !filter.tags_any.is_empty() || !filter.tags_all.is_empty() {
+            select = select.filter(autoxide_kernel::tags::TagIndex.condition(
+                tenant,
+                crate::resource::ENTRY,
+                Column::Id,
+                &filter.tags_any,
+                &filter.tags_all,
+            ));
         }
         if let Some(missing) = &filter.missing_locale {
             // Nhóm bản dịch đã có mục bằng ngôn ngữ đó thì loại; mục chính nó bằng ngôn ngữ đó

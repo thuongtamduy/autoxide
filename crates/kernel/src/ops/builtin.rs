@@ -242,6 +242,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::reasons::CreateReasonCodes),
             // Lần dùng / lỗi cuối của kết nối ra ngoài (bước 51).
             Box::new(crate::ops::connections::CreateConnectionStatus),
+            // Nhãn nội bộ gắn bản ghi (bước 51 P20).
+            Box::new(crate::ops::tags::CreateTags),
         ]
     }
 
@@ -308,6 +310,7 @@ impl Module for KernelModule {
             crate::job::runs::JOBS_READ,
             crate::ops::views::VIEWS_SHARE,
             crate::ops::reasons::REASONS_MANAGE,
+            crate::ops::tags::TAGS_MANAGE,
             crate::job::runs::JOBS_MANAGE,
         ]
     }
@@ -318,6 +321,7 @@ impl Module for KernelModule {
             crate::job::runs::JOB_RETRIED,
             crate::ops::records::RECORD_NOTE_ADDED,
             crate::ops::approvals::APPROVAL_DECIDED,
+            crate::ops::tags::RECORD_TAGS_CHANGED,
             crate::tenancy::admin::TENANT_CREATED,
             crate::tenancy::admin::TENANT_UPDATED,
             crate::tenancy::domains::DOMAIN_ADDED,
@@ -335,7 +339,11 @@ impl Module for KernelModule {
     }
 
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
-        vec![crate::tenancy::PUBLIC_URL, crate::tenancy::BUSINESS_MODEL]
+        vec![
+            crate::tenancy::PUBLIC_URL,
+            crate::tenancy::BUSINESS_MODEL,
+            crate::ops::tags::TAGS_RESTRICTED,
+        ]
     }
 
     fn routes(&self) -> OpenApiRouter {
@@ -365,6 +373,17 @@ impl Module for KernelModule {
                 codes: self.catalog.reason_codes(),
                 permissions: permissions.clone(),
                 translations: self.translations.clone(),
+            }));
+        }
+        if let (Some(outbox), Some((resources, _))) = (&self.outbox, &self.resources) {
+            routes = routes.merge(crate::ops::tags::routes(crate::ops::tags::TagsState {
+                taggables: self.catalog.taggables(),
+                resources: resources.clone(),
+                outbox: outbox.clone(),
+                settings: self.settings.clone().map(|settings| {
+                    let settings: Arc<dyn crate::tenancy::settings::TenantSettings> = settings;
+                    settings
+                }),
             }));
         }
         if let (Some(outbox), Some((resources, permissions))) = (&self.outbox, &self.resources) {

@@ -103,6 +103,8 @@ pub(crate) struct EntryResponse {
     /// entry straight from a list.
     #[schema(example = "\"1731628800000000\"")]
     version: String,
+    /// The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`).
+    tags: Vec<autoxide_kernel::tags::TagRef>,
 }
 
 /// Mục như API trả, kèm term và tác giả (đọc chung một lần cho mọi mục), và bản dịch AI nào đã
@@ -117,6 +119,10 @@ pub(crate) async fn describe(
     let mut authors = service.author_ids(tenant, &ids).await?;
     let outdated = service.outdated_translations(tenant, &entries).await?;
     let mut live = service.published_paths(tenant, &ids).await?;
+    // Nhãn nội bộ (bước 51 P20): một câu cho cả trang.
+    let keys: Vec<String> = ids.iter().map(ToString::to_string).collect();
+    let mut tags =
+        autoxide_kernel::tags::TagIndex.of_records(tenant, crate::resource::ENTRY, &keys).await?;
     Ok(entries
         .into_iter()
         .map(|entry| {
@@ -126,7 +132,9 @@ pub(crate) async fn describe(
             );
             let stale = outdated.contains(&entry.id);
             let public = live.remove(&entry.id);
+            let entry_tags = tags.remove(&entry.id.to_string()).unwrap_or_default();
             let mut response = entry_response(entry, term_ids, author_ids, stale);
+            response.tags = entry_tags;
             if let Some((path, published_at)) = public {
                 response.path = Some(path);
                 response.published_at = Some(published_at);
@@ -179,6 +187,7 @@ fn entry_response(
         version: autoxide_kernel::version::etag(entry.updated_at),
         published_at: None,
         path: None,
+        tags: Vec::new(),
         created_at: entry.created_at,
         updated_at: entry.updated_at,
     }
@@ -244,6 +253,10 @@ pub(crate) struct EntriesQuery {
     /// Only entries shown on the website of this organization unit: its own and those of the
     /// units above it.
     pub site: Option<Uuid>,
+    /// Only entries with at least one of these internal tags (comma-separated ids).
+    pub tags_any: Option<String>,
+    /// Only entries with every one of these internal tags (comma-separated ids).
+    pub tags_all: Option<String>,
 }
 
 impl EntriesQuery {
@@ -267,7 +280,30 @@ impl EntriesQuery {
                 Some,
             ),
         };
+        let mut tags = |raw: Option<&str>, field: &'static str| -> Vec<Uuid> {
+            let mut ids = Vec::new();
+            for part in
+                raw.unwrap_or_default().split(',').map(str::trim).filter(|part| !part.is_empty())
+            {
+                match part.parse::<Uuid>() {
+                    Ok(id) => ids.push(id),
+                    Err(_) => {
+                        problems.push(autoxide_kernel::error::FieldError::new(
+                            field,
+                            "invalid",
+                            "must be comma-separated tag ids",
+                        ));
+                        break;
+                    }
+                }
+            }
+            ids
+        };
+        let tags_any = tags(self.tags_any.as_deref(), "tags_any");
+        let tags_all = tags(self.tags_all.as_deref(), "tags_all");
         EntryFilter {
+            tags_any,
+            tags_all,
             owner_org: self.owner_org,
             site: self.site,
             review_requested: self.review_requested,
