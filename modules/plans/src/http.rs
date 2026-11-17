@@ -254,7 +254,9 @@ pub(crate) struct PlanRequest {
     /// Features to turn on, by key (`features` of the modules).
     #[serde(default)]
     features: Vec<String>,
-    /// Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0.
+    /// Limits by key (`limits` of the modules); `null` is unlimited, a limit left out is 0. A limit
+    /// that has parts also takes a cap per part, `<limit>.<part>` (for example
+    /// `organizations.units.store`); a part left out has no cap of its own.
     #[serde(default)]
     limits: BTreeMap<String, Option<i64>>,
 }
@@ -326,6 +328,9 @@ impl From<PriceRequest> for PriceInput {
 /// Use of one limit.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct LimitUse {
+    /// The limit; `<limit>.<part>` is the separate cap of one part of a limit that has parts (for
+    /// example `organizations.units.store`: units of type `store`), listed when the plan caps that
+    /// part or the tenant uses it.
     #[schema(example = "organizations.units")]
     key: String,
     /// `count`, `amount` or `metered`.
@@ -575,23 +580,39 @@ pub(crate) async fn limit_uses(
 ) -> Result<Vec<LimitUse>, Error> {
     let snapshot = service.snapshot(tenant).await?;
     let used = service.usage(tenant, now()).await?;
-    Ok(service
-        .entitlements
-        .catalog()
-        .limits()
-        .map(|found| {
-            let key = found.limit.key();
-            let max = snapshot.limit(key);
-            let used = used.get(key).copied().unwrap_or(0);
-            LimitUse {
-                key: key.to_owned(),
-                kind: found.limit.kind().as_str().to_owned(),
-                max,
-                used,
-                over_limit: max.is_some_and(|max| used > max),
-            }
-        })
-        .collect())
+    let mut uses = Vec::new();
+    for found in service.entitlements.catalog().limits() {
+        let key = found.limit.key();
+        let kind = found.limit.kind().as_str();
+        let max = snapshot.limit(key);
+        uses.push(limit_use(key, kind, max, used.get(key).copied().unwrap_or(0)));
+        if found.limit.parts().is_none() {
+            continue;
+        }
+        // Mức riêng theo phần (vd theo loại nút): phần gói đặt mức, và phần đang có lượng dùng.
+        let prefix = format!("{key}.");
+        let parts: std::collections::BTreeSet<&String> = snapshot
+            .limits
+            .keys()
+            .chain(used.keys())
+            .filter(|part| part.starts_with(&prefix))
+            .collect();
+        for part in parts {
+            let max = snapshot.part_limit(part);
+            uses.push(limit_use(part, kind, max, used.get(part).copied().unwrap_or(0)));
+        }
+    }
+    Ok(uses)
+}
+
+fn limit_use(key: &str, kind: &str, max: Option<i64>, used: i64) -> LimitUse {
+    LimitUse {
+        key: key.to_owned(),
+        kind: kind.to_owned(),
+        max,
+        used,
+        over_limit: max.is_some_and(|max| used > max),
+    }
 }
 
 // ---- Handler --------------------------------------------------------------------------------

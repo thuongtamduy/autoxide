@@ -311,3 +311,36 @@ async fn ma_tham_chieu_chi_tao_mot_lan() {
     .await
     .unwrap();
 }
+
+/// Khoá chia sẻ (bước 36): hai transaction cùng giữ khoá chia sẻ trên một dòng được; khoá độc quyền
+/// phải chờ tới khi bên giữ khoá chia sẻ commit.
+#[tokio::test]
+async fn lock_one_shared_blocks_exclusive_lock() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let id = open_wallet(&db, Money::new(5, Currency::USD)).await;
+        let released = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let shared = db.begin_write().await.unwrap();
+        let row = rows::lock_one_shared(&shared, wallet::Entity::find_by_id(id)).await.unwrap();
+        assert_eq!(row.unwrap().balance_minor, 5);
+
+        let exclusive = tokio::spawn({
+            let db = db.clone();
+            let released = released.clone();
+            async move {
+                let transaction = db.begin_write().await.unwrap();
+                rows::lock_one(&transaction, wallet::Entity::find_by_id(id)).await.unwrap();
+                // Tới được đây thì bên giữ khoá chia sẻ phải đã nhả.
+                let seen = released.load(Ordering::SeqCst);
+                transaction.commit().await.unwrap();
+                seen
+            }
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        released.store(true, Ordering::SeqCst);
+        shared.commit().await.unwrap();
+        assert!(exclusive.await.unwrap(), "the exclusive lock waited for the shared one");
+    })
+    .await
+    .unwrap();
+}

@@ -242,20 +242,63 @@ impl OrgService {
         principal: &Principal,
         input: NewUnit,
     ) -> Result<UnitRow, Error> {
-        // Hạn mức số nút (bước 35): giữ chỗ TRƯỚC transaction của module, lỗi thì trả lại.
+        // Hạn mức số nút (bước 35): giữ chỗ TRƯỚC transaction của module, lỗi thì trả lại. Giữ cả
+        // chỗ chung lẫn chỗ theo loại nút (`organizations.units.<loại>`).
         let id = OrgId::from_uuid(Uuid::now_v7());
         let reference = unit_reference(id.as_uuid());
-        self.entitlements.reserve(tenant.id(), &UNITS_LIMIT, 1, &reference).await?;
+        let unit_type = input.unit_type.clone();
+        self.hold(tenant, &unit_type, &reference).await?;
         match self.insert_unit(tenant, principal, input, id).await {
             Ok(row) => {
-                self.entitlements.confirm(tenant.id(), &UNITS_LIMIT, &reference).await?;
+                self.keep(tenant, &unit_type, &reference).await?;
                 Ok(row)
             }
             Err(error) => {
-                self.entitlements.release(tenant.id(), &UNITS_LIMIT, &reference).await?;
+                self.give_back(tenant, &unit_type, &reference).await?;
                 Err(error)
             }
         }
+    }
+
+    /// Giữ chỗ hạn mức cho một nút loại `unit_type`: chỗ chung rồi chỗ theo loại; loại hết chỗ thì
+    /// trả lại chỗ chung.
+    async fn hold(
+        &self,
+        tenant: &TenantContext,
+        unit_type: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        let entitlements = &self.entitlements;
+        entitlements.reserve(tenant.id(), &UNITS_LIMIT, 1, reference).await?;
+        let part =
+            entitlements.reserve_part(tenant.id(), &UNITS_LIMIT, unit_type, 1, reference).await;
+        if let Err(error) = part {
+            entitlements.release(tenant.id(), &UNITS_LIMIT, reference).await?;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Chỗ đã giữ thành vĩnh viễn (nút đã ghi).
+    async fn keep(
+        &self,
+        tenant: &TenantContext,
+        unit_type: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        self.entitlements.confirm(tenant.id(), &UNITS_LIMIT, reference).await?;
+        self.entitlements.confirm_part(tenant.id(), &UNITS_LIMIT, unit_type, reference).await
+    }
+
+    /// Trả lại chỗ (ghi hỏng, hay nút bị lưu trữ).
+    async fn give_back(
+        &self,
+        tenant: &TenantContext,
+        unit_type: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        self.entitlements.release(tenant.id(), &UNITS_LIMIT, reference).await?;
+        self.entitlements.release_part(tenant.id(), &UNITS_LIMIT, unit_type, reference).await
     }
 
     async fn insert_unit(
@@ -425,23 +468,23 @@ impl OrgService {
         let reference = unit_reference(id);
         let archiving = status == UnitStatus::Archived.as_str();
         // Nút đang lưu trữ mà đổi sang trạng thái khác: lại được tính vào hạn mức.
-        let reviving = !archiving
-            && find(tenant.database().read(), tenant, id)
+        let revived = match archiving {
+            true => None,
+            false => find(tenant.database().read(), tenant, id)
                 .await
-                .is_ok_and(|row| row.status == UnitStatus::Archived.as_str());
-        if reviving {
-            self.entitlements.reserve(tenant.id(), &UNITS_LIMIT, 1, &reference).await?;
+                .ok()
+                .filter(|row| row.status == UnitStatus::Archived.as_str())
+                .map(|row| row.unit_type),
+        };
+        if let Some(unit_type) = &revived {
+            self.hold(tenant, unit_type, &reference).await?;
         }
         let changed = self.set_status(tenant, principal, id, status, reason).await;
-        match (&changed, reviving) {
-            (Ok(_), true) => {
-                self.entitlements.confirm(tenant.id(), &UNITS_LIMIT, &reference).await?
-            }
-            (Err(_), true) => {
-                self.entitlements.release(tenant.id(), &UNITS_LIMIT, &reference).await?
-            }
-            (Ok(row), false) if row.status == UnitStatus::Archived.as_str() => {
-                self.entitlements.release(tenant.id(), &UNITS_LIMIT, &reference).await?;
+        match (&changed, &revived) {
+            (Ok(_), Some(unit_type)) => self.keep(tenant, unit_type, &reference).await?,
+            (Err(_), Some(unit_type)) => self.give_back(tenant, unit_type, &reference).await?,
+            (Ok(row), None) if row.status == UnitStatus::Archived.as_str() => {
+                self.give_back(tenant, &row.unit_type, &reference).await?;
             }
             _ => {}
         }
@@ -889,7 +932,9 @@ pub(crate) const UNITS_LIMIT: autoxide_kernel::entitlement::Limit =
     autoxide_kernel::entitlement::Limit::count(
         "organizations.units",
         "Organization units a tenant can have, besides its root (archived units do not count).",
-    );
+    )
+    // Gói đặt thêm được mức theo loại nút: `organizations.units.<loại>` (A-3.12).
+    .per("unit type");
 
 /// Mã giữ chỗ hạn mức của nút `id`.
 fn unit_reference(id: Uuid) -> String {
@@ -897,6 +942,19 @@ fn unit_reference(id: Uuid) -> String {
 }
 
 /// Bộ đếm thật cho job đối soát của `plans`: số nút không lưu trữ, trừ gốc.
+/// Phần hẹp kernel cần về cây tổ chức (`OrgNodes`): vd gắn tên miền với một cửa hàng. Nút lưu trữ
+/// không còn dùng được.
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::OrgNodes for OrgService {
+    async fn has_node(&self, tenant: &TenantContext, org: OrgId) -> Result<bool, Error> {
+        let found = unit::Entity::find_by_id(org.as_uuid())
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
+        Ok(found.is_some_and(|unit| unit.status != UnitStatus::Archived.as_str()))
+    }
+}
+
 pub(crate) struct UnitCounter;
 
 #[async_trait::async_trait]
@@ -910,5 +968,26 @@ impl autoxide_kernel::entitlement::UsageCounter for UnitCounter {
             .count(tenant.database().read())
             .await?;
         Ok(i64::try_from(found).unwrap_or(i64::MAX))
+    }
+
+    async fn count_parts(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<std::collections::BTreeMap<String, i64>, Error> {
+        use sea_orm::QuerySelect;
+        // Một câu `GROUP BY` theo loại, không tải từng nút.
+        let counts: Vec<(String, i64)> = unit::Entity::find()
+            .select_only()
+            .column(unit::Column::UnitType)
+            .column_as(unit::Column::Id.count(), "units")
+            .filter(unit::Column::ParentId.is_not_null())
+            .filter(unit::Column::Status.ne(UnitStatus::Archived.as_str()))
+            .scoped(tenant)
+            .group_by(unit::Column::UnitType)
+            .into_tuple()
+            .all(tenant.database().read())
+            .await?;
+        let parts: std::collections::BTreeMap<String, i64> = counts.into_iter().collect();
+        Ok(parts)
     }
 }

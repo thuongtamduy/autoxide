@@ -29,6 +29,9 @@ curl -X POST https://api.example.com/api/v1/plans/plans \
 ```
 
 - Hạn mức đặt `null` là không giới hạn; hạn mức không nêu là `0`.
+- Hạn mức chia phần (`parts` trong `GET /api/v1/kernel/modules`) nhận thêm mức riêng cho từng phần:
+  `"organizations.units.store": 2` cho tối đa 2 nút loại `store`, trong giới hạn chung
+  `organizations.units`. Phần không nêu thì không có mức riêng.
 - Gói chính bật một module thì phải bật cả module nó cần (`requires`), không thì trả
   `plans.module_dependency_missing`.
 - `"is_default": true` làm gói của khách chưa có thuê bao (chỉ một gói mặc định).

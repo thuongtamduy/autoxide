@@ -73,7 +73,7 @@ pub use settings::{
     CONNECTION_GROUP, PUBLIC_URL, SETTINGS_MANAGE, SettingCheck, SettingValue, TenantSetting,
     TenantSettings, parsed_setting,
 };
-pub use site::{SITE_PARAM, Site, SiteQuery};
+pub use site::{SITE_PARAM, Site, SiteQuery, site_not_found};
 
 pub(crate) use config::read_setting;
 

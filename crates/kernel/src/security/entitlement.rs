@@ -77,22 +77,23 @@ pub struct Limit {
     key: &'static str,
     description: &'static str,
     kind: LimitKind,
+    parts: Option<&'static str>,
 }
 
 impl Limit {
     /// Hạn mức đếm số bản ghi đang có.
     pub const fn count(key: &'static str, description: &'static str) -> Self {
-        Limit { key, description, kind: LimitKind::Count }
+        Limit { key, description, kind: LimitKind::Count, parts: None }
     }
 
     /// Hạn mức theo lượng đang dùng, đơn vị `unit` (vd `bytes`).
     pub const fn amount(key: &'static str, description: &'static str, unit: &'static str) -> Self {
-        Limit { key, description, kind: LimitKind::Amount { unit } }
+        Limit { key, description, kind: LimitKind::Amount { unit }, parts: None }
     }
 
     /// Hạn mức lượng dùng trong kỳ `period`.
     pub const fn metered(key: &'static str, description: &'static str, period: Period) -> Self {
-        Limit { key, description, kind: LimitKind::Metered { period } }
+        Limit { key, description, kind: LimitKind::Metered { period }, parts: None }
     }
 
     pub const fn key(&self) -> &'static str {
@@ -106,6 +107,25 @@ impl Limit {
     pub const fn kind(&self) -> LimitKind {
         self.kind
     }
+
+    /// Hạn mức có thêm mức riêng theo từng phần (vd theo loại nút): gói đặt được cả khoá
+    /// `<key>.<phần>` (`organizations.units.store`) bên cạnh mức chung `<key>`. `parts` mô tả phần là
+    /// gì (vd `"unit type"`), hiện cho người soạn gói. Phần không có mức riêng thì không bị giới hạn
+    /// riêng — chỉ tính vào mức chung. Module giữ chỗ phần bằng
+    /// [`EntitlementsHandle::reserve_part`] cùng lúc với chỗ chung.
+    pub const fn per(self, parts: &'static str) -> Self {
+        Limit { parts: Some(parts), ..self }
+    }
+
+    /// Mô tả phần, khi hạn mức có mức riêng theo phần.
+    pub const fn parts(&self) -> Option<&'static str> {
+        self.parts
+    }
+
+    /// Khoá mức riêng của phần `part`: `<key>.<part>`.
+    pub fn part_key(&self, part: &str) -> String {
+        format!("{}.{part}", self.key)
+    }
 }
 
 /// Bộ đếm thật trong database của module cho một hạn mức `Count` / `Amount`: job đối soát dùng nó
@@ -115,6 +135,12 @@ impl Limit {
 pub trait UsageCounter: Send + Sync {
     /// Lượng đang dùng thật của khách `tenant`.
     async fn count(&self, tenant: &TenantContext) -> Result<i64, Error>;
+
+    /// Lượng đang dùng thật theo từng phần (hạn mức khai [`Limit::per`]): phần → lượng. Mặc định
+    /// rỗng (hạn mức không chia phần).
+    async fn count_parts(&self, _tenant: &TenantContext) -> Result<BTreeMap<String, i64>, Error> {
+        Ok(BTreeMap::new())
+    }
 }
 
 /// Khách được làm gì với dữ liệu của mình.
@@ -155,6 +181,12 @@ impl TenantEntitlements {
         self.unrestricted || self.features.contains(feature)
     }
 
+    /// Mức tối đa riêng của một phần (`<key>.<phần>`, xem [`Limit::per`]): `None` = không giới hạn
+    /// riêng — khác [`limit`](Self::limit), khoá vắng mặt nghĩa là không đặt mức riêng.
+    pub fn part_limit(&self, key: &str) -> Option<i64> {
+        if self.unrestricted { None } else { self.limits.get(key).copied().flatten() }
+    }
+
     /// Mức tối đa của hạn mức `limit`: `None` = không giới hạn.
     pub fn limit(&self, limit: &str) -> Option<i64> {
         if self.unrestricted { None } else { self.limits.get(limit).copied().unwrap_or(Some(0)) }
@@ -185,6 +217,42 @@ pub trait Entitlements: Send + Sync {
 
     /// Trả lại chỗ đã giữ hay đã xác nhận; gọi nhiều lần hay với `reference` lạ đều `Ok`.
     async fn release(&self, tenant: TenantId, limit: &Limit, reference: &str) -> Result<(), Error>;
+
+    /// Như [`reserve`](Self::reserve) cho mức riêng của phần `part` (khoá `<key>.<part>`, xem
+    /// [`Limit::per`]); phần không có mức riêng chỉ được ghi lượng dùng, không bao giờ bị từ chối.
+    /// Mặc định: không giới hạn.
+    async fn reserve_part(
+        &self,
+        _tenant: TenantId,
+        _limit: &Limit,
+        _part: &str,
+        _amount: i64,
+        _reference: &str,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Như [`confirm`](Self::confirm) cho phần `part`. Mặc định: `Ok`.
+    async fn confirm_part(
+        &self,
+        _tenant: TenantId,
+        _limit: &Limit,
+        _part: &str,
+        _reference: &str,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Như [`release`](Self::release) cho phần `part`. Mặc định: `Ok`.
+    async fn release_part(
+        &self,
+        _tenant: TenantId,
+        _limit: &Limit,
+        _part: &str,
+        _reference: &str,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 
     /// Ghi lượng dùng `quantity` của hạn mức `Metered`; trùng `reference` thì bỏ qua. Vượt mức
     /// của kỳ → `quota_exhausted`.
@@ -407,6 +475,50 @@ impl EntitlementsHandle {
         }
     }
 
+    /// Xem [`Entitlements::reserve_part`]; không có bên cung cấp thì `Ok`. Module giữ chỗ chung
+    /// ([`reserve`](Self::reserve)) trước, rồi chỗ của phần; phần bị từ chối thì trả lại chỗ chung.
+    pub async fn reserve_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        amount: i64,
+        reference: &str,
+    ) -> Result<(), Error> {
+        match self.provider_for(tenant) {
+            Some(provider) => provider.reserve_part(tenant, limit, part, amount, reference).await,
+            None => Ok(()),
+        }
+    }
+
+    /// Xem [`Entitlements::confirm_part`]; không có bên cung cấp thì `Ok`.
+    pub async fn confirm_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        match self.provider_for(tenant) {
+            Some(provider) => provider.confirm_part(tenant, limit, part, reference).await,
+            None => Ok(()),
+        }
+    }
+
+    /// Xem [`Entitlements::release_part`]; không có bên cung cấp thì `Ok`.
+    pub async fn release_part(
+        &self,
+        tenant: TenantId,
+        limit: &Limit,
+        part: &str,
+        reference: &str,
+    ) -> Result<(), Error> {
+        match self.provider_for(tenant) {
+            Some(provider) => provider.release_part(tenant, limit, part, reference).await,
+            None => Ok(()),
+        }
+    }
+
     /// Xem [`Entitlements::record_usage`]; không có bên cung cấp thì `Ok`.
     pub async fn record_usage(
         &self,
@@ -522,8 +634,16 @@ impl EntitlementCatalog {
         self.data.limits.values()
     }
 
+    /// Hạn mức mang khoá `key` — kể cả khoá mức riêng của một phần (`<key>.<phần>`) của hạn mức khai
+    /// [`Limit::per`]; phần phải là tên dạng định danh (chữ thường, số, `_`).
     pub fn limit(&self, key: &str) -> Option<&CatalogLimit> {
-        self.data.limits.get(key)
+        if let Some(found) = self.data.limits.get(key) {
+            return Some(found);
+        }
+        let (base, part) = key.rsplit_once('.')?;
+        let found = self.data.limits.get(base)?;
+        let valid = found.limit.parts().is_some() && crate::module::is_identifier(part);
+        valid.then_some(found)
     }
 
     /// Module mà `module` cần (đã `require` trait của chúng lúc khởi động). Rỗng trước khi mọi

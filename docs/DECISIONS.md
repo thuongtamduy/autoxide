@@ -8010,3 +8010,61 @@ Quyết định:
 
 Lý do: dùng lại đường đọc bảng của việc dời khách thay vì bắt mỗi module viết hàm xuất; JSON Lines đọc được bằng công cụ
 phổ biến và nạp lại theo từng dòng.
+
+## D-329 · Đánh số tuần tự, khoá chia sẻ, nhiều module cùng góp một trait (bước 36 phần 2) — 2026-11-17 — agent quyết
+
+Quyết định:
+
+1. **`autoxide_kernel::numbering`**: bảng `kernel_sequences` (`tenant_id`, `scope`, `last_value`, `updated_at`; khoá
+   chính `(tenant_id, scope)`) là bảng cấp khách hàng của module nội bộ `kernel` (migration `m0016_create_sequences`),
+   có ở mọi database dữ liệu. `next` là **một câu** `INSERT … ON CONFLICT (tenant_id, scope) DO UPDATE SET last_value =
+   kernel_sequences.last_value + 1 RETURNING last_value` thay cho hai câu (INSERT … DO NOTHING rồi UPDATE … RETURNING)
+   của đặc tả: cùng tác dụng, ít một lượt đi về; chạy trên Postgres và SQLite ≥ 3.35. Số cấp trong transaction ghi của
+   bên gọi: rollback thì không tiêu số; các bên cùng dãy nối đuôi nhau tới commit. Không dùng `SEQUENCE` (nhảy số khi
+   rollback, SQLite không có).
+2. **`rows::lock_one_shared`**: `SELECT … FOR SHARE` trên Postgres, câu thường trên SQLite (một bên ghi). Dùng cho dòng
+   kỳ kế toán: bút toán giữ khoá chia sẻ, khoá sổ giữ khoá độc quyền.
+3. **`StartContext::contribute` / `contributions`** (và `TestAppBuilder::contribute`): trait nhiều module cùng cung
+   cấp (bộ nối `PaymentGateway`, `BankFeed`…), khác `provide` chỉ một bên. Mỗi module góp mỗi trait một lần; bên đọc
+   thấy các bộ góp của module đăng ký TRƯỚC, theo thứ tự đăng ký. Hàm mới, không bắt module cũ sửa (D-038).
+
+Test trên cả hai database: 32 transaction đồng thời nhận đúng 1..32; rollback không tiêu số; dãy và khách độc lập;
+khoá độc quyền chờ khoá chia sẻ.
+
+## D-330 · Hạn mức chia phần — hạn mức theo loại nút (bước 35, A-3.12) — 2026-11-17 — agent quyết
+
+Bối cảnh: D-326 để lại hạn mức theo loại nút vì loại nút là dữ liệu của khách, còn sổ hạn mức của kernel khai tĩnh.
+
+Quyết định:
+
+1. **Hạn mức chia phần**: `Limit::count(…).per("unit type")` khai rằng gói đặt được thêm mức riêng cho từng phần bằng khoá
+   `<key>.<phần>` (`organizations.units.store`), phần là tên dạng định danh. Sổ hạn mức nhận khoá đó
+   (`EntitlementCatalog::limit`), nên gói, gói thêm, ghi đè riêng dùng được như hạn mức thường — không đổi bảng nào.
+2. **Phần không có mức riêng thì không bị giới hạn riêng** (`TenantEntitlements::part_limit` trả `None`), khác hạn mức
+   thường (vắng = 0) — loại nút mới không bị chặn chỉ vì gói chưa nhắc tới nó; mức chung vẫn chặn.
+3. **Giữ chỗ phần**: hàm mới có mặc định của `Entitlements` (`reserve_part` / `confirm_part` / `release_part`, D-038).
+   Module giữ chỗ chung trước rồi chỗ của phần, phần bị từ chối thì trả chỗ chung. `plans` luôn ghi lượng dùng của phần
+   (kể cả khi chưa có mức) để đặt mức sau thì số đã đúng.
+4. **Đối soát**: `UsageCounter::count_parts` (mặc định rỗng); `plans.reconcile_usage` đặt lại số của mọi phần đang có
+   bản ghi hay đã có dòng lượng dùng. `organizations` đếm bằng một câu `GROUP BY unit_type`.
+5. API: `GET /api/v1/kernel/modules` thêm `parts` cho hạn mức; `GET /api/v1/plans/entitlements` liệt kê dòng của từng phần
+   gói đặt mức hay khách đang dùng. Chỉ thêm trường, không phá vỡ.
+
+## D-331 · Hồ sơ của website đang được gọi; `organizations` công bố `OrgNodes` — 2026-11-17 — agent quyết
+
+Bối cảnh: giao diện (`docs/prompts/web-build-api-gaps.md`) không biết tên miền đang mở là website của nút nào, nên tên
+miền gắn với cửa hàng con vẫn hiện tên của trụ sở. Khi làm thì thấy thêm hai lỗi: `organizations` chưa công bố
+`dyn OrgNodes` (D-305 dựa vào nó), nên `PATCH /kernel/domains/{id}` với `org_id` luôn trả `unsupported`; và gắn nút xong
+cache tên miền → (khách, nút) của sổ database vẫn giữ nút cũ tới khi hết hạn.
+
+Quyết định:
+
+1. `GET /api/v1/organizations/public/site` (công khai, tham số `site` tuỳ chọn): hồ sơ công khai của nút website theo
+   extractor `Site` của kernel — tên miền gắn nút → nút đó; `?site=` → nút đó; không có → nút gốc. Khách chưa mở cây tổ
+   chức: trả hồ sơ mang tên khách, không ghi gì (request công khai, khách có thể đang chỉ đọc). Nút không có hay không
+   hoạt động → `site_not_found`.
+2. `organizations` công bố `dyn OrgNodes`: nút có trong cây của khách và chưa lưu trữ.
+3. `TenantDomains::assign_org` quên dòng cache của tên miền (máy khác thấy khi cache hết hạn).
+4. Thông tin pháp lý và logo Bộ Công Thương không thêm vào hồ sơ công khai: thuộc `compliance` (bước 37,
+   `GET /public/owner`, `/public/badge`); logo thương hiệu thuộc dòng "Thông tin cửa hàng công khai" (bước 68) — không
+   lưu hai chỗ.

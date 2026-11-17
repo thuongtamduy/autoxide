@@ -51,6 +51,19 @@ pub async fn lock_one<E: EntityTrait, C: ConnectionTrait>(
     select.lock_exclusive().one(transaction).await
 }
 
+/// Đọc dòng `select` chọn (tối đa một dòng) và giữ **khoá chia sẻ** tới hết `transaction` (bước 36):
+/// nhiều transaction cùng giữ khoá chia sẻ trên một dòng được, nhưng bên muốn [`lock_one`] (khoá độc
+/// quyền) hay sửa dòng đó phải chờ chúng xong. Vd mọi bút toán giữ khoá chia sẻ trên dòng kỳ kế toán,
+/// còn khoá sổ khoá độc quyền: khoá sổ chờ các bút toán đang ghi, bút toán mới chờ khoá sổ xong rồi
+/// thấy kỳ đã khoá. Postgres: `SELECT … FOR SHARE`. SQLite: câu `SELECT` thường (mọi transaction ghi
+/// đã giữ quyền ghi cả database — xem đầu file).
+pub async fn lock_one_shared<E: EntityTrait, C: ConnectionTrait>(
+    transaction: &C,
+    select: Select<E>,
+) -> Result<Option<E::Model>, DbErr> {
+    select.lock_shared().one(transaction).await
+}
+
 /// Giới hạn cho [`adjust`]: giá trị của cột SAU khi cộng phải nằm trong `[floor, ceiling]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Bounds {

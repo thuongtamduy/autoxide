@@ -437,7 +437,30 @@ impl StartContext<'_> {
     {
         self.apis.require(self.module)
     }
+
+    /// Góp một bộ cài đặt cho trait mà NHIỀU module cùng cung cấp (bước 36), vd mỗi module bộ nối
+    /// đối tác góp một `dyn PaymentGateway`: `context.contribute::<dyn PaymentGateway>(Arc::new(vnpay))?`.
+    /// Khác [`provide`](Self::provide) (đúng một bên công bố): bao nhiêu module góp cũng được, mỗi
+    /// module góp mỗi trait tối đa một lần.
+    pub fn contribute<T>(&mut self, api: Arc<T>) -> Result<(), Error>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.apis.contribute(self.module, api)
+    }
+
+    /// Mọi bộ cài đặt của `T` mà các module đăng ký TRƯỚC đã góp, theo thứ tự đăng ký; chưa ai góp
+    /// thì rỗng (bên dùng tự quyết đó có phải lỗi không).
+    pub fn contributions<T>(&self) -> Vec<Arc<T>>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.apis.contributions()
+    }
 }
+
+/// Một bộ góp: module góp và `Arc<T>` cất dưới dạng `dyn Any`.
+type Contribution = (&'static str, Box<dyn Any + Send + Sync>);
 
 /// Sổ các trait đã được công bố, tra theo kiểu của trait.
 #[derive(Default)]
@@ -449,6 +472,8 @@ struct Apis {
     /// `(module, module cung cấp)` mỗi lần một module `require` trait của module khác: sổ module
     /// và `plans` biết module nào cần module nào (bước 35). `Mutex` vì `require` chỉ mượn `&self`.
     required: std::sync::Mutex<BTreeSet<(&'static str, &'static str)>>,
+    /// Trait nhiều bên cùng góp (`contribute`): theo kiểu, danh sách `(module, Arc<T>)` theo thứ tự góp.
+    contributed: HashMap<TypeId, Vec<Contribution>>,
 }
 
 impl Apis {
@@ -465,6 +490,36 @@ impl Apis {
         }
         self.provided.insert(TypeId::of::<T>(), (module, Box::new(api)));
         Ok(())
+    }
+
+    fn contribute<T>(&mut self, module: &'static str, api: Arc<T>) -> Result<(), Error>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        let entries = self.contributed.entry(TypeId::of::<T>()).or_default();
+        if entries.iter().any(|(owner, _)| *owner == module) {
+            return Err(Error::internal(format!(
+                "module `{module}` contributes `{}` twice; contribute each contract once",
+                std::any::type_name::<T>()
+            )));
+        }
+        entries.push((module, Box::new(api)));
+        Ok(())
+    }
+
+    fn contributions<T>(&self) -> Vec<Arc<T>>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.contributed
+            .get(&TypeId::of::<T>())
+            .map(|entries| {
+                entries
+                    .iter()
+                    .filter_map(|(_, api)| api.downcast_ref::<Arc<T>>().cloned())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn get<T>(&self) -> Option<Arc<T>>

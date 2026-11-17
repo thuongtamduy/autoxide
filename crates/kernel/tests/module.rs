@@ -181,6 +181,61 @@ async fn hai_module_cong_bo_cung_mot_trait_la_loi() {
     .unwrap();
 }
 
+/// Nhiều module cùng góp một trait (`contribute`, bước 36); module sau thấy mọi bộ góp trước nó theo
+/// thứ tự đăng ký; một module góp hai lần là lỗi.
+#[tokio::test]
+async fn nhieu_module_cung_gop_mot_trait() {
+    TestDatabase::run(async |database| {
+        struct Named(&'static str);
+        impl UserDirectory for Named {
+            fn display_name(&self, id: u32) -> String {
+                format!("{}-{id}", self.0)
+            }
+        }
+        struct Contributor(&'static str, usize);
+        impl Module for Contributor {
+            fn name(&self) -> &'static str {
+                self.0
+            }
+
+            fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+                for _ in 0..self.1 {
+                    context.contribute::<dyn UserDirectory>(Arc::new(Named(self.0)))?;
+                }
+                Ok(())
+            }
+        }
+        struct Reader(Arc<Mutex<Vec<String>>>);
+        impl Module for Reader {
+            fn name(&self) -> &'static str {
+                "reader"
+            }
+
+            fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+                let all = context.contributions::<dyn UserDirectory>();
+                *self.0.lock().unwrap() = all.iter().map(|api| api.display_name(1)).collect();
+                Ok(())
+            }
+        }
+        let db = connect(database).await;
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let mut modules = Modules::new(vec![
+            Box::new(Contributor("vnpay", 1)),
+            Box::new(Contributor("momo", 1)),
+            Box::new(Reader(Arc::clone(&seen))),
+        ])
+        .unwrap();
+        modules.start(&db).unwrap();
+        assert_eq!(*seen.lock().unwrap(), ["vnpay-1", "momo-1"]);
+
+        let mut twice = Modules::new(vec![Box::new(Contributor("vnpay", 2))]).unwrap();
+        let error = twice.start(&db).unwrap_err().to_string();
+        assert!(error.contains("contributes"), "{error}");
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn module_khoi_dong_hong_thi_dung_va_bao_ten_module() {
     TestDatabase::run(async |database| {

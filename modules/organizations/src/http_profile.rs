@@ -27,6 +27,7 @@ pub(crate) fn routes() -> OpenApiRouter<Arc<OrgService>> {
     OpenApiRouter::new()
         .routes(routes!(get_public_profile, update_public_profile))
         .routes(routes!(list_public_stores))
+        .routes(routes!(get_site_profile))
 }
 
 /// The public profile of an organization unit, as websites show it.
@@ -172,6 +173,34 @@ async fn update_public_profile(
         cover_media_id: input.cover_media_id,
     };
     Ok(Data { data: service.update_profile(&tenant, &principal, id, changes).await?.into() })
+}
+
+/// Get the profile of the website being visited.
+///
+/// No sign-in needed. The website is the organization unit the domain of the request is bound to
+/// (see `PATCH /api/v1/kernel/domains/{id}`), or the one named with `site` when the page is not
+/// served on its own domain; otherwise the whole tenant (its root unit). A store's own domain thus
+/// shows the store's name, address and hours, not the head office's. Use `unit_id` as `site` in
+/// other public calls (menus, content) when they are not made on that domain.
+#[utoipa::path(
+    get,
+    path = "/public/site",
+    extensions(("x-public" = json!(true))),
+    operation_id = "get_site_profile",
+    security((), ("bearer" = [])),
+    params(autoxide_kernel::tenancy::SiteQuery),
+    responses(
+        (status = 200, description = "The public profile of the website's unit.", body = Data<PublicProfileResponse>),
+        (status = 400, description = "`site` is not a UUID; code `invalid_site`.", body = Problem),
+        (status = 404, description = "No active unit `site` in this tenant; code `site_not_found`.", body = Problem),
+    )
+)]
+async fn get_site_profile(
+    State(service): State<Arc<OrgService>>,
+    tenant: TenantContext,
+    site: autoxide_kernel::tenancy::Site,
+) -> Result<Data<PublicProfileResponse>, Error> {
+    Ok(Data { data: service.site_profile(&tenant, &site).await?.into() })
 }
 
 /// List the stores of this tenant shown on its websites.

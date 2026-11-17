@@ -455,6 +455,11 @@ context.usage_counter(&PRODUCTS, Arc::new(ProductCounter))?; // the real count, 
   reservation would wait for itself. A process that dies between reserve and confirm loses
   nothing: holds expire (`AUTOXIDE_PLANS_HOLD_MINUTES`) and a daily job resets usage from your
   `UsageCounter`.
+- **A limit with parts** (`Limit::count(…).per("unit type")`): a plan can also cap each part with
+  `<key>.<part>` (`organizations.units.store`). Reserve the shared hold first, then the part's
+  (`reserve_part(tenant, &LIMIT, part, 1, &reference)`; if the part is refused, release the shared
+  one), and confirm / release both. A part with no cap of its own is only counted. Implement
+  `UsageCounter::count_parts` so the daily job also fixes the per-part counts.
 - **A metered limit** (`Limit::metered`, use per month): `record_usage(tenant, &LIMIT, quantity,
   reference)`; the same `reference` is counted once; over the month's quota it answers `429
   quota_exhausted` with `Retry-After`.

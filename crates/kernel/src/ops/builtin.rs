@@ -160,6 +160,8 @@ impl Module for KernelModule {
             crate::event::outbox_access_migration("k0001_event_access", NAME),
             // Xuất toàn bộ dữ liệu một khách (bước 35, D-328).
             Box::new(crate::tenancy::exports::CreateTenantExports),
+            // Dãy số tuần tự không nhảy số (bước 36): cấp khách hàng, có ở mọi database dữ liệu.
+            Box::new(crate::numbering::CreateSequences),
         ]
     }
 

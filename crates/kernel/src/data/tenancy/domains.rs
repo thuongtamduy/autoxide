@@ -609,7 +609,9 @@ impl TenantDomains {
             // Vừa bị thu hồi (hay nhận lại bởi khách khác) giữa lúc đọc và lúc ghi.
             return Err(tenant_domain_revoked());
         }
-        // Cache của sổ database chỉ giữ tên miền → khách: gắn nút không đổi gì ở đó.
+        // Cache của sổ database giữ tên miền → (khách, nút) (`domain_site`): quên dòng này để website
+        // thấy nút mới ngay ở máy này (máy khác thấy khi cache hết hạn).
+        self.registry.invalidate_domain(&row.domain);
         let after = self.find(row.id).await?;
         let event = DomainUpdated {
             id: after.id,
