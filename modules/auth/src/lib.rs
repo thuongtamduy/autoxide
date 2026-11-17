@@ -153,6 +153,30 @@ impl Module for AuthModule {
         Ok(())
     }
 
+    // Thời hạn lưu dữ liệu cá nhân (bước 37 C5, D-360), đọc từ cấu hình đang có.
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        let Some(config) = &self.config else {
+            return Vec::new();
+        };
+        let days = u32::try_from(config.refresh_token_ttl.as_secs() / 86_400).unwrap_or(u32::MAX);
+        vec![
+            RetentionPolicy::new(
+                "auth.accounts",
+                "Accounts (email, name, password hash); kept until the account is deleted.",
+                DataCategory::Basic,
+                Keep::UntilDeleted,
+            ),
+            RetentionPolicy::new(
+                "auth.sessions",
+                "Sign-in sessions and refresh tokens (hashed).",
+                DataCategory::Security,
+                Keep::Days(days.max(1)),
+            )
+            .setting(config::REFRESH_TOKEN_DAYS.name),
+        ]
+    }
+
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         context.finder_source(Arc::new(find::Users))?;
         let config = self

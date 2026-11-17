@@ -598,6 +598,19 @@ chạy từ placement mới và chỉ còn bản cũ chờ xoá.
   nó dừng. Lượt dời bắt đầu qua API được job của nó thử lại; bắt đầu một lượt khác khi một lượt
   đang chạy thì nhận `tenant_move_running`.
 
+**Nơi lưu dữ liệu.** Ghi nước đặt máy chủ của từng placement bằng `autoxide placement country <tên> VN`
+(`-` khi chưa rõ; `autoxide placement list` cho xem). Khách buộc lưu dữ liệu ở một nước (nhân sự nền tảng đặt
+bằng `PUT /api/v1/compliance/residency`) không dời được sang placement ở nước khác hay chưa rõ nước: lượt dời
+trả `tenant_residency_violation`. Xem [COMPLIANCE.vi.md](COMPLIANCE.vi.md#nơi-lưu-dữ-liệu).
+
+## Sự cố dữ liệu cá nhân
+
+Khi dữ liệu cá nhân có thể đã lộ (mất bản backup, database bị mở ra ngoài, gửi nhầm mail), ở Việt Nam báo cáo
+gửi cơ quan có hạn **72 giờ kể từ khi phát hiện**. Ghi sự cố vào API ngay (`POST /api/v1/compliance/incidents`),
+đặt chính sách `incident.alert_emails` của khách để lời nhắc tới đúng người, và làm theo sổ tay ở
+[COMPLIANCE.vi.md](COMPLIANCE.vi.md#sự-cố-dữ-liệu-cá-nhân-sổ-tay-72-giờ). `autoxide doctor` cảnh báo khi sự cố
+đã quá hạn.
+
 ## Chạy nhiều máy chủ
 
 Với PostgreSQL, chạy bao nhiêu tiến trình `app` cũng được sau reverse proxy: chúng chỉ
@@ -643,3 +656,5 @@ Chỉ một máy chủ, không có bộ cân bằng tải thì để khoảng r�
 - [ ] Đã cấu hình SMTP, để đặt lại mật khẩu và xác minh email chạy được
 - [ ] Backup theo lịch và chép sang máy khác; đã thử khôi phục một lần
 - [ ] `/health/ready` được hệ thống giám sát theo dõi
+- [ ] Đã ghi nước của placement (`autoxide placement country`) khi có khách buộc lưu dữ liệu tại Việt Nam, và
+      đặt `incident.alert_emails` để nhận nhắc hạn 72 giờ của sự cố

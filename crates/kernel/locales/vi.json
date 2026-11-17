@@ -246,5 +246,7 @@
   "uri_too_long": "Đường dẫn của request quá dài.",
   "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì.",
   "web_push_disabled": "Máy chủ chưa cấu hình thông báo đẩy trên trình duyệt.",
-  "zns_disabled": "Máy chủ chưa cấu hình gửi tin Zalo ZNS."
+  "zns_disabled": "Máy chủ chưa cấu hình gửi tin Zalo ZNS.",
+  "tenant_residency_violation": "Khách yêu cầu lưu dữ liệu tại {country}; vị trí dữ liệu này không đáp ứng (chưa rõ nước hoặc ở nước khác). Ghi nước của vị trí dữ liệu bằng `autoxide placement country`, hoặc chọn vị trí dữ liệu ở {country}.",
+  "field:must be a two-letter ISO 3166-1 country code, e.g. `VN`": "phải là mã nước ISO 3166-1 hai chữ cái, ví dụ `VN`"
 }

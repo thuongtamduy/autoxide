@@ -124,6 +124,14 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Loại dữ liệu cá nhân module giữ và thời hạn lưu của từng loại (bước 37, D-360). Gọi sau
+    /// `configure` (thời hạn đọc từ cấu hình của module); kernel gom thành
+    /// [`RetentionCatalog`](crate::privacy::RetentionCatalog), `compliance` công khai ở sổ hoạt động
+    /// xử lý. Mặc định rỗng.
+    fn retention(&self) -> Vec<crate::privacy::RetentionPolicy> {
+        Vec::new()
+    }
+
     /// Bảng mặt điều khiển của module (bước 33, D-253): bảng không có `tenant_id` vì chung cả nền
     /// tảng, chỉ có dữ liệu ở database điều khiển. Mọi bảng khác của module (trừ `<m>_migrations`)
     /// là bảng cấp khách hàng và phải có `tenant_id` — testkit và `cargo xtask check` kiểm.
@@ -283,6 +291,7 @@ pub struct StartContext<'a> {
     wake: &'a Arc<tokio::sync::Notify>,
     apis: &'a mut Apis,
     personal_data: &'a PersonalDataExport,
+    retention: &'a crate::privacy::RetentionCatalog,
     resources: &'a crate::resource::ResourceDirectory,
     work: &'a crate::ops::work::WorkSources,
     finders: &'a crate::ops::find::FinderSources,
@@ -395,6 +404,11 @@ impl StartContext<'_> {
     /// có cả phần các module khởi động sau đăng ký.
     pub fn personal_data_export(&self) -> PersonalDataExport {
         self.personal_data.clone()
+    }
+
+    /// Sổ thời hạn lưu mọi module khai (`Module::retention`), đủ cả module đăng ký sau.
+    pub fn retention_catalog(&self) -> crate::privacy::RetentionCatalog {
+        self.retention.clone()
     }
 
     /// Đăng ký loại đối tượng `kind` (`<module>.<loại>`) của module này, kèm bộ tra (xem

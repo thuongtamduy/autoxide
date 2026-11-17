@@ -34,6 +34,7 @@ pub(crate) mod org_tree;
 mod placements;
 mod registry;
 pub(crate) mod request;
+pub(crate) mod residency;
 pub(crate) mod schema;
 mod scope;
 pub(crate) mod settings;
@@ -71,6 +72,7 @@ pub use registry::{
     ChildTenant, DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
 };
 pub use request::{TENANT_HEADER, TenantHint};
+pub use residency::{Residency, parse_country};
 pub use scope::{ScopeExt, TenantScoped};
 pub use settings::{
     BUSINESS_MODEL, BUSINESS_MODELS, CONNECTION_GROUP, PUBLIC_URL, SETTINGS_MANAGE, SettingCheck,
@@ -522,6 +524,16 @@ pub mod errors {
              first.",
         )
         .with_param("placement", placement)
+    }
+
+    pub fn tenant_residency_violation(country: &str) -> Error {
+        Error::conflict(
+            "tenant_residency_violation",
+            "The tenant must keep its data in {country}; this placement does not meet that (its \
+             country is unknown or different). Set the placement's country with `autoxide \
+             placement country`, or choose a placement in {country}.",
+        )
+        .with_param("country", country)
     }
 
     pub fn tenant_slug_taken(slug: &str) -> Error {

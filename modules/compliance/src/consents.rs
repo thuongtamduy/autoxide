@@ -19,7 +19,7 @@ use crate::events;
 use crate::service::{ComplianceService, now};
 
 /// (`subject_kind`, `subject_key`, `subject_value`, `user_id`) của đối tượng đồng ý.
-fn subject_columns(
+pub(crate) fn subject_columns(
     subject: &ConsentSubject,
 ) -> (&'static str, String, Option<String>, Option<Uuid>) {
     match subject {

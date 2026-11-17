@@ -2787,6 +2787,122 @@
         ],
         "type": "object"
       },
+      "ComplianceConsentCategory": {
+        "description": "A consent category of the banner.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "key": {
+            "description": "`necessary`, `preferences`, `analytics` or `marketing`.",
+            "type": "string"
+          },
+          "preselected": {
+            "description": "Always `false`: no box is ticked beforehand.",
+            "type": "boolean"
+          },
+          "providers": {
+            "description": "Providers that load when the category is accepted (names and countries, no IDs).",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceConsentProvider"
+            },
+            "type": "array"
+          },
+          "required": {
+            "description": "`true` only for `necessary` (always on, no tracking tag).",
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "required",
+          "preselected",
+          "title",
+          "description",
+          "providers"
+        ],
+        "type": "object"
+      },
+      "ComplianceConsentConfig": {
+        "description": "The cookie banner and the tags to load.",
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceConsentCategory"
+            },
+            "type": "array"
+          },
+          "csp_hosts": {
+            "description": "Hosts of every active provider of the website, for the Content-Security-Policy.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "enabled": {
+            "description": "`false`: show no banner and load no tag.",
+            "type": "boolean"
+          },
+          "loading": {
+            "description": "How to load tags: `after_consent_deferred` — after consent, `async`, after the page has\nrendered; never on sign-in or account pages.",
+            "type": "string"
+          },
+          "policy_version": {
+            "description": "Store it with the visitor's choice; ask again when it changes.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "position": {
+            "description": "`bottom`, `top` or `center`.",
+            "type": "string"
+          },
+          "tags": {
+            "description": "Tags to load now: only the active tags of the categories in `granted`; empty by default.",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceTagToLoad"
+            },
+            "type": "array"
+          },
+          "texts": {
+            "description": "`title`, `body`, `accept_all`, `reject_all` (show it as prominently as `accept_all`),\n`customize`, `save`, `legal_title`, `legal`.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "enabled",
+          "policy_version",
+          "position",
+          "categories",
+          "tags",
+          "csp_hosts",
+          "texts",
+          "loading"
+        ],
+        "type": "object"
+      },
+      "ComplianceConsentProvider": {
+        "description": "A provider listed in a category.",
+        "properties": {
+          "country": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "country"
+        ],
+        "type": "object"
+      },
       "ComplianceConsentRequest": {
         "additionalProperties": false,
         "description": "A consent to give or withdraw.",
@@ -2823,6 +2939,190 @@
         "required": [
           "purpose",
           "granted"
+        ],
+        "type": "object"
+      },
+      "ComplianceCookieCategoryCount": {
+        "description": "How many accepted a category.",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "count": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "count"
+        ],
+        "type": "object"
+      },
+      "ComplianceCookieConsentRequest": {
+        "additionalProperties": false,
+        "description": "A visitor's choice to record.",
+        "properties": {
+          "categories": {
+            "description": "Categories accepted; an empty list rejects all (`necessary` is always on).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "consent_id": {
+            "description": "A random value (16 to 64 letters, digits, `-`, `_`) the interface creates and keeps in a\nnecessary cookie.",
+            "type": "string"
+          },
+          "policy_version": {
+            "description": "The `policy_version` of the banner shown.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "consent_id",
+          "categories",
+          "policy_version"
+        ],
+        "type": "object"
+      },
+      "ComplianceCookieSettings": {
+        "description": "The cookie banner of a website.",
+        "properties": {
+          "categories": {
+            "description": "Optional categories the tenant turned on.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "effective_categories": {
+            "description": "Categories the banner asks about: those turned on plus those of active tags (`necessary` is\nalways there and not listed).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "enabled": {
+            "description": "`false`: no banner and no tag ever loads.",
+            "type": "boolean"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "policy_version": {
+            "description": "Version of the cookie policy; changes when categories or active providers change, and\nvisitors are asked again. `0` until the banner is set.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "position": {
+            "description": "`bottom`, `top` or `center`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "enabled",
+          "categories",
+          "effective_categories",
+          "policy_version",
+          "position",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceCookieSettingsRequest": {
+        "additionalProperties": false,
+        "description": "Cookie banner settings to save.",
+        "properties": {
+          "categories": {
+            "description": "Optional categories to ask about: `preferences`, `analytics`, `marketing`.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "position": {
+            "description": "`bottom`, `top` or `center`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComplianceCookieStats": {
+        "description": "Consent counts of a website.",
+        "properties": {
+          "accepted": {
+            "description": "Choices that accepted each category.",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceCookieCategoryCount"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "since": {
+            "description": "Start of the period (the last 30 days).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "total": {
+            "description": "Choices recorded.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "org_id",
+          "since",
+          "total",
+          "accepted"
+        ],
+        "type": "object"
+      },
+      "ComplianceDataRecipient": {
+        "description": "A party that receives personal data.",
+        "properties": {
+          "country": {
+            "description": "Country that receives the data (ISO 3166-1 alpha-2); data sent abroad when not `VN`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Who, e.g. `Google Analytics 4`.",
+            "type": "string"
+          },
+          "source": {
+            "description": "Where it comes from: `purpose` (set on the purpose) or `tracking` (an active tag).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
         ],
         "type": "object"
       },
@@ -3021,6 +3321,292 @@
           "title",
           "format",
           "body"
+        ],
+        "type": "object"
+      },
+      "ComplianceIncident": {
+        "description": "A personal data breach.",
+        "properties": {
+          "affected_count": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "authority_notified_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "authority_reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "data_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "detected_at": {
+            "description": "When it was detected; the reporting deadline counts from here.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "entries": {
+            "description": "The log (`GET /incidents/{id}` only; absent in lists).",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceIncidentEntry"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "overdue": {
+            "description": "`true` while not reported and past `report_due_at`.",
+            "type": "boolean"
+          },
+          "report_due_at": {
+            "description": "Report to the authority before this time (72 hours by default, legal rule `privacy.incident`).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "severity": {
+            "description": "`low`, `medium`, `high` or `critical`.",
+            "type": "string"
+          },
+          "status": {
+            "description": "`open`, `contained`, `reported` or `closed`.",
+            "type": "string"
+          },
+          "subjects_notified_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "severity",
+          "status",
+          "detected_at",
+          "report_due_at",
+          "overdue",
+          "data_categories",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceIncidentChange": {
+        "additionalProperties": false,
+        "description": "Changes to a breach (absent fields stay as they are).",
+        "properties": {
+          "affected_count": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "authority_notified_at": {
+            "description": "When the authority was notified (moves an open breach to `reported`).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "authority_reference": {
+            "description": "Reference of the report at the authority.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "severity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open`, `contained`, `reported` (sets `authority_notified_at` to now if absent) or `closed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subjects_notified_at": {
+            "description": "When the people affected were told.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComplianceIncidentDraft": {
+        "description": "A draft notification.",
+        "properties": {
+          "audience": {
+            "type": "string"
+          },
+          "disclaimer": {
+            "description": "Reminder that a legal professional must review it.",
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "audience",
+          "locale",
+          "subject",
+          "text",
+          "disclaimer"
+        ],
+        "type": "object"
+      },
+      "ComplianceIncidentEntry": {
+        "description": "A line of the log of a breach.",
+        "properties": {
+          "author_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceIncidentEntryRequest": {
+        "additionalProperties": false,
+        "description": "A line to add to the log.",
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
+      "ComplianceIncidentRequest": {
+        "additionalProperties": false,
+        "description": "A personal data breach to record.",
+        "properties": {
+          "affected_count": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "data_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "detected_at": {
+            "description": "When it was detected (not in the future); defaults to now.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "severity": {
+            "description": "`low`, `medium`, `high` or `critical`.",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "severity"
         ],
         "type": "object"
       },
@@ -3733,6 +4319,54 @@
         ],
         "type": "object"
       },
+      "ComplianceProcessingRegister": {
+        "description": "The register of processing activities.",
+        "properties": {
+          "contact": {
+            "description": "The `privacy.contact` policy of the tenant, if set.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "controller": {
+            "description": "Name of the tenant (the data controller).",
+            "type": "string"
+          },
+          "disclaimer": {
+            "description": "Reminder that a legal professional should review it.",
+            "type": "string"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "purposes": {
+            "items": {
+              "$ref": "#/components/schemas/CompliancePurpose"
+            },
+            "type": "array"
+          },
+          "residency": {
+            "$ref": "#/components/schemas/ComplianceResidency"
+          },
+          "retention": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceRetentionItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "controller",
+          "purposes",
+          "retention",
+          "residency",
+          "generated_at",
+          "disclaimer"
+        ],
+        "type": "object"
+      },
       "CompliancePublicOwner": {
         "description": "The website owner's information for a footer (what the law requires a commerce website to show).",
         "properties": {
@@ -3808,6 +4442,296 @@
         ],
         "type": "object"
       },
+      "CompliancePurpose": {
+        "description": "A processing purpose, with its legal basis.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "category": {
+            "description": "`service`, `marketing`, `analytics`, `legal` or `kyc`.",
+            "type": "string"
+          },
+          "data_categories": {
+            "description": "Kinds of personal data processed, e.g. `[\"email\", \"name\"]`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "description": "Description by language, e.g. `{\"en\": \"…\", \"vi\": \"…\"}`.",
+            "type": "object"
+          },
+          "key": {
+            "description": "e.g. `marketing`.",
+            "type": "string"
+          },
+          "legal_basis": {
+            "description": "`consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`.",
+            "type": "string"
+          },
+          "recipients": {
+            "description": "Who receives the data.",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceDataRecipient"
+            },
+            "type": "array"
+          },
+          "retention": {
+            "description": "How long the data is kept, in words.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "description": "`default` (from the legal rules) or `tenant` (added or changed by the tenant).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "category",
+          "legal_basis",
+          "data_categories",
+          "recipients",
+          "description",
+          "active",
+          "source"
+        ],
+        "type": "object"
+      },
+      "CompliancePurposeChange": {
+        "additionalProperties": false,
+        "description": "Changes to a processing purpose (absent fields stay as they are).",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "legal_basis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recipients": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceDataRecipient"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "retention": {
+            "description": "How long the data is kept, in words; `null` clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "CompliancePurposeRequest": {
+        "additionalProperties": false,
+        "description": "A processing purpose to add.",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "category": {
+            "description": "`service`, `marketing`, `analytics`, `legal` or `kyc`.",
+            "type": "string"
+          },
+          "data_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "description": "Description by language, e.g. `{\"en\": \"…\", \"vi\": \"…\"}`.",
+            "type": "object"
+          },
+          "key": {
+            "description": "Lower-case letters, digits and `_`, e.g. `loyalty`. A key of the default purposes overrides\nthat default.",
+            "type": "string"
+          },
+          "legal_basis": {
+            "description": "`consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`.",
+            "type": "string"
+          },
+          "recipients": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceDataRecipient"
+            },
+            "type": "array"
+          },
+          "retention": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "category",
+          "legal_basis",
+          "description"
+        ],
+        "type": "object"
+      },
+      "ComplianceResidency": {
+        "description": "Where the tenant's data is kept.",
+        "properties": {
+          "compliant": {
+            "description": "`true` when there is no requirement or the placement is in the required country.",
+            "type": "boolean"
+          },
+          "data_residency": {
+            "description": "Country the tenant must keep its data in (ISO 3166-1 alpha-2, e.g. `VN`); `null` when free.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "description": "The placement (database) that keeps the data.",
+            "type": "string"
+          },
+          "placement_country": {
+            "description": "Country of that placement; `null` when unknown.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "placement",
+          "compliant"
+        ],
+        "type": "object"
+      },
+      "ComplianceResidencyRequest": {
+        "additionalProperties": false,
+        "description": "Where a tenant must keep its data.",
+        "properties": {
+          "data_residency": {
+            "description": "Two-letter country code (e.g. `VN`: keep the data in Vietnam), or `null` for no requirement.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_id": {
+            "description": "The tenant; defaults to the caller's (the platform tenant).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComplianceRetentionItem": {
+        "description": "A kind of personal data and how long it is kept.",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/DataCategory",
+            "description": "`basic`, `sensitive`, `security` or `accounting`."
+          },
+          "days": {
+            "description": "Days, when `keep` is `days`.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "keep": {
+            "description": "`days`, `until_deleted` or `forever`.",
+            "type": "string"
+          },
+          "limit_days": {
+            "description": "Longest the legal rule `privacy.retention_limits` allows for the category, in days.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "module": {
+            "description": "Module that keeps the data.",
+            "type": "string"
+          },
+          "name": {
+            "description": "`<module>.<kind>`, e.g. `forms.submissions`.",
+            "type": "string"
+          },
+          "setting": {
+            "description": "Server setting that sets it, if any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`ok`, `exceeds_limit` (kept longer than the limit) or `forever_not_allowed` (kept forever\nalthough the category should not be).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "name",
+          "description",
+          "category",
+          "keep",
+          "status"
+        ],
+        "type": "object"
+      },
       "ComplianceRule": {
         "description": "A legal rule in force.",
         "properties": {
@@ -3879,6 +4803,369 @@
         },
         "required": [
           "pack"
+        ],
+        "type": "object"
+      },
+      "ComplianceSubjectRequest": {
+        "description": "A request of a data subject received through another channel.",
+        "properties": {
+          "channel": {
+            "description": "`email`, `post`, `phone`, `authority` or `other`.",
+            "type": "string"
+          },
+          "closed_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "due_at": {
+            "description": "Answer before this time (legal rule `privacy.subject_requests`).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "handled_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`.",
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overdue": {
+            "description": "`true` while not done and past `due_at`.",
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "description": "`received`, `in_progress`, `fulfilled` or `rejected`.",
+            "type": "string"
+          },
+          "subject": {
+            "description": "The user id, email address or phone number (E.164) of the person.",
+            "type": "string"
+          },
+          "subject_kind": {
+            "description": "`user`, `email` or `phone`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "channel",
+          "subject_kind",
+          "subject",
+          "received_at",
+          "due_at",
+          "overdue",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceSubjectRequestChange": {
+        "additionalProperties": false,
+        "description": "A status change.",
+        "properties": {
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`in_progress` or `rejected` (needs `reason`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComplianceSubjectRequestFulfil": {
+        "additionalProperties": false,
+        "description": "How a request was fulfilled.",
+        "properties": {
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComplianceSubjectRequestRequest": {
+        "additionalProperties": false,
+        "description": "A request to record.",
+        "properties": {
+          "channel": {
+            "description": "`email`, `post`, `phone`, `authority` or `other`.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`.",
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received_at": {
+            "description": "When it was received (not in the future); defaults to now. The due date counts from here.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "description": "The person: a user id, an email address or a phone number.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "channel",
+          "subject"
+        ],
+        "type": "object"
+      },
+      "ComplianceSubjectRequestResult": {
+        "description": "The result of fulfilling a request.",
+        "properties": {
+          "erased": {
+            "description": "For `erasure` / `withdrawal`: records erased or emptied.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "export": {
+            "description": "For `access`: the person's data by module — send it to them; it is not stored.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "next_steps": {
+            "description": "What a person still has to do, if anything.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request": {
+            "$ref": "#/components/schemas/ComplianceSubjectRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "ComplianceTagToLoad": {
+        "description": "A tag to load now.",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "script": {
+            "description": "Script to load (`async`, after the page has rendered); `null` when the interface builds it\nfrom the provider's guide.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tracking_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "tracking_id",
+          "category"
+        ],
+        "type": "object"
+      },
+      "ComplianceTrackingProvider": {
+        "description": "A built-in tracking provider.",
+        "properties": {
+          "category": {
+            "description": "Consent category it needs: `analytics` or `marketing`.",
+            "type": "string"
+          },
+          "country": {
+            "description": "Country that receives the data (ISO 3166-1 alpha-2).",
+            "type": "string"
+          },
+          "csp_hosts": {
+            "description": "Hosts to allow in the Content-Security-Policy when it loads.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "example": {
+            "description": "Form of the tracking ID, e.g. `G-XXXXXXXXXX`.",
+            "type": "string"
+          },
+          "key": {
+            "description": "Key to use in `provider`, e.g. `ga4`.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "example",
+          "csp_hosts",
+          "country"
+        ],
+        "type": "object"
+      },
+      "ComplianceTrackingTag": {
+        "description": "A tracking tag of a website.",
+        "properties": {
+          "category": {
+            "description": "Consent category it needs.",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit of the website (the root unit is the whole tenant).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "description": "`active` or `paused`.",
+            "type": "string"
+          },
+          "tracking_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "provider",
+          "tracking_id",
+          "status",
+          "category",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceTrackingTagChange": {
+        "additionalProperties": false,
+        "description": "Changes to a tag.",
+        "properties": {
+          "status": {
+            "description": "`active` or `paused`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tracking_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComplianceTrackingTagRequest": {
+        "additionalProperties": false,
+        "description": "A tag to add.",
+        "properties": {
+          "org_id": {
+            "description": "The unit of the website; defaults to the root unit (the whole tenant).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "description": "`ga4`, `gtm`, `google_ads`, `meta`, `tiktok` or `zalo`.",
+            "type": "string"
+          },
+          "tracking_id": {
+            "description": "The ID the provider gave, e.g. `G-XXXXXXXXXX`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "tracking_id"
         ],
         "type": "object"
       },
@@ -5137,6 +6424,16 @@
           "updated_at"
         ],
         "type": "object"
+      },
+      "DataCategory": {
+        "description": "Kind of personal data (Vietnam, Personal Data Protection Law 91/2025/QH15).",
+        "enum": [
+          "basic",
+          "sensitive",
+          "security",
+          "accounting"
+        ],
+        "type": "string"
       },
       "Data_AcceptedResponse": {
         "description": "Envelope of a single result.",
@@ -6906,6 +8203,174 @@
         ],
         "type": "object"
       },
+      "Data_ComplianceConsentConfig": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The cookie banner and the tags to load.",
+            "properties": {
+              "categories": {
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceConsentCategory"
+                },
+                "type": "array"
+              },
+              "csp_hosts": {
+                "description": "Hosts of every active provider of the website, for the Content-Security-Policy.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "enabled": {
+                "description": "`false`: show no banner and load no tag.",
+                "type": "boolean"
+              },
+              "loading": {
+                "description": "How to load tags: `after_consent_deferred` — after consent, `async`, after the page has\nrendered; never on sign-in or account pages.",
+                "type": "string"
+              },
+              "policy_version": {
+                "description": "Store it with the visitor's choice; ask again when it changes.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "position": {
+                "description": "`bottom`, `top` or `center`.",
+                "type": "string"
+              },
+              "tags": {
+                "description": "Tags to load now: only the active tags of the categories in `granted`; empty by default.",
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceTagToLoad"
+                },
+                "type": "array"
+              },
+              "texts": {
+                "description": "`title`, `body`, `accept_all`, `reject_all` (show it as prominently as `accept_all`),\n`customize`, `save`, `legal_title`, `legal`.",
+                "type": "object"
+              }
+            },
+            "required": [
+              "enabled",
+              "policy_version",
+              "position",
+              "categories",
+              "tags",
+              "csp_hosts",
+              "texts",
+              "loading"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceCookieSettings": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The cookie banner of a website.",
+            "properties": {
+              "categories": {
+                "description": "Optional categories the tenant turned on.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "effective_categories": {
+                "description": "Categories the banner asks about: those turned on plus those of active tags (`necessary` is\nalways there and not listed).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "enabled": {
+                "description": "`false`: no banner and no tag ever loads.",
+                "type": "boolean"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "policy_version": {
+                "description": "Version of the cookie policy; changes when categories or active providers change, and\nvisitors are asked again. `0` until the banner is set.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "position": {
+                "description": "`bottom`, `top` or `center`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "org_id",
+              "enabled",
+              "categories",
+              "effective_categories",
+              "policy_version",
+              "position",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceCookieStats": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Consent counts of a website.",
+            "properties": {
+              "accepted": {
+                "description": "Choices that accepted each category.",
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceCookieCategoryCount"
+                },
+                "type": "array"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "since": {
+                "description": "Start of the period (the last 30 days).",
+                "format": "date-time",
+                "type": "string"
+              },
+              "total": {
+                "description": "Choices recorded.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "org_id",
+              "since",
+              "total",
+              "accepted"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceDocument": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -7071,6 +8536,193 @@
               "form",
               "documents",
               "checklist"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceIncident": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A personal data breach.",
+            "properties": {
+              "affected_count": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "authority_notified_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "authority_reference": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "data_categories": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "type": "string"
+              },
+              "detected_at": {
+                "description": "When it was detected; the reporting deadline counts from here.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "entries": {
+                "description": "The log (`GET /incidents/{id}` only; absent in lists).",
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceIncidentEntry"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "overdue": {
+                "description": "`true` while not reported and past `report_due_at`.",
+                "type": "boolean"
+              },
+              "report_due_at": {
+                "description": "Report to the authority before this time (72 hours by default, legal rule `privacy.incident`).",
+                "format": "date-time",
+                "type": "string"
+              },
+              "severity": {
+                "description": "`low`, `medium`, `high` or `critical`.",
+                "type": "string"
+              },
+              "status": {
+                "description": "`open`, `contained`, `reported` or `closed`.",
+                "type": "string"
+              },
+              "subjects_notified_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "description",
+              "severity",
+              "status",
+              "detected_at",
+              "report_due_at",
+              "overdue",
+              "data_categories",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceIncidentDraft": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A draft notification.",
+            "properties": {
+              "audience": {
+                "type": "string"
+              },
+              "disclaimer": {
+                "description": "Reminder that a legal professional must review it.",
+                "type": "string"
+              },
+              "locale": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "audience",
+              "locale",
+              "subject",
+              "text",
+              "disclaimer"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceIncidentEntry": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A line of the log of a breach.",
+            "properties": {
+              "author_user_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "body": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "body",
+              "created_at"
             ],
             "type": "object"
           }
@@ -7487,6 +9139,63 @@
         ],
         "type": "object"
       },
+      "Data_ComplianceProcessingRegister": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The register of processing activities.",
+            "properties": {
+              "contact": {
+                "description": "The `privacy.contact` policy of the tenant, if set.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "controller": {
+                "description": "Name of the tenant (the data controller).",
+                "type": "string"
+              },
+              "disclaimer": {
+                "description": "Reminder that a legal professional should review it.",
+                "type": "string"
+              },
+              "generated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "purposes": {
+                "items": {
+                  "$ref": "#/components/schemas/CompliancePurpose"
+                },
+                "type": "array"
+              },
+              "residency": {
+                "$ref": "#/components/schemas/ComplianceResidency"
+              },
+              "retention": {
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceRetentionItem"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "controller",
+              "purposes",
+              "retention",
+              "residency",
+              "generated_at",
+              "disclaimer"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CompliancePublicOwner": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -7571,6 +9280,121 @@
         ],
         "type": "object"
       },
+      "Data_CompliancePurpose": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A processing purpose, with its legal basis.",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "category": {
+                "description": "`service`, `marketing`, `analytics`, `legal` or `kyc`.",
+                "type": "string"
+              },
+              "data_categories": {
+                "description": "Kinds of personal data processed, e.g. `[\"email\", \"name\"]`.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "description": "Description by language, e.g. `{\"en\": \"…\", \"vi\": \"…\"}`.",
+                "type": "object"
+              },
+              "key": {
+                "description": "e.g. `marketing`.",
+                "type": "string"
+              },
+              "legal_basis": {
+                "description": "`consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`.",
+                "type": "string"
+              },
+              "recipients": {
+                "description": "Who receives the data.",
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceDataRecipient"
+                },
+                "type": "array"
+              },
+              "retention": {
+                "description": "How long the data is kept, in words.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source": {
+                "description": "`default` (from the legal rules) or `tenant` (added or changed by the tenant).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "category",
+              "legal_basis",
+              "data_categories",
+              "recipients",
+              "description",
+              "active",
+              "source"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceResidency": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Where the tenant's data is kept.",
+            "properties": {
+              "compliant": {
+                "description": "`true` when there is no requirement or the placement is in the required country.",
+                "type": "boolean"
+              },
+              "data_residency": {
+                "description": "Country the tenant must keep its data in (ISO 3166-1 alpha-2, e.g. `VN`); `null` when free.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "placement": {
+                "description": "The placement (database) that keeps the data.",
+                "type": "string"
+              },
+              "placement_country": {
+                "description": "Country of that placement; `null` when unknown.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tenant_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "tenant_id",
+              "placement",
+              "compliant"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceRulesImported": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -7585,6 +9409,205 @@
             },
             "required": [
               "imported"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceSubjectRequest": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A request of a data subject received through another channel.",
+            "properties": {
+              "channel": {
+                "description": "`email`, `post`, `phone`, `authority` or `other`.",
+                "type": "string"
+              },
+              "closed_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "due_at": {
+                "description": "Answer before this time (legal rule `privacy.subject_requests`).",
+                "format": "date-time",
+                "type": "string"
+              },
+              "handled_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`.",
+                "type": "string"
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "overdue": {
+                "description": "`true` while not done and past `due_at`.",
+                "type": "boolean"
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "received_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "status": {
+                "description": "`received`, `in_progress`, `fulfilled` or `rejected`.",
+                "type": "string"
+              },
+              "subject": {
+                "description": "The user id, email address or phone number (E.164) of the person.",
+                "type": "string"
+              },
+              "subject_kind": {
+                "description": "`user`, `email` or `phone`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "channel",
+              "subject_kind",
+              "subject",
+              "received_at",
+              "due_at",
+              "overdue",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceSubjectRequestResult": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The result of fulfilling a request.",
+            "properties": {
+              "erased": {
+                "description": "For `erasure` / `withdrawal`: records erased or emptied.",
+                "format": "int64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "export": {
+                "description": "For `access`: the person's data by module — send it to them; it is not stored.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "next_steps": {
+                "description": "What a person still has to do, if anything.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request": {
+                "$ref": "#/components/schemas/ComplianceSubjectRequest"
+              }
+            },
+            "required": [
+              "request"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceTrackingTag": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A tracking tag of a website.",
+            "properties": {
+              "category": {
+                "description": "Consent category it needs.",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The unit of the website (the root unit is the whole tenant).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "status": {
+                "description": "`active` or `paused`.",
+                "type": "string"
+              },
+              "tracking_id": {
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "provider",
+              "tracking_id",
+              "status",
+              "category",
+              "created_at",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -17123,6 +19146,152 @@
         ],
         "type": "object"
       },
+      "Data_Vec_CompliancePurpose": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A processing purpose, with its legal basis.",
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "category": {
+                  "description": "`service`, `marketing`, `analytics`, `legal` or `kyc`.",
+                  "type": "string"
+                },
+                "data_categories": {
+                  "description": "Kinds of personal data processed, e.g. `[\"email\", \"name\"]`.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "description": "Description by language, e.g. `{\"en\": \"…\", \"vi\": \"…\"}`.",
+                  "type": "object"
+                },
+                "key": {
+                  "description": "e.g. `marketing`.",
+                  "type": "string"
+                },
+                "legal_basis": {
+                  "description": "`consent`, `contract`, `legal_obligation`, `vital_interest` or `public_interest`.",
+                  "type": "string"
+                },
+                "recipients": {
+                  "description": "Who receives the data.",
+                  "items": {
+                    "$ref": "#/components/schemas/ComplianceDataRecipient"
+                  },
+                  "type": "array"
+                },
+                "retention": {
+                  "description": "How long the data is kept, in words.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "description": "`default` (from the legal rules) or `tenant` (added or changed by the tenant).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "category",
+                "legal_basis",
+                "data_categories",
+                "recipients",
+                "description",
+                "active",
+                "source"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_ComplianceRetentionItem": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A kind of personal data and how long it is kept.",
+              "properties": {
+                "category": {
+                  "$ref": "#/components/schemas/DataCategory",
+                  "description": "`basic`, `sensitive`, `security` or `accounting`."
+                },
+                "days": {
+                  "description": "Days, when `keep` is `days`.",
+                  "format": "int32",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": "string"
+                },
+                "keep": {
+                  "description": "`days`, `until_deleted` or `forever`.",
+                  "type": "string"
+                },
+                "limit_days": {
+                  "description": "Longest the legal rule `privacy.retention_limits` allows for the category, in days.",
+                  "format": "int32",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "module": {
+                  "description": "Module that keeps the data.",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "`<module>.<kind>`, e.g. `forms.submissions`.",
+                  "type": "string"
+                },
+                "setting": {
+                  "description": "Server setting that sets it, if any.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`ok`, `exceeds_limit` (kept longer than the limit) or `forever_not_allowed` (kept forever\nalthough the category should not be).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "module",
+                "name",
+                "description",
+                "category",
+                "keep",
+                "status"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_ComplianceRule": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -17170,6 +19339,58 @@
                 "body",
                 "legal_basis",
                 "needs_legal_review"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_ComplianceTrackingProvider": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A built-in tracking provider.",
+              "properties": {
+                "category": {
+                  "description": "Consent category it needs: `analytics` or `marketing`.",
+                  "type": "string"
+                },
+                "country": {
+                  "description": "Country that receives the data (ISO 3166-1 alpha-2).",
+                  "type": "string"
+                },
+                "csp_hosts": {
+                  "description": "Hosts to allow in the Content-Security-Policy when it loads.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "example": {
+                  "description": "Form of the tracking ID, e.g. `G-XXXXXXXXXX`.",
+                  "type": "string"
+                },
+                "key": {
+                  "description": "Key to use in `provider`, e.g. `ga4`.",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "name",
+                "category",
+                "example",
+                "csp_hosts",
+                "country"
               ],
               "type": "object"
             },
@@ -18274,6 +20495,13 @@
                 "backend": {
                   "description": "`sqlite` or `postgres`.",
                   "type": "string"
+                },
+                "country_code": {
+                  "description": "Country of the servers (ISO 3166-1 alpha-2), for tenants that must keep their data in one\ncountry; `null` when unknown. Set with `autoxide placement country`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "created_at": {
                   "format": "date-time",
@@ -29131,6 +31359,125 @@
         ],
         "type": "object"
       },
+      "Page_ComplianceIncident": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A personal data breach.",
+              "properties": {
+                "affected_count": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "authority_notified_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "authority_reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "data_categories": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "detected_at": {
+                  "description": "When it was detected; the reporting deadline counts from here.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "entries": {
+                  "description": "The log (`GET /incidents/{id}` only; absent in lists).",
+                  "items": {
+                    "$ref": "#/components/schemas/ComplianceIncidentEntry"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "overdue": {
+                  "description": "`true` while not reported and past `report_due_at`.",
+                  "type": "boolean"
+                },
+                "report_due_at": {
+                  "description": "Report to the authority before this time (72 hours by default, legal rule `privacy.incident`).",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "severity": {
+                  "description": "`low`, `medium`, `high` or `critical`.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`open`, `contained`, `reported` or `closed`.",
+                  "type": "string"
+                },
+                "subjects_notified_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "description",
+                "severity",
+                "status",
+                "detected_at",
+                "report_due_at",
+                "overdue",
+                "data_categories",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_ComplianceKycProfile": {
         "description": "One page of a list.",
         "properties": {
@@ -29376,6 +31723,177 @@
                 "org_id",
                 "entity_type",
                 "legal_name",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_ComplianceSubjectRequest": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A request of a data subject received through another channel.",
+              "properties": {
+                "channel": {
+                  "description": "`email`, `post`, `phone`, `authority` or `other`.",
+                  "type": "string"
+                },
+                "closed_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "due_at": {
+                  "description": "Answer before this time (legal rule `privacy.subject_requests`).",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "handled_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`.",
+                  "type": "string"
+                },
+                "notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "overdue": {
+                  "description": "`true` while not done and past `due_at`.",
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "received_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`received`, `in_progress`, `fulfilled` or `rejected`.",
+                  "type": "string"
+                },
+                "subject": {
+                  "description": "The user id, email address or phone number (E.164) of the person.",
+                  "type": "string"
+                },
+                "subject_kind": {
+                  "description": "`user`, `email` or `phone`.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "channel",
+                "subject_kind",
+                "subject",
+                "received_at",
+                "due_at",
+                "overdue",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_ComplianceTrackingTag": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A tracking tag of a website.",
+              "properties": {
+                "category": {
+                  "description": "Consent category it needs.",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The unit of the website (the root unit is the whole tenant).",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`active` or `paused`.",
+                  "type": "string"
+                },
+                "tracking_id": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "provider",
+                "tracking_id",
+                "status",
+                "category",
                 "created_at",
                 "updated_at"
               ],
@@ -35407,6 +37925,13 @@
           "backend": {
             "description": "`sqlite` or `postgres`.",
             "type": "string"
+          },
+          "country_code": {
+            "description": "Country of the servers (ISO 3166-1 alpha-2), for tenants that must keep their data in one\ncountry; `null` when unknown. Set with `autoxide placement country`.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "created_at": {
             "format": "date-time",
@@ -57013,6 +59538,319 @@
         ]
       }
     },
+    "/api/v1/compliance/cookie-consents/stats": {
+      "get": {
+        "description": "Requires `compliance.tracking.manage` on the unit. Totals of the last 30 days only, never single\nrecords.",
+        "operationId": "compliance_get_compliance_cookie_stats",
+        "parameters": [
+          {
+            "description": "Unit of the website.",
+            "in": "query",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCookieStats"
+                }
+              }
+            },
+            "description": "The counts."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage` (code `permission_denied`) or the unit is out of your scope."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit; code `site_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get cookie consent counts of a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.tracking.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/cookie-settings/{org_id}": {
+      "get": {
+        "description": "Requires `compliance.tracking.manage` on the unit.",
+        "operationId": "compliance_get_compliance_cookie_settings",
+        "parameters": [
+          {
+            "description": "Unit of the website.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCookieSettings"
+                }
+              }
+            },
+            "description": "The settings."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage` (code `permission_denied`) or the unit is out of your scope."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit; code `site_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the cookie banner settings of a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.tracking.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `compliance.tracking.manage` on the unit. Changing the categories asked about raises\nthe policy version (visitors are asked again).",
+        "operationId": "compliance_set_compliance_cookie_settings",
+        "parameters": [
+          {
+            "description": "Unit of the website.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCookieSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCookieSettings"
+                }
+              }
+            },
+            "description": "The settings now."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage` (code `permission_denied`) or the unit is out of your scope."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit; code `site_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the cookie banner of a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.tracking.manage"
+        ]
+      }
+    },
     "/api/v1/compliance/documents": {
       "get": {
         "description": "Requires `compliance.documents.read`.",
@@ -57682,6 +60520,786 @@
         ],
         "x-permissions": [
           "compliance.documents.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/incidents": {
+      "get": {
+        "description": "Requires `compliance.incidents.manage`.",
+        "operationId": "compliance_list_compliance_incidents",
+        "parameters": [
+          {
+            "description": "Only records with this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only records past their deadline and not done.",
+            "in": "query",
+            "name": "overdue",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ComplianceIncident"
+                }
+              }
+            },
+            "description": "One page of breaches."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.incidents.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List personal data breaches.",
+        "tags": [
+          "compliance"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only records with this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only records past their deadline and not done.",
+            "kind": "boolean",
+            "name": "overdue",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "compliance.list_compliance_incidents",
+        "x-permissions": [
+          "compliance.incidents.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `compliance.incidents.manage`. The report to the authority is due 72 hours after\ndetection (legal rule `privacy.incident`; Personal Data Protection Law 91/2025/QH15, Decree\n356/2025/ND-CP). Reminders go to the `incident.alert_emails` policy; see the runbook in\ndocs/COMPLIANCE.md.",
+        "operationId": "compliance_open_compliance_incident",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceIncidentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceIncident"
+                }
+              }
+            },
+            "description": "The breach.",
+            "headers": {
+              "Location": {
+                "description": "Path of the breach.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.incidents.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a personal data breach.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.incidents.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/incidents/{id}": {
+      "get": {
+        "description": "Requires `compliance.incidents.manage`.",
+        "operationId": "compliance_get_compliance_incident",
+        "parameters": [
+          {
+            "description": "Id of the breach.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceIncident"
+                }
+              }
+            },
+            "description": "The breach.",
+            "headers": {
+              "ETag": {
+                "description": "Version; send it in `If-Match` to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.incidents.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such breach; code `compliance.incident_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a personal data breach with its log.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.incidents.manage"
+        ]
+      },
+      "patch": {
+        "description": "Requires `compliance.incidents.manage`. Send `If-Match` with the `ETag` you read. Record the\nreport with `authority_notified_at` and `authority_reference`.",
+        "operationId": "compliance_update_compliance_incident",
+        "parameters": [
+          {
+            "description": "Id of the breach.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`ETag` of the version you read.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceIncidentChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceIncident"
+                }
+              }
+            },
+            "description": "The breach after the change.",
+            "headers": {
+              "ETag": {
+                "description": "New version.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.incidents.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such breach; code `compliance.incident_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Changed since you read it; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a personal data breach.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.incidents.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/incidents/{id}/draft": {
+      "get": {
+        "description": "Requires `compliance.incidents.manage`. Filled from the breach and the tenant's `privacy.contact`\npolicy; a draft only — a person completes, reviews and sends it (the official form of the\nauthority needs a legal professional).",
+        "operationId": "compliance_get_compliance_incident_draft",
+        "parameters": [
+          {
+            "description": "Id of the breach.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`authority` (notification to the data protection authority) or `subjects` (the people\naffected).",
+            "in": "query",
+            "name": "audience",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`vi` or `en` (default).",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceIncidentDraft"
+                }
+              }
+            },
+            "description": "The draft."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.incidents.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such breach; code `compliance.incident_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`audience` is not `authority` or `subjects`; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a draft notification of a personal data breach.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.incidents.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/incidents/{id}/entries": {
+      "post": {
+        "description": "Requires `compliance.incidents.manage`. The log only grows.",
+        "operationId": "compliance_add_compliance_incident_entry",
+        "parameters": [
+          {
+            "description": "Id of the breach.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceIncidentEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceIncidentEntry"
+                }
+              }
+            },
+            "description": "The line.",
+            "headers": {
+              "Location": {
+                "description": "Path of the breach.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.incidents.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such breach; code `compliance.incident_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Empty or too long; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a line to the log of a personal data breach.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.incidents.manage"
         ]
       }
     },
@@ -60915,6 +64533,80 @@
         ]
       }
     },
+    "/api/v1/compliance/processing-register": {
+      "get": {
+        "description": "Requires `compliance.privacy.read`. Purposes, legal bases, kinds of data, recipients, retention\nand where the data is kept — the input of a data protection impact assessment (its official form\nneeds a legal professional).",
+        "operationId": "compliance_get_compliance_processing_register",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceProcessingRegister"
+                }
+              }
+            },
+            "description": "The register."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the register of processing activities.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.read"
+        ]
+      }
+    },
     "/api/v1/compliance/public/badge": {
       "get": {
         "description": "No sign-in (the tenant and website come from the domain, `?domain=` or `?site=`). Only a\nwebsite `notified` / `registered` has a logo; otherwise 404.",
@@ -61002,6 +64694,179 @@
           }
         },
         "summary": "Get the Ministry of Industry and Trade logo of a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/compliance/public/consent-config": {
+      "get": {
+        "description": "No sign-in (the tenant and website come from the domain or `?site=`). Without `granted` no tag is\nreturned: nothing loads before consent. Rejecting all is as easy as accepting all, and no\ncategory is preselected. Load the tags after the page renders.",
+        "operationId": "compliance_get_public_compliance_consent_config",
+        "parameters": [
+          {
+            "description": "Categories the visitor already accepted (comma-separated, e.g. `analytics,marketing`), read\nfrom the necessary cookie. Only the tags of these categories are returned; none by default.",
+            "in": "query",
+            "name": "granted",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`vi` or `en` (default).",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceConsentConfig"
+                }
+              }
+            },
+            "description": "The banner.",
+            "headers": {
+              "ETag": {
+                "description": "Version; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Get the cookie banner and the tags to load, for a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/compliance/public/cookie-consents": {
+      "post": {
+        "description": "No sign-in (the tenant and website come from the domain or `?site=`). Stores the random id, the\ncategories, the policy version and a hash of the network block — never the raw IP. A signed-in\nvisitor's choice is also written to the consent ledger (purposes `analytics` / `marketing`).\nLimited per network block per hour.",
+        "operationId": "compliance_record_public_compliance_cookie_consent",
+        "parameters": [
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCookieConsentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The banner changed or is off; show it again (code `compliance.cookie_policy_changed`, with `version`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many records from this address; code `compliance.cookie_consents_throttled`, wait `Retry-After` seconds."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Record a visitor's cookie choice (anonymous proof of consent).",
         "tags": [
           "compliance"
         ],
@@ -61156,6 +65021,649 @@
           "compliance"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/compliance/public/purposes": {
+      "get": {
+        "description": "No sign-in (the tenant comes from the domain). Only purposes in use; the advertising and\nanalytics providers active on the tenant's websites are listed as recipients, with the country\nthat receives the data (transfers abroad).",
+        "operationId": "compliance_list_public_compliance_purposes",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CompliancePurpose"
+                }
+              }
+            },
+            "description": "The purposes in use."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List the processing purposes, for the public privacy notice.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/compliance/purposes": {
+      "get": {
+        "description": "Requires `compliance.privacy.read`. The defaults of the legal rules (`privacy.default_purposes`)\nmerged with the purposes the tenant added or changed.",
+        "operationId": "compliance_list_compliance_purposes",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CompliancePurpose"
+                }
+              }
+            },
+            "description": "Every purpose."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the processing purposes of the tenant.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `compliance.privacy.manage`. Personal Data Protection Law 91/2025/QH15: each purpose\nstates its legal basis — have a legal professional review them.",
+        "operationId": "compliance_create_compliance_purpose",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompliancePurposeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CompliancePurpose"
+                }
+              }
+            },
+            "description": "The purpose.",
+            "headers": {
+              "Location": {
+                "description": "Path of the purposes.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.manage`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant already has this purpose; code `compliance.purpose_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a processing purpose.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/purposes/{key}": {
+      "patch": {
+        "description": "Requires `compliance.privacy.manage`. Changing a default purpose stores the tenant's own version\nof it.",
+        "operationId": "compliance_update_compliance_purpose",
+        "parameters": [
+          {
+            "description": "Key of the purpose.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompliancePurposeChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CompliancePurpose"
+                }
+              }
+            },
+            "description": "The purpose after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such purpose; code `compliance.purpose_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a processing purpose.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/residency": {
+      "get": {
+        "description": "Requires `compliance.privacy.read`.",
+        "operationId": "compliance_get_compliance_residency",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceResidency"
+                }
+              }
+            },
+            "description": "Where the data is kept."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get where the tenant's data is kept.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.read"
+        ]
+      },
+      "put": {
+        "description": "Platform staff with `compliance.privacy.manage`. Refused when the tenant's placement is not in\nthat country (or its country is unknown): record it with `autoxide placement country` or move the\ntenant first. Moving a tenant later to a placement elsewhere is refused too. Cybersecurity Law\n116/2025/QH15, Decree 53/2022/ND-CP — have a legal professional check who must keep data in\nVietnam.",
+        "operationId": "compliance_set_compliance_residency",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceResidencyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceResidency"
+                }
+              }
+            },
+            "description": "Where the data is kept now."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.manage` (code `permission_denied`) or not platform staff (code `tenant_platform_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tenant; code `tenant_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's placement is not in that country; code `tenant_residency_violation`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a two-letter country code; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set where a tenant must keep its data.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/retention": {
+      "get": {
+        "description": "Requires `compliance.privacy.read`. Every module declares the personal data it keeps; each item\nis compared with the limits of the legal rule `privacy.retention_limits`.",
+        "operationId": "compliance_list_compliance_retention",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ComplianceRetentionItem"
+                }
+              }
+            },
+            "description": "Every kind of personal data."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List how long each kind of personal data is kept.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.read"
+        ]
       }
     },
     "/api/v1/compliance/rules": {
@@ -61334,6 +65842,1331 @@
         ],
         "x-permissions": [
           "compliance.rules.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/subject-requests": {
+      "get": {
+        "description": "Requires `compliance.privacy.manage`.",
+        "operationId": "compliance_list_compliance_subject_requests",
+        "parameters": [
+          {
+            "description": "Only records with this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only records past their deadline and not done.",
+            "in": "query",
+            "name": "overdue",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ComplianceSubjectRequest"
+                }
+              }
+            },
+            "description": "One page of requests."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the requests of data subjects received through other channels.",
+        "tags": [
+          "compliance"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only records with this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only records past their deadline and not done.",
+            "kind": "boolean",
+            "name": "overdue",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "compliance.list_compliance_subject_requests",
+        "x-permissions": [
+          "compliance.privacy.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `compliance.privacy.manage`. The due date comes from the legal rule\n`privacy.subject_requests` in force when it was received (Personal Data Protection Law\n91/2025/QH15, Decree 356/2025/ND-CP — have a legal professional check it). Requests a user makes\nin their account run at once and are not recorded here.",
+        "operationId": "compliance_record_compliance_subject_request",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceSubjectRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceSubjectRequest"
+                }
+              }
+            },
+            "description": "The request.",
+            "headers": {
+              "Location": {
+                "description": "Path of the request.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a request of a data subject received by email, post, phone or from an authority.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/subject-requests/{id}": {
+      "get": {
+        "description": "Requires `compliance.privacy.manage`.",
+        "operationId": "compliance_get_compliance_subject_request",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceSubjectRequest"
+                }
+              }
+            },
+            "description": "The request."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request; code `compliance.subject_request_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a request of a data subject.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.manage"
+        ]
+      },
+      "patch": {
+        "description": "Requires `compliance.privacy.manage`. Reject with a `reason`; fulfil with `POST …/fulfil`.",
+        "operationId": "compliance_update_compliance_subject_request",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceSubjectRequestChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceSubjectRequest"
+                }
+              }
+            },
+            "description": "The request after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request; code `compliance.subject_request_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Already fulfilled or rejected; code `compliance.subject_request_closed`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Changed at the same time by someone else; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change the status of a request of a data subject, or add notes.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/subject-requests/{id}/fulfil": {
+      "post": {
+        "description": "Requires `compliance.privacy.manage`. `access` of a user returns the personal data every module\nkeeps about them (send it to the person; it is not stored); `erasure` of an email address or\nphone number empties it from the consent ledger; erasing a whole account is\n`DELETE /api/v1/auth/users/{id}`. Other kinds are done by hand and only recorded.",
+        "operationId": "compliance_fulfil_compliance_subject_request",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceSubjectRequestFulfil"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceSubjectRequestResult"
+                }
+              }
+            },
+            "description": "What was done."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.privacy.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request; code `compliance.subject_request_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Already fulfilled or rejected; code `compliance.subject_request_closed`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Changed at the same time by someone else; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Notes too long; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fulfil a request of a data subject.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.privacy.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/tracking-providers": {
+      "get": {
+        "description": "Requires `compliance.tracking.manage`. Tenants only enter the tracking ID of these; no script.",
+        "operationId": "compliance_list_compliance_tracking_providers",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ComplianceTrackingProvider"
+                }
+              }
+            },
+            "description": "Every provider."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the built-in tracking providers.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.tracking.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/tracking-tags": {
+      "get": {
+        "description": "Requires `compliance.tracking.manage`; only units in your scope.",
+        "operationId": "compliance_list_compliance_tracking_tags",
+        "parameters": [
+          {
+            "description": "Only the tags of this unit (website).",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ComplianceTrackingTag"
+                }
+              }
+            },
+            "description": "One page of tags."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the tracking tags of websites.",
+        "tags": [
+          "compliance"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the tags of this unit (website).",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "compliance.list_compliance_tracking_tags",
+        "x-permissions": [
+          "compliance.tracking.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `compliance.tracking.manage` on the unit. Only the ID; it loads only after the visitor\nconsents to its category, and the provider is listed as a recipient of personal data in\n`GET /public/purposes`. The cookie policy version changes when a new provider becomes active.",
+        "operationId": "compliance_create_compliance_tracking_tag",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceTrackingTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceTrackingTag"
+                }
+              }
+            },
+            "description": "The tag.",
+            "headers": {
+              "Location": {
+                "description": "Path of the tag.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage` (code `permission_denied`) or the unit is out of your scope."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such unit; code `site_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The website already has this ID; code `compliance.tracking_tag_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown provider (code `compliance.tracking_provider_unknown`) or ID of the wrong form (code `compliance.tracking_id_invalid`, with `expected`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a tracking tag to a website.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.tracking.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/tracking-tags/{id}": {
+      "delete": {
+        "description": "Requires `compliance.tracking.manage` on its unit.",
+        "operationId": "compliance_delete_compliance_tracking_tag",
+        "parameters": [
+          {
+            "description": "Id of the tag.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tag in your scope; code `compliance.tracking_tag_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a tracking tag.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.tracking.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `compliance.tracking.manage` on its unit.",
+        "operationId": "compliance_get_compliance_tracking_tag",
+        "parameters": [
+          {
+            "description": "Id of the tag.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceTrackingTag"
+                }
+              }
+            },
+            "description": "The tag."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tag in your scope; code `compliance.tracking_tag_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a tracking tag.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.tracking.manage"
+        ]
+      },
+      "patch": {
+        "description": "Requires `compliance.tracking.manage` on its unit.",
+        "operationId": "compliance_update_compliance_tracking_tag",
+        "parameters": [
+          {
+            "description": "Id of the tag.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceTrackingTagChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceTrackingTag"
+                }
+              }
+            },
+            "description": "The tag after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.tracking.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tag in your scope; code `compliance.tracking_tag_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The website already has this ID; code `compliance.tracking_tag_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (code `compliance.tracking_id_invalid` for the ID)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pause, resume or change the ID of a tracking tag.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.tracking.manage"
         ]
       }
     },

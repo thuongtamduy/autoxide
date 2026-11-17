@@ -123,6 +123,23 @@ impl Module for MediaModule {
         Ok(())
     }
 
+    // Thời hạn lưu dữ liệu cá nhân (bước 37 C5, D-360), đọc từ cấu hình đang có.
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        let Some(config) = &self.config else {
+            return Vec::new();
+        };
+        vec![
+            RetentionPolicy::new(
+                "media.trash",
+                "Media items in the trash (may show people) before they are deleted for good.",
+                DataCategory::Basic,
+                Keep::Days(config.trash_days),
+            )
+            .setting(config::TRASH_DAYS.name),
+        ]
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }

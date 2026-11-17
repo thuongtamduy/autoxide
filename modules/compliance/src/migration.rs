@@ -30,6 +30,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![autoxide_kernel::throttle::tenant_table("compliance")],
         ),
         Box::new(MoitWebsites),
+        Box::new(Privacy),
+        Box::new(Tracking),
     ]
 }
 
@@ -639,6 +641,264 @@ impl MigrationTrait for MoitWebsites {
         drop_all(
             manager,
             &["compliance_website_pages", "compliance_websites", "compliance_legal_profiles"],
+        )
+        .await
+    }
+}
+
+/// Sổ mục đích xử lý, sự cố dữ liệu cá nhân (mốc 72 giờ) và sổ yêu cầu của chủ thể qua kênh khác
+/// (D-217, D-360).
+struct Privacy;
+
+impl MigrationName for Privacy {
+    fn name(&self) -> &str {
+        "m0013_privacy"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for Privacy {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_purposes")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("key", 64))
+                    .col(schema::string_len("category", 16))
+                    .col(schema::string_len("legal_basis", 24))
+                    .col(schema::text("data_categories"))
+                    .col(schema::text("recipients"))
+                    .col(schema::text("description"))
+                    .col(schema::string_len_null("retention", 200))
+                    .col(schema::boolean("active"))
+                    .col(schema::uuid_null("updated_by"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_purposes",
+            "compliance_purposes_key",
+            &["tenant_id", "key"],
+            true,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_incidents")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("title", 200))
+                    .col(schema::text("description"))
+                    .col(schema::string_len("severity", 16))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::timestamp_with_time_zone("detected_at"))
+                    .col(schema::timestamp_with_time_zone("report_due_at"))
+                    .col(schema::integer("reminded_hours"))
+                    .col(schema::timestamp_with_time_zone_null("authority_notified_at"))
+                    .col(schema::string_len_null("authority_reference", 100))
+                    .col(schema::timestamp_with_time_zone_null("subjects_notified_at"))
+                    .col(schema::text("data_categories"))
+                    .col(schema::big_integer_null("affected_count"))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_incidents",
+            "compliance_incidents_due_idx",
+            &["tenant_id", "status", "report_due_at"],
+            false,
+        )
+        .await?;
+        // Job nhắc hạn quét mọi khách của một database.
+        index(
+            manager,
+            "compliance_incidents",
+            "compliance_incidents_sweep_idx",
+            &["status", "report_due_at"],
+            false,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_incident_entries")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("incident_id"))
+                    .col(schema::text("body"))
+                    .col(schema::uuid_null("author_user_id"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_incident_entries",
+            "compliance_incident_entries_incident_idx",
+            &["tenant_id", "incident_id", "id"],
+            false,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_subject_requests")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("kind", 16))
+                    .col(schema::string_len("channel", 16))
+                    .col(schema::string_len("subject_kind", 8))
+                    .col(schema::string_len("subject", 254))
+                    .col(schema::timestamp_with_time_zone("received_at"))
+                    .col(schema::timestamp_with_time_zone("due_at"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::text_null("reason"))
+                    .col(schema::text_null("notes"))
+                    .col(schema::uuid_null("handled_by"))
+                    .col(schema::timestamp_with_time_zone_null("closed_at"))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_subject_requests",
+            "compliance_subject_requests_due_idx",
+            &["tenant_id", "status", "due_at"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        drop_all(
+            manager,
+            &[
+                "compliance_subject_requests",
+                "compliance_incident_entries",
+                "compliance_incidents",
+                "compliance_purposes",
+            ],
+        )
+        .await
+    }
+}
+
+/// Mã theo dõi quảng cáo của website, banner đồng ý cookie và bằng chứng đồng ý ẩn danh (D-235,
+/// D-361).
+struct Tracking;
+
+impl MigrationName for Tracking {
+    fn name(&self) -> &str {
+        "m0014_tracking_and_cookies"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for Tracking {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_tracking_tags")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::string_len("provider", 32))
+                    .col(schema::string_len("tracking_id", 64))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_tracking_tags",
+            "compliance_tracking_tags_key",
+            &["tenant_id", "org_id", "provider", "tracking_id"],
+            true,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_cookie_settings")
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::boolean("enabled"))
+                    .col(schema::text("categories"))
+                    .col(schema::integer("policy_version"))
+                    .col(schema::string_len("signature", 64))
+                    .col(schema::string_len("position", 16))
+                    .col(schema::uuid_null("updated_by"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .primary_key(Index::create().col("tenant_id").col("org_id"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_cookie_consents")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::string_len("consent_id", 64))
+                    .col(schema::text("categories"))
+                    .col(schema::integer("policy_version"))
+                    .col(schema::string_len_null("ip_hash", 32))
+                    .col(schema::uuid_null("user_id"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_cookie_consents",
+            "compliance_cookie_consents_consent_idx",
+            &["tenant_id", "consent_id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "compliance_cookie_consents",
+            "compliance_cookie_consents_org_idx",
+            &["tenant_id", "org_id", "created_at"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "compliance_cookie_consents",
+            "compliance_cookie_consents_sweep_idx",
+            &["created_at"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        drop_all(
+            manager,
+            &[
+                "compliance_cookie_consents",
+                "compliance_cookie_settings",
+                "compliance_tracking_tags",
+            ],
         )
         .await
     }

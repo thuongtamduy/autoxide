@@ -42,5 +42,13 @@ events! {
     WEBSITE_CREATED, WebsiteCreated, "compliance.website_created", "A website was added for the Ministry of Industry and Trade checklist (`website_id`, `org_id`, `domain`, `kind`).";
     WEBSITE_UPDATED, WebsiteUpdated, "compliance.website_updated", "A website or its linked mandatory pages changed (`website_id`, `domain`, `kind`).";
     WEBSITE_STATUS_CHANGED, WebsiteStatusChanged, "compliance.website_status_changed", "The notification / registration status of a website with the Ministry of Industry and Trade changed (`website_id`, `domain`, `kind`, `status`, `previous_status`).";
+    PURPOSE_UPDATED, PurposeUpdated, "compliance.purpose_updated", "A processing purpose of the tenant was added or changed (`key`, `legal_basis`, `active`).";
+    RESIDENCY_CHANGED, ResidencyChanged, "compliance.residency_changed", "Where the tenant must keep its data changed (`data_residency`, `previous`).";
+    INCIDENT_OPENED, IncidentOpened, "compliance.incident_opened", "A personal data breach was recorded (`incident_id`, `severity`, `status`, `report_due_at`).";
+    INCIDENT_UPDATED, IncidentUpdated, "compliance.incident_updated", "A personal data breach changed (`incident_id`, `severity`, `status`, `previous_status`).";
+    INCIDENT_DEADLINE_NEAR, IncidentDeadlineNear, "compliance.incident_deadline_near", "A personal data breach is not reported yet and a reminder milestone passed (`incident_id`, `hours_since_detection`, `report_due_at`).";
+    SUBJECT_REQUEST_RECEIVED, SubjectRequestReceived, "compliance.subject_request_received", "A request of a data subject received through another channel was recorded (`request_id`, `kind`, `channel`, `due_at`).";
+    SUBJECT_REQUEST_UPDATED, SubjectRequestUpdated, "compliance.subject_request_updated", "A request of a data subject changed status (`request_id`, `kind`, `status`, `previous_status`).";
+    TRACKING_CHANGED, TrackingChanged, "compliance.tracking_changed", "A tracking tag or the cookie banner of a website changed (`org_id`, `tag_id`, `provider`, `status`, `action`).";
     RULES_IMPORTED, RulesImported, "compliance.rules_imported", "Legal rules were imported (`jurisdiction`, `rules`).";
 }

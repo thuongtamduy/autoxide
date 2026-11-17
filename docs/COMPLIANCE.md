@@ -19,10 +19,14 @@ What the module covers:
 | Account verification for posting (phone / identity) | `/me/verification`, `/me/phone-verifications…` |
 | Versioned legal documents and proof of acceptance | `/documents…`, `/me/acceptances`, `/public/documents/{kind}` |
 | Consent ledger | `/me/consents` |
+| **Personal data**: purposes and legal bases, retention, processing register, data residency | `/purposes…`, `/retention`, `/processing-register`, `/residency`, `/public/purposes` |
+| **Personal data breaches** (72 hours) and **data subject requests** from other channels | `/incidents…`, `/subject-requests…` |
+| **Tracking tags and cookie consent** | `/tracking-tags…`, `/cookie-settings/{org_id}`, `/public/consent-config`, `/public/cookie-consents` |
 | Legal rules with effective dates, tenant policies | `/rules`, `/policies…` |
 | **Website legal profile and the Ministry of Industry and Trade (MOIT)** | `/legal-profiles…`, `/websites…`, `/public/badge`, `/public/owner` |
 
-This guide explains the last part, and the mandatory page templates of `content` that go with it.
+This guide explains the Ministry of Industry and Trade procedure with the mandatory page templates of
+`content`, then personal data (with the 72-hour breach runbook) and tracking tags with cookie consent.
 
 ## The Ministry of Industry and Trade procedure
 
@@ -179,3 +183,156 @@ POST /api/v1/content/templates/{key}/drafts
   A required variable still missing gives `content.template_variables_missing` (422) listing them all.
 - The result is a **draft** page (`content.write`); review it, publish it, then link it to the website.
 - Every template starts with "Sample content — have a legal professional review it before use".
+
+## Personal data
+
+Personal Data Protection Law 91/2025/QH15 and Decree 356/2025/ND-CP (in force from 1 January 2026 — check
+the originals with a legal professional). Each tenant is the data controller of its own data.
+
+### Purposes and legal bases
+
+`GET /purposes` (`compliance.privacy.read`) lists the purposes of processing: the defaults of the legal rule
+`privacy.default_purposes` (`service`, `marketing`, `analytics`, `legal`) merged with the tenant's own.
+`POST /purposes` adds one, `PATCH /purposes/{key}` changes one (changing a default stores the tenant's
+version) — both need `compliance.privacy.manage`. Each purpose has a `category`, a `legal_basis`
+(`consent`, `contract`, `legal_obligation`, `vital_interest`, `public_interest`), the kinds of data, the
+recipients (name, country) and a description by language. `GET /public/purposes` (no sign-in) lists the
+purposes in use for the privacy notice; active tracking providers appear there as recipients, with the
+country that receives the data.
+
+### Retention
+
+Every module declares the personal data it keeps and for how long (`Module::retention`, read from its
+settings). `GET /retention` lists them, each compared with the legal rule `privacy.retention_limits`:
+`ok`, `exceeds_limit` or `forever_not_allowed` (only `accounting` — proof the law requires — may be kept
+forever). The limits shipped are cautious defaults, not numbers from the law. `autoxide doctor` warns
+(`compliance.retention`) when an item is not `ok`; lower the setting named in `setting`.
+
+### Processing register
+
+`GET /processing-register` returns purposes, legal bases, kinds of data, recipients, retention and where the
+data is kept — the input of a data protection impact assessment, whose official form needs a legal
+professional.
+
+### Data residency
+
+A tenant can be required to keep its data in one country (Cybersecurity Law 116/2025/QH15, Decree
+53/2022/ND-CP — who must keep data in Vietnam needs a legal check):
+
+```bash
+autoxide placement country main VN          # record where a placement's servers are
+```
+
+```http
+PUT /api/v1/compliance/residency
+{"tenant_id": "…", "data_residency": "VN"}
+```
+
+Only platform staff with `compliance.privacy.manage` set it. It is refused (`tenant_residency_violation`,
+409) while the tenant's placement is not in that country or its country is unknown; moving the tenant later
+to a placement elsewhere is refused with the same code, and so is changing the placement's country. `GET
+/residency` shows the tenant's state; `autoxide doctor` warns (`compliance.data_residency`) about any tenant
+not met.
+
+### Personal data breaches: the 72-hour runbook
+
+The report to the authority is due **72 hours after detection** (legal rule `privacy.incident`, data with an
+effective date). Do this as soon as a breach is suspected:
+
+1. **Record it at once** — `POST /incidents` with `title`, `severity` (`low`…`critical`) and `detected_at`
+   (when it was detected, not when it started). The answer gives `report_due_at`. Needs
+   `compliance.incidents.manage`.
+2. **Set who is reminded** — the tenant policy `incident.alert_emails` (`PUT /policies/incident.alert_emails`
+   with a list of addresses). A job every 15 minutes sends a mail at 24, 48, 60 and 68 hours and at the
+   deadline (each once), and emits `compliance.incident_deadline_near`.
+3. **Contain and log** — `PATCH /incidents/{id}` with `status: "contained"`, the kinds of data and the
+   number of people; add each finding and action with `POST /incidents/{id}/entries` (the log only grows).
+4. **Draft the notifications** — `GET /incidents/{id}/draft?audience=authority&locale=vi` (and
+   `audience=subjects` for the people affected). These are drafts filled from the incident and the
+   `privacy.contact` policy: complete the missing parts, have them reviewed, send them yourself.
+5. **Record the report** — `PATCH /incidents/{id}` with `authority_notified_at` and `authority_reference`
+   (the breach becomes `reported`), then `subjects_notified_at` when people were told; `closed` at the end.
+
+`GET /incidents?overdue=true` lists breaches past their deadline, and `autoxide doctor`
+(`compliance.privacy_deadlines`) warns about them. The deployment guide points here
+([DEPLOY.md](DEPLOY.md)).
+
+### Requests of data subjects received through other channels
+
+A request a user makes in their account (export, delete) runs at once. A request received by email, post,
+phone or from an authority is recorded so it is not lost:
+
+- `POST /subject-requests` with `kind` (`access`, `erasure`, `rectification`, `objection`, `restriction`,
+  `withdrawal`), `channel` (`email`, `post`, `phone`, `authority`, `other`), `subject` (a user id, an email
+  address or a phone number) and `received_at`. `due_at` comes from the legal rule `privacy.subject_requests`
+  in force when it was received (72 hours by default — check the original texts).
+- `POST /subject-requests/{id}/fulfil`: `access` of a user returns the personal data of every module (send
+  it to the person; it is not stored); `erasure` / `withdrawal` of an email or phone number empties it from
+  the consent ledger (the hashed key and the records stay as proof, so nothing is sent again). Erasing a
+  whole account is `DELETE /api/v1/auth/users/{id}`.
+- `PATCH /subject-requests/{id}` sets `in_progress` or `rejected` (with a `reason`). `GET
+  /subject-requests?overdue=true` lists late ones. All need `compliance.privacy.manage`.
+
+When an account is deleted (`auth.user_deleted`), `compliance` deletes its verified phone number and
+pending codes and removes the user from cookie consent records; proof of consents, accepted documents and
+the identity verification result stay for the time the law requires. The personal data export of a user
+(`GET /api/v1/auth/me/export`) includes the `compliance` part.
+
+## Tracking tags and cookie consent
+
+A tenant adds the measurement tags of advertising platforms without pasting scripts, and they run only after
+the visitor consents. (Personal Data Protection Law 91/2025/QH15, Decree 356/2025/ND-CP, Consumer Protection
+Law 19/2023/QH15 — whether analytics cookies need consent, and the impact assessment for transfers abroad,
+need a legal check; the design takes the strict reading: ask first.)
+
+### Providers and tags
+
+`GET /tracking-providers` lists the built-in providers; the tenant only enters the ID:
+
+| `provider` | Name | Category | ID form | Data goes to |
+| --- | --- | --- | --- | --- |
+| `ga4` | Google Analytics 4 | `analytics` | `G-XXXXXXXXXX` | US |
+| `gtm` | Google Tag Manager | `marketing` | `GTM-XXXXXXX` | US |
+| `google_ads` | Google Ads | `marketing` | `AW-123456789` | US |
+| `meta` | Meta Pixel | `marketing` | digits | US |
+| `tiktok` | TikTok Pixel | `marketing` | letters and digits | SG |
+| `zalo` | Zalo Ads Pixel | `marketing` | digits | VN |
+
+`POST /tracking-tags {org_id, provider, tracking_id}`, `PATCH /tracking-tags/{id}` (`status`: `active` /
+`paused`), `DELETE /tracking-tags/{id}` — `compliance.tracking.manage` on the website's unit. A wrong ID gives
+`compliance.tracking_id_invalid` with the expected form; an unknown provider
+`compliance.tracking_provider_unknown`.
+
+### Banner
+
+`PUT /cookie-settings/{org_id}` sets `enabled`, the optional `categories` asked about (`preferences`,
+`analytics`, `marketing`; `necessary` is always on and carries no tag) and `position`. Categories of active
+tags are always asked. Changing the categories or the active providers raises `policy_version`: visitors are
+asked again. `GET /cookie-consents/stats?org_id=` gives totals of the last 30 days, never single records.
+
+### For the interface
+
+```http
+GET  /api/v1/compliance/public/consent-config?granted=analytics&locale=vi
+POST /api/v1/compliance/public/cookie-consents
+{"consent_id": "<random, kept in a necessary cookie>", "categories": ["analytics"], "policy_version": 3}
+```
+
+The contract with the interface:
+
+- **Nothing loads before consent.** Without `granted` the config returns no tag; with it, only the active
+  tags of those categories. Read the visitor's choice from your necessary cookie and pass it.
+- **Reject is as easy as accept.** Show `texts.reject_all` as prominently as `texts.accept_all`, on the first
+  layer; no category is preselected (`preselected: false`). `texts.legal` is not overridable.
+- **Record the choice** with `POST /public/cookie-consents` (no sign-in; limited per network block by
+  `AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR`). It stores the random id, the categories, the version
+  and a hash of the network block — never the raw IP — for the days of `privacy.consent_proof_days`. A
+  signed-in visitor's choice also goes to the consent ledger (purposes `analytics` / `marketing`, scope
+  `website:<unit id>`). An old `policy_version` gives `compliance.cookie_policy_changed` (409): show the banner
+  again.
+- **Do not slow the page.** Load tags `async`, after the page has rendered (`loading:
+  after_consent_deferred`); add `csp_hosts` to the Content-Security-Policy; never load tags on sign-in or
+  account pages; on checkout pages send only the standard conversion events (`view_item`, `add_to_cart`,
+  `begin_checkout`, `purchase`).
+- Sending conversions from the server to ad platforms is not built (it needs its own legal check on
+  personal data transfers).
