@@ -217,6 +217,11 @@ export type ApiKeyResponse = {
   /** When the key stops working; `null`: never. */
   expires_at?: string | null;
   id: string;
+  /**
+   * Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
+   * approval) or `service` (another program). The audit log records it as `actor_kind`.
+   */
+  kind: string;
   /** Last time the key was used, to the minute; `null`: never used. */
   last_used_at?: string | null;
   /** What the key is for. */
@@ -237,6 +242,28 @@ export type ApiKeyResponse = {
    * their first 12 characters.
    */
   prefix: string;
+};
+
+/** A command an AI agent asked to run, waiting for a person. */
+export type ApprovalRequest = {
+  api_key_id?: string | null;
+  created_at: string;
+  decided_at?: string | null;
+  decided_by?: string | null;
+  expires_at: string;
+  id: string;
+  /** Any of these permissions may approve it. */
+  permissions: string[];
+  /** Why it was rejected. */
+  reason?: string | null;
+  /** The user whose agent key asked. */
+  requested_by: string;
+  /** `pending`, `approved`, `rejected`, `expired` or `used` (approved, then run). */
+  status: string;
+  /** The command, e.g. `DELETE /api/v1/content/entries/0190…`. */
+  summary: string;
+  /** Where to look at it and decide. */
+  url: string;
 };
 
 /** Put a tenant on a plan. */
@@ -261,8 +288,10 @@ export type AuditEntryResponse = {
   /** API key used, when the change was made with one. */
   actor_api_key_id?: string | null;
   /**
-   * Who made the change: `user` (a signed-in user or API key), `system` (command line,
-   * background jobs) or `public` (someone not signed in, such as a visitor sending a form).
+   * Who made the change: `user` (a person, signed in or through an API key of kind `human`),
+   * `agent` (an AI agent's API key), `service` (another program's API key), `support` (platform
+   * staff through a support grant), `system` (command line, background jobs) or `public`
+   * (someone not signed in, such as a visitor sending a form).
    */
   actor_kind: string;
   /**
@@ -2351,6 +2380,11 @@ export type CreateApiKeyRequest = {
    * not expire.
    */
   expires_at?: string | null;
+  /**
+   * Who will use the key: `human` (you, the default), `agent` (an AI agent: commands marked
+   * for approval wait for a person to approve them) or `service` (another program).
+   */
+  kind?: string | null;
   /** What the key is for, 1 to 100 characters. */
   name: string;
   /**
@@ -2743,6 +2777,31 @@ export type Data_AltSuggestionResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ApprovalRequest = {
+  /** A command an AI agent asked to run, waiting for a person. */
+  data: {
+    api_key_id?: string | null;
+    created_at: string;
+    decided_at?: string | null;
+    decided_by?: string | null;
+    expires_at: string;
+    id: string;
+    /** Any of these permissions may approve it. */
+    permissions: string[];
+    /** Why it was rejected. */
+    reason?: string | null;
+    /** The user whose agent key asked. */
+    requested_by: string;
+    /** `pending`, `approved`, `rejected`, `expired` or `used` (approved, then run). */
+    status: string;
+    /** The command, e.g. `DELETE /api/v1/content/entries/0190…`. */
+    summary: string;
+    /** Where to look at it and decide. */
+    url: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_AuditEntryResponse = {
   /** One change, as recorded in the audit log. */
   data: {
@@ -2751,8 +2810,10 @@ export type Data_AuditEntryResponse = {
     /** API key used, when the change was made with one. */
     actor_api_key_id?: string | null;
     /**
-     * Who made the change: `user` (a signed-in user or API key), `system` (command line,
-     * background jobs) or `public` (someone not signed in, such as a visitor sending a form).
+     * Who made the change: `user` (a person, signed in or through an API key of kind `human`),
+     * `agent` (an AI agent's API key), `service` (another program's API key), `support` (platform
+     * staff through a support grant), `system` (command line, background jobs) or `public`
+     * (someone not signed in, such as a visitor sending a form).
      */
     actor_kind: string;
     /**
@@ -6985,6 +7046,30 @@ export type Data_Vec_AdministrativeUnit = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_ApprovalRequest = {
+  data: {
+    api_key_id?: string | null;
+    created_at: string;
+    decided_at?: string | null;
+    decided_by?: string | null;
+    expires_at: string;
+    id: string;
+    /** Any of these permissions may approve it. */
+    permissions: string[];
+    /** Why it was rejected. */
+    reason?: string | null;
+    /** The user whose agent key asked. */
+    requested_by: string;
+    /** `pending`, `approved`, `rejected`, `expired` or `used` (approved, then run). */
+    status: string;
+    /** The command, e.g. `DELETE /api/v1/content/entries/0190…`. */
+    summary: string;
+    /** Where to look at it and decide. */
+    url: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_BillingPeriodResponse = {
   data: {
     amount: Money;
@@ -10976,6 +11061,11 @@ export type Page_ApiKeyResponse = {
     /** When the key stops working; `null`: never. */
     expires_at?: string | null;
     id: string;
+    /**
+     * Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
+     * approval) or `service` (another program). The audit log records it as `actor_kind`.
+     */
+    kind: string;
     /** Last time the key was used, to the minute; `null`: never used. */
     last_used_at?: string | null;
     /** What the key is for. */
@@ -11009,8 +11099,10 @@ export type Page_AuditEntryResponse = {
     /** API key used, when the change was made with one. */
     actor_api_key_id?: string | null;
     /**
-     * Who made the change: `user` (a signed-in user or API key), `system` (command line,
-     * background jobs) or `public` (someone not signed in, such as a visitor sending a form).
+     * Who made the change: `user` (a person, signed in or through an API key of kind `human`),
+     * `agent` (an AI agent's API key), `service` (another program's API key), `support` (platform
+     * staff through a support grant), `system` (command line, background jobs) or `public`
+     * (someone not signed in, such as a visitor sending a form).
      */
     actor_kind: string;
     /**
@@ -14397,6 +14489,12 @@ export type RegisterRequest = {
    * the setting `auth.customer_registration`).
    */
   realm?: Realm;
+};
+
+/** Why a request is rejected. */
+export type RejectRequest = {
+  /** 1 to 500 characters, shown to the agent. */
+  reason: string;
 };
 
 /** The changes of one version. */
@@ -19379,6 +19477,7 @@ export interface paths {
     delete: {
       parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -20784,6 +20883,60 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/approvals": {
+    /** List approval requests. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string }; };
+      responses: {
+        200: Data_Vec_ApprovalRequest;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/approvals/{id}": {
+    /** Get an approval request. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ApprovalRequest;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/approvals/{id}/approve": {
+    /** Approve an agent's command. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ApprovalRequest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/approvals/{id}/reject": {
+    /** Reject an agent's command. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RejectRequest;
+      responses: {
+        200: Data_ApprovalRequest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

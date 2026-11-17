@@ -2,6 +2,7 @@
 //! `kernel` (`builtin`) với sổ module đã cài và cờ theo người dùng.
 
 pub(crate) mod alerts;
+pub(crate) mod approvals;
 pub(crate) mod builtin;
 pub mod bulk;
 pub(crate) mod can;

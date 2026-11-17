@@ -122,13 +122,13 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Webhook | `EndpointResponse` trả lần giao gần nhất (trạng thái, lúc, HTTP); lọc endpoint theo trạng thái | mới | Gọi `/deliveries?limit=1` cho từng endpoint; lọc trên trang đang xem |
 | [x] | Webhook | Mô tả event theo `Accept-Language` | mới | Hiện tiếng Anh cả khi chọn tiếng Việt |
 | [ ] | Nhà phát triển › Webhook | Danh sách lần giao xuyên endpoint có lọc; gửi lại một lần giao | 52 | Gộp `/webhooks/{id}/deliveries` (25 lần mỗi endpoint); chưa có "Gửi lại" |
-| [ ] | Nhật ký audit | `actor_kind` (người / agent / dịch vụ / hỗ trợ nền tảng) và tham số lọc `actor_kind=` | 51, 52 | Chưa có chip lọc theo loại người làm — **Có một phần** (17/11): `actor_kind` có trong mỗi dòng (`user`, `system`, `public`) và lọc được bằng `GET /audit?actor_kind=`. Còn chờ bước 51: tách `user` thành người / agent / dịch vụ (cần loại API key) và hỗ trợ nền tảng |
+| [x] | Nhật ký audit | `actor_kind` (người / agent / dịch vụ / hỗ trợ nền tảng) và tham số lọc `actor_kind=` | 51, 52 | Chưa có chip lọc theo loại người làm — **Có một phần** (17/11): `actor_kind` có trong mỗi dòng (`user`, `system`, `public`) và lọc được bằng `GET /audit?actor_kind=`. Còn chờ bước 51: tách `user` thành người / agent / dịch vụ (cần loại API key) và hỗ trợ nền tảng — **Đã có** (17/11, bước 51 P12): `actor_kind` thêm `agent`, `service`, `support` (người vẫn là `user`); `GET /audit?actor_kind=agent,service` nhận nhiều giá trị |
 | [x] | Nhật ký audit | Mục audit trả kèm tên người làm (hoặc `include=actor`) | mới | Gọi `GET /auth/users/{id}` cho mỗi người trên trang; không có quyền thì hiện mã rút gọn |
-| [ ] | API key | `kind` của key (người, agent, dịch vụ) | 51 | Chưa hiện loại key |
+| [x] | API key | `kind` của key (người, agent, dịch vụ) | 51 | Chưa hiện loại key — **Đã có** (17/11, bước 51 P12): `POST /auth/api-keys {kind: human|agent|service}` (mặc định `human`), `kind` trong mọi câu trả lời về key |
 | [x] | API key | Quản trị viên xem và thu hồi key của mọi người trong khách | mới | Chỉ key của chính mình |
 | [x] | API key | Xác nhận lại bằng passkey hoặc TOTP thay cho mật khẩu khi tạo key | mới | Chỉ mật khẩu |
 | [x] | Tạo API key | Sổ permission đọc được khi không có `auth.roles.read` (vd `GET /me/permissions` kèm mô tả) | mới | Chỉ thấy tên permission, không có mô tả |
-| [ ] | Chờ duyệt | `GET /kernel/approvals`, `POST /approvals/{id}/approve`, `/reject` | 51 | Dữ liệu mẫu (`src/sample/agent.ts`) |
+| [x] | Chờ duyệt | `GET /kernel/approvals`, `POST /approvals/{id}/approve`, `/reject` | 51 | Dữ liệu mẫu (`src/sample/agent.ts`) — **Đã có** (17/11, bước 51 P12): `GET /api/v1/kernel/approvals?status=`, `GET /kernel/approvals/{id}`, `POST …/approve`, `POST …/reject {reason}`; agent gọi lệnh có `x-approval: "agent"` (đầu tiên: xoá bài viết) nhận 202 kèm yêu cầu, được duyệt thì gửi lại kèm `Autoxide-Approval: <id>`; event `kernel.approval_decided` |
 | [ ] | Nhật ký gọi tool MCP | Nhật ký các lần agent gọi tool | 51, 52 | Dữ liệu mẫu (`src/sample/agent.ts`) |
 | [x] | Kết nối MCP | Core công bố địa chỉ công khai (`AUTOXIDE_HTTP_PUBLIC_URL`) | mới | Dùng `AUTOXIDE_API_URL` của giao diện |
 | [ ] | Nhà phát triển › Request | `GET /kernel/requests?status_class=&api_key_id=` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |

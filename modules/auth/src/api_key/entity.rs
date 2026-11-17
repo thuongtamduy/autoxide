@@ -20,6 +20,8 @@ pub(crate) mod api_key {
         pub org_id: Option<Uuid>,
         pub last_used_at: Option<DateTimeUtc>,
         pub created_at: DateTimeUtc,
+        /// `human`, `agent` hay `service` (bước 51 P12).
+        pub kind: String,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

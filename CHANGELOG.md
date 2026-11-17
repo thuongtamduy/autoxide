@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Agents as actors and approvals (step 51, D-365): API keys have a `kind` (`human`, `agent`, `service`); the audit
+  log records `actor_kind` `agent`, `service` and `support` besides `user`, and filters on several at once
+  (`actor_kind=agent,service`). Commands marked `x-approval: "agent"` (first: deleting a post or page) answer an
+  agent's call with `202` and an approval request; a person holding the command's permission approves or rejects
+  it (`/api/v1/kernel/approvals`, event `kernel.approval_decided`), and the agent sends the same request again with
+  `Autoxide-Approval: <id>`. MCP tools marked `requires_approval_for_agent` refuse agents (`approval_required`).
 - Step 37, reports of infringements and consumer complaints (Vietnam — E-commerce Law 2025, Intellectual Property Law, Decree
   85/2021/ND-CP, Consumer Protection Law 19/2023/QH15, Decree 55/2024/ND-CP; check the original texts; guide
   `docs/COMPLIANCE.md`): cases with intake from public forms with anti-spam tokens (`POST /api/v1/compliance/public/reports`,

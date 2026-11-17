@@ -236,6 +236,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::work_states::CreateWorkStates),
             // Ghi chú trên mọi bản ghi (bước 51 P13).
             Box::new(crate::ops::records::CreateRecordNotes),
+            // Yêu cầu duyệt lệnh của agent (bước 51 P12).
+            Box::new(crate::ops::approvals::CreateApprovalRequests),
         ]
     }
 
@@ -310,6 +312,7 @@ impl Module for KernelModule {
             crate::tenancy::settings::SETTING_CHANGED,
             crate::job::runs::JOB_RETRIED,
             crate::ops::records::RECORD_NOTE_ADDED,
+            crate::ops::approvals::APPROVAL_DECIDED,
             crate::tenancy::admin::TENANT_CREATED,
             crate::tenancy::admin::TENANT_UPDATED,
             crate::tenancy::domains::DOMAIN_ADDED,
@@ -343,6 +346,11 @@ impl Module for KernelModule {
             routes = routes.merge(crate::job::runs::routes(crate::job::runs::JobsState {
                 outbox: outbox.clone(),
             }));
+        }
+        if let Some(outbox) = &self.outbox {
+            routes = routes.merge(crate::ops::approvals::routes(
+                crate::ops::approvals::ApprovalsState { outbox: outbox.clone() },
+            ));
         }
         if let (Some(outbox), Some((resources, permissions))) = (&self.outbox, &self.resources) {
             routes = routes.merge(crate::ops::records::routes(crate::ops::records::RecordsState {
