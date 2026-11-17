@@ -13,6 +13,7 @@ use autoxide_kernel::bulk::BulkAction;
 use autoxide_kernel::config::Config;
 use autoxide_kernel::connections::ConnectionProbe;
 use autoxide_kernel::csv::line;
+use autoxide_kernel::custom_fields::CustomFields;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::doctor::CHECK_TIMEOUT;
 use autoxide_kernel::einvoice::EInvoiceProvider;

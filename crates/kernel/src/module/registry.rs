@@ -118,6 +118,10 @@ impl Modules {
             texts.extend(declared);
         }
         catalog.text_overrides().fill(texts);
+        // Loại bản ghi nhận trường tự định nghĩa (bước 51 P19).
+        catalog
+            .custom_fields()
+            .fill(modules.iter().flat_map(|module| module.custom_field_targets()).collect());
         let client_configs = crate::ops::client_config::ClientConfigs::default();
         let user_flags = crate::user_flags::Handle::default();
         let keys = crate::secret::KeyConfig::default();
@@ -278,6 +282,7 @@ impl Modules {
         let probes = self.catalog.connection_probes();
         let taggables = self.catalog.taggables();
         let texts = self.catalog.text_overrides();
+        let custom_fields = self.catalog.custom_fields();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         // Gọi sau `configure` của mọi module: thời hạn đọc từ cấu hình.
@@ -314,6 +319,7 @@ impl Modules {
                 probes: &probes,
                 taggables: &taggables,
                 texts: &texts,
+                custom_fields: &custom_fields,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,

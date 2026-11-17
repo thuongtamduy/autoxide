@@ -129,6 +129,8 @@ pub(crate) struct EntryFields {
     pub ai_assisted: Option<bool>,
     /// Chỉ máy chủ đặt (khi tự dịch): revision của bản gốc đã dịch. Không có trong API.
     pub translated_from: Option<Uuid>,
+    /// Giá trị trường tự định nghĩa gửi lên (bước 51 P19); `null` trong map xoá một trường.
+    pub custom_fields: Option<serde_json::Map<String, Value>>,
 }
 
 /// Một mục mới.
@@ -205,6 +207,8 @@ pub(crate) struct EntryFilter {
     /// Nhãn nội bộ (bước 51 P20): có một trong / có mọi nhãn này.
     pub tags_any: Vec<Uuid>,
     pub tags_all: Vec<Uuid>,
+    /// Trường tự định nghĩa (bước 51 P19): (khoá, `<toán tử>:<giá trị>`) từ `cf.<khoá>=`.
+    pub custom: Vec<(String, String)>,
 }
 
 impl ContentService {
@@ -266,7 +270,11 @@ impl ContentService {
             )),
         }
         let auto_slug = input.fields.slug.is_none();
-        self.apply(tenant, &mut candidate, input.fields, &mut problems).await?;
+        let mut fields = input.fields;
+        let custom = fields.custom_fields.take();
+        candidate.custom_fields =
+            self.custom_values(tenant, custom.as_ref(), None, true, &mut problems).await?;
+        self.apply(tenant, &mut candidate, fields, &mut problems).await?;
         mark_agent_written(principal, &mut candidate);
         if let Some(parent) = input.parent_id {
             self.check_parent(tenant, tenant.database().read(), &candidate, parent, &mut problems)
@@ -338,6 +346,18 @@ impl ContentService {
                 }
                 Err(error) => return Err(error.into()),
             };
+            if let Some(values) = stored_custom(&entry) {
+                self.custom_fields
+                    .write_index(
+                        &transaction,
+                        tenant,
+                        "content",
+                        crate::resource::ENTRY,
+                        entry.id,
+                        &values,
+                    )
+                    .await?;
+            }
             revisions::record(
                 &transaction,
                 tenant,
@@ -461,6 +481,13 @@ impl ContentService {
         if let Some(ai) = filter.ai_generated {
             select = select.filter(Column::AiGenerated.eq(ai));
         }
+        for (key, value) in &filter.custom {
+            let condition = self
+                .custom_fields
+                .condition(tenant, "content", crate::resource::ENTRY, Column::Id, key, value)
+                .await?;
+            select = select.filter(condition);
+        }
         if !filter.tags_any.is_empty() || !filter.tags_all.is_empty() {
             select = select.filter(autoxide_kernel::tags::TagIndex.condition(
                 tenant,
@@ -560,6 +587,13 @@ impl ContentService {
         if before.ai_assisted && fields.ai_assisted == Some(false) {
             principal.require(&permissions::CONTENT_PUBLISH).map_err(|_| ai_label_locked())?;
         }
+        let mut fields = fields;
+        if let Some(custom) = fields.custom_fields.take() {
+            let current = stored_custom(&before);
+            candidate.custom_fields = self
+                .custom_values(tenant, Some(&custom), current.as_ref(), false, &mut problems)
+                .await?;
+        }
         self.apply(tenant, &mut candidate, fields, &mut problems).await?;
         mark_agent_written(principal, &mut candidate);
         if !problems.is_empty() {
@@ -599,6 +633,18 @@ impl ContentService {
             }
             Err(error) => return Err(error.into()),
         };
+        if after.custom_fields != before.custom_fields {
+            self.custom_fields
+                .write_index(
+                    &transaction,
+                    tenant,
+                    "content",
+                    crate::resource::ENTRY,
+                    after.id,
+                    &stored_custom(&after).unwrap_or_default(),
+                )
+                .await?;
+        }
         if let Some(reason) = reason {
             revisions::record(&transaction, tenant, &after, reason, Some(principal.user_id()), now)
                 .await?;
@@ -623,6 +669,31 @@ impl ContentService {
         }
         transaction.commit().await?;
         Ok(after)
+    }
+
+    /// Kiểm giá trị trường tự định nghĩa (bước 51 P19) theo định nghĩa của khách; lỗi vào
+    /// `problems` (đường dẫn `custom_fields.<key>`). Trả JSON để lưu; `None` khi không có gì.
+    pub(crate) async fn custom_values(
+        &self,
+        tenant: &TenantContext,
+        incoming: Option<&serde_json::Map<String, Value>>,
+        current: Option<&serde_json::Map<String, Value>>,
+        creating: bool,
+        problems: &mut Vec<FieldError>,
+    ) -> Result<Option<String>, Error> {
+        match self
+            .custom_fields
+            .validate(tenant, crate::resource::ENTRY, incoming, current, creating)
+            .await
+        {
+            Ok(values) if values.is_empty() => Ok(None),
+            Ok(values) => Ok(Some(Value::Object(values).to_string())),
+            Err(error) if error.code() == "kernel.custom_field_invalid" => {
+                problems.extend(error.fields().iter().cloned());
+                Ok(current.map(|current| Value::Object(current.clone()).to_string()))
+            }
+            Err(error) => Err(error),
+        }
     }
 
     /// Áp `fields` lên `candidate` rồi kiểm toàn bộ (mọi lỗi vào `problems`); tính văn bản
@@ -1041,6 +1112,7 @@ pub(crate) fn blank(
         ai_generated: false,
         ai_assisted: false,
         restricted_at: None,
+        custom_fields: None,
         review_requested_at: None,
         review_requested_by: None,
         translated_from_revision_id: None,
@@ -1051,6 +1123,11 @@ pub(crate) fn blank(
 }
 
 /// `ActiveModel` chỉ đánh dấu các cột khác nhau giữa `before` và `after`.
+/// Giá trị trường tự định nghĩa đã lưu trên bài.
+pub(crate) fn stored_custom(entry: &Entry) -> Option<serde_json::Map<String, Value>> {
+    entry.custom_fields.as_deref().and_then(|text| serde_json::from_str(text).ok())
+}
+
 pub(crate) fn changed_columns(before: &Entry, after: &Entry) -> entry::ActiveModel {
     let mut row: entry::ActiveModel = before.clone().into_active_model();
     macro_rules! set_if_changed {
@@ -1059,6 +1136,7 @@ pub(crate) fn changed_columns(before: &Entry, after: &Entry) -> entry::ActiveMod
         };
     }
     set_if_changed!(
+        custom_fields,
         parent_id,
         parent_key,
         status,

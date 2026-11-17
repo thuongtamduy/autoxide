@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Custom fields (step 51): modules let tenants add their own fields to a record type
+  (`Module::custom_field_targets`); `/api/v1/kernel/custom-fields` defines them (`kernel.custom_fields.manage`;
+  14 types, labels and help by language, required, options, ranges, default, visibility, filterable). Values live
+  on the record (`custom_fields`), checked by `CustomFields::validate` with every problem at once; filterable
+  fields are indexed in the same transaction and lists filter on `cf.<key>=<eq|in|gte|lte|prefix>:<value>`.
+  Posts and pages take custom fields.
 - Tenant wording (step 51): modules mark the texts a tenant may replace (`Module::overridable_texts`; content: the
   terms "Post" and "Page"); `GET /api/v1/kernel/texts`, `PUT/DELETE /api/v1/kernel/texts/{locale}/{key}`
   (`kernel.texts.manage`) set the tenant's wording — plain text, the same placeholders as the default, never error

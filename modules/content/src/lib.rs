@@ -72,6 +72,15 @@ struct ContentModule {
 }
 
 impl Module for ContentModule {
+    fn custom_field_targets(&self) -> Vec<autoxide_kernel::custom_fields::CustomFieldTarget> {
+        // Trường tự định nghĩa của khách trên bài viết / trang (bước 51 P19): chỉ nội bộ.
+        vec![autoxide_kernel::custom_fields::CustomFieldTarget::new(
+            resource::ENTRY,
+            permissions::CONTENT_READ,
+            permissions::CONTENT_WRITE,
+        )]
+    }
+
     fn overridable_texts(&self) -> Vec<autoxide_kernel::texts::OverridableText> {
         // Thuật ngữ khách đổi được (bước 51 P21): giao diện và website hiện tên loại mục theo khách.
         vec![
@@ -194,6 +203,7 @@ impl Module for ContentModule {
             .with_orgs(context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok())
             .with_entitlements(context.entitlements())
             .with_resources(context.resources())
+            .with_custom_fields(context.custom_fields())
             // Mẫu trang bắt buộc (D-359): biến từ hồ sơ pháp lý của `compliance` khi app có module đó.
             .with_templates(
                 (*context.require::<autoxide_kernel::template::TemplateEngine>()?).clone(),

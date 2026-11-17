@@ -260,6 +260,12 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Loại bản ghi của module nhận trường tự định nghĩa (bước 51 P19, D-235). Module lưu giá trị
+    /// trên bản ghi (cột `custom_fields`), kiểm bằng `CustomFields::validate`. Mặc định: không có.
+    fn custom_field_targets(&self) -> Vec<crate::ops::custom_fields::CustomFieldTarget> {
+        Vec::new()
+    }
+
     /// Lệnh quản trị của module cho `autoxide task` (D-169): việc người vận hành chạy tay,
     /// vd làm lại dữ liệu dẫn xuất sau khi đổi cấu hình. Gọi sau `start`. Tên khai ngắn
     /// (`refresh_variants`); kernel thêm tiền tố `<module>.`.
@@ -318,6 +324,7 @@ pub struct StartContext<'a> {
     probes: &'a crate::ops::connections::ConnectionProbes,
     taggables: &'a crate::ops::tags::Taggables,
     texts: &'a crate::ops::texts::TextOverrides,
+    custom_fields: &'a crate::ops::custom_fields::CustomFields,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -514,6 +521,11 @@ impl StartContext<'_> {
     /// tượng); `write`: permission ghi bản ghi — cần để gắn / gỡ nhãn.
     pub fn taggable(&mut self, kind: &'static str, write: Permission) -> Result<(), Error> {
         self.taggables.register(self.module, kind, write)
+    }
+
+    /// Trường tự định nghĩa (bước 51 P19): kiểm giá trị, ghi index lọc, dựng điều kiện lọc.
+    pub fn custom_fields(&self) -> crate::ops::custom_fields::CustomFields {
+        self.custom_fields.clone()
     }
 
     /// Câu khách đã đổi (bước 51 P21): tra trước câu mặc định.

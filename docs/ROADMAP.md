@@ -234,9 +234,12 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       chỉ cờ của mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản xuất dữ liệu, xoá khi xoá tài khoản;
       `tenant_id` thêm ở bước 33 cùng mọi bảng
 - [x] Danh sách lý do theo khách (P18, D-223); cài đặt nối ra ngoài có `last_used_at`, `last_error` và thử
-- [ ] Trường tự định nghĩa trên bản ghi (P19, D-235): module khai đích, khách thêm trường (kiểu, nhãn, bắt buộc,
+- [x] Trường tự định nghĩa trên bản ghi (P19, D-235): module khai đích, khách thêm trường (kiểu, nhãn, bắt buộc,
       mức hiện `internal` / `public` / `buyer_input`), giá trị nằm trên bản ghi, lọc qua bảng index của module ghi
       cùng transaction, dùng chung cho xuất / nhập / tự động hoá; hạn mức theo gói; test trên cả hai database
+      — xong phần lõi (17/11): `kernel_custom_fields`, `/kernel/custom-fields`, `CustomFields::validate` / `write_index` /
+      `condition`, `content.entry` (giá trị, lọc `cf.<khoá>`). Còn: cột `cf.<khoá>` trong xuất (P16) / nhập (56),
+      đọc công khai mức `public`, đưa trường `personal_data` vào xuất / xoá dữ liệu cá nhân, hạn mức theo gói, tool MCP
 - [x] Nhãn gắn bản ghi (P20, D-235): nhãn nội bộ dùng chung mọi loại bản ghi, lọc `tags_any` / `tags_all`, gắn
       hàng loạt, gộp nhãn, event cho tự động hoá — xong (17/11) trừ gắn hàng loạt: thao tác hàng loạt (P8) chưa nhận
       tham số (nhãn nào), làm khi thêm tham số cho `BulkAction`

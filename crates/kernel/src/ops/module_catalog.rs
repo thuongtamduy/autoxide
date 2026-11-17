@@ -78,6 +78,8 @@ pub(crate) struct ModuleCatalog {
     taggables: crate::ops::tags::Taggables,
     /// Câu khách đổi được và câu khách đã đổi (bước 51 P21).
     texts: crate::ops::texts::TextOverrides,
+    /// Trường tự định nghĩa (bước 51 P19).
+    custom_fields: crate::ops::custom_fields::CustomFields,
     /// Lịch sử theo bản ghi (bước 51 P13), module nhật ký công bố; điền sau khi mọi module khởi động.
     history: crate::ops::records::HistorySlot,
     /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
@@ -176,6 +178,10 @@ impl ModuleCatalog {
 
     pub(crate) fn text_overrides(&self) -> crate::ops::texts::TextOverrides {
         self.texts.clone()
+    }
+
+    pub(crate) fn custom_fields(&self) -> crate::ops::custom_fields::CustomFields {
+        self.custom_fields.clone()
     }
 
     pub(crate) fn lists(&self) -> crate::ops::list_exports::ListsHandle {

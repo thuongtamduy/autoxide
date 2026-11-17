@@ -49,6 +49,8 @@ pub struct Model {
     pub ai_assisted: bool,
     /// Bị ẩn tạm vì vụ việc (D-363); `None`: không. Chỉ bộ nghe event của `compliance` đổi.
     pub restricted_at: Option<DateTimeUtc>,
+    /// Giá trị trường tự định nghĩa của khách (bước 51 P19), JSON; `None`: không có.
+    pub custom_fields: Option<String>,
     /// Lúc bên viết xin duyệt (`NULL`: không xin, hay đã đăng / rút lại).
     pub review_requested_at: Option<DateTimeUtc>,
     pub review_requested_by: Option<Uuid>,
