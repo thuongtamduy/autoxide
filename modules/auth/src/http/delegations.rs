@@ -25,6 +25,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(list_delegations, grant_delegation))
         .routes(routes!(revoke_delegation))
         .routes(routes!(my_tenants))
+        .routes(routes!(list_child_tenants))
 }
 
 /// A delegation: holders of a role of the parent tenant work in a child tenant with it.
@@ -130,6 +131,56 @@ async fn list_delegations(
         Direction::Incoming => state.delegations.incoming(&tenant).await?,
     };
     Ok(Data { data: rows.into_iter().map(Into::into).collect() })
+}
+
+/// A tenant below this one (a child, or a child of a child…).
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ChildTenantResponse {
+    id: Uuid,
+    /// The tenant right above it (this tenant for a direct child).
+    parent_id: Uuid,
+    #[schema(example = "store-hanoi")]
+    slug: String,
+    name: String,
+    /// `provisioning`, `active`, `suspended`, `maintenance` or `moving`.
+    #[schema(example = "active")]
+    status: String,
+}
+
+/// List the tenants below this one, to choose where a delegation goes.
+///
+/// Requires `auth.delegations.manage`. Children first, then their children, each level sorted
+/// by slug; at most 16 levels down. Only names and states — nothing of their data.
+#[utoipa::path(
+    get,
+    path = "/delegations/tenants",
+    extensions(("x-permissions" = json!(["auth.delegations.manage"]))),
+    operation_id = "list_child_tenants",
+    security(("bearer" = [])),
+    responses(
+        (status = 200, description = "The tenants below this one.", body = Data<Vec<ChildTenantResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.delegations.manage`; code `permission_denied`.", body = Problem),
+    )
+)]
+async fn list_child_tenants(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    principal: Principal,
+) -> Result<Data<Vec<ChildTenantResponse>>, Error> {
+    principal.require(&DELEGATIONS_MANAGE)?;
+    let children = state.delegations.databases.tenant_descendants(tenant.id()).await?;
+    let data = children
+        .into_iter()
+        .map(|child| ChildTenantResponse {
+            id: child.id.as_uuid(),
+            parent_id: child.parent_id.as_uuid(),
+            slug: child.slug,
+            name: child.name,
+            status: child.status,
+        })
+        .collect();
+    Ok(Data { data })
 }
 
 /// Let holders of a role work in a child tenant.

@@ -218,6 +218,12 @@ async fn khach_tu_thu_hoi_tru_yeu_cau_co_tham_quyen() {
         )
         .await;
         let id = granted["data"]["id"].as_str().unwrap().to_owned();
+        // Khách thấy tên nhân sự được vào (chỉ tên, không email riêng).
+        assert_eq!(granted["data"]["staff_name"], "agent@platform.example", "{granted}");
+        let (status, seen) =
+            call(&setup, "GET", "/support-access", &setup.shop_admin, None, None).await;
+        assert_eq!(status, StatusCode::OK, "{seen}");
+        assert_eq!(seen["data"][0]["staff_name"], "agent@platform.example");
         let (status, revoked) =
             call(&setup, "DELETE", &format!("/support-access/{id}"), &setup.shop_admin, None, None)
                 .await;

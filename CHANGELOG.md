@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `GET /api/v1/auth/me/memberships` (and `/users/{id}/memberships`) include `org_name` and `org_unit_type`, so a user
+  who cannot read the organization tree still sees where they work.
+- `GET /api/v1/auth/delegations/tenants`: a parent tenant lists the tenants below it, to choose where a delegation
+  goes.
+- `GET /api/v1/kernel/client-config` has an `auth` section: `login_link`, `passkeys`, `self_registration`, so a
+  sign-in page shows only the ways the server allows.
+- Support access grants include `staff_name`, so a tenant sees who may enter its data.
 - `GET /api/v1/auth/memberships/counts` (MCP `auth.count_memberships`): how many people work in every organization
   unit — `direct` and `total` (including people on the units above) — without reading every membership.
 - `GET /api/v1/organizations/settings` gives each setting's `schema` (JSON Schema of its value: `type`, `enum`,

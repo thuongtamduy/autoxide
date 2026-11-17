@@ -36,6 +36,14 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 pub(crate) struct MembershipResponse {
     /// The unit; the root unit has the id of the tenant.
     org_id: Uuid,
+    /// Name of the unit, so a user who cannot read the organization tree still sees where they
+    /// work; `null` when the unit no longer exists (or no organization module is installed).
+    #[schema(example = "Store 1")]
+    org_name: Option<String>,
+    /// Type of the unit (see `GET /api/v1/organizations/unit-types`); `tenant` for the root, `null`
+    /// like `org_name`.
+    #[schema(example = "store")]
+    org_unit_type: Option<String>,
     /// The roles there, sorted by name. A role grants each permission at its scope from this
     /// unit (`unit`: this unit, `subtree`: this unit and the units below it).
     roles: Vec<RoleResponse>,
@@ -45,6 +53,8 @@ impl From<Membership> for MembershipResponse {
     fn from(membership: Membership) -> Self {
         MembershipResponse {
             org_id: membership.org_id,
+            org_name: None,
+            org_unit_type: None,
             roles: membership.roles.into_iter().map(RoleResponse::from).collect(),
         }
     }
@@ -114,8 +124,25 @@ pub(crate) struct MembershipsQuery {
     inherited: bool,
 }
 
-fn memberships(list: Vec<Membership>) -> Data<Vec<MembershipResponse>> {
-    Data { data: list.into_iter().map(MembershipResponse::from).collect() }
+/// Câu trả lời kèm tên nút: một lần tra mỗi nút qua `OrgDirectory` (người dùng làm ở ít nút).
+pub(crate) async fn memberships(
+    state: &HttpState,
+    tenant: &TenantContext,
+    list: Vec<Membership>,
+) -> Result<Data<Vec<MembershipResponse>>, Error> {
+    let mut data = Vec::with_capacity(list.len());
+    for membership in list {
+        let mut response = MembershipResponse::from(membership);
+        if let Some(orgs) = &state.orgs {
+            let id = autoxide_kernel::tenancy::OrgId::from_uuid(response.org_id);
+            if let Some(unit) = orgs.unit(tenant, id).await? {
+                response.org_name = Some(unit.name);
+                response.org_unit_type = Some(unit.unit_type);
+            }
+        }
+        data.push(response);
+    }
+    Ok(Data { data })
 }
 
 /// List the organization units a user works in, with the roles there.
@@ -142,7 +169,8 @@ async fn get_user_memberships(
     Path(id): Path<Uuid>,
 ) -> Result<Data<Vec<MembershipResponse>>, Error> {
     principal.require(&USERS_READ)?;
-    Ok(memberships(state.roles.memberships(&tenant, id).await?))
+    let list = state.roles.memberships(&tenant, id).await?;
+    memberships(&state, &tenant, list).await
 }
 
 /// Replace every organization unit a user works in, and the roles there.
@@ -177,7 +205,8 @@ async fn replace_user_memberships(
     principal.require(&ROLES_MANAGE)?;
     let wanted =
         input.memberships.into_iter().map(|entry| (entry.org_id, entry.role_ids)).collect();
-    Ok(memberships(state.roles.set_memberships(&tenant, &principal, id, wanted).await?))
+    let list = state.roles.set_memberships(&tenant, &principal, id, wanted).await?;
+    memberships(&state, &tenant, list).await
 }
 
 /// List who works in which organization unit, with which role.
@@ -286,5 +315,6 @@ async fn get_my_memberships(
     tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<Vec<MembershipResponse>>, Error> {
-    Ok(memberships(state.roles.memberships(&tenant, principal.user_id()).await?))
+    let list = state.roles.memberships(&tenant, principal.user_id()).await?;
+    memberships(&state, &tenant, list).await
 }

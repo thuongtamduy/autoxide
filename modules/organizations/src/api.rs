@@ -55,6 +55,25 @@ pub struct Unit {
     pub status: UnitStatus,
 }
 
+impl Unit {
+    /// Một nút đang hoạt động (cho cài đặt `OrgDirectory` giả trong test của module khác).
+    pub fn new(
+        id: OrgId,
+        parent_id: Option<OrgId>,
+        unit_type: impl Into<String>,
+        name: impl Into<String>,
+    ) -> Self {
+        Unit {
+            id,
+            parent_id,
+            unit_type: unit_type.into(),
+            name: name.into(),
+            code: None,
+            status: UnitStatus::Active,
+        }
+    }
+}
+
 /// Giá trị hiệu lực của một cài đặt ở một nút (cài đặt kế thừa theo cây, bước 34 mục 4).
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]

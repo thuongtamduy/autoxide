@@ -65,7 +65,7 @@ pub use org_settings::{OrgSetting, OrgSettingCatalog, OrgSettingCheck};
 pub use org_tree::{OrgTree, nearest, root_immutable, root_of};
 pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
 pub use registry::{
-    DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
+    ChildTenant, DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
 };
 pub use request::{TENANT_HEADER, TenantHint};
 pub use scope::{ScopeExt, TenantScoped};

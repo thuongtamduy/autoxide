@@ -474,8 +474,37 @@ export type ChangeRequest = {
   reference: string;
 };
 
+/** A tenant below this one (a child, or a child of a child…). */
+export type ChildTenantResponse = {
+  id: string;
+  name: string;
+  /** The tenant right above it (this tenant for a direct child). */
+  parent_id: string;
+  slug: string;
+  /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+  status: string;
+};
+
 /** Settings of the server an interface needs, by module: only values safe to show anyone. A module without such settings is absent. */
 export type ClientConfigResponse = {
+  /** Sign-in settings an interface needs. */
+  auth: {
+    /**
+     * `true` when people can sign in with a link sent by email (`AUTOXIDE_AUTH_LOGIN_LINK`,
+     * `POST /api/v1/auth/login/link`): show "sign in with a link".
+     */
+    login_link: boolean;
+    /**
+     * `true` when passkeys are set up (`AUTOXIDE_AUTH_PASSKEY_RP_ID`): show "sign in with a
+     * passkey".
+     */
+    passkeys: boolean;
+    /**
+     * `true` when people can create their own account (`AUTOXIDE_AUTH_SELF_REGISTRATION`):
+     * show "create an account".
+     */
+    self_registration: boolean;
+  };
   /** Content settings an interface needs. */
   content: {
     /**
@@ -3049,6 +3078,11 @@ export type Data_SupportGrantResponse = {
     revoked_by_tenant: boolean;
     /** The role of the platform tenant whose permissions they get. */
     role_id: string;
+    /**
+     * Display name of that staff member, so the tenant knows who may enter; `null` when the
+     * account no longer exists.
+     */
+    staff_name?: string | null;
     /** The platform staff account. */
     staff_user_id: string;
     starts_at: string;
@@ -3530,6 +3564,19 @@ export type Data_Vec_BillingPeriodResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_ChildTenantResponse = {
+  data: {
+    id: string;
+    name: string;
+    /** The tenant right above it (this tenant for a direct child). */
+    parent_id: string;
+    slug: string;
+    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    status: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CommentCount = {
   data: {
     /** Shown comments (top-level and replies). */
@@ -3614,6 +3661,16 @@ export type Data_Vec_MembershipResponse = {
   data: {
     /** The unit; the root unit has the id of the tenant. */
     org_id: string;
+    /**
+     * Name of the unit, so a user who cannot read the organization tree still sees where they
+     * work; `null` when the unit no longer exists (or no organization module is installed).
+     */
+    org_name?: string | null;
+    /**
+     * Type of the unit (see `GET /api/v1/organizations/unit-types`); `tenant` for the root, `null`
+     * like `org_name`.
+     */
+    org_unit_type?: string | null;
     /**
      * The roles there, sorted by name. A role grants each permission at its scope from this
      * unit (`unit`: this unit, `subtree`: this unit and the units below it).
@@ -3985,6 +4042,11 @@ export type Data_Vec_SupportGrantResponse = {
     revoked_by_tenant: boolean;
     /** The role of the platform tenant whose permissions they get. */
     role_id: string;
+    /**
+     * Display name of that staff member, so the tenant knows who may enter; `null` when the
+     * account no longer exists.
+     */
+    staff_name?: string | null;
     /** The platform staff account. */
     staff_user_id: string;
     starts_at: string;
@@ -4979,6 +5041,16 @@ export type MembershipRequest = {
 export type MembershipResponse = {
   /** The unit; the root unit has the id of the tenant. */
   org_id: string;
+  /**
+   * Name of the unit, so a user who cannot read the organization tree still sees where they
+   * work; `null` when the unit no longer exists (or no organization module is installed).
+   */
+  org_name?: string | null;
+  /**
+   * Type of the unit (see `GET /api/v1/organizations/unit-types`); `tenant` for the root, `null`
+   * like `org_name`.
+   */
+  org_unit_type?: string | null;
   /**
    * The roles there, sorted by name. A role grants each permission at its scope from this
    * unit (`unit`: this unit, `subtree`: this unit and the units below it).
@@ -8357,6 +8429,11 @@ export type SupportGrantResponse = {
   revoked_by_tenant: boolean;
   /** The role of the platform tenant whose permissions they get. */
   role_id: string;
+  /**
+   * Display name of that staff member, so the tenant knows who may enter; `null` when the
+   * account no longer exists.
+   */
+  staff_name?: string | null;
   /** The platform staff account. */
   staff_user_id: string;
   starts_at: string;
@@ -9362,6 +9439,18 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/delegations/tenants": {
+    /** List the tenants below this one, to choose where a delegation goes. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ChildTenantResponse;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };

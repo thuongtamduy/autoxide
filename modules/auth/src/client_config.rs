@@ -1,0 +1,33 @@
+//! Phần của `auth` trong cấu hình cho giao diện (`GET /api/v1/kernel/client-config`): cách đăng nhập
+//! nào máy chủ cho dùng, để trang đăng nhập chỉ hiện nút dùng được. Không có secret nào.
+
+use autoxide_kernel::error::Error;
+use autoxide_kernel::module::ClientSection;
+use serde::Serialize;
+use utoipa::ToSchema;
+
+use crate::config::AuthConfig;
+
+/// Sign-in settings an interface needs.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = AuthClientConfig)]
+struct AuthClientConfig {
+    /// `true` when people can sign in with a link sent by email (`AUTOXIDE_AUTH_LOGIN_LINK`,
+    /// `POST /api/v1/auth/login/link`): show "sign in with a link".
+    login_link: bool,
+    /// `true` when passkeys are set up (`AUTOXIDE_AUTH_PASSKEY_RP_ID`): show "sign in with a
+    /// passkey".
+    passkeys: bool,
+    /// `true` when people can create their own account (`AUTOXIDE_AUTH_SELF_REGISTRATION`):
+    /// show "create an account".
+    self_registration: bool,
+}
+
+pub(crate) fn section(config: &AuthConfig) -> Result<Option<ClientSection>, Error> {
+    let section = AuthClientConfig {
+        login_link: config.login_link,
+        passkeys: config.passkey.is_some(),
+        self_registration: config.self_registration,
+    };
+    ClientSection::new(&section).map(Some)
+}
