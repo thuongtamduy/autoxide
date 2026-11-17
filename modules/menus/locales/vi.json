@@ -12,6 +12,7 @@
   "field:must be 1 to {max_badge} characters": "phải dài 1 đến {max_badge} ký tự",
   "field:must be 1 to {max_label} characters (it may be empty when `ref` is given)": "phải dài 1 đến {max_label} ký tự (được để trống khi có `ref`)",
   "field:must be `https://`, `http://`, `mailto:` or a path starting with a single `/`": "phải là `https://`, `http://`, `mailto:` hay đường dẫn bắt đầu bằng một dấu `/`",
+  "field:must be `targets`": "phải là `targets`",
   "field:must be a resource type like `content.term`": "phải là loại đối tượng như `content.term`",
   "field:must be after `from`": "phải sau `from`",
   "field:must be left out when creating a menu": "phải bỏ trống khi tạo menu",

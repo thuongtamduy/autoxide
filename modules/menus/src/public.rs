@@ -278,6 +278,74 @@ impl MenuService {
     }
 }
 
+// Tình trạng hiện tại của một đích (màn quản trị, `include=targets`).
+/// How the object of a menu item stands now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum TargetState {
+    Public,
+    NotPublic,
+    Missing,
+    UnknownKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TargetInfo {
+    pub state: TargetState,
+    /// Chỉ khi công khai: bộ tra không đưa tiêu đề của đối tượng chưa công khai ra ngoài module.
+    pub title: Option<String>,
+    pub path: Option<String>,
+}
+
+impl MenuService {
+    /// Tình trạng đích (`ref`, `feature`) của mọi mục: hỏi sổ đối tượng theo lô, mỗi loại một lần,
+    /// theo ngôn ngữ của menu. Người gọi đã qua kiểm `menus.read` (đọc menu trước).
+    pub(crate) async fn target_states(
+        &self,
+        tenant: &TenantContext,
+        nodes: &[Node],
+        locale: &str,
+    ) -> Result<HashMap<(String, String), TargetInfo>, Error> {
+        let mut rows = Vec::new();
+        collect(nodes, &mut rows);
+        let mut wanted: HashMap<String, Vec<String>> = HashMap::new();
+        for row in &rows {
+            for (kind, id) in [(&row.ref_kind, &row.ref_id), (&row.feature_kind, &row.feature_id)] {
+                if let (Some(kind), Some(id)) = (kind, id) {
+                    wanted.entry(kind.clone()).or_default().push(id.clone());
+                }
+            }
+        }
+        let mut states = HashMap::new();
+        for (kind, mut ids) in wanted {
+            ids.sort_unstable();
+            ids.dedup();
+            if !self.resources.knows(&kind) {
+                let unknown =
+                    TargetInfo { state: TargetState::UnknownKind, title: None, path: None };
+                states.extend(ids.into_iter().map(|id| ((kind.clone(), id), unknown.clone())));
+                continue;
+            }
+            let found = self.resources.resolve_many(tenant, &kind, &ids, Some(locale)).await?;
+            for id in ids {
+                let info = match found.get(&id) {
+                    None => TargetInfo { state: TargetState::Missing, title: None, path: None },
+                    Some(resource) if resource.public => TargetInfo {
+                        state: TargetState::Public,
+                        title: Some(resource.title.clone()),
+                        path: resource.url.clone(),
+                    },
+                    Some(_) => {
+                        TargetInfo { state: TargetState::NotPublic, title: None, path: None }
+                    }
+                };
+                states.insert((kind.clone(), id), info);
+            }
+        }
+        Ok(states)
+    }
+}
+
 struct Context<'a> {
     objects: &'a HashMap<(String, String), Resource>,
     auto: &'a HashMap<Uuid, Vec<ResourceRef>>,

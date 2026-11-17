@@ -5,7 +5,7 @@
 //! mã chỉ nhận một lần: lưu bước của mã vừa dùng, chỉ nhận bước lớn hơn — kẻ nhìn
 //! trộm một mã không dùng lại được nó (RFC 6238 mục 5.2).
 
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -105,7 +105,24 @@ impl MfaService {
         if !self.status(tenant, user_id).await?.totp_enabled {
             return Err(not_enabled());
         }
-        self.check_code_limited(tenant, user_id, code, false).await
+        // Lỗi "mã sai" của MFA chỉ ô `code`; mọi chỗ xác nhận lại (`/me/reauth`, tạo API key)
+        // nhận mã ở ô `totp_code`, nên lỗi phải chỉ đúng ô client đã gửi.
+        self.check_code_limited(tenant, user_id, code, false).await.map_err(|error| {
+            if error.kind() == ErrorKind::Validation {
+                let fields = error
+                    .fields()
+                    .iter()
+                    .map(|field| {
+                        let mut field = field.clone();
+                        field.field = "totp_code".to_owned();
+                        field
+                    })
+                    .collect();
+                Error::validation(fields)
+            } else {
+                error
+            }
+        })
     }
 
     pub(crate) async fn status(

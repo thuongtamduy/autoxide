@@ -180,23 +180,7 @@ impl ApiKeyService {
                 Some(self.sessions.check_password(tenant, user_id, current).await?.1)
             }
             Some(Reauth::Totp(code)) => {
-                // Lỗi "mã sai" của MFA chỉ ô `code`; ở đây ô tên là `totp_code`.
-                self.mfa.reauthenticate(tenant, user_id, code).await.map_err(|error| {
-                    if error.kind() == ErrorKind::Validation {
-                        let fields = error
-                            .fields()
-                            .iter()
-                            .map(|field| {
-                                let mut field = field.clone();
-                                field.field = "totp_code".to_owned();
-                                field
-                            })
-                            .collect();
-                        Error::validation(fields)
-                    } else {
-                        error
-                    }
-                })?;
+                self.mfa.reauthenticate(tenant, user_id, code).await?;
                 None
             }
             Some(Reauth::Passkey { ceremony_id, credential }) => {
