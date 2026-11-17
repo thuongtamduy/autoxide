@@ -22,6 +22,15 @@
       "needs_legal_review": true
     },
     {
+      "key": "posting.phone_countries",
+      "version": 2,
+      "effective_from": "2024-12-25T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"countries": ["84"], "mobile": {"84": {"length": 9, "prefixes": ["3", "5", "7", "8", "9"]}}},
+      "legal_basis": "NĐ 147/2024/NĐ-CP (xác thực tài khoản bằng số điện thoại di động Việt Nam), hiệu lực 25/12/2024; đầu số di động theo quy hoạch kho số viễn thông (đầu 3, 5, 7, 8, 9 sau mã nước, 9 chữ số) — cần đối chiếu văn bản gốc.",
+      "needs_legal_review": true
+    },
+    {
       "key": "privacy.incident",
       "version": 1,
       "effective_from": "2026-01-01T00:00:00+07:00",

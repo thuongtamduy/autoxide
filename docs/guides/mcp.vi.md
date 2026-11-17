@@ -102,6 +102,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `comments.queue` | `comments.read` | read-only |
 | `comments.set_target_state` | `comments.manage` | writes |
 | `comments.unanswered` | `comments.read` | read-only |
+| `compliance.account_verification` | — | read-only |
 | `compliance.documents` | `compliance.documents.read` | read-only |
 | `compliance.kyc_profiles` | `compliance.kyc.read` | read-only |
 | `compliance.pending_acceptances` | — | read-only |

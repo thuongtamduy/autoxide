@@ -8643,3 +8643,50 @@ năm); NĐ 174/2016/NĐ-CP Điều 12 (tính từ khi kết thúc kỳ kế toá
    toán quá hạn là việc sau (cần quyết thêm về chứng cứ chuỗi).
 5. `USER_DELETED` không áp cho chứng từ: chứng từ không mang ID người dùng (người mua là ảnh chụp tên / mã số thuế), nên không có
    gì để xoá theo tài khoản; dữ liệu người mua cá nhân được ẩn danh khi hết hạn lưu như trên.
+
+## D-356 · Xác thực tài khoản đăng nội dung: số điện thoại bằng mã SMS một lần, mức định danh từ KYC, bộ hỏi `PostingVerifier` thật cho `comments` (bước 37 mục NĐ 147/2024) — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Nghị định 147/2024/NĐ-CP về quản lý, cung cấp, sử dụng
+dịch vụ Internet và thông tin trên mạng (hiệu lực 25/12/2024): tài khoản đăng thông tin (bình luận, livestream…) trên mạng xã
+hội phải xác thực bằng số điện thoại di động Việt Nam (hoặc định danh điện tử). Website bán hàng / hỏi đáp sản phẩm có thuộc
+phạm vi hay không chưa chắc, nên mọi thứ là cấu hình theo khách (D-202).
+
+1. **Mức xác thực** `VerificationLevel { None, Phone, Identity }` (`Identity` bao `Phone`). `Phone`: số di động đã xác nhận
+   bằng mã một lần. `Identity`: hồ sơ KYC của chính người dùng đang `verified` và chưa hết hạn — **đọc thẳng từ hồ sơ KYC**
+   mỗi lần hỏi, không chép `identity_verified_at` / `identity_profile_id` sang `compliance_account_verifications` như đặc tả
+   phác thảo: một nguồn sự thật, thu hồi hay hết hạn KYC có hiệu lực ngay, không cần đồng bộ.
+2. **Bảng** (migration mới `m0009_account_verification`, `m0010_create_throttle`, `m0011_tenancy_throttle`):
+   `compliance_account_verifications` (PK `tenant_id`,`user_id`; `phone_key` = SHA-256 của số, `''` khi chưa có) và
+   `compliance_phone_challenges` (mã lưu bằng SHA-256 của pepper riêng của khách — `SecretKey::derive_for(tenant,
+   "compliance.otp")` — cùng ID lượt và mã; thêm index (`tenant_id`,`phone`,`id`) cho bước khoá ở mục 4).
+3. **Gửi mã** (`POST /me/phone-verifications`): chuẩn hoá `PhoneNumber::parse(raw, "84")` → quy tắc
+   `posting.phone_countries` hiệu lực (thêm **phiên bản 2** của quy tắc, không sửa bản 1: `mobile.84` = 9 chữ số, đầu 3/5/7/8/9
+   — số cố định bị từ chối) → chưa có `dyn SmsSender` thì `sms_disabled` (503) → số đã xác thực cho đủ tài khoản thì
+   `compliance.phone_in_use` sớm → throttle theo số / giờ, tài khoản / ngày, IP / giờ (`compliance_throttle`, mã
+   `compliance.otp_throttled`) → lưu bản băm → **gửi SMS đồng bộ ngoài transaction, chờ tối đa 10 giây** (lỗi → xoá lượt, trả
+   lỗi của nhà cung cấp / `compliance.sms_timeout`). Theo đặc tả, **không** gửi qua job: bảng job đọc được qua API quản trị và
+   dead-letter queue, mã không được nằm ở đó. Tin viết tiếng Việt không dấu (SMS brandname tính tiền theo bảng mã; bản Unicode
+   đắt và dễ bị cắt) — câu cố định trong code, chưa qua i18n vì tin SMS chưa có hệ mẫu tin; làm khi có bộ nối SMS thật.
+4. **Xác nhận** (`POST /me/phone-verifications/{id}/confirm`): trong một transaction ghi, `rows::lock` **mọi lượt của cùng số**
+   theo ID (Postgres `FOR UPDATE`, SQLite vốn một bên ghi) — hai lần xác nhận cùng lượt, hay hai tài khoản cùng nhận một số khi
+   chỉ được một, nối đuôi nhau và bên sau đọc lại thấy kết quả bên trước. Rồi: hết hạn / đã dùng → `compliance.otp_invalid`;
+   quá `AUTOXIDE_COMPLIANCE_OTP_MAX_ATTEMPTS` → `compliance.otp_attempts_exceeded` (429); so băm hằng thời gian (sai → cộng lần
+   sai, commit); `posting.max_accounts_per_phone` (mặc định 1) → `compliance.phone_in_use`; `UPDATE … WHERE consumed_at IS NULL`
+   phải đổi đúng một dòng; ghi số đã xác thực + event `compliance.phone_verified` (chỉ `user_id`) cùng transaction.
+   `DELETE /me/phone` gỡ số (event `compliance.phone_removed`). Lượt cũ hơn 24 giờ xoá trong job hằng ngày
+   `compliance.kyc_expiry` (không thêm lịch `compliance.challenges_purge` riêng như đặc tả — cùng nhịp, đỡ một lịch).
+5. **Hợp đồng** `autoxide_compliance::api`: `AccountVerification { level, verified_phone }`, `PostingGate::check(tenant,
+   principal?, PostingSurface)` đọc chính sách `posting.comments|reviews|livestream` (mặc định `none`; khách vãng lai chỉ qua
+   khi `none`; thiếu mức → `compliance.verification_required`, 403).
+6. **Bộ hỏi của kernel cho `comments`** (D-202): `compliance` đăng ký `PostingVerifier`; "đã xác thực" = đạt
+   `max(posting.comments, phone)` — loại đích trong `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` vẫn cần ít nhất số điện thoại khi
+   khách để `none`. Kernel thêm `PostingVerifier::required_everywhere` (mặc định `false`, D-038) và `comments` hỏi nó: khách đặt
+   `posting.comments` khác `none` thì **mọi** loại đích của bình luận cần xác thực (đặc tả C2). Chưa cài `compliance` thì hành
+   vi như trước D-202.
+7. Cấu hình mới: `AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS` (300), `…_OTP_MAX_ATTEMPTS` (5), `…_OTP_PER_PHONE_PER_HOUR` (3),
+   `…_OTP_PER_USER_PER_DAY` (10), `…_OTP_PER_IP_PER_HOUR` (20, thêm so với đặc tả để chặn một máy tạo nhiều tài khoản xin mã).
+   Tool MCP `compliance.account_verification` (đọc mức của chính mình); gửi / nhập mã chỉ qua REST — việc tương tác của người
+   dùng, agent không có mã.
+8. **Chưa làm:** bộ nối nhà cung cấp SMS brandname thật (chỉ có `FakeSmsSender` của testkit; chủ dự án chọn nhà cung cấp,
+   cấp tài khoản và đăng ký brandname); nghe `auth.user_deleted` để xoá số của người đã xoá tài khoản và xuất số trong dữ liệu cá
+   nhân — làm cùng mục "Dữ liệu cá nhân" của bước 37.

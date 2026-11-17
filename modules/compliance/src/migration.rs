@@ -22,6 +22,13 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0008_tenancy_jobs",
             vec![autoxide_kernel::job::tenant_table("compliance")],
         ),
+        Box::new(AccountVerification),
+        // Bảng `compliance_throttle`: giới hạn số mã một lần theo số, người dùng, IP băm (D-116).
+        autoxide_kernel::throttle::throttle_migration("m0010_create_throttle", "compliance"),
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0011_tenancy_throttle",
+            vec![autoxide_kernel::throttle::tenant_table("compliance")],
+        ),
     ]
 }
 
@@ -434,5 +441,91 @@ impl MigrationTrait for Consents {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         drop_all(manager, &["compliance_consent_records", "compliance_consents"]).await
+    }
+}
+
+/// Xác thực tài khoản đăng nội dung (NĐ 147/2024, D-356): số điện thoại đã xác thực của từng người
+/// dùng và mã một lần đang chờ nhập. Mức "định danh" đọc thẳng từ hồ sơ KYC, không chép sang đây.
+struct AccountVerification;
+
+impl MigrationName for AccountVerification {
+    fn name(&self) -> &str {
+        "m0009_account_verification"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AccountVerification {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_account_verifications")
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("user_id"))
+                    .col(schema::string_len_null("phone", 16))
+                    // SHA-256 của số E.164; `''` khi chưa có số (cột tham gia index không để NULL).
+                    .col(schema::string_len("phone_key", 64))
+                    .col(schema::timestamp_with_time_zone_null("phone_verified_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .primary_key(Index::create().col("tenant_id").col("user_id"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_account_verifications",
+            "compliance_account_verifications_phone_idx",
+            &["tenant_id", "phone_key"],
+            false,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("compliance_phone_challenges")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("user_id"))
+                    .col(schema::string_len("phone", 16))
+                    .col(schema::string_len("code_hash", 64))
+                    .col(schema::integer("attempts"))
+                    .col(schema::timestamp_with_time_zone("expires_at"))
+                    .col(schema::timestamp_with_time_zone_null("consumed_at"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "compliance_phone_challenges",
+            "compliance_phone_challenges_user_idx",
+            &["tenant_id", "user_id", "created_at"],
+            false,
+        )
+        .await?;
+        // Xác nhận khoá mọi mã đang chờ của cùng một số (theo thứ tự ID) để hai người không cùng nhận
+        // một số khi chỉ được một tài khoản.
+        index(
+            manager,
+            "compliance_phone_challenges",
+            "compliance_phone_challenges_phone_idx",
+            &["tenant_id", "phone", "id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "compliance_phone_challenges",
+            "compliance_phone_challenges_sweep_idx",
+            &["created_at"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        drop_all(manager, &["compliance_phone_challenges", "compliance_account_verifications"])
+            .await
     }
 }

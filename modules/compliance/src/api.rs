@@ -113,6 +113,89 @@ pub struct KycSession {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
+/// How far an account is verified for posting content; `identity` includes `phone`.
+//
+// Mức xác thực của một tài khoản (NĐ 147/2024/NĐ-CP — cần đối chiếu văn bản gốc). `Identity` bao
+// `Phone`: thứ tự khai báo là thứ tự mạnh dần, so sánh bằng `>=`.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = ComplianceVerificationLevel)]
+pub enum VerificationLevel {
+    /// Not verified.
+    None,
+    /// A Vietnamese mobile number was confirmed with a one-time code.
+    Phone,
+    /// The identity was verified (KYC profile `verified` and not expired).
+    Identity,
+}
+
+impl VerificationLevel {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            VerificationLevel::None => "none",
+            VerificationLevel::Phone => "phone",
+            VerificationLevel::Identity => "identity",
+        }
+    }
+
+    /// Đọc từ giá trị chính sách `posting.<chỗ đăng>` (`none` / `phone` / `identity`).
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "none" => Some(VerificationLevel::None),
+            "phone" => Some(VerificationLevel::Phone),
+            "identity" => Some(VerificationLevel::Identity),
+            _ => None,
+        }
+    }
+}
+
+/// Chỗ người dùng đăng nội dung; khách đặt mức cần cho từng chỗ qua chính sách `posting.<chỗ>`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PostingSurface {
+    Comments,
+    Reviews,
+    Livestream,
+}
+
+impl PostingSurface {
+    /// Khoá chính sách của chỗ đăng, vd `posting.comments`.
+    pub fn policy_key(self) -> &'static str {
+        match self {
+            PostingSurface::Comments => "posting.comments",
+            PostingSurface::Reviews => "posting.reviews",
+            PostingSurface::Livestream => "posting.livestream",
+        }
+    }
+}
+
+/// Cổng đăng nội dung: so mức khách đặt cho chỗ đăng với mức của tài khoản.
+#[async_trait::async_trait]
+pub trait PostingGate: Send + Sync {
+    /// `None` principal = khách vãng lai, chỉ qua được khi chính sách là `none`. Thiếu mức khách đặt →
+    /// `compliance.verification_required` (403, kèm `level`).
+    async fn check(
+        &self,
+        tenant: TenantId,
+        principal: Option<&autoxide_kernel::access::Principal>,
+        surface: PostingSurface,
+    ) -> Result<(), Error>;
+}
+
+/// Trạng thái xác thực tài khoản.
+#[async_trait::async_trait]
+pub trait AccountVerification: Send + Sync {
+    async fn level(&self, tenant: TenantId, user_id: Uuid) -> Result<VerificationLevel, Error>;
+
+    /// Số đã xác thực (vd cho `notifications` gửi SMS / ZNS). Chưa có → `None`.
+    async fn verified_phone(
+        &self,
+        tenant: TenantId,
+        user_id: Uuid,
+    ) -> Result<Option<autoxide_kernel::sms::PhoneNumber>, Error>;
+}
+
 /// Loại văn bản pháp lý.
 pub const DOCUMENT_KINDS: [&str; 6] = [
     "terms_of_use",
@@ -283,3 +366,8 @@ pub const KYC_REJECTED: &str = "compliance.kyc_rejected";
 /// Event phát khi một đồng ý bị rút: payload có `consent_id`, `purpose`, `scope`, `channel`. Module
 /// gửi tin quảng cáo (vd `notifications`) nghe để huỷ tin đang chờ.
 pub const CONSENT_WITHDRAWN: &str = "compliance.consent_withdrawn";
+
+/// Event phát khi người dùng xác thực xong số điện thoại (payload `user_id`, không có số) hay gỡ số
+/// đã xác thực.
+pub const PHONE_VERIFIED: &str = "compliance.phone_verified";
+pub const PHONE_REMOVED: &str = "compliance.phone_removed";

@@ -1531,6 +1531,24 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Your account verification level for posting content (Vietnam, Decree 147/2024): `none`, `phone` (mobile number confirmed by SMS code) or `identity` (identity verified), with the verified number masked. Codes are sent and confirmed only through REST (`POST /api/v1/compliance/me/phone-verifications`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "compliance.account_verification",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the legal documents of the tenant (terms of use, privacy policy…) with their current version number.",
       "input_schema": {
         "additionalProperties": false,
