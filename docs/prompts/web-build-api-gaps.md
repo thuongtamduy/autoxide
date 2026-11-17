@@ -51,10 +51,11 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 
 | | Màn | Cần | Bước | Giao diện đang làm gì |
 |---|---|---|---|---|
-| [ ] | Hồ sơ | `PATCH /me` đổi tên hiển thị | 34 (đã ghi ở `ui-phase2-api.md`) | Chỉ hiện tên |
-| [ ] | Hồ sơ | Ngôn ngữ ưa thích (thư và thông báo gửi chậm dùng ngôn ngữ này) | 37 (`/me/preferences`) | Ngôn ngữ giao diện lưu ở cookie |
+| [x] | Hồ sơ | `PATCH /me` đổi tên hiển thị | 34 (đã ghi ở `ui-phase2-api.md`) | **Đã nối** (17/11, W-046 của web): `PATCH /auth/me` (tên, ngôn ngữ, múi giờ) |
+| [x] | Hồ sơ | Ngôn ngữ ưa thích (thư và thông báo gửi chậm dùng ngôn ngữ này) | 37 (`/me/preferences`) | **Đã nối** (17/11, W-046 của web): `locale` của `PATCH /auth/me` (D-308); ngôn ngữ giao diện vẫn ở cookie |
 | [ ] | Thông báo | Tuỳ chọn nhận thông báo theo loại và kênh | 37 (`/me/preferences`), 52 | Chưa dựng tab này |
-| [ ] | Hồ sơ | "Nơi bạn làm việc": khách hàng và nhánh tổ chức bạn vào được, kèm cách vào (trực tiếp, uỷ quyền, vào để hỗ trợ) | 34 | Chưa dựng |
+| [x] | Hồ sơ | "Nơi bạn làm việc": khách hàng và nhánh tổ chức bạn vào được, kèm cách vào (trực tiếp, uỷ quyền, vào để hỗ trợ) | 34 | **Đã nối** (17/11, W-046 của web): `GET /auth/me/memberships`, `GET /auth/me/tenants`. Thiếu: tên nút trong `MembershipResponse` — người không có `organizations.units.read` chỉ thấy mã nút (dòng mới dưới) |
+| [ ] | Hồ sơ | `GET /auth/me/memberships` trả kèm tên (và loại) của nút | mới (gặp 17/11) | Tên nút đọc từ `GET /organizations/units` nếu có quyền, không thì hiện mã |
 | [ ] | Đăng nhập và bảo mật | Tài khoản Google / OIDC đã liên kết: xem và gỡ | 40 | Chưa dựng |
 | [x] | Đăng nhập và bảo mật | `/me` trả `has_password`; endpoint để tài khoản chưa có mật khẩu (vd đăng nhập bằng passkey hay OIDC) tự đặt mật khẩu. `DELETE /me` bảo "đặt mật khẩu trước" nhưng chưa có cách đặt | mới | Luôn hiện "Đổi mật khẩu" |
 | [x] | Hồ sơ | Email đang chờ xác minh sau khi yêu cầu đổi (`pending_email`, hạn), và endpoint huỷ yêu cầu đổi | mới | Chỉ báo "đã gửi thư tới …" |
@@ -62,6 +63,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Đăng nhập và bảo mật | Passkey trả loại authenticator (AAGUID → tên như Touch ID, Windows Hello) | mới | Hiện tên người dùng tự đặt |
 | [ ] | Đăng nhập và bảo mật | Thêm passkey: options của `POST /auth/me/passkeys/registration` đòi ép `credProtect` (`extensions.enforceCredentialProtectionPolicy: true`, `credentialProtectionPolicy: userVerificationRequired`). Authenticator ảo của Chromium từ chối (`NotAllowedError`); bỏ phần mở rộng thì tạo được. Cần thử trên thiết bị thật (Windows Hello, iCloud Keychain, Android): thiết bị không hỗ trợ `credProtect` sẽ không thêm được passkey. Đề xuất: `enforceCredentialProtectionPolicy: false` (vẫn xin, không ép), hoặc ghi rõ lý do ép trong quyết định | mới (gặp khi chạy thử 16/11) | Hiện "đã huỷ" của trình duyệt; đăng nhập bằng passkey (W-042 của web) đã nối và chạy với core thật |
 | [x] | Mọi biểu mẫu có mật khẩu | `detail` của `auth.wrong_password` đang nhắc `POST /api/v1/auth/password-reset`: câu cho người gọi API, người dùng thường không hiểu. Viết câu cho người dùng; đưa hướng dẫn cho máy vào tài liệu OpenAPI | mới | Hiện nguyên câu của core |
+| [ ] | Đăng nhập | `GET /kernel/client-config` nói đăng nhập bằng link có bật không (`auth.login_link`), để trang đăng nhập chỉ hiện "Đăng nhập bằng link" khi dùng được | mới (gặp 17/11) | Luôn hiện; tắt thì core báo `auth.login_link_disabled` sau khi gửi email |
 
 ## Tổ chức › Người dùng và role (`/org/access`)
 
@@ -72,14 +74,15 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Chi tiết người dùng | `UserResponse` có `has_password`, `mfa_enabled`, lần đăng nhập cuối | mới | Luôn hiện "Đặt mật khẩu đầu tiên" và "Tắt xác thực hai bước"; đặt lần hai thì hiện lỗi `auth.password_already_set` |
 | [ ] | Role | Số người giữ mỗi role, "xem người giữ role" | 34 (`GET /memberships?role_id=`); số đếm: mới | Chưa có cột này. Nhân bản role đã có (16/11, `GET` rồi `POST /auth/roles`) |
 | [x] | Chi tiết role | Mô tả của permission theo `Accept-Language` | mới | Hiện mô tả tiếng Anh cả khi chọn tiếng Việt |
-| [ ] | Chi tiết role | Độ sâu theo nút (`grants: [{permission, scope}]`, lưới permission × độ sâu), membership theo nút | 34 | Chưa dựng; chỉ chọn permission ở phạm vi toàn khách |
+| [x] | Chi tiết role | Độ sâu theo nút (`grants: [{permission, scope}]`, lưới permission × độ sâu), membership theo nút | 34 | **Đã nối** (17/11, W-046 của web): ô độ sâu cho permission `scoped`, `requires_mfa`; role ở các nút khác gốc trên trang người dùng (`GET/PUT /auth/users/{id}/memberships`) |
 | [x] | `/verify-email`, `/reset-password` | Mã lỗi tách "hết hạn" và "đã dùng" (hiện chung `auth.invalid_*_token`) | mới | Hiện `detail` của core kèm cách xin link mới |
 | [x] | Mọi form quản trị người dùng | `detail` của `auth.password_already_set`, `auth.invalid_verification_token` đang nhắc tên endpoint (câu cho máy) | mới (cùng loại với `auth.wrong_password`) | Hiện nguyên câu của core |
-| [ ] | Lời mời | `GET/POST /auth/invitations`, `DELETE /{id}`, `POST /{id}/resend`; trả kèm tên role và người mời | 34 | Dữ liệu mẫu (`src/sample/org.ts`) |
-| [ ] | Uỷ quyền | `GET/POST/DELETE /auth/delegations`; danh sách khách con | 34 (khách con: 33) | Dữ liệu mẫu (`src/sample/org.ts`) |
+| [x] | Lời mời | `GET/POST /auth/invitations`, `DELETE /{id}`, `POST /{id}/resend`; trả kèm tên role và người mời | 34 | **Đã nối** (17/11, W-046 của web), cả trang nhận lời mời (`/invitation`, `/account/invitation`). Tên role và người mời giao diện tự ghép (role: `GET /auth/roles`; người mời: `GET /auth/users/{id}` từng người) |
+| [x] | Uỷ quyền | `GET/POST/DELETE /auth/delegations`; danh sách khách con | 34 (khách con: 33) | **Đã nối** (17/11, W-046 của web). Còn thiếu danh sách khách con cho khách cha (dòng mới dưới) |
+| [ ] | Uỷ quyền | Khách cha xem danh sách khách con của mình (tên, slug) để chọn khi uỷ quyền và hiện tên thay ID | mới (gặp 17/11) | Ô nhập ID khách con; bảng hiện ID (`GET /kernel/tenants?parent_id=` chỉ cho khách nền tảng) |
 | [x] | Hồ sơ công khai | Hồ sơ công khai của nút (`PATCH /organizations/units/{id}`), giờ mở cửa theo ngày và ngày nghỉ, danh mục tỉnh / xã | 34 (D-200, `address`) | **Đã nối** (17/11, W-045 của web): `GET/PATCH …/units/{id}/public-profile`, trạng thái công khai theo `GET /public/stores`, tỉnh / xã từ `address`; form sửa một khung giờ chung cho mọi ngày |
-| [ ] | Quyền vào hỗ trợ | `GET /auth/support-access`, cài đặt `auth.support_access` | 34 | Dữ liệu mẫu (`src/sample/org.ts`) |
-| [ ] | Quyền vào hỗ trợ | Khách tự thu hồi một lần cấp quyền vào hỗ trợ (bước 34 chỉ cho nhà vận hành thu hồi) | mới | Dữ liệu mẫu (`src/sample/org.ts`), ghi "theo API đề xuất" |
+| [x] | Quyền vào hỗ trợ | `GET /auth/support-access`, cài đặt `auth.support_access` | 34 | **Đã nối** (17/11, W-046 của web): danh sách, bật / tắt ở nút gốc. Nhân sự nền tảng hiện bằng mã (khách không đọc được tài khoản của khách nền tảng) — nên trả kèm tên hiển thị |
+| [x] | Quyền vào hỗ trợ | Khách tự thu hồi một lần cấp quyền vào hỗ trợ (bước 34 chỉ cho nhà vận hành thu hồi) | mới | **Đã nối** (17/11, W-046 của web): `DELETE /auth/support-access/{id}` (trừ lần cấp theo yêu cầu cơ quan) |
 
 ## Nội dung › Bài viết và trình soạn bài (`/content`)
 
@@ -186,7 +189,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Cây tổ chức | Số người làm được ở mỗi nút | mới | Tính từ `GET /auth/memberships` (đọc hết, tối đa 2.000 dòng) — đúng nhưng tốn với khách lớn; nên có số đếm ở `GET /organizations/units` |
 | [x] | Cây tổ chức | `GET /organizations/settings`, `GET/PUT/DELETE /units/{id}/settings/{key}` | 34 | **Đã nối** (17/11). Sổ cài đặt chưa nói dạng giá trị (chuỗi, danh sách, đúng sai): giao diện đoán theo giá trị đang có và mặc định; có trường `type` / JSON Schema thì làm được ô nhập đúng loại |
 | [ ] | Cây tổ chức | Yêu cầu tách nhánh từ phía khách: `GET/POST /organizations/units/{id}/split-requests` | mới (bước 38 chỉ có CLI) | Đã bỏ nút khỏi màn (17/11) tới khi có API |
-| [ ] | Cây tổ chức | `POST /auth/invitations` (mời vào một nút) | 34 | Dữ liệu mẫu |
+| [x] | Cây tổ chức | `POST /auth/invitations` (mời vào một nút) | 34 | **Đã nối** (17/11, W-046 của web): nút "Mời" ở chi tiết nút, lời mời đang chờ hiện trong bảng người ở nút |
 | [ ] | Tuân thủ | `GET /compliance/rules?as_of=` kèm lịch sử phiên bản | 37 | Dữ liệu mẫu (`src/sample/compliance-rules.ts`) |
 | [ ] | Tuân thủ › Website | `GET /compliance/websites`, `GET …/{id}/checklist`, `GET …/{id}/dossier`, `POST …/{id}/status` (số hồ sơ, ngày nộp; kết quả: link và ảnh logo) | 37 (ngày nộp: mới) | Dữ liệu mẫu (`src/sample/compliance.ts`) |
 | [ ] | Tuân thủ | `GET /compliance/overview`: số việc chờ theo khu vực | mới | Tính từ hàm mẫu |
