@@ -59,7 +59,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Chuyển khách | Vào khách khác qua uỷ quyền / hỗ trợ: `GET /auth/me/tenants`, header `Autoxide-Tenant` | 34 | **Đã nối** (17/11, W-051 của web): bộ chọn góc trên trái, dải báo, trang "quyền đã hết"; đã thử với core thật (uỷ quyền và hỗ trợ) |
 | [x] | Chuyển khách | **Quyền của người dùng ở khách đang vào**: `GET /auth/me` trả permission của người gọi ở khách của request (kèm cách vào: `delegation` / `support`) | mới (gặp 17/11) — **cần nhất** | Ở khách đang vào `GET /auth/me` trả 401 `auth.invalid_token`, `GET /auth/me/memberships` trả 404 `auth.user_not_found`: giao diện không biết người dùng được làm gì, nên tạm không ẩn màn nào (core vẫn từ chối từng lời gọi) — **Đã có** (17/11, D-339): ở khách đang vào, `GET /auth/me` trả tài khoản (của khách gốc) và `permissions` / `all_permissions` **ở khách của request**, kèm `tenant_id`, `access` (`direct` / `delegation` / `support`) và `home_tenant_id`; `GET /auth/me/memberships` trả `[]` (không còn 404). — **Đã dùng** (17/11, W-055 của web) |
 | [ ] | Đăng nhập và bảo mật | Tài khoản Google / OIDC đã liên kết: xem và gỡ | 40 | Chưa dựng |
-| [x] | Đăng nhập và bảo mật | `/me` trả `has_password`; endpoint để tài khoản chưa có mật khẩu (vd đăng nhập bằng passkey hay OIDC) tự đặt mật khẩu. `DELETE /me` bảo "đặt mật khẩu trước" nhưng chưa có cách đặt | mới | Luôn hiện "Đổi mật khẩu" |
+| [x] | Đăng nhập và bảo mật | `/me` trả `has_password`; endpoint để tài khoản chưa có mật khẩu (vd đăng nhập bằng passkey hay OIDC) tự đặt mật khẩu. `DELETE /me` bảo "đặt mật khẩu trước" nhưng chưa có cách đặt | mới | Luôn hiện "Đổi mật khẩu" — **Đã dùng `POST /auth/me/reauth`** (17/11, W-057 của web): đổi email, bật TOTP, thêm passkey, xoá tài khoản xác nhận bằng mật khẩu, mã TOTP hay passkey. **Nhỏ:** mã sai báo ở ô `code` dù ô gửi là `totp_code` (giao diện đổi tên ô); xin báo đúng ô đã gửi |
 | [x] | Hồ sơ | Email đang chờ xác minh sau khi yêu cầu đổi (`pending_email`, hạn), và endpoint huỷ yêu cầu đổi | mới | Chỉ báo "đã gửi thư tới …" |
 | [x] | Phiên đăng nhập | Mỗi phiên trả cách đăng nhập (mật khẩu, mật khẩu + mã, passkey) và IP hay vị trí gần đúng (lưu theo luật dữ liệu cá nhân, có hạn) | mới | Chỉ hiện trình duyệt và hệ điều hành (giao diện đã chuyển `User-Agent` thật cho core) |
 | [x] | Đăng nhập và bảo mật | Passkey trả loại authenticator (AAGUID → tên như Touch ID, Windows Hello) | mới | Hiện tên người dùng tự đặt |
@@ -305,7 +305,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/promotions
 | [ ] | Đối soát COD | `GET/POST /cod/statements`, `GET /cod/discrepancies`, `POST /{id}/resolve`; `payee`; số liệu phải thu / lệch / quá hạn | 44 (`payee`: 46) |
 | [ ] | Hãng vận chuyển | `GET/POST /carrier-accounts`, `PATCH /{id}`, `POST /{id}/test`; `check_status`, `checked_at`, `last_error`, `capabilities`, `secret_set_at` | 44 |
 | [ ] | Vận chuyển | Mã lỗi mới: `shipping.discrepancy_not_found`, `discrepancy_resolved`, `calendar_exists`, `parcel_count`, `days_range`, `outside_area`, `weight_out_of_range`, `no_pickup_point`, `carrier_name_taken` | mới |
-| [ ] | Vận chuyển | Danh mục tỉnh / xã cho ô địa chỉ | 34 (`address`) |
+| [x] | Vận chuyển | Danh mục tỉnh / xã cho ô địa chỉ | 34 (`address`) — **Đã dùng** cho ô địa chỉ của website (17/11, W-057 của web) |
 
 ## Tài chính › Kế toán (`/finance`)
 
@@ -409,7 +409,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/customers.
 | [ ] | Khách hàng | `GET/POST /customers`, `GET/PUT /{id}`, `/{id}/notes`, `/{id}/orders`, `/{id}/points`, `POST /{id}/points/adjustments` | 47 |
 | [ ] | Khách hàng | Trường hồ sơ trả sẵn bản che (SĐT / email / ngày sinh); xem đầy đủ cần permission riêng và ghi audit | mới |
 | [ ] | Khách hàng | Số liệu tóm tắt: số hồ sơ, có tài khoản, chỉ SĐT, tỉ lệ mua lại 90 ngày | mới (51) |
-| [ ] | Tài khoản người mua | `GET /auth/customers?status=`, `POST /{id}/lock`, `/{id}/unlock`, cài đặt `customer_registration` | 34 |
+| [x] | Tài khoản người mua | `GET /auth/customers?status=`, `POST /{id}/lock`, `/{id}/unlock`, cài đặt `customer_registration` | 34 — **Đã nối** (17/11, W-057 của web): `GET /auth/customers` (tìm `q`, `status`), khoá / mở bằng `PATCH /auth/customers/{id}` `{disabled}`, cài đặt `auth.customer_registration` ở nút gốc |
 | [ ] | Nhóm khách | `GET/POST /groups`, `PUT/DELETE /groups/{id}`, `GET /groups/{id}/preview` (kèm số đã đồng ý nhận tin), thành viên; `used_in`; mã `customers.group_in_use`, `customers.rule_empty` | 47 (mã lỗi và `used_in`: mới) |
 | [ ] | Điểm và hạng | `GET/POST /loyalty/rules`, `GET /loyalty/tiers`, `GET /loyalty/summary` | 47 (summary: mới) |
 | [ ] | Điểm và hạng | Thưởng điểm khi đánh giá có ngày hiệu lực, không phụ thuộc số sao, đếm đã thưởng | 47 |
@@ -500,7 +500,7 @@ giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi c�
 | [ ] | Sản phẩm | Phí và ngày giao theo tỉnh khi chưa có giỏ, kèm giờ chốt đơn trong ngày | 44 (mới) | Dữ liệu mẫu, giờ chốt 16:00 — đã thêm vào lộ trình bước 44 (16/11) |
 | [ ] | Khuyến mại | Số thông báo Sở Công Thương và trần giảm theo luật trong `GET /public/promotions` | 43 (mới) | Dữ liệu mẫu — đã thêm vào lộ trình bước 43 (16/11) |
 | [ ] | Tài khoản người mua | Đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay passkey | 47 (mới) | Mẫu: số điện thoại + mã cố định, không nhận mật khẩu — đã thêm vào lộ trình bước 47 (16/11) |
-| [x] | Đặt hàng | Endpoint công khai cho đơn vị hành chính của module `address` (tỉnh, phường) | D-193 (mới) | **Đã có** (bước 34); trang quản trị đã dùng (hồ sơ công khai). Ô địa chỉ khi đặt hàng của website còn dùng mẫu: việc của web, đợt sau |
+| [x] | Đặt hàng | Endpoint công khai cho đơn vị hành chính của module `address` (tỉnh, phường) | D-193 (mới) | **Đã có** (bước 34); trang quản trị đã dùng (hồ sơ công khai). Ô địa chỉ khi đặt hàng của website còn dùng mẫu: việc của web, đợt sau — website đặt hàng và sổ địa chỉ **đã dùng** (17/11, W-057 của web) |
 | [ ] | Giỏ, đặt hàng | Báo giá giỏ trả thêm: số điểm tối đa dùng được, cách trả dùng được cho giỏ (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán | 45 (mới) | Dữ liệu mẫu — đã thêm vào lộ trình bước 45 (16/11) |
 | [ ] | Đơn của tôi | `return_until`, `buyer_cancel_until` có sẵn trong đơn | 45 (mới) | Tự tính hạn 7 ngày — đã thêm vào lộ trình bước 45 (16/11) |
 | [ ] | Gian hàng người bán | Catalog công khai lọc theo người bán và đường dẫn trang sản phẩm cho hàng người bán; hồ sơ người bán có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn, trạng thái tạm ngừng | 41, 46 (mới) | Dữ liệu mẫu; hàng người bán mở ở gian hàng — đã thêm vào lộ trình bước 41, 46 (16/11) |
