@@ -6,6 +6,7 @@ pub(crate) mod builtin;
 pub(crate) mod client_config;
 pub mod doctor;
 pub mod find;
+pub mod list_exports;
 pub mod logging;
 pub mod metrics;
 pub(crate) mod module_catalog;

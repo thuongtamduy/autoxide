@@ -72,6 +72,10 @@ pub(crate) struct KernelModule {
     migration_runs: Option<Arc<crate::tenancy::migration_runs::MigrationRuns>>,
     /// `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS`.
     export_days: i64,
+    /// `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` (bước 51 P16).
+    job_file_days: u32,
+    /// Hàng đợi job của kernel (xuất danh sách); có sau `start`.
+    jobs: Option<crate::job::JobQueue>,
     /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (đọc ở cấu hình kernel): dời khách chờ request đang
     /// chạy xong trong chừng này.
     request_timeout: std::time::Duration,
@@ -98,6 +102,8 @@ impl KernelModule {
             exports: None,
             migration_runs: None,
             export_days: 30,
+            job_file_days: 7,
+            jobs: None,
             request_timeout: std::time::Duration::from_secs(30),
             keys,
             tenant_settings,
@@ -219,6 +225,8 @@ impl Module for KernelModule {
             Box::new(crate::job::runs::CreateJobRuns),
             // View đã lưu của danh sách (bước 51 P7): cấp khách hàng, mọi database dữ liệu.
             Box::new(crate::ops::views::CreateSavedViews),
+            // File của job (bản xuất danh sách, bước 51 P16).
+            Box::new(crate::job::runs::AddJobFiles),
         ]
     }
 
@@ -254,6 +262,10 @@ impl Module for KernelModule {
         let export_days = reader.get_with(&crate::tenancy::exports::EXPORT_RETENTION_DAYS, |raw| {
             crate::config::parse_in_range(raw, 1i64, 365)
         });
+        let job_file_days = reader
+            .get_with(&crate::ops::list_exports::FILE_RETENTION_DAYS, |raw| {
+                crate::config::parse_in_range(raw, 1u32, 365)
+            });
         if let Some(seconds) = request_timeout(reader) {
             self.request_timeout = std::time::Duration::from_secs(seconds);
         }
@@ -262,6 +274,7 @@ impl Module for KernelModule {
         self.max_flags = max_flags?;
         self.templates = crate::template::TemplateEngine::new(template_bytes?);
         self.export_days = export_days?;
+        self.job_file_days = job_file_days?;
         Ok(())
     }
 
@@ -320,6 +333,19 @@ impl Module for KernelModule {
             routes = routes.merge(crate::job::runs::routes(crate::job::runs::JobsState {
                 outbox: outbox.clone(),
             }));
+        }
+        if let (Some(jobs), Some(entitlements), Some(registry)) =
+            (&self.jobs, &self.entitlements, &self.registry)
+        {
+            routes = routes.merge(crate::ops::list_exports::routes(
+                crate::ops::list_exports::ExportsState {
+                    sources: self.catalog.export_sources(),
+                    lists: self.catalog.lists(),
+                    jobs: jobs.clone(),
+                    entitlements: entitlements.clone(),
+                    registry: registry.clone(),
+                },
+            ));
         }
         if let Some(entitlements) = &self.entitlements {
             let state = crate::ops::work::WorkState::new(
@@ -405,6 +431,20 @@ impl Module for KernelModule {
 
     fn jobs(&self) -> Vec<crate::job::JobRegistration> {
         let mut jobs = Vec::new();
+        if let Some(registry) = &self.registry {
+            jobs.push(crate::job::JobRegistration::new(
+                crate::ops::list_exports::EXPORT_LIST,
+                Arc::new(crate::ops::list_exports::ExportRunner {
+                    sources: self.catalog.export_sources(),
+                    registry: registry.clone(),
+                    retention_days: self.job_file_days,
+                }),
+            ));
+            jobs.push(crate::job::JobRegistration::new(
+                crate::ops::list_exports::CLEAN_FILES,
+                Arc::new(crate::ops::list_exports::CleanRunner { registry: registry.clone() }),
+            ));
+        }
         if let Some(domains) = &self.domains {
             jobs.push(crate::job::JobRegistration::new(
                 crate::tenancy::domains::VERIFY_DOMAINS,
@@ -445,10 +485,14 @@ impl Module for KernelModule {
         if self.live_exports().is_some() {
             schedules.push(crate::tenancy::exports::schedule());
         }
+        if self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some()) {
+            schedules.push(crate::ops::list_exports::schedule());
+        }
         schedules
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        self.jobs = Some(context.jobs());
         self.database = Some(context.database().clone());
         self.translations = context.translations().clone();
         self.entitlements = Some(context.entitlements());

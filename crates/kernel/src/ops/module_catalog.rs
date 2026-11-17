@@ -62,6 +62,10 @@ pub(crate) struct ModuleCatalog {
     finders: crate::ops::find::FinderSources,
     /// Sổ số liệu tóm tắt (bước 51 P4).
     metrics: crate::ops::summary::SummaryMetrics,
+    /// Sổ danh sách xuất được (bước 51 P16).
+    exports: crate::ops::list_exports::ExportSources,
+    /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
+    lists: crate::ops::list_exports::ListsHandle,
     /// Sổ điều hướng đã gom (bước 51 P1).
     navigation: Arc<OnceLock<crate::module::navigation::NavigationCatalog>>,
 }
@@ -120,6 +124,14 @@ impl ModuleCatalog {
 
     pub(crate) fn summary_metrics(&self) -> crate::ops::summary::SummaryMetrics {
         self.metrics.clone()
+    }
+
+    pub(crate) fn export_sources(&self) -> crate::ops::list_exports::ExportSources {
+        self.exports.clone()
+    }
+
+    pub(crate) fn lists(&self) -> crate::ops::list_exports::ListsHandle {
+        self.lists.clone()
     }
 
     pub(crate) fn fill_navigation(&self, navigation: crate::module::navigation::NavigationCatalog) {

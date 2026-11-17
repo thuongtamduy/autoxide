@@ -359,7 +359,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/orders.ts`
 | [x] | Đơn hàng | View đã lưu `GET/POST /me/views` (hệ thống / nút / của tôi) | 51 | **Đã có** (17/11, bước 51 P7): `GET/POST /api/v1/me/views`, `PATCH/DELETE /me/views/{id}` cho mọi danh sách (`resource` = `x-autoxide-list` của endpoint, vd `content.list_content_entries`); `params` kiểm theo `x-autoxide-filters` (422 nêu `params.<tên>`); phạm vi `personal` / `node` (kèm `org_id`) / `tenant`, hai phạm vi chung cần `kernel.views.share`. Danh sách đơn hàng có view khi bước 45 dựng endpoint. View "hệ thống" do module khai: chưa có module nào cần, thêm khi bước 41–49 khai |
 | [ ] | Đơn hàng | Hỏi bằng lời: `POST /ai/filters/parse` | 52 (mẫu chỉ bật khi `/ai/status` thật bật) |
 | [ ] | Đơn hàng | Thao tác hàng loạt kèm hoàn tác | 51 |
-| [ ] | Đơn hàng | Xuất CSV theo bộ lọc bằng job; in phiếu giao | 51 (route của giao diện đọc dữ liệu mẫu) |
+| [ ] | Đơn hàng | Xuất CSV theo bộ lọc bằng job; in phiếu giao | 51 (route của giao diện đọc dữ liệu mẫu) | **Có một phần** (17/11, bước 51 P16): xuất chung `POST /api/v1/kernel/exports {resource, params, columns}` → job (theo dõi ở `GET /kernel/jobs/{id}`, có `file.url`), tải ở `GET /kernel/jobs/{id}/file`; đã có cho bài viết / trang (`content.list_content_entries`). Danh sách đơn hàng khai `export_source` khi bước 45 dựng endpoint; in phiếu giao thuộc bước 45 |
 | [ ] | Chi tiết đơn | `POST /{id}/transitions` kèm `If-Match`; trạng thái `awaiting_acceptance` | 45 |
 | [ ] | Chi tiết đơn | Hoàn tác một lần chuyển trạng thái của nhân viên trong N phút | mới |
 | [ ] | Chi tiết đơn | `POST /{id}/refunds`, `POST /{id}/payments/manual`; nơi tiền về của từng khoản hoàn | 45 |

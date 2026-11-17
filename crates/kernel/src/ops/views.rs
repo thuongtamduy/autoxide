@@ -75,6 +75,11 @@ impl ListSchemas {
     fn get(&self, resource: &str) -> Option<&Vec<ListParameter>> {
         self.0.get(resource)
     }
+
+    /// Tham số của danh sách `resource` (gồm `order`, `sort`).
+    pub(crate) fn parameters(&self, resource: &str) -> Option<&[ListParameter]> {
+        self.0.get(resource).map(Vec::as_slice)
+    }
 }
 
 /// Gắn `x-autoxide-list` / `x-autoxide-filters` vào mọi endpoint danh sách của `module` và trả
@@ -185,7 +190,7 @@ fn resolve<'a>(schema: &'a Value, components: &'a Value) -> &'a Value {
 
 /// Kiểm `params` của view theo tham số của danh sách; lỗi ghi vào `problems` với tên
 /// `params.<tham số>`.
-fn check_params(
+pub(crate) fn check_params(
     parameters: &[ListParameter],
     params: &serde_json::Map<String, Value>,
     problems: &mut Vec<FieldError>,

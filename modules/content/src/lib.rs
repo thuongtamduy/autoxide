@@ -17,6 +17,7 @@ mod config;
 mod entity;
 mod entries;
 mod events;
+mod export;
 mod find;
 mod http;
 mod migration;
@@ -187,6 +188,7 @@ impl Module for ContentModule {
         context.work_source(Arc::new(work::Review))?;
         context.summary_metric(Arc::new(work::Review))?;
         context.finder_source(Arc::new(find::Entries))?;
+        context.export_source(Arc::new(export::Entries(service.clone())))?;
         context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;
         context.resource_type(resource::TERM, Arc::new(resource::TermResolver(service.clone())))?;
         // Menu cũ cho module `menus` nhập sang (D-238).
