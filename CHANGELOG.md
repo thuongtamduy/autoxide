@@ -11,6 +11,14 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Tenants sign up by themselves (step 35): `POST /api/v1/plans/signups` (no sign-in, anti-spam form token, always
+  `202`), a mail with a link valid 24 hours, `POST /signups/confirm` (records acceptance of the platform's terms of use
+  and privacy policy in `compliance`), identity checks through `compliance` for plans that `requires_kyc`, then the
+  same provisioning staff use — the person is invited as the new tenant's administrator. `GET /signups/{id}?token=`
+  follows it; platform staff list sign-ups with `GET /signups` and MCP `plans.list_signups`. Plans get `self_signup`.
+  Off by default: new settings `AUTOXIDE_PLANS_SIGNUP`, `AUTOXIDE_PLANS_SIGNUP_URL`,
+  `AUTOXIDE_PLANS_SIGNUP_RETURN_URL`. New events `plans.signup_created`, `plans.signup_completed`,
+  `plans.signup_rejected`. See `docs/PLANS.md`.
 - Entries embed records of other modules (step 51): a body node `embed` with `kind` and `id` (e.g. a product) is
   checked when saved (the type must be registered, the record must exist); public reads return `embeds` keyed
   by `<kind>:<id>` with the title, summary, path and image of each record that is still public.

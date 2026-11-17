@@ -26,6 +26,8 @@ pub(crate) mod plan {
         pub placement: String,
         pub requires_kyc: bool,
         pub sample_data: bool,
+        /// Khách tự đăng ký được gói này (`POST /plans/signups`, D-349).
+        pub self_signup: bool,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
     }

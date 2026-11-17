@@ -201,6 +201,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `plans.get_provisioning` | `plans.subscriptions.read` | read-only |
 | `plans.get_subscription` | `plans.subscriptions.read` | read-only |
 | `plans.list_plans` | `plans.plans.read` | read-only |
+| `plans.list_signups` | `plans.subscriptions.read` | read-only |
 | `plans.list_usage` | `plans.subscriptions.read` | read-only |
 | `plans.provision_tenant` | `plans.provision` | writes |
 | `plans.retire_plan` | `plans.plans.manage` | writes |

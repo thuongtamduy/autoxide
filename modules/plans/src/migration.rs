@@ -27,6 +27,17 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreateBillingPeriods),
         Box::new(CreateBillingProfiles),
         Box::new(CreateProvisionings),
+        Box::new(CreateSignups),
+        // Bảng `plans_throttle` và `plans_antispam_nonces`: chống spam cho đăng ký công khai (D-349).
+        autoxide_kernel::throttle::throttle_migration("m0012_create_throttle", "plans"),
+        autoxide_kernel::antispam::antispam_migration("m0013_create_antispam_nonces", "plans"),
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0014_tenancy_signup_helpers",
+            vec![
+                autoxide_kernel::throttle::tenant_table("plans"),
+                autoxide_kernel::antispam::tenant_table("plans"),
+            ],
+        ),
     ]
 }
 
@@ -497,5 +508,75 @@ impl MigrationTrait for CreateProvisionings {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("plans_provisioning").to_owned()).await
+    }
+}
+
+/// Khách tự đăng ký (bước 35 mục 5, D-349): cờ `self_signup` của gói và bảng `plans_signup`.
+struct CreateSignups;
+
+impl MigrationName for CreateSignups {
+    fn name(&self) -> &str {
+        "m0011_create_signups"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateSignups {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("plans_plan")
+                    .add_column(schema::boolean("self_signup").default(false))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("plans_signup")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::string_len("email", 254))
+                    .col(schema::string_len_null("admin_name", 200))
+                    .col(schema::string_len("tenant_name", 200))
+                    .col(schema::string_len("slug", 63))
+                    .col(schema::uuid("plan_id"))
+                    .col(schema::uuid_null("price_id"))
+                    // `individual`, `household_business`, `organization` (định danh khi gói cần).
+                    .col(schema::string_len("party_type", 32))
+                    .col(schema::string_len_null("locale", 16))
+                    // `pending_email`, `awaiting_kyc`, `provisioning`, `completed`, `rejected`,
+                    // `expired`.
+                    .col(schema::string_len("status", 16))
+                    // SHA-256 của token trong mail; token thật không lưu.
+                    .col(schema::string_len("token_hash", 64))
+                    // JSON: phiên bản văn bản pháp lý đã chấp nhận lúc xác nhận email.
+                    .col(schema::text_null("terms"))
+                    .col(schema::uuid_null("kyc_profile_id"))
+                    .col(schema::uuid_null("provisioning_id"))
+                    .col(schema::uuid_null("tenant_id"))
+                    .col(schema::string_len_null("reason", 100))
+                    .col(schema::timestamp_with_time_zone_null("confirmed_at"))
+                    .col(schema::timestamp_with_time_zone("expires_at"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(manager, "plans_signup", "plans_signup_token_unique", &["token_hash"], true).await?;
+        index(manager, "plans_signup", "plans_signup_email_idx", &["email", "status"], false)
+            .await?;
+        index(manager, "plans_signup", "plans_signup_status_idx", &["status", "expires_at"], false)
+            .await?;
+        index(manager, "plans_signup", "plans_signup_list_idx", &["status", "id"], false).await?;
+        index(manager, "plans_signup", "plans_signup_provisioning_idx", &["provisioning_id"], false)
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager.drop_table(Table::drop().table("plans_signup").to_owned()).await?;
+        manager
+            .alter_table(Table::alter().table("plans_plan").drop_column("self_signup").to_owned())
+            .await
     }
 }

@@ -27,6 +27,8 @@ mod permissions;
 mod provider;
 mod provisioning;
 mod service;
+mod signup;
+mod signup_http;
 mod tools;
 mod usage;
 
@@ -88,6 +90,7 @@ impl Module for PlansModule {
             "plans_billing_period",
             "plans_billing_profile",
             "plans_provisioning",
+            "plans_signup",
         ]
     }
 
@@ -131,6 +134,10 @@ impl Module for PlansModule {
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
             tax_category: config.tax_category.clone(),
             notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
+            kyc: context.require::<dyn autoxide_compliance::api::KycGate>().ok(),
+            acceptance: context.require::<dyn autoxide_compliance::api::AcceptanceGate>().ok(),
+            guard: context.require::<autoxide_kernel::antispam::SpamGuard>()?,
+            signup: config.signup.clone(),
         });
         if let Some(notifier) = &service.notifier {
             notices::declare(notifier.as_ref())?;
@@ -153,7 +160,7 @@ impl Module for PlansModule {
     }
 
     // Tiền thuê bao về (module `ledger`): đánh dấu kỳ đã trả. Thuê bao đổi trạng thái: báo quản trị
-    // viên khách (module `notifications`).
+    // viên khách (module `notifications`). Định danh của khách tự đăng ký xong (module `compliance`).
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
         // Chỉ khi có module tương ứng (event chưa ai khai thì kernel từ chối đăng ký nghe).
         let Some(service) = self.service.clone() else {
@@ -170,8 +177,19 @@ impl Module for PlansModule {
         if service.notifier.is_some() {
             subscriptions.push(autoxide_kernel::event::Subscription::new(
                 "plans.subscription_status_changed",
-                Arc::new(notices::StatusNotices(service)),
+                Arc::new(notices::StatusNotices(service.clone())),
             ));
+        }
+        // Định danh của khách tự đăng ký xong (module `compliance`): cấp phát hay từ chối.
+        if service.kyc.is_some() {
+            for event in
+                [autoxide_compliance::api::KYC_VERIFIED, autoxide_compliance::api::KYC_REJECTED]
+            {
+                subscriptions.push(autoxide_kernel::event::Subscription::new(
+                    event,
+                    Arc::new(signup::KycListener(service.clone())),
+                ));
+            }
         }
         subscriptions
     }

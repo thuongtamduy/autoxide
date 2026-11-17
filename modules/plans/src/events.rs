@@ -37,5 +37,8 @@ events! {
     BILLING_PERIOD_PAID, BillingPeriodPaid, "plans.billing_period_paid", "A billing period was paid (`tenant_id`, `reference`, `amount`, `currency`).";
     BILLING_PERIOD_VOIDED, BillingPeriodVoided, "plans.billing_period_voided", "A billing period was voided (`tenant_id`, `reference`).";
     BILLING_PROFILE_UPDATED, BillingProfileUpdated, "plans.billing_profile_updated", "A tenant set its billing profile (`tenant_id`); read it with `GET /api/v1/plans/tenants/{tenant_id}/billing-profile`.";
+    SIGNUP_CREATED, SignupCreated, "plans.signup_created", "Someone asked to sign up a new tenant and was sent a confirmation mail (`signup_id`, `plan_id`).";
+    SIGNUP_COMPLETED, SignupCompleted, "plans.signup_completed", "A self sign-up ended with its tenant ready (`signup_id`, `plan_id`, `tenant_id`).";
+    SIGNUP_REJECTED, SignupRejected, "plans.signup_rejected", "A self sign-up was turned down (`signup_id`, `plan_id`, `reason`: `kyc_rejected`, `tenant_slug_taken`, …).";
     ENTITLEMENTS_CHANGED, EntitlementsChanged, "plans.entitlements_changed", "What a tenant may use changed because of its subscription, add-ons or overrides (`tenant_id`). Read `GET /api/v1/plans/entitlements` again.";
 }

@@ -51,6 +51,7 @@ pub(crate) struct PlanInput {
     pub placement: String,
     pub requires_kyc: bool,
     pub sample_data: bool,
+    pub self_signup: bool,
     pub modules: Vec<String>,
     pub features: Vec<String>,
     pub limits: BTreeMap<String, Option<i64>>,
@@ -156,6 +157,15 @@ pub(crate) struct PlansService {
     pub tax_category: String,
     /// Thông báo tới quản trị viên khách (module `notifications`); `None` thì không báo.
     pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
+    /// Định danh người đăng ký khách mới (module `compliance`); `None` thì gói `requires_kyc` không
+    /// mở cho tự đăng ký.
+    pub kyc: Option<Arc<dyn autoxide_compliance::api::KycGate>>,
+    /// Ghi chấp nhận điều khoản của người đăng ký (module `compliance`); `None` thì bỏ qua.
+    pub acceptance: Option<Arc<dyn autoxide_compliance::api::AcceptanceGate>>,
+    /// Chống spam cho đăng ký công khai (kernel).
+    pub guard: Arc<autoxide_kernel::antispam::SpamGuard>,
+    /// `AUTOXIDE_PLANS_SIGNUP*`.
+    pub signup: crate::config::SignupConfig,
 }
 
 /// Bộ nhớ đệm quyền dùng theo khách trong tiến trình (`AUTOXIDE_PLANS_CACHE_SECONDS`): quyền dùng
@@ -210,7 +220,7 @@ impl PlansService {
     }
 
     /// Ghi `event` dưới khách nền tảng, trong `connection` (transaction của thay đổi).
-    async fn record<C: ConnectionTrait, E: Event>(
+    pub(crate) async fn record<C: ConnectionTrait, E: Event>(
         &self,
         connection: &C,
         actor: Actor,
@@ -647,6 +657,13 @@ impl PlansService {
                 "is_default",
                 "not_allowed",
                 "only an active base plan can be the default",
+            ));
+        }
+        if input.self_signup && input.kind != "base" {
+            problems.push(FieldError::new(
+                "self_signup",
+                "not_allowed",
+                "only a base plan can be chosen at sign-up",
             ));
         }
         for (field, value) in [
@@ -1235,6 +1252,7 @@ fn active_plan(input: &PlanInput) -> plan::ActiveModel {
         placement: Set(input.placement.clone()),
         requires_kyc: Set(input.requires_kyc),
         sample_data: Set(input.sample_data),
+        self_signup: Set(input.self_signup),
         ..Default::default()
     }
 }

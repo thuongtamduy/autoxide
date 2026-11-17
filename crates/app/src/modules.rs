@@ -210,12 +210,12 @@ mod tests {
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
-            // Mỗi lịch (của `kernel` — dọn bản xuất —, `ai`, `auth`, `idempotency`, `webhooks`, `files`, năm của `plans`, một
+            // Mỗi lịch (của `kernel` — dọn bản xuất —, `ai`, `auth`, `idempotency`, `webhooks`, `files`, sáu của `plans`, một
             // của `tax`, ba của `ledger` (niêm phong, hết hạn thanh toán, đối soát), một của `invoices`, một của
             // `compliance` (hết hạn định danh; nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), hai của `media`, hai của `content`, một của `forms`, một
             // của `newsletter` và một của `comments`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 26);
+            assert_eq!(a.unwrap() + b.unwrap(), 27);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

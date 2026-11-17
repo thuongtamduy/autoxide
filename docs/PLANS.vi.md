@@ -60,8 +60,37 @@ Việc chạy nền: theo dõi bằng `GET /api/v1/plans/provisionings/{id}` (`s
 `failed`); sửa nguyên nhân rồi `POST …/retry` chạy tiếp từ bước đã xong. Trên máy chủ:
 `autoxide tenant create --slug acme --name "Acme Ltd" --plan <id gói> --admin-email
 owner@acme.example` làm như vậy ngay. Gói `dedicated` cần `placement`: một placement loại `dedicated`
-thêm trước bằng `autoxide placement add`. Gói `requires_kyc` chưa cấp phát được tới khi có xác thực
-danh tính (bước 37); khách tự đăng ký cũng vậy.
+thêm trước bằng `autoxide placement add`. Gói `requires_kyc` không cấp phát thẳng được: khách tự đăng
+ký và qua bước xác thực danh tính (mục sau).
+
+## Khách tự đăng ký
+
+Bật bằng `AUTOXIDE_PLANS_SIGNUP=true` và đánh dấu gói cho chọn bằng `"self_signup": true` (gói chính
+đang bán). Trang đăng ký của website gọi API ở tên miền của khách nền tảng (hay gửi
+`Autoxide-Tenant: <slug khách nền tảng>`), không cần đăng nhập:
+
+1. `GET /api/v1/antispam/token?scope=plans:signup` lấy token form, rồi `POST /api/v1/plans/signups`
+   với `email`, `tenant_name`, `slug`, `plan_code`, `"accept_terms": true` (người đăng ký chấp nhận
+   điều khoản sử dụng và chính sách bảo mật hiện hành của nền tảng) và `form_token`. Câu trả lời luôn
+   là `202`; giá trị sai trả `422` kèm mọi lỗi một lần (`plan_code` không mở cho tự đăng ký, `slug` đã
+   có người dùng…).
+2. Một thư gửi tới địa chỉ đó, kèm link dùng được 24 giờ (`AUTOXIDE_PLANS_SIGNUP_URL`, có `{token}`;
+   không đặt thì thư chứa token). Trang gửi token tới `POST /api/v1/plans/signups/confirm`: việc
+   chấp nhận điều khoản được ghi lại (module `compliance`), và
+   - gói `requires_kyc`: đăng ký thành `awaiting_kyc`, `kyc.url` là nơi người đăng ký xác thực danh
+     tính (gọi xác nhận lần nữa thì mở lượt mới; xong, nhà cung cấp đưa người dùng về
+     `AUTOXIDE_PLANS_SIGNUP_RETURN_URL`). Đạt → tạo khách; không đạt → `rejected` (`kyc_rejected`);
+   - gói khác: tạo khách ngay.
+3. Tạo khách là đúng lượt cấp phát nhân sự vận hành dùng (`provisioning_id`); người đăng ký được mời
+   qua thư làm quản trị viên (role `admin`). Theo dõi bằng `GET /api/v1/plans/signups/{id}?token=…`:
+   `pending_email` → (`awaiting_kyc`) → `provisioning` → `completed` (`tenant_id`), hoặc `rejected`
+   (`reason`) / `expired`.
+
+Gửi lại cùng email và slug khi đang chờ thì có thư mới (link cũ hết dùng). Hai người cùng chờ một slug:
+người đến bước cấp phát trước giữ slug, người sau bị `rejected` (`tenant_slug_taken`). Đăng ký chưa
+xác nhận hết hạn sau 24 giờ, chưa xác thực danh tính xong hết hạn sau 30 ngày; đăng ký đã kết thúc bị
+xoá sau 30 ngày. Nhân sự nền tảng xem danh sách bằng `GET /api/v1/plans/signups`
+(`plans.subscriptions.read`, MCP `plans.list_signups`).
 
 ## Gán gói cho khách
 
@@ -143,5 +172,8 @@ quá thời hạn lưu tự làm việc này.
 | `AUTOXIDE_PLANS_CACHE_SECONDS` | `30` | Mỗi máy chủ giữ quyền dùng của khách trong bộ nhớ bao lâu |
 | `AUTOXIDE_PLANS_HOLD_MINUTES` | `15` | Chỗ giữ hạn mức chưa xác nhận được giữ bao lâu |
 | `AUTOXIDE_PLANS_REMINDER_DAYS` | `7,1` | Trước hạn bao nhiêu ngày thì gửi mail nhắc |
+| `AUTOXIDE_PLANS_SIGNUP` | `false` | Cho khách mới tự đăng ký |
+| `AUTOXIDE_PLANS_SIGNUP_URL` | — | Trang xác nhận đăng ký, có `{token}` |
+| `AUTOXIDE_PLANS_SIGNUP_RETURN_URL` | — | Trang người dùng quay về sau xác thực danh tính, `{id}` = lượt đăng ký |
 | `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS` | `3600` | Job của module gói không có phải chờ bao lâu |
 | `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` | `30` | Giữ bản xuất dữ liệu khách bao lâu |
