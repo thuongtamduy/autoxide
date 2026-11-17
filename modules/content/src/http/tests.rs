@@ -1027,3 +1027,139 @@ async fn tim_nang_cao_va_mo_thang_theo_ma() {
     .await
     .unwrap();
 }
+
+/// Hộp việc theo người và việc thiết lập (bước 51 P10): hoãn ẩn việc khỏi hộp của người hoãn (bỏ
+/// hoãn thì hiện lại); giao cho người không có quyền của nguồn là 422; `assigned=me` lọc; bước
+/// thiết lập "trang đầu tiên" xong khi có trang đã đăng.
+#[tokio::test]
+async fn hoan_giao_viec_va_buoc_thiet_lap() {
+    TestDatabase::run(async |test| {
+        // Mỗi người một ID (app chung cho `admin` và `reader` cùng ID 1): giao việc tra quyền theo ID.
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["content.read", "content.write", "content.publish"])
+            .user("editor", 3, &["content.read", "content.publish"])
+            .user("writer", 2, &["content.read", "content.write"])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let created = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "page", "title": "Giới thiệu"})),
+        )
+        .await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let read = send(&app, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let asked = send(
+            &app,
+            "POST",
+            &format!("/entries/{id}/request-review"),
+            Some("admin"),
+            &[("if-match", &etag)],
+            None,
+        )
+        .await;
+        assert_eq!(asked.status(), StatusCode::OK, "{}", asked.json());
+        let work =
+            |query: &str| app.get(&format!("/api/v1/kernel/work{query}")).token("admin").send();
+        let items = work("").await.unwrap().json();
+        let key = items["data"]["items"][0]["key"].as_str().unwrap().to_owned();
+        assert!(key.ends_with(&id), "{items}");
+        let me = |method: Method, path: &str, body: Option<Value>| {
+            let mut request =
+                app.request(method, &format!("/api/v1/me/work/{key}/{path}")).token("admin");
+            if let Some(body) = body {
+                request = request.json(body);
+            }
+            request.send()
+        };
+
+        let past = me(Method::POST, "snooze", Some(json!({"until": "2000-01-01T00:00:00Z"})))
+            .await
+            .unwrap();
+        assert_eq!(past.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let later = (chrono::Utc::now() + chrono::Duration::days(30))
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let snoozed = me(Method::POST, "snooze", Some(json!({"until": later}))).await.unwrap();
+        assert_eq!(snoozed.status(), StatusCode::OK, "{}", snoozed.json());
+        assert_eq!(work("").await.unwrap().json()["data"]["items"], json!([]), "đã hoãn");
+        let with = work("?include_snoozed=true").await.unwrap().json();
+        assert!(with["data"]["items"][0]["snoozed_until"].is_string(), "{with}");
+        assert_eq!(
+            me(Method::DELETE, "snooze", None).await.unwrap().status(),
+            StatusCode::NO_CONTENT
+        );
+
+        let refused =
+            me(Method::POST, "assign", Some(json!({"user_id": Uuid::from_u128(2)}))).await.unwrap();
+        assert_eq!(
+            refused.status(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "writer không có content.publish"
+        );
+        let assigned =
+            me(Method::POST, "assign", Some(json!({"user_id": Uuid::from_u128(1)}))).await.unwrap();
+        assert_eq!(assigned.json()["data"]["assignee_id"], Uuid::from_u128(1).to_string());
+        assert_eq!(work("?assigned=me").await.unwrap().json()["data"]["items"][0]["key"], key);
+        assert_eq!(work("?assigned=nobody").await.unwrap().json()["data"]["items"], json!([]));
+        let unknown = app
+            .request(Method::POST, "/api/v1/me/work/nope:1/snooze")
+            .token("admin")
+            .json(json!({"until": later}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            (unknown.status(), unknown.json()["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("kernel.work_not_found"))
+        );
+
+        let setup = || app.get("/api/v1/kernel/setup").token("admin").send();
+        let before = setup().await.unwrap().json();
+        let step = before["data"]["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|step| step["id"] == "content.first_page")
+            .cloned()
+            .unwrap();
+        assert_eq!(
+            (step["done"].as_bool(), step["screen"].as_str()),
+            (Some(false), Some("content.entries"))
+        );
+        let read = send(&app, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let published = send(
+            &app,
+            "POST",
+            &format!("/entries/{id}/publish"),
+            Some("admin"),
+            &[("if-match", &etag)],
+            None,
+        )
+        .await;
+        assert_eq!(published.status(), StatusCode::OK, "{}", published.json());
+        let after = setup().await.unwrap().json();
+        let step = after["data"]["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|step| step["id"] == "content.first_page")
+            .cloned()
+            .unwrap();
+        assert_eq!(step["done"], true, "{after}");
+    })
+    .await
+    .unwrap();
+}

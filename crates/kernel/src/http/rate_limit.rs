@@ -179,6 +179,14 @@ impl Authenticator for ApiKeyLimited {
     fn decides_entry(&self) -> bool {
         self.inner.decides_entry()
     }
+
+    async fn principal_of(
+        &self,
+        tenant: &crate::tenancy::TenantContext,
+        user_id: uuid::Uuid,
+    ) -> Result<Option<Principal>, Error> {
+        self.inner.principal_of(tenant, user_id).await
+    }
 }
 
 /// Lớp HTTP: từ chối bằng 429 `rate_limited` kèm `Retry-After`.

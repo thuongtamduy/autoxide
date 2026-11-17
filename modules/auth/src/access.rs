@@ -85,6 +85,19 @@ impl Authenticator for RequestAuthenticator {
     fn decides_entry(&self) -> bool {
         true
     }
+
+    // Người dùng bị khoá, người mua (không permission) hay không có: `None`.
+    async fn principal_of(
+        &self,
+        tenant: &TenantContext,
+        user_id: uuid::Uuid,
+    ) -> Result<Option<Principal>, Error> {
+        let found = self.roles.user_principal(tenant, user_id).await?;
+        Ok(found.and_then(|(user, principal)| {
+            (user.is_active() && user.realm != autoxide_kernel::access::Realm::Customer)
+                .then_some(principal)
+        }))
+    }
 }
 
 impl RequestAuthenticator {

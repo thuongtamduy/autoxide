@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Inbox per person and setup checklist (step 51): `POST/DELETE /api/v1/me/work/{key}/snooze` hides a piece of work
+  from your inbox until a time; `POST /api/v1/me/work/{key}/assign` assigns it to a user who can see its source
+  (`Authenticator::principal_of`, default `None`); `GET /api/v1/kernel/work` shows `assignee_id`, filters
+  `assigned=me|nobody` and hides snoozed work unless `include_snoozed=true`. Modules declare setup steps computed
+  from their data (`StartContext::setup_step`); `GET /api/v1/kernel/setup` lists those that fit the tenant's
+  business model with progress. Content: "publish the first page".
 - Step 37, personal data (Vietnam, Personal Data Protection Law 91/2025/QH15, Decree 356/2025/ND-CP — check the
   original texts; guide `docs/COMPLIANCE.md`): processing purposes with legal bases and recipients (`GET|POST
   /api/v1/compliance/purposes`, `PATCH /purposes/{key}`, public `GET /public/purposes`), retention of each kind of

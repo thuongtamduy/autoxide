@@ -229,6 +229,8 @@ impl Module for KernelModule {
             Box::new(crate::job::runs::AddJobFiles),
             // Nơi lưu dữ liệu theo khách (bước 37, D-360): nước của placement, yêu cầu của khách.
             Box::new(crate::tenancy::residency::AddDataResidency),
+            // Hoãn / giao việc của hộp việc (bước 51 P10).
+            Box::new(crate::ops::work_states::CreateWorkStates),
         ]
     }
 
@@ -368,6 +370,15 @@ impl Module for KernelModule {
                 entitlements: entitlements.clone(),
             };
             routes = routes.merge(crate::ops::find::routes(find));
+            routes = routes.merge(crate::ops::setup::routes(crate::ops::setup::SetupState {
+                steps: self.catalog.setup_steps(),
+                entitlements: entitlements.clone(),
+                translations: self.translations.clone(),
+                settings: self.settings.clone().map(|settings| {
+                    let settings: Arc<dyn crate::tenancy::settings::TenantSettings> = settings;
+                    settings
+                }),
+            }));
             routes = routes.merge(crate::ops::resolve::routes(crate::ops::resolve::ResolveState {
                 resolvers: self.catalog.code_resolvers(),
                 entitlements: entitlements.clone(),

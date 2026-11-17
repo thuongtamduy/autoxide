@@ -150,6 +150,11 @@ impl WorkSources {
     fn all(&self) -> Vec<Entry> {
         self.entries.read().unwrap_or_else(PoisonError::into_inner).clone()
     }
+
+    /// Nguồn có id `id`, kèm module của nó.
+    pub(crate) fn find(&self, id: &str) -> Option<Entry> {
+        self.all().into_iter().find(|(_, source)| source.id() == id)
+    }
 }
 
 /// One piece of work.
@@ -166,6 +171,10 @@ pub(crate) struct WorkItemView {
     pub due_at: Option<DateTime<Utc>>,
     /// Where to do it: the screen of `GET /api/v1/kernel/navigation` and the record.
     pub target: WorkTarget,
+    /// Who it is assigned to (`POST /api/v1/me/work/{key}/assign`).
+    pub assignee_id: Option<Uuid>,
+    /// Hidden from your inbox until then (only with `include_snoozed=true`).
+    pub snoozed_until: Option<DateTime<Utc>>,
 }
 
 /// Where a piece of work is done.
@@ -201,6 +210,11 @@ pub(crate) struct WorkQuery {
     org_id: Option<Uuid>,
     /// At most this many items, 1 to 200. Defaults to 50.
     limit: Option<u16>,
+    /// `me`: only work assigned to you; `nobody`: only work assigned to no one.
+    assigned: Option<String>,
+    /// `true`: also the work you snoozed (with `snoozed_until`).
+    #[serde(default)]
+    include_snoozed: bool,
 }
 
 #[derive(Clone)]
@@ -247,10 +261,11 @@ impl WorkState {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-        org_id: Option<Uuid>,
-        limit: u16,
+        query: &WorkQuery,
         language: Language,
     ) -> Result<WorkView, Error> {
+        let org_id = query.org_id;
+        let limit = query.limit.unwrap_or(50);
         let target = target_of(tenant, org_id);
         let sources = self.allowed(tenant, principal, target).await?;
         let answers =
@@ -289,6 +304,22 @@ impl WorkState {
                 &b.key,
             ))
         });
+        // Hoãn / giao (P10): đọc một lần cho cả danh sách.
+        let keys: Vec<String> = items.iter().map(|item| item.key.clone()).collect();
+        let states = crate::ops::work_states::states(tenant, principal.user_id(), &keys).await?;
+        let now = Utc::now();
+        items.retain_mut(|item| {
+            let state = states.get(&item.key).cloned().unwrap_or_default();
+            item.assignee_id = state.assignee_id;
+            item.snoozed_until = state.snoozed_until.filter(|until| *until > now);
+            let shown = query.include_snoozed || item.snoozed_until.is_none();
+            let assigned = match query.assigned.as_deref() {
+                Some("me") => item.assignee_id == Some(principal.user_id()),
+                Some("nobody") => item.assignee_id.is_none(),
+                _ => true,
+            };
+            shown && assigned
+        });
         items.truncate(usize::from(limit));
         Ok(WorkView { items, incomplete })
     }
@@ -306,6 +337,8 @@ impl WorkState {
             title,
             due_at: item.due_at,
             target: WorkTarget { screen: item.screen.to_owned(), record_id: item.record_id },
+            assignee_id: None,
+            snoozed_until: None,
         }
     }
 
@@ -384,7 +417,7 @@ pub(crate) fn routes(state: WorkState) -> OpenApiRouter {
     responses(
         (status = 200, description = "The work.", body = Data<WorkView>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 422, description = "`limit` is not between 1 and 200; see `errors`.", body = Problem),
+        (status = 422, description = "`limit` is not between 1 and 200, or `assigned` is not `me` or `nobody`; see `errors`.", body = Problem),
     )
 )]
 async fn list_work(
@@ -395,14 +428,25 @@ async fn list_work(
     Query(query): Query<WorkQuery>,
 ) -> Result<Data<WorkView>, Error> {
     let limit = query.limit.unwrap_or(50);
+    let mut problems = Vec::new();
     if !(1..=200).contains(&limit) {
-        return Err(Error::validation(vec![crate::error::FieldError::new(
+        problems.push(crate::error::FieldError::new(
             "limit",
             "invalid",
             "must be between 1 and 200",
-        )]));
+        ));
     }
-    Ok(Data { data: state.items(&tenant, &principal, query.org_id, limit, language).await? })
+    if query.assigned.as_deref().is_some_and(|assigned| !["me", "nobody"].contains(&assigned)) {
+        problems.push(crate::error::FieldError::new(
+            "assigned",
+            "invalid",
+            "must be `me` or `nobody`",
+        ));
+    }
+    if !problems.is_empty() {
+        return Err(Error::validation(problems));
+    }
+    Ok(Data { data: state.items(&tenant, &principal, &query, language).await? })
 }
 
 /// Count the work waiting for you, by source.

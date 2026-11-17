@@ -308,6 +308,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/resolve".to_owned(),
                     "/settings".to_owned(),
                     "/settings/{name}".to_owned(),
+                    "/setup".to_owned(),
                     "/summary".to_owned(),
                     "/tenant".to_owned(),
                     "/tenants".to_owned(),
@@ -330,7 +331,9 @@ async fn module_nhan_database_va_khai_route() {
                     "/flags/{key}".to_owned(),
                     "/permissions".to_owned(),
                     "/views".to_owned(),
-                    "/views/{id}".to_owned()
+                    "/views/{id}".to_owned(),
+                    "/work/{key}/assign".to_owned(),
+                    "/work/{key}/snooze".to_owned()
                 ]
             ]
         );

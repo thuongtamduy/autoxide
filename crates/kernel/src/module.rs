@@ -299,6 +299,7 @@ pub struct StartContext<'a> {
     exports: &'a crate::ops::list_exports::ExportSources,
     bulk: &'a crate::ops::bulk::BulkActions,
     resolvers: &'a crate::ops::resolve::CodeResolvers,
+    setup: &'a crate::ops::setup::SetupSteps,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -468,6 +469,12 @@ impl StartContext<'_> {
         resolver: Arc<dyn crate::ops::resolve::CodeResolver>,
     ) -> Result<(), Error> {
         self.resolvers.register(self.module, resolver)
+    }
+
+    /// Đăng ký bước thiết lập (bước 51 P10) cho `GET /kernel/setup`; id `<module>.<bước>`, nhãn
+    /// tiếng Anh dịch qua `text:` của module.
+    pub fn setup_step(&mut self, step: Arc<dyn crate::ops::setup::SetupStep>) -> Result<(), Error> {
+        self.setup.register(self.module, step)
     }
 
     /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do
