@@ -238,6 +238,10 @@ impl Module for KernelModule {
             Box::new(crate::ops::records::CreateRecordNotes),
             // Yêu cầu duyệt lệnh của agent (bước 51 P12).
             Box::new(crate::ops::approvals::CreateApprovalRequests),
+            // Danh sách lý do theo khách (bước 51 P18).
+            Box::new(crate::ops::reasons::CreateReasonCodes),
+            // Lần dùng / lỗi cuối của kết nối ra ngoài (bước 51).
+            Box::new(crate::ops::connections::CreateConnectionStatus),
         ]
     }
 
@@ -303,6 +307,7 @@ impl Module for KernelModule {
             crate::tenancy::TENANTS_DELETE,
             crate::job::runs::JOBS_READ,
             crate::ops::views::VIEWS_SHARE,
+            crate::ops::reasons::REASONS_MANAGE,
             crate::job::runs::JOBS_MANAGE,
         ]
     }
@@ -351,6 +356,16 @@ impl Module for KernelModule {
             routes = routes.merge(crate::ops::approvals::routes(
                 crate::ops::approvals::ApprovalsState { outbox: outbox.clone() },
             ));
+        }
+        routes = routes.merge(crate::ops::connections::routes(
+            crate::ops::connections::ConnectionsState { probes: self.catalog.connection_probes() },
+        ));
+        if let Some((_, permissions)) = &self.resources {
+            routes = routes.merge(crate::ops::reasons::routes(crate::ops::reasons::ReasonsState {
+                codes: self.catalog.reason_codes(),
+                permissions: permissions.clone(),
+                translations: self.translations.clone(),
+            }));
         }
         if let (Some(outbox), Some((resources, permissions))) = (&self.outbox, &self.resources) {
             routes = routes.merge(crate::ops::records::routes(crate::ops::records::RecordsState {

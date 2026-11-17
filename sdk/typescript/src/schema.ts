@@ -2326,6 +2326,16 @@ export type ConfirmedList = {
   name: NewsletterText;
 };
 
+/** The result of testing a connection. */
+export type ConnectionTest = {
+  /** The connection tested, `<module>.connection.<kind>`. */
+  connection: string;
+  /** Why it failed, for the administrator. */
+  error?: string | null;
+  ok: boolean;
+  tested_at: string;
+};
+
 /** A mandatory page template. */
 export type ContentTemplate = {
   /**
@@ -4004,6 +4014,19 @@ export type Data_ConfirmResponse = {
   /** The lists confirmed. */
   data: {
     lists: ConfirmedList[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConnectionTest = {
+  /** The result of testing a connection. */
+  data: {
+    /** The connection tested, `<module>.connection.<kind>`. */
+    connection: string;
+    /** Why it failed, for the administrator. */
+    error?: string | null;
+    ok: boolean;
+    tested_at: string;
   };
 };
 
@@ -6763,6 +6786,13 @@ export type Data_TenantSettingState = {
     group?: string | null;
     /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
     is_set: boolean;
+    /** For a setting of a partner connection: why its last use failed; omitted when it worked. */
+    last_error?: string | null;
+    /**
+     * For a setting of a partner connection: the last time the connection was used (or tested
+     * with `POST /api/v1/kernel/settings/{name}/test`).
+     */
+    last_used_at?: string | null;
     /**
      * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
      * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
@@ -7817,6 +7847,25 @@ export type Data_Vec_PublicProfileResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_ReasonView = {
+  data: {
+    active: boolean;
+    /** Declared by the module (else added by the tenant). */
+    builtin: boolean;
+    code: string;
+    /** In the language of `Accept-Language`: the tenant's own label, else the default. */
+    label: string;
+    /** The tenant's own labels, by language. */
+    labels: {
+      [key: string]: string;
+    };
+    /** Required by law: cannot be turned off. */
+    legal: boolean;
+    position: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_RecordNote = {
   data: {
     author_id: string;
@@ -8112,6 +8161,13 @@ export type Data_Vec_TenantSettingState = {
     group?: string | null;
     /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
     is_set: boolean;
+    /** For a setting of a partner connection: why its last use failed; omitted when it worked. */
+    last_error?: string | null;
+    /**
+     * For a setting of a partner connection: the last time the connection was used (or tested
+     * with `POST /api/v1/kernel/settings/{name}/test`).
+     */
+    last_used_at?: string | null;
     /**
      * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
      * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
@@ -14390,6 +14446,36 @@ export type PutMenuRequest = {
  */
 export type Realm = "staff" | "customer";
 
+/** Changes to a reason; omitted fields stay. A code the list does not have yet is added. */
+export type ReasonChange = {
+  active?: boolean | null;
+  /**
+   * The tenant's labels by language (`vi`, `en`…), up to 200 characters each; an empty label
+   * goes back to the default. A new code needs at least one.
+   */
+  labels?: {
+    [key: string]: string;
+  } | null;
+  position?: number | null;
+};
+
+/** One reason of a list. */
+export type ReasonView = {
+  active: boolean;
+  /** Declared by the module (else added by the tenant). */
+  builtin: boolean;
+  code: string;
+  /** In the language of `Accept-Language`: the tenant's own label, else the default. */
+  label: string;
+  /** The tenant's own labels, by language. */
+  labels: {
+    [key: string]: string;
+  };
+  /** Required by law: cannot be turned off. */
+  legal: boolean;
+  position: number;
+};
+
 /** Proof that you are the account owner, for one sensitive change. */
 export type ReauthRequest = {
   /** How you prove it is you. */
@@ -15894,6 +15980,13 @@ export type TenantSettingState = {
   group?: string | null;
   /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
   is_set: boolean;
+  /** For a setting of a partner connection: why its last use failed; omitted when it worked. */
+  last_error?: string | null;
+  /**
+   * For a setting of a partner connection: the last time the connection was used (or tested
+   * with `POST /api/v1/kernel/settings/{name}/test`).
+   */
+  last_used_at?: string | null;
   /**
    * `<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named
    * `<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.
@@ -21239,6 +21332,34 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/reasons/{list}": {
+    /** List the reasons of a list. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { list: string }; query: { include_inactive?: boolean }; };
+      responses: {
+        200: Data_Vec_ReasonView;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/reasons/{list}/{code}": {
+    /** Change or add a reason. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { list: string; code: string }; };
+      requestBody: ReasonChange;
+      responses: {
+        200: Data_Vec_ReasonView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/records/{kind}/{id}/activity": {
     /** Get the activity of a record. */
     get: {
@@ -21334,6 +21455,19 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/settings/{name}/test": {
+    /** Test a connection. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { name: string }; };
+      responses: {
+        200: Data_ConnectionTest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

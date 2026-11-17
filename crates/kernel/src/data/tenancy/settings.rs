@@ -473,6 +473,13 @@ pub(crate) struct SettingState {
     /// The value, for settings that are not secret and are set.
     value: Option<String>,
     updated_at: Option<DateTime<Utc>>,
+    /// For a setting of a partner connection: the last time the connection was used (or tested
+    /// with `POST /api/v1/kernel/settings/{name}/test`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_used_at: Option<DateTime<Utc>>,
+    /// For a setting of a partner connection: why its last use failed; omitted when it worked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_error: Option<String>,
 }
 
 /// Payload of `kernel.setting_changed`: the name only.
@@ -517,6 +524,8 @@ fn state(setting: &TenantSetting, row: Option<&entity::Model>) -> SettingState {
         is_set: row.is_some(),
         value: row.filter(|_| !setting.secret).map(|row| row.value.clone()),
         updated_at: row.map(|row| row.updated_at),
+        last_used_at: None,
+        last_error: None,
     }
 }
 
@@ -567,6 +576,16 @@ impl SettingsService {
             .filter(|setting| group.is_none_or(|group| setting.group == Some(group)))
             .map(|setting| state(setting, setting.row_in(&rows)))
             .collect();
+        // Lần dùng / lỗi cuối của kết nối ra ngoài, gắn vào từng cài đặt của kết nối.
+        let connections = crate::ops::connections::statuses(tenant).await?;
+        for state in &mut states {
+            if let Some(status) = crate::ops::connections::connection_of(&state.name)
+                .and_then(|connection| connections.get(connection))
+            {
+                state.last_used_at = status.last_used_at;
+                state.last_error = status.last_error.clone();
+            }
+        }
         states.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(states)
     }
