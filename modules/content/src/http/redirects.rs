@@ -101,6 +101,9 @@ pub(crate) struct RedirectsQuery {
     locale: Option<String>,
     /// Only `auto`, `gone` or `manual` redirects.
     source: Option<String>,
+    /// Only redirects whose old path or target address contains this text, in any case and with
+    /// or without accents.
+    q: Option<String>,
 }
 
 /// List redirects.
@@ -134,6 +137,7 @@ pub(crate) async fn list_redirects(
             &principal,
             query.locale.as_deref(),
             query.source.as_deref(),
+            query.q.as_deref(),
             &page,
         )
         .await?;

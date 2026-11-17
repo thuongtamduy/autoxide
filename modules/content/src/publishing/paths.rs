@@ -245,6 +245,7 @@ pub(crate) async fn put_redirect<C: ConnectionTrait>(
         to_url: Set(None),
         status_code: Set(row.status),
         source: Set(row.source.to_owned()),
+        search_key: Set(crate::publishing::redirects::search_key(row.from, None)),
         created_by: Set(row.by),
         created_at: Set(row.at),
         updated_at: Set(row.at),

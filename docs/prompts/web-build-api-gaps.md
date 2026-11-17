@@ -85,7 +85,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Hồ sơ công khai | Hồ sơ công khai của nút (`PATCH /organizations/units/{id}`), giờ mở cửa theo ngày và ngày nghỉ, danh mục tỉnh / xã | 34 (D-200, `address`) | **Đã nối** (17/11, W-045 của web): `GET/PATCH …/units/{id}/public-profile`, trạng thái công khai theo `GET /public/stores`, tỉnh / xã từ `address`; form sửa một khung giờ chung cho mọi ngày |
 | [x] | Quyền vào hỗ trợ | `GET /auth/support-access`, cài đặt `auth.support_access` | 34 | **Đã nối** (17/11, W-046 của web): danh sách, bật / tắt ở nút gốc. Nhân sự nền tảng hiện bằng mã (khách không đọc được tài khoản của khách nền tảng) — nên trả kèm tên hiển thị. **Đã có** (17/11, D-333): `staff_name` trong mọi câu trả lời về lần cấp |
 | [x] | Quyền vào hỗ trợ | Khách tự thu hồi một lần cấp quyền vào hỗ trợ (bước 34 chỉ cho nhà vận hành thu hồi) | mới | **Đã nối** (17/11, W-046 của web): `DELETE /auth/support-access/{id}` (trừ lần cấp theo yêu cầu cơ quan) |
-| [ ] | Người dùng | Gửi lại thư xác minh email cho một người dùng khác (quản trị viên bấm trên dòng): `POST /auth/users/{id}/verification` | mới | Menu "⋯" không có mục này (W-059 của web) |
+| [x] | Người dùng | Gửi lại thư xác minh email cho một người dùng khác (quản trị viên bấm trên dòng): `POST /auth/users/{id}/verification` | mới | Menu "⋯" không có mục này (W-059 của web) — **Đã có** (17/11), đường dẫn khác đề xuất: `POST /auth/users/{id}/email/verification` (`auth.users.manage`, không vượt quyền người kia) → 202; đã xác minh thì 409 `auth.email_already_verified` |
 
 ## Nội dung › Bài viết và trình soạn bài (`/content`)
 
@@ -157,8 +157,8 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Soạn bản tin | Địa chỉ người gửi (tên + email) trong `GET /newsletter/settings`, để xem trước hộp thư đúng như người nhận thấy | mới | Hiện tên khách từ `GET /kernel/tenant` (W-056) — **Đã có:** `GET /api/v1/kernel/client-config` → `mail.from` (dạng `Tên <địa chỉ>`, `AUTOXIDE_MAIL_FROM`) — mọi thư của máy chủ, kể cả bản tin, gửi từ địa chỉ này; `mail.sends` = `false` khi thư chỉ ghi ra file. |
 | [ ] | Bình luận, Người đăng ký | Lệnh hàng loạt: duyệt / từ chối / spam / xoá nhiều bình luận; chặn / bỏ chặn / xoá nhiều người đăng ký (nhận danh sách id, trả kết quả từng id) | 51 (hàng loạt chung) | Lặp lệnh từng cái (PATCH kèm `If-Match`, DELETE), gom lỗi "Xong 8/10" (W-058) |
 | [ ] | Bình luận, Người đăng ký | Sắp theo cột khác thời gian (`sort=` tên, trạng thái…) và tổng số khớp bộ lọc | mới (tổng số: 51) | Chỉ cột thời gian sắp được (`order`); phân trang theo con trỏ, không có tổng (W-058) |
-| [ ] | Bài nộp | Xuất CSV theo danh sách id đã chọn (`ids=`), không chỉ theo `status` | mới | Giữ nút xuất cả biểu mẫu (W-059) |
-| [ ] | Biểu mẫu | Nhân bản một biểu mẫu (`POST /forms/{id}/duplicate`, mã mới, trạng thái nháp) | mới | "⋯" có chép mã form và địa chỉ API, không có nhân bản (W-059) |
+| [x] | Bài nộp | Xuất CSV theo danh sách id đã chọn (`ids=`), không chỉ theo `status` | mới | Giữ nút xuất cả biểu mẫu (W-059) — **Đã có** (17/11): `GET /forms/{id}/submissions/export?ids=<id>,<id>…` (tối đa 200; bài đã chọn xuất bất kể trạng thái, kể cả `spam`, trừ khi thêm `status`) |
+| [x] | Biểu mẫu | Nhân bản một biểu mẫu (`POST /forms/{id}/duplicate`, mã mới, trạng thái nháp) | mới | "⋯" có chép mã form và địa chỉ API, không có nhân bản (W-059) — **Đã có** (17/11): `POST /forms/{id}/duplicate {key?, name?}` → 201. Form không có trạng thái nháp: bản sao ở `closed` (không nhận bài tới khi mở), cùng nút, không chép bài gửi; key mặc định `<key>-copy` (`-copy-2`… khi trùng), tên `<tên> (copy)` |
 
 ## Nội dung › Thư viện media, Trang và cấu trúc, Menu
 
@@ -188,7 +188,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Menu | Giữ id của mục giữa các lần lưu (nhận `id` trong `SiteMenuItemInput`); hiện `PUT` cấp id mới cho mọi mục | mới | Giữ mục đang chọn theo vị trí trong cây |
 | [x] | Menu | Ngôn ngữ được phép của menu (`AUTOXIDE_MENUS_LOCALES`) qua API | mới | Dùng danh sách ngôn ngữ của content; core vẫn kiểm |
 | [x] | Menu | Header `Deprecation` / `Sunset` trên `/content/menus…` | v0.14.0 | Lấy ngày từ header `Sunset` thật |
-| [ ] | Chuyển hướng | Tham số `q` cho `GET /content/redirects` (tìm theo đường dẫn nguồn / đích) | mới | Chỉ lọc theo nguồn như cũ (W-059) |
+| [x] | Chuyển hướng | Tham số `q` cho `GET /content/redirects` (tìm theo đường dẫn nguồn / đích) | mới | Chỉ lọc theo nguồn như cũ (W-059) — **Đã có** (17/11): `q` tìm trong đường dẫn cũ và địa chỉ đích, không phân biệt hoa thường, có dấu hay không (cột khoá tìm, như nhau trên SQLite và Postgres) |
 
 ## Tổ chức › Cây tổ chức (`/org`) và Tuân thủ (`/compliance`)
 

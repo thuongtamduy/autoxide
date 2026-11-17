@@ -403,6 +403,63 @@ impl FormsService {
         Ok(after)
     }
 
+    /// Bản sao của form `id` (trường, nguồn được gửi, câu cảm ơn, giới hạn, email nhận thông báo),
+    /// cùng nút sở hữu, ở trạng thái `closed` để không nhận bài trước khi người quản trị mở. Không
+    /// chép bài gửi. `key` bỏ trống: `<key>-copy`, trùng thì `<key>-copy-2`, `-3`… Cần `forms.read`
+    /// (đọc bản gốc) và `forms.manage` (tạo).
+    pub(crate) async fn duplicate_form(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        key: Option<String>,
+        name: Option<String>,
+    ) -> Result<Form, Error> {
+        principal.require(&FORMS_MANAGE)?;
+        let source = self.get_form(tenant, principal, id).await?;
+        let key = match key.map(|key| key.trim().to_owned()).filter(|key| !key.is_empty()) {
+            Some(key) => key,
+            None => self.free_copy_key(tenant, &source.row.key).await?,
+        };
+        let name = name
+            .map(|name| name.trim().to_owned())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| copy_name(&source.row.name));
+        let to_u32 = |value: Option<i32>| value.and_then(|value| u32::try_from(value).ok());
+        let input = FormInput {
+            org_id: source.row.org_id,
+            key: Some(key),
+            name: Some(name),
+            status: Some(FormStatus::Closed),
+            fields: Some(source.fields),
+            allowed_origins: Some(source.allowed_origins),
+            success_message: Some(source.success_message),
+            notify_emails: Some(source.notify_emails),
+            reply_to_field: Some(source.row.reply_to_field),
+            ip_limit_per_hour: Some(to_u32(source.row.ip_limit_per_hour)),
+            email_limit_per_hour: Some(to_u32(source.row.email_limit_per_hour)),
+            retention_days: Some(to_u32(source.row.retention_days)),
+        };
+        self.create_form(tenant, principal, input).await
+    }
+
+    /// Key chưa dùng cho bản sao của form `key`: `<key>-copy`, rồi `-copy-2`, `-copy-3`…
+    async fn free_copy_key(&self, tenant: &TenantContext, key: &str) -> Result<String, Error> {
+        let read = tenant.database().read();
+        for n in 1..=100 {
+            let suffix = if n == 1 { "-copy".to_owned() } else { format!("-copy-{n}") };
+            // Cắt phần gốc cho vừa `KEY_MAX` (key chỉ có chữ ASCII nên cắt theo byte an toàn) và
+            // không để `-` ở cuối phần gốc.
+            let room = KEY_MAX.saturating_sub(suffix.len());
+            let base = key.get(..room.min(key.len())).unwrap_or(key).trim_end_matches('-');
+            let candidate = format!("{base}{suffix}");
+            if !key_taken(read, tenant, &candidate, None).await? {
+                return Ok(candidate);
+            }
+        }
+        Err(key_conflict(&format!("{key}-copy")))
+    }
+
     /// Xoá form `id` cùng mọi phiên bản và mọi bài gửi của nó. Cần `forms.manage`.
     pub(crate) async fn delete_form(
         &self,
@@ -674,6 +731,14 @@ pub(crate) fn normalize_origin(raw: &str) -> Option<String> {
 /// Đích kiểm quyền của form: nút của nó, form của cả khách là nút gốc.
 pub(crate) fn form_target(tenant: &TenantContext, row: &form::Model) -> OrgTarget {
     OrgTarget::new(row.org_id.map_or(root_of(tenant.id()), OrgId::from_uuid), None)
+}
+
+/// Tên mặc định của bản sao: "<tên> (copy)", vừa `NAME_MAX` ký tự.
+fn copy_name(name: &str) -> String {
+    let suffix = " (copy)";
+    let keep = NAME_MAX.saturating_sub(suffix.chars().count());
+    let base: String = name.chars().take(keep).collect();
+    format!("{base}{suffix}")
 }
 
 #[cfg(test)]

@@ -4,16 +4,18 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
+use uuid::Uuid;
 use validator::Validate;
 
 use super::HttpState;
@@ -22,6 +24,7 @@ use super::users::UserResponse;
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(resend_verification))
+        .routes(routes!(resend_user_verification))
         .routes(routes!(change_email, cancel_email_change))
         .merge(
             // Link trong thư vẫn dùng được khi khách chỉ đọc (A-3.11).
@@ -84,6 +87,41 @@ async fn resend_verification(
     language: Language,
 ) -> Result<StatusCode, Error> {
     state.verifications.send_current(&tenant, principal.user_id(), language).await?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+/// Send the verification mail of a user again.
+///
+/// Requires `auth.users.manage`, and every permission the user has (you cannot act on someone
+/// with more power than you). For a teammate who lost or never got the mail: it goes to the
+/// user's current address (in the language of `Accept-Language`), with a token valid 24 hours.
+/// At most one mail per minute per address.
+#[utoipa::path(
+    post,
+    path = "/users/{id}/email/verification",
+    extensions(("x-permissions" = json!(["auth.users.manage"]))),
+    operation_id = "resend_user_email_verification",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the user.")),
+    responses(
+        (status = 202, description = "A verification mail is on its way to the user."),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
+        (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
+        (status = 409, description = "The address is already verified; code `auth.email_already_verified`.", body = Problem),
+    )
+)]
+async fn resend_user_verification(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    principal: Principal,
+    language: Language,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, Error> {
+    principal.require(&crate::permissions::USERS_MANAGE)?;
+    state.users.get(&tenant, id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
+    state.roles.require_covers(&tenant, &principal, id).await?;
+    state.verifications.send_current_by(&tenant, Actor::from(&principal), id, language).await?;
     Ok(StatusCode::ACCEPTED)
 }
 
@@ -271,6 +309,57 @@ mod tests {
                 call(&app, "POST", "/email-verification/confirm", None, Some(body)).await;
             assert_eq!(status, StatusCode::OK, "{changed}");
             assert_eq!(changed["data"]["email"], "bob@new.example");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Đề bài giao diện W-059: người quản trị gửi lại thư xác minh cho một người dùng; người
+    /// không có quyền bị từ chối; địa chỉ đã xác minh thì 409.
+    #[tokio::test]
+    async fn quan_tri_vien_gui_lai_thu_xac_minh() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app_with(test, false).await;
+            let root = crate::api::NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: true,
+            };
+            crate::api::Accounts::create(services.users.as_ref(), &services.tenant, root)
+                .await
+                .unwrap();
+            let admin = bearer(&app, "root@example.com", PASSWORD).await;
+            let ada = bearer(&app, "ada@example.com", PASSWORD).await;
+            let ada_id = services
+                .users
+                .find_by_email(&services.tenant, "ada@example.com")
+                .await
+                .unwrap()
+                .unwrap()
+                .id;
+            let path = format!("/users/{ada_id}/email/verification");
+            let (status, _, _) = call(&app, "POST", &path, Some(&ada), None).await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            let before = services.mails.sent.lock().unwrap().len();
+            let (status, _, body) = call(&app, "POST", &path, Some(&admin), None).await;
+            assert_eq!(status, StatusCode::ACCEPTED, "{body}");
+            let sent = services.mails.sent.lock().unwrap().clone();
+            assert_eq!(sent.len(), before + 1);
+            assert_eq!(sent.last().unwrap().to, "ada@example.com");
+
+            let body = json!({"token": token(&services)});
+            let (status, _, _) =
+                call(&app, "POST", "/email-verification/confirm", None, Some(body)).await;
+            assert_eq!(status, StatusCode::OK);
+            let (status, _, problem) = call(&app, "POST", &path, Some(&admin), None).await;
+            assert_eq!(
+                (status, problem["code"].as_str()),
+                (StatusCode::CONFLICT, Some("auth.email_already_verified"))
+            );
+            let missing = format!("/users/{}/email/verification", uuid::Uuid::now_v7());
+            let (status, _, _) = call(&app, "POST", &missing, Some(&admin), None).await;
+            assert_eq!(status, StatusCode::NOT_FOUND);
         })
         .await
         .unwrap();
