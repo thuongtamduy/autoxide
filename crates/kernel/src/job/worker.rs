@@ -601,6 +601,14 @@ async fn run_job(
         }
     }
     database.write().execute(&update).await?;
+    // Job người dùng theo dõi (bước 51 P15): xong hay hỏng hẳn thì ghi lên dòng theo dõi, nếu có.
+    match &outcome {
+        Ok(()) => crate::job::runs::finish(database.write(), job.id, None).await?,
+        Err(error) if job.attempts >= job.max_attempts => {
+            crate::job::runs::finish(database.write(), job.id, Some(error)).await?;
+        }
+        Err(_) => {}
+    }
     Ok(())
 }
 

@@ -2866,6 +2866,30 @@ export type Data_InvoicesTemplatePreview = {
 };
 
 /** Envelope of a single result. */
+export type Data_JobRunView = {
+  /** A tracked background job. */
+  data: {
+    created_at: string;
+    /** Why it failed, when `failed`. */
+    error?: string | null;
+    finished_at?: string | null;
+    id: string;
+    kind: string;
+    /** What it does, in English. */
+    label: string;
+    /** Module that runs it. */
+    module: string;
+    org_id?: string | null;
+    progress?: JobProgress | null;
+    requested_by?: string | null;
+    /** What the job produced (counts, ids, per-record results…), once it reports it. */
+    result?: unknown;
+    /** `queued`, `running`, `succeeded` or `failed`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LedgerAccountResponse = {
   /** A ledger account: one purpose, for one counterparty, in one currency, in one book. */
   data: {
@@ -4323,6 +4347,34 @@ export type Data_RoleResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SavedView = {
+  /** A saved list view. */
+  data: {
+    /** The columns shown, in order. */
+    columns: string[];
+    created_at: string;
+    /** `compact` or `comfortable`. */
+    density?: string | null;
+    group_by?: string | null;
+    id: string;
+    name: string;
+    org_id?: string | null;
+    /** Who saved it. */
+    owner: string;
+    /** The query parameters of the list (filters, `sort`, `order`). */
+    params: Record<string, unknown>;
+    /**
+     * The list, as `x-autoxide-list` of its endpoint in this document, e.g.
+     * `content.list_content_entries`.
+     */
+    resource: string;
+    /** `personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`. */
+    scope: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ScheduleResponse = {
   /** A scheduled publish or take-down. */
   data: {
@@ -5295,6 +5347,29 @@ export type Data_Vec_InvoicesExportProfile = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_JobRunView = {
+  data: {
+    created_at: string;
+    /** Why it failed, when `failed`. */
+    error?: string | null;
+    finished_at?: string | null;
+    id: string;
+    kind: string;
+    /** What it does, in English. */
+    label: string;
+    /** Module that runs it. */
+    module: string;
+    org_id?: string | null;
+    progress?: JobProgress | null;
+    requested_by?: string | null;
+    /** What the job produced (counts, ids, per-record results…), once it reports it. */
+    result?: unknown;
+    /** `queued`, `running`, `succeeded` or `failed`. */
+    status: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_LedgerExchangeRate = {
   data: {
     /** ISO 4217 code, e.g. `USD`. */
@@ -5778,6 +5853,33 @@ export type Data_Vec_RoleResponse = {
     permissions: string[];
     /** `true`: the role's permissions work only for accounts with two-step sign-in. */
     requires_mfa: boolean;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SavedView = {
+  data: {
+    /** The columns shown, in order. */
+    columns: string[];
+    created_at: string;
+    /** `compact` or `comfortable`. */
+    density?: string | null;
+    group_by?: string | null;
+    id: string;
+    name: string;
+    org_id?: string | null;
+    /** Who saved it. */
+    owner: string;
+    /** The query parameters of the list (filters, `sort`, `order`). */
+    params: Record<string, unknown>;
+    /**
+     * The list, as `x-autoxide-list` of its endpoint in this document, e.g.
+     * `content.list_content_entries`.
+     */
+    resource: string;
+    /** `personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`. */
+    scope: string;
     updated_at: string;
   }[];
 };
@@ -7094,6 +7196,33 @@ export type InvoicesTemplateVariable = {
   name: string;
   /** The template must use it. */
   required: boolean;
+};
+
+/** How far a job is. */
+export type JobProgress = {
+  done: number;
+  total: number;
+};
+
+/** A tracked background job. */
+export type JobRunView = {
+  created_at: string;
+  /** Why it failed, when `failed`. */
+  error?: string | null;
+  finished_at?: string | null;
+  id: string;
+  kind: string;
+  /** What it does, in English. */
+  label: string;
+  /** Module that runs it. */
+  module: string;
+  org_id?: string | null;
+  progress?: JobProgress | null;
+  requested_by?: string | null;
+  /** What the job produced (counts, ids, per-record results…), once it reports it. */
+  result?: unknown;
+  /** `queued`, `running`, `succeeded` or `failed`. */
+  status: string;
 };
 
 /** What an entry is. */
@@ -8438,6 +8567,28 @@ export type NewTenantDomain = {
    * `localhost` or the platform's own domain.
    */
   domain: string;
+};
+
+/** A view to save. */
+export type NewView = {
+  columns?: string[];
+  density?: string | null;
+  group_by?: string | null;
+  /** 1 to 100 characters. */
+  name: string;
+  org_id?: string | null;
+  /**
+   * Query parameters of the list; each is checked against `x-autoxide-filters` and the
+   * parameters of the endpoint.
+   */
+  params?: Record<string, unknown>;
+  /** The list, as `x-autoxide-list` of its endpoint. */
+  resource: string;
+  /**
+   * `personal` (the default), `node` (needs `org_id`) or `tenant`; the last two need
+   * `kernel.views.share`.
+   */
+  scope?: string | null;
 };
 
 /** One mail of a campaign to the person. */
@@ -12121,6 +12272,31 @@ export type SavedMenuTarget = {
   title?: string | null;
 };
 
+/** A saved list view. */
+export type SavedView = {
+  /** The columns shown, in order. */
+  columns: string[];
+  created_at: string;
+  /** `compact` or `comfortable`. */
+  density?: string | null;
+  group_by?: string | null;
+  id: string;
+  name: string;
+  org_id?: string | null;
+  /** Who saved it. */
+  owner: string;
+  /** The query parameters of the list (filters, `sort`, `order`). */
+  params: Record<string, unknown>;
+  /**
+   * The list, as `x-autoxide-list` of its endpoint in this document, e.g.
+   * `content.list_content_entries`.
+   */
+  resource: string;
+  /** `personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`. */
+  scope: string;
+  updated_at: string;
+};
+
 /** A new schedule. */
 export type ScheduleRequest = {
   action: Action;
@@ -13765,6 +13941,17 @@ export type VerificationConfirmation = {
 /** The answer to an address confirmation. */
 export type VerifiedResponse = {
   verified: boolean;
+};
+
+/** Changes to a saved view; omitted fields stay as they are. */
+export type ViewChanges = {
+  columns?: string[] | null;
+  /** `""` clears it. */
+  density?: string | null;
+  /** `""` clears it. */
+  group_by?: string | null;
+  name?: string | null;
+  params?: Record<string, unknown> | null;
 };
 
 /** Who may load the content without signing in. */
@@ -17476,6 +17663,44 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/jobs": {
+    /** List background jobs. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; kind?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_JobRunView;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/jobs/{id}": {
+    /** Get a background job. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_JobRunView;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/jobs/{id}/retry": {
+    /** Run a failed background job again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_JobRunView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/modules": {
     /** List the installed modules. */
     get: {
@@ -18483,6 +18708,56 @@ export interface paths {
       responses: {
         200: Data_Vec_MyPermission;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/views": {
+    /** List my saved views. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { resource?: string }; };
+      responses: {
+        200: Data_Vec_SavedView;
+        401: Problem;
+        default: Problem;
+      };
+    };
+    /** Save a list view. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewView;
+      responses: {
+        201: Data_SavedView;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/views/{id}": {
+    /** Change a saved view. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ViewChanges;
+      responses: {
+        200: Data_SavedView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a saved view. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

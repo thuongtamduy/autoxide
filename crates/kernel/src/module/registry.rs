@@ -617,13 +617,21 @@ impl Modules {
     pub fn routes(&self) -> Vec<(&'static str, OpenApiRouter)> {
         let mut routes: Vec<(&'static str, OpenApiRouter)> =
             self.modules.iter().map(|module| (module.name(), module.routes())).collect();
+        // Schema bộ lọc (P7): sinh từ tham số của từng endpoint danh sách, gắn vào OpenAPI và giữ
+        // lại để kiểm view đã lưu.
+        let mut lists = Vec::new();
+        for (name, router) in &mut routes {
+            lists.extend(crate::ops::views::annotate(name, router.get_openapi_mut()));
+        }
         if let Some(flags) = self.user_flags.get() {
             let mine = crate::ops::my_permissions::MyPermissions {
                 catalog: self.permissions.clone(),
                 translations: self.translations.clone(),
             };
-            let me =
-                crate::user_flags::routes(flags).merge(crate::ops::my_permissions::routes(mine));
+            let views = crate::ops::views::ViewsState { lists: crate::ops::views::schemas(lists) };
+            let me = crate::user_flags::routes(flags)
+                .merge(crate::ops::my_permissions::routes(mine))
+                .merge(crate::ops::views::routes(views));
             routes.push((crate::user_flags::ME, me));
         }
         routes
