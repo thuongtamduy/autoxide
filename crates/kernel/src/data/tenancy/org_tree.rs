@@ -374,6 +374,29 @@ impl OrgTree {
         Ok(())
     }
 
+    /// Mọi cặp (tổ tiên, con cháu) của cây của khách, kể cả cặp tự trỏ của mỗi nút — cho phép tính
+    /// gộp theo cây trong bộ nhớ bằng một câu (vd số người làm được ở mỗi nút). Số dòng = số nút ×
+    /// độ sâu trung bình.
+    pub async fn pairs<C: ConnectionTrait>(
+        connection: &C,
+        tenant: TenantId,
+    ) -> Result<Vec<(OrgId, OrgId)>, Error> {
+        let rows: Vec<(Uuid, Uuid)> = closure::Entity::find()
+            .select_only()
+            .column(closure::Column::AncestorId)
+            .column(closure::Column::DescendantId)
+            .filter(closure::Column::TenantId.eq(tenant.as_uuid()))
+            .into_tuple()
+            .all(connection)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(ancestor, descendant)| {
+                (OrgId::from_uuid(ancestor), OrgId::from_uuid(descendant))
+            })
+            .collect())
+    }
+
     /// Điều kiện SeaORM "cột `column` là một nút trong nhánh của một trong `roots`": `column IN
     /// (SELECT descendant_id FROM kernel_org_closure WHERE tenant_id = … AND ancestor_id IN …)`.
     /// Một subquery có index, không đổ danh sách ID ra bộ nhớ.

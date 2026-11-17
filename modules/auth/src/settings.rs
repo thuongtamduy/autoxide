@@ -11,6 +11,7 @@ pub(crate) const CUSTOMER_REGISTRATION: OrgSetting = OrgSetting::new(
      (`POST /api/v1/auth/register` with `realm: customer`). Read at the root unit.",
 )
 .with_default("true")
+.with_schema(r#"{"type":"boolean"}"#)
 .checked(boolean);
 
 /// Khách cho nhân sự nền tảng vào dữ liệu để hỗ trợ (bước 34 mục 13, D-211); tắt thì chỉ yêu cầu
@@ -22,6 +23,7 @@ pub(crate) const SUPPORT_ACCESS: OrgSetting = OrgSetting::new(
      the root unit.",
 )
 .with_default("true")
+.with_schema(r#"{"type":"boolean"}"#)
 .checked(boolean);
 
 pub(crate) fn all() -> Vec<OrgSetting> {

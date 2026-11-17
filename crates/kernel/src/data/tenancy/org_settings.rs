@@ -24,6 +24,9 @@ pub struct OrgSetting {
     /// Giá trị mặc định, viết dạng JSON (vd `"\"UTC\""`).
     default: Option<&'static str>,
     check: Option<OrgSettingCheck>,
+    /// Dạng giá trị, viết dạng JSON Schema (vd `{"type":"boolean"}`): giao diện dựng ô nhập đúng
+    /// loại. Bộ kiểm vẫn là nơi quyết định giá trị hợp lệ.
+    schema: Option<&'static str>,
 }
 
 impl std::fmt::Debug for OrgSetting {
@@ -35,7 +38,7 @@ impl std::fmt::Debug for OrgSetting {
 impl OrgSetting {
     /// Cài đặt `key` (`<module>.<tên>`), mô tả tiếng Anh cho người quản trị.
     pub const fn new(key: &'static str, description: &'static str) -> Self {
-        OrgSetting { key, description, default: None, check: None }
+        OrgSetting { key, description, default: None, check: None, schema: None }
     }
 
     /// Giá trị mặc định khi không nút nào đặt, viết dạng JSON: `.with_default("\"UTC\"")`.
@@ -48,6 +51,18 @@ impl OrgSetting {
     pub const fn checked(mut self, check: OrgSettingCheck) -> Self {
         self.check = Some(check);
         self
+    }
+
+    /// Dạng giá trị viết bằng JSON Schema, cho giao diện dựng ô nhập:
+    /// `.with_schema(r#"{"type":"boolean"}"#)`. Phải là object có `type`; mặc định phải khớp `type`.
+    pub const fn with_schema(mut self, json: &'static str) -> Self {
+        self.schema = Some(json);
+        self
+    }
+
+    /// JSON Schema của giá trị; `None` khi module không khai.
+    pub fn schema(&self) -> Option<Value> {
+        self.schema.and_then(|json| serde_json::from_str(json).ok())
     }
 
     pub fn key(&self) -> &'static str {
@@ -143,8 +158,42 @@ pub(crate) fn declaration_problems(
                 )),
             }
         }
+        if let Some(json) = setting.schema {
+            problems.extend(schema_problem(key, json, setting.default_value()));
+        }
     }
     problems
+}
+
+/// Schema phải là object JSON có `type` thuộc các kiểu JSON Schema; mặc định (nếu có) khớp `type`.
+fn schema_problem(key: &str, json: &str, default: Option<Value>) -> Option<String> {
+    let schema = serde_json::from_str::<Value>(json).ok();
+    let kind = schema.as_ref().and_then(|schema| schema.get("type")).and_then(Value::as_str);
+    let Some(kind) = kind else {
+        return Some(format!(
+            "the schema of organization setting `{key}` must be a JSON object with a `type`: {json}"
+        ));
+    };
+    let matches = |value: &Value| match kind {
+        "string" => value.is_string(),
+        "boolean" => value.is_boolean(),
+        "integer" => value.is_i64() || value.is_u64(),
+        "number" => value.is_number(),
+        "array" => value.is_array(),
+        "object" => value.is_object(),
+        _ => false,
+    };
+    if !["string", "boolean", "integer", "number", "array", "object"].contains(&kind) {
+        return Some(format!(
+            "the schema of organization setting `{key}` has an unknown type `{kind}`"
+        ));
+    }
+    match default {
+        Some(value) if !matches(&value) => Some(format!(
+            "the default of organization setting `{key}` is not of the schema's type `{kind}`"
+        )),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -172,9 +221,18 @@ mod tests {
             OrgSetting::new("shop.empty", " "),
             OrgSetting::new("shop.json", "Bad JSON.").with_default("{"),
             OrgSetting::new("shop.check", "Bad default.").with_default("1").checked(upper),
+            OrgSetting::new("shop.schema", "Schema without type.").with_schema("{}"),
+            OrgSetting::new("shop.kind", "Default of another type.")
+                .with_default("1")
+                .with_schema(r#"{"type":"boolean"}"#),
         ];
         let problems = declaration_problems("shop", &bad, &mut seen);
-        assert_eq!(problems.len(), 5, "{problems:#?}");
+        assert_eq!(problems.len(), 7, "{problems:#?}");
+        let typed = OrgSetting::new("shop.flag", "Flag.")
+            .with_default("true")
+            .with_schema(r#"{"type":"boolean"}"#);
+        assert!(declaration_problems("shop", &[typed], &mut Vec::new()).is_empty());
+        assert_eq!(typed.schema(), Some(serde_json::json!({"type": "boolean"})));
         let catalog = OrgSettingCatalog::new(vec![bad[4], good]);
         let keys: Vec<&str> = catalog.iter().map(OrgSetting::key).collect();
         assert_eq!(keys, ["shop.check", "shop.code"]);

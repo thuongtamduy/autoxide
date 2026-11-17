@@ -295,6 +295,26 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Count the people of every organization unit: `direct` (memberships on the unit) and `total` (on the unit or a unit above it).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "auth.count_memberships",
+      "output_schema": null,
+      "permissions": [
+        "auth.users.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": true

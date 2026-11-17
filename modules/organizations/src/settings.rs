@@ -26,6 +26,7 @@ pub(crate) const TIMEZONE: OrgSetting = OrgSetting::new(
      reminders use it.",
 )
 .with_default("\"UTC\"")
+.with_schema(r#"{"type":"string","format":"iana-time-zone","examples":["Asia/Ho_Chi_Minh"]}"#)
 .checked(time_zone);
 
 /// Tiền tệ của nút (ISO 4217).
@@ -33,6 +34,7 @@ pub(crate) const CURRENCY: OrgSetting = OrgSetting::new(
     "organizations.currency",
     "Currency of the unit (ISO 4217 code, e.g. `VND`): prices and amounts are in it.",
 )
+.with_schema(r#"{"type":"string","pattern":"^[A-Z]{3}$","examples":["VND"]}"#)
 .checked(currency);
 
 /// Ngôn ngữ của nút (thư gửi khách, giao diện mặc định).
@@ -42,6 +44,7 @@ pub(crate) const LANGUAGE: OrgSetting = OrgSetting::new(
      language.",
 )
 .with_default("\"en\"")
+.with_schema(r#"{"type":"string","enum":["en","vi"]}"#)
 .checked(language);
 
 /// Ngôn ngữ website của nút đưa ra (D-307): `content`, `menus` đọc qua `OrgDirectory::setting`.
@@ -51,6 +54,7 @@ pub(crate) const LANGUAGES: OrgSetting = OrgSetting::new(
      (e.g. `[\"vi\", \"en\"]`). Unset: the tenant's languages. Content written in other languages \
      is not shown on that website.",
 )
+.with_schema(r#"{"type":"array","items":{"type":"string"},"minItems":1,"uniqueItems":true}"#)
 .checked(languages);
 
 pub(crate) fn all() -> Vec<OrgSetting> {

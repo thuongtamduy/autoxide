@@ -3596,6 +3596,20 @@ export type Data_Vec_LimitUse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_MemberCountResponse = {
+  data: {
+    /** People with a membership on this unit itself (each person once, whatever their roles). */
+    direct: number;
+    org_id: string;
+    /**
+     * People with a membership on this unit or on a unit above it — the people
+     * `GET /api/v1/auth/memberships?org_id=…&inherited=true` lists.
+     */
+    total: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_MembershipResponse = {
   data: {
     /** The unit; the root unit has the id of the tenant. */
@@ -3940,6 +3954,12 @@ export type Data_Vec_SettingResponse = {
     description: string;
     /** `<module>.<name>`, e.g. `organizations.timezone`. */
     key: string;
+    /**
+     * The shape of the value as a JSON Schema (`type`: `string`, `boolean`, `integer`, `number`,
+     * `array` or `object`, with `enum`, `pattern`, `items`… where they apply), for building the
+     * right input; `null` when the module does not say. The server checks every value anyway.
+     */
+    schema?: Record<string, unknown> | null;
   }[];
 };
 
@@ -4933,6 +4953,18 @@ export type MediaItemResponse = {
   visibility: Visibility;
   /** Width in pixels; only for raster images (JPEG, PNG, GIF, WebP, AVIF). */
   width?: number | null;
+};
+
+/** How many people work in one organization unit. */
+export type MemberCountResponse = {
+  /** People with a membership on this unit itself (each person once, whatever their roles). */
+  direct: number;
+  org_id: string;
+  /**
+   * People with a membership on this unit or on a unit above it — the people
+   * `GET /api/v1/auth/memberships?org_id=…&inherited=true` lists.
+   */
+  total: number;
 };
 
 /** The roles to give in one unit. */
@@ -7975,6 +8007,12 @@ export type SettingResponse = {
   description: string;
   /** `<module>.<name>`, e.g. `organizations.timezone`. */
   key: string;
+  /**
+   * The shape of the value as a JSON Schema (`type`: `string`, `boolean`, `integer`, `number`,
+   * `array` or `object`, with `enum`, `pattern`, `items`… where they apply), for building the
+   * right input; `null` when the module does not say. The server checks every value anyway.
+   */
+  schema?: Record<string, unknown> | null;
 };
 
 /** A new value for a setting. */
@@ -9850,6 +9888,18 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/memberships/counts": {
+    /** Count the people of every organization unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_MemberCountResponse;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };

@@ -196,7 +196,8 @@ họ), `subtree` (nút của họ và mọi nút bên dưới) hay `tenant` (m�
   lấy nút duy nhất của họ (hay gốc khi phạm vi là toàn khách), và bắt họ chọn khi họ làm ở nhiều nút.
 - **Cài đặt kế thừa theo cây** (múi giờ, tiền tệ, ngôn ngữ, chính sách của module): khai trong
   `Module::org_settings` — `OrgSetting::new("shop.return_days", "…").with_default("30")
-  .checked(check)`, key mang tiền tố của module, mặc định và hàm kiểm theo JSON. Module
+  .with_schema(r#"{"type":"integer","minimum":0}"#).checked(check)`, key mang tiền tố của module,
+  mặc định và hàm kiểm theo JSON; schema cho giao diện biết dựng ô nhập loại nào. Module
   `organizations` lưu giá trị (`PUT /api/v1/organizations/units/{id}/settings/{key}`, permission
   `organizations.settings.write`) và trả giá trị hiệu lực ở một nút — nút gần nhất trên chuỗi có
   đặt, không có thì mặc định — qua `OrgDirectory::setting(tenant, unit, key)`. Không chép các giá
