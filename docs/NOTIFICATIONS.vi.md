@@ -78,6 +78,16 @@ bên nào (test dùng bản giả). Không có bên gửi thì kênh bị bỏ q
 (khoá `auth` của trình duyệt, token thiết bị) được lưu đã mã hoá. Dịch vụ đẩy báo đăng ký hay token đã
 mất thì nó bị xoá.
 
+Đẩy di động: ứng dụng đăng ký token FCM / APNs bằng `POST /me/device-tokens`
+(`{"platform": "android", "token": "…", "app_id": "com.example.shop"}`; đăng ký lại cùng token thì cập
+nhật), xem các thiết bị của người dùng bằng `GET /me/device-tokens` (không bao giờ trả token) và gỡ một
+thiết bị bằng `DELETE /me/device-tokens/{id}`. Đẩy di động theo cùng luật như web push: tuỳ chọn nhận theo
+loại, tin quảng cáo cần đồng ý (kênh `push` trong sổ đồng ý) và trong khung giờ của
+`notifications.send_windows` (khoá `push`). Token nhà cung cấp báo đã mất hay từ chối bị xoá ngay; token
+lỗi 10 lần liên tiếp cũng bị xoá. Module nhà cung cấp cài trait `MobilePushSender` của kernel; bộ nối
+Firebase Cloud Messaging và Apple Push Notification service cần khoá của nhà cung cấp, không có trong bản
+này.
+
 ## Cho người dùng: hộp thư và tuỳ chọn
 
 - `GET /me/inbox` (một trang, `unread=true` để chỉ lấy tin chưa đọc), `GET /me/inbox/unread-count`,
@@ -103,7 +113,8 @@ Thông báo của nền tảng chạy nền, mỗi lượt 50 khách, tới hộ
 quá hạn, và mỗi tháng một lần khi dùng tới 80% một hạn mức.
 
 Tool MCP: `notifications.list_kinds`, `notifications.send_notification`, `notifications.list_messages`,
-`notifications.list_my_inbox`, `notifications.mark_inbox_read`, `notifications.get_template_schema`,
+`notifications.list_my_inbox`, `notifications.mark_inbox_read`, `notifications.list_my_devices`,
+`notifications.get_template_schema`,
 `notifications.preview_template`, `notifications.update_template_draft`.
 
 ## Mẫu do khách tự soạn

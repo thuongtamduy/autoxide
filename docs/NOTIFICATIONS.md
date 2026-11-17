@@ -82,6 +82,16 @@ release ships none (tests use fakes). Without a provider the channel is skipped 
 Push secrets (the browser's `auth` key, device tokens) are stored encrypted. When a push service says a
 subscription or token is gone, it is removed.
 
+Mobile push: the app registers its FCM / APNs token with `POST /me/device-tokens`
+(`{"platform": "android", "token": "…", "app_id": "com.example.shop"}`; registering the same token again
+updates it), lists the person's devices with `GET /me/device-tokens` (the token is never returned) and
+removes one with `DELETE /me/device-tokens/{id}`. Mobile push follows the same rules as web push:
+preferences per kind, advertising only with a consent (channel `push` in the consent ledger) and inside
+the allowed hours of `notifications.send_windows` (key `push`). A token the provider reports as gone or
+rejects is removed at once; a token that fails 10 times in a row is removed too. A provider module
+implements the kernel trait `MobilePushSender`; Firebase Cloud Messaging and Apple Push Notification
+service connectors need the provider's keys and are not part of this release.
+
 ## For people: inbox and preferences
 
 - `GET /me/inbox` (page, `unread=true` for unread only), `GET /me/inbox/unread-count`,
@@ -107,7 +117,8 @@ admin; running it again never sends twice. `category` is `transactional` (admins
 suspended or past due, and once a month when they use 80% of a limit.
 
 MCP tools: `notifications.list_kinds`, `notifications.send_notification`, `notifications.list_messages`,
-`notifications.list_my_inbox`, `notifications.mark_inbox_read`, `notifications.get_template_schema`,
+`notifications.list_my_inbox`, `notifications.mark_inbox_read`, `notifications.list_my_devices`,
+`notifications.get_template_schema`,
 `notifications.preview_template`, `notifications.update_template_draft`.
 
 ## Templates written by the tenant

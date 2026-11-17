@@ -39,7 +39,7 @@ pub(crate) fn routes(service: Arc<NotificationsService>) -> OpenApiRouter {
         .routes(routes!(my_preferences, set_my_preferences))
         .routes(routes!(add_push_subscription))
         .routes(routes!(remove_push_subscription))
-        .routes(routes!(add_device_token))
+        .routes(routes!(list_device_tokens, add_device_token))
         .routes(routes!(remove_device_token))
         .routes(routes!(web_push_key))
         .routes(routes!(unsubscribe))
@@ -540,6 +540,29 @@ impl From<device_token::Model> for DeviceTokenResponse {
             last_used_at: row.last_used_at,
         }
     }
+}
+
+/// List your registered mobile devices.
+///
+/// Any signed-in user, for their own devices. Tokens are stored encrypted and never returned.
+#[utoipa::path(
+    get,
+    path = "/me/device-tokens",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "list_my_device_tokens",
+    security(("bearer" = [])),
+    responses(
+        (status = 200, description = "Your devices, newest first.", body = Data<Vec<DeviceTokenResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+    )
+)]
+async fn list_device_tokens(
+    State(service): State<Arc<NotificationsService>>,
+    tenant: TenantContext,
+    principal: Principal,
+) -> Result<Data<Vec<DeviceTokenResponse>>, Error> {
+    let rows = service.my_device_tokens(&tenant, &principal).await?;
+    Ok(Data { data: rows.into_iter().map(DeviceTokenResponse::from).collect() })
 }
 
 /// Register this mobile device for push notifications.

@@ -7557,6 +7557,18 @@ export type Data_Vec_MyTenantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_NotificationDeviceToken = {
+  data: {
+    app_id: string;
+    created_at: string;
+    id: string;
+    last_used_at?: string | null;
+    locale?: string | null;
+    platform: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_NotificationKindInfo = {
   data: {
     category: NotificationCategory;
@@ -23354,6 +23366,15 @@ export interface paths {
     };
   };
   "/api/v1/notifications/me/device-tokens": {
+    /** List your registered mobile devices. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_NotificationDeviceToken;
+        401: Problem;
+        default: Problem;
+      };
+    };
     /** Register this mobile device for push notifications. */
     post: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };

@@ -16,7 +16,7 @@ use validator::Validate;
 use crate::api::Notification;
 use crate::custom::Source;
 use crate::http_admin::{MessageResponse, RecipientRequest};
-use crate::http_me::{InboxItem, KindResponse, describe_kind};
+use crate::http_me::{DeviceTokenResponse, InboxItem, KindResponse, describe_kind};
 use crate::http_templates::{
     DraftRequest, DraftResponse, PreviewResponse, SchemaResponse, describe_schema, parse_source,
 };
@@ -147,7 +147,22 @@ pub(crate) fn all(service: &Arc<NotificationsService>) -> Vec<Tool> {
     let (kinds, send, messages, inbox, read) =
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
     let (schema, preview, draft) = (service.clone(), service.clone(), service.clone());
+    let devices = service.clone();
     vec![
+        Tool::new(
+            "list_my_devices",
+            "List your mobile devices registered for push notifications (platform, app, last use); \
+             tokens are never shown.",
+            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+                let service = devices.clone();
+                async move {
+                    let rows = service.my_device_tokens(&tenant, &principal).await?;
+                    Ok::<Vec<DeviceTokenResponse>, Error>(rows.into_iter().map(DeviceTokenResponse::from).collect())
+                }
+            },
+        )
+        .for_any_signed_in()
+        .read_only(),
         Tool::new(
             "get_template_schema",
             "Show the variables a notification template of a kind may use (`{{ path }}`), which are \

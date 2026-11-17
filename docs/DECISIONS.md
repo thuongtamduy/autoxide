@@ -9042,3 +9042,20 @@ Căn cứ (cần đối chiếu văn bản gốc / người có chuyên môn ph�
    đo trước khi tối ưu.
 7. Mục "(thấp) báo cáo đã lưu và lịch gửi qua email (A-b10)" **không làm ở bước này**: nó dùng phần xuất chung của bước 51 (D-213),
    phần đó chưa có báo cáo đã lưu; làm cùng bước 51 / 38.
+
+## D-367 · Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17 — agent quyết
+
+Bối cảnh: mục cuối của bước 37. Trait `MobilePushSender` (kernel) và bản giả (testkit) có từ D-348; `notifications` đã có bảng
+`notifications_device_tokens` (token mã hoá bằng `Sealer`, `token_key` SHA-256), `POST` / `DELETE /me/device-tokens`, gửi qua trait,
+xoá token khi nhà cung cấp trả `Gone`, cùng luật đồng ý (kênh `push`) và khung giờ (`notifications.send_windows`, khoá `push`) như web
+push.
+
+1. Thêm `GET /me/device-tokens` và tool MCP `notifications.list_my_devices` (chỉ đọc, chỉ thiết bị của chính mình, không trả token).
+2. Dọn token hỏng: lỗi vĩnh viễn của nhà cung cấp (`Validation` / `BadRequest` / `NotFound` / `Forbidden` — token sai dạng, sai app)
+   → xoá ngay (lý do `invalid`); lỗi tạm thời → tăng `failures`, gửi được thì về 0, 10 lần liên tiếp → xoá (lý do `failing`). Một thiết
+   bị lỗi không làm hỏng việc gửi tới thiết bị khác; không thiết bị nào nhận mà có lỗi tạm thời → trả lỗi để job queue thử lại.
+   Event `notifications.push_subscription_removed` mang lý do.
+3. **Không dựng** bộ nối Firebase Cloud Messaging / Apple Push Notification service: cần khoá của nhà cung cấp (CLAUDE.md "chỉ dừng lại
+   hỏi khi cần secret thật"); là module riêng cài `MobilePushSender`, làm khi chủ dự án cấp khoá.
+4. Đóng bước 37: mọi mục `[x]`, chuyển sang `docs/roadmap/done.md` như bước 35 / 36. Còn lại có ghi: báo cáo đã lưu (A-b10) dời sang
+   bước 51 / 38 (D-366); bộ nối thật (SMS brandname, Zalo ZNS, web push VAPID, FCM / APNs, VNeID / eKYC) chờ khoá của nhà cung cấp.

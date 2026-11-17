@@ -4,8 +4,8 @@ Mỗi bước xong khi `./gate.sh --quick` xanh; agent đánh dấu `[x]`, commi
 và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–36 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **kế tiếp bước
-37**; bước 50 chờ chủ dự án công khai repo (D-199); bản
+Trạng thái: **bước 0–37 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **kế tiếp bước
+40**; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
@@ -63,83 +63,6 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
 ## Giai đoạn A — Hợp đồng và nền lõi
-
-## 37. Tuân thủ pháp luật Việt Nam (D-186)
-
-Đặc tả: [`docs/steps/37-compliance.md`](steps/37-compliance.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Thiết kế: trụ 5 và mục 4 (đăng ký Bộ Công Thương). Bắt đầu SAU bước 34. Mỗi mục ghi căn cứ pháp lý
-trong quyết định của nó; quy định hay đổi để dạng dữ liệu có ngày hiệu lực.
-
-- [x] Định danh (KYC): hồ sơ cá nhân / tổ chức, `IdentityVerifier` (VNeID qua nhà cung cấp, eKYC), trạng thái,
-      hạn, `needs_info`, lưu tối thiểu (kết quả, mã tham chiếu; hạn chế ảnh giấy tờ, sinh trắc học); người bán,
-      livestream, tiếp thị liên kết chưa xác thực bị chặn bán / phát (Luật TMĐT 122/2025 Điều 17, từ 01/7/2026)
-      — module `compliance` (D-347): `dyn KycGate`, quy tắc `kyc.required_activities` là dữ liệu có ngày hiệu lực;
-      nhà cung cấp thật (VNeID / eKYC) là module riêng cắm `IdentityVerifier`, hiện chỉ có bản giả
-- [x] Hồ sơ pháp lý website và logo Bộ Công Thương: hồ sơ chủ sở hữu theo khách và theo người bán; loại website
-      theo tên miền (bán hàng → thông báo, logo xanh; sàn / trung gian → đăng ký, logo đỏ); danh sách kiểm là dữ
-      liệu có phiên bản, API và `autoxide doctor` báo thứ còn thiếu — D-357: `/legal-profiles`, `/websites`, trang gắn
-      website, quy tắc `moit.checklist.sales|platform`, `ComplianceFacts` / `LegalProfiles`, `compliance.moit_readiness`
-- [x] Bộ hồ sơ Bộ Công Thương: xuất bộ hồ sơ (dữ liệu tờ khai, nháp đề án, quy chế); lưu trạng thái và đoạn mã
-      logo, endpoint công khai trả về cho giao diện; đối chiếu "bán trước khi thông báo website" bị cấm hay bị
-      phạt rồi mới chọn chặn hay nhãn (A-3.5) — D-357: `/websites/{id}/dossier`, `/websites/{id}/status` (đoạn mã logo
-      đọc chặt, dựng lại), `/public/badge`, `/public/owner`; D-358: nhãn, không chặn (cần đối chiếu văn bản gốc)
-- [x] Trang bắt buộc có mẫu (`content`): thông tin chủ sở hữu, chính sách dữ liệu cá nhân, đổi trả, vận chuyển,
-      thanh toán, kiểm hàng, giải quyết khiếu nại, điều khoản; sàn thêm quy chế, mẫu hợp đồng với người bán,
-      thông tin người bán trên trang sản phẩm (EN + VI, ghi rõ cần người có chuyên môn pháp lý duyệt)
-      — D-359: `GET /content/templates`, `POST /content/templates/{key}/drafts` (biến từ `LegalProfiles` của
-      `compliance`, bộ dựng mẫu của kernel, chỉ vào text node), `content::api::PublishedEntries` (chưa có bên dùng)
-- [x] Báo vi phạm sở hữu trí tuệ / hàng giả: tiếp nhận → ẩn → phản hồi của người bị báo → quyết định, có hạn xử
-      lý, lưu vết; kênh khiếu nại của sàn; cung cấp thông tin người bán khi cơ quan có thẩm quyền yêu cầu (có
-      audit) — D-363: `/cases` (+ `/restrict`, `/restore`, `/decision`, `/close`), `/respondent/cases`, `/public/reports`,
-      `/public/cases/{id}`, `/disclosures`; quy tắc `cases.deadlines` (ngày làm việc), lịch `compliance.case_deadlines`; ẩn đích qua
-      hợp đồng kernel `autoxide_kernel::moderation` (`content` trả 451, `comments` ẩn); chưa gửi thư cho bên bị phản ánh
-- [x] Xác thực tài khoản đăng nội dung (NĐ 147/2024): cờ "đã xác thực số điện thoại / định danh", khách bật cho
-      bình luận, đánh giá, livestream; mã một lần qua `SmsSender` (SMS brandname, D-190) + bản giả; đăng ký
-      `PostingVerifier` (D-202) cho `comments` (`AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`) dùng trạng thái thật
-      — D-356: `/me/verification`, `/me/phone-verifications` (+ `/confirm`), `DELETE /me/phone`, `PostingGate` /
-      `AccountVerification`, mức định danh đọc từ KYC; chưa có bộ nối SMS brandname thật (chỉ bản giả)
-- [x] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn lưu theo
-      loại dữ liệu; nơi lưu theo khách (chọn lưu tại VN); sự cố có mốc 72 giờ từ khi phát hiện trong sổ tay vận
-      hành, kèm bản nháp thông báo; sổ yêu cầu của chủ thể qua kênh khác, hạn là dữ liệu (D-217, cần đối chiếu)
-      — D-360: `/purposes`, `/retention` (`Module::retention` + `RetentionCatalog` ở kernel), `/processing-register`,
-      `/residency` (cột kernel, `autoxide placement country`, `tenant_residency_violation` khi đặt / dời), `/incidents`
-      (nhắc 15 phút, bản nháp), `/subject-requests` (+ `/fulfil`); xoá tài khoản xoá số điện thoại, bản xuất có phần
-      `compliance`; còn: `Module::retention` cho `audit`, `webhooks`, `newsletter`
-- [x] Văn bản pháp lý có phiên bản (D-190; Luật Giao dịch điện tử 20/2023): điều khoản, chính sách dữ liệu cá
-      nhân, quy chế sàn, hợp đồng người bán, điều kiện giao dịch chung — số phiên bản, ngày hiệu lực; ai chấp
-      nhận bản nào, lúc nào, kênh nào; chấp nhận lại khi cần; số người chấp nhận theo phiên bản — `compliance`
-      (D-347): bản đã đăng không đổi, SHA-256 của bản chấp nhận, `dyn AcceptanceGate`
-- [x] Bảo vệ người tiêu dùng (D-190; Luật 19/2023/QH15 + NĐ 55/2024, từ 01/7/2024): nền tảng không chặn, không
-      ẩn đánh giá trái quy định; minh bạch điều kiện giao dịch chung; kênh tiếp nhận và hạn xử lý khiếu nại của
-      người tiêu dùng — cần đối chiếu văn bản gốc từng điều — D-364: `ModerationPolicy` + `moderation.hide_reasons`,
-      `/public/moderation-reasons`, `/public/complaints` (gửi + kênh), vụ việc `consumer_complaint`; bước 45 dùng cho đánh giá
-- [x] Gắn nhãn nội dung do AI tạo (D-190; Luật Trí tuệ nhân tạo 134/2025/QH15, từ 01/3/2026, và nghị định hướng
-      dẫn — cần đối chiếu): nội dung tạo hay sửa từ gợi ý AI mang `ai_assisted`, API trả về để giao diện gắn
-      nhãn khi công khai — D-362: `content` `ai_assisted` (bỏ nhãn cần `content.publish`), `media` `alt_ai_assisted`, trả ở
-      API quản trị, xem trước, công khai và MCP
-- [x] Module nền `notifications` (D-194, D-348): kênh email, SMS, Zalo ZNS (trait), web push, đẩy di động, trong ứng
-      dụng; mẫu theo i18n và theo khách; tuỳ chọn nhận của người dùng; hộp thư, nhật ký gửi, REST + MCP — bộ gửi ZNS,
-      web push (VAPID) và đẩy di động (FCM / APNs) mới có trait ở kernel và bản giả ở testkit (bộ nối thật cần khoá của
-      nhà cung cấp — hỏi chủ dự án khi làm); `newsletter` trên sổ đồng ý chung và mẫu động D-206: mục dưới (D-365, D-366);
-      (thấp) báo cáo đã lưu và lịch gửi qua email (A-b10) dời sang bước 51 / 38 vì cần phần xuất chung (D-366)
-- [x] Tách tin giao dịch và tin quảng cáo (NĐ 91/2020 — cần đối chiếu bản thay thế đang dự thảo; D-348): tin quảng cáo
-      chỉ gửi khi đã đồng ý trước (kiểm lại ngay trước khi gửi), rút đồng ý là huỷ tin đang chờ; khung giờ gửi và nhãn
-      `QC` là quy tắc có ngày hiệu lực (`notifications.send_windows`, `notifications.marketing_labels`); chỉ một tin
-      mời đăng ký đầu tiên; email quảng cáo có `List-Unsubscribe` và link rút đồng ý
-- [x] Mẫu mail, thông báo khách tự soạn (D-206): bộ dựng mẫu an toàn ở kernel (biến, điều kiện, vòng lặp, giới
-      hạn chạy, luôn thoát HTML, kiểm biến theo schema khi lưu); mail HTML khung MJML có thương hiệu khách + bản
-      chữ thuần; nháp / xuất bản / quay lại, xem trước, gửi thử tới chính người gọi; `newsletter` cá nhân hoá
-      — bộ dựng mẫu ở kernel (D-351); D-365: `/templates/{kind}/{channel}/{locale}/draft|publish|versions|rollback|published|
-      preview|test-send`, `/kinds/{kind}/schema`, `/branding`, khung MJML (`mrml`) cho mọi email; D-366: `newsletter` trên sổ
-      đồng ý chung (`ledger_state`, lịch `newsletter.backfill_consents`, hỏi sổ mỗi lô), chiến dịch `format = template`
-- [x] Mã theo dõi quảng cáo và đồng ý cookie (D-235): nhà cung cấp cho sẵn (GA4, GTM, Google Ads, Meta, TikTok,
-      Zalo), khách chỉ điền mã ID; banner đồng ý theo nhóm, từ chối dễ như đồng ý, không tải gì trước khi đồng ý;
-      bằng chứng đồng ý ẩn danh; nhà cung cấp tự vào danh sách bên nhận dữ liệu; tải sau, không chặn hiển thị
-      — D-361: `/tracking-tags`, `/cookie-settings/{org_id}`, `/public/consent-config` (chỉ trả mã của nhóm đã đồng ý),
-      `/public/cookie-consents`; gắn vào `/public/site` khi bước 67 có `SiteExtensions`
-- [ ] Kênh đẩy cho ứng dụng di động (D-220): trait `MobilePushSender` (Firebase / Apple là module riêng, cần
-      khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push
 
 ## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
 

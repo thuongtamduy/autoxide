@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, mobile push (`docs/NOTIFICATIONS.md`): `GET /api/v1/notifications/me/device-tokens` lists your registered
+  devices (tokens are stored encrypted and never returned) and the MCP tool `notifications.list_my_devices`; a device token
+  the provider rejects is removed at once, one that fails 10 times in a row too, and one failing device no longer blocks the
+  others. Firebase Cloud Messaging / Apple Push Notification service connectors still need the provider's keys. Step 37 is
+  complete. Decision D-367.
 - Step 37, the newsletter on the shared consent ledger of `compliance` (`docs/NEWSLETTER.md`): every confirmed subscription
   is a consent (`marketing`, scope `newsletter.list:<id>`, channel `email`) and unsubscribing withdraws it; withdrawing in
   `compliance` unsubscribes; each batch asks the ledger again and skips people without consent (`consent_withdrawn`, no

@@ -217,6 +217,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `notifications.get_template_schema` | — | read-only |
 | `notifications.list_kinds` | — | read-only |
 | `notifications.list_messages` | `notifications.messages.read` | read-only |
+| `notifications.list_my_devices` | — | read-only |
 | `notifications.list_my_inbox` | — | read-only |
 | `notifications.mark_inbox_read` | — | writes |
 | `notifications.preview_template` | `notifications.templates.read` or `notifications.templates.manage` | read-only |

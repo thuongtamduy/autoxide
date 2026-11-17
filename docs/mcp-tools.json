@@ -6616,6 +6616,24 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List your mobile devices registered for push notifications (platform, app, last use); tokens are never shown.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "notifications.list_my_devices",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List your in-app notifications, newest first.",
       "input_schema": {
         "additionalProperties": false,
