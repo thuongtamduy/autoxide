@@ -26,6 +26,7 @@ pub(crate) mod domains;
 pub(crate) mod exports;
 mod link_token;
 pub mod migration;
+pub(crate) mod migration_runs;
 pub(crate) mod moves;
 pub(crate) mod org_settings;
 pub(crate) mod org_tree;

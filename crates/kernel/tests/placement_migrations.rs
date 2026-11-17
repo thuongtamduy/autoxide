@@ -1,0 +1,129 @@
+//! Migrate placement bằng API (D-334): chạy thử liệt kê migration còn chờ mà không đổi gì; chạy
+//! thật bằng job, ghi phần đã áp dụng; một lượt một lúc; chỉ nhân sự nền tảng. Cả SQLite và Postgres.
+
+// File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+use autoxide_testkit::{TestApp, TestDatabase};
+use axum::http::{Method, StatusCode};
+use sea_orm::{ConnectionTrait, Statement};
+use serde_json::{Value, json};
+
+async fn call(
+    app: &TestApp,
+    method: Method,
+    path: &str,
+    who: &str,
+    body: Option<Value>,
+) -> (StatusCode, Value) {
+    let mut request = app.request(method, &format!("/api/v1/kernel{path}")).token(who);
+    if let Some(body) = body {
+        request = request.json(body);
+    }
+    let answer = request.send().await.unwrap();
+    let body = if answer.body().is_empty() { Value::Null } else { answer.json() };
+    (answer.status(), body)
+}
+
+#[tokio::test]
+async fn migrate_placement_bang_api() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant_dedicated("solo")
+            .user("ops", 1, &["kernel.tenants.operate"])
+            .user("reader", 2, &["kernel.tenants.read"])
+            .build()
+            .await
+            .unwrap();
+        // Làm placement của `solo` chậm một migration: xoá bảng và dòng lịch sử của nó.
+        let solo = app.tenant("solo").await.unwrap();
+        let write = solo.database().write();
+        let backend = write.get_database_backend();
+        for sql in [
+            "DROP TABLE kernel_sequences",
+            "DELETE FROM kernel_migrations WHERE version = 'm0016_create_sequences'",
+        ] {
+            write.execute_raw(Statement::from_string(backend, sql)).await.unwrap();
+        }
+
+        // Không phải nhân sự vận hành: bị chặn.
+        let body = json!({"dry_run": true});
+        let (status, _) =
+            call(&app, Method::POST, "/placements/migrations", "reader", Some(body.clone())).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+
+        // Chạy thử: thấy migration còn chờ, không đổi gì.
+        let (status, dry) =
+            call(&app, Method::POST, "/placements/migrations", "ops", Some(body.clone())).await;
+        assert_eq!(status, StatusCode::OK, "{dry}");
+        let pending = dry["data"]["pending"].as_array().unwrap();
+        assert_eq!(pending.len(), 1, "{dry}");
+        assert_eq!(pending[0]["migrations"], json!(["kernel/m0016_create_sequences"]));
+        let (_, again) =
+            call(&app, Method::POST, "/placements/migrations", "ops", Some(body)).await;
+        assert_eq!(again["data"]["pending"], dry["data"]["pending"], "chạy thử không đổi gì");
+        let placement = pending[0]["placement"].as_str().unwrap().to_owned();
+
+        // Placement lạ: 404.
+        let (status, missing) = call(
+            &app,
+            Method::POST,
+            "/placements/migrations",
+            "ops",
+            Some(json!({"placement": "nowhere"})),
+        )
+        .await;
+        assert_eq!(
+            (status, missing["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("tenant_placement_not_found"))
+        );
+
+        // Chạy thật: một lượt một lúc.
+        let (status, run) = call(
+            &app,
+            Method::POST,
+            "/placements/migrations",
+            "ops",
+            Some(json!({"placement": placement})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{run}");
+        assert_eq!(run["data"]["status"], "pending");
+        let id = run["data"]["id"].as_str().unwrap().to_owned();
+        let (status, busy) =
+            call(&app, Method::POST, "/placements/migrations", "ops", Some(json!({}))).await;
+        assert_eq!(
+            (status, busy["code"].as_str()),
+            (StatusCode::CONFLICT, Some("kernel.migration_run_busy"))
+        );
+
+        let worker = app.modules().worker(2).unwrap();
+        for _ in 0..5 {
+            if worker.run_once().await.unwrap() == 0 {
+                break;
+            }
+        }
+        let (status, done) =
+            call(&app, Method::GET, &format!("/placements/migrations/{id}"), "ops", None).await;
+        assert_eq!(status, StatusCode::OK, "{done}");
+        assert_eq!(done["data"]["status"], "done", "{done}");
+        assert_eq!(
+            done["data"]["applied"][0]["migrations"],
+            json!(["kernel/m0016_create_sequences"])
+        );
+        let (_, listed) = call(&app, Method::GET, "/placements/migrations", "ops", None).await;
+        assert_eq!(listed["data"][0]["id"], id);
+        // Bảng đã có lại; chạy thử không còn gì chờ.
+        let (_, dry) = call(
+            &app,
+            Method::POST,
+            "/placements/migrations",
+            "ops",
+            Some(json!({"dry_run": true})),
+        )
+        .await;
+        assert_eq!(dry["data"]["pending"][0]["migrations"], json!([]));
+    })
+    .await
+    .unwrap();
+}

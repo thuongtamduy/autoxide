@@ -33,6 +33,16 @@ async fn register(services: &Services, user_id: Uuid, device: &mut SoftAuthentic
     let tenant = services.tenant.clone();
     let passkeys = &services.passkeys;
     let ceremony = passkeys.start_registration(&tenant, user_id, PASSWORD).await.unwrap();
+    // Xin `credProtect` nhưng không ép (D-334): authenticator không hỗ trợ vẫn tạo được passkey.
+    let extensions = ceremony.options["publicKey"]["extensions"].clone();
+    let extensions =
+        if extensions.is_null() { ceremony.options["extensions"].clone() } else { extensions };
+    assert_eq!(
+        extensions["credentialProtectionPolicy"], "userVerificationRequired",
+        "{}",
+        ceremony.options
+    );
+    assert_eq!(extensions["enforceCredentialProtectionPolicy"], false);
     let credential = device.register(&ceremony.options);
     passkeys.finish_registration(&tenant, user_id, ceremony.id, "Phone", &credential).await.unwrap()
 }

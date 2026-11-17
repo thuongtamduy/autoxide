@@ -378,3 +378,56 @@ async fn che_do_mot_khach_khong_tao_duoc_khach() {
     .await
     .unwrap();
 }
+
+/// Đổi trạng thái kèm lý do: lý do nằm trong event `kernel.tenant_updated` (nhật ký audit); lý do
+/// quá dài bị từ chối.
+#[tokio::test]
+async fn ly_do_doi_trang_thai_vao_audit() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, TenancyMode::Multi).await;
+        let acme = setup.admin.create(Actor::system(), new_tenant("acme")).await.unwrap();
+        let changes = json!({"status": "suspended", "reason": "  Unpaid invoices  "});
+        let (status, body) = call(
+            &setup.app,
+            Method::PATCH,
+            &format!("/api/v1/kernel/tenants/{}", acme.id),
+            "platform",
+            Some(changes),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let tenant = setup
+            .registry
+            .tenant(autoxide_kernel::tenancy::TenantId::from_uuid(acme.id))
+            .await
+            .unwrap();
+        use sea_orm::ConnectionTrait as _;
+        use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
+        let select = Query::select()
+            .column(Alias::new("payload"))
+            .from(Alias::new("kernel_events"))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(acme.id))
+            .and_where(Expr::col(Alias::new("name")).eq("kernel.tenant_updated"))
+            .to_owned();
+        let rows = tenant.database().read().query_all(&select).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        let payload: Value =
+            serde_json::from_str(&rows[0].try_get::<String>("", "payload").unwrap()).unwrap();
+        assert_eq!(payload["reason"], "Unpaid invoices", "{payload}");
+        assert_eq!(payload["after"]["status"], "suspended");
+
+        let long = json!({"status": "active", "reason": "x".repeat(501)});
+        let (status, body) = call(
+            &setup.app,
+            Method::PATCH,
+            &format!("/api/v1/kernel/tenants/{}", acme.id),
+            "platform",
+            Some(long),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        assert_eq!(body["errors"][0]["field"], "reason");
+    })
+    .await
+    .unwrap();
+}

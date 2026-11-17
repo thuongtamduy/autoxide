@@ -116,7 +116,23 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         state.clone(),
         state.clone(),
     );
+    let count = state.clone();
     vec![
+        Tool::new(
+            "count_role_members",
+            "Count the people holding each role (at any unit, each person once).",
+            move |tenant: TenantContext, _: Principal, _: autoxide_kernel::mcp::NoInput| {
+                let state = count.clone();
+                async move {
+                    let counts = state.roles.role_member_counts(&tenant).await?;
+                    let data: Vec<crate::http::roles::RoleCountResponse> =
+                        counts.into_iter().map(Into::into).collect();
+                    Ok::<_, Error>(autoxide_kernel::response::Data { data })
+                }
+            },
+        )
+        .requires(ROLES_READ)
+        .read_only(),
         Tool::new(
             "list_roles",
             "List roles with the permissions they grant; follow `pagination.next_cursor` for more.",

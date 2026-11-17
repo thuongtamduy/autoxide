@@ -380,3 +380,31 @@ async fn dem_so_nguoi_moi_nut() {
     .await
     .unwrap();
 }
+
+/// Số người giữ mỗi role: mỗi người một lần dù giữ ở nhiều nút; role không ai giữ là 0.
+#[tokio::test]
+async fn dem_so_nguoi_giu_moi_role() {
+    TestDatabase::run(async |test| {
+        let services = services(test).await;
+        let tenant = &services.tenant;
+        let tree = tree(&services).await;
+        let ann = user(&services, "ann@example.com").await;
+        let bob = user(&services, "bob@example.com").await;
+        let reader = role(&services, "reader", &[], &[("notes.read", Scope::Subtree)]).await;
+        let unused = role(&services, "unused", &["auth.users.read"], &[]).await;
+        let admin = Principal::with_all_permissions(Uuid::now_v7());
+        let wanted = vec![(tree.a.as_uuid(), vec![reader.id]), (tree.b.as_uuid(), vec![reader.id])];
+        services.roles.set_memberships(tenant, &admin, ann, wanted).await.unwrap();
+        services
+            .roles
+            .set_memberships(tenant, &admin, bob, vec![(tree.a1.as_uuid(), vec![reader.id])])
+            .await
+            .unwrap();
+        let counts = services.roles.role_member_counts(tenant).await.unwrap();
+        let of = |id: Uuid| counts.iter().find(|(role, _)| *role == id).map(|(_, n)| *n);
+        assert_eq!(of(reader.id), Some(2), "Ann ở hai nút vẫn là một người");
+        assert_eq!(of(unused.id), Some(0));
+    })
+    .await
+    .unwrap();
+}

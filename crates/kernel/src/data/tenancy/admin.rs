@@ -269,6 +269,10 @@ pub struct TenantChanges {
     /// change is refused with `403 tenant_read_only`; `false`: writable again. Independent of
     /// `status`. The platform tenant cannot be made read-only.
     pub read_only: Option<bool>,
+    /// Why (1 to 500 characters), kept with the change in the audit log (event
+    /// `kernel.tenant_updated`) — e.g. why a tenant was suspended.
+    #[schema(example = "Unpaid invoices after the grace period")]
+    pub reason: Option<String>,
 }
 
 /// Which tenants to list, and what to add to each.
@@ -314,6 +318,9 @@ const EXPANSIONS: [&str; 3] = ["placement", "subscription", "usage"];
 struct TenantChanged {
     before: Option<Tenant>,
     after: Option<Tenant>,
+    /// Lý do người làm nêu (chỉ có ở lần sửa).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -653,7 +660,11 @@ impl TenantAdmin {
         self.registry.invalidate(tenant_id);
         let tenant = self.describe(row).await?;
         let context = self.registry.tenant(tenant_id).await?;
-        let event = TenantCreated(TenantChanged { before: None, after: Some(tenant.clone()) });
+        let event = TenantCreated(TenantChanged {
+            before: None,
+            after: Some(tenant.clone()),
+            reason: None,
+        });
         self.outbox
             .record(context.database().write(), &context, actor, Some(subject(id)), &event)
             .await?;
@@ -706,6 +717,13 @@ impl TenantAdmin {
                 "the platform tenant cannot be made read-only",
             ));
         }
+        let reason = changes
+            .reason
+            .map(|reason| reason.trim().to_owned())
+            .filter(|reason| !reason.is_empty());
+        if reason.as_ref().is_some_and(|reason| reason.chars().count() > 500) {
+            problems.push(FieldError::new("reason", "length", "must be 1 to 500 characters long"));
+        }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -735,8 +753,11 @@ impl TenantAdmin {
         self.registry.invalidate(tenant_id);
         let after = self.get(&id.to_string()).await?;
         let context = self.registry.tenant(tenant_id).await?;
-        let event =
-            TenantUpdated(TenantChanged { before: Some(before), after: Some(after.clone()) });
+        let event = TenantUpdated(TenantChanged {
+            before: Some(before),
+            after: Some(after.clone()),
+            reason,
+        });
         self.outbox
             .record(context.database().write(), &context, actor, Some(subject(id)), &event)
             .await?;
