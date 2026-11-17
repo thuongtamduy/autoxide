@@ -54,8 +54,10 @@ pub(crate) struct AuditEntryResponse {
     /// exists; absent when no user made the change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     actor_name: Option<Option<String>>,
-    /// Who made the change: `user` (a signed-in user or API key), `system` (command line,
-    /// background jobs) or `public` (someone not signed in, such as a visitor sending a form).
+    /// Who made the change: `user` (a person, signed in or through an API key of kind `human`),
+    /// `agent` (an AI agent's API key), `service` (another program's API key), `support` (platform
+    /// staff through a support grant), `system` (command line, background jobs) or `public`
+    /// (someone not signed in, such as a visitor sending a form).
     #[schema(example = "user")]
     actor_kind: String,
     /// Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.
@@ -109,8 +111,9 @@ pub(crate) struct AuditFilter {
     action: Option<String>,
     /// Only changes in this module, e.g. `auth`.
     module: Option<String>,
-    /// Only changes made by this kind of actor: `user`, `system` or `public` (see `actor_kind`).
-    #[param(example = "user")]
+    /// Only changes made by these kinds of actor, comma-separated: `user` (a person), `agent`,
+    /// `service`, `support`, `app`, `scim`, `system` or `public` (see `actor_kind`).
+    #[param(example = "agent,service")]
     actor_kind: Option<String>,
     /// `actor`: add `actor_name`, the display name of who made each change, in the same answer.
     #[param(inline)]
@@ -226,14 +229,21 @@ async fn list_entries(
 ) -> Result<Page<AuditEntryResponse>, Error> {
     principal.require(&AUDIT_READ)?;
     let with_actor = matches!(filter.include, Some(AuditInclude::Actor));
-    let actor_kind = filter.actor_kind.map(|kind| kind.trim().to_owned());
-    if let Some(kind) = &actor_kind
-        && !["user", "system", "public"].contains(&kind.as_str())
-    {
+    const KINDS: [&str; 8] =
+        ["user", "agent", "service", "support", "app", "scim", "system", "public"];
+    let actor_kind: Vec<String> = filter
+        .actor_kind
+        .as_deref()
+        .unwrap_or_default()
+        .split(',')
+        .map(|kind| kind.trim().to_owned())
+        .filter(|kind| !kind.is_empty())
+        .collect();
+    if actor_kind.iter().any(|kind| !KINDS.contains(&kind.as_str())) {
         return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
             "actor_kind",
             "invalid",
-            "must be `user`, `system` or `public`",
+            "must list `user`, `agent`, `service`, `support`, `app`, `scim`, `system` or `public`",
         )]));
     }
     let filter = Filter {

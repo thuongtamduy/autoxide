@@ -1241,3 +1241,112 @@ async fn ghi_chu_tren_ban_ghi() {
     .await
     .unwrap();
 }
+
+/// Lệnh cần duyệt khi agent gọi (bước 51 P12): agent xoá bài thì nhận 202 và yêu cầu duyệt, bài
+/// còn nguyên; agent không tự duyệt được; gửi lại trước khi duyệt là 409; người duyệt xong thì gửi
+/// lại cùng request (cùng `Idempotency-Key`) kèm `Autoxide-Approval` mới xoá thật, một lần.
+#[tokio::test]
+async fn agent_goi_lenh_rui_ro_nhan_202_approval_required() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let perms = ["content.read", "content.write", "content.delete"].map(str::to_owned);
+        let robot = Principal::new(Uuid::from_u128(1), perms.clone())
+            .via_api_key(Uuid::from_u128(9))
+            .with_actor_kind(autoxide_kernel::access::ActorKind::Agent);
+        let app = TestApp::builder(test)
+            .user("editor", 2, &["content.read", "content.write", "content.delete"])
+            .principal("robot", robot)
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let created = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("editor"),
+            &[],
+            Some(json!({"kind": "post", "title": "Sắp xoá"})),
+        )
+        .await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let read = send(&app, "GET", &format!("/entries/{id}"), Some("editor"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let key = Uuid::now_v7().to_string();
+        let delete = |approval: Option<&str>| {
+            let mut headers = vec![("if-match", etag.as_str()), ("idempotency-key", key.as_str())];
+            if let Some(approval) = approval {
+                headers.push(("autoxide-approval", approval));
+            }
+            let path = format!("/entries/{id}");
+            let headers: Vec<(String, String)> =
+                headers.into_iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect();
+            let app = &app;
+            async move {
+                let pairs: Vec<(&str, &str)> =
+                    headers.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+                send(app, "DELETE", &path, Some("robot"), &pairs, None).await
+            }
+        };
+
+        let asked = delete(None).await;
+        assert_eq!(asked.status(), StatusCode::ACCEPTED, "{}", asked.json());
+        let approval = asked.json()["data"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(asked.json()["data"]["status"], "pending");
+        assert_eq!(
+            send(&app, "GET", &format!("/entries/{id}"), Some("editor"), &[], None).await.status(),
+            StatusCode::OK,
+            "chưa xoá"
+        );
+        let early = delete(Some(&approval)).await;
+        assert_eq!(
+            (early.status(), early.json()["code"].as_str()),
+            (StatusCode::CONFLICT, Some("kernel.approval_invalid"))
+        );
+        let decide = |who: &str| {
+            app.post(&format!("/api/v1/kernel/approvals/{approval}/approve")).token(who).send()
+        };
+        let own = decide("robot").await.unwrap();
+        assert_eq!(
+            (own.status(), own.json()["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("kernel.approval_forbidden"))
+        );
+        let pending = app
+            .get("/api/v1/kernel/approvals?status=pending")
+            .token("editor")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        assert_eq!(pending["data"][0]["id"], approval, "người duyệt thấy yêu cầu");
+        let approved = decide("editor").await.unwrap();
+        assert_eq!(approved.json()["data"]["status"], "approved", "{}", approved.json());
+
+        let done = delete(Some(&approval)).await;
+        assert_eq!(
+            done.status(),
+            StatusCode::NO_CONTENT,
+            "{}",
+            String::from_utf8_lossy(done.body())
+        );
+        assert_eq!(
+            send(&app, "GET", &format!("/entries/{id}"), Some("editor"), &[], None).await.status(),
+            StatusCode::NOT_FOUND
+        );
+        let used = app
+            .get(&format!("/api/v1/kernel/approvals/{approval}"))
+            .token("robot")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        assert_eq!(used["data"]["status"], "used");
+    })
+    .await
+    .unwrap();
+}

@@ -16,7 +16,8 @@ pub(crate) struct Filter {
     pub action: Option<String>,
     pub module: Option<String>,
     /// `user`, `system` hay `public` (đã kiểm ở handler).
-    pub actor_kind: Option<String>,
+    /// Một hay nhiều loại bên làm (giá trị cột `actor_kind`); rỗng: mọi loại.
+    pub actor_kind: Vec<String>,
 }
 
 // Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
@@ -162,17 +163,20 @@ impl AuditService {
         if let Some(module) = filter.module {
             select = select.filter(Column::Module.eq(module));
         }
-        if let Some(kind) = filter.actor_kind {
+        if !filter.actor_kind.is_empty() {
             // Dòng ghi trước khi có cột `actor_kind` (NULL) hiểu theo `actor_user_id`, như khi trả về.
-            let legacy = match kind.as_str() {
-                "user" => Some(Column::ActorUserId.is_not_null()),
-                "system" => Some(Column::ActorUserId.is_null()),
-                _ => None,
-            };
-            let mut condition = Condition::any().add(Column::ActorKind.eq(kind));
-            if let Some(legacy) = legacy {
-                condition =
-                    condition.add(Condition::all().add(Column::ActorKind.is_null()).add(legacy));
+            let mut condition = Condition::any();
+            for kind in filter.actor_kind {
+                let legacy = match kind.as_str() {
+                    "user" => Some(Column::ActorUserId.is_not_null()),
+                    "system" => Some(Column::ActorUserId.is_null()),
+                    _ => None,
+                };
+                condition = condition.add(Column::ActorKind.eq(kind));
+                if let Some(legacy) = legacy {
+                    condition = condition
+                        .add(Condition::all().add(Column::ActorKind.is_null()).add(legacy));
+                }
             }
             select = select.filter(condition);
         }

@@ -300,6 +300,7 @@ async fn api_key_ngoai_nhanh_bi_tu_choi() {
             .unwrap();
         let owner = services.roles.principal(tenant, ann).await.unwrap();
         let new_key = |org: Option<OrgId>| NewApiKey {
+            kind: autoxide_kernel::access::ActorKind::Human,
             name: "agent".to_owned(),
             permissions: vec!["notes.read".to_owned()],
             org_id: org.map(|org| org.as_uuid()),

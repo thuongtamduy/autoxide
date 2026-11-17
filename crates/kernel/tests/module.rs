@@ -286,6 +286,10 @@ async fn module_nhan_database_va_khai_route() {
             paths,
             [
                 vec![
+                    "/approvals".to_owned(),
+                    "/approvals/{id}".to_owned(),
+                    "/approvals/{id}/approve".to_owned(),
+                    "/approvals/{id}/reject".to_owned(),
                     "/bulk/{resource}/{action}".to_owned(),
                     "/client-config".to_owned(),
                     "/domains".to_owned(),

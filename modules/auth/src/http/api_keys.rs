@@ -146,6 +146,10 @@ pub(crate) struct ApiKeyResponse {
     /// Last time the key was used, to the minute; `null`: never used.
     last_used_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
+    /// Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
+    /// approval) or `service` (another program). The audit log records it as `actor_kind`.
+    #[schema(example = "agent")]
+    kind: String,
 }
 
 impl From<ApiKey> for ApiKeyResponse {
@@ -159,6 +163,7 @@ impl From<ApiKey> for ApiKeyResponse {
             expires_at: key.expires_at,
             last_used_at: key.last_used_at,
             created_at: key.created_at,
+            kind: crate::api_key::KeyKind::key_name(key.kind).to_owned(),
         }
     }
 }
@@ -182,6 +187,11 @@ pub(crate) struct CreateApiKeyRequest {
     /// What the key is for, 1 to 100 characters.
     #[schema(example = "nightly report agent")]
     name: String,
+    /// Who will use the key: `human` (you, the default), `agent` (an AI agent: commands marked
+    /// for approval wait for a person to approve them) or `service` (another program).
+    #[serde(default)]
+    #[schema(example = "agent")]
+    kind: Option<String>,
     /// Permissions the key may use: at least one, each one you have yourself (see
     /// `GET /api/v1/auth/me`). Give a key only what its job needs.
     #[schema(example = json!(["auth.users.read"]))]
@@ -216,6 +226,7 @@ pub(crate) struct CreateApiKeyRequest {
 impl From<CreateApiKeyRequest> for NewApiKey {
     fn from(input: CreateApiKeyRequest) -> Self {
         NewApiKey {
+            kind: crate::api_key::KeyKind::of_key(input.kind.as_deref().unwrap_or("human")),
             name: input.name,
             permissions: input.permissions,
             org_id: input.org_id,
@@ -298,6 +309,13 @@ async fn create_api_key(
     principal: Principal,
     ValidJson(input): ValidJson<CreateApiKeyRequest>,
 ) -> Result<Created<CreatedApiKeyResponse>, Error> {
+    if input.kind.as_deref().is_some_and(|kind| !["human", "agent", "service"].contains(&kind)) {
+        return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
+            "kind",
+            "invalid",
+            "must be `human`, `agent` or `service`",
+        )]));
+    }
     let created = state.api_keys.create(&tenant, &principal, input.into()).await?;
     Ok(Created::new(format!("/auth/api-keys/{}", created.key.id), created.into()))
 }

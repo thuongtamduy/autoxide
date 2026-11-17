@@ -98,6 +98,7 @@
   "field:must be 1 to {name_max_length} characters": "phải dài 1 đến {name_max_length} ký tự",
   "field:must be 1 to {name_max_length} characters: lowercase letters, digits, `_` and `-`, starting with a letter": "phải dài 1 đến {name_max_length} ký tự: chữ thường, số, `_` và `-`, bắt đầu bằng chữ",
   "field:must be `en` or `vi`": "phải là `en` hay `vi`",
+  "field:must be `human`, `agent` or `service`": "phải là `human`, `agent` hoặc `service`",
   "field:must be `support` or `legal_request`": "phải là `support` hay `legal_request`",
   "field:must be a unit you work in (one of your roles covers it)": "phải là nút bạn làm việc (một role của bạn phủ nút đó)",
   "field:must be a valid email address of at most {email_max_length} characters": "phải là địa chỉ email hợp lệ, tối đa {email_max_length} ký tự",

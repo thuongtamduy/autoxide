@@ -7,6 +7,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
+use autoxide_kernel::access::ActorKind;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
@@ -68,6 +69,8 @@ pub(crate) struct ApiKey {
     pub expires_at: Option<DateTime<Utc>>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+    /// `Human`, `Agent` hay `Service` (bước 51 P12).
+    pub kind: ActorKind,
 }
 
 /// Key vừa tạo, kèm phần bí mật — chỉ có ở lúc tạo.
@@ -80,6 +83,8 @@ pub(crate) struct CreatedApiKey {
 #[derive(Debug, Clone)]
 pub(crate) struct NewApiKey {
     pub name: String,
+    /// `Human` (mặc định), `Agent` hay `Service`.
+    pub kind: ActorKind,
     pub permissions: Vec<String>,
     /// Nút của hàng rào; `None`: nút gốc (không rào). Phải là nút người tạo làm việc ở đó.
     pub org_id: Option<Uuid>,
@@ -230,6 +235,7 @@ impl ApiKeyService {
             org_id: Set(Some(org_id)),
             last_used_at: Set(None),
             created_at: Set(now),
+            kind: Set(input.kind.key_name().to_owned()),
         }
         .insert(&transaction)
         .await?;
@@ -250,6 +256,7 @@ impl ApiKeyService {
             "permissions": permissions,
             "org_id": org_id,
             "expires_at": input.expires_at,
+            "kind": input.kind.key_name(),
         });
         let event = events::ApiKeyCreated { before: None, after: Some(after) };
         self.outbox
@@ -267,6 +274,7 @@ impl ApiKeyService {
             expires_at: input.expires_at,
             last_used_at: None,
             created_at: now,
+            kind: input.kind,
         };
         Ok(CreatedApiKey { key, secret })
     }
@@ -400,7 +408,10 @@ impl ApiKeyService {
             .collect();
         // Quyền của key = permission của key ∩ quyền hiện tại của chủ key, giữ nguyên nút và độ
         // sâu của chủ key; key gắn nút thì thêm hàng rào ở nút đó (bước 34).
-        let mut principal = owner.only(granted.iter().map(String::as_str)).via_api_key(row.id);
+        let mut principal = owner
+            .only(granted.iter().map(String::as_str))
+            .via_api_key(row.id)
+            .with_actor_kind(ActorKind::of_key(&row.kind));
         if let Some(org) = row.org_id {
             principal = principal.with_fence(OrgId::from_uuid(org));
         }
@@ -520,6 +531,31 @@ fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
         expires_at: row.expires_at,
         last_used_at: row.last_used_at,
         created_at: row.created_at,
+        kind: ActorKind::of_key(&row.kind),
+    }
+}
+
+/// Loại API key: đọc / ghi cột `kind` (`human`, `agent`, `service`).
+pub(crate) trait KeyKind {
+    fn of_key(raw: &str) -> Self;
+    fn key_name(self) -> &'static str;
+}
+
+impl KeyKind for ActorKind {
+    fn of_key(raw: &str) -> Self {
+        match raw {
+            "agent" => ActorKind::Agent,
+            "service" => ActorKind::Service,
+            _ => ActorKind::Human,
+        }
+    }
+
+    fn key_name(self) -> &'static str {
+        match self {
+            ActorKind::Agent => "agent",
+            ActorKind::Service => "service",
+            _ => "human",
+        }
     }
 }
 
@@ -689,6 +725,7 @@ mod tests {
 
     fn new_key(permissions: &[&str]) -> NewApiKey {
         NewApiKey {
+            kind: autoxide_kernel::access::ActorKind::Human,
             org_id: None,
             name: "agent".to_owned(),
             permissions: permissions.iter().map(|p| (*p).to_owned()).collect(),
@@ -738,6 +775,30 @@ mod tests {
         .unwrap();
     }
 
+    /// Loại key (bước 51 P12): key `agent` xác thực thành bên làm `Agent`, giữ qua danh sách.
+    #[tokio::test]
+    async fn key_agent_la_ben_lam_agent() {
+        TestDatabase::run(async |test| {
+            let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
+            let mut input = new_key(&["auth.users.read"]);
+            input.kind = ActorKind::Agent;
+            let created = services.api_keys.create(&tenant, &ada, input).await.unwrap();
+            assert_eq!(created.key.kind, ActorKind::Agent);
+            let principal = services.api_keys.authenticate(&tenant, &created.secret).await.unwrap();
+            assert_eq!(principal.actor_kind(), ActorKind::Agent);
+            assert_eq!(autoxide_kernel::event::Actor::from(&principal).kind(), "agent");
+            let page = services
+                .api_keys
+                .list(&tenant, ada.user_id(), &PageRequest::first(10, Order::Desc))
+                .await
+                .unwrap();
+            assert_eq!(page.data[0].kind, ActorKind::Agent);
+        })
+        .await
+        .unwrap();
+    }
+
     #[tokio::test]
     async fn key_khong_vuot_quyen_chu_key() {
         TestDatabase::run(async |test| {
@@ -745,6 +806,7 @@ mod tests {
             let tenant = services.tenant.clone();
             let past = Utc::now() - chrono::Duration::hours(1);
             let input = NewApiKey {
+                kind: autoxide_kernel::access::ActorKind::Human,
                 org_id: None,
                 name: " ".to_owned(),
                 permissions: vec![

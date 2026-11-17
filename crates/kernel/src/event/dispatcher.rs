@@ -284,6 +284,7 @@ impl Dispatcher {
         let tenant = TenantId::from_uuid(row.try_get("", "tenant_id")?);
         let tenant = self.databases.tenant(tenant).await?;
         let payload: String = row.try_get("", "payload")?;
+        let actor_kind: Option<String> = row.try_get("", "actor_kind")?;
         Ok(Delivered {
             id: row.try_get("", "id")?,
             tenant,
@@ -292,8 +293,8 @@ impl Dispatcher {
             actor: Actor {
                 user_id: row.try_get("", "actor_user_id")?,
                 api_key_id: row.try_get("", "actor_api_key_id")?,
-                public: row.try_get::<Option<String>>("", "actor_kind")?.as_deref()
-                    == Some("public"),
+                public: actor_kind.as_deref() == Some("public"),
+                kind: actor_kind.as_deref().and_then(crate::access::ActorKind::parse),
                 access: access_of(
                     row.try_get::<Option<String>>("", "actor_access")?.as_deref(),
                     row.try_get("", "actor_access_id")?,

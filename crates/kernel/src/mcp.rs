@@ -143,6 +143,8 @@ pub struct Tool {
     deprecation: Option<ToolDeprecation>,
     /// Khai tường minh: mọi người đã đăng nhập gọi được (service tự giới hạn vào dữ liệu của họ).
     any_signed_in: bool,
+    /// Lệnh rủi ro: agent gọi thì bị từ chối, chỉ sang REST để xin duyệt (bước 51 P12).
+    approval_for_agent: bool,
 }
 
 impl std::fmt::Debug for Tool {
@@ -174,7 +176,21 @@ impl Tool {
             handler: Arc::new(Typed { handler, input: PhantomData }),
             deprecation: None,
             any_signed_in: false,
+            approval_for_agent: false,
         }
+    }
+
+    /// Lệnh rủi ro (bước 51 P12): REST tương ứng khai `x-approval: "agent"`. Agent gọi tool này thì
+    /// bị từ chối (`approval_required`) và được chỉ sang endpoint REST để xin người duyệt — MCP
+    /// không làm được điều REST cấm.
+    pub fn requires_approval_for_agent(mut self) -> Self {
+        self.approval_for_agent = true;
+        self
+    }
+
+    /// Xem [`requires_approval_for_agent`](Self::requires_approval_for_agent).
+    pub fn needs_approval_for_agent(&self) -> bool {
+        self.approval_for_agent
     }
 
     /// Chỉ người có `permission` mới thấy và gọi được tool.
@@ -282,6 +298,14 @@ impl Tool {
         principal: Principal,
         arguments: Value,
     ) -> Result<Value, Error> {
+        if self.approval_for_agent && principal.actor_kind() == crate::access::ActorKind::Agent {
+            return Err(Error::forbidden(
+                "approval_required",
+                "Tool `{tool}` needs a person's approval when an agent calls it: call its REST \
+                 endpoint instead, which answers 202 with an approval request.",
+            )
+            .with_param("tool", self.name.clone()));
+        }
         self.handler.call(tenant, principal, arguments).await
     }
 

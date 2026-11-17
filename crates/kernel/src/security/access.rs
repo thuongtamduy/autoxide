@@ -136,6 +136,57 @@ pub enum Realm {
     Customer,
 }
 
+/// Loại bên làm (bước 51 P12, D-224): ghi vào audit (`actor_kind`), dùng để buộc duyệt lệnh rủi ro
+/// khi agent gọi. Người dùng đăng nhập là `Human` (giá trị `user` trong audit, giữ như trước).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActorKind {
+    /// A person (signed in, or through an API key of kind `human`).
+    #[default]
+    Human,
+    /// An AI agent, through an API key of kind `agent`.
+    Agent,
+    /// Another program, through an API key of kind `service`.
+    Service,
+    /// The program itself (jobs, CLI).
+    System,
+    /// Platform staff inside the tenant through a support grant.
+    Support,
+    /// An installed app.
+    App,
+    /// Provisioning through SCIM.
+    Scim,
+}
+
+impl ActorKind {
+    /// Giá trị cột `actor_kind` của event / audit. `Human` là `user` (giá trị có từ trước bước 51).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ActorKind::Human => "user",
+            ActorKind::Agent => "agent",
+            ActorKind::Service => "service",
+            ActorKind::System => "system",
+            ActorKind::Support => "support",
+            ActorKind::App => "app",
+            ActorKind::Scim => "scim",
+        }
+    }
+
+    /// Ngược của [`as_str`](Self::as_str); `human` cũng là `Human`.
+    pub fn parse(raw: &str) -> Option<Self> {
+        Some(match raw {
+            "user" | "human" => ActorKind::Human,
+            "agent" => ActorKind::Agent,
+            "service" => ActorKind::Service,
+            "system" => ActorKind::System,
+            "support" => ActorKind::Support,
+            "app" => ActorKind::App,
+            "scim" => ActorKind::Scim,
+            _ => return None,
+        })
+    }
+}
+
 /// Đường bên gọi vào khách hiện tại (bước 34): membership trực tiếp, uỷ quyền từ khách cha, hay
 /// quyền vào hỗ trợ của nhân sự nền tảng. Ghi vào event (`Actor::access`) để audit thấy.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -337,6 +388,8 @@ pub struct Principal {
     fence: Option<OrgId>,
     /// Đường vào khách hiện tại.
     access: AccessPath,
+    /// Loại bên làm theo credential (API key `agent`, `service`…).
+    kind: ActorKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -362,6 +415,8 @@ pub struct PrincipalSnapshot {
     realm: Realm,
     fence: Option<Uuid>,
     access: AccessPath,
+    #[serde(default)]
+    kind: ActorKind,
 }
 
 impl PrincipalSnapshot {
@@ -388,6 +443,7 @@ impl PrincipalSnapshot {
             realm: self.realm,
             fence: self.fence.map(OrgId::from_uuid),
             access: self.access,
+            kind: self.kind,
         }
     }
 
@@ -421,11 +477,26 @@ impl Principal {
             realm: self.realm,
             fence: self.fence.map(|fence| fence.as_uuid()),
             access: self.access,
+            kind: self.kind,
         }
     }
 }
 
 impl Principal {
+    /// Đặt loại bên làm (bộ xác thực, theo loại API key).
+    pub fn with_actor_kind(mut self, kind: ActorKind) -> Self {
+        self.kind = kind;
+        self
+    }
+
+    /// Loại bên làm: `Support` khi vào bằng quyền vào hỗ trợ, không thì theo credential.
+    pub fn actor_kind(&self) -> ActorKind {
+        match self.access {
+            AccessPath::Support(_) => ActorKind::Support,
+            _ => self.kind,
+        }
+    }
+
     /// Người dùng `user_id` với đúng các permission `permissions`, ở độ sâu `tenant`.
     pub fn new(user_id: Uuid, permissions: impl IntoIterator<Item = String>) -> Self {
         let root = root_of(DEFAULT_TENANT);
@@ -463,6 +534,7 @@ impl Principal {
             realm: Realm::Staff,
             fence: None,
             access: AccessPath::Direct,
+            kind: ActorKind::Human,
         }
     }
 

@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Agents as actors and approvals (step 51, D-362): API keys have a `kind` (`human`, `agent`, `service`); the audit
+  log records `actor_kind` `agent`, `service` and `support` besides `user`, and filters on several at once
+  (`actor_kind=agent,service`). Commands marked `x-approval: "agent"` (first: deleting a post or page) answer an
+  agent's call with `202` and an approval request; a person holding the command's permission approves or rejects
+  it (`/api/v1/kernel/approvals`, event `kernel.approval_decided`), and the agent sends the same request again with
+  `Autoxide-Approval: <id>`. MCP tools marked `requires_approval_for_agent` refuse agents (`approval_required`).
 - Notes and activity on any record (step 51): `GET/POST /api/v1/kernel/records/{kind}/{id}/notes` and
   `DELETE …/notes/{note_id}` keep internal notes on any record of the resource directory, for those who can read it
   (`<module>.read`); `mentions` must name users who can read it too, and the event `kernel.record_note_added`

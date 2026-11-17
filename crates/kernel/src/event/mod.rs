@@ -117,6 +117,8 @@ pub struct Actor {
     /// Đường người làm vào khách (bước 34): trực tiếp, uỷ quyền từ khách cha, hay quyền vào hỗ
     /// trợ của nhân sự nền tảng — audit của khách thấy ai vào bằng đường nào.
     pub access: crate::access::AccessPath,
+    /// Loại bên làm (bước 51 P12); `None`: suy từ `user_id` / `public` như trước.
+    pub kind: Option<crate::access::ActorKind>,
 }
 
 impl Actor {
@@ -137,6 +139,7 @@ impl Actor {
             api_key_id: Some(api_key_id),
             public: false,
             access: crate::access::AccessPath::Direct,
+            kind: None,
         }
     }
 
@@ -145,10 +148,12 @@ impl Actor {
         Actor { public: true, ..Actor::default() }
     }
 
-    /// `system`, `user` hay `public` — giá trị cột `actor_kind`.
+    /// `public`, `system`, `user` (người), `agent`, `service`, `support`… — giá trị cột `actor_kind`.
     pub fn kind(&self) -> &'static str {
         if self.public {
             "public"
+        } else if let Some(kind) = self.kind {
+            kind.as_str()
         } else if self.user_id.is_some() {
             "user"
         } else {
@@ -164,6 +169,7 @@ impl From<&crate::access::Principal> for Actor {
             api_key_id: principal.api_key_id(),
             public: false,
             access: principal.access(),
+            kind: Some(principal.actor_kind()),
         }
     }
 }

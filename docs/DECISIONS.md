@@ -8878,3 +8878,26 @@ cách hiểu chặt: hỏi trước, mặc định không tải gì.
    `compliance.tracking_tag_not_found`, `compliance.tracking_tag_exists`, `compliance.cookie_policy_changed`,
    `compliance.cookie_consents_throttled`.
 8. Ngoài phạm vi: gửi chuyển đổi từ máy chủ tới nền tảng quảng cáo (cần đối chiếu riêng về chuyển dữ liệu cá nhân).
+
+## D-362 · Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17 — agent quyết
+
+**Bối cảnh.** Bước 51 P12 cần phân biệt người, agent, chương trình trong audit, và buộc lệnh rủi ro chờ người
+duyệt khi agent gọi, như nhau cho REST và MCP.
+
+**Quyết định.**
+1. `autoxide_kernel::access::ActorKind` (`Human`, `Agent`, `Service`, `System`, `Support`, `App`, `Scim`) nằm trên
+   `Principal` (bộ xác thực đặt theo loại API key) và `Actor` của event. Giá trị cột `actor_kind` của người **giữ
+   là `user`** như trước bước 51 — không đổi giá trị đã có trong audit (hợp đồng API); giá trị mới chỉ thêm
+   (`agent`, `service`, `support`, `app`, `scim`). Bộ lọc audit nhận nhiều giá trị (`actor_kind=agent,service`).
+2. API key có `kind` (`human` mặc định, `agent`, `service`; cột `auth_api_key.kind`).
+3. Lệnh rủi ro khai bằng phần mở rộng OpenAPI `x-approval: "agent"` trên `#[utoipa::path]` (một chỗ khai, có
+   trong tài liệu, kernel thêm response 202). Lớp của kernel chặn agent, ghi `kernel_approval_requests` (băm method,
+   địa chỉ, thân), trả 202. Người có một permission của lệnh duyệt / từ chối. Agent **gửi lại đúng request đó** kèm
+   `Autoxide-Approval: <id>` và cùng `Idempotency-Key` (lớp idempotency không giữ 202 chờ duyệt); mỗi lần duyệt
+   dùng một lần (cập nhật có điều kiện), hạn 24 giờ. Chọn "gửi lại" thay vì kernel tự phát lại request: không cần
+   giữ thân request trong database, không phải chạy lệnh thay người khác ngoài request.
+4. MCP: tool khai `requires_approval_for_agent` từ chối agent (`approval_required`) và chỉ sang REST để xin duyệt
+   — MCP không làm được điều REST cấm (luật kiến trúc 8). Xin duyệt thẳng qua MCP làm sau khi có nhu cầu.
+
+**Hệ quả.** Lệnh đầu tiên cần duyệt: xoá bài viết / trang của `content`. Module khác đánh dấu lệnh rủi ro của mình
+bằng cùng phần mở rộng.
