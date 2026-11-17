@@ -379,6 +379,8 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`docs/ADDRESS.md`](docs/ADDRESS.md) — administrative units and addresses: reading the list,
   importing the official list
 - [`docs/TAX.md`](docs/TAX.md) — taxes: the Vietnam tax data pack, computing taxes, tax profiles
+- [`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md) — notifications: kinds and categories, channels,
+  consent and allowed hours for advertising, inbox and preferences, declaring a kind in a module
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 

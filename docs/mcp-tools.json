@@ -5121,6 +5121,235 @@
     },
     {
       "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the notification kinds declared by modules: key, category (`security`, `transactional`, `marketing`) and channels.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "notifications.list_kinds",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the send log of notifications (one row per channel), newest first, with status and skip reason. Shows addresses of recipients.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which messages.",
+        "properties": {
+          "channel": {
+            "description": "e.g. `email`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of messages, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`queued`, `deferred`, `sent`, `failed`, `skipped` or `canceled`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "notifications.list_messages",
+      "output_schema": null,
+      "permissions": [
+        "notifications.messages.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List your in-app notifications, newest first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which inbox page.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of notifications, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "unread": {
+            "description": "`true`: only unread notifications.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "name": "notifications.list_my_inbox",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Mark one of your in-app notifications as read, or all of them when `id` is omitted.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which notification to mark read.",
+        "properties": {
+          "id": {
+            "description": "Id of one notification of your inbox; omit to mark all as read.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "notifications.mark_inbox_read",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Send a notification of a declared kind to one recipient (user, email, phone or every admin). Advertising needs `notifications.send_marketing` and is only sent to people who consented. Always pass a `dedupe_key`: retrying with it sends nothing new.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A notification to send (flat fields: give exactly one recipient).",
+        "properties": {
+          "dedupe_key": {
+            "description": "Required: retrying with the same key sends nothing new.",
+            "type": "string"
+          },
+          "email": {
+            "description": "An email address.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Key of a declared kind (see `list_kinds`).",
+            "type": "string"
+          },
+          "link": {
+            "description": "Page opened from the notification.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "params": {
+            "description": "Values for the `{name}` places of the text.",
+            "type": "object"
+          },
+          "phone": {
+            "description": "A phone number, e.g. `+84912345678`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_admins": {
+            "description": "`true`: every active admin of the tenant.",
+            "type": "boolean"
+          },
+          "user_id": {
+            "description": "A user of the tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "dedupe_key"
+        ],
+        "type": "object"
+      },
+      "name": "notifications.send_notification",
+      "output_schema": null,
+      "permissions": [
+        "notifications.send"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": true,
         "read_only": false,
         "requires_approval_for_agent": false,

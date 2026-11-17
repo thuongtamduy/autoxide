@@ -828,6 +828,21 @@ impl Users for UserService {
     }
 }
 
+#[async_trait::async_trait]
+impl crate::api::TenantAdmins for UserService {
+    async fn admins(&self, tenant: &TenantContext) -> Result<Vec<User>, Error> {
+        let read = tenant.database().read();
+        let ids = crate::role::active_admin_ids(read, tenant).await?;
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = Entity::find().scoped(tenant).filter(Column::Id.is_in(ids)).all(read).await?;
+        let mut users: Vec<User> = rows.into_iter().map(User::from).collect();
+        users.sort_unstable_by_key(|user| user.id);
+        Ok(users)
+    }
+}
+
 /// Ảnh chụp những gì audit cần biết về một người dùng (không có hash mật khẩu).
 fn snapshot(row: &entity::Model) -> serde_json::Value {
     json!({

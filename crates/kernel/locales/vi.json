@@ -101,6 +101,7 @@
   "length_required": "Request cần header `content-length`.",
   "limit_exceeded": "Đã dùng hết hạn mức `{limit}` ({used}/{max}). Nâng gói hoặc giải phóng bớt.",
   "method_not_allowed": "Endpoint này không hỗ trợ HTTP method này. Xem header `allow`.",
+  "mobile_push_disabled": "Máy chủ chưa cấu hình thông báo đẩy tới ứng dụng di động.",
   "module_not_enabled": "Gói hiện tại của bạn chưa có module `{module}`. Nâng gói để dùng.",
   "money.allocation_invalid": "Chỉ chia được một số tiền theo ít nhất một tỉ lệ, và không được mọi tỉ lệ đều bằng 0.",
   "money.amount_invalid": "Số tiền phải là số nguyên đơn vị nhỏ nhất viết dưới dạng chuỗi, như \"1999\" cho 19,99 USD hay \"-500\"; giá trị nhận được dài {length} ký tự và không phải dạng đó.",
@@ -194,5 +195,7 @@
   "unavailable": "Máy chủ tạm thời không xử lý được request. Hãy thử lại sau.",
   "unsupported_media_type": "Kiểu nội dung không được hỗ trợ. Gửi JSON với `content-type: application/json`.",
   "uri_too_long": "Đường dẫn của request quá dài.",
-  "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì."
+  "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì.",
+  "web_push_disabled": "Máy chủ chưa cấu hình thông báo đẩy trên trình duyệt.",
+  "zns_disabled": "Máy chủ chưa cấu hình gửi tin Zalo ZNS."
 }

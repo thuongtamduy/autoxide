@@ -154,6 +154,8 @@ pub(crate) struct PlansService {
     pub ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
     /// `AUTOXIDE_PLANS_TAX_CATEGORY`: nhóm thuế của dòng thuê bao trên hoá đơn.
     pub tax_category: String,
+    /// Thông báo tới quản trị viên khách (module `notifications`); `None` thì không báo.
+    pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
 }
 
 /// Bộ nhớ đệm quyền dùng theo khách trong tiến trình (`AUTOXIDE_PLANS_CACHE_SECONDS`): quyền dùng

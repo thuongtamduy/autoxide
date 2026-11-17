@@ -6,7 +6,7 @@ mod service;
 
 pub(crate) use service::{
     AdminRoleSeed, MEMBERS_LIMIT, MemberCount, MemberCounter, Membership, MembershipFilter,
-    MembershipRow, Role, RoleInput, RoleService, add_roles, count_active_admins,
+    MembershipRow, Role, RoleInput, RoleService, active_admin_ids, add_roles, count_active_admins,
     count_active_admins_unlocked, grant_admin, grant_problems, has_membership,
     has_second_factor_condition, holds_mfa_role, last_admin, member_reference, role_by_name,
     role_grants, root_roles,

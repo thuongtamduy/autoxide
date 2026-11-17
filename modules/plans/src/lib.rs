@@ -22,6 +22,7 @@ mod jobs;
 mod lifecycle;
 mod merge;
 mod migration;
+mod notices;
 mod permissions;
 mod provider;
 mod provisioning;
@@ -129,7 +130,11 @@ impl Module for PlansModule {
             invoices: context.require::<dyn autoxide_invoices::api::Invoices>().ok(),
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
             tax_category: config.tax_category.clone(),
+            notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
         });
+        if let Some(notifier) = &service.notifier {
+            notices::declare(notifier.as_ref())?;
+        }
         self.service = Some(service.clone());
         context.provide::<dyn api::Provisioning>(Arc::new(provisioning::Provisioner(
             service.clone(),
@@ -147,18 +152,28 @@ impl Module for PlansModule {
         jobs::schedules()
     }
 
-    // Tiền thuê bao về (module `ledger`): đánh dấu kỳ đã trả.
+    // Tiền thuê bao về (module `ledger`): đánh dấu kỳ đã trả. Thuê bao đổi trạng thái: báo quản trị
+    // viên khách (module `notifications`).
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
-        // Chỉ khi có `ledger` (event chưa ai khai thì kernel từ chối đăng ký nghe).
-        self.service.clone().filter(|service| service.ledger.is_some()).map_or_else(
-            Vec::new,
-            |service| {
-                vec![autoxide_kernel::event::Subscription::new(
-                    "ledger.payment_succeeded",
-                    Arc::new(billing::PaymentListener(service)),
-                )]
-            },
-        )
+        // Chỉ khi có module tương ứng (event chưa ai khai thì kernel từ chối đăng ký nghe).
+        let Some(service) = self.service.clone() else {
+            return Vec::new();
+        };
+        let mut subscriptions = Vec::new();
+        if service.ledger.is_some() {
+            subscriptions.push(autoxide_kernel::event::Subscription::new(
+                "ledger.payment_succeeded",
+                Arc::new(billing::PaymentListener(service.clone())),
+            ));
+        }
+        // Thuê bao quá hạn / tạm khoá: báo quản trị viên khách (module `notifications`).
+        if service.notifier.is_some() {
+            subscriptions.push(autoxide_kernel::event::Subscription::new(
+                "plans.subscription_status_changed",
+                Arc::new(notices::StatusNotices(service)),
+            ));
+        }
+        subscriptions
     }
 
     fn routes(&self) -> OpenApiRouter {

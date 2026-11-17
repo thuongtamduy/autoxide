@@ -327,6 +327,11 @@ pub fn error_codes(text: &str) -> Vec<(usize, String)> {
                 // Mẫu mail cần bản dịch của tiêu đề và nội dung.
                 codes.push((line, format!("{literal}.subject")));
                 codes.push((line, format!("{literal}.text")));
+            } else if is_notification_template(&source[..start]) {
+                // Mẫu thông báo (D-348) cần bản dịch của tiêu đề, nội dung và bản ngắn.
+                codes.push((line, format!("{literal}.title")));
+                codes.push((line, format!("{literal}.body")));
+                codes.push((line, format!("{literal}.short")));
             }
         }
         index = end + 1;
@@ -348,6 +353,17 @@ fn is_mail_template(before: &str) -> bool {
     let tail: String =
         before.chars().rev().take(60).collect::<Vec<_>>().into_iter().rev().collect();
     tail.split_whitespace().collect::<Vec<_>>().join(" ").trim_end().ends_with("MailTemplate::new(")
+}
+
+/// Văn bản `before` kết thúc bằng `NotificationTemplate::new(`.
+fn is_notification_template(before: &str) -> bool {
+    let tail: String =
+        before.chars().rev().take(60).collect::<Vec<_>>().into_iter().rev().collect();
+    tail.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_end()
+        .ends_with("NotificationTemplate::new(")
 }
 
 /// Văn bản `before` (ngay trước một chuỗi) kết thúc bằng một chỗ tạo lỗi.
@@ -488,6 +504,12 @@ const WELCOME: MailTemplate = MailTemplate::new(
     "Welcome",
     "Hello.",
 );
+const SHIPPED: NotificationTemplate = NotificationTemplate::new(
+    "orders.order_shipped",
+    "Shipped",
+    "Your order shipped.",
+    "Shipped",
+);
 "#;
         assert_eq!(
             codes(text),
@@ -499,7 +521,10 @@ const WELCOME: MailTemplate = MailTemplate::new(
                 "not_found",
                 "internal_error",
                 "notes.mail.welcome.subject",
-                "notes.mail.welcome.text"
+                "notes.mail.welcome.text",
+                "orders.order_shipped.title",
+                "orders.order_shipped.body",
+                "orders.order_shipped.short"
             ]
         );
     }
