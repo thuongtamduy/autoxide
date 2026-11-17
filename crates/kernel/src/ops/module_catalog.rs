@@ -53,6 +53,9 @@ const INTERNAL: [&str; 2] = [crate::builtin::NAME, crate::antispam::module::NAME
 #[derive(Clone, Default)]
 pub(crate) struct ModuleCatalog {
     entries: Arc<OnceLock<Vec<Entry>>>,
+    /// Bước kiểm (`autoxide doctor`) của mọi module, kèm tên module: cảnh báo vận hành
+    /// (`GET /kernel/ops/alerts`) chạy lại chúng.
+    checks: Arc<OnceLock<Vec<(&'static str, crate::doctor::Check)>>>,
 }
 
 /// Một module trong sổ: phần khai báo (không đổi lúc chạy) và migrator riêng của nó để đọc
@@ -92,6 +95,16 @@ impl ModuleCatalog {
             .collect();
         // Đã điền rồi thì giữ bản cũ: sổ không đổi trong lúc chạy.
         let _ = self.entries.set(entries);
+        let checks = modules
+            .iter()
+            .flat_map(|module| module.checks().into_iter().map(|check| (module.name(), check)))
+            .collect();
+        let _ = self.checks.set(checks);
+    }
+
+    /// Bước kiểm của mọi module (rỗng trước khi mọi module khởi động).
+    pub(crate) fn checks(&self) -> &[(&'static str, crate::doctor::Check)] {
+        self.checks.get().map_or(&[], Vec::as_slice)
     }
 
     fn entries(&self) -> Result<&[Entry], Error> {

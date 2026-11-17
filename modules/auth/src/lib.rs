@@ -183,6 +183,11 @@ impl Module for AuthModule {
             outbox.clone(),
             config.passkey.as_ref(),
         )?);
+        // Link trong thư mở trên tên miền của khách khi khách đã đặt `kernel.public_url`.
+        let links = context
+            .require::<dyn autoxide_kernel::tenancy::TenantSettings>()
+            .map(autoxide_kernel::tenancy::SiteLinks::new)
+            .unwrap_or_default();
         let verifications = Arc::new(verify::EmailVerifications {
             users: users.clone(),
             sessions: sessions.clone(),
@@ -190,6 +195,7 @@ impl Module for AuthModule {
             translations: context.translations().clone(),
             outbox: outbox.clone(),
             jobs: context.jobs(),
+            links: links.clone(),
             url: config.email_verification_url.clone(),
             report_url: config.email_change_report_url.clone(),
             databases: databases.clone(),
@@ -213,6 +219,7 @@ impl Module for AuthModule {
             mailer: mailer.clone(),
             translations: context.translations().clone(),
             outbox: outbox.clone(),
+            links: links.clone(),
             url: config.password_reset_url.clone(),
             databases: databases.clone(),
         });
@@ -271,6 +278,7 @@ impl Module for AuthModule {
             mailer: mailer.clone(),
             translations: context.translations().clone(),
             outbox: outbox.clone(),
+            links: links.clone(),
             url: config.login_link_url.clone(),
             minutes: config.login_link_minutes,
             databases: databases.clone(),
@@ -284,6 +292,7 @@ impl Module for AuthModule {
             translations: context.translations().clone(),
             outbox: outbox.clone(),
             databases: databases.clone(),
+            links: links.clone(),
             url: config.invitation_url.clone(),
             days: config.invitation_days,
             entitlements: context.entitlements(),
@@ -501,6 +510,7 @@ pub(crate) mod testing {
             translations: translations.clone(),
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
             jobs: autoxide_kernel::job::JobQueue::new("auth"),
+            links: Default::default(),
             url: None,
             report_url: None,
             databases: registry.clone(),
@@ -531,6 +541,7 @@ pub(crate) mod testing {
             mailer: mails.clone(),
             translations: translations.clone(),
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+            links: Default::default(),
             url: None,
             databases: registry.clone(),
         });

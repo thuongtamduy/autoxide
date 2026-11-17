@@ -64,6 +64,8 @@ pub(crate) struct EmailVerifications {
     pub outbox: Outbox,
     /// Hàng đợi job của `auth`: mail báo địa chỉ cũ khi đổi email (`email_report.rs`).
     pub jobs: JobQueue,
+    /// Link theo tên miền của khách (`kernel.public_url`).
+    pub links: autoxide_kernel::tenancy::SiteLinks,
     /// Trang của giao diện, có `{token}`; `None`: mail chứa token.
     pub url: Option<String>,
     /// Trang báo "không phải tôi", có `{token}`; `None`: mail chứa token.
@@ -300,7 +302,7 @@ impl EmailVerifications {
         let hours = TOKEN_HOURS.to_string();
         let mail = match &self.url {
             Some(url) => {
-                let link = url.replace("{token}", &token);
+                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
                 let params = [("email", email), ("hours", &hours), ("link", &link)];
                 VERIFY_LINK.mail(email, &self.translations, language, &params)
             }

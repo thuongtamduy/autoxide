@@ -1,6 +1,7 @@
 //! Vận hành: log, số đo, OpenTelemetry, `autoxide doctor`, `autoxide task`; module nội bộ
 //! `kernel` (`builtin`) với sổ module đã cài và cờ theo người dùng.
 
+pub(crate) mod alerts;
 pub(crate) mod builtin;
 pub(crate) mod client_config;
 pub mod doctor;
@@ -11,3 +12,4 @@ pub(crate) mod my_permissions;
 pub mod task;
 pub mod telemetry;
 pub(crate) mod user_flags;
+pub(crate) mod whats_new;

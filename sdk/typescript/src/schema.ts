@@ -111,6 +111,31 @@ export type AiStatus = {
   tokens_today: number;
 };
 
+/** Something about the server that needs attention. */
+export type Alert = {
+  /** What to do about it (a setting, a command), in English; `null` when the check gives none. */
+  hint?: string | null;
+  /** What was found, in English. */
+  message: string;
+  /** The check that found it, `<module>.<check>` (as in `autoxide doctor`). */
+  name: string;
+  /**
+   * `failed` (what depends on it does not work) or `warning` (works, but fix it before
+   * running for real).
+   */
+  severity: string;
+};
+
+/** The current alerts. */
+export type AlertsResponse = {
+  /** Failed ones first, then warnings; empty when everything is fine. */
+  alerts: Alert[];
+  /** When the checks ran (up to a minute ago; `refresh=true` runs them now). */
+  checked_at: string;
+  /** How many checks ran. */
+  checks: number;
+};
+
 /** A domain that may get a TLS certificate. */
 export type AllowedTenantDomain = {
   domain: string;
@@ -1485,6 +1510,19 @@ export type Data_AiStatus = {
     provider: string;
     /** Tokens used today (UTC), text and embeddings together. */
     tokens_today: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AlertsResponse = {
+  /** The current alerts. */
+  data: {
+    /** Failed ones first, then warnings; empty when everything is fine. */
+    alerts: Alert[];
+    /** When the checks ran (up to a minute ago; `refresh=true` runs them now). */
+    checked_at: string;
+    /** How many checks ran. */
+    checks: number;
   };
 };
 
@@ -5219,6 +5257,21 @@ export type Data_Vec_PublicProfileResponse = {
     unit_type: string;
     /** `null` until the profile is first saved. */
     updated_at?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_Release = {
+  data: {
+    /** Release day (`YYYY-MM-DD`); `null` for `unreleased`. */
+    date?: string | null;
+    /**
+     * The changes by kind, in the order of the changelog: `added`, `changed`, `deprecated`,
+     * `removed`, `fixed`, `security`. Each item is Markdown (in English).
+     */
+    sections: ReleaseSection[];
+    /** `0.14.0`, or `unreleased` for changes in this build that have no version yet. */
+    version: string;
   }[];
 };
 
@@ -10697,6 +10750,27 @@ export type RegisterRequest = {
   realm?: Realm;
 };
 
+/** The changes of one version. */
+export type Release = {
+  /** Release day (`YYYY-MM-DD`); `null` for `unreleased`. */
+  date?: string | null;
+  /**
+   * The changes by kind, in the order of the changelog: `added`, `changed`, `deprecated`,
+   * `removed`, `fixed`, `security`. Each item is Markdown (in English).
+   */
+  sections: ReleaseSection[];
+  /** `0.14.0`, or `unreleased` for changes in this build that have no version yet. */
+  version: string;
+};
+
+/** One kind of change in a release. */
+export type ReleaseSection = {
+  /** One Markdown paragraph per change. */
+  items: string[];
+  /** `added`, `changed`, `deprecated`, `removed`, `fixed` or `security`. */
+  kind: string;
+};
+
 /** A new name for a tag. */
 export type RenameTagRequest = {
   /** 1 to 50 characters, without `,`; unique, ignoring case. */
@@ -15810,6 +15884,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/ops/alerts": {
+    /** List what needs attention on the server. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { refresh?: boolean }; };
+      responses: {
+        200: Data_AlertsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/placements": {
     /** List the placements. */
     get: {
@@ -16112,6 +16198,17 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/whats-new": {
+    /** List what is new in this server. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { since?: string }; };
+      responses: {
+        200: Data_Vec_Release;
         422: Problem;
         default: Problem;
       };

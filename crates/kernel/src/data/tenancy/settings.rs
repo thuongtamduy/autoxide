@@ -61,9 +61,93 @@ pub const SETTINGS_MANAGE: Permission = Permission::new(
 /// URL công khai của khách (link trong email…); không đặt thì `AUTOXIDE_HTTP_PUBLIC_URL`.
 pub const PUBLIC_URL: TenantSetting = TenantSetting::new(
     "kernel.public_url",
-    "Public URL of this tenant's site, e.g. `https://shop.example`, used in links sent by mail. \
-     When unset, the server-wide AUTOXIDE_HTTP_PUBLIC_URL is used.",
-);
+    "Public address of this tenant's site, e.g. `https://shop.example` (scheme and host only). \
+     Links in mails sent for this tenant (sign-in links, invitations, password resets, email \
+     checks, newsletter and comment confirmations) open on it: the server's link addresses keep \
+     their path, only the start changes. When unset, the server's addresses are used as set.",
+)
+.checked(site_origin);
+
+fn site_origin(raw: &str) -> Result<(), FieldError> {
+    if origin_of(raw.trim()).is_some_and(|origin| origin == raw.trim().trim_end_matches('/')) {
+        Ok(())
+    } else {
+        Err(FieldError::new(
+            "value",
+            "invalid",
+            "must be an address such as `https://shop.example`, with no path",
+        ))
+    }
+}
+
+/// Phần đầu `scheme://host[:port]` của một địa chỉ http(s); `None` khi không phải.
+fn origin_of(url: &str) -> Option<&str> {
+    let rest = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
+    let host_len = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    if host_len == 0 || rest[..host_len].contains(['@', ' ']) {
+        return None;
+    }
+    Some(&url[..url.len() - rest.len() + host_len])
+}
+
+/// Link trong thư theo khách (đề bài giao diện): khách đã đặt `kernel.public_url` thì link mở trên
+/// tên miền của khách — giữ đường dẫn của địa chỉ máy chủ, chỉ đổi phần đầu. Clone rẻ; mặc định
+/// (không có cấu hình theo khách, vd test dựng tay) trả nguyên địa chỉ.
+#[derive(Clone, Default)]
+pub struct SiteLinks(Option<Arc<dyn TenantSettings>>);
+
+impl SiteLinks {
+    pub fn new(settings: Arc<dyn TenantSettings>) -> Self {
+        SiteLinks(Some(settings))
+    }
+
+    /// `template` (địa chỉ đã cấu hình của máy chủ, có thể chứa `{token}`) cho khách `tenant`.
+    pub async fn rewrite(&self, tenant: &TenantContext, template: &str) -> Result<String, Error> {
+        let Some(settings) = &self.0 else { return Ok(template.to_owned()) };
+        // Giá trị cũ đặt trước khi có bộ kiểm mà sai dạng: dùng địa chỉ của máy chủ.
+        let site = parsed_setting(settings.as_ref(), tenant, &PUBLIC_URL, |raw| {
+            site_origin(raw).map(|()| raw.trim().to_owned())
+        })
+        .await?;
+        Ok(site.map_or_else(|| template.to_owned(), |site| rebase(template, &site)))
+    }
+}
+
+/// Đổi phần đầu của `template` thành `site`; `template` không phải địa chỉ http(s) thì giữ nguyên.
+fn rebase(template: &str, site: &str) -> String {
+    let site = site.trim().trim_end_matches('/');
+    match (origin_of(template), origin_of(site)) {
+        (Some(origin), Some(_)) => format!("{site}{}", &template[origin.len()..]),
+        _ => template.to_owned(),
+    }
+}
+
+/// Mô hình kinh doanh của khách (D-185): giao diện chọn các bước thiết lập, màn mặc định theo đó.
+/// Chỉ là thông tin; quyền dùng vẫn do gói (bước 35) quyết.
+pub const BUSINESS_MODEL: TenantSetting = TenantSetting::new(
+    "kernel.business_model",
+    "How this tenant does business, so interfaces show the right setup steps and screens: \
+     `independent` (one shop), `multi_store` (one business, several stores), `chain` (a parent \
+     with child tenants), `marketplace` (sellers sell on the tenant's site) or `saas` (the tenant \
+     sells software by plan). Information only: what the tenant may use comes from its plan.",
+)
+.checked(business_model);
+
+/// Giá trị `kernel.business_model` nhận.
+pub const BUSINESS_MODELS: [&str; 5] =
+    ["independent", "multi_store", "chain", "marketplace", "saas"];
+
+fn business_model(raw: &str) -> Result<(), FieldError> {
+    if BUSINESS_MODELS.contains(&raw.trim()) {
+        Ok(())
+    } else {
+        Err(FieldError::new(
+            "value",
+            "invalid",
+            "must be `independent`, `multi_store`, `chain`, `marketplace` or `saas`",
+        ))
+    }
+}
 
 /// Event: một cấu hình của khách vừa được đặt hay bỏ. Chỉ mang tên, không bao giờ mang giá trị.
 pub(crate) const SETTING_CHANGED: EventInfo = EventInfo::new(
@@ -942,5 +1026,27 @@ impl MigrationTrait for CreateTenantSettings {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("kernel_tenant_settings").to_owned()).await
+    }
+}
+
+#[cfg(test)]
+mod site_link_tests {
+    use super::*;
+
+    #[test]
+    fn doi_phan_dau_giu_duong_dan() {
+        assert_eq!(
+            rebase("https://www.example.com/confirm?token={token}", "https://shop.acme.vn/"),
+            "https://shop.acme.vn/confirm?token={token}"
+        );
+        assert_eq!(
+            rebase("https://api.example.com", "http://localhost:3400"),
+            "http://localhost:3400"
+        );
+        assert_eq!(rebase("not a url {token}", "https://shop.acme.vn"), "not a url {token}");
+        assert!(site_origin("https://shop.acme.vn").is_ok());
+        assert!(site_origin("https://shop.acme.vn/").is_ok());
+        assert!(site_origin("https://shop.acme.vn/vi").is_err());
+        assert!(site_origin("ftp://shop").is_err());
     }
 }

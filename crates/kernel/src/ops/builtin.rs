@@ -30,6 +30,8 @@ pub(crate) struct KernelModule {
     public_url: PublicUrl,
     /// Sổ module, do `Modules::start` điền sau khi mọi module khởi động.
     catalog: ModuleCatalog,
+    /// Cảnh báo vận hành (bước kiểm của mọi module, giữ kết quả một phút).
+    alerts: Arc<crate::ops::alerts::Alerts>,
     /// Cấu hình cho giao diện của mọi module (D-271), điền cùng lúc với sổ module.
     client_configs: crate::ops::client_config::ClientConfigs,
     /// Database của chương trình; có sau `start` (để đọc trạng thái migration).
@@ -98,6 +100,7 @@ impl KernelModule {
             seeds,
             admin: None,
             public_url: PublicUrl::default(),
+            alerts: Arc::new(crate::ops::alerts::Alerts::new(catalog.clone())),
             catalog,
             client_configs,
             database: None,
@@ -246,13 +249,15 @@ impl Module for KernelModule {
     }
 
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
-        vec![crate::tenancy::PUBLIC_URL]
+        vec![crate::tenancy::PUBLIC_URL, crate::tenancy::BUSINESS_MODEL]
     }
 
     fn routes(&self) -> OpenApiRouter {
         let catalog = self.catalog_state().map_or_else(OpenApiRouter::new, module_catalog::routes);
-        let mut routes =
-            catalog.merge(crate::ops::client_config::routes(self.client_configs.clone()));
+        let mut routes = catalog
+            .merge(crate::ops::client_config::routes(self.client_configs.clone()))
+            .merge(crate::ops::whats_new::routes())
+            .merge(crate::ops::alerts::routes(self.alerts.clone()));
         if let (Some(settings), Some(registry)) = (&self.settings, &self.registry) {
             routes =
                 routes.merge(crate::tenancy::settings::routes(settings.clone(), registry.clone()));

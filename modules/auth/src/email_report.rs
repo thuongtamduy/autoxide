@@ -134,7 +134,7 @@ impl EmailVerifications {
         let days = REPORT_DAYS.to_string();
         let mail = match &self.report_url {
             Some(url) => {
-                let link = url.replace("{token}", &token);
+                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
                 let params = [
                     ("old_email", job.old_email.as_str()),
                     ("new_email", &new_email),

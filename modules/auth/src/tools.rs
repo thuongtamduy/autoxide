@@ -410,6 +410,7 @@ mod tests {
                 databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
                     services.database.clone(),
                 ),
+                links: Default::default(),
                 url: None,
                 days: 7,
                 entitlements: Default::default(),
@@ -422,6 +423,7 @@ mod tests {
                 mailer: services.mails.clone(),
                 translations: autoxide_kernel::i18n::Translations::default(),
                 outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                links: Default::default(),
                 url: None,
                 minutes: 15,
                 databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
