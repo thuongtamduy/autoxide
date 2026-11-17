@@ -80,7 +80,53 @@ fn document_payload(row: &document::Model, symbol: Option<&str>) -> Result<Value
     }))
 }
 
+/// Ảnh chụp tỉ giá của một chứng từ ngoại tệ.
+pub(crate) struct FxSnapshot {
+    pub rate: autoxide_kernel::decimal::Decimal,
+    pub rate_id: Uuid,
+    /// Tổng tiền của chứng từ quy ra tiền của sổ.
+    pub base_total: Money,
+}
+
+fn rate_missing(base: Currency, quote: Currency, on: chrono::NaiveDate) -> Error {
+    Error::new(
+        autoxide_kernel::error::ErrorKind::Validation,
+        "invoices.rate_missing",
+        "There is no {base}/{quote} exchange rate for {date}. Record the rate before issuing.",
+    )
+    .with_param("base", base.code())
+    .with_param("quote", quote.code())
+    .with_param("date", on.format("%Y-%m-%d").to_string())
+}
+
 impl InvoicesService {
+    /// Tỉ giá cho chứng từ `row` lập ngày `on` khi tiền của chứng từ khác tiền của sổ người bán
+    /// (Luật Kế toán 88/2015 Điều 11: ngoại tệ quy đổi ra đồng Việt Nam). Không có tỉ giá →
+    /// `invoices.rate_missing`.
+    async fn fx_snapshot(
+        &self,
+        tenant: &TenantContext,
+        row: &document::Model,
+        seller: OrgId,
+        on: chrono::NaiveDate,
+    ) -> Result<Option<FxSnapshot>, Error> {
+        let currency = Currency::parse(&row.currency)?;
+        let base = self.ledger.book_currency(tenant, seller).await?;
+        if base == currency {
+            return Ok(None);
+        }
+        let Some(found) = self.ledger.exchange_rate(tenant, currency, base, on).await? else {
+            return Err(rate_missing(currency, base, on));
+        };
+        let rate = found.rate.0;
+        let base_total = Money::new(row.total_minor, currency).convert(
+            rate,
+            base,
+            autoxide_kernel::decimal::Rounding::HalfUp,
+        )?;
+        Ok(Some(FxSnapshot { rate, rate_id: found.id, base_total }))
+    }
+
     /// Ảnh chụp người bán (hồ sơ thuế gần nhất trên cây).
     async fn seller_snapshot(&self, tenant: &TenantContext, seller: OrgId) -> Result<Value, Error> {
         Ok(match self.tax.profile(tenant, seller).await? {
@@ -136,7 +182,14 @@ impl InvoicesService {
             Value::Null
         };
         let today = Utc::now().date_naive();
-        let (outbox, jobs, seller) = (&self.outbox, &self.jobs, &seller);
+        // Chứng từ ngoại tệ: chụp tỉ giá ngày lập (đọc `ledger` NGOÀI transaction ghi).
+        let fx = if current.status == "draft" {
+            self.fx_snapshot(tenant, &current, seller_org, current.issue_date.unwrap_or(today))
+                .await?
+        } else {
+            None
+        };
+        let (outbox, jobs, seller, fx) = (&self.outbox, &self.jobs, &seller, &fx);
         let issued = database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -225,6 +278,12 @@ impl InvoicesService {
                 active.issue_date = Set(Some(issue_date));
                 active.retention_until = Set(Some(retention_until(issue_date)));
                 active.seller = Set(seller.to_string());
+                if let Some(fx) = fx {
+                    active.exchange_rate = Set(Some(autoxide_kernel::decimal::to_column(fx.rate)));
+                    active.exchange_rate_id = Set(Some(fx.rate_id));
+                    active.base_currency = Set(Some(fx.base_total.currency().code().to_owned()));
+                    active.base_total_minor = Set(Some(fx.base_total.minor()));
+                }
                 active.issued_by = Set(actor.user_id);
                 active.issued_at = Set(Some(at));
                 active.updated_at = Set(at);
@@ -751,6 +810,10 @@ fn issue_entry(row: &document::Model) -> Result<Option<NewEntry>, Error> {
     .source_id(row.id.to_string());
     if let Some(day) = row.issue_date {
         entry = entry.on(day);
+    }
+    // Chứng từ ngoại tệ: bút toán quy đổi bằng đúng tỉ giá đã chụp trên chứng từ.
+    if let Some(rate) = row.exchange_rate.as_deref() {
+        entry = entry.exchange_rate(autoxide_kernel::decimal::from_column(rate)?);
     }
     Ok(Some(entry))
 }

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="{{ locale }}">
+<head>
+<meta charset="utf-8">
+<title>{{ labels.title[document.kind] }} {{ document.symbol }} {{ document.number }}</title>
+<style>
+  body { font-family: "Liberation Sans", Arial, sans-serif; font-size: 12px; color: #111; margin: 24px; }
+  h1 { font-size: 20px; text-align: center; margin: 8px 0; text-transform: uppercase; }
+  .meta { text-align: center; margin-bottom: 16px; }
+  .draft { color: #b00; text-align: center; font-weight: bold; }
+  .parties { display: flex; gap: 24px; margin-bottom: 16px; }
+  .parties div { flex: 1; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #999; padding: 4px 6px; }
+  th { background: #f2f2f2; }
+  td.num { text-align: right; white-space: nowrap; }
+  .totals td { border: none; text-align: right; }
+  .sign { display: flex; justify-content: space-around; margin-top: 32px; text-align: center; }
+  .sign small { display: block; color: #555; }
+  @media print { body { margin: 0; } }
+</style>
+</head>
+<body>
+{% if document.status == "draft" %}<p class="draft">{{ labels.draft }}</p>{% endif %}
+<h1>{{ labels.title[document.kind] }}</h1>
+<p class="meta">
+  {% if document.symbol %}{{ labels.symbol }}: {{ document.symbol }} · {% endif %}{{ labels.number }}: {{ document.number }}
+  {% if document.issue_date %} · {{ labels.date }}: {{ document.issue_date|date }}{% endif %}
+</p>
+{% set left = labels.seller %}{% set right = labels.buyer %}
+{% if document.kind == "goods_receipt" %}{% set left = labels.receiver %}{% set right = labels.supplier %}{% endif %}
+{% if document.kind == "cash_receipt" %}{% set left = labels.payee %}{% set right = labels.payer %}{% endif %}
+{% if document.kind == "cash_payment" %}{% set left = labels.payer %}{% set right = labels.payee %}{% endif %}
+<div class="parties">
+  <div>
+    <strong>{{ left }}:</strong> {{ seller.legal_name }}<br>
+    {% if seller.tax_code %}{{ labels.tax_code }}: {{ seller.tax_code }}<br>{% endif %}
+    {% if seller.address %}{{ labels.address }}: {{ seller.address }}{% endif %}
+  </div>
+  <div>
+    <strong>{{ right }}:</strong> {{ buyer.name }}<br>
+    {% if buyer.tax_code %}{{ labels.tax_code }}: {{ buyer.tax_code }}<br>{% endif %}
+    {% if buyer.address %}{{ labels.address }}: {{ buyer.address }}{% endif %}
+  </div>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>{{ labels.line_no }}</th><th>{{ labels.description }}</th><th>{{ labels.unit }}</th>
+      <th>{{ labels.quantity }}</th><th>{{ labels.unit_price }}</th><th>{{ labels.amount }}</th>
+      {% if document.taxed %}<th>{{ labels.vat_rate }}</th><th>{{ labels.vat }}</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+  {% for line in lines %}
+    <tr>
+      <td class="num">{{ line.line_no }}</td>
+      <td>{{ line.description }}</td>
+      <td>{{ line.unit }}</td>
+      {% if line.kind == "note" %}<td></td><td></td><td></td>{% else %}
+      <td class="num">{{ line.quantity|number }}</td>
+      <td class="num">{{ line.unit_price|money }}</td>
+      <td class="num">{{ line.net|money }}</td>
+      {% endif %}
+      {% if document.taxed %}<td class="num">{% if line.rate_percent %}{{ line.rate_percent }}%{% endif %}</td><td class="num">{{ line.tax|money }}</td>{% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<table class="totals">
+  <tr><td>{{ labels.subtotal }}: {{ totals.subtotal|money }}</td></tr>
+  {% if document.taxed %}<tr><td>{{ labels.tax_total }}: {{ totals.tax|money }}</td></tr>{% endif %}
+  <tr><td><strong>{{ labels.total }}: {{ totals.total|money }}</strong></td></tr>
+  {% if document.exchange_rate %}<tr><td>{{ labels.exchange_rate }}: {{ document.exchange_rate|number }} · {{ labels.base_total }}: {{ totals.base_total|money }}</td></tr>{% endif %}
+</table>
+{% if document.lookup_code %}<p>{{ labels.lookup_code }}: {{ document.lookup_code }}{% if document.authority_code %} · {{ labels.authority_code }}: {{ document.authority_code }}{% endif %}</p>{% endif %}
+<div class="sign">
+  {% if document.kind == "delivery_note" %}
+  <div>{{ labels.sign_receiver }}<small>{{ labels.sign_note }}</small></div>
+  <div>{{ labels.sign_deliverer }}<small>{{ labels.sign_note }}</small></div>
+  {% elif document.kind == "goods_receipt" %}
+  <div>{{ labels.sign_deliverer }}<small>{{ labels.sign_note }}</small></div>
+  <div>{{ labels.sign_storekeeper }}<small>{{ labels.sign_note }}</small></div>
+  {% elif document.kind == "cash_receipt" or document.kind == "cash_payment" %}
+  <div>{{ right }}<small>{{ labels.sign_note }}</small></div>
+  <div>{{ labels.sign_cashier }}<small>{{ labels.sign_note }}</small></div>
+  {% else %}
+  <div>{{ labels.sign_buyer }}<small>{{ labels.sign_note }}</small></div>
+  <div>{{ labels.sign_seller }}<small>{{ labels.sign_note }}</small></div>
+  {% endif %}
+</div>
+</body>
+</html>

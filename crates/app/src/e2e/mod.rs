@@ -6,6 +6,7 @@ pub(crate) mod access;
 pub(crate) mod billing;
 pub(crate) mod guides;
 pub(crate) mod invoices;
+pub(crate) mod invoices_print;
 pub(crate) mod ledger_flows;
 pub(crate) mod media;
 pub(crate) mod migrations;

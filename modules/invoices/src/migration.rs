@@ -17,6 +17,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0006_tenancy_jobs",
             vec![autoxide_kernel::job::tenant_table("invoices")],
         ),
+        Box::new(AddPrintExportArchive),
     ]
 }
 
@@ -227,6 +228,155 @@ impl MigrationTrait for CreateInvoices {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for table in TABLES {
             manager.drop_table(Table::drop().table(table).to_owned()).await?;
+        }
+        Ok(())
+    }
+}
+
+/// Bước 36 mục 7, 10, 11, 12 (D-352…D-355): ảnh chụp tỉ giá trên chứng từ ngoại tệ, ẩn danh người mua
+/// khi hết hạn lưu, mẫu in theo khách, bản xuất kế toán, bản lưu trữ.
+struct AddPrintExportArchive;
+
+impl MigrationName for AddPrintExportArchive {
+    fn name(&self) -> &str {
+        "m0007_print_export_archive"
+    }
+}
+
+const DOCUMENT_COLUMNS: [&str; 5] =
+    ["exchange_rate", "exchange_rate_id", "base_currency", "base_total_minor", "buyer_purged_at"];
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddPrintExportArchive {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // SQLite chỉ thêm được một cột mỗi câu `ALTER TABLE`.
+        let columns = [
+            schema::string_len_null("exchange_rate", 40),
+            schema::uuid_null("exchange_rate_id"),
+            schema::string_len_null("base_currency", 3),
+            schema::big_integer_null("base_total_minor"),
+            schema::timestamp_with_time_zone_null("buyer_purged_at"),
+        ];
+        for mut column in columns {
+            manager
+                .alter_table(
+                    Table::alter().table("invoices_documents").add_column(&mut column).to_owned(),
+                )
+                .await?;
+        }
+        // Quét chứng từ hết hạn lưu (job hằng ngày, mọi khách của database).
+        index(
+            manager,
+            "invoices_documents",
+            "invoices_documents_retention_sweep_idx",
+            &["retention_until", "buyer_purged_at"],
+            false,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("invoices_templates")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    // UUID nil = cả khách (cột trong khoá unique không để null: hai database xử lý
+                    // null khác nhau).
+                    .col(schema::uuid("org_id"))
+                    .col(schema::string_len("kind", 32))
+                    .col(schema::string_len("locale", 8))
+                    .col(schema::integer("version"))
+                    .col(schema::text("body"))
+                    .col(schema::uuid_null("updated_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "invoices_templates",
+            "invoices_templates_key_idx",
+            &["tenant_id", "org_id", "kind", "locale"],
+            true,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("invoices_exports")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("org_id"))
+                    .col(schema::string_len("profile", 32))
+                    .col(schema::string_len("format", 8))
+                    .col(schema::date("period_from"))
+                    .col(schema::date("period_to"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::string_len_null("file_key", 300))
+                    .col(schema::big_integer_null("size"))
+                    .col(schema::big_integer_null("row_count"))
+                    .col(schema::text_null("error"))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "invoices_exports",
+            "invoices_exports_created_idx",
+            &["tenant_id", "created_at"],
+            false,
+        )
+        .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table("invoices_archives")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::string_len("reason", 32))
+                    .col(schema::string_len("storage_prefix", 300))
+                    .col(schema::string_len_null("manifest_sha256", 64))
+                    .col(schema::text_null("files"))
+                    .col(schema::date_null("retain_until"))
+                    .col(schema::text_null("error"))
+                    .col(schema::uuid_null("created_by"))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "invoices_archives",
+            "invoices_archives_tenant_idx",
+            &["tenant_id", "created_at"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for table in ["invoices_archives", "invoices_exports", "invoices_templates"] {
+            manager.drop_table(Table::drop().table(table).to_owned()).await?;
+        }
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("invoices_documents_retention_sweep_idx")
+                    .table(Alias::new("invoices_documents"))
+                    .to_owned(),
+            )
+            .await?;
+        for column in DOCUMENT_COLUMNS {
+            manager
+                .alter_table(
+                    Table::alter().table("invoices_documents").drop_column(column).to_owned(),
+                )
+                .await?;
         }
         Ok(())
     }

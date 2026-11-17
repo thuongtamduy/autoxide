@@ -14,9 +14,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::api::RenderFormat;
 use crate::api::{Buyer, Document, NewDocument, NewDocumentLine};
 use crate::documents::DocumentFilter;
-use crate::permissions::{ISSUE, READ, WRITE};
+use crate::permissions::{EXPORT, ISSUE, READ, WRITE};
 use crate::service::InvoicesService;
 
 /// Which documents.
@@ -83,6 +84,7 @@ pub(crate) struct DraftInput {
 pub(crate) fn all(service: &Arc<InvoicesService>) -> Vec<Tool> {
     let (list, get, create, issue) =
         (service.clone(), service.clone(), service.clone(), service.clone());
+    let (print, export, status) = (service.clone(), service.clone(), service.clone());
     vec![
         Tool::new(
             "documents",
@@ -165,5 +167,123 @@ pub(crate) fn all(service: &Arc<InvoicesService>) -> Vec<Tool> {
             },
         )
         .requires(ISSUE),
+        Tool::new(
+            "print",
+            "Print a document as HTML with its print template (the unit's, the tenant's or the built-in \
+             one) in `en` or `vi`. For a PDF use `GET /api/v1/invoices/documents/{id}/render?format=pdf`.",
+            move |tenant: TenantContext, principal: Principal, input: PrintInput| {
+                let service = print.clone();
+                async move {
+                    let locale = input.locale.unwrap_or_else(|| "en".to_owned());
+                    if !crate::templates::LOCALES.contains(&locale.as_str()) {
+                        return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
+                            "locale",
+                            "invalid",
+                            "must be `en` or `vi`",
+                        )]));
+                    }
+                    let rendered = service
+                        .render_manual(&tenant, &principal, input.document_id, RenderFormat::Html, &locale)
+                        .await?;
+                    Ok::<_, Error>(PrintOutput { html: String::from_utf8_lossy(&rendered.body).into_owned() })
+                }
+            },
+        )
+        .requires(READ)
+        .read_only(),
+        Tool::new(
+            "create_export",
+            "Ask for an accounting export of a period (general journal or documents, CSV or XLSX) for \
+             the accountant's software; a background job makes the file.",
+            move |tenant: TenantContext, principal: Principal, input: ExportInput| {
+                let service = export.clone();
+                async move {
+                    let request = crate::exports::ExportInput {
+                        org: input.org_id.map(OrgId::from_uuid),
+                        profile: input.profile,
+                        format: input.format,
+                        from: input.from,
+                        to: input.to,
+                    };
+                    let row = service.request_export(&tenant, &principal, request).await?;
+                    Ok::<_, Error>(ExportStatus::from(row))
+                }
+            },
+        )
+        .requires(EXPORT),
+        Tool::new(
+            "export",
+            "The status of an accounting export; once `ready`, download it from \
+             `GET /api/v1/invoices/exports/{id}/download`.",
+            move |tenant: TenantContext, principal: Principal, input: ExportId| {
+                let service = status.clone();
+                async move { Ok::<_, Error>(ExportStatus::from(service.get_export(&tenant, &principal, input.export_id).await?)) }
+            },
+        )
+        .requires(EXPORT)
+        .read_only(),
     ]
+}
+
+/// Which document to print.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PrintInput {
+    document_id: Uuid,
+    /// `en` (default) or `vi`.
+    locale: Option<String>,
+}
+
+/// A printed document.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub(crate) struct PrintOutput {
+    html: String,
+}
+
+/// An export to make.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExportInput {
+    /// Only this unit's book or documents; omit for the whole tenant.
+    org_id: Option<Uuid>,
+    /// `generic_journal`, `vn_double_entry` or `generic_documents`.
+    profile: String,
+    /// `csv` or `xlsx`.
+    format: String,
+    /// First day, `YYYY-MM-DD`.
+    from: chrono::NaiveDate,
+    /// Last day, `YYYY-MM-DD`.
+    to: chrono::NaiveDate,
+}
+
+/// Which export.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExportId {
+    export_id: Uuid,
+}
+
+/// Where an export is.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub(crate) struct ExportStatus {
+    id: Uuid,
+    profile: String,
+    format: String,
+    /// `pending`, `running`, `ready` or `failed`.
+    status: String,
+    row_count: Option<i64>,
+    error: Option<String>,
+}
+
+impl From<crate::entity::export::Model> for ExportStatus {
+    fn from(row: crate::entity::export::Model) -> Self {
+        ExportStatus {
+            id: row.id,
+            profile: row.profile,
+            format: row.format,
+            status: row.status,
+            row_count: row.row_count,
+            error: row.error,
+        }
+    }
 }

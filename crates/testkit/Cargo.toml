@@ -13,6 +13,7 @@ autoxide-kernel.workspace = true
 axum.workspace = true
 bytes.workspace = true
 chrono.workspace = true
+rust_decimal.workspace = true
 futures-util.workspace = true
 # Client MCP thật cho `TestApp::mcp` (testkit chỉ là dev-dependency, nên feature client không
 # lọt vào binary).

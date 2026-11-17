@@ -1,4 +1,4 @@
-# Lộ trình — các bước đã xong (0–35)
+# Lộ trình — các bước đã xong (0–36)
 
 Chuyển nguyên văn từ `docs/ROADMAP.md` theo D-228 để lộ trình chỉ còn việc đang mở. Lịch sử từng bước
 xem `CHANGELOG.md` và `docs/DECISIONS.md`.
@@ -690,3 +690,59 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
 - [x] Xoá hẳn khách khi thuê bao `deleted` (D-327, D-337): `POST /kernel/tenants/{id}/erase`, bảng giữ lại khai ở
       `Module::retained_tables` (phần kế toán của bước 36); `plans` xoá khách khi hết thời hạn lưu
 - [x] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): hạn mức chia phần `Limit::per` (D-330)
+
+## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)
+
+Đặc tả: [`docs/steps/36-money-ledger-tax.md`](steps/36-money-ledger-tax.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Thiết kế: trụ 4. Bắt đầu SAU bước 34 (làm song song với 35 được; mục tính tiền của 35 dùng cổng
+thanh toán của bước này). Core không bao giờ tự giữ tiền.
+
+- [x] Số thập phân `rust_decimal` cho tính toán (ghi `STACK.md`), quy tắc làm tròn theo từng chỗ
+      dùng, chuyển qua lại với `Money` không mất đơn vị
+- [x] Module `ledger`: tài khoản theo khách / nút / người bán, bút toán nợ = có, chỉ thêm, đảo
+      bút toán để sửa, số dư suy từ bút toán, khoá dòng khi ghi đồng thời; test đồng thời trên cả
+      hai database (D-342; kèm kỳ tháng, khoá sổ, chuỗi băm, doctor `ledger.chain` / `ledger.balances`)
+- [x] Trait `PaymentGateway`, `PayoutGateway` trong kernel (như `TextModel`); nhận webhook của đối
+      tác: kiểm chữ ký, ghi nguyên văn, xử lý qua job, không trùng (mã tham chiếu D-184); đối soát
+      định kỳ sổ cái với sao kê đối tác; một bộ cài đặt giả cho test (D-343; `PayoutGateway` đi cùng
+      mục chi trả)
+- [x] Ba chế độ dòng tiền theo khách / sàn: tự thu, thu hộ qua đối tác, chia tại cổng — mỗi chế độ
+      sinh đúng bút toán (phải trả người bán, phí, thuế khấu trừ, tạm giữ tới hết hạn đổi trả) — D-350:
+      `Ledger::settle`, `ledger_holds`, chi trả qua `PayoutGateway`; đối tác chi hộ thật chưa có (chỉ bản giả)
+- [x] Engine thuế: nhóm hàng hoá, biểu thuế theo vùng thuế với ngày hiệu lực, giá gồm / chưa gồm
+      thuế, hồ sơ thuế người bán, thuế khấu trừ thay; ảnh chụp thuế suất trên từng dòng chứng từ;
+      gói dữ liệu "vn" (GTGT, mức giảm tạm thời, thuế tiêu thụ đặc biệt, tỉ lệ khấu trừ hộ kinh
+      doanh) cập nhật bằng CLI / API; `autoxide doctor` cảnh báo thuế suất sắp hết hạn
+- [x] Chứng từ: đánh số tuần tự không nhảy số theo phạm vi (khách / người bán / năm / ký hiệu), an
+      toàn đồng thời; trait `EInvoiceProvider` cho hoá đơn điện tử; phát hành thay người bán khi
+      được uỷ quyền (D-344, module `invoices`)
+- [x] Lưu trữ và khoá sổ kế toán (D-190): chứng từ, sổ cái, hoá đơn giữ ít nhất 10 năm (Luật Kế
+      toán 88/2015, Điều 41; NĐ 174/2016) — xoá khách hay yêu cầu xoá dữ liệu cá nhân thì phần kế
+      toán được giữ lại (lưu trữ / xuất ra), phần còn lại xoá; khoá sổ theo kỳ (kỳ đã khoá không
+      nhận bút toán, sửa bằng bút toán ở kỳ mở) — khoá sổ và giữ bảng `ledger_*` (D-342); bản lưu trữ
+      `POST /invoices/archives` ngoài thư mục khách, job `invoices.purge_expired` ẩn danh người mua / xoá chứng từ
+      quá hạn của khách đã xoá, không chạm chứng từ còn hạn (D-355; cần đối chiếu văn bản gốc)
+- [x] Hoá đơn khởi tạo từ máy tính tiền (D-190): `EInvoiceProvider` hỗ trợ cả loại này cho bán lẻ
+      tại quầy (NĐ 123/2020 sửa bởi NĐ 70/2025: hộ kinh doanh doanh thu từ 1 tỷ đồng / năm từ
+      01/6/2025; ngưỡng theo lộ trình — để dạng dữ liệu, cần đối chiếu văn bản mới nhất)
+- [x] Chuyển khoản VietQR tự khớp (D-194): sinh mã QR theo chuẩn VietQR với nội dung mang mã tham
+      chiếu, nhận biến động số dư qua trait `BankFeed` (ngân hàng hay dịch vụ đọc sao kê), khớp tự
+      động theo mã và số tiền, sai lệch vào hàng chờ xử lý tay; tiền vào thẳng tài khoản của người
+      bán / khách (chế độ tự thu, D-187) — D-350; nguồn biến động thật (ngân hàng, Casso / SePay…) cần hợp
+      đồng và khoá, hiện chỉ có `FakeBankFeed`
+- [x] Tỉ giá có ngày hiệu lực theo cặp tiền (nhập tay hay lấy từ nguồn qua trait); chứng từ ngoại tệ
+      lưu ảnh chụp tỉ giá; báo cáo gộp nhiều tiền tệ (bước 38) dùng bảng này — D-352: `ledger_fx_rates`,
+      `Ledger::exchange_rate`, `ExchangeRateSource` (chỉ bản giả), bút toán và chứng từ ngoại tệ giữ tỉ giá
+- [x] Mẫu in chứng từ (hoá đơn bán lẻ, phiếu giao hàng, phiếu nhập, phiếu thu): mẫu theo khách và
+      i18n, xuất HTML và PDF — chọn thư viện sau khi kiểm, ghi `STACK.md` — D-351 (`minijinja`), D-353 (PDF bố
+      cục cố định bằng `krilla`, `Invoices::render`)
+- [x] Xuất dữ liệu kế toán: sổ nhật ký chung và chứng từ theo kỳ ra CSV / Excel theo định dạng nhập
+      của phần mềm kế toán phổ biến, để kế toán của khách không nhập lại tay — D-354: `generic_journal`,
+      `vn_double_entry`, `generic_documents`; mẫu nhập riêng của MISA / Fast chưa đối chiếu được (cần kiểm)
+- [x] Đối chiếu thiết kế 2 (D-216, D-218): một bộ tên tài khoản, một cơ chế tạm giữ (`ledger_holds`), một
+      hạn thanh toán cho cả VietQR; `cod_remittance` (COD không về tài khoản nhà vận hành sàn); mã số thuế 12
+      số (TT 86/2024 — cần đối chiếu); `GET /ledger/entries?source_module&source_id`; phí sàn tách GTGT,
+      khấu trừ thay chỉ cho hộ / cá nhân (NĐ 117/2025 — cần đối chiếu) — D-350
+- [x] Đối chiếu đợt 2: `sealed_at` và số đếm niêm phong theo kỳ; `Ledger::balances` theo nhiều đối tượng (công
+      nợ nhà cung cấp) — D-350

@@ -55,7 +55,8 @@ pub use identity::{FAKE_IDENTITY_PROVIDER, FakeIdentityVerifier, FakeSmsSender};
 pub use leak::{branch_leak_check, cursor_leak_check, leak_check};
 pub use ownership::schema_ownership_violations;
 pub use payment::{
-    FAKE_PROVIDER, FakeBankFeed, FakePaymentGateway, FakePayoutGateway, FakePayoutOutcome,
+    FAKE_PROVIDER, FAKE_RATE_PROVIDER, FakeBankFeed, FakeExchangeRateSource, FakePaymentGateway,
+    FakePayoutGateway, FakePayoutOutcome,
 };
 pub use push::{FakeMobilePushSender, FakeWebPushSender, FakeZnsSender};
 pub use s3::{

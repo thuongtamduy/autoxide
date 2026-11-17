@@ -11,7 +11,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 
 use crate::error::{Error, ErrorKind};
-use crate::money::Money;
+use crate::money::{Currency, Money};
 use crate::tenancy::TenantId;
 
 /// Những gì một cổng làm được.
@@ -571,6 +571,48 @@ pub trait BankFeed: Send + Sync {
         account: &BankAccountRef,
         cursor: Option<String>,
     ) -> Result<BankBatch, Error>;
+}
+
+/// Một tỉ giá đối tác báo: 1 `base` = `rate` `quote` vào ngày `on`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct QuotedRate {
+    pub base: Currency,
+    pub quote: Currency,
+    /// Số đơn vị chính của `quote` cho 1 đơn vị chính của `base` (vd 1 USD = 25345.5 VND). Không bao giờ
+    /// là số thực: đọc từ chữ, giữ dạng thập phân chính xác.
+    pub rate: rust_decimal::Decimal,
+    pub on: NaiveDate,
+}
+
+impl QuotedRate {
+    pub fn new(
+        base: Currency,
+        quote: Currency,
+        rate: rust_decimal::Decimal,
+        on: NaiveDate,
+    ) -> Self {
+        QuotedRate { base, quote, rate, on }
+    }
+}
+
+/// Nguồn tỉ giá (ngân hàng, dịch vụ dữ liệu — D-237): `ledger` lưu tỉ giá nhận được vào bảng tỉ giá
+/// của khách (nguồn `provider:<tên>`), cạnh tỉ giá nhập tay. Bộ nối góp bằng
+/// `context.contribute::<dyn ExchangeRateSource>(…)`; test dùng `FakeExchangeRateSource`.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait ExchangeRateSource: Send + Sync {
+    /// Tên ổn định (`provider:<tên>` trong cột nguồn của tỉ giá).
+    fn provider(&self) -> &'static str;
+
+    /// Tỉ giá của `base` sang mọi loại tiền nguồn này có, ngày `on`. Không gọi trong transaction ghi.
+    async fn rates(
+        &self,
+        tenant: TenantId,
+        base: Currency,
+        on: NaiveDate,
+    ) -> Result<Vec<QuotedRate>, Error>;
 }
 
 /// `payment.signature_invalid` (401): chữ ký của thông báo không hợp lệ.

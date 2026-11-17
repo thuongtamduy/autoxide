@@ -12,9 +12,12 @@ mod config;
 mod entity;
 mod events;
 mod flows;
+mod fx;
 mod http;
 mod http_flows;
+mod http_fx;
 mod http_payments;
+mod journal;
 mod migration;
 mod payments;
 mod payouts;
@@ -32,6 +35,8 @@ mod vietqr;
 mod tests;
 #[cfg(test)]
 mod tests_flows;
+#[cfg(test)]
+mod tests_fx;
 #[cfg(test)]
 mod tests_payments;
 #[cfg(test)]
@@ -118,6 +123,8 @@ impl Module for LedgerModule {
             "ledger_payouts",
             "ledger_bank_accounts",
             "ledger_bank_transactions",
+            // Tỉ giá đã dùng cho chứng từ, bút toán ngoại tệ (Luật Kế toán 88/2015, Điều 11).
+            "ledger_fx_rates",
         ]
     }
 
@@ -164,6 +171,8 @@ impl Module for LedgerModule {
             gateways: context.contributions::<dyn autoxide_kernel::payment::PaymentGateway>(),
             payout_gateways: context.contributions::<dyn autoxide_kernel::payment::PayoutGateway>(),
             bank_feeds: context.contributions::<dyn autoxide_kernel::payment::BankFeed>(),
+            rate_sources: context
+                .contributions::<dyn autoxide_kernel::payment::ExchangeRateSource>(),
             tax: context.require::<dyn autoxide_tax::api::TaxEngine>().ok(),
             jobs: context.jobs(),
             config: self.config,
@@ -176,7 +185,8 @@ impl Module for LedgerModule {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
             http::routes(service.clone())
                 .merge(http_payments::routes(service.clone()))
-                .merge(http_flows::routes(service))
+                .merge(http_flows::routes(service.clone()))
+                .merge(http_fx::routes(service))
         })
     }
 

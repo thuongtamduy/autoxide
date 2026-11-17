@@ -12,8 +12,9 @@ use sea_orm::EntityTrait;
 use uuid::Uuid;
 
 use crate::api::{
-    AccountKey, Entry, FlowSettings, Hold, Ledger, NewEntry, NewPayment, NewPayout, NewRefund,
-    NewReversal, NewTransferPayment, OpenAccount, Payment, Payout, Refund, Settled, Settlement,
+    AccountKey, Entry, ExchangeRate, FlowSettings, Hold, JournalLine, JournalQuery, Ledger,
+    NewEntry, NewPayment, NewPayout, NewRefund, NewReversal, NewTransferPayment, OpenAccount,
+    Payment, Payout, Refund, Settled, Settlement,
 };
 use crate::entity::entry;
 use crate::service::{LedgerService, describe_entry};
@@ -157,5 +158,35 @@ impl Ledger for Provider {
         payment: NewTransferPayment,
     ) -> Result<Submitted<Payment>, Error> {
         self.0.create_transfer_payment(tenant, actor, payment).await
+    }
+
+    async fn exchange_rate(
+        &self,
+        tenant: &TenantContext,
+        base: autoxide_kernel::money::Currency,
+        quote: autoxide_kernel::money::Currency,
+        on: NaiveDate,
+    ) -> Result<Option<ExchangeRate>, Error> {
+        self.0
+            .exchange_rate(tenant, base, quote, on)
+            .await?
+            .map(crate::fx::describe_rate)
+            .transpose()
+    }
+
+    async fn book_currency(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+    ) -> Result<autoxide_kernel::money::Currency, Error> {
+        self.0.book_currency(tenant, org).await
+    }
+
+    async fn journal(
+        &self,
+        tenant: &TenantContext,
+        query: JournalQuery,
+    ) -> Result<autoxide_kernel::pagination::Page<JournalLine>, Error> {
+        self.0.journal(tenant, query).await
     }
 }

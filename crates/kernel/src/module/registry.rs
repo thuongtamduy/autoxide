@@ -895,6 +895,7 @@ mod tests {
                 "AUTOXIDE_HTTP_PUBLIC_URL",
                 "AUTOXIDE_USER_FLAGS_MAX",
                 "AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS",
+                "AUTOXIDE_TEMPLATE_MAX_BYTES",
             ]
             .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")

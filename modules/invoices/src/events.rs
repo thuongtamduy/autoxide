@@ -31,6 +31,11 @@ pub(crate) const DOCUMENT_CORRECTED: EventInfo = EventInfo::new(
     "An issued document was adjusted or replaced (`document_id`, `relation`, `by_document_id`).",
 );
 
+pub(crate) const EXPORT_READY: EventInfo = EventInfo::new(
+    "invoices.export_ready",
+    "An accounting export file is ready to download (`export_id`, `profile`, `format`, `rows`).",
+);
+
 macro_rules! event {
     ($kind:ident, $name:literal) => {
         #[derive(Debug, Serialize)]
@@ -47,6 +52,7 @@ event!(DocumentAccepted, "invoices.document_accepted");
 event!(DocumentRejected, "invoices.document_rejected");
 event!(DocumentCancelled, "invoices.document_cancelled");
 event!(DocumentCorrected, "invoices.document_corrected");
+event!(ExportReady, "invoices.export_ready");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -55,5 +61,6 @@ pub(crate) fn all() -> Vec<EventInfo> {
         DOCUMENT_REJECTED,
         DOCUMENT_CANCELLED,
         DOCUMENT_CORRECTED,
+        EXPORT_READY,
     ]
 }

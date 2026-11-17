@@ -58,6 +58,7 @@ rmcp = { workspace = true, features = [
 reqwest.workspace = true
 rust_decimal.workspace = true
 sea-orm.workspace = true
+sha2.workspace = true
 tower.workspace = true
 
 [lints]

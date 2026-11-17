@@ -418,6 +418,22 @@ databases.
 - **Never update or delete a transaction.** Correct a mistake with a new, reversing
   transaction (`amount.checked_neg()`) that points to the one it reverses; balances are
   then always explained by the history.
+- **Accounting goes through the ledger, not your own balance table.** What a sale, a fee or a
+  payout means in the books (receivable, revenue, VAT, what is owed to a seller) is posted with
+  `dyn autoxide_ledger::api::Ledger::post` (or `settle` for money flows), with a stable
+  `reference`. An entry in a foreign currency is converted with the rate of its day; pass the
+  rate you showed the customer with `NewEntry::exchange_rate`. Read rates with
+  `Ledger::exchange_rate` — never keep your own rate table. Your own balance table is only for
+  things that are not accounting (stock, points, quotas). See [MONEY.md](MONEY.md).
+- **Numbers without gaps** (invoice, order or receipt numbers) come from
+  `autoxide_kernel::numbering::next(&transaction, tenant, scope)` inside the transaction that
+  writes the record: a rollback does not use up the number.
+- **Printed documents** (delivery notes, goods receipts, receipts) are documents of the
+  `invoices` module: create them with `dyn Invoices::create_document` and print them with
+  `Invoices::render` (HTML from the tenant's template, or PDF). Templates a tenant writes for
+  anything else (mails, notifications) go through `autoxide_kernel::template::TemplateEngine`
+  (`context.require::<TemplateEngine>()`): declare a `TemplateSchema`, call `validate` on save
+  and `render` to print — never another template language.
 
 ### Features and limits (plans)
 

@@ -373,6 +373,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 - [`docs/ADDRESS.vi.md`](docs/ADDRESS.vi.md) — đơn vị hành chính và địa chỉ: đọc danh mục, nhập
   danh mục chính thức
 - [`docs/TAX.vi.md`](docs/TAX.vi.md) — thuế: gói dữ liệu thuế Việt Nam, tính thuế, hồ sơ thuế
+- [`docs/MONEY.vi.md`](docs/MONEY.vi.md) — tiền: sổ cái, thanh toán và chế độ dòng tiền, VietQR, chứng từ kế
+  toán, tỉ giá, in chứng từ, xuất dữ liệu kế toán, lưu chứng từ 10 năm
 - [`docs/NOTIFICATIONS.vi.md`](docs/NOTIFICATIONS.vi.md) — thông báo: loại và nhóm, kênh, đồng ý và
   khung giờ của tin quảng cáo, hộp thư và tuỳ chọn, khai một loại trong module
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu

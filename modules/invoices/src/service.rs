@@ -33,6 +33,11 @@ pub(crate) struct InvoicesService {
     pub tax: Arc<dyn TaxEngine>,
     pub ledger: Arc<dyn Ledger>,
     pub providers: Vec<Arc<dyn EInvoiceProvider>>,
+    /// Bộ dựng mẫu của kernel (mẫu in).
+    pub templates: Arc<autoxide_kernel::template::TemplateEngine>,
+    /// Nơi lưu chung (module `files`): bản xuất kế toán, bản lưu trữ. Không có thì hai việc đó báo
+    /// `invoices.storage_unavailable`.
+    pub storage: Option<Arc<dyn autoxide_kernel::storage::Storage>>,
 }
 
 // ---- Lỗi ----------------------------------------------------------------------------------------
@@ -186,6 +191,12 @@ pub(crate) async fn describe<C: ConnectionTrait>(
         lookup_code: row.lookup_code,
         rejection_reason: row.rejection_reason,
         retention_until: row.retention_until,
+        exchange_rate: row.exchange_rate.clone(),
+        exchange_rate_id: row.exchange_rate_id,
+        base_total: match (row.base_total_minor, row.base_currency.as_deref()) {
+            (Some(minor), Some(currency)) => Some(money(minor, currency)?),
+            _ => None,
+        },
         source_module: row.source_module,
         source_id: row.source_id,
         reference: row.reference,
