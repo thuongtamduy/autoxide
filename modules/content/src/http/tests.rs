@@ -489,3 +489,37 @@ async fn phien_ban_kem_ten_nguoi_sua() {
     .await
     .unwrap();
 }
+
+/// Đề bài giao diện W-059: `q` của danh sách chuyển hướng tìm trong đường dẫn cũ và địa chỉ đích,
+/// không phân biệt hoa thường, có dấu hay không.
+#[tokio::test]
+async fn tim_chuyen_huong_theo_q() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let body = json!({"locale": "en", "from_path": "/khuyến-mãi-cũ", "to_url": "https://Shop.example.com/Sale", "status_code": 301});
+        let created = send(&app, "POST", "/redirects", Some("admin"), &[], Some(body)).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        let body = json!({"locale": "en", "from_path": "/about-us", "to_url": "/about", "status_code": 301});
+        let created = send(&app, "POST", "/redirects", Some("admin"), &[], Some(body)).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+
+        let found = async |q: &str| {
+            let list = send(&app, "GET", &format!("/redirects?q={q}"), Some("admin"), &[], None).await;
+            assert_eq!(list.status(), StatusCode::OK, "{}", list.json());
+            list.json()["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["from_path"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(found("khuyen%20mai").await.len(), 0, "khoảng trắng không phải dấu gạch");
+        assert_eq!(found("khuyen-mai").await, ["/khuyến-mãi-cũ"]);
+        assert_eq!(found("SHOP.EXAMPLE").await, ["/khuyến-mãi-cũ"], "tìm cả địa chỉ đích");
+        assert_eq!(found("about").await, ["/about-us"]);
+        assert_eq!(found("50%25").await.len(), 0, "`%` là chữ thường");
+        assert_eq!(found("").await.len(), 2);
+    })
+    .await
+    .unwrap();
+}

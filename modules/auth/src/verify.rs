@@ -94,12 +94,24 @@ impl EmailVerifications {
         user_id: Uuid,
         language: Language,
     ) -> Result<(), Error> {
+        self.send_current_by(tenant, Actor::user(user_id), user_id, language).await
+    }
+
+    /// Như [`send_current`](Self::send_current), do `actor` (vd người quản trị gửi lại thư cho
+    /// một nhân viên) — bên gọi đã kiểm quyền.
+    pub(crate) async fn send_current_by(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        user_id: Uuid,
+        language: Language,
+    ) -> Result<(), Error> {
         let user =
             self.users.get(tenant, user_id).await?.ok_or_else(|| user::user_not_found(user_id))?;
         if user.email_verified_at.is_some() {
             return Err(already_verified());
         }
-        self.send(tenant, Actor::user(user_id), &user, &user.email, language).await
+        self.send(tenant, actor, &user, &user.email, language).await
     }
 
     /// Người dùng `user_id` xin đổi email sang `new_email`: kiểm mật khẩu hiện tại, rồi

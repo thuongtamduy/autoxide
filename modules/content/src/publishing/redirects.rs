@@ -53,10 +53,15 @@ impl ContentService {
         principal: &Principal,
         locale: Option<&str>,
         source: Option<&str>,
+        q: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<Redirect>, Error> {
         principal.require(&CONTENT_MANAGE)?;
         let mut select = redirect::Entity::find().scoped(tenant);
+        if let Some(q) = q.map(str::trim).filter(|q| !q.is_empty()) {
+            select =
+                select.filter(autoxide_kernel::search::contains(redirect::Column::SearchKey, q));
+        }
         if let Some(locale) = locale {
             select = select.filter(redirect::Column::Locale.eq(locale));
         }
@@ -296,6 +301,7 @@ impl ContentService {
             )
             .with_param("path", &from));
         }
+        let search_key = search_key(&from, to_url.as_deref());
         Ok(Redirect {
             id,
             tenant_id: tenant.id().as_uuid(),
@@ -305,6 +311,7 @@ impl ContentService {
             to_url,
             status_code: input.status_code,
             source: "manual".to_owned(),
+            search_key,
             created_by: Some(by),
             created_at: now,
             updated_at: now,
@@ -463,4 +470,10 @@ fn redirect_summary(row: &Redirect) -> serde_json::Value {
 pub(crate) fn redirect_not_found(id: Uuid) -> Error {
     Error::not_found("content.redirect_not_found", "No redirect has the id `{id}`.")
         .with_param("id", id)
+}
+
+/// Khoá tìm của một chuyển hướng: đường dẫn cũ và địa chỉ đích, bỏ dấu, viết thường — tìm như nhau
+/// trên SQLite và Postgres (`autoxide_kernel::search`).
+pub(crate) fn search_key(from_path: &str, to_url: Option<&str>) -> String {
+    autoxide_kernel::search::fold(&format!("{from_path} {}", to_url.unwrap_or_default()))
 }

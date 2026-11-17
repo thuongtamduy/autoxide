@@ -459,7 +459,7 @@ fn lines(
                 }
                 Next::Page(after) => {
                     let (rows, cursor) =
-                        service.export_page(&tenant, form_id, status, &keys, after).await?;
+                        service.export_page(&tenant, form_id, status, &[], &keys, after).await?;
                     count.fetch_add(rows.len() as u64, Ordering::SeqCst);
                     let chunk: String = rows.iter().map(|row| csv::line(row)).collect();
                     let next = cursor.map_or(Next::Done, |cursor| Next::Page(Some(cursor)));

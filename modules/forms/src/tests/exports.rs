@@ -70,7 +70,8 @@ async fn xuat_qua_job_giong_tung_byte_ban_dong_bo() {
         let ready = service.get_export(&tenant, &exporter, view.row.id).await.unwrap();
         assert_eq!(ready.state, ExportState::Ready);
         assert_eq!(ready.row.row_count, Some(205));
-        let (_, text) = service.export_csv(&tenant, &exporter, form.row.id, None).await.unwrap();
+        let (_, text) =
+            service.export_csv(&tenant, &exporter, form.row.id, None, &[]).await.unwrap();
         let stored = storage.bytes(&storage_key(view.row.id)).unwrap();
         assert_eq!(stored.as_ref(), text.as_bytes());
         assert_eq!(ready.row.size, Some(i64::try_from(text.len()).unwrap()));
@@ -123,7 +124,7 @@ async fn xuat_qua_job_giong_tung_byte_ban_dong_bo() {
         let filtered = service.get_export(&tenant, &exporter, filtered.row.id).await.unwrap();
         assert_eq!(filtered.row.row_count, Some(0));
         let (_, spam) = service
-            .export_csv(&tenant, &exporter, form.row.id, Some(SubmissionStatus::Spam))
+            .export_csv(&tenant, &exporter, form.row.id, Some(SubmissionStatus::Spam), &[])
             .await
             .unwrap();
         assert_eq!(storage.bytes(&storage_key(filtered.row.id)).unwrap().as_ref(), spam.as_bytes());

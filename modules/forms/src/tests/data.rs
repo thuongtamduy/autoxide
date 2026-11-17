@@ -23,14 +23,14 @@ async fn xuat_csv_chan_injection_va_tim_theo_chu() {
 
         assert_eq!(
             service
-                .export_csv(&tenant, &user(&["read"]), form.row.id, None)
+                .export_csv(&tenant, &user(&["read"]), form.row.id, None, &[])
                 .await
                 .unwrap_err()
                 .code(),
             "permission_denied"
         );
         let (name, text) =
-            service.export_csv(&tenant, &user(&["export"]), form.row.id, None).await.unwrap();
+            service.export_csv(&tenant, &user(&["export"]), form.row.id, None, &[]).await.unwrap();
         assert_eq!(name, "contact-submissions.csv");
         let lines: Vec<&str> = text.split("\r\n").collect();
         assert!(lines[0].starts_with("\u{feff}\"id\",\"created_at\",\"status\""), "{}", lines[0]);

@@ -8,6 +8,7 @@ mod m0006_embeddings;
 mod m0009_schedule_ai_review;
 mod m0012_org;
 mod m0013_site_paths;
+mod m0014_redirect_search;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -137,5 +138,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0013_site_paths::Migration),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "content"),
+        // Khoá tìm của chuyển hướng: `q` của `GET /redirects` (W-059 của giao diện).
+        Box::new(m0014_redirect_search::Migration),
     ]
 }

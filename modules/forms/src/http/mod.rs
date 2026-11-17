@@ -30,6 +30,7 @@ pub(crate) fn routes(service: Arc<FormsService>) -> OpenApiRouter {
         .layer(autoxide_kernel::tenancy::allowed_while_read_only())
         .routes(routes!(admin::list_forms, admin::create_form))
         .routes(routes!(admin::get_form, admin::update_form, admin::delete_form))
+        .routes(routes!(admin::duplicate_form))
         .routes(routes!(inbox::list_submissions))
         .routes(routes!(inbox::export_submissions))
         .routes(routes!(exports::get_export))
