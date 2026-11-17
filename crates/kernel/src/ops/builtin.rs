@@ -222,6 +222,7 @@ impl Module for KernelModule {
             crate::tenancy::DOMAINS_MANAGE,
             crate::tenancy::TENANTS_MOVE,
             crate::tenancy::DATA_EXPORT,
+            crate::tenancy::TENANTS_DELETE,
         ]
     }
 
@@ -236,6 +237,7 @@ impl Module for KernelModule {
             crate::tenancy::domains::DOMAIN_FAILED,
             crate::tenancy::domains::DOMAIN_UPDATED,
             crate::tenancy::moves::TENANT_MOVED,
+            crate::tenancy::erasure::TENANT_DELETED,
         ]
     }
 
@@ -379,7 +381,8 @@ impl Module for KernelModule {
                 self.seeds.clone(),
                 context.outbox()?,
             )
-            .with_entitlements(context.entitlements()),
+            .with_entitlements(context.entitlements())
+            .with_setup(self.move_setup.clone()),
         );
         self.admin = Some(admin.clone());
         context.provide::<crate::tenancy::TenantAdmin>(admin)?;

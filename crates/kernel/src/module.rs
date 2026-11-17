@@ -109,6 +109,13 @@ pub trait Module: Send + Sync {
         None
     }
 
+    /// Bảng cấp khách hàng của module phải GIỮ khi xoá hẳn một khách (D-337): chứng từ, sổ kế toán,
+    /// hoá đơn lưu ít nhất 10 năm (Luật Kế toán 88/2015, Điều 41; D-190). Mặc định rỗng: dữ liệu
+    /// của module bị xoá cùng khách.
+    fn retained_tables(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
+
     /// Bảng mặt điều khiển của module (bước 33, D-253): bảng không có `tenant_id` vì chung cả nền
     /// tảng, chỉ có dữ liệu ở database điều khiển. Mọi bảng khác của module (trừ `<m>_migrations`)
     /// là bảng cấp khách hàng và phải có `tenant_id` — testkit và `cargo xtask check` kiểm.

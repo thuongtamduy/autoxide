@@ -23,6 +23,7 @@
 pub(crate) mod admin;
 mod config;
 pub(crate) mod domains;
+pub(crate) mod erasure;
 pub(crate) mod exports;
 mod link_token;
 pub mod migration;
@@ -57,6 +58,7 @@ pub use domains::{
     CHALLENGE_PREFIX, CHALLENGE_VALUE_PREFIX, DOMAINS_MANAGE, DnsTxtLookup, DomainRecord,
     TenantDomain, TenantDomains, normalize_domain,
 };
+pub use erasure::{TENANTS_DELETE, TenantErasure};
 pub use exports::{DATA_EXPORT, TenantExport, TenantExportLink, TenantExports};
 pub use link_token::{OptionalTenant, link_token, resolve_link_token, split_link_token};
 pub use moves::{
@@ -214,6 +216,8 @@ pub enum TenantStatus {
     Maintenance,
     /// Đang dời sang database khác: như bảo trì.
     Moving,
+    /// Đã xoá hẳn (dữ liệu đã xoá, chỉ còn dòng trong sổ khách): request nhận `tenant_not_found`.
+    Deleted,
 }
 
 impl TenantStatus {
@@ -224,6 +228,7 @@ impl TenantStatus {
             TenantStatus::Suspended => "suspended",
             TenantStatus::Maintenance => "maintenance",
             TenantStatus::Moving => "moving",
+            TenantStatus::Deleted => "deleted",
         }
     }
 
@@ -235,6 +240,7 @@ impl TenantStatus {
             "suspended" => Some(TenantStatus::Suspended),
             "maintenance" => Some(TenantStatus::Maintenance),
             "moving" => Some(TenantStatus::Moving),
+            "deleted" => Some(TenantStatus::Deleted),
             _ => None,
         }
     }
@@ -735,6 +741,7 @@ pub fn ensure_serving(tenant: &TenantContext) -> Result<(), Error> {
         TenantStatus::Maintenance | TenantStatus::Moving | TenantStatus::Provisioning => {
             Err(errors::tenant_maintenance(30))
         }
+        TenantStatus::Deleted => Err(errors::tenant_not_found(&tenant.id().to_string())),
     }
 }
 

@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Delete a tenant and its data for good: `POST /api/v1/kernel/tenants/{id}/erase` (platform staff with the new
+  permission `kernel.tenants.delete`; the tenant must be suspended, and its slug sent again as `confirm`). Rows and
+  files of the tenant are deleted, its domains released; the tenant stays listed with status `deleted` and requests
+  to it answer `404 tenant_not_found`. Tables modules must keep (accounting records) are declared with
+  `Module::retained_tables`. A subscription that reaches the end of its retention period now deletes the tenant this
+  way (it was only suspended).
+
 - Billing profile of a tenant (legal name, tax code, email for invoices, phone, address):
   `GET/PUT /api/v1/plans/billing-profile`, and `GET /api/v1/plans/tenants/{tenant_id}/billing-profile` for platform
   staff. Billing reminders go to its email when the subscription has no `billing_email`.

@@ -299,7 +299,8 @@ impl Modules {
             registry.clone(),
             self.migrator().map_err(|error| ModuleError(error.to_string()))?,
         );
-        self.moves.fill(self.names(), self.control_plane_tables(), migrator, placements);
+        let retained = self.modules.iter().flat_map(|module| module.retained_tables()).collect();
+        self.moves.fill(self.names(), self.control_plane_tables(), migrator, placements, retained);
         Ok(())
     }
 

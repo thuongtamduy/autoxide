@@ -138,6 +138,12 @@ role, a lock row, a counter) is created by `Module::seed_tenant`, a `TenantSeed`
 the tenant is created. It must be safe to run again: `autoxide tenant provision` repeats a
 creation that stopped half-way.
 
+**What happens when a tenant is deleted.** Deleting a tenant for good (`POST
+/api/v1/kernel/tenants/{id}/erase`, or when its subscription ends its retention period) deletes
+every row of the tenant in every tenant-level table, and its files. A table the law requires to
+keep (accounting records: at least 10 years in Vietnam) is listed in `Module::retained_tables`;
+its rows stay.
+
 **Settings per tenant.** A setting a tenant may change for itself is declared in
 `Module::tenant_settings` (named `<module>.<key>`) and read with
 `context.require::<dyn TenantSettings>()`; when the tenant has not set it, use the server's

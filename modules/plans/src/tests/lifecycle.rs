@@ -217,13 +217,18 @@ async fn tam_khoa_qua_han_thanh_huy_roi_qua_thoi_han_luu_thanh_xoa() {
             ok(&app, Method::GET, &format!("/plans/tenants/{tenant}/subscription"), "ops", None)
                 .await;
         assert_eq!(sub["data"]["status"], "deleted");
-        // Khách bị khoá hẳn, dữ liệu giữ lại.
+        // Khách bị xoá hẳn (D-337): request tới khách nhận `tenant_not_found`; sổ khách giữ dòng
+        // `deleted`; thuê bao (sổ sách của nhà vận hành) vẫn còn, như đã đọc ở trên.
         let (code, body) = call(&app, Method::GET, "/plans/entitlements", "owner", None).await;
         assert_eq!(
             (code, body["code"].as_str()),
-            (StatusCode::FORBIDDEN, Some("tenant_suspended")),
+            (StatusCode::NOT_FOUND, Some("tenant_not_found")),
             "{body}"
         );
+        let row = ok(&app, Method::GET, &format!("/kernel/tenants/{tenant}"), "ops", None).await;
+        assert_eq!(row["data"]["status"], "deleted");
+        // Lượt chạy sau không làm gì thêm.
+        tick(&app).await;
     })
     .await
     .unwrap();

@@ -354,6 +354,8 @@ pub struct TenantAdmin {
     outbox: Outbox,
     /// Thuê bao, hạn mức (module `plans`, bước 35): bộ lọc `subscription_status`, `near_limit`.
     entitlements: crate::entitlement::EntitlementsHandle,
+    /// Bảng của các module (xoá hẳn khách, D-337); `None` khi chưa gắn.
+    setup: Option<super::moves::MoveSetup>,
 }
 
 impl std::fmt::Debug for TenantAdmin {
@@ -375,7 +377,25 @@ pub(super) fn is_slug(slug: &str) -> bool {
 
 impl TenantAdmin {
     pub(crate) fn new(registry: DatabaseRegistry, seeds: Seeds, outbox: Outbox) -> Self {
-        TenantAdmin { registry, seeds, outbox, entitlements: Default::default() }
+        TenantAdmin { registry, seeds, outbox, entitlements: Default::default(), setup: None }
+    }
+
+    /// Bảng của các module, cho xoá hẳn khách (D-337).
+    pub(crate) fn with_setup(mut self, setup: super::moves::MoveSetup) -> Self {
+        self.setup = Some(setup);
+        self
+    }
+
+    pub(super) fn setup(&self) -> Result<&super::moves::MoveSetup, Error> {
+        self.setup.as_ref().ok_or_else(|| Error::internal("tenant deletion is not set up"))
+    }
+
+    pub(super) fn registry(&self) -> &DatabaseRegistry {
+        &self.registry
+    }
+
+    pub(super) fn outbox(&self) -> &Outbox {
+        &self.outbox
     }
 
     /// Thuê bao và hạn mức cho bộ lọc của danh sách khách (bước 35).
@@ -431,7 +451,7 @@ impl TenantAdmin {
                 problems.push(FieldError::new(
                     "status",
                     "invalid",
-                    "must be one of provisioning, active, suspended, maintenance, moving",
+                    "must be one of provisioning, active, suspended, maintenance, moving, deleted",
                 ));
             }
             select = select.filter(tenant::Column::Status.eq(status.as_str()));
@@ -699,6 +719,9 @@ impl TenantAdmin {
         expected: Option<DateTime<Utc>>,
     ) -> Result<Tenant, Error> {
         let row = self.find(id).await?;
+        if row.status == TenantStatus::Deleted.as_str() {
+            return Err(errors::tenant_not_found(&id.to_string()));
+        }
         if expected.is_some_and(|expected| expected != row.updated_at) {
             return Err(crate::version::changed());
         }
@@ -1069,6 +1092,7 @@ pub(crate) fn routes(admin: Arc<TenantAdmin>) -> OpenApiRouter {
         .routes(routes!(list_tenants, create_tenant))
         .routes(routes!(get_tenant, update_tenant))
         .routes(routes!(list_placements))
+        .merge(super::erasure::routes())
         .with_state(admin)
 }
 

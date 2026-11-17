@@ -88,8 +88,8 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
       cho nhân sự nền tảng; hạn mức nút đếm mọi nút trừ gốc, hạn mức theo loại nút khai riêng; thông báo
       của nền tảng tới quản trị mọi khách — đã làm (D-326, D-327, D-328): `suspend`, hạn mức nút trừ gốc, bộ lọc
       `subscription_status` / `near_limit`, xuất dữ liệu khách bằng job; còn: thông báo nền tảng (chờ `notifications`, bước 37)
-- [ ] Xoá hẳn khách khi thuê bao `deleted` (D-327): kernel chưa có lệnh xoá khách — thêm lệnh xoá (giữ phần kế toán theo
-      bước 36), rồi `plans` gọi thay vì chỉ khoá hẳn
+- [x] Xoá hẳn khách khi thuê bao `deleted` (D-327, D-337): `POST /kernel/tenants/{id}/erase`, bảng giữ lại khai ở
+      `Module::retained_tables` (phần kế toán của bước 36); `plans` xoá khách khi hết thời hạn lưu
 - [x] Hạn mức theo loại nút (`organizations.units.<loại>`, A-3.12): hạn mức chia phần `Limit::per` (D-330)
 
 ## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)

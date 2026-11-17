@@ -8154,3 +8154,22 @@ Hai yêu cầu của giao diện (`docs/prompts/web-build-api-gaps.md`).
    lỗi này là sửa lỗi theo quy ước đã công bố ("lỗi kiểm dữ liệu liệt kê mọi trường một lần"); hai endpoint ghi `400`
    cho tham số thiếu (`/kernel/domains/allowed`, tải bản xuất của `forms`) sửa mô tả theo.
 
+## D-337 · Xoá hẳn khách — 2026-11-17 — agent quyết
+
+Thay phần "kernel chưa có lệnh xoá khách: khoá hẳn, giữ dữ liệu" của D-327.
+
+1. `TenantAdmin::erase` (+ `POST /api/v1/kernel/tenants/{id}/erase`, permission mới `kernel.tenants.delete`
+   rủi ro `destructive`, khách nền tảng; thân `{confirm: <slug>, reason}`). Không có tool MCP: việc không hoàn tác được
+   không giao cho agent.
+2. Chỉ xoá khách `suspended` (`409 tenant_not_suspended`): bước khoá cho mọi máy chủ ngừng phục vụ (TTL cache khách)
+   và là lúc xuất dữ liệu lần cuối. Không xoá khách nền tảng.
+3. Xoá mọi dòng `tenant_id = X` của mọi bảng cấp khách hàng ở database của khách (kể cả outbox, hàng đợi job) trong
+   một transaction, trừ bảng khai ở `Module::retained_tables` (mới, mặc định rỗng — D-038) cho chứng từ kế toán (Luật
+   Kế toán 88/2015, Điều 41; D-190; bước 36 khai). Xoá file dưới `tenants/<id>/` ở nơi lưu chung và nơi lưu riêng
+   của placement; xoá tên miền và lượt xuất của khách ở mặt điều khiển.
+4. Giữ dòng `kernel_tenants` với trạng thái mới `deleted` (bia mộ): bảng mặt điều khiển của module khác (thuê bao, kỳ
+   thanh toán của `plans` — sổ sách của nhà vận hành) vẫn trỏ được; slug không dùng lại; request tới khách nhận `404
+   tenant_not_found`; `PATCH` khách đã xoá cũng vậy. Event `kernel.tenant_deleted` ghi ở khách nền tảng.
+5. `plans`: thuê bao `canceled` hết thời hạn lưu → khoá khách (nếu chưa) → xoá → rồi mới thành `deleted`. Xoá hỏng
+   giữa chừng thì thuê bao vẫn `canceled` tới hạn, lượt chạy sau thử lại (xoá chạy lại được).
+

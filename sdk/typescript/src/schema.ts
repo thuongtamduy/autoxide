@@ -3300,6 +3300,23 @@ export type Data_TenantDomain = {
 };
 
 /** Envelope of a single result. */
+export type Data_TenantErasure = {
+  /** What deleting a tenant removed. */
+  data: {
+    /** Files deleted. */
+    files: number;
+    /** Tables kept, as modules require (accounting records must be kept for years). */
+    retained_tables: string[];
+    /** Total rows deleted. */
+    rows: number;
+    slug: string;
+    /** Rows deleted, per table (tables with none are left out). */
+    tables: TenantTableRows[];
+    tenant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TenantExport = {
   /** An export of all the data of a tenant. */
   data: {
@@ -4631,6 +4648,14 @@ export type EntryResponse = {
 export type EntryTerms = {
   /** In order; the first category is the main one. At most 50. */
   term_ids: string[];
+};
+
+/** Delete a tenant for good. */
+export type EraseRequest = {
+  /** The tenant's slug again, to confirm. */
+  confirm: string;
+  /** Why, 1 to 500 characters (kept in the audit log of the platform). */
+  reason: string;
 };
 
 /** Result of erasing an email address. */
@@ -8843,6 +8868,20 @@ export type TenantDomainRecord = {
   value: string;
 };
 
+/** What deleting a tenant removed. */
+export type TenantErasure = {
+  /** Files deleted. */
+  files: number;
+  /** Tables kept, as modules require (accounting records must be kept for years). */
+  retained_tables: string[];
+  /** Total rows deleted. */
+  rows: number;
+  slug: string;
+  /** Rows deleted, per table (tables with none are left out). */
+  tables: TenantTableRows[];
+  tenant_id: string;
+};
+
 /**
  * Related records of a tenant, asked for with `expand`. All three fields are always present
  * (`null` when not asked for or when there is nothing).
@@ -12388,6 +12427,22 @@ export interface paths {
         403: Problem;
         404: Problem;
         412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/erase": {
+    /** Delete a tenant and its data for good. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: EraseRequest;
+      responses: {
+        200: Data_TenantErasure;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
