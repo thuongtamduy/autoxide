@@ -91,6 +91,8 @@ pub(crate) struct PasswordResets {
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
     pub outbox: Outbox,
+    /// Link theo tên miền của khách (`kernel.public_url`).
+    pub links: autoxide_kernel::tenancy::SiteLinks,
     /// Trang của giao diện, có `{token}`; `None`: mail chứa token.
     pub url: Option<String>,
     /// Sổ database: tìm khách ghi trong token của link.
@@ -148,7 +150,7 @@ impl PasswordResets {
         let minutes = TOKEN_MINUTES.to_string();
         let mail = match &self.url {
             Some(url) => {
-                let link = url.replace("{token}", &token);
+                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
                 let params =
                     [("email", user.email.as_str()), ("minutes", &minutes), ("link", &link)];
                 RESET_LINK.mail(&user.email, &self.translations, language, &params)
@@ -424,6 +426,43 @@ mod tests {
             }
 
             assert_eq!(succeeded, 1);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Đề bài giao diện: khách đã đặt `kernel.public_url` thì link trong thư mở trên tên miền của
+    /// khách, giữ đường dẫn của địa chỉ máy chủ; khách khác vẫn dùng địa chỉ máy chủ.
+    #[tokio::test]
+    async fn link_trong_thu_theo_ten_mien_cua_khach() {
+        TestDatabase::run(async |test| {
+            let services = setup(test).await;
+            let tenant = services.tenant.clone();
+            let settings = std::sync::Arc::new(autoxide_testkit::FakeTenantSettings::default());
+            let resets = PasswordResets {
+                jobs: services.resets.jobs.clone(),
+                users: services.resets.users.clone(),
+                mailer: services.resets.mailer.clone(),
+                translations: services.resets.translations.clone(),
+                outbox: services.resets.outbox.clone(),
+                links: autoxide_kernel::tenancy::SiteLinks::new(settings.clone()),
+                url: Some("https://www.example.com/reset?token={token}".to_owned()),
+                databases: services.resets.databases.clone(),
+            };
+            let job = |email: &str| ResetJob {
+                email: email.to_owned(),
+                realm: autoxide_kernel::access::Realm::Staff,
+                language: "en".to_owned(),
+            };
+            resets.send(&tenant, &job("ada@example.com")).await.unwrap();
+            let text = services.mails.sent.lock().unwrap().last().unwrap().text.clone();
+            assert!(text.contains("https://www.example.com/reset?token="), "{text}");
+
+            settings.set(tenant.id(), "kernel.public_url", "https://shop.acme.vn");
+            time_passes(&services, 2).await;
+            resets.send(&tenant, &job("ada@example.com")).await.unwrap();
+            let text = services.mails.sent.lock().unwrap().last().unwrap().text.clone();
+            assert!(text.contains("https://shop.acme.vn/reset?token="), "{text}");
         })
         .await
         .unwrap();

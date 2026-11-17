@@ -105,10 +105,21 @@ impl CommentsService {
     }
 
     /// Đường dẫn đầy đủ tới trang của đích, khi biết địa chỉ website và đường dẫn.
-    fn page_link(&self, resource: Option<&Resource>) -> Option<String> {
-        let site = self.config.site_url.as_deref()?;
+    async fn page_link(
+        &self,
+        tenant: &TenantContext,
+        resource: Option<&Resource>,
+    ) -> Result<Option<String>, Error> {
+        let Some(site) = self.config.site_url.as_deref() else { return Ok(None) };
+        // Khách đã đặt `kernel.public_url`: trang mở trên tên miền của khách.
+        let site = self.site_links().rewrite(tenant, site).await?;
         let path = resource.and_then(|resource| resource.url.as_deref()).unwrap_or("");
-        Some(format!("{site}{path}"))
+        Ok(Some(format!("{site}{path}")))
+    }
+
+    /// Link theo tên miền của khách (`kernel.public_url`).
+    fn site_links(&self) -> autoxide_kernel::tenancy::SiteLinks {
+        autoxide_kernel::tenancy::SiteLinks::new(self.settings.clone())
     }
 
     /// Xếp mail xác minh `email` (token `issued`) cho bình luận `row`.
@@ -125,6 +136,7 @@ impl CommentsService {
         };
         let language = language(row.locale.as_deref());
         // Link mang khách của token (`autoxide_kernel::tenancy::link_token`).
+        let url = self.site_links().rewrite(tenant, url).await?;
         let link = url.replace("{token}", &link_token(tenant, &issued.token));
         let target = target_name(resource, language);
         let hours = VERIFY_HOURS.to_string();
@@ -267,8 +279,11 @@ impl CommentsService {
         let language = language(followed.as_ref().and_then(|row| row.locale.as_deref()));
         let resource = self.resource_of(tenant, &reply).await?;
         let target = target_name(resource.as_ref(), language);
-        let page =
-            self.page_link(resource.as_ref()).map(|link| format!("\n{link}\n")).unwrap_or_default();
+        let page = self
+            .page_link(tenant, resource.as_ref())
+            .await?
+            .map(|link| format!("\n{link}\n"))
+            .unwrap_or_default();
         let mut sent = 0;
         for follower in followers {
             if reply.author_email.as_deref() == Some(follower.email.as_str()) {
@@ -285,8 +300,11 @@ impl CommentsService {
                     chrono::Duration::days(UNSUBSCRIBE_DAYS),
                 )
                 .await?;
-            let unsubscribe =
-                unsubscribe_url.replace("{token}", &link_token(tenant, &issued.token));
+            let unsubscribe = self
+                .site_links()
+                .rewrite(tenant, unsubscribe_url)
+                .await?
+                .replace("{token}", &link_token(tenant, &issued.token));
             let params = [
                 ("target", target.as_str()),
                 ("page", page.as_str()),

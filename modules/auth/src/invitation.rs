@@ -156,6 +156,8 @@ pub(crate) struct Invitations {
     pub translations: Translations,
     pub outbox: Outbox,
     pub databases: DatabaseRegistry,
+    /// Link theo tên miền của khách (`kernel.public_url`).
+    pub links: autoxide_kernel::tenancy::SiteLinks,
     /// Trang của giao diện, có `{token}`; `None`: mail chứa token.
     pub url: Option<String>,
     /// `AUTOXIDE_AUTH_INVITATION_DAYS`.
@@ -377,7 +379,7 @@ impl Invitations {
         let tenant_name = tenant.name().to_owned();
         let mail = match &self.url {
             Some(url) => {
-                let link = url.replace("{token}", &token);
+                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
                 let params = [
                     ("tenant", tenant_name.as_str()),
                     ("inviter", &inviter),
@@ -651,6 +653,7 @@ mod tests {
 
     fn invitations(services: &Services) -> Invitations {
         Invitations {
+            links: Default::default(),
             users: services.users.clone(),
             sessions: services.sessions.clone(),
             jobs: autoxide_kernel::job::JobQueue::new("auth"),

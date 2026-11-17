@@ -399,7 +399,7 @@ impl NewsletterService {
         // Database giữ bản băm của phần thô; link mang khách (`autoxide_kernel::tenancy::link_token`).
         let token = autoxide_kernel::secret::random_token(32)?;
         let link = autoxide_kernel::tenancy::link_token(tenant, &token);
-        let mail = self.campaign_mail(row, list, email, &link, Some(item.id))?;
+        let mail = self.campaign_mail(tenant, row, list, email, &link, Some(item.id)).await?;
         let claimed = delivery::Entity::update_many()
             .scoped(tenant)
             .col_expr(

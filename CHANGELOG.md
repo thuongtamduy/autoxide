@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `GET /api/v1/kernel/whats-new` (no sign-in): the changelog of the running server by version. `GET
+  /api/v1/kernel/ops/alerts` (platform staff): the `autoxide doctor` checks that are not fine, with what to do.
+- Tenant setting `kernel.business_model` (`independent`, `multi_store`, `chain`, `marketplace`, `saas`). Tenant
+  setting `kernel.public_url` now takes effect: links in mails sent for the tenant (sign-in links, invitations,
+  password resets, email checks, newsletter and comment confirmations) open on the tenant's site.
+
 - `GET /api/v1/audit?actor_kind=user|system|public`; `GET /api/v1/newsletter/subscribers?sort=email|status` (emails
   sort byte by byte, the same on SQLite and PostgreSQL).
 
