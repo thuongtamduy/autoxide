@@ -44,6 +44,8 @@
   "text:An issued document was cancelled (`document_id`, `source_module`, `source_id`).": "Một chứng từ đã phát hành bị huỷ (`document_id`, `source_module`, `source_id`).",
   "text:Cancel, adjust and replace issued documents of the units in your scope.": "Huỷ, điều chỉnh và thay thế chứng từ đã phát hành của các nút trong phạm vi của bạn.",
   "text:Create and retire document series (symbols) for the units in your scope.": "Tạo và ngừng dùng ký hiệu chứng từ cho các nút trong phạm vi của bạn.",
+  "text:Finance": "Tài chính",
+  "text:Invoices": "Hoá đơn",
   "text:Issue documents (gives them their number and sends e-invoices) for the units in your scope.": "Phát hành chứng từ (cấp số và gửi hoá đơn điện tử) cho các nút trong phạm vi của bạn.",
   "text:Record and revoke mandates to issue invoices on behalf of sellers in your scope.": "Ghi và thu hồi uỷ nhiệm lập hoá đơn thay người bán trong phạm vi của bạn.",
   "text:See the documents, series and mandates of the units in your scope.": "Xem chứng từ, ký hiệu và uỷ nhiệm của các nút trong phạm vi của bạn.",

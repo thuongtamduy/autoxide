@@ -64,6 +64,16 @@ struct NewsletterModule {
 }
 
 impl Module for NewsletterModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("marketing", "Marketing", "megaphone", 40)).item(
+            NavItem::new("marketing.newsletter", "marketing", "Newsletter", 30).permissions(&[
+                crate::permissions::NEWSLETTER_READ,
+                crate::permissions::NEWSLETTER_EXPORT,
+            ]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "newsletter"
     }

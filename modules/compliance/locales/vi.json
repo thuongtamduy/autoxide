@@ -45,6 +45,7 @@
   "text:An identity verification was refused (`profile_id`, `subject_kind`, `subject_id`, `status`, `reason_code`).": "Một lượt định danh vừa bị từ chối (`profile_id`, `subject_kind`, `subject_id`, `status`, `reason_code`).",
   "text:An identity was verified (`profile_id`, `subject_kind`, `subject_id`, `status`, `expires_at`).": "Một định danh vừa được xác thực (`profile_id`, `subject_kind`, `subject_id`, `status`, `expires_at`).",
   "text:Approve, reject, revoke identity verification profiles and ask for more information (signed-in person only, not API keys).": "Duyệt, từ chối, thu hồi hồ sơ định danh và yêu cầu bổ sung (chỉ người đăng nhập, không qua API key).",
+  "text:Compliance": "Tuân thủ",
   "text:Create legal documents and publish new versions.": "Tạo văn bản pháp lý và đăng phiên bản mới.",
   "text:Legal rules were imported (`jurisdiction`, `rules`).": "Quy tắc pháp lý vừa được nhập (`jurisdiction`, `rules`).",
   "text:More information was asked for a verification (`profile_id`, `subject_kind`, `subject_id`).": "Một lượt định danh vừa được yêu cầu bổ sung (`profile_id`, `subject_kind`, `subject_id`).",

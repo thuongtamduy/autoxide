@@ -43,6 +43,14 @@ struct InvoicesModule {
 }
 
 impl Module for InvoicesModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("finance", "Finance", "wallet", 80)).item(
+            NavItem::new("finance.invoices", "finance", "Invoices", 20)
+                .permissions(&[crate::permissions::READ]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "invoices"
     }

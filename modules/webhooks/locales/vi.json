@@ -12,6 +12,8 @@
   "text:A webhook endpoint was deleted.": "Một endpoint webhook bị xoá.",
   "text:A webhook endpoint's address, events or state changed, or its secret was replaced.": "Địa chỉ, event hay trạng thái của một endpoint webhook thay đổi, hoặc secret của nó được thay.",
   "text:Create, change and delete webhook endpoints and see their deliveries. An endpoint receives every event it subscribes to, including users' personal data: give it to administrators only.": "Tạo, sửa và xoá endpoint webhook, xem các lần gửi. Endpoint nhận mọi event nó đăng ký, kể cả dữ liệu cá nhân của người dùng: chỉ cấp cho quản trị viên.",
+  "text:Settings": "Cài đặt",
   "text:Something happened.": "Có việc xảy ra.",
+  "text:Webhooks": "Webhook",
   "webhooks.endpoint_not_found": "Không có webhook `{id}`."
 }

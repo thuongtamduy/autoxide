@@ -3198,6 +3198,15 @@ export type Data_ModuleInfo = {
 };
 
 /** Envelope of a single result. */
+export type Data_NavigationView = {
+  /** The navigation the caller may use, grouped. */
+  data: {
+    /** Groups in display order; a group without any visible item is left out. */
+    groups: NavGroupView[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_NewsletterEmailData = {
   /** Everything the newsletter holds about one email address. */
   data: {
@@ -7552,6 +7561,42 @@ export type MyTenantResponse = {
   id: string;
   name: string;
   slug: string;
+};
+
+/** One group of the side bar. */
+export type NavGroupView = {
+  /** Neutral icon name (`home`, `cart`, `file`…); interfaces map it to their own icons. */
+  icon: string;
+  /** Stable key, e.g. `content`. */
+  id: string;
+  items: NavItemView[];
+  /** Label in the language of `Accept-Language`. */
+  label: string;
+  /** `tenant` (the tenant's admin) or `platform` (platform staff only). */
+  space: string;
+};
+
+/** One screen of a group. */
+export type NavItemView = {
+  /** Work source of the inbox that counts pending work for this screen, when there is one. */
+  counter?: string | null;
+  /** Stable key of the screen, e.g. `content.entries`. */
+  id: string;
+  label: string;
+  required_feature?: string | null;
+  /** Label of the sub-group in the row of tabs, when there is one. */
+  section?: string | null;
+  /**
+   * `available`, or `locked` when the tenant's plan lacks `required_feature` (show it with a
+   * lock and a way to upgrade, do not hide it).
+   */
+  state: string;
+};
+
+/** The navigation the caller may use, grouped. */
+export type NavigationView = {
+  /** Groups in display order; a group without any visible item is left out. */
+  groups: NavGroupView[];
 };
 
 /** What happens when a post is published (by the `content` module). */
@@ -16129,6 +16174,18 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/navigation": {
+    /** Get the navigation of the admin interface. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string }; };
+      responses: {
+        200: Data_NavigationView;
+        304: void;
+        401: Problem;
         default: Problem;
       };
     };

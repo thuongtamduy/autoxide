@@ -18,8 +18,10 @@
   "tax.profile_not_found": "Nút này và các nút cấp trên chưa có hồ sơ thuế. Hãy tạo hồ sơ thuế trước.",
   "tax.rate_missing": "Chưa có thuế suất cho nhóm `{category}` vào ngày {date}. Hãy nhập gói dữ liệu thuế mới.",
   "text:A tax data pack was imported (`code`, `version`, `rates`).": "Một gói dữ liệu thuế đã được nhập (`code`, `version`, `rates`).",
+  "text:Finance": "Tài chính",
   "text:Platform staff: import tax data packs (rates and rules for every tenant).": "Nhân sự nền tảng: nhập gói dữ liệu thuế (thuế suất và quy tắc cho mọi khách).",
   "text:See tax jurisdictions, categories and rates, compute taxes, and see the tax profiles of the units in your scope.": "Xem vùng thuế, nhóm thuế và thuế suất, tính thuế, xem hồ sơ thuế của các nút trong phạm vi của bạn.",
   "text:Set the tax profile (tax code, regime, business lines) of the units in your scope.": "Đặt hồ sơ thuế (mã số thuế, chế độ thuế, ngành nghề) của các nút trong phạm vi của bạn.",
+  "text:Tax": "Thuế",
   "text:The tax profile of an organization unit was set (`org_id`, `regime`, `created`).": "Hồ sơ thuế của một nút tổ chức đã được đặt (`org_id`, `regime`, `created`)."
 }

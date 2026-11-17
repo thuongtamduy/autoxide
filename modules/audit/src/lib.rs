@@ -41,6 +41,14 @@ struct AuditModule {
 }
 
 impl Module for AuditModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("settings", "Settings", "gear", 110)).item(
+            NavItem::new("settings.audit", "settings", "Audit log", 40)
+                .permissions(&[crate::http::AUDIT_READ]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "audit"
     }

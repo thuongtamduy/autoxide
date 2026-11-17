@@ -64,6 +64,14 @@ struct MediaModule {
 }
 
 impl Module for MediaModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("content", "Content", "file", 50)).item(
+            NavItem::new("content.media", "content", "Media library", 40)
+                .permissions(&[crate::permissions::MEDIA_READ]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "media"
     }

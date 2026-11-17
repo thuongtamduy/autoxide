@@ -57,6 +57,14 @@ struct MenusModule {
 }
 
 impl Module for MenusModule {
+    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        Navigation::default().group(NavGroup::new("content", "Content", "file", 50)).item(
+            NavItem::new("content.menus", "content", "Menus", 30)
+                .permissions(&[crate::permissions::MENUS_READ]),
+        )
+    }
+
     fn name(&self) -> &'static str {
         "menus"
     }

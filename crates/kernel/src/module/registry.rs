@@ -285,6 +285,12 @@ impl Modules {
         );
         self.apis = apis;
         self.tenancy = Some(registry.clone());
+        // Sổ điều hướng (bước 51 P1): nhóm trùng phải khai giống hệt, mục không trùng.
+        let navigation = super::navigation::collect(
+            self.modules.iter().map(|module| (module.name(), module.navigation())).collect(),
+        )
+        .map_err(|problems| ModuleError(problems.join("; ")))?;
+        self.catalog.fill_navigation(navigation);
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
         self.catalog.fill(&self.modules, self.entitlements.catalog());
         self.client_configs.fill(&self.modules);

@@ -61,9 +61,11 @@
   "text:Archived.": "Đã lưu trữ.",
   "text:Ban and unban people, open, close and hide targets.": "Cấm và bỏ cấm người dùng; mở, đóng và ẩn đích bình luận.",
   "text:Comment as a signed-in user, change and delete one's own comments, set one's display name.": "Bình luận khi đã đăng nhập, sửa và xoá bình luận của mình, đặt tên hiển thị.",
+  "text:Comments": "Bình luận",
   "text:Deleted.": "Đã xoá.",
   "text:Every comment written with one email address was cleared (a data subject request); the address is not in the payload.": "Mọi bình luận viết bằng một địa chỉ email đã bị xoá sạch (yêu cầu của chủ thể dữ liệu); nội dung event không có địa chỉ.",
   "text:Export or erase every comment written with an email address.": "Xuất hay xoá mọi bình luận viết bằng một địa chỉ email.",
+  "text:Marketing": "Tiếp thị",
   "text:Read every comment in any status, with author emails, network fingerprints and reports.": "Xem mọi bình luận ở mọi trạng thái, kèm email người viết, dấu vết mạng và báo cáo.",
   "text:The daily job deleted comments that waited for approval or were spam for too long.": "Việc chạy hằng ngày đã xoá các bình luận chờ duyệt hay là spam quá lâu."
 }
