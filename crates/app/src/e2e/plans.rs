@@ -8,7 +8,8 @@ use axum::body::Body;
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 
-const OWNER: [&str; 6] = [
+const OWNER: [&str; 7] = [
+    "kernel.data.export",
     "organizations.units.read",
     "organizations.units.write",
     "organizations.units.manage",
@@ -29,7 +30,9 @@ async fn app(test: &TestDatabase) -> TestApp {
             1,
             &["plans.plans.manage", "plans.subscriptions.manage", "kernel.modules.read"],
         )
-        .user_in("acme", "owner", 2, &OWNER);
+        .user_in("acme", "owner", 2, &OWNER)
+        .tenant("beta")
+        .user_in("beta", "stranger", 3, &["kernel.data.export"]);
     for module in crate::modules::all() {
         builder = builder.boxed_module(module);
     }
@@ -189,6 +192,80 @@ async fn so_module_ghi_tinh_nang_han_muc_va_module_can() {
         let (_, kernel) =
             call(&app, Method::GET, "/api/v1/kernel/modules/kernel", "ops", None).await;
         assert_eq!(kernel["data"]["limits"][0]["key"], "kernel.api_requests");
+    })
+    .await
+    .unwrap();
+}
+
+/// Chạy worker tới khi hết job.
+async fn drain(app: &TestApp) {
+    let worker = app.modules().worker(4).unwrap();
+    for _ in 0..10 {
+        if worker.run_once().await.unwrap() == 0 {
+            break;
+        }
+    }
+}
+
+#[tokio::test]
+async fn xuat_toan_bo_du_lieu_mot_khach() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let acme = app.tenant("acme").await.unwrap().id();
+        // Dữ liệu của khách: một nút tổ chức.
+        let body = json!({"code": "store", "name": "Store marker-export"});
+        let (status, _) =
+            call(&app, Method::POST, "/api/v1/organizations/unit-types", "owner", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED);
+        let base = format!("/api/v1/kernel/tenants/{acme}/exports");
+        let (status, export) = call(&app, Method::POST, &base, "owner", None).await;
+        assert_eq!(status, StatusCode::CREATED, "{export}");
+        let id = export["data"]["id"].as_str().unwrap().to_owned();
+        // Người của khách khác: như không có khách đó.
+        let (status, body) = call(&app, Method::POST, &base, "stranger", None).await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("tenant_not_found"))
+        );
+        drain(&app).await;
+        let (_, got) = call(&app, Method::GET, &format!("{base}/{id}"), "owner", None).await;
+        assert_eq!(got["data"]["status"], "ready", "{got}");
+        let content = app.get(&format!("{base}/{id}/content")).token("owner").send().await.unwrap();
+        assert_eq!(content.status(), StatusCode::OK);
+        let text = content.text();
+        let first: Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
+        assert_eq!(first["format"], "autoxide-tenant-export");
+        assert!(text.contains("marker-export"), "dữ liệu của khách có trong bản xuất");
+        assert!(!text.contains("password_hash"), "cột bí mật không có");
+        // Link tải không cần đăng nhập; link mới thay link cũ.
+        let (_, link) = call(&app, Method::POST, &format!("{base}/{id}/link"), "owner", None).await;
+        let url = link["data"]["url"].as_str().unwrap().to_owned();
+        let opened = app.get(&url).send().await.unwrap();
+        assert_eq!(opened.status(), StatusCode::OK);
+        assert_eq!(opened.text(), text);
+        call(&app, Method::POST, &format!("{base}/{id}/link"), "owner", None).await;
+        let stale = app.get(&url).send().await.unwrap();
+        assert_eq!(
+            (stale.status(), stale.json()["code"].clone()),
+            (StatusCode::NOT_FOUND, json!("kernel.export_link_invalid"))
+        );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn huy_thue_bao_tu_xin_xuat_du_lieu() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let acme = put_on(&app, "basic", &[], json!({})).await;
+        let uri = format!("/api/v1/plans/tenants/{acme}/subscription/cancel");
+        let (status, body) = call(&app, Method::POST, &uri, "ops", None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let exports = app.api::<autoxide_kernel::tenancy::TenantExports>().unwrap();
+        let listed = exports.list(acme).await.unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].reason, "subscription_canceled");
     })
     .await
     .unwrap();

@@ -302,6 +302,7 @@ async fn module_thay_danh_muc_permission_cua_moi_module() {
         assert_eq!(
             *seen.lock().unwrap(),
             [
+                "kernel.data.export",
                 "kernel.domains.manage",
                 "kernel.modules.read",
                 "kernel.placements.read",

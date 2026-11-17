@@ -2894,6 +2894,34 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Start an export of all the data of a tenant (yours by default) into one JSON Lines file, in the background; follow it with `kernel.get_tenant_export` until it is `ready`, then download it over REST.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "tenant": {
+            "description": "Id or slug of the tenant; your own tenant when left out.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.export_tenant",
+      "output_schema": null,
+      "permissions": [
+        "kernel.data.export"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -2947,6 +2975,42 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a data export of a tenant: its `status` (`pending`, `running`, `ready`, `failed`, `expired`), rows per table and size.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "export_id": {
+            "description": "Id of the export.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "tenant": {
+            "description": "Id or slug of the tenant; your own tenant when left out.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "export_id"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.get_tenant_export",
+      "output_schema": null,
+      "permissions": [
+        "kernel.data.export"
       ]
     },
     {

@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Export all the data of a tenant as one JSON Lines file, in the background: `POST /api/v1/kernel/tenants/{id}/exports`
+  (platform staff, or the tenant's own administrators with the new permission `kernel.data.export`), status, download
+  with a bearer token or a 24-hour link; MCP tools `kernel.export_tenant`, `kernel.get_tenant_export`. Secrets and
+  password hashes are left out; started automatically when a subscription is canceled; kept
+  `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` (30).
 - New module `plans` (step 35): sell the software by plan without code changes. A plan is data — modules, features,
   limits and prices — with add-ons and per-tenant overrides; tenants without a subscription get the default plan, and
   with no default plan nothing changes. `GET /api/v1/plans/entitlements` tells a user interface what the tenant may

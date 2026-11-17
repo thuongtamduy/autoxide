@@ -58,6 +58,10 @@ pub(crate) struct KernelModule {
     move_setup: crate::tenancy::moves::MoveSetup,
     /// Service dời khách giữa các placement; có sau `start`.
     moves: Option<Arc<crate::tenancy::TenantMoves>>,
+    /// Xuất dữ liệu khách (bước 35, D-328); có sau `start`.
+    exports: Option<Arc<crate::tenancy::TenantExports>>,
+    /// `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS`.
+    export_days: i64,
     /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (đọc ở cấu hình kernel): dời khách chờ request đang
     /// chạy xong trong chừng này.
     request_timeout: std::time::Duration,
@@ -81,6 +85,8 @@ impl KernelModule {
             domains: None,
             move_setup,
             moves: None,
+            exports: None,
+            export_days: 30,
             request_timeout: std::time::Duration::from_secs(30),
             keys,
             tenant_settings,
@@ -96,6 +102,14 @@ impl KernelModule {
             flags,
             translations: crate::i18n::Translations::default(),
         }
+    }
+
+    /// Xuất dữ liệu khách, chỉ khi có nơi lưu file (module `files`): không có nơi để ghi bản xuất
+    /// thì không có route, tool, job hay lịch nào của nó.
+    fn live_exports(&self) -> Option<&Arc<crate::tenancy::TenantExports>> {
+        let storage =
+            self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some());
+        self.exports.as_ref().filter(|_| storage)
     }
 
     fn catalog_state(&self) -> Option<CatalogState> {
@@ -144,6 +158,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::org_tree::CreateOrgTree),
             // Đường người làm vào khách (bước 34, D-310).
             crate::event::outbox_access_migration("k0001_event_access", NAME),
+            // Xuất toàn bộ dữ liệu một khách (bước 35, D-328).
+            Box::new(crate::tenancy::exports::CreateTenantExports),
         ]
     }
 
@@ -155,6 +171,7 @@ impl Module for KernelModule {
             "kernel_placements",
             "kernel_tenant_domains",
             "kernel_tenant_moves",
+            "kernel_tenant_exports",
         ]
     }
 
@@ -173,12 +190,16 @@ impl Module for KernelModule {
         let previous = crate::secret::read_previous(reader);
         let public_url = crate::public_url::read_setting(reader);
         let max_flags = user_flags::read_setting(reader);
+        let export_days = reader.get_with(&crate::tenancy::exports::EXPORT_RETENTION_DAYS, |raw| {
+            crate::config::parse_in_range(raw, 1i64, 365)
+        });
         if let Some(seconds) = request_timeout(reader) {
             self.request_timeout = std::time::Duration::from_secs(seconds);
         }
         self.keys.set(secret?, previous?);
         self.public_url = public_url?;
         self.max_flags = max_flags?;
+        self.export_days = export_days?;
         Ok(())
     }
 
@@ -192,6 +213,7 @@ impl Module for KernelModule {
             crate::tenancy::PLACEMENTS_READ,
             crate::tenancy::DOMAINS_MANAGE,
             crate::tenancy::TENANTS_MOVE,
+            crate::tenancy::DATA_EXPORT,
         ]
     }
 
@@ -234,6 +256,9 @@ impl Module for KernelModule {
         if let Some(moves) = &self.moves {
             routes = routes.merge(crate::tenancy::moves::routes(moves.clone()));
         }
+        if let Some(exports) = self.live_exports() {
+            routes = routes.merge(crate::tenancy::exports::routes(exports.clone()));
+        }
         routes
     }
 
@@ -266,6 +291,9 @@ impl Module for KernelModule {
         if let Some(moves) = &self.moves {
             tools.extend(crate::tenancy::moves::tools(moves.clone()));
         }
+        if let Some(exports) = self.live_exports() {
+            tools.extend(crate::tenancy::exports::tools(exports.clone()));
+        }
         tools
     }
 
@@ -283,15 +311,29 @@ impl Module for KernelModule {
                 Arc::new(crate::tenancy::moves::MoveTenantRunner(moves.clone())),
             ));
         }
+        if let Some(exports) = self.live_exports() {
+            jobs.push(crate::job::JobRegistration::new(
+                crate::tenancy::exports::EXPORT_TENANT,
+                Arc::new(crate::tenancy::exports::ExportRunner(exports.clone())),
+            ));
+            jobs.push(crate::job::JobRegistration::new(
+                crate::tenancy::exports::CLEAN_EXPORTS,
+                Arc::new(crate::tenancy::exports::CleanRunner(exports.clone())),
+            ));
+        }
         jobs
     }
 
     fn schedules(&self) -> Vec<crate::job::Schedule> {
         // Tên miền riêng chỉ có ở chế độ `multi`: chế độ `single` không thêm job nào mỗi 10 phút.
-        match &self.domains {
+        let mut schedules = match &self.domains {
             Some(domains) if domains.multi_tenant() => vec![crate::tenancy::domains::schedule()],
             _ => Vec::new(),
+        };
+        if self.live_exports().is_some() {
+            schedules.push(crate::tenancy::exports::schedule());
         }
+        schedules
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
@@ -342,6 +384,14 @@ impl Module for KernelModule {
         ));
         self.moves = Some(moves.clone());
         context.provide::<crate::tenancy::TenantMoves>(moves)?;
+        let exports = Arc::new(crate::tenancy::TenantExports::new(
+            context.tenancy().clone(),
+            self.move_setup.clone(),
+            context.jobs(),
+            self.export_days,
+        ));
+        self.exports = Some(exports.clone());
+        context.provide::<crate::tenancy::TenantExports>(exports)?;
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))

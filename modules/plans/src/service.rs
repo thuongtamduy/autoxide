@@ -126,6 +126,8 @@ pub(crate) struct PlansService {
     pub translations: autoxide_kernel::i18n::Translations,
     /// `AUTOXIDE_PLANS_REMINDER_DAYS`: nhắc trước hạn chừng này ngày.
     pub reminder_days: Vec<u32>,
+    /// Xuất dữ liệu khách của kernel: tự xin một lượt khi thuê bao bị huỷ (D-328).
+    pub exports: Option<Arc<autoxide_kernel::tenancy::TenantExports>>,
 }
 
 /// Bộ nhớ đệm quyền dùng theo khách trong tiến trình (`AUTOXIDE_PLANS_CACHE_SECONDS`): quyền dùng

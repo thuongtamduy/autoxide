@@ -94,6 +94,16 @@ do; mở lại bằng `PATCH /api/v1/kernel/tenants/{id}` (`"status": "active"`)
 `GET /api/v1/kernel/tenants?subscription_status=past_due` và `?near_limit=true` liệt kê khách cần theo
 dõi.
 
+## Xuất dữ liệu của một khách
+
+Nhân sự nền tảng (`kernel.tenants.operate`) và quản trị viên của chính khách (`kernel.data.export`)
+xuất được toàn bộ dữ liệu của khách thành một file JSON Lines: `POST /api/v1/kernel/tenants/{id}/exports`,
+rồi `GET …/exports/{export_id}` tới khi `ready`, rồi `GET …/exports/{export_id}/content` (hay
+`POST …/link` lấy link 24 giờ mở được không cần đăng nhập). Dòng đầu mô tả bản xuất; mỗi dòng sau là
+`{"table": "...", "row": {...}}`. Bản băm mật khẩu và secret bị bỏ ra, nội dung file đã tải lên cũng
+không có (có dòng ghi của chúng; tải từng file qua API của module file). Thuê bao bị huỷ thì một lượt
+xuất tự bắt đầu. Bản xuất bị xoá sau `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` (30) ngày.
+
 ## Cấu hình
 
 | Biến | Mặc định | |
@@ -102,3 +112,4 @@ dõi.
 | `AUTOXIDE_PLANS_HOLD_MINUTES` | `15` | Chỗ giữ hạn mức chưa xác nhận được giữ bao lâu |
 | `AUTOXIDE_PLANS_REMINDER_DAYS` | `7,1` | Trước hạn bao nhiêu ngày thì gửi mail nhắc |
 | `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS` | `3600` | Job của module gói không có phải chờ bao lâu |
+| `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` | `30` | Giữ bản xuất dữ liệu khách bao lâu |

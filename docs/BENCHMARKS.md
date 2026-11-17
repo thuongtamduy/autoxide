@@ -431,3 +431,41 @@ cùng lúc, không so với bảng cũ.
 
 `GET /auth/me` bằng access token: 7 → 3 câu SQL (xác thực 2 → 1, thân 5 → 2), về lại mức trước bước 33 (5315–5724
 req/s ở hai lần đo mốc). Mọi request đã đăng nhập bớt một câu (file, audit +10–25%); đường ghi và đăng nhập không đổi.
+
+## Sau bước 35 (gói, chặn theo gói, hạn mức) — 16/11/2026
+
+So bản `4344086` (trước bước 35) với bản `ed1a700` (bước 35 phần A–F), cùng máy 4 CPU, máy tạo tải chạy chung, SQLite,
+chế độ `multi` (`LOADTEST_TENANCY=multi LOADTEST_TENANTS=20 LOADTEST_DEDICATED=2 LOADTEST_PLAN=1`), 6 giây mỗi bài, mỗi
+bản 3 lần xen kẽ, lấy trung vị. Bản mới: khách s1 có thuê bao gói bật mọi module (không giới hạn), s2 không có thuê
+bao (không có gói mặc định); bản cũ không có module `plans` nên hai khách giống nhau — so cùng đường đi.
+
+| Bài đo | Kết nối | Trước (req/s) | Sau (req/s) | Đổi | p50 trước → sau (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| GET /health/ready | 64 | 13377 | 15241 | +14% | 5.08 → 4.69 |
+| GET /auth/me (access token) | 64 | 4653 | 4588 | -1% | 13.33 → 13.58 |
+| GET /auth/me (API key) | 64 | 3139 | 3298 | +5% | 19.88 → 19.21 |
+| GET /auth/users?limit=50 | 64 | 1027 | 1040 | +1% | 61.91 → 61.43 |
+| GET /audit?limit=50 | 64 | 1171 | 1188 | +1% | 54.79 → 53.82 |
+| GET /files/{id}/content (16 KiB) | 64 | 4123 | 4171 | +1% | 15.32 → 15.09 |
+| MCP tools/call auth.whoami | 64 | 4040 | 3930 | -3% | 15.51 → 15.99 |
+| PATCH /auth/users/{id} (ghi + event) | 64 | 1000 | 1017 | +2% | 61.82 → 62.14 |
+| POST /files (4 KiB, ghi) | 64 | 1218 | 1159 | -5% | 52.34 → 54.54 |
+| POST /auth/login (Argon2id) | 16 | 143 | 144 | +1% | 122.94 → 120.00 |
+| đọc | 64 | 3936 | 3762 | -4% | 16.01 → 16.63 |
+| ghi | 64 | 1005 | 993 | -1% | 62.99 → 63.94 |
+| khách chung, có gói: GET /auth/me | 64 | 3908 | 3811 | -2% | 16.08 → 16.62 |
+| khách chung, có gói: GET /auth/users | 64 | 1584 | 1574 | -1% | 39.91 → 40.12 |
+| khách chung, có gói: PATCH /auth/users | 64 | 985 | 989 | +0% | 64.40 → 64.40 |
+| khách chung, có gói: GET /forms | 64 | 4448 | 4388 | -1% | 13.97 → 14.23 |
+| khách chung, không gói: GET /auth/me | 64 | 4047 | 3874 | -4% | 15.53 → 16.21 |
+| khách chung, không gói: GET /auth/users | 64 | 1661 | 1591 | -4% | 38.24 → 39.52 |
+| khách chung, không gói: PATCH /auth/users | 64 | 1018 | 978 | -4% | 61.55 → 64.00 |
+| khách chung, không gói: GET /forms | 64 | 4599 | 4361 | -5% | 13.55 → 14.34 |
+| khách riêng: GET /auth/me | 64 | 3426 | 3309 | -3% | 18.14 → 18.92 |
+| khách riêng: GET /auth/users | 64 | 1525 | 1455 | -5% | 41.80 → 44.03 |
+| khách riêng: PATCH /auth/users | 64 | 1019 | 1028 | +1% | 61.53 → 60.44 |
+| khách riêng: GET /forms | 64 | 3697 | 3683 | -0% | 16.77 → 17.05 |
+
+Mọi bài trong ±5% (dao động ±20%, D-179). Lớp chặn theo gói ở mỗi request của module (đếm request, đọc quyền dùng từ
+bộ nhớ đệm) không đo được trên đường nóng; khách có gói và khách không gói chạy ngang nhau. Bảng đầu là người dùng
+của khách nền tảng (luôn không giới hạn: tay cầm không hỏi `plans`).

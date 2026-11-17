@@ -308,6 +308,12 @@ impl MoveSetup {
     fn get(&self) -> Result<&Setup, Error> {
         self.0.get().ok_or_else(|| Error::internal("tenant moves are used before modules started"))
     }
+
+    /// Tên mọi module và bảng mặt điều khiển của chúng (xuất dữ liệu khách dùng chung, D-328).
+    pub(crate) fn tables(&self) -> Result<(Vec<&'static str>, Vec<&'static str>), Error> {
+        let setup = self.get()?;
+        Ok((setup.modules.clone(), setup.control_plane.clone()))
+    }
 }
 
 /// Kết quả kiểm một lượt dời, trước khi chạy.

@@ -23,6 +23,7 @@
 pub(crate) mod admin;
 mod config;
 pub(crate) mod domains;
+pub(crate) mod exports;
 mod link_token;
 pub mod migration;
 pub(crate) mod moves;
@@ -55,6 +56,7 @@ pub use domains::{
     CHALLENGE_PREFIX, CHALLENGE_VALUE_PREFIX, DOMAINS_MANAGE, DnsTxtLookup, DomainRecord,
     TenantDomain, TenantDomains, normalize_domain,
 };
+pub use exports::{DATA_EXPORT, TenantExport, TenantExportLink, TenantExports};
 pub use link_token::{OptionalTenant, link_token, resolve_link_token, split_link_token};
 pub use moves::{
     TENANTS_MOVE, TenantMove, TenantMoveBlocker, TenantMovePlan, TenantMoves, TenantTableRows,

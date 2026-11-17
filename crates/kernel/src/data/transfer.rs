@@ -534,6 +534,90 @@ impl TenantTables {
     }
 }
 
+/// Cột không đưa vào bản xuất dữ liệu của khách (bước 35, D-328): bản băm mật khẩu / token, secret,
+/// dữ liệu đã niêm phong — không giúp gì khách khi mang dữ liệu đi, chỉ thêm rủi ro nếu bản xuất lộ.
+pub fn is_secret_column(name: &str) -> bool {
+    name.ends_with("_hash")
+        || name.ends_with("_token")
+        || name.contains("secret")
+        || name.contains("sealed")
+        || name == "password"
+}
+
+impl TenantTables {
+    /// Xuất mọi dòng của khách `tenant` ở `source` thành JSON Lines (`{"table": …, "row": {…}}` mỗi
+    /// dòng), gửi từng khúc ~64 KiB qua `sink`. Bỏ hàng đợi job / outbox và cột bí mật
+    /// ([`is_secret_column`]). Byte ghi base64, thời gian RFC 3339 UTC. Trả số dòng mỗi bảng.
+    pub async fn export(
+        &self,
+        source: &Database,
+        tenant: TenantId,
+        sink: &tokio::sync::mpsc::Sender<Result<bytes::Bytes, crate::error::Error>>,
+    ) -> Result<Vec<CopiedTable>, TransferError> {
+        use base64::Engine as _;
+        const CHUNK: usize = 64 * 1024;
+        let connection = fresh(source);
+        let backend = ConnectionTrait::get_database_backend(connection);
+        let mut buffer: Vec<u8> = Vec::with_capacity(CHUNK * 2);
+        let closed =
+            || TransferError("the export was stopped while it was being written".to_owned());
+        let mut counted = Vec::new();
+        for table in self.tables.iter().filter(|table| table.kind() == TableKind::Data) {
+            let columns: Vec<&Column> =
+                table.from.iter().filter(|column| !is_secret_column(&column.name)).collect();
+            let mut select = Query::select();
+            select.from(Alias::new(table.name.as_str()));
+            for column in &columns {
+                select.column(Alias::new(column.name.as_str()));
+            }
+            select.and_where(Expr::col(Alias::new(TENANT_COLUMN)).eq(tenant.as_uuid()));
+            let rows = connection.stream_raw(backend.build(&select)).await?;
+            let mut rows = std::pin::pin!(rows);
+            let mut count = 0;
+            while let Some(row) = rows.try_next().await? {
+                let mut object = serde_json::Map::with_capacity(columns.len());
+                for column in &columns {
+                    let value = match read(&row, column)? {
+                        Value::Uuid(value) => {
+                            value.map(|id| serde_json::Value::from(id.to_string()))
+                        }
+                        Value::ChronoDateTimeUtc(value) => {
+                            value.map(|at| serde_json::Value::from(at.to_rfc3339()))
+                        }
+                        Value::String(value) => value.map(serde_json::Value::from),
+                        Value::SmallInt(value) => value.map(serde_json::Value::from),
+                        Value::Int(value) => value.map(serde_json::Value::from),
+                        Value::BigInt(value) => value.map(serde_json::Value::from),
+                        Value::Bool(value) => value.map(serde_json::Value::from),
+                        Value::Double(value) => value.map(serde_json::Value::from),
+                        Value::Bytes(value) => value.map(|bytes| {
+                            serde_json::Value::from(
+                                base64::engine::general_purpose::STANDARD.encode(bytes),
+                            )
+                        }),
+                        _ => None,
+                    };
+                    object.insert(column.name.clone(), value.unwrap_or(serde_json::Value::Null));
+                }
+                let line = serde_json::json!({ "table": table.name, "row": object });
+                serde_json::to_writer(&mut buffer, &line)
+                    .map_err(|error| TransferError(error.to_string()))?;
+                buffer.push(b'\n');
+                count += 1;
+                if buffer.len() >= CHUNK {
+                    let chunk = bytes::Bytes::from(std::mem::take(&mut buffer));
+                    sink.send(Ok(chunk)).await.map_err(|_| closed())?;
+                }
+            }
+            counted.push(CopiedTable { table: table.name.clone(), rows: count });
+        }
+        if !buffer.is_empty() {
+            sink.send(Ok(bytes::Bytes::from(buffer))).await.map_err(|_| closed())?;
+        }
+        Ok(counted)
+    }
+}
+
 /// `a` và `b` là cùng một database không (hai placement trỏ tới cùng một chỗ): SQLite so file,
 /// Postgres so tên database, schema và lúc máy chủ khởi động (`pg_postmaster_start_time`, khác
 /// nhau giữa hai máy chủ dù cùng tên database). Dời khách giữa hai "database" thật ra là một sẽ

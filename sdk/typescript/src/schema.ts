@@ -3150,6 +3150,45 @@ export type Data_TenantDomain = {
 };
 
 /** Envelope of a single result. */
+export type Data_TenantExport = {
+  /** An export of all the data of a tenant. */
+  data: {
+    created_at: string;
+    error?: string | null;
+    /** The file is deleted after this time. */
+    expires_at?: string | null;
+    id: string;
+    /** `manual`, or `subscription_canceled` when the subscription was canceled. */
+    reason: string;
+    requested_by?: string | null;
+    /** Size of the file in bytes, once ready. */
+    size?: number | null;
+    /**
+     * `pending`, `running`, `ready` (download it), `failed` (see `error`) or `expired` (deleted
+     * after the retention days).
+     */
+    status: string;
+    /** Rows exported per table. */
+    tables: TenantTableRows[];
+    tenant_id: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TenantExportLink = {
+  /** A link to download an export without signing in. */
+  data: {
+    expires_at: string;
+    /**
+     * Path to open, relative to the API, e.g. `/api/v1/kernel/exports/download?token=…`. Anyone
+     * with it can download until `expires_at`; a new link replaces the previous one.
+     */
+    url: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TenantMove = {
   /** A move of a tenant to another placement. */
   data: {
@@ -3926,6 +3965,31 @@ export type Data_Vec_SupportGrantResponse = {
     starts_at: string;
     /** The tenant the staff may enter. */
     tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TenantExport = {
+  data: {
+    created_at: string;
+    error?: string | null;
+    /** The file is deleted after this time. */
+    expires_at?: string | null;
+    id: string;
+    /** `manual`, or `subscription_canceled` when the subscription was canceled. */
+    reason: string;
+    requested_by?: string | null;
+    /** Size of the file in bytes, once ready. */
+    size?: number | null;
+    /**
+     * `pending`, `running`, `ready` (download it), `failed` (see `error`) or `expired` (deleted
+     * after the retention days).
+     */
+    status: string;
+    /** Rows exported per table. */
+    tables: TenantTableRows[];
+    tenant_id: string;
+    updated_at: string;
   }[];
 };
 
@@ -8389,6 +8453,39 @@ export type TenantExpanded = {
   usage?: Record<string, unknown> | null;
 };
 
+/** An export of all the data of a tenant. */
+export type TenantExport = {
+  created_at: string;
+  error?: string | null;
+  /** The file is deleted after this time. */
+  expires_at?: string | null;
+  id: string;
+  /** `manual`, or `subscription_canceled` when the subscription was canceled. */
+  reason: string;
+  requested_by?: string | null;
+  /** Size of the file in bytes, once ready. */
+  size?: number | null;
+  /**
+   * `pending`, `running`, `ready` (download it), `failed` (see `error`) or `expired` (deleted
+   * after the retention days).
+   */
+  status: string;
+  /** Rows exported per table. */
+  tables: TenantTableRows[];
+  tenant_id: string;
+  updated_at: string;
+};
+
+/** A link to download an export without signing in. */
+export type TenantExportLink = {
+  expires_at: string;
+  /**
+   * Path to open, relative to the API, e.g. `/api/v1/kernel/exports/download?token=…`. Anyone
+   * with it can download until `expires_at`; a new link replaces the previous one.
+   */
+  url: string;
+};
+
 /** A move of a tenant to another placement. */
 export type TenantMove = {
   created_at: string;
@@ -11648,6 +11745,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/exports/download": {
+    /** Download a data export with a link. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { token: string }; };
+      responses: {
+        200: string;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/modules": {
     /** List the installed modules. */
     get: {
@@ -11783,6 +11892,71 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/exports": {
+    /** List the data exports of a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_TenantExport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Export all the data of a tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        201: Data_TenantExport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/exports/{export_id}": {
+    /** Get a data export of a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; export_id: string }; };
+      responses: {
+        200: Data_TenantExport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/exports/{export_id}/content": {
+    /** Download a data export of a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; export_id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/exports/{export_id}/link": {
+    /** Create a download link for a data export. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; export_id: string }; };
+      responses: {
+        200: Data_TenantExportLink;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
