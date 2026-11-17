@@ -2711,6 +2711,34 @@ export type Data_LedgerBalanceResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_LedgerBankAccount = {
+  /** A bank account money is transferred into (the unit's own account, never the platform's). */
+  data: {
+    account_name: string;
+    account_number: string;
+    /** NAPAS bank identification number, e.g. `970436`. */
+    bank_bin: string;
+    created_at: string;
+    /** Bank feed that reports the transfers, if any. */
+    feed_provider?: string | null;
+    id: string;
+    org_id: string;
+    /** `active` or `disabled`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerBankFeedReceipt = {
+  /** Receipt of a bank feed notification. */
+  data: {
+    /** Transactions stored now (ones sent before are not counted). */
+    stored: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LedgerBookResponse = {
   /** A book: the ledger of one organization unit (an accounting entity). */
   data: {
@@ -2747,6 +2775,10 @@ export type Data_LedgerEntry = {
     reversed_by_entry_id?: string | null;
     /** The entry this one reverses. */
     reverses_entry_id?: string | null;
+    /** When the entry was sealed into the hash chain; `null` while not yet sealed. */
+    sealed_at?: string | null;
+    /** Position in the book's hash chain; `null` until the entry is sealed (within seconds). */
+    sequence?: number | null;
     source_id?: string | null;
     source_kind: string;
     source_module: string;
@@ -2777,10 +2809,63 @@ export type Data_LedgerExceptionResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_LedgerFlowSettings = {
+  /** The money-flow settings in force for a unit (set on it or inherited from the nearest unit above). */
+  data: {
+    cod_remittance: LedgerCodRemittance;
+    /** Days the seller's share is held after the money comes in (return window), 0 to 365. */
+    hold_days: number;
+    /** The settings come from a unit above. */
+    inherited: boolean;
+    mode: LedgerFlowMode;
+    /** The unit asked about. */
+    org_id: string;
+    /** Payment partner used in the collect and split modes. */
+    payment_provider?: string | null;
+    /** Partner that pays the sellers out (collect mode). */
+    payout_provider?: string | null;
+    /**
+     * The unit the settings are set on (its book gets the entries in the collect and split
+     * modes); `null` when nothing is set and the defaults apply.
+     */
+    source_org_id?: string | null;
+    updated_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerHold = {
+  /** The seller's share of a sale held until the return window ends. */
+  data: {
+    /** Still held: the sale minus fees, withholding and refunds so far. */
+    amount: Money;
+    book_id: string;
+    created_at: string;
+    id: string;
+    /** The unit of the book (the marketplace). */
+    org_id: string;
+    /** Held when the money came in. */
+    original: Money;
+    /** When the job moves the money to the seller's available balance. */
+    release_at: string;
+    /** The entry that moved the money to the available balance. */
+    release_entry_id?: string | null;
+    seller_org_id: string;
+    source_id: string;
+    source_module: string;
+    /** `held` or `released`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LedgerPayment = {
   /** A payment collected through a licensed partner. */
   data: {
     amount: Money;
+    /** Bank transfer payments: the receiving bank account (of the unit, never of the platform). */
+    bank_account_id?: string | null;
     book_id: string;
     captured_at?: string | null;
     /** Partner page where the buyer pays. */
@@ -2797,7 +2882,7 @@ export type Data_LedgerPayment = {
     provider: string;
     /** Id of the transaction at the partner, once created there. */
     provider_ref?: string | null;
-    /** QR payload, when the partner gives one. */
+    /** QR payload, when the partner gives one, or the VietQR code of a bank transfer payment. */
     qr_payload?: string | null;
     reference: string;
     /** Refunded or being refunded. */
@@ -2810,6 +2895,8 @@ export type Data_LedgerPayment = {
      * amount; see the exceptions).
      */
     status: string;
+    /** Bank transfer payments: the code the buyer must keep in the transfer description. */
+    transfer_code?: string | null;
     updated_at: string;
   };
 };
@@ -2819,6 +2906,33 @@ export type Data_LedgerPaymentDetail = {
   /** A payment with its refunds. */
   data: LedgerPayment & {
     refunds: LedgerRefund[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerPayout = {
+  /** A payout of a seller's available balance through the payout partner. */
+  data: {
+    amount: Money;
+    book_id: string;
+    created_at: string;
+    description: string;
+    failure_reason?: string | null;
+    id: string;
+    /** The unit of the book (the marketplace). */
+    org_id: string;
+    /** The seller paid. */
+    payee_org_id: string;
+    provider: string;
+    provider_ref?: string | null;
+    reference: string;
+    /**
+     * `pending` (the partner has not answered yet; send the same request again), `sent` (the
+     * partner is working on it), `succeeded` or `failed` (the money is back on the seller's
+     * available balance).
+     */
+    status: string;
+    updated_at: string;
   };
 };
 
@@ -2872,6 +2986,20 @@ export type Data_LedgerRefund = {
     /** `pending`, `succeeded` or `failed`. */
     status: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerSealStatus = {
+  /** How many entries of a book are in its hash chain. */
+  data: {
+    book_id: string;
+    /** When the oldest entry not yet sealed was posted; entries are sealed within seconds. */
+    oldest_unsealed_at?: string | null;
+    /** The period counted, or `null` for the whole book. */
+    period_id?: string | null;
+    sealed: number;
+    total: number;
   };
 };
 
@@ -6609,6 +6737,42 @@ export type LedgerBalanceResponse = {
   balance: Money;
 };
 
+/** A bank account money is transferred into (the unit's own account, never the platform's). */
+export type LedgerBankAccount = {
+  account_name: string;
+  account_number: string;
+  /** NAPAS bank identification number, e.g. `970436`. */
+  bank_bin: string;
+  created_at: string;
+  /** Bank feed that reports the transfers, if any. */
+  feed_provider?: string | null;
+  id: string;
+  org_id: string;
+  /** `active` or `disabled`. */
+  status: string;
+  updated_at: string;
+};
+
+/** A bank account to register. */
+export type LedgerBankAccountRequest = {
+  /** Name on the account, 1 to 50 characters. */
+  account_name: string;
+  /** 1 to 19 letters or digits. */
+  account_number: string;
+  /** NAPAS bank identification number (6 digits), e.g. `970436`. */
+  bank_bin: string;
+  /** Bank feed (statement reader) that reports transfers into this account. */
+  feed_provider?: string | null;
+  /** The unit that owns the account; default the tenant's root. */
+  org_id?: string | null;
+};
+
+/** Receipt of a bank feed notification. */
+export type LedgerBankFeedReceipt = {
+  /** Transactions stored now (ones sent before are not counted). */
+  stored: number;
+};
+
 /** A book to open. */
 export type LedgerBookRequest = {
   /** Accounting currency; default the unit's setting `organizations.currency`, else `VND`. */
@@ -6633,11 +6797,14 @@ export type LedgerBookResponse = {
   org_id: string;
 };
 
+/** Where cash on delivery goes (D-216): never to the marketplace operator's own account. */
+export type LedgerCodRemittance = "partner_collection" | "seller_direct";
+
 /** The other party an account is kept for (a seller, a customer, a carrier…). */
 export type LedgerCounterparty = {
   /** Id of the party in its own module. */
   id: string;
-  /** `org`, `customer`, `carrier`, `partner`, or `<module>.<kind>`. */
+  /** `org`, `customer`, `supplier`, `carrier`, `partner`, `bank_account`, or `<module>.<kind>`. */
   kind: string;
 };
 
@@ -6659,6 +6826,10 @@ export type LedgerEntry = {
   reversed_by_entry_id?: string | null;
   /** The entry this one reverses. */
   reverses_entry_id?: string | null;
+  /** When the entry was sealed into the hash chain; `null` while not yet sealed. */
+  sealed_at?: string | null;
+  /** Position in the book's hash chain; `null` until the entry is sealed (within seconds). */
+  sequence?: number | null;
   source_id?: string | null;
   source_kind: string;
   source_module: string;
@@ -6720,6 +6891,68 @@ export type LedgerExceptionResponse = {
   updated_at: string;
 };
 
+/** How money flows for a unit (D-187: the platform never holds buyers' money). */
+export type LedgerFlowMode = "self_collect" | "partner_collect" | "split_at_gateway";
+
+/** The money-flow settings in force for a unit (set on it or inherited from the nearest unit above). */
+export type LedgerFlowSettings = {
+  cod_remittance: LedgerCodRemittance;
+  /** Days the seller's share is held after the money comes in (return window), 0 to 365. */
+  hold_days: number;
+  /** The settings come from a unit above. */
+  inherited: boolean;
+  mode: LedgerFlowMode;
+  /** The unit asked about. */
+  org_id: string;
+  /** Payment partner used in the collect and split modes. */
+  payment_provider?: string | null;
+  /** Partner that pays the sellers out (collect mode). */
+  payout_provider?: string | null;
+  /**
+   * The unit the settings are set on (its book gets the entries in the collect and split
+   * modes); `null` when nothing is set and the defaults apply.
+   */
+  source_org_id?: string | null;
+  updated_at?: string | null;
+};
+
+/** Money-flow settings to set on a unit. */
+export type LedgerFlowSettingsRequest = {
+  /** `partner_collection` (default) or `seller_direct`: where cash on delivery goes. */
+  cod_remittance?: string | null;
+  /** Days the seller's share is held after the money comes in, 0 to 365. Defaults to 7. */
+  hold_days?: number | null;
+  /** `self_collect`, `partner_collect` or `split_at_gateway`. */
+  mode: string;
+  /** Payment partner; required in the collect and split modes, and must support them. */
+  payment_provider?: string | null;
+  /** Payout partner; required in the collect mode. */
+  payout_provider?: string | null;
+};
+
+/** The seller's share of a sale held until the return window ends. */
+export type LedgerHold = {
+  /** Still held: the sale minus fees, withholding and refunds so far. */
+  amount: Money;
+  book_id: string;
+  created_at: string;
+  id: string;
+  /** The unit of the book (the marketplace). */
+  org_id: string;
+  /** Held when the money came in. */
+  original: Money;
+  /** When the job moves the money to the seller's available balance. */
+  release_at: string;
+  /** The entry that moved the money to the available balance. */
+  release_entry_id?: string | null;
+  seller_org_id: string;
+  source_id: string;
+  source_module: string;
+  /** `held` or `released`. */
+  status: string;
+  updated_at: string;
+};
+
 /** One line of a manual entry. */
 export type LedgerLineRequest = {
   account_id: string;
@@ -6731,6 +6964,8 @@ export type LedgerLineRequest = {
 /** A payment collected through a licensed partner. */
 export type LedgerPayment = {
   amount: Money;
+  /** Bank transfer payments: the receiving bank account (of the unit, never of the platform). */
+  bank_account_id?: string | null;
   book_id: string;
   captured_at?: string | null;
   /** Partner page where the buyer pays. */
@@ -6747,7 +6982,7 @@ export type LedgerPayment = {
   provider: string;
   /** Id of the transaction at the partner, once created there. */
   provider_ref?: string | null;
-  /** QR payload, when the partner gives one. */
+  /** QR payload, when the partner gives one, or the VietQR code of a bank transfer payment. */
   qr_payload?: string | null;
   reference: string;
   /** Refunded or being refunded. */
@@ -6760,6 +6995,8 @@ export type LedgerPayment = {
    * amount; see the exceptions).
    */
   status: string;
+  /** Bank transfer payments: the code the buyer must keep in the transfer description. */
+  transfer_code?: string | null;
   updated_at: string;
 };
 
@@ -6789,6 +7026,45 @@ export type LedgerPaymentRequest = {
   return_url?: string | null;
   /** Id of your document (order, invoice…). */
   source_id?: string | null;
+};
+
+/** A payout of a seller's available balance through the payout partner. */
+export type LedgerPayout = {
+  amount: Money;
+  book_id: string;
+  created_at: string;
+  description: string;
+  failure_reason?: string | null;
+  id: string;
+  /** The unit of the book (the marketplace). */
+  org_id: string;
+  /** The seller paid. */
+  payee_org_id: string;
+  provider: string;
+  provider_ref?: string | null;
+  reference: string;
+  /**
+   * `pending` (the partner has not answered yet; send the same request again), `sent` (the
+   * partner is working on it), `succeeded` or `failed` (the money is back on the seller's
+   * available balance).
+   */
+  status: string;
+  updated_at: string;
+};
+
+/** A payout to make. */
+export type LedgerPayoutRequest = {
+  /** At most the seller's available balance. */
+  amount: Money;
+  /** Short text, 1 to 140 characters, no personal data. */
+  description: string;
+  /** The seller (unit) to pay. */
+  payee_org_id: string;
+  /**
+   * Your id of this payout: sending it again returns the same payout (and asks the partner again
+   * if it did not answer the first time).
+   */
+  reference: string;
 };
 
 /** An accounting period (a calendar month). */
@@ -6871,6 +7147,17 @@ export type LedgerReversalRequest = {
   reference: string;
 };
 
+/** How many entries of a book are in its hash chain. */
+export type LedgerSealStatus = {
+  book_id: string;
+  /** When the oldest entry not yet sealed was posted; entries are sealed within seconds. */
+  oldest_unsealed_at?: string | null;
+  /** The period counted, or `null` for the whole book. */
+  period_id?: string | null;
+  sealed: number;
+  total: number;
+};
+
 /** Debit or credit. */
 export type LedgerSide = "debit" | "credit";
 
@@ -6906,6 +7193,22 @@ export type LedgerTrialBalanceTotal = {
   credit: Money;
   currency: string;
   debit: Money;
+};
+
+/** A VietQR payment to create. */
+export type LedgerVietqrPaymentRequest = {
+  /** In VND. */
+  amount: Money;
+  /** Receiving bank account; may be left out when the unit has only one active account. */
+  bank_account_id?: string | null;
+  /** Short text, 1 to 140 characters, no personal data. */
+  description: string;
+  /** The unit that receives the money; default the tenant's root. */
+  org_id?: string | null;
+  /** Your id of this payment: sending it again returns the same payment. */
+  reference: string;
+  /** Id of your document (order, invoice…). */
+  source_id?: string | null;
 };
 
 /** Receipt of a partner notification. */
@@ -8706,6 +9009,26 @@ export type Page_LedgerAccountResponse = {
 };
 
 /** One page of a list. */
+export type Page_LedgerBankAccount = {
+  /** The items of this page, in the requested order. */
+  data: {
+    account_name: string;
+    account_number: string;
+    /** NAPAS bank identification number, e.g. `970436`. */
+    bank_bin: string;
+    created_at: string;
+    /** Bank feed that reports the transfers, if any. */
+    feed_provider?: string | null;
+    id: string;
+    org_id: string;
+    /** `active` or `disabled`. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_LedgerBookResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -8743,6 +9066,10 @@ export type Page_LedgerEntry = {
     reversed_by_entry_id?: string | null;
     /** The entry this one reverses. */
     reverses_entry_id?: string | null;
+    /** When the entry was sealed into the hash chain; `null` while not yet sealed. */
+    sealed_at?: string | null;
+    /** Position in the book's hash chain; `null` until the entry is sealed (within seconds). */
+    sequence?: number | null;
     source_id?: string | null;
     source_kind: string;
     source_module: string;
@@ -8775,10 +9102,39 @@ export type Page_LedgerExceptionResponse = {
 };
 
 /** One page of a list. */
+export type Page_LedgerHold = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Still held: the sale minus fees, withholding and refunds so far. */
+    amount: Money;
+    book_id: string;
+    created_at: string;
+    id: string;
+    /** The unit of the book (the marketplace). */
+    org_id: string;
+    /** Held when the money came in. */
+    original: Money;
+    /** When the job moves the money to the seller's available balance. */
+    release_at: string;
+    /** The entry that moved the money to the available balance. */
+    release_entry_id?: string | null;
+    seller_org_id: string;
+    source_id: string;
+    source_module: string;
+    /** `held` or `released`. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_LedgerPayment = {
   /** The items of this page, in the requested order. */
   data: {
     amount: Money;
+    /** Bank transfer payments: the receiving bank account (of the unit, never of the platform). */
+    bank_account_id?: string | null;
     book_id: string;
     captured_at?: string | null;
     /** Partner page where the buyer pays. */
@@ -8795,7 +9151,7 @@ export type Page_LedgerPayment = {
     provider: string;
     /** Id of the transaction at the partner, once created there. */
     provider_ref?: string | null;
-    /** QR payload, when the partner gives one. */
+    /** QR payload, when the partner gives one, or the VietQR code of a bank transfer payment. */
     qr_payload?: string | null;
     reference: string;
     /** Refunded or being refunded. */
@@ -8806,6 +9162,36 @@ export type Page_LedgerPayment = {
     /**
      * `pending`, `succeeded`, `failed`, `expired` or `needs_review` (the partner reported another
      * amount; see the exceptions).
+     */
+    status: string;
+    /** Bank transfer payments: the code the buyer must keep in the transfer description. */
+    transfer_code?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerPayout = {
+  /** The items of this page, in the requested order. */
+  data: {
+    amount: Money;
+    book_id: string;
+    created_at: string;
+    description: string;
+    failure_reason?: string | null;
+    id: string;
+    /** The unit of the book (the marketplace). */
+    org_id: string;
+    /** The seller paid. */
+    payee_org_id: string;
+    provider: string;
+    provider_ref?: string | null;
+    reference: string;
+    /**
+     * `pending` (the partner has not answered yet; send the same request again), `sent` (the
+     * partner is working on it), `succeeded` or `failed` (the money is back on the seller's
+     * available balance).
      */
     status: string;
     updated_at: string;
@@ -16601,6 +16987,46 @@ export interface paths {
       };
     };
   };
+  "/api/v1/ledger/bank-accounts": {
+    /** List the bank accounts in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerBankAccount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Register a bank account for VietQR transfers. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerBankAccountRequest;
+      responses: {
+        201: Data_LedgerBankAccount;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/bank-feeds/{provider}": {
+    /** Receive bank account transactions from a bank feed. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { provider: string }; };
+      requestBody: string;
+      responses: {
+        200: Data_LedgerBankFeedReceipt;
+        401: Problem;
+        413: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ledger/books": {
     /** List the books in your scope. */
     get: {
@@ -16633,6 +17059,19 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_LedgerBookResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/books/{id}/seal-status": {
+    /** Get the seal status of a book. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { period_id?: string }; };
+      responses: {
+        200: Data_LedgerSealStatus;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -16726,6 +17165,57 @@ export interface paths {
       };
     };
   };
+  "/api/v1/ledger/flow-settings/{org_id}": {
+    /** Get the money-flow settings in force for a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_LedgerFlowSettings;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Set the money-flow mode of a unit. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: LedgerFlowSettingsRequest;
+      responses: {
+        200: Data_LedgerFlowSettings;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/holds": {
+    /** List seller money held until the return window ends. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; seller_org_id?: string; source_module?: string; source_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerHold;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/holds/{id}/release": {
+    /** Release held seller money now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_LedgerHold;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ledger/payments": {
     /** List payments in your scope. */
     get: {
@@ -16749,6 +17239,22 @@ export interface paths {
         403: Problem;
         422: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/payments/vietqr": {
+    /** Create a VietQR bank transfer payment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerVietqrPaymentRequest;
+      responses: {
+        200: Data_LedgerPayment;
+        201: Data_LedgerPayment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -16780,6 +17286,47 @@ export interface paths {
         409: Problem;
         422: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/payouts": {
+    /** List payouts in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; payee_org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerPayout;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Pay a seller its available balance. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerPayoutRequest;
+      responses: {
+        200: Data_LedgerPayout;
+        201: Data_LedgerPayout;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/payouts/{id}": {
+    /** Get a payout. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_LedgerPayout;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

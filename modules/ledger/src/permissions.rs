@@ -53,6 +53,28 @@ pub(crate) const RECONCILE: Permission = Permission::new(
 )
 .with_risk(Risk::Money);
 
+pub(crate) const SETTINGS_MANAGE: Permission = Permission::new(
+    "ledger.settings_manage",
+    "Set the money-flow mode, hold days and partners, and register bank accounts, for the units in \
+     your scope.",
+)
+.scoped()
+.with_risk(Risk::Money);
+
+pub(crate) const PAYOUTS_CREATE: Permission = Permission::new(
+    "ledger.payouts_create",
+    "Pay sellers in your scope their available balance through the payout partner.",
+)
+.scoped()
+.with_risk(Risk::Money);
+
+pub(crate) const HOLDS_RELEASE: Permission = Permission::new(
+    "ledger.holds_release",
+    "Release held seller money before the return window ends, in the books of your scope.",
+)
+.scoped()
+.with_risk(Risk::Money);
+
 pub(crate) fn all() -> Vec<Permission> {
     vec![
         READ,
@@ -63,5 +85,8 @@ pub(crate) fn all() -> Vec<Permission> {
         PAYMENTS_CREATE,
         REFUNDS_CREATE,
         RECONCILE,
+        SETTINGS_MANAGE,
+        PAYOUTS_CREATE,
+        HOLDS_RELEASE,
     ]
 }

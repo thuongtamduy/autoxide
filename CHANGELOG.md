@@ -11,6 +11,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Money flows in the ledger (step 36): units choose how money flows — `self_collect`, `partner_collect` (a licensed
+  partner collects for the marketplace) or `split_at_gateway` — with `GET|PUT /api/v1/ledger/flow-settings/{org_id}`
+  (inherited down the tree; where cash on delivery goes, never to the marketplace operator). Modules record sales,
+  marketplace fees (VAT split), tax withheld for household sellers (rates from the `tax` pack), refunds and partner
+  fees through `Ledger::settle`; the seller's share is held until the return window ends (`GET /holds`,
+  `POST /holds/{id}/release`, job every 5 minutes) and paid out through the new kernel trait `PayoutGateway`
+  (`GET|POST /payouts`, `GET /payouts/{id}`; a refused payout puts the money back). VietQR bank transfers:
+  `POST /payments/vietqr` returns the VietQR code and a transfer code, `GET|POST /bank-accounts`, and the new kernel
+  trait `BankFeed` reports transfers (`POST /bank-feeds/{provider}` or polling every
+  `AUTOXIDE_LEDGER_BANK_FEED_POLL_SECONDS`) that are matched by code and amount; differences go to the exceptions.
+  Entries show `sequence` and `sealed_at`; `GET /books/{id}/seal-status`; `Ledger::balances` for many accounts at once.
+  New permissions `ledger.settings_manage`, `ledger.payouts_create`, `ledger.holds_release`; events
+  `ledger.payout_sent`, `ledger.payout_failed`, `ledger.hold_released`; MCP tools `ledger.flow_settings`,
+  `ledger.holds`, `ledger.release_hold`, `ledger.payouts`, `ledger.create_payout`, `ledger.create_vietqr_payment`.
+  The testkit has `FakePayoutGateway` and `FakeBankFeed`. Real bank feeds and payout partners are separate modules.
 - Navigation for admin interfaces (step 51): `GET /api/v1/kernel/navigation?org_id=` and MCP `kernel.navigation`
   return the groups and screens modules declare (`Module::navigation`), filtered by the modules on for the tenant,
   the caller's permissions at the unit and the plan (`locked` screens need a feature the plan lacks), with labels

@@ -266,6 +266,10 @@ pub(crate) mod payment {
         pub reference_fingerprint: String,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
+        /// VietQR: mã chuyển khoản trong nội dung (`AX…`), duy nhất theo khách.
+        pub transfer_code: Option<String>,
+        /// VietQR: tài khoản ngân hàng nhận (của người bán / khách — nền tảng không giữ tiền).
+        pub bank_account_id: Option<Uuid>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -408,6 +412,155 @@ pub(crate) mod reconciliation {
         pub error: Option<String>,
         pub created_by: Option<Uuid>,
         pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod flow_setting {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_flow_settings")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// Nút đặt cài đặt; nút con kế thừa. Ở chế độ thu hộ / chia tại cổng, sổ của nút này (sàn)
+        /// nhận bút toán.
+        pub org_id: Uuid,
+        /// `self_collect`, `partner_collect`, `split_at_gateway`.
+        pub mode: String,
+        pub payment_provider: Option<String>,
+        pub payout_provider: Option<String>,
+        pub hold_days: i32,
+        /// `partner_collection` hay `seller_direct`.
+        pub cod_remittance: String,
+        pub updated_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod hold {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_holds")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub book_id: Uuid,
+        /// Nút của sổ (sàn).
+        pub org_id: Uuid,
+        pub seller_org_id: Uuid,
+        /// Còn đang giữ (giảm theo phí, khấu trừ thay, hoàn tiền; không âm).
+        pub amount_minor: i64,
+        pub original_minor: i64,
+        pub currency: String,
+        pub release_at: DateTimeUtc,
+        /// `held`, `released`.
+        pub status: String,
+        pub source_module: String,
+        pub source_id: String,
+        pub release_entry_id: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod payout {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_payouts")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub book_id: Uuid,
+        pub org_id: Uuid,
+        pub payee_org_id: Uuid,
+        pub amount_minor: i64,
+        pub amount_currency: String,
+        pub provider: String,
+        pub provider_ref: Option<String>,
+        /// `pending` (chưa gửi được), `sent` (đối tác đang làm), `succeeded`, `failed`.
+        pub status: String,
+        pub failure_reason: Option<String>,
+        pub description: String,
+        pub reference: String,
+        pub reference_fingerprint: String,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod bank_account {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_bank_accounts")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// Nút sở hữu tài khoản (tiền vào thẳng tài khoản này).
+        pub org_id: Uuid,
+        pub bank_bin: String,
+        pub account_number: String,
+        pub account_name: String,
+        /// Nguồn biến động số dư (`BankFeed`), nếu có.
+        pub feed_provider: Option<String>,
+        pub feed_cursor: Option<String>,
+        /// `active`, `disabled`.
+        pub status: String,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod bank_transaction {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_bank_transactions")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub bank_account_id: Uuid,
+        pub provider: String,
+        pub provider_txn_id: String,
+        pub direction: String,
+        pub amount_minor: i64,
+        pub amount_currency: String,
+        pub memo: String,
+        pub booked_at: DateTimeUtc,
+        /// `pending`, `matched`, `exception`, `ignored`.
+        pub match_status: String,
+        pub payment_id: Option<Uuid>,
+        pub received_at: DateTimeUtc,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

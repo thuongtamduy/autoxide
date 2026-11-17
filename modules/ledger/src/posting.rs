@@ -54,7 +54,7 @@ fn unbalanced(debit: Money, credit: Money) -> Error {
     .with_param("credit", credit)
 }
 
-fn insufficient_balance() -> Error {
+pub(crate) fn insufficient_balance() -> Error {
     Error::conflict(
         "ledger.insufficient_balance",
         "The account balance is not enough for this entry.",
@@ -85,8 +85,142 @@ pub(crate) fn month_of(day: NaiveDate) -> (NaiveDate, NaiveDate) {
     (first, last)
 }
 
+/// Đầu vào đã kiểm của một bút toán.
+struct Checked {
+    description: String,
+    reference: Reference,
+    fingerprint: String,
+    currency: Currency,
+}
+
+/// Kiểm bút toán (không I/O): mọi lỗi đầu vào gom một lần, cân nợ / có, cùng loại tiền.
+fn checked(entry: &NewEntry, reverses: Option<Uuid>) -> Result<Checked, Error> {
+    let mut problems = Vec::new();
+    let description = entry.description.trim().to_owned();
+    if !(1..=200).contains(&description.chars().count()) {
+        problems.push(FieldError::new(
+            "description",
+            "length",
+            "must be 1 to 200 characters long (fixed text, no personal data)",
+        ));
+    }
+    if !valid_name(&entry.source_module) {
+        problems.push(FieldError::new("source_module", "format", "must be a module name"));
+    }
+    if !valid_name(&entry.source_kind) {
+        problems.push(FieldError::new(
+            "source_kind",
+            "format",
+            "must be lowercase words joined by `.`",
+        ));
+    }
+    if entry.source_id.as_deref().is_some_and(|id| !valid_id(id)) {
+        problems.push(FieldError::new(
+            "source_id",
+            "format",
+            "must be 1 to 100 visible ASCII characters",
+        ));
+    }
+    let reference = Reference::checked(&entry.reference, "reference", &mut problems);
+    if entry.lines.len() < 2 {
+        problems.push(FieldError::new("lines", "count", "an entry needs at least two lines"));
+    }
+    for (index, item) in entry.lines.iter().enumerate() {
+        if !item.amount.is_positive() {
+            problems.push(FieldError::new(
+                format!("lines[{index}].amount"),
+                "range",
+                "must be greater than zero",
+            ));
+        }
+        if let LineAccount::Key(key) = &item.account {
+            check_key(key, &format!("lines[{index}].account."), &mut problems);
+            if key.book != entry.book {
+                problems.push(FieldError::new(
+                    format!("lines[{index}].account.book"),
+                    "book",
+                    "must be the book of the entry",
+                ));
+            }
+        }
+    }
+    if !problems.is_empty() {
+        return Err(Error::validation(problems));
+    }
+    let Some(reference) = reference else {
+        return Err(Error::internal("a checked reference went missing"));
+    };
+    let currency = entry.lines[0].amount.currency();
+    let mixed = entry.lines.iter().any(|item| {
+        item.amount.currency() != currency
+            || matches!(&item.account, LineAccount::Key(key) if key.currency != currency)
+    });
+    if mixed {
+        return Err(currency_mixed());
+    }
+    let total = |side: Side| {
+        Money::sum(
+            currency,
+            entry.lines.iter().filter(|item| item.side == side).map(|item| item.amount),
+        )
+    };
+    let (debit, credit) = (total(Side::Debit)?, total(Side::Credit)?);
+    if debit != credit {
+        return Err(unbalanced(debit, credit));
+    }
+    let fingerprint = fingerprint_of(entry, reverses)?;
+    Ok(Checked { description, reference, fingerprint, currency })
+}
+
+/// Bút toán sẵn sàng ghi vào sổ `book` (đã có) ngày `effective_date` — không I/O, dùng được trong
+/// transaction ghi của module (dòng tiền ghi khoản tạm giữ và bút toán cùng một transaction).
+pub(crate) fn draft_for(
+    entry: NewEntry,
+    book: book::Model,
+    effective_date: NaiveDate,
+    reverses: Option<Uuid>,
+    guard: Option<(Principal, Permission)>,
+) -> Result<Draft, Error> {
+    let Checked { description, reference, fingerprint, currency } = checked(&entry, reverses)?;
+    if book.base_currency != currency.code() {
+        let base = Currency::parse(&book.base_currency)?;
+        return Err(exchange_rate_missing(base, currency, effective_date));
+    }
+    Ok(Draft {
+        book,
+        effective_date,
+        description,
+        source_module: entry.source_module,
+        source_kind: entry.source_kind,
+        source_id: entry.source_id,
+        reference,
+        fingerprint,
+        currency,
+        lines: entry.lines,
+        reverses,
+        guard,
+    })
+}
+
+/// Ghi bút toán `draft` trong transaction ghi `transaction` của bên gọi (không commit).
+pub(crate) async fn write_in(
+    transaction: &DatabaseTransaction,
+    tenant: &TenantContext,
+    actor: Actor,
+    draft: &Draft,
+    outbox: &autoxide_kernel::event::Outbox,
+) -> Result<Submitted<Entry>, Error> {
+    write(transaction, tenant, actor, draft, outbox).await
+}
+
+/// Sàn mặc định khi mở tài khoản theo khoá: nghĩa vụ với người bán không bao giờ âm (không chi,
+/// trừ phí, hoàn quá số đang có).
+fn default_floor(purpose: &str) -> Option<i64> {
+    matches!(purpose, "payable.seller_held" | "payable.seller_available").then_some(0)
+}
+
 /// Bút toán đã kiểm, sẵn sàng ghi.
-struct Draft {
+pub(crate) struct Draft {
     book: book::Model,
     effective_date: NaiveDate,
     description: String,
@@ -183,103 +317,14 @@ impl LedgerService {
         reverses: Option<Uuid>,
         guard: Option<(Principal, Permission)>,
     ) -> Result<Submitted<Entry>, Error> {
-        let mut problems = Vec::new();
-        let description = entry.description.trim().to_owned();
-        if !(1..=200).contains(&description.chars().count()) {
-            problems.push(FieldError::new(
-                "description",
-                "length",
-                "must be 1 to 200 characters long (fixed text, no personal data)",
-            ));
-        }
-        if !valid_name(&entry.source_module) {
-            problems.push(FieldError::new("source_module", "format", "must be a module name"));
-        }
-        if !valid_name(&entry.source_kind) {
-            problems.push(FieldError::new(
-                "source_kind",
-                "format",
-                "must be lowercase words joined by `.`",
-            ));
-        }
-        if entry.source_id.as_deref().is_some_and(|id| !valid_id(id)) {
-            problems.push(FieldError::new(
-                "source_id",
-                "format",
-                "must be 1 to 100 visible ASCII characters",
-            ));
-        }
-        let reference = Reference::checked(&entry.reference, "reference", &mut problems);
-        if entry.lines.len() < 2 {
-            problems.push(FieldError::new("lines", "count", "an entry needs at least two lines"));
-        }
-        for (index, item) in entry.lines.iter().enumerate() {
-            if !item.amount.is_positive() {
-                problems.push(FieldError::new(
-                    format!("lines[{index}].amount"),
-                    "range",
-                    "must be greater than zero",
-                ));
-            }
-            if let LineAccount::Key(key) = &item.account {
-                check_key(key, &format!("lines[{index}].account."), &mut problems);
-                if key.book != entry.book {
-                    problems.push(FieldError::new(
-                        format!("lines[{index}].account.book"),
-                        "book",
-                        "must be the book of the entry",
-                    ));
-                }
-            }
-        }
-        if !problems.is_empty() {
-            return Err(Error::validation(problems));
-        }
-        let Some(reference) = reference else {
-            return Err(Error::internal("a checked reference went missing"));
-        };
-        let currency = entry.lines[0].amount.currency();
-        let mixed = entry.lines.iter().any(|item| {
-            item.amount.currency() != currency
-                || matches!(&item.account, LineAccount::Key(key) if key.currency != currency)
-        });
-        if mixed {
-            return Err(currency_mixed());
-        }
-        let total = |side: Side| {
-            Money::sum(
-                currency,
-                entry.lines.iter().filter(|item| item.side == side).map(|item| item.amount),
-            )
-        };
-        let (debit, credit) = (total(Side::Debit)?, total(Side::Credit)?);
-        if debit != credit {
-            return Err(unbalanced(debit, credit));
-        }
-        let fingerprint = fingerprint_of(&entry, reverses)?;
+        // Kiểm trước khi mở sổ: đầu vào sai không để lại sổ rỗng.
+        checked(&entry, reverses)?;
         let book = self.ensure_book(tenant, entry.book).await?;
         let effective_date = match entry.effective_date {
             Some(day) => day,
             None => self.today(tenant, entry.book).await,
         };
-        if book.base_currency != currency.code() {
-            let base = Currency::parse(&book.base_currency)?;
-            return Err(exchange_rate_missing(base, currency, effective_date));
-        }
-        let draft = Draft {
-            book,
-            effective_date,
-            description,
-            source_module: entry.source_module,
-            source_kind: entry.source_kind,
-            source_id: entry.source_id,
-            reference,
-            fingerprint,
-            currency,
-            lines: entry.lines,
-            reverses,
-            guard,
-        };
+        let draft = draft_for(entry, book, effective_date, reverses, guard)?;
         let (database, draft) = (tenant.database(), &draft);
         reference::submit_once(database, move || async move {
             let transaction = database.begin_write().await?;
@@ -472,8 +517,16 @@ async fn write(
     keys.dedup();
     let mut by_key = Vec::with_capacity(keys.len());
     for key in keys {
-        let (found, _) =
-            LedgerService::find_or_open(transaction, tenant, &book, key, None, None, None).await?;
+        let (found, _) = LedgerService::find_or_open(
+            transaction,
+            tenant,
+            &book,
+            key,
+            None,
+            default_floor(&key.purpose),
+            None,
+        )
+        .await?;
         by_key.push((key.clone(), found));
     }
     let ids: Vec<Uuid> = draft
