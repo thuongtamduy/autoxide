@@ -62,15 +62,16 @@ impl NewsletterService {
 
     /// Mail xác nhận gửi tới `to`: tên các danh sách (do quản trị viên đặt) và link — không có
     /// chữ nào do người đăng ký gõ.
-    pub(crate) fn confirmation_mail(
+    pub(crate) async fn confirmation_mail(
         &self,
+        tenant: &autoxide_kernel::tenancy::TenantContext,
         to: &str,
         locale: Locale,
         lists: &[&List],
         token: &str,
         token_id: uuid::Uuid,
     ) -> Result<Mail, Error> {
-        let link = token_link(self.confirm_url()?, token);
+        let link = token_link(&self.links.rewrite(tenant, self.confirm_url()?).await?, token);
         let names: Vec<String> =
             lists.iter().map(|list| format!("- {}", list.name.get(locale))).collect();
         let names = names.join("\n");
@@ -84,8 +85,9 @@ impl NewsletterService {
 
     /// Mail chiến dịch `row` của danh sách `list` gửi tới `to`, với token huỷ đăng ký `token`.
     /// `delivery_id`: khoá chống trùng (`None` cho mail thử).
-    pub(crate) fn campaign_mail(
+    pub(crate) async fn campaign_mail(
         &self,
+        tenant: &autoxide_kernel::tenancy::TenantContext,
         row: &campaign::Model,
         list: &List,
         to: &str,
@@ -94,7 +96,8 @@ impl NewsletterService {
     ) -> Result<Mail, Error> {
         self.check_ready(row)?;
         let unsubscribe = self.public_url.link(&format!("{UNSUBSCRIBE_PATH}?token={token}"))?;
-        let preferences = token_link(self.preferences_url()?, token);
+        let preferences =
+            token_link(&self.links.rewrite(tenant, self.preferences_url()?).await?, token);
         let locale = Locale::stored(&row.locale);
         let address = self.config.postal_address.clone().unwrap_or_default();
         let params = [
@@ -195,13 +198,16 @@ impl NewsletterService {
         principal.require(&crate::permissions::NEWSLETTER_READ)?;
         let campaign = self.find_campaign(tenant, id).await?;
         let list = self.find_list(tenant, campaign.row.list_id).await?;
-        let mail = self.campaign_mail(
-            &campaign.row,
-            &list,
-            "subscriber@example.invalid",
-            PREVIEW_TOKEN,
-            None,
-        )?;
+        let mail = self
+            .campaign_mail(
+                tenant,
+                &campaign.row,
+                &list,
+                "subscriber@example.invalid",
+                PREVIEW_TOKEN,
+                None,
+            )
+            .await?;
         Ok(Preview { subject: mail.subject, text: mail.text, html: mail.html })
     }
 

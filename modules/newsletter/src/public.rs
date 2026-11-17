@@ -383,7 +383,16 @@ impl NewsletterService {
                     let locale = job.locale.unwrap_or_else(|| Locale::stored(&row.locale));
                     // Link mang khách của token (`autoxide_kernel::tenancy::link_token`).
                     let token = link_token(tenant, &issued.token);
-                    match self.confirmation_mail(&job.email, locale, &to_confirm, &token, issued.id)
+                    match self
+                        .confirmation_mail(
+                            tenant,
+                            &job.email,
+                            locale,
+                            &to_confirm,
+                            &token,
+                            issued.id,
+                        )
+                        .await
                     {
                         Ok(mail) => self.mailer.send(tenant, mail).await,
                         Err(error) => Err(error),

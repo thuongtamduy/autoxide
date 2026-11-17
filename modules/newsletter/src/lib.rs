@@ -108,7 +108,12 @@ impl Module for NewsletterModule {
         // nhận một event không ai khai là lỗi khởi động).
         self.listens_published = context.events().contains(campaigns::new_posts::ENTRY_PUBLISHED);
         self.listens_failures = context.events().contains(autoxide_kernel::mail::DELIVERY_FAILED);
-        let service = Arc::new(NewsletterService::new(parts, config));
+        // Link trong thư mở trên tên miền của khách khi khách đã đặt `kernel.public_url`.
+        let links = context
+            .require::<dyn autoxide_kernel::tenancy::TenantSettings>()
+            .map(autoxide_kernel::tenancy::SiteLinks::new)
+            .unwrap_or_default();
+        let service = Arc::new(NewsletterService::new(parts, config).with_links(links));
         context.personal_data(service.clone())?;
         self.service = Some(service);
         self.databases = Some(context.tenancy());

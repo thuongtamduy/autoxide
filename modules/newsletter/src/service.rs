@@ -40,6 +40,8 @@ pub(crate) struct NewsletterService {
     /// Sổ database: token trong link mang khách của nó (`autoxide_kernel::tenancy::link_token`).
     pub(crate) databases: DatabaseRegistry,
     pub(crate) config: NewsletterConfig,
+    /// Link trong thư theo tên miền của khách (`kernel.public_url`); mặc định: địa chỉ máy chủ.
+    pub(crate) links: autoxide_kernel::tenancy::SiteLinks,
 }
 
 /// Thứ service cần từ kernel và module khác.
@@ -69,7 +71,14 @@ impl NewsletterService {
             resources: parts.resources,
             databases: parts.databases,
             config,
+            links: Default::default(),
         }
+    }
+
+    /// Link trong thư theo tên miền của khách.
+    pub(crate) fn with_links(mut self, links: autoxide_kernel::tenancy::SiteLinks) -> Self {
+        self.links = links;
+        self
     }
 }
 

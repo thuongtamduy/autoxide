@@ -641,7 +641,7 @@ impl NewsletterService {
         let list = self.find_list(tenant, campaign.row.list_id).await?;
         let token = autoxide_kernel::secret::random_token(32)?;
         let token = autoxide_kernel::tenancy::link_token(tenant, &token);
-        let mail = self.campaign_mail(&campaign.row, &list, &email, &token, None)?;
+        let mail = self.campaign_mail(tenant, &campaign.row, &list, &email, &token, None).await?;
         self.mailer.send(tenant, mail).await?;
         tracing::info!(campaign_id = %id, "newsletter test mail queued");
         Ok(())

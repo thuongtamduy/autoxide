@@ -92,6 +92,8 @@ pub(crate) struct LoginLinks {
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
     pub outbox: Outbox,
+    /// Link theo tên miền của khách (`kernel.public_url`).
+    pub links: autoxide_kernel::tenancy::SiteLinks,
     /// Trang của giao diện, có `{token}`; `None`: mail chứa token.
     pub url: Option<String>,
     pub minutes: i64,
@@ -169,7 +171,7 @@ impl LoginLinks {
         let minutes = self.minutes.to_string();
         let mail = match &self.url {
             Some(url) => {
-                let link = url.replace("{token}", &token);
+                let link = self.links.rewrite(tenant, url).await?.replace("{token}", &token);
                 let params =
                     [("email", user.email.as_str()), ("minutes", &minutes), ("link", &link)];
                 LINK_MAIL.mail(&user.email, &self.translations, language, &params)
@@ -265,6 +267,7 @@ mod tests {
             mailer: services.mails.clone(),
             translations: autoxide_kernel::i18n::Translations::default(),
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+            links: Default::default(),
             url: None,
             minutes: 15,
             databases: autoxide_kernel::tenancy::DatabaseRegistry::single(

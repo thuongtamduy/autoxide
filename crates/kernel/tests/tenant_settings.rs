@@ -170,9 +170,12 @@ async fn setting_secret_khong_bao_gio_tra_ra() {
         assert!(!list.to_string().contains(secret), "{list}");
         let names: Vec<&str> =
             list["data"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
-        assert_eq!(names, ["demo.api_key", "demo.greeting", "kernel.public_url"]);
+        assert_eq!(
+            names,
+            ["demo.api_key", "demo.greeting", "kernel.business_model", "kernel.public_url"]
+        );
         assert_eq!(list["data"][1]["value"], "Xin chào");
-        assert_eq!(list["data"][2]["is_set"], false);
+        assert_eq!(list["data"][3]["is_set"], false);
 
         // Database chỉ giữ bản mã hoá; event chỉ mang tên.
         let stored =
@@ -183,6 +186,16 @@ async fn setting_secret_khong_bao_gio_tra_ra() {
         assert!(
             events.iter().all(|payload| !payload.contains(secret) && !payload.contains("Xin chào"))
         );
+
+        // `kernel.business_model` chỉ nhận các mô hình đã khai (D-185).
+        let model = "/api/v1/kernel/settings/kernel.business_model";
+        let (status, bad) =
+            call(&app, Method::PUT, model, "admin", Some(json!({"value": "shop"}))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{bad}");
+        let (status, set) =
+            call(&app, Method::PUT, model, "admin", Some(json!({"value": "marketplace"}))).await;
+        assert_eq!(status, StatusCode::OK, "{set}");
+        call(&app, Method::DELETE, model, "admin", None).await;
 
         // Module đọc được giá trị thật; khách khác không thấy gì.
         let settings = modules.api::<dyn TenantSettings>().unwrap();
@@ -349,6 +362,7 @@ async fn doi_ten_cau_hinh_gia_tri_cu_van_dung_duoc() {
                 ("demo.color", &Value::Null),
                 ("demo.connection.partner.account", &connection),
                 ("demo.connection.partner.key", &connection),
+                ("kernel.business_model", &Value::Null),
                 ("kernel.public_url", &Value::Null),
             ]
         );
@@ -439,7 +453,7 @@ async fn loc_nhom_cho_nhan_su_nen_tang_va_tool_mcp() {
         assert_eq!(names, ["demo.connection.partner.account", "demo.connection.partner.key"]);
         assert_eq!(only[0]["value"], "acct-1");
         let all = client.call_tool(tool("kernel.list_settings", json!({}))).await.unwrap();
-        assert_eq!(all.structured_content.unwrap()["data"].as_array().unwrap().len(), 4);
+        assert_eq!(all.structured_content.unwrap()["data"].as_array().unwrap().len(), 5);
         client.cancel().await.unwrap();
     })
     .await
