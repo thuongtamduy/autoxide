@@ -268,6 +268,7 @@ impl Modules {
         let setup = self.catalog.setup_steps();
         let reasons = self.catalog.reason_codes();
         let probes = self.catalog.connection_probes();
+        let taggables = self.catalog.taggables();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         // Gọi sau `configure` của mọi module: thời hạn đọc từ cấu hình.
@@ -302,6 +303,7 @@ impl Modules {
                 setup: &setup,
                 reasons: &reasons,
                 probes: &probes,
+                taggables: &taggables,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,

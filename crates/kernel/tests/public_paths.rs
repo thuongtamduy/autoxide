@@ -50,6 +50,7 @@ use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::setup::SetupStep;
 use autoxide_kernel::sms::SmsSender;
 use autoxide_kernel::storage::Storage;
+use autoxide_kernel::tags::TagIndex;
 use autoxide_kernel::task::TaskArgument;
 use autoxide_kernel::telemetry::TelemetryError;
 use autoxide_kernel::template::TemplateEngine;

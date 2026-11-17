@@ -4258,6 +4258,8 @@ export type Data_EntryResponse = {
     /** Last part of the address. */
     slug: string;
     status: Status;
+    /** The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`). */
+    tags: TagRef[];
     /**
      * Categories and tags, in order (the first category is the main one). Set with
      * `PUT /api/v1/content/entries/{id}/terms`; takes effect at once.
@@ -6548,6 +6550,20 @@ export type Data_TagResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_TagView = {
+  /** A tag of the tenant. */
+  data: {
+    color: string;
+    created_at: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** Records carrying it. */
+    uses: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TaxPackResponse = {
   /** An imported tax data pack. */
   data: {
@@ -8032,6 +8048,29 @@ export type Data_Vec_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_TagRef = {
+  data: {
+    /** One of `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`. */
+    color: string;
+    id: string;
+    name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TagView = {
+  data: {
+    color: string;
+    created_at: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** Records carrying it. */
+    uses: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_TaxCategoryResponse = {
   data: {
     code: string;
@@ -8589,6 +8628,8 @@ export type EntryResponse = {
   /** Last part of the address. */
   slug: string;
   status: Status;
+  /** The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`). */
+  tags: TagRef[];
   /**
    * Categories and tags, in order (the first category is the main one). Set with
    * `PUT /api/v1/content/entries/{id}/terms`; takes effect at once.
@@ -10357,6 +10398,12 @@ export type MenuTarget = {
   kind: string;
 };
 
+/** The tag to merge into. */
+export type MergeTag = {
+  /** Every record of the merged tag gets this tag; the merged tag is deleted. */
+  into: string;
+};
+
 /**
  * The value of a figure: `money` (`amount` in the smallest unit of `currency`), `count`, or
  * `ratio` (`numerator` / `denominator`).
@@ -10692,6 +10739,15 @@ export type NewRecordNote = {
   body: string;
   /** Up to 20 users to notify; each must be able to read the record. */
   mentions?: string[];
+};
+
+/** A tag to create. */
+export type NewTag = {
+  /** A color of the fixed palette; `gray` by default. */
+  color?: string | null;
+  description?: string | null;
+  /** 1 to 50 characters; unique in the tenant, ignoring case and accents. */
+  name: string;
 };
 
 /** A new tenant. */
@@ -11818,6 +11874,8 @@ export type Page_EntryResponse = {
     /** Last part of the address. */
     slug: string;
     status: Status;
+    /** The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`). */
+    tags: TagRef[];
     /**
      * Categories and tags, in order (the first category is the main one). Set with
      * `PUT /api/v1/content/entries/{id}/terms`; takes effect at once.
@@ -14512,6 +14570,14 @@ export type RecordNote = {
   mentions: string[];
 };
 
+/** The tags of a record. */
+export type RecordTagsInput = {
+  /** New tags to create and attach by name (an existing name is reused). */
+  new_tags?: string[];
+  /** The tags the record has after the call (replaces the current ones). */
+  tag_ids?: string[];
+};
+
 /** One-time recovery codes. Shown only once. */
 export type RecoveryCodesResponse = {
   /**
@@ -15463,6 +15529,22 @@ export type SuspendRequest = {
   reason: string;
 };
 
+/** Changes to a tag; omitted fields stay. */
+export type TagChanges = {
+  color?: string | null;
+  /** `""` clears it. */
+  description?: string | null;
+  name?: string | null;
+};
+
+/** A tag, as attached to a record. */
+export type TagRef = {
+  /** One of `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`. */
+  color: string;
+  id: string;
+  name: string;
+};
+
 /** A tag. Items carry tags as names; tags are created when first given to an item. */
 export type TagResponse = {
   created_at: string;
@@ -15472,6 +15554,17 @@ export type TagResponse = {
   /** Unique, ignoring case. */
   name: string;
   updated_at: string;
+};
+
+/** A tag of the tenant. */
+export type TagView = {
+  color: string;
+  created_at: string;
+  description?: string | null;
+  id: string;
+  name: string;
+  /** Records carrying it. */
+  uses: number;
 };
 
 /** A new comment state for a target. Omitted fields stay as they are. */
@@ -19515,7 +19608,7 @@ export interface paths {
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; tags_any?: string; tags_all?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_EntryResponse;
         401: Problem;
@@ -21409,6 +21502,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/records/{kind}/{id}/tags": {
+    /** Set the tags of a record. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; id: string }; };
+      requestBody: RecordTagsInput;
+      responses: {
+        200: Data_Vec_TagRef;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/resolve": {
     /** Open a record by its code. */
     get: {
@@ -21490,6 +21599,72 @@ export interface paths {
       responses: {
         200: Data_SummaryView;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tags": {
+    /** List the tags. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_TagView;
+        401: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a tag. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewTag;
+      responses: {
+        201: Data_TagView;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tags/{id}": {
+    /** Change a tag. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TagChanges;
+      responses: {
+        200: Data_TagView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a tag. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tags/{id}/merge": {
+    /** Merge a tag into another. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MergeTag;
+      responses: {
+        200: Data_TagView;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

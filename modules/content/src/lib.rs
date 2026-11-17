@@ -198,6 +198,8 @@ impl Module for ContentModule {
         context.finder_source(Arc::new(find::Entries))?;
         context.code_resolver(Arc::new(find::BySlug))?;
         context.setup_step(Arc::new(setup::FirstPage))?;
+        // Nhãn nội bộ (bước 51 P20): gắn / gỡ cần quyền sửa bài.
+        context.taggable(resource::ENTRY, permissions::CONTENT_WRITE)?;
         context.export_source(Arc::new(export::Entries(service.clone())))?;
         context.bulk_action(Arc::new(export::Archive(service.clone())))?;
         context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;

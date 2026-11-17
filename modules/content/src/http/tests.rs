@@ -1350,3 +1350,125 @@ async fn agent_goi_lenh_rui_ro_nhan_202_approval_required() {
     .await
     .unwrap();
 }
+
+/// Nhãn nội bộ (bước 51 P20): gắn cần quyền ghi bài; tên trùng khác hoa thường / dấu là một nhãn;
+/// lọc `tags_any` / `tags_all`; bài trả `tags`; gộp nhãn chuyển hết bản ghi; khách bật
+/// `kernel.tags.restricted` thì người không có `kernel.tags.manage` không tạo nhãn mới.
+#[tokio::test]
+async fn nhan_noi_bo_tren_bai_viet() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let app = TestApp::builder(test)
+            .user(
+                "admin",
+                1,
+                &["content.read", "content.write", "kernel.tags.manage", "kernel.settings.manage"],
+            )
+            .user("writer", 2, &["content.read", "content.write"])
+            .user("reader", 3, &["content.read"])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let mut ids = Vec::new();
+        for title in ["Một", "Hai"] {
+            let created = send(
+                &app,
+                "POST",
+                "/entries",
+                Some("admin"),
+                &[],
+                Some(json!({"kind": "post", "title": title})),
+            )
+            .await;
+            ids.push(created.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        let tag = |who: &str, id: &str, body: Value| {
+            app.put(&format!("/api/v1/kernel/records/content.entry/{id}/tags"))
+                .token(who)
+                .json(body)
+                .send()
+        };
+        let first = tag("writer", &ids[0], json!({"new_tags": ["VIP", "Cần gọi"]})).await.unwrap();
+        assert_eq!(first.status(), StatusCode::OK, "{}", first.json());
+        assert_eq!(first.json()["data"].as_array().unwrap().len(), 2);
+        let second = tag("writer", &ids[1], json!({"new_tags": ["vip"]})).await.unwrap();
+        let vip = second.json()["data"][0]["id"].as_str().unwrap().to_owned();
+        assert_eq!(second.json()["data"][0]["name"], "VIP", "cùng tên khác hoa thường là một nhãn");
+        assert_eq!(
+            tag("reader", &ids[0], json!({"tag_ids": []})).await.unwrap().status(),
+            StatusCode::FORBIDDEN
+        );
+
+        let all = app.get("/api/v1/kernel/tags").token("reader").send().await.unwrap().json();
+        let call = all["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == "Cần gọi")
+            .cloned()
+            .unwrap();
+        assert_eq!(
+            all["data"].as_array().unwrap().iter().find(|t| t["name"] == "VIP").unwrap()["uses"],
+            2
+        );
+        let call_id = call["id"].as_str().unwrap().to_owned();
+        let list = |query: String| {
+            let app = &app;
+            async move {
+                send(app, "GET", &format!("/entries?{query}"), Some("reader"), &[], None).await
+            }
+        };
+        assert_eq!(
+            list(format!("tags_any={vip}")).await.json()["data"].as_array().unwrap().len(),
+            2
+        );
+        let both = list(format!("tags_all={vip},{call_id}")).await.json();
+        assert_eq!(both["data"].as_array().unwrap().len(), 1, "{both}");
+        assert_eq!(both["data"][0]["tags"].as_array().unwrap().len(), 2);
+
+        let merged = app
+            .post(&format!("/api/v1/kernel/tags/{call_id}/merge"))
+            .token("admin")
+            .json(json!({"into": vip}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(merged.status(), StatusCode::OK, "{}", merged.json());
+        let after = list(format!("tags_any={vip}")).await.json();
+        assert!(
+            after["data"].as_array().unwrap().iter().all(|entry| entry["tags"]
+                .as_array()
+                .unwrap()
+                .len()
+                == 1)
+        );
+
+        let restricted = app
+            .put("/api/v1/kernel/settings/kernel.tags.restricted")
+            .token("admin")
+            .json(json!({"value": "true"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(restricted.status(), StatusCode::OK, "{}", restricted.json());
+        let refused =
+            tag("writer", &ids[0], json!({"tag_ids": [vip], "new_tags": ["Mới"]})).await.unwrap();
+        assert_eq!(
+            (refused.status(), refused.json()["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("kernel.tags_restricted"))
+        );
+        assert_eq!(
+            tag("writer", &ids[0], json!({"tag_ids": []})).await.unwrap().status(),
+            StatusCode::OK,
+            "bỏ nhãn vẫn được"
+        );
+    })
+    .await
+    .unwrap();
+}

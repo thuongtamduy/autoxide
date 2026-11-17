@@ -309,6 +309,7 @@ pub struct StartContext<'a> {
     setup: &'a crate::ops::setup::SetupSteps,
     reasons: &'a crate::ops::reasons::ReasonCodes,
     probes: &'a crate::ops::connections::ConnectionProbes,
+    taggables: &'a crate::ops::tags::Taggables,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -499,6 +500,12 @@ impl StartContext<'_> {
         probe: Arc<dyn crate::ops::connections::ConnectionProbe>,
     ) -> Result<(), Error> {
         self.probes.register(self.module, probe)
+    }
+
+    /// Cho gắn nhãn nội bộ (bước 51 P20) lên loại bản ghi `kind` của module (phải có trong sổ đối
+    /// tượng); `write`: permission ghi bản ghi — cần để gắn / gỡ nhãn.
+    pub fn taggable(&mut self, kind: &'static str, write: Permission) -> Result<(), Error> {
+        self.taggables.register(self.module, kind, write)
     }
 
     /// Ghi lần dùng / lỗi cuối của kết nối ra ngoài (hiện ở `GET /api/v1/kernel/settings`).

@@ -21,6 +21,7 @@ pub(crate) mod records;
 pub mod resolve;
 pub mod setup;
 pub mod summary;
+pub mod tags;
 pub mod task;
 pub mod telemetry;
 pub(crate) mod user_flags;
