@@ -229,8 +229,9 @@ pub struct TenantMovePlan {
     pub tables: Vec<TenantTableRows>,
     /// Sum of `tables[].rows`.
     pub rows: u64,
-    /// Files of the tenant that would be copied to the file storage of `to`; `0` when both
-    /// placements keep files in the same storage (nothing to copy).
+    /// Files of the tenant that would be copied to the file storage of `to`. `0` in two cases:
+    /// both placements keep files in the same storage (nothing to copy), or the tenant has no
+    /// files.
     pub files: u64,
     /// Seconds the tenant answers `503 tenant_maintenance` before copying starts (other servers
     /// see the move and requests in progress finish); copying takes longer for many rows.
@@ -293,6 +294,8 @@ struct Setup {
     modules: Vec<&'static str>,
     control_plane: Vec<&'static str>,
     migrator: Migrator,
+    /// Quản lý placement (migrate placement bằng API, D-334).
+    placements: super::Placements,
 }
 
 impl MoveSetup {
@@ -301,8 +304,14 @@ impl MoveSetup {
         modules: Vec<&'static str>,
         control_plane: Vec<&'static str>,
         migrator: Migrator,
+        placements: super::Placements,
     ) {
-        let _ = self.0.set(Setup { modules, control_plane, migrator });
+        let _ = self.0.set(Setup { modules, control_plane, migrator, placements });
+    }
+
+    /// Quản lý placement, sau khi mọi module đã khởi động.
+    pub(crate) fn placements(&self) -> Result<super::Placements, Error> {
+        Ok(self.get()?.placements.clone())
     }
 
     fn get(&self) -> Result<&Setup, Error> {

@@ -76,6 +76,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `audit.get_entry` | `audit.read` | read-only |
 | `audit.list_entries` | `audit.read` | read-only |
 | `auth.count_memberships` | `auth.users.read` | read-only |
+| `auth.count_role_members` | `auth.roles.read` | read-only |
 | `auth.create_api_key` | — | writes |
 | `auth.create_invitation` | `auth.invitations.manage` | writes |
 | `auth.create_role` | `auth.roles.manage` | writes |
@@ -131,6 +132,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.add_domain` | `kernel.domains.manage` | writes |
 | `kernel.current_tenant` | — | read-only |
 | `kernel.export_tenant` | `kernel.data.export` | writes |
+| `kernel.get_migration_run` | `kernel.tenants.operate` | read-only |
 | `kernel.get_module` | `kernel.modules.read` | read-only |
 | `kernel.get_tenant` | `kernel.tenants.read` | read-only |
 | `kernel.get_tenant_export` | `kernel.data.export` | read-only |
@@ -139,6 +141,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
+| `kernel.migrate_placements` | `kernel.tenants.operate` | writes |
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |

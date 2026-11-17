@@ -219,7 +219,8 @@ impl PlansService {
         }
         if deleted {
             // Kernel chưa có lệnh xoá khách: khoá hẳn khách, giữ dữ liệu (D-327).
-            self.suspend_tenant(Actor::system(), tenant).await?;
+            let reason = "Subscription deleted after its retention period";
+            self.suspend_tenant(Actor::system(), tenant, reason).await?;
             tracing::warn!(tenant_id = %tenant, "subscription deleted after its retention; the tenant is suspended and its data kept until it is deleted");
         }
         Ok(changed)
@@ -907,12 +908,20 @@ impl PlansService {
 
     /// Nhân sự nền tảng khoá hẳn khách `tenant` (mọi request bị từ chối, kể cả đọc; khác chỉ đọc
     /// của thuê bao tạm khoá) — qua sổ khách của kernel, có event và audit.
-    pub(crate) async fn suspend_tenant(&self, actor: Actor, tenant: TenantId) -> Result<(), Error> {
+    pub(crate) async fn suspend_tenant(
+        &self,
+        actor: Actor,
+        tenant: TenantId,
+        reason: &str,
+    ) -> Result<(), Error> {
         let Some(admin) = self.tenants.clone() else {
             return Err(Error::internal("the kernel did not provide the tenant service"));
         };
-        let changes =
-            TenantChanges { status: Some("suspended".to_owned()), ..TenantChanges::default() };
+        let changes = TenantChanges {
+            status: Some("suspended".to_owned()),
+            reason: Some(reason.to_owned()),
+            ..TenantChanges::default()
+        };
         admin.update(actor, tenant.as_uuid(), changes, None).await?;
         Ok(())
     }

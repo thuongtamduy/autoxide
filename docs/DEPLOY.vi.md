@@ -519,6 +519,12 @@ Khi chạy nhiều khách hàng, dữ liệu của mỗi khách nằm ở một 
    autoxide migrate up --all
    ```
 
+   Nhân sự nền tảng cũng migrate được các placement qua API, không cần vào máy chủ:
+   `POST /api/v1/kernel/placements/migrations` với `{"dry_run": true}` liệt kê những gì sẽ chạy;
+   bỏ `dry_run` thì một lượt chạy bắt đầu ở nền (theo dõi bằng
+   `GET /api/v1/kernel/placements/migrations/{id}`). `main` luôn được migrate bằng
+   `autoxide migrate up` trước khi máy chủ chạy.
+
 2. Thử trước. Chạy thử (dry run) không đổi gì:
 
    ```bash

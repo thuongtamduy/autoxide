@@ -321,7 +321,7 @@ async fn suspend_tenant(
         )]));
     }
     tracing::info!(tenant_id = %tenant, reason = %input.reason, "tenant suspended by platform staff");
-    service.suspend_tenant(Actor::from(&principal), tenant).await?;
+    service.suspend_tenant(Actor::from(&principal), tenant, &input.reason).await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 

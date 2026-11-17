@@ -2275,6 +2275,39 @@ export type Data_MfaStatusResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_MigrationDryRun = {
+  /** The pending migrations a dry run found. */
+  data: {
+    /** Always `true`. */
+    dry_run: boolean;
+    /** Per placement, the migrations that would run (empty: up to date). */
+    pending: PlacementMigrationList[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_MigrationRun = {
+  /** A run of the migrations of the tenant databases (placements). */
+  data: {
+    /** Migrations applied, per placement done (also when a later placement failed). */
+    applied: PlacementMigrationList[];
+    created_at: string;
+    /**
+     * Why it failed: the placement and its error. Fix it and start a new run; what is already
+     * applied is skipped.
+     */
+    error?: string | null;
+    id: string;
+    /** The placement it runs on; `null`: every placement, by name. */
+    placement?: string | null;
+    requested_by?: string | null;
+    /** `pending`, `running`, `done` or `failed`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ModuleInfo = {
   /** A module installed in this server, and everything it declares. */
   data: {
@@ -3255,8 +3288,9 @@ export type Data_TenantMovePlan = {
     /** What must be fixed first; empty when the move can run. */
     blocking: TenantMoveBlocker[];
     /**
-     * Files of the tenant that would be copied to the file storage of `to`; `0` when both
-     * placements keep files in the same storage (nothing to copy).
+     * Files of the tenant that would be copied to the file storage of `to`. `0` in two cases:
+     * both placements keep files in the same storage (nothing to copy), or the tenant has no
+     * files.
      */
     files: number;
     /** Placement that keeps the tenant's data now. */
@@ -3690,6 +3724,27 @@ export type Data_Vec_MenuSummary = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_MigrationRun = {
+  data: {
+    /** Migrations applied, per placement done (also when a later placement failed). */
+    applied: PlacementMigrationList[];
+    created_at: string;
+    /**
+     * Why it failed: the placement and its error. Fix it and start a new run; what is already
+     * applied is skipped.
+     */
+    error?: string | null;
+    id: string;
+    /** The placement it runs on; `null`: every placement, by name. */
+    placement?: string | null;
+    requested_by?: string | null;
+    /** `pending`, `running`, `done` or `failed`. */
+    status: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ModuleInfo = {
   data: {
     /**
@@ -3952,6 +4007,18 @@ export type Data_Vec_PublicProfileResponse = {
     unit_type: string;
     /** `null` until the profile is first saved. */
     updated_at?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_RoleCountResponse = {
+  data: {
+    /**
+     * People holding the role, at any unit; each person once. List them with
+     * `GET /api/v1/auth/memberships?role_id=…`.
+     */
+    members: number;
+    role_id: string;
   }[];
 };
 
@@ -5162,6 +5229,44 @@ export type MfaStatusResponse = {
   recovery_codes_remaining: number;
   /** Sign-in asks for a code from an authenticator app. */
   totp_enabled: boolean;
+};
+
+/** The pending migrations a dry run found. */
+export type MigrationDryRun = {
+  /** Always `true`. */
+  dry_run: boolean;
+  /** Per placement, the migrations that would run (empty: up to date). */
+  pending: PlacementMigrationList[];
+};
+
+/** A run of the migrations of the tenant databases (placements). */
+export type MigrationRun = {
+  /** Migrations applied, per placement done (also when a later placement failed). */
+  applied: PlacementMigrationList[];
+  created_at: string;
+  /**
+   * Why it failed: the placement and its error. Fix it and start a new run; what is already
+   * applied is skipped.
+   */
+  error?: string | null;
+  id: string;
+  /** The placement it runs on; `null`: every placement, by name. */
+  placement?: string | null;
+  requested_by?: string | null;
+  /** `pending`, `running`, `done` or `failed`. */
+  status: string;
+  updated_at: string;
+};
+
+/** What to migrate. */
+export type MigrationRunRequest = {
+  /** `true`: only list the migrations that would run, change nothing. Default `false`. */
+  dry_run?: boolean;
+  /**
+   * Name of one placement; omitted: every placement (not `main`, which the server migrates
+   * before it starts).
+   */
+  placement?: string | null;
 };
 
 /** A deprecated endpoint. */
@@ -6966,6 +7071,13 @@ export type Placement = {
   storage?: PlacementStorage | null;
 };
 
+/** Migrations of one placement. */
+export type PlacementMigrationList = {
+  /** `<module>/<migration>`: pending ones for a dry run, applied ones for a run. */
+  migrations: string[];
+  placement: string;
+};
+
 /** Where a placement keeps its tenants' files. Access keys are never shown. */
 export type PlacementStorage = {
   /** Bucket (`s3`). */
@@ -7871,6 +7983,16 @@ export type RevisionResponse = {
   snapshot?: Record<string, unknown> | null;
 };
 
+/** How many people hold one role. */
+export type RoleCountResponse = {
+  /**
+   * People holding the role, at any unit; each person once. List them with
+   * `GET /api/v1/auth/memberships?role_id=…`.
+   */
+  members: number;
+  role_id: string;
+};
+
 /** A permission a role grants, with how far it reaches in the organization tree. */
 export type RoleGrant = {
   permission: string;
@@ -8516,6 +8638,11 @@ export type TenantChanges = {
    * `status`. The platform tenant cannot be made read-only.
    */
   read_only?: boolean | null;
+  /**
+   * Why (1 to 500 characters), kept with the change in the audit log (event
+   * `kernel.tenant_updated`) — e.g. why a tenant was suspended.
+   */
+  reason?: string | null;
   /** `active` or `suspended`. A suspended tenant refuses every request, reads included. */
   status?: string | null;
 };
@@ -8655,8 +8782,9 @@ export type TenantMovePlan = {
   /** What must be fixed first; empty when the move can run. */
   blocking: TenantMoveBlocker[];
   /**
-   * Files of the tenant that would be copied to the file storage of `to`; `0` when both
-   * placements keep files in the same storage (nothing to copy).
+   * Files of the tenant that would be copied to the file storage of `to`. `0` in two cases:
+   * both placements keep files in the same storage (nothing to copy), or the tenant has no
+   * files.
    */
   files: number;
   /** Placement that keeps the tenant's data now. */
@@ -10080,6 +10208,18 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/roles/counts": {
+    /** Count the people holding each role. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_RoleCountResponse;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -11948,6 +12088,45 @@ export interface paths {
         200: Data_Vec_Placement;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/placements/migrations": {
+    /** List the recent migration runs. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_MigrationRun;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Migrate the tenant databases (placements), or see what would run. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: MigrationRunRequest;
+      responses: {
+        200: Data_MigrationDryRun;
+        201: Data_MigrationRun;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/placements/migrations/{id}": {
+    /** Get a migration run. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_MigrationRun;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

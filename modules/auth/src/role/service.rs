@@ -714,6 +714,41 @@ impl RoleService {
         }))
     }
 
+    /// Số người giữ mỗi role của khách (ở bất kỳ nút nào), mỗi người một lần; mọi role, kể cả role
+    /// không ai giữ (0). Hai câu: các role, và các cặp (role, người) khác nhau.
+    pub(crate) async fn role_member_counts(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<Vec<(Uuid, usize)>, Error> {
+        use std::collections::{BTreeMap, BTreeSet};
+        let connection = tenant.database().read();
+        let roles: Vec<Uuid> = role::Entity::find()
+            .select_only()
+            .column(role::Column::Id)
+            .scoped(tenant)
+            .order_by_asc(role::Column::Id)
+            .into_tuple()
+            .all(connection)
+            .await?;
+        let pairs: Vec<(Uuid, Uuid)> = user_role::Entity::find()
+            .select_only()
+            .column(user_role::Column::RoleId)
+            .column(user_role::Column::UserId)
+            .distinct()
+            .scoped(tenant)
+            .into_tuple()
+            .all(connection)
+            .await?;
+        let mut holders: BTreeMap<Uuid, BTreeSet<Uuid>> = BTreeMap::new();
+        for (role, user) in pairs {
+            holders.entry(role).or_default().insert(user);
+        }
+        Ok(roles
+            .into_iter()
+            .map(|role| (role, holders.get(&role).map_or(0, BTreeSet::len)))
+            .collect())
+    }
+
     /// Số người ở mỗi nút của cây: `direct` = người có membership ở chính nút, `total` = người có
     /// membership ở nút hay ở một nút trên nó (cùng nghĩa với `inherited=true` của danh sách). Mỗi
     /// người tính một lần dù có nhiều role. Mọi nút của cây (kể cả nút không có ai), nút gốc trước.

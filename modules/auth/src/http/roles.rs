@@ -28,6 +28,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(list_permissions))
         .routes(routes!(list_roles, create_role))
+        .routes(routes!(count_role_members))
         .routes(routes!(get_role, replace_role, delete_role))
         .routes(routes!(get_user_roles, replace_user_roles))
 }
@@ -230,6 +231,46 @@ async fn list_roles(
     principal.require(&ROLES_READ)?;
     let page = state.roles.list(&tenant, &PageRequest::try_from(query)?).await?;
     Ok(page.map(RoleResponse::from))
+}
+
+/// How many people hold one role.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct RoleCountResponse {
+    role_id: Uuid,
+    /// People holding the role, at any unit; each person once. List them with
+    /// `GET /api/v1/auth/memberships?role_id=…`.
+    members: u64,
+}
+
+impl From<(Uuid, usize)> for RoleCountResponse {
+    fn from((role_id, members): (Uuid, usize)) -> Self {
+        RoleCountResponse { role_id, members: u64::try_from(members).unwrap_or(u64::MAX) }
+    }
+}
+
+/// Count the people holding each role.
+///
+/// Requires `auth.roles.read`. One entry per role of the tenant, including roles nobody holds.
+#[utoipa::path(
+    get,
+    path = "/roles/counts",
+    extensions(("x-permissions" = json!(["auth.roles.read"]))),
+    operation_id = "count_role_members",
+    security(("bearer" = [])),
+    responses(
+        (status = 200, description = "The counts, one entry per role.", body = Data<Vec<RoleCountResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.read`; code `permission_denied`.", body = Problem),
+    )
+)]
+async fn count_role_members(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    principal: Principal,
+) -> Result<Data<Vec<RoleCountResponse>>, Error> {
+    principal.require(&ROLES_READ)?;
+    let counts = state.roles.role_member_counts(&tenant).await?;
+    Ok(Data { data: counts.into_iter().map(RoleCountResponse::from).collect() })
 }
 
 /// Create a role.

@@ -295,7 +295,11 @@ impl Modules {
                 .collect(),
         );
         let migrator = self.migrator().map_err(|error| ModuleError(error.to_string()))?;
-        self.moves.fill(self.names(), self.control_plane_tables(), migrator);
+        let placements = crate::tenancy::Placements::new(
+            registry.clone(),
+            self.migrator().map_err(|error| ModuleError(error.to_string()))?,
+        );
+        self.moves.fill(self.names(), self.control_plane_tables(), migrator, placements);
         Ok(())
     }
 
