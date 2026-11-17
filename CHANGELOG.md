@@ -11,6 +11,17 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `compliance` (step 37): identity verification (KYC) through a provider (`IdentityVerifier`, callbacks
+  checked by signature, processed in the background) or by manual review (signed-in reviewers only); duplicate
+  documents wait for review; only the result, the provider reference, the verified name and the last four digits are
+  kept. Legal rules are dated data (bundled `vn` pack, imported by platform staff with `POST /api/v1/compliance/rules`);
+  selling, livestreaming and affiliate marketing require a verified identity from 1 July 2026. Versioned legal documents
+  with translations, a SHA-256 of each text and proof of acceptance (`/api/v1/compliance/documents`,
+  `/me/pending-acceptances`, `/me/acceptances`, public `GET /public/documents/{kind}`); a consent ledger per purpose
+  (`/me/consents`). Other modules use it through `KycGate`, `AcceptanceGate`, `ConsentLedger` and `ComplianceRules`.
+  New setting `AUTOXIDE_COMPLIANCE_KYC_CALLBACK_RETENTION_DAYS`. The legal bases are recorded but must be checked
+  against the original texts by a legal professional.
+
 - Admin interface requests (W-059 of the web): `q` on `GET /api/v1/content/redirects` (old path or target, any case,
   with or without accents); `ids` on `GET /api/v1/forms/{id}/submissions/export` to export picked submissions;
   `POST /api/v1/forms/{id}/duplicate`; `POST /api/v1/auth/users/{id}/email/verification` to send a user's

@@ -8366,3 +8366,36 @@ RUSTSEC-2026-0542 (`humantime`, bọc `chrono`): **không còn bảo trì**, kh�
   DECISIONS". Gate chạy `-D advisory-not-detected`: khi cảnh báo được gỡ hay không còn khớp, gate đỏ cho tới khi gỡ dòng.
 - Việc kế tiếp (không chặn lộ trình): theo dõi `sqlx` / SeaORM chuyển sang `jiff`; khi có, chuyển cả Autoxide trong
   một bước riêng và gỡ ba dòng này.
+
+## D-347 · Module `compliance` — định danh, quy tắc pháp lý, văn bản pháp lý, sổ đồng ý — 2026-11-17 — agent quyết
+
+Bước 37, phần mà bước 35 (khách tự đăng ký) cần trước. Căn cứ pháp lý dưới đây viết từ
+`docs/research/business-foundation.md` và nguồn thứ cấp — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**.
+
+1. **Module riêng `compliance`, luôn bật** (không bán theo gói). Đăng ký sau `invoices`, trước `plans`. Công bố bốn trait:
+   `KycGate`, `AcceptanceGate`, `ConsentLedger`, `ComplianceRules`; module khác chỉ dùng qua đó.
+2. **Định danh (Luật TMĐT 122/2025/QH15, Điều 17, hiệu lực 01/7/2026)**: hồ sơ theo đối tượng (`user`, `org`, `email`,
+   `reference` của module gọi); kernel có trait `IdentityVerifier` (bắt đầu lượt, đọc kết quả, kiểm chữ ký callback). Callback
+   công khai `POST /compliance/kyc/callbacks/{provider}` kiểm chữ ký trên thân thô rồi mới lưu, xử lý trong job
+   `compliance.kyc_process` (gọi lại vô hại). Duyệt tay (duyệt, từ chối, thu hồi, yêu cầu bổ sung) cần **người đăng nhập**,
+   không nhận API key. Cùng số giấy tờ đã xác thực ở hồ sơ khác → không tự xác thực, chờ duyệt (`duplicate_document`).
+   Hết hạn sau `valid_days` của quy tắc (job hằng ngày `compliance.kyc_expiry`).
+3. **Lưu tối thiểu (Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15)**: kết quả, mã tham chiếu, tên đã xác thực, băm + 4 số cuối của
+   số giấy tờ. Không lưu ảnh khuôn mặt, sinh trắc học, số giấy tờ đầy đủ. Callback thô xoá sau
+   `AUTOXIDE_COMPLIANCE_KYC_CALLBACK_RETENTION_DAYS` (mặc định 90).
+4. **Quy tắc pháp lý là dữ liệu có ngày hiệu lực** (Luật số hai): bảng `compliance_rules` ở mặt điều khiển, khoá (vùng, khoá,
+   phiên bản), chỉ thêm không sửa, mỗi bản có `legal_basis` và `needs_legal_review`. Gói `rules/vn.json` đi kèm máy chủ có hiệu
+   lực ngay (đọc kèm khi database chưa có bản đó) và được job `compliance.rules_refresh` (hằng giờ, chỉ mặt điều khiển) nhập vào
+   database; nhân sự nền tảng nhập gói mới qua `POST /compliance/rules`. Vùng pháp lý của khách là chính sách `jurisdiction`
+   (mặc định `vn`).
+5. **Văn bản pháp lý có phiên bản (Luật Giao dịch điện tử 20/2023/QH15)**: một văn bản mỗi loại; phiên bản đã đăng không đổi,
+   có bản dịch theo ngôn ngữ, SHA-256 của tiêu đề + nội dung. Chấp nhận ghi phiên bản, băm, kênh, cách, dấu vân tay IP (băm),
+   user agent; gọi lại vô hại. `requires_reacceptance` (bản đầu luôn bắt) → `AcceptanceGate::require_accepted` chặn tới khi
+   chấp nhận bản mới. Bảng văn bản, chấp nhận, đồng ý là bảng giữ lại khi xoá hẳn khách (bằng chứng).
+6. **Sổ đồng ý theo mục đích (Luật 91/2025, NĐ 356/2025)**: trạng thái theo (đối tượng, mục đích, phạm vi, kênh); `""` là
+   "mọi". Mỗi lần đổi thêm một bản ghi bằng chứng (câu đã hiển thị + phiên bản), không trùng theo `source_ref`. Rút ở khoá
+   rộng hơn (hay bằng) sau thời điểm đồng ý thắng đồng ý hẹp hơn. Email / số điện thoại khoá bằng SHA-256, giá trị gốc giữ để
+   gửi tin.
+7. **Nhà cung cấp thật** (VNeID qua đơn vị được cấp phép, eKYC) là module riêng cắm `IdentityVerifier`; cần hợp đồng và khoá
+   — chưa làm, chỉ có `FakeIdentityVerifier` ở testkit. Không có nhà cung cấp: chỉ duyệt tay qua giấy tờ đã tải lên.
+

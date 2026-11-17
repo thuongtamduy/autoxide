@@ -39,6 +39,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Chứng từ (bước 36): cần `dyn TaxEngine` và `dyn Ledger`; `plans` (tính tiền thuê bao) và module
         // thương mại lập chứng từ qua `dyn Invoices`.
         Box::new(autoxide_invoices::module()),
+        // Tuân thủ (bước 37): định danh (KYC), quy tắc pháp lý, văn bản pháp lý, sổ đồng ý. Dùng
+        // `dyn IdentityVerifier` nếu có module cung cấp (đứng trước); `plans` (khách tự đăng ký) và module
+        // thương mại chặn qua `dyn KycGate` / `dyn AcceptanceGate`.
+        Box::new(autoxide_compliance::module()),
         // Gói, thuê bao, quyền dùng (bước 35): sau mọi module nền nó cần — `invoices` (hoá đơn thuê
         // bao), `ledger` (thu tiền) — và (bước 37) `compliance`. Module đăng ký trước vẫn hỏi quyền
         // dùng được qua tay cầm của kernel, gắn sau khi mọi module khởi động (D-323).
@@ -202,10 +206,11 @@ mod tests {
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
             // Mỗi lịch (của `kernel` — dọn bản xuất —, `ai`, `auth`, `idempotency`, `webhooks`, `files`, năm của `plans`, một
-            // của `tax`, ba của `ledger` (niêm phong, hết hạn thanh toán, đối soát), một của `invoices`, hai
+            // của `tax`, ba của `ledger` (niêm phong, hết hạn thanh toán, đối soát), một của `invoices`, một của
+            // `compliance` (hết hạn định danh; nhập quy tắc chạy ở mặt điều khiển — cũng là database này), hai
             // của `media`, hai của `content`, một của `forms`, một của `newsletter` và một của
             // `comments`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 23);
+            assert_eq!(a.unwrap() + b.unwrap(), 25);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

@@ -1,0 +1,66 @@
+{
+  "jurisdiction": "vn",
+  "checked_on": "2026-11-17",
+  "source_note": "Viết từ docs/research/business-foundation.md và báo chí / công ty luật. Mọi mục cần đối chiếu văn bản gốc / người có chuyên môn pháp lý trước khi chạy thật.",
+  "rules": [
+    {
+      "key": "kyc.required_activities",
+      "version": 1,
+      "effective_from": "2026-07-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"sell": true, "livestream": true, "affiliate": true, "valid_days": 730},
+      "legal_basis": "Luật Thương mại điện tử 122/2025/QH15, Điều 17 (định danh người bán, người livestream, tiếp thị liên kết), hiệu lực 01/7/2026 — cần đối chiếu văn bản gốc.",
+      "needs_legal_review": true
+    },
+    {
+      "key": "posting.phone_countries",
+      "version": 1,
+      "effective_from": "2024-12-25T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"countries": ["84"]},
+      "legal_basis": "NĐ 147/2024/NĐ-CP (xác thực tài khoản bằng số điện thoại di động Việt Nam) — cần đối chiếu văn bản gốc.",
+      "needs_legal_review": true
+    },
+    {
+      "key": "privacy.incident",
+      "version": 1,
+      "effective_from": "2026-01-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"report_within_hours": 72, "remind_at_hours": [24, 48, 60, 68]},
+      "legal_basis": "Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và NĐ 356/2025 (thông báo vi phạm trong 72 giờ) — cần đối chiếu văn bản gốc.",
+      "needs_legal_review": true
+    },
+    {
+      "key": "privacy.consent_proof_days",
+      "version": 1,
+      "effective_from": "2026-01-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"days": 1825},
+      "legal_basis": "Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (chứng minh đồng ý) — thời hạn giữ bằng chứng là lựa chọn mặc định, cần đối chiếu.",
+      "needs_legal_review": true
+    },
+    {
+      "key": "privacy.default_purposes",
+      "version": 1,
+      "effective_from": "2026-01-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"purposes": [
+        {"key": "service", "category": "service", "legal_basis": "contract", "description": {"en": "Provide the service you asked for.", "vi": "Cung cấp dịch vụ bạn yêu cầu."}},
+        {"key": "marketing", "category": "marketing", "legal_basis": "consent", "description": {"en": "Send news and offers.", "vi": "Gửi tin tức và ưu đãi."}},
+        {"key": "analytics", "category": "analytics", "legal_basis": "consent", "description": {"en": "Measure how the service is used.", "vi": "Đo cách dịch vụ được dùng."}},
+        {"key": "legal", "category": "legal", "legal_basis": "legal_obligation", "description": {"en": "Keep records the law requires.", "vi": "Lưu hồ sơ theo yêu cầu của pháp luật."}}
+      ]},
+      "legal_basis": "Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (mục đích và căn cứ xử lý) — cần đối chiếu văn bản gốc.",
+      "needs_legal_review": true
+    },
+    {
+      "key": "moderation.hide_reasons",
+      "version": 1,
+      "effective_from": "2024-07-01T00:00:00+07:00",
+      "effective_to": null,
+      "body": {"reasons": ["spam", "illegal_content", "personal_data", "unrelated", "offensive"]},
+      "legal_basis": "Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15 và NĐ 55/2024/NĐ-CP (không ẩn đánh giá trái quy định) — cần đối chiếu văn bản gốc.",
+      "needs_legal_review": true
+    }
+  ]
+}
