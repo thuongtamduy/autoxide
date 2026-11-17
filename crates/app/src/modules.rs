@@ -37,6 +37,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_plans::module()),
         // Thuế (bước 36): sổ cái và chứng từ (sau) cần `dyn TaxEngine`, nên đứng trước chúng.
         Box::new(autoxide_tax::module()),
+        // Sổ cái kép (bước 36): cần `dyn OrgDirectory` (múi giờ, tiền tệ của nút); chứng từ, thanh
+        // toán và module thương mại (sau) ghi sổ qua `dyn Ledger`.
+        Box::new(autoxide_ledger::module()),
         // Thư viện media: cần nơi lưu của `files` (đứng sau nó); module nội dung sau này
         // cần trait `Media` của nó.
         Box::new(autoxide_media::module()),
@@ -196,10 +199,10 @@ mod tests {
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
             // Mỗi lịch (của `kernel` — dọn bản xuất —, `ai`, `auth`, `idempotency`, `webhooks`, `files`, năm của `plans`, một
-            // của `tax`, hai
+            // của `tax`, một của `ledger`, hai
             // của `media`, hai của `content`, một của `forms`, một của `newsletter` và một của
             // `comments`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 19);
+            assert_eq!(a.unwrap() + b.unwrap(), 20);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

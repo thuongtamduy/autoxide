@@ -1,0 +1,227 @@
+//! Tool MCP của `ledger`: cùng service, cùng permission với REST.
+
+use std::sync::Arc;
+
+use autoxide_kernel::access::Principal;
+use autoxide_kernel::decimal::Rounding;
+use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::mcp::{PageInput, Tool};
+use autoxide_kernel::money::{Currency, Money};
+use autoxide_kernel::pagination::Page;
+use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
+use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+use uuid::Uuid;
+use validator::Validate;
+
+use crate::api::{Entry, LineAccount, NewEntry, NewLine, Side};
+use crate::http::{TrialBalanceResponse, describe_trial};
+use crate::permissions::{POST, READ};
+use crate::service::{EntryFilter, LedgerService};
+
+/// Which account and day.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct BalanceInput {
+    /// Id of the account.
+    account_id: Uuid,
+    /// End of this day, `YYYY-MM-DD`; omit for the current balance.
+    as_of: Option<NaiveDate>,
+}
+
+/// The balance of an account.
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct BalanceItem {
+    account_id: Uuid,
+    purpose: String,
+    currency: String,
+    as_of: Option<NaiveDate>,
+    /// Balance on the normal side of the account.
+    balance: Money,
+}
+
+/// Which entries.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EntriesInput {
+    /// Only the book of this unit.
+    org_id: Option<Uuid>,
+    /// Only entries written by this module (`ledger` for manual entries).
+    source_module: Option<String>,
+    /// Only entries for this source document.
+    source_id: Option<String>,
+    /// Only entries dated on or after this day.
+    from: Option<NaiveDate>,
+    /// Only entries dated on or before this day.
+    to: Option<NaiveDate>,
+    /// Maximum number of entries, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+}
+
+/// Which book and days.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TrialInput {
+    /// Unit of the book; default the tenant's root.
+    org_id: Option<Uuid>,
+    /// First day, `YYYY-MM-DD`.
+    from: NaiveDate,
+    /// Last day, `YYYY-MM-DD`.
+    to: NaiveDate,
+}
+
+// Trường phẳng (client MCP không đọc `$ref`): dòng khai inline, số tiền là chữ thập phân theo đơn
+// vị chính trong `currency` của bút toán.
+/// One line of an entry.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LineInput {
+    account_id: Uuid,
+    /// `debit` or `credit`.
+    side: String,
+    /// Amount as a decimal string in the entry currency, e.g. `"150000"`; greater than zero.
+    amount: String,
+}
+
+/// A manual entry.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PostInput {
+    /// Unit of the book; default the tenant's root.
+    org_id: Option<Uuid>,
+    /// Accounting day `YYYY-MM-DD`; default today. Must be in an open period.
+    effective_date: Option<NaiveDate>,
+    /// Fixed text, 1 to 200 characters, without personal data (kept for good).
+    description: String,
+    /// Your id of this entry: sending it again returns the entry already posted.
+    reference: String,
+    /// Currency code of every line, e.g. `VND`.
+    currency: String,
+    /// Two or more lines; debits must equal credits.
+    #[schema(inline)]
+    lines: Vec<LineInput>,
+}
+
+pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
+    let (balance, entries, trial, post) =
+        (service.clone(), service.clone(), service.clone(), service.clone());
+    vec![
+        Tool::new(
+            "balance",
+            "The balance of a ledger account, now or at the end of a day.",
+            move |tenant: TenantContext, principal: Principal, input: BalanceInput| {
+                let service = balance.clone();
+                async move {
+                    let (found, amount) = service
+                        .balance_for(&tenant, &principal, input.account_id, input.as_of)
+                        .await?;
+                    Ok::<_, Error>(BalanceItem {
+                        account_id: found.id,
+                        purpose: found.purpose,
+                        currency: found.currency,
+                        as_of: input.as_of,
+                        balance: amount,
+                    })
+                }
+            },
+        )
+        .requires(READ)
+        .read_only(),
+        Tool::new(
+            "entries",
+            "List ledger entries in your scope with their lines, newest first; follow \
+             `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, principal: Principal, input: EntriesInput| {
+                let service = entries.clone();
+                async move {
+                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let filter = EntryFilter {
+                        book_org: input.org_id.map(OrgId::from_uuid),
+                        source_module: input.source_module,
+                        source_id: input.source_id,
+                        from: input.from,
+                        to: input.to,
+                    };
+                    let found: Page<Entry> =
+                        service.list_entries(&tenant, &principal, filter, &page).await?;
+                    Ok::<_, Error>(found)
+                }
+            },
+        )
+        .requires(READ)
+        .read_only(),
+        Tool::new(
+            "trial_balance",
+            "The trial balance of a book for a range of days: opening balance, debits, credits and \
+             closing balance per account.",
+            move |tenant: TenantContext, principal: Principal, input: TrialInput| {
+                let service = trial.clone();
+                async move {
+                    let org = input.org_id.map_or_else(|| root_of(tenant.id()), OrgId::from_uuid);
+                    let book = service.book_of(&tenant, &principal, &READ, org).await?;
+                    let (book, rows) = service
+                        .trial_balance(&tenant, &principal, book.id, input.from, input.to)
+                        .await?;
+                    let found: TrialBalanceResponse =
+                        describe_trial(book, input.from, input.to, rows)?;
+                    Ok::<_, Error>(found)
+                }
+            },
+        )
+        .requires(READ)
+        .read_only(),
+        Tool::new(
+            "post_entry",
+            "Post a manual double entry (debits equal credits). Entries are never changed: correct \
+             one by reversing it. The same reference and content again returns the entry already \
+             posted.",
+            move |tenant: TenantContext, principal: Principal, input: PostInput| {
+                let service = post.clone();
+                async move {
+                    let currency = Currency::parse(&input.currency)?;
+                    let mut problems = Vec::new();
+                    let mut lines = Vec::with_capacity(input.lines.len());
+                    for (index, item) in input.lines.into_iter().enumerate() {
+                        let Some(side) = Side::parse(&item.side) else {
+                            problems.push(FieldError::new(
+                                format!("lines[{index}].side"),
+                                "invalid",
+                                "must be `debit` or `credit`",
+                            ));
+                            continue;
+                        };
+                        let amount = Money::from_decimal(
+                            autoxide_kernel::decimal::parse(&item.amount)?,
+                            currency,
+                            Rounding::HalfUp,
+                        )?;
+                        lines.push(NewLine {
+                            account: LineAccount::Id(item.account_id),
+                            side,
+                            amount,
+                        });
+                    }
+                    if !problems.is_empty() {
+                        return Err(Error::validation(problems));
+                    }
+                    let org = input.org_id.map_or_else(|| root_of(tenant.id()), OrgId::from_uuid);
+                    let mut entry = NewEntry::new(
+                        org,
+                        "ledger",
+                        "manual",
+                        input.reference,
+                        input.description,
+                        lines,
+                    );
+                    entry.effective_date = input.effective_date;
+                    let found = service.post_manual(&tenant, &principal, entry).await?.into_inner();
+                    Ok::<_, Error>(found)
+                }
+            },
+        )
+        .requires(POST),
+    ]
+}

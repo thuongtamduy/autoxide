@@ -2124,6 +2124,115 @@ export type Data_InvitationResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_LedgerAccountResponse = {
+  /** A ledger account: one purpose, for one counterparty, in one currency, in one book. */
+  data: {
+    /** Current balance on the normal side (entries dated in the future included). */
+    balance: Money;
+    book_id: string;
+    counterparty?: LedgerCounterparty | null;
+    created_at: string;
+    currency: string;
+    /** Account number in the accounting software; `null`: from the mapping of the book. */
+    external_code?: string | null;
+    floor?: Money | null;
+    id: string;
+    name?: string | null;
+    /** The side that increases the balance. */
+    normal_side: LedgerSide;
+    org_id: string;
+    /** E.g. `revenue.sales`, `payable.seller_held`, or `<module>.<name>`. */
+    purpose: string;
+    /** `active` or `closed` (takes no new entries). */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerBalanceResponse = {
+  /** The balance of an account. */
+  data: {
+    account_id: string;
+    /** The day asked for; `null`: now. */
+    as_of?: string | null;
+    /** Balance on the normal side of the account. */
+    balance: Money;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerBookResponse = {
+  /** A book: the ledger of one organization unit (an accounting entity). */
+  data: {
+    /** Accounting currency of the book. */
+    base_currency: string;
+    /** Last day of the latest closed period: no entry may be dated on or before it. */
+    closed_through?: string | null;
+    created_at: string;
+    /** First month of the fiscal year, 1 to 12. */
+    fiscal_year_start_month: number;
+    id: string;
+    /** The unit that keeps the book. */
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerEntry = {
+  /** A ledger entry. */
+  data: {
+    actor_user_id?: string | null;
+    book_id: string;
+    description: string;
+    /** Accounting day, `YYYY-MM-DD`. */
+    effective_date: string;
+    id: string;
+    lines: LedgerEntryLine[];
+    /** The unit the book belongs to. */
+    org_id: string;
+    period_id: string;
+    posted_at: string;
+    reference: string;
+    /** The entry that reverses this one, if any. */
+    reversed_by_entry_id?: string | null;
+    /** The entry this one reverses. */
+    reverses_entry_id?: string | null;
+    source_id?: string | null;
+    source_kind: string;
+    source_module: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerPeriodResponse = {
+  /** An accounting period (a calendar month). */
+  data: {
+    book_id: string;
+    closed_at?: string | null;
+    closed_by?: string | null;
+    ends_on: string;
+    id: string;
+    starts_on: string;
+    /** `open` or `closed`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerTrialBalanceResponse = {
+  /** A trial balance. */
+  data: {
+    accounts: LedgerTrialBalanceRow[];
+    book_id: string;
+    from: string;
+    org_id: string;
+    to: string;
+    totals: LedgerTrialBalanceTotal[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_LibrarySummaryResponse = {
   /** Totals of the media library. */
   data: {
@@ -5136,6 +5245,232 @@ export type LastDelivery = {
   status: string;
 };
 
+/** Changes to an account. Omitted fields stay; `null` clears. */
+export type LedgerAccountChange = {
+  /** Account number in the accounting software, up to 32 characters. */
+  external_code?: string | null;
+  floor?: Money | null;
+  name?: string | null;
+  /** `active` or `closed`. */
+  status?: string | null;
+};
+
+/** One line on an account. */
+export type LedgerAccountLine = {
+  amount: Money;
+  base_amount: Money;
+  effective_date: string;
+  entry_id: string;
+  exchange_rate?: string | null;
+  id: string;
+  line_no: number;
+  side: LedgerSide;
+};
+
+/** An account to open. */
+export type LedgerAccountRequest = {
+  counterparty_id?: string | null;
+  /** Kind of counterparty, with `counterparty_id`. */
+  counterparty_kind?: string | null;
+  currency: string;
+  floor?: Money | null;
+  /** Up to 200 characters. */
+  name?: string | null;
+  normal_side?: LedgerSide | null;
+  /** The unit of the book; default the tenant's root. The book is opened if missing. */
+  org_id?: string | null;
+  /** A basic purpose (`cash.bank`, `revenue.sales`…) or `<module>.<name>`. */
+  purpose: string;
+};
+
+/** A ledger account: one purpose, for one counterparty, in one currency, in one book. */
+export type LedgerAccountResponse = {
+  /** Current balance on the normal side (entries dated in the future included). */
+  balance: Money;
+  book_id: string;
+  counterparty?: LedgerCounterparty | null;
+  created_at: string;
+  currency: string;
+  /** Account number in the accounting software; `null`: from the mapping of the book. */
+  external_code?: string | null;
+  floor?: Money | null;
+  id: string;
+  name?: string | null;
+  /** The side that increases the balance. */
+  normal_side: LedgerSide;
+  org_id: string;
+  /** E.g. `revenue.sales`, `payable.seller_held`, or `<module>.<name>`. */
+  purpose: string;
+  /** `active` or `closed` (takes no new entries). */
+  status: string;
+  updated_at: string;
+};
+
+/** The balance of an account. */
+export type LedgerBalanceResponse = {
+  account_id: string;
+  /** The day asked for; `null`: now. */
+  as_of?: string | null;
+  /** Balance on the normal side of the account. */
+  balance: Money;
+};
+
+/** A book to open. */
+export type LedgerBookRequest = {
+  /** Accounting currency; default the unit's setting `organizations.currency`, else `VND`. */
+  base_currency?: string | null;
+  /** First month of the fiscal year, 1 to 12; default 1. */
+  fiscal_year_start_month?: number | null;
+  /** The unit; default the tenant's root unit. */
+  org_id?: string | null;
+};
+
+/** A book: the ledger of one organization unit (an accounting entity). */
+export type LedgerBookResponse = {
+  /** Accounting currency of the book. */
+  base_currency: string;
+  /** Last day of the latest closed period: no entry may be dated on or before it. */
+  closed_through?: string | null;
+  created_at: string;
+  /** First month of the fiscal year, 1 to 12. */
+  fiscal_year_start_month: number;
+  id: string;
+  /** The unit that keeps the book. */
+  org_id: string;
+};
+
+/** The other party an account is kept for (a seller, a customer, a carrier…). */
+export type LedgerCounterparty = {
+  /** Id of the party in its own module. */
+  id: string;
+  /** `org`, `customer`, `carrier`, `partner`, or `<module>.<kind>`. */
+  kind: string;
+};
+
+/** A ledger entry. */
+export type LedgerEntry = {
+  actor_user_id?: string | null;
+  book_id: string;
+  description: string;
+  /** Accounting day, `YYYY-MM-DD`. */
+  effective_date: string;
+  id: string;
+  lines: LedgerEntryLine[];
+  /** The unit the book belongs to. */
+  org_id: string;
+  period_id: string;
+  posted_at: string;
+  reference: string;
+  /** The entry that reverses this one, if any. */
+  reversed_by_entry_id?: string | null;
+  /** The entry this one reverses. */
+  reverses_entry_id?: string | null;
+  source_id?: string | null;
+  source_kind: string;
+  source_module: string;
+};
+
+/** One line of an entry. */
+export type LedgerEntryLine = {
+  account_id: string;
+  amount: Money;
+  /** The amount in the book currency. */
+  base_amount: Money;
+  /** Rate used to convert to the book currency; `null` when the same currency. */
+  exchange_rate?: string | null;
+  line_no: number;
+  side: LedgerSide;
+};
+
+/** A manual entry to post. */
+export type LedgerEntryRequest = {
+  /**
+   * Fixed text, 1 to 200 characters. It is kept for good in the hash chain: no names, emails or
+   * phone numbers.
+   */
+  description: string;
+  /** Accounting day; default today in the unit's time zone. Must be in an open period. */
+  effective_date?: string | null;
+  /** Two or more lines; debits must equal credits. */
+  lines: LedgerLineRequest[];
+  /** Unit of the book; default the tenant's root. */
+  org_id?: string | null;
+  /**
+   * Your id of this entry (1 to 100 visible ASCII characters): sending it again returns the
+   * entry already posted.
+   */
+  reference: string;
+  /** Id of the source document. */
+  source_id?: string | null;
+  /** Kind of source document, e.g. `manual`, `opening`; default `manual`. */
+  source_kind?: string | null;
+};
+
+/** One line of a manual entry. */
+export type LedgerLineRequest = {
+  account_id: string;
+  /** Greater than zero; every line in the same currency as its account. */
+  amount: Money;
+  side: LedgerSide;
+};
+
+/** An accounting period (a calendar month). */
+export type LedgerPeriodResponse = {
+  book_id: string;
+  closed_at?: string | null;
+  closed_by?: string | null;
+  ends_on: string;
+  id: string;
+  starts_on: string;
+  /** `open` or `closed`. */
+  status: string;
+};
+
+/** A reversal. */
+export type LedgerReversalRequest = {
+  /** Accounting day of the reversal; default today in the unit's time zone (an open period). */
+  effective_date?: string | null;
+  /** Your id of the reversal: sending it again returns the reversal already posted. */
+  reference: string;
+};
+
+/** Debit or credit. */
+export type LedgerSide = "debit" | "credit";
+
+/** A trial balance. */
+export type LedgerTrialBalanceResponse = {
+  accounts: LedgerTrialBalanceRow[];
+  book_id: string;
+  from: string;
+  org_id: string;
+  to: string;
+  totals: LedgerTrialBalanceTotal[];
+};
+
+/** One account in a trial balance. */
+export type LedgerTrialBalanceRow = {
+  account_id: string;
+  /** Balance at the end of `to`. */
+  closing: Money;
+  counterparty?: LedgerCounterparty | null;
+  /** Credits dated in the range. */
+  credit: Money;
+  /** Debits dated in the range. */
+  debit: Money;
+  external_code?: string | null;
+  normal_side: LedgerSide;
+  /** Balance at the end of the day before `from`. */
+  opening: Money;
+  purpose: string;
+};
+
+/** Debits and credits in one currency: always equal. */
+export type LedgerTrialBalanceTotal = {
+  credit: Money;
+  currency: string;
+  debit: Money;
+};
+
 /** Totals of the media library. */
 export type LibrarySummaryResponse = {
   /**
@@ -6472,6 +6807,110 @@ export type Page_InvitationResponse = {
      * `pending`, `accepted` or `revoked`. A pending invitation past `expires_at` can no longer be
      * accepted; resend it.
      */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerAccountLine = {
+  /** The items of this page, in the requested order. */
+  data: {
+    amount: Money;
+    base_amount: Money;
+    effective_date: string;
+    entry_id: string;
+    exchange_rate?: string | null;
+    id: string;
+    line_no: number;
+    side: LedgerSide;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerAccountResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Current balance on the normal side (entries dated in the future included). */
+    balance: Money;
+    book_id: string;
+    counterparty?: LedgerCounterparty | null;
+    created_at: string;
+    currency: string;
+    /** Account number in the accounting software; `null`: from the mapping of the book. */
+    external_code?: string | null;
+    floor?: Money | null;
+    id: string;
+    name?: string | null;
+    /** The side that increases the balance. */
+    normal_side: LedgerSide;
+    org_id: string;
+    /** E.g. `revenue.sales`, `payable.seller_held`, or `<module>.<name>`. */
+    purpose: string;
+    /** `active` or `closed` (takes no new entries). */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerBookResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Accounting currency of the book. */
+    base_currency: string;
+    /** Last day of the latest closed period: no entry may be dated on or before it. */
+    closed_through?: string | null;
+    created_at: string;
+    /** First month of the fiscal year, 1 to 12. */
+    fiscal_year_start_month: number;
+    id: string;
+    /** The unit that keeps the book. */
+    org_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerEntry = {
+  /** The items of this page, in the requested order. */
+  data: {
+    actor_user_id?: string | null;
+    book_id: string;
+    description: string;
+    /** Accounting day, `YYYY-MM-DD`. */
+    effective_date: string;
+    id: string;
+    lines: LedgerEntryLine[];
+    /** The unit the book belongs to. */
+    org_id: string;
+    period_id: string;
+    posted_at: string;
+    reference: string;
+    /** The entry that reverses this one, if any. */
+    reversed_by_entry_id?: string | null;
+    /** The entry this one reverses. */
+    reverses_entry_id?: string | null;
+    source_id?: string | null;
+    source_kind: string;
+    source_module: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerPeriodResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    book_id: string;
+    closed_at?: string | null;
+    closed_by?: string | null;
+    ends_on: string;
+    id: string;
+    starts_on: string;
+    /** `open` or `closed`. */
     status: string;
   }[];
   pagination: Pagination;
@@ -13148,6 +13587,226 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/accounts": {
+    /** List the accounts of a book. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { book_id: string; purpose?: string; counterparty_kind?: string; counterparty_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerAccountResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Open an account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerAccountRequest;
+      responses: {
+        200: Data_LedgerAccountResponse;
+        201: Data_LedgerAccountResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/accounts/{id}": {
+    /** Get an account with its balance. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_LedgerAccountResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change an account: name, floor, external code, status. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: LedgerAccountChange;
+      responses: {
+        200: Data_LedgerAccountResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/accounts/{id}/balance": {
+    /** Get the balance of an account, now or at the end of a day. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { as_of?: string }; };
+      responses: {
+        200: Data_LedgerBalanceResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/accounts/{id}/lines": {
+    /** List the entry lines on an account. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerAccountLine;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/books": {
+    /** List the books in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerBookResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Open the book of a unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerBookRequest;
+      responses: {
+        201: Data_LedgerBookResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/books/{id}": {
+    /** Get a book. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_LedgerBookResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/entries": {
+    /** List entries in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; source_module?: string; source_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerEntry;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Post a manual entry. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerEntryRequest;
+      responses: {
+        200: Data_LedgerEntry;
+        201: Data_LedgerEntry;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/entries/{id}": {
+    /** Get an entry with its lines. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_LedgerEntry;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/entries/{id}/reverse": {
+    /** Reverse an entry. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: LedgerReversalRequest;
+      responses: {
+        200: Data_LedgerEntry;
+        201: Data_LedgerEntry;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/periods": {
+    /** List the periods of a book. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { book_id: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerPeriodResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/periods/{id}/close": {
+    /** Close a period. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_LedgerPeriodResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/trial-balance": {
+    /** Get the trial balance of a book for a range of days. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { book_id: string; from: string; to: string }; };
+      responses: {
+        200: Data_LedgerTrialBalanceResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };

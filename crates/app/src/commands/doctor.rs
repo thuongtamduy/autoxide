@@ -328,6 +328,8 @@ mod tests {
                 ("address.administrative_units", "warning"),
                 // Gói thuế chưa nhập (job nhập trong vòng một giờ, D-341).
                 ("tax.tax_rates", "warning"),
+                ("ledger.chain", "ok"),
+                ("ledger.balances", "ok"),
             ] {
                 assert!(found.contains(&expected), "{expected:?} not in {found:?}");
             }

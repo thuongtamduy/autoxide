@@ -102,9 +102,9 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 
 - [x] Số thập phân `rust_decimal` cho tính toán (ghi `STACK.md`), quy tắc làm tròn theo từng chỗ
       dùng, chuyển qua lại với `Money` không mất đơn vị
-- [ ] Module `ledger`: tài khoản theo khách / nút / người bán, bút toán nợ = có, chỉ thêm, đảo
+- [x] Module `ledger`: tài khoản theo khách / nút / người bán, bút toán nợ = có, chỉ thêm, đảo
       bút toán để sửa, số dư suy từ bút toán, khoá dòng khi ghi đồng thời; test đồng thời trên cả
-      hai database
+      hai database (D-342; kèm kỳ tháng, khoá sổ, chuỗi băm, doctor `ledger.chain` / `ledger.balances`)
 - [ ] Trait `PaymentGateway`, `PayoutGateway` trong kernel (như `TextModel`); nhận webhook của đối
       tác: kiểm chữ ký, ghi nguyên văn, xử lý qua job, không trùng (mã tham chiếu D-184); đối soát
       định kỳ sổ cái với sao kê đối tác; một bộ cài đặt giả cho test
@@ -120,7 +120,8 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 - [ ] Lưu trữ và khoá sổ kế toán (D-190): chứng từ, sổ cái, hoá đơn giữ ít nhất 10 năm (Luật Kế
       toán 88/2015, Điều 41; NĐ 174/2016) — xoá khách hay yêu cầu xoá dữ liệu cá nhân thì phần kế
       toán được giữ lại (lưu trữ / xuất ra), phần còn lại xoá; khoá sổ theo kỳ (kỳ đã khoá không
-      nhận bút toán, sửa bằng bút toán ở kỳ mở)
+      nhận bút toán, sửa bằng bút toán ở kỳ mở) — khoá sổ theo kỳ và giữ bảng `ledger_*` khi xoá khách đã
+      có (D-342); còn chứng từ, hoá đơn, `purge_expired`, bản lưu trữ (mục 10 của đặc tả)
 - [ ] Hoá đơn khởi tạo từ máy tính tiền (D-190): `EInvoiceProvider` hỗ trợ cả loại này cho bán lẻ
       tại quầy (NĐ 123/2020 sửa bởi NĐ 70/2025: hộ kinh doanh doanh thu từ 1 tỷ đồng / năm từ
       01/6/2025; ngưỡng theo lộ trình — để dạng dữ liệu, cần đối chiếu văn bản mới nhất)

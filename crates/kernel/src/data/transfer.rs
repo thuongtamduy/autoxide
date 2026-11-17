@@ -69,6 +69,8 @@ impl CopiedTable {
 enum Kind {
     Uuid,
     Timestamp,
+    /// Ngày (Postgres `date`, SQLite `date_text` — chữ `YYYY-MM-DD`).
+    Date,
     Text,
     SmallInt,
     Int,
@@ -221,6 +223,7 @@ fn kind_of(declared: &str) -> Option<Kind> {
     Some(match base {
         "uuid" | "uuid_text" => Kind::Uuid,
         "timestamp with time zone" | "timestamp_with_timezone_text" => Kind::Timestamp,
+        "date" | "date_text" => Kind::Date,
         "text" | "varchar" | "character varying" | "character" | "char" | "json_text"
         | "jsonb_text" | "enum_text" => Kind::Text,
         "smallint" | "tinyint" => Kind::SmallInt,
@@ -291,6 +294,7 @@ fn read(row: &QueryResult, column: &Column) -> Result<Value, TransferError> {
         Kind::Timestamp => {
             Value::ChronoDateTimeUtc(row.try_get::<Option<DateTime<Utc>>>("", name)?)
         }
+        Kind::Date => Value::ChronoDate(row.try_get::<Option<chrono::NaiveDate>>("", name)?),
         Kind::Text => Value::String(row.try_get::<Option<String>>("", name)?),
         Kind::SmallInt => Value::SmallInt(row.try_get::<Option<i16>>("", name)?),
         Kind::Int => Value::Int(row.try_get::<Option<i32>>("", name)?),
@@ -669,6 +673,8 @@ mod tests {
         assert_eq!(kind_of("uuid"), Some(Kind::Uuid));
         assert_eq!(kind_of("timestamp_with_timezone_text"), Some(Kind::Timestamp));
         assert_eq!(kind_of("timestamp with time zone"), Some(Kind::Timestamp));
+        assert_eq!(kind_of("date_text"), Some(Kind::Date));
+        assert_eq!(kind_of("date"), Some(Kind::Date));
         assert_eq!(kind_of("varchar(255)"), Some(Kind::Text));
         assert_eq!(kind_of("character varying"), Some(Kind::Text));
         assert_eq!(kind_of("INTEGER"), Some(Kind::Int));

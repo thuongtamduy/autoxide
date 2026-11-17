@@ -145,6 +145,10 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
+| `ledger.balance` | `ledger.read` | read-only |
+| `ledger.entries` | `ledger.read` | read-only |
+| `ledger.post_entry` | `ledger.post` | writes |
+| `ledger.trial_balance` | `ledger.read` | read-only |
 | `media.get` | `media.read` | read-only |
 | `media.list` | `media.read` | read-only |
 | `media.list_tags` | `media.read` | read-only |
