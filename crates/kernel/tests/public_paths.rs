@@ -45,6 +45,7 @@ use autoxide_kernel::response::Data;
 use autoxide_kernel::rows::lock;
 use autoxide_kernel::search::normalize;
 use autoxide_kernel::secret::SecretKey;
+use autoxide_kernel::setup::SetupStep;
 use autoxide_kernel::sms::SmsSender;
 use autoxide_kernel::storage::Storage;
 use autoxide_kernel::task::TaskArgument;

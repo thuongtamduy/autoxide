@@ -519,6 +519,21 @@ impl Authenticator for FakeAuthenticator {
             None => Err(Error::unauthenticated("auth.invalid_token", "The token is not valid.")),
         }
     }
+
+    // Người dùng của test theo ID (cùng khách): như bộ xác thực thật tra quyền của người khác.
+    async fn principal_of(
+        &self,
+        tenant: &autoxide_kernel::tenancy::TenantContext,
+        user_id: uuid::Uuid,
+    ) -> Result<Option<Principal>, Error> {
+        Ok(self
+            .0
+            .values()
+            .find(|principal| {
+                principal.user_id() == user_id && principal.tenant_id() == tenant.id()
+            })
+            .cloned())
+    }
 }
 
 /// Request đang dựng. Gửi bằng [`TestRequest::send`].

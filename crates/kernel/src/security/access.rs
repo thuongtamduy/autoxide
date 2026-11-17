@@ -798,6 +798,18 @@ pub trait Authenticator: Send + Sync {
     fn decides_entry(&self) -> bool {
         false
     }
+
+    /// Quyền hiện tại của người dùng `user_id` ở khách `tenant`, không qua request (bước 51 P10,
+    /// P11): kiểm người được giao việc có quyền của nguồn, liệt kê người cấp được quyền. `None`:
+    /// không có người dùng đang hoạt động đó (hay bộ xác thực không biết). Mặc định: `None`.
+    async fn principal_of(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<Option<Principal>, Error> {
+        let _ = (tenant, user_id);
+        Ok(None)
+    }
 }
 
 /// Hỏi "tài khoản này đã xác thực (số điện thoại / định danh) để đăng nội dung chưa" — điểm nối

@@ -68,6 +68,10 @@ pub(crate) struct ModuleCatalog {
     bulk: crate::ops::bulk::BulkActions,
     /// Sổ bộ nhận dạng mã (bước 51 P9).
     resolvers: crate::ops::resolve::CodeResolvers,
+    /// Sổ bước thiết lập (bước 51 P10).
+    setup: crate::ops::setup::SetupSteps,
+    /// Lịch sử theo bản ghi (bước 51 P13), module nhật ký công bố; điền sau khi mọi module khởi động.
+    history: crate::ops::records::HistorySlot,
     /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
     lists: crate::ops::list_exports::ListsHandle,
     /// Sổ điều hướng đã gom (bước 51 P1).
@@ -140,6 +144,14 @@ impl ModuleCatalog {
 
     pub(crate) fn code_resolvers(&self) -> crate::ops::resolve::CodeResolvers {
         self.resolvers.clone()
+    }
+
+    pub(crate) fn setup_steps(&self) -> crate::ops::setup::SetupSteps {
+        self.setup.clone()
+    }
+
+    pub(crate) fn history(&self) -> crate::ops::records::HistorySlot {
+        self.history.clone()
     }
 
     pub(crate) fn lists(&self) -> crate::ops::list_exports::ListsHandle {

@@ -182,6 +182,8 @@ pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
     // Nhãn và câu định nghĩa của số liệu tóm tắt (bước 51 P4, D-207).
     found.extend(call_arguments(text, "MetricInfo::new(", 1));
     found.extend(call_arguments(text, "MetricInfo::new(", 2));
+    // Nhãn bước thiết lập (bước 51 P10).
+    found.extend(call_arguments(text, "SetupInfo::new(", 1));
     found.retain(
         |(_, site)| !matches!(site, FieldMessage::Built(expression) if expression.starts_with('$')),
     );

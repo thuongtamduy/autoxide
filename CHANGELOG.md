@@ -33,6 +33,20 @@ endpoints are marked deprecated with a sunset date first.
   returned by the admin, preview and public endpoints; removing it needs `content.publish` (new error
   `content.ai_label_requires_publish`). Media items carry `alt_ai_assisted` (`PATCH /api/v1/media/{id}`,
   `media.update`), also returned with the images of public entries. Decision D-362.
+- Notes and activity on any record (step 51): `GET/POST /api/v1/kernel/records/{kind}/{id}/notes` and
+  `DELETE …/notes/{note_id}` keep internal notes on any record of the resource directory, for those who can read it
+  (`<module>.read`); `mentions` must name users who can read it too, and the event `kernel.record_note_added`
+  carries them for notifications. `GET /api/v1/kernel/records/{kind}/{id}/activity` merges the notes with the
+  record's history, which the audit module provides (`RecordHistory`).
+- Why a permission is missing (step 51): `POST /api/v1/me/can` answers up to 50 `{permission, org_id}` questions
+  with `allowed` and, when not, the reason a real request would fail with: `unknown_permission`,
+  `module_not_enabled` (with `required_module`) or `missing_permission`.
+- Inbox per person and setup checklist (step 51): `POST/DELETE /api/v1/me/work/{key}/snooze` hides a piece of work
+  from your inbox until a time; `POST /api/v1/me/work/{key}/assign` assigns it to a user who can see its source
+  (`Authenticator::principal_of`, default `None`); `GET /api/v1/kernel/work` shows `assignee_id`, filters
+  `assigned=me|nobody` and hides snoozed work unless `include_snoozed=true`. Modules declare setup steps computed
+  from their data (`StartContext::setup_step`); `GET /api/v1/kernel/setup` lists those that fit the tenant's
+  business model with progress. Content: "publish the first page".
 - Step 37, personal data (Vietnam, Personal Data Protection Law 91/2025/QH15, Decree 356/2025/ND-CP — check the
   original texts; guide `docs/COMPLIANCE.md`): processing purposes with legal bases and recipients (`GET|POST
   /api/v1/compliance/purposes`, `PATCH /purposes/{key}`, public `GET /public/purposes`), retention of each kind of

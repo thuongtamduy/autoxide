@@ -25,6 +25,25 @@ export type AcceptedResponse = {
 /** What a schedule does: `publish` or `unpublish`. */
 export type Action = "publish" | "unpublish";
 
+/** One line of a record's activity: a note, or an event recorded about it. */
+export type ActivityItem = {
+  /** With `event`: its name, e.g. `content.entry_published`. */
+  action?: string | null;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  at: string;
+  id: string;
+  /** `note` or `event`. */
+  kind: string;
+  /** With `note`: users it mentions. */
+  mentions?: string[] | null;
+  /**
+   * With `event`: what happened, in the language of `Accept-Language`, when the event has a
+   * readable sentence; with `note`: the note.
+   */
+  text?: string | null;
+};
+
 /** One line of recent activity. */
 export type ActivityResponse = {
   /** The event, `<module>.<what_happened>`. */
@@ -510,6 +529,33 @@ export type CampaignResponse = {
 
 /** Where a campaign is. */
 export type CampaignStatus = "draft" | "scheduled" | "sending" | "paused" | "sent" | "cancelled";
+
+/** The answer to one question. */
+export type CanAnswer = {
+  allowed: boolean;
+  org_id?: string | null;
+  permission: string;
+  /**
+   * Why not: `unknown_permission`, `module_not_enabled` (the tenant's plan does not include the
+   * module) or `missing_permission` (none of your roles grants it at this unit).
+   */
+  reason?: string | null;
+  /** With `module_not_enabled`: the module the plan must include. */
+  required_module?: string | null;
+};
+
+/** One question: may I use `permission` at `org_id`? */
+export type CanCheck = {
+  /** The organization unit; omitted: the whole tenant. */
+  org_id?: string | null;
+  permission: string;
+};
+
+/** The questions. */
+export type CanRequest = {
+  /** 1 to 50 questions. */
+  checks: CanCheck[];
+};
 
 /** Cancel your tenant's subscription. */
 export type CancelRequest = {
@@ -5946,6 +5992,19 @@ export type Data_ReauthResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_RecordNote = {
+  /** An internal note on a record. */
+  data: {
+    author_id: string;
+    body: string;
+    created_at: string;
+    id: string;
+    /** Users the note mentions. */
+    mentions: string[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RecoveryCodesResponse = {
   /** One-time recovery codes. Shown only once. */
   data: {
@@ -6143,6 +6202,20 @@ export type Data_SeoSuggestion = {
     model: string;
     /** Up to 5 existing categories or tags of the entry's language that fit; never new ones. */
     term_ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SetupView = {
+  /** The setup checklist. */
+  data: {
+    /** Blocking steps not done yet. */
+    blocking_left: number;
+    done: number;
+    /** Steps that did not answer in time or failed (counted as not done). */
+    incomplete: string[];
+    steps: SetupStepView[];
+    total: number;
   };
 };
 
@@ -6857,6 +6930,27 @@ export type Data_Value = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_ActivityItem = {
+  data: {
+    /** With `event`: its name, e.g. `content.entry_published`. */
+    action?: string | null;
+    actor_id?: string | null;
+    actor_name?: string | null;
+    at: string;
+    id: string;
+    /** `note` or `event`. */
+    kind: string;
+    /** With `note`: users it mentions. */
+    mentions?: string[] | null;
+    /**
+     * With `event`: what happened, in the language of `Accept-Language`, when the event has a
+     * readable sentence; with `note`: the note.
+     */
+    text?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ActivityResponse = {
   data: {
     /** The event, `<module>.<what_happened>`. */
@@ -6920,6 +7014,22 @@ export type Data_Vec_BillingPeriodResponse = {
     /** `open`, `paid` or `void`. */
     status: string;
     tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CanAnswer = {
+  data: {
+    allowed: boolean;
+    org_id?: string | null;
+    permission: string;
+    /**
+     * Why not: `unknown_permission`, `module_not_enabled` (the tenant's plan does not include the
+     * module) or `missing_permission` (none of your roles grants it at this unit).
+     */
+    reason?: string | null;
+    /** With `module_not_enabled`: the module the plan must include. */
+    required_module?: string | null;
   }[];
 };
 
@@ -7622,6 +7732,18 @@ export type Data_Vec_PublicProfileResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_RecordNote = {
+  data: {
+    author_id: string;
+    body: string;
+    created_at: string;
+    id: string;
+    /** Users the note mentions. */
+    mentions: string[];
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_Release = {
   data: {
     /** Release day (`YYYY-MM-DD`); `null` for `unreleased`. */
@@ -8004,6 +8126,18 @@ export type Data_WorkCounts = {
       [key: string]: number;
     };
     incomplete: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_WorkStateView = {
+  /** The state of a piece of work for you. */
+  data: {
+    /** Who it is assigned to. */
+    assignee_id?: string | null;
+    key: string;
+    /** Hidden from your inbox until then. */
+    snoozed_until?: string | null;
   };
 };
 
@@ -10410,6 +10544,14 @@ export type NewExport = {
 
 /** What happens when a post is published (by the `content` module). */
 export type NewPosts = "off" | "draft" | "send";
+
+/** A note to write. */
+export type NewRecordNote = {
+  /** 1 to 5000 characters. */
+  body: string;
+  /** Up to 20 users to notify; each must be able to read the record. */
+  mentions?: string[];
+};
 
 /** A new tenant. */
 export type NewTenant = {
@@ -14182,6 +14324,16 @@ export type ReauthResponse = {
   reauth_token?: string | null;
 };
 
+/** An internal note on a record. */
+export type RecordNote = {
+  author_id: string;
+  body: string;
+  created_at: string;
+  id: string;
+  /** Users the note mentions. */
+  mentions: string[];
+};
+
 /** One-time recovery codes. Shown only once. */
 export type RecoveryCodesResponse = {
   /**
@@ -14618,6 +14770,30 @@ export type SettingResponse = {
 export type SettingValueRequest = {
   /** The value, checked by the setting (see its description). */
   value: unknown;
+};
+
+/** One setup step. */
+export type SetupStepView = {
+  /** Selling cannot start before it is done. */
+  blocking: boolean;
+  /** Computed from the tenant's data. */
+  done: boolean;
+  id: string;
+  /** What to do, in the language of `Accept-Language`. */
+  label: string;
+  /** Screen id of the navigation where it is done. */
+  screen: string;
+};
+
+/** The setup checklist. */
+export type SetupView = {
+  /** Blocking steps not done yet. */
+  blocking_left: number;
+  done: number;
+  /** Steps that did not answer in time or failed (counted as not done). */
+  incomplete: string[];
+  steps: SetupStepView[];
+  total: number;
 };
 
 /** How urgent a piece of work is. */
@@ -16139,6 +16315,12 @@ export type WithholdingQuote = {
   total: Money;
 };
 
+/** Who should do the work. */
+export type WorkAssignRequest = {
+  /** A user who may see the work's source; `null` removes the assignment. */
+  user_id?: string | null;
+};
+
 /** Counts for the menu. */
 export type WorkCounts = {
   /** Pending work by source (the `counter` of navigation items); `work` is the total. */
@@ -16150,15 +16332,34 @@ export type WorkCounts = {
 
 /** One piece of work. */
 export type WorkItemView = {
+  /** Who it is assigned to (`POST /api/v1/me/work/{key}/assign`). */
+  assignee_id?: string | null;
   due_at?: string | null;
   /** Stable key, `<source>:<record id>`. */
   key: string;
   severity: Severity;
+  /** Hidden from your inbox until then (only with `include_snoozed=true`). */
+  snoozed_until?: string | null;
   source: string;
   /** Where to do it: the screen of `GET /api/v1/kernel/navigation` and the record. */
   target: WorkTarget;
   /** What to do, in the language of `Accept-Language`. */
   title: string;
+};
+
+/** When to show the work again. */
+export type WorkSnoozeRequest = {
+  /** A time in the future, at most a year away. */
+  until: string;
+};
+
+/** The state of a piece of work for you. */
+export type WorkStateView = {
+  /** Who it is assigned to. */
+  assignee_id?: string | null;
+  key: string;
+  /** Hidden from your inbox until then. */
+  snoozed_until?: string | null;
 };
 
 /** Where a piece of work is done. */
@@ -20885,6 +21086,55 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/records/{kind}/{id}/activity": {
+    /** Get the activity of a record. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number }; };
+      responses: {
+        200: Data_Vec_ActivityItem;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/records/{kind}/{id}/notes": {
+    /** List the notes of a record. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; };
+      responses: {
+        200: Data_Vec_RecordNote;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Write a note on a record. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; id: string }; };
+      requestBody: NewRecordNote;
+      responses: {
+        201: Data_RecordNote;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/records/{kind}/{id}/notes/{note_id}": {
+    /** Delete your note on a record. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; id: string; note_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/resolve": {
     /** Open a record by its code. */
     get: {
@@ -20931,6 +21181,17 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/setup": {
+    /** Get the setup checklist. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_SetupView;
+        401: Problem;
         default: Problem;
       };
     };
@@ -21179,7 +21440,7 @@ export interface paths {
   "/api/v1/kernel/work": {
     /** List the work waiting for you. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; assigned?: string; include_snoozed?: boolean }; };
       responses: {
         200: Data_WorkView;
         401: Problem;
@@ -21191,7 +21452,7 @@ export interface paths {
   "/api/v1/kernel/work/counts": {
     /** Count the work waiting for you, by source. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; assigned?: string; include_snoozed?: boolean }; };
       responses: {
         200: Data_WorkCounts;
         401: Problem;
@@ -21762,6 +22023,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/me/can": {
+    /** Ask what you may do, and why not. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CanRequest;
+      responses: {
+        200: Data_Vec_CanAnswer;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/me/flags": {
     /** List my interface flags. */
     get: {
@@ -21854,6 +22128,44 @@ export interface paths {
         204: void;
         401: Problem;
         403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/work/{key}/assign": {
+    /** Assign a piece of work. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: WorkAssignRequest;
+      responses: {
+        200: Data_WorkStateView;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/work/{key}/snooze": {
+    /** Snooze a piece of work. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: WorkSnoozeRequest;
+      responses: {
+        200: Data_WorkStateView;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Stop snoozing a piece of work. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      responses: {
+        204: void;
+        401: Problem;
         404: Problem;
         default: Problem;
       };

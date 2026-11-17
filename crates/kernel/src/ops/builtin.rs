@@ -76,6 +76,8 @@ pub(crate) struct KernelModule {
     job_file_days: u32,
     /// Hàng đợi job của kernel (xuất danh sách); có sau `start`.
     jobs: Option<crate::job::JobQueue>,
+    /// Sổ đối tượng và sổ permission (ghi chú trên bản ghi, bước 51 P13); có sau `start`.
+    resources: Option<(crate::resource::ResourceDirectory, crate::access::PermissionCatalog)>,
     /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (đọc ở cấu hình kernel): dời khách chờ request đang
     /// chạy xong trong chừng này.
     request_timeout: std::time::Duration,
@@ -104,6 +106,7 @@ impl KernelModule {
             export_days: 30,
             job_file_days: 7,
             jobs: None,
+            resources: None,
             request_timeout: std::time::Duration::from_secs(30),
             keys,
             tenant_settings,
@@ -229,6 +232,10 @@ impl Module for KernelModule {
             Box::new(crate::job::runs::AddJobFiles),
             // Nơi lưu dữ liệu theo khách (bước 37, D-360): nước của placement, yêu cầu của khách.
             Box::new(crate::tenancy::residency::AddDataResidency),
+            // Hoãn / giao việc của hộp việc (bước 51 P10).
+            Box::new(crate::ops::work_states::CreateWorkStates),
+            // Ghi chú trên mọi bản ghi (bước 51 P13).
+            Box::new(crate::ops::records::CreateRecordNotes),
         ]
     }
 
@@ -302,6 +309,7 @@ impl Module for KernelModule {
         vec![
             crate::tenancy::settings::SETTING_CHANGED,
             crate::job::runs::JOB_RETRIED,
+            crate::ops::records::RECORD_NOTE_ADDED,
             crate::tenancy::admin::TENANT_CREATED,
             crate::tenancy::admin::TENANT_UPDATED,
             crate::tenancy::domains::DOMAIN_ADDED,
@@ -336,6 +344,14 @@ impl Module for KernelModule {
                 outbox: outbox.clone(),
             }));
         }
+        if let (Some(outbox), Some((resources, permissions))) = (&self.outbox, &self.resources) {
+            routes = routes.merge(crate::ops::records::routes(crate::ops::records::RecordsState {
+                resources: resources.clone(),
+                permissions: permissions.clone(),
+                outbox: outbox.clone(),
+                history: self.catalog.history(),
+            }));
+        }
         if let (Some(jobs), Some(entitlements), Some(registry)) =
             (&self.jobs, &self.entitlements, &self.registry)
         {
@@ -368,6 +384,15 @@ impl Module for KernelModule {
                 entitlements: entitlements.clone(),
             };
             routes = routes.merge(crate::ops::find::routes(find));
+            routes = routes.merge(crate::ops::setup::routes(crate::ops::setup::SetupState {
+                steps: self.catalog.setup_steps(),
+                entitlements: entitlements.clone(),
+                translations: self.translations.clone(),
+                settings: self.settings.clone().map(|settings| {
+                    let settings: Arc<dyn crate::tenancy::settings::TenantSettings> = settings;
+                    settings
+                }),
+            }));
             routes = routes.merge(crate::ops::resolve::routes(crate::ops::resolve::ResolveState {
                 resolvers: self.catalog.code_resolvers(),
                 entitlements: entitlements.clone(),
@@ -510,6 +535,7 @@ impl Module for KernelModule {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         self.jobs = Some(context.jobs());
+        self.resources = Some((context.resources(), context.permissions().clone()));
         self.database = Some(context.database().clone());
         self.translations = context.translations().clone();
         self.entitlements = Some(context.entitlements());

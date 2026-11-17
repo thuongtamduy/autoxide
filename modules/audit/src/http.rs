@@ -600,4 +600,35 @@ mod tests {
         .await
         .unwrap();
     }
+
+    /// Lịch sử theo bản ghi (bước 51 P13): chỉ event có đúng chủ thể, mới trước, kèm người làm.
+    #[tokio::test]
+    async fn lich_su_theo_ban_ghi() {
+        TestDatabase::run(async |test| {
+            let (app, recorder) = setup(test).await;
+            let ada = Uuid::now_v7();
+            for (name, subject) in [
+                ("auth.user_updated", "auth.user:1"),
+                ("auth.role_created", "auth.role:1"),
+                ("auth.user_disabled", "auth.user:1"),
+            ] {
+                recorder.handle(&event(app.database(), name, ada, subject)).await.unwrap();
+            }
+            let history = app
+                .modules()
+                .api::<dyn autoxide_kernel::resource::RecordHistory>()
+                .expect("audit công bố RecordHistory");
+            let tenant = autoxide_kernel::tenancy::DatabaseRegistry::single(app.database().clone())
+                .default_tenant();
+            let lines = history
+                .history(&tenant, "auth.user:1", 10, autoxide_kernel::i18n::Language::En)
+                .await
+                .unwrap();
+            let actions: Vec<&str> = lines.iter().map(|line| line.action.as_str()).collect();
+            assert_eq!(actions, ["auth.user_disabled", "auth.user_updated"]);
+            assert_eq!(lines[0].actor_user_id, Some(ada));
+        })
+        .await
+        .unwrap();
+    }
 }
