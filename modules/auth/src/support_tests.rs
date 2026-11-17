@@ -337,3 +337,56 @@ async fn khach_tat_ho_tro_chi_con_yeu_cau_co_tham_quyen() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn chi_nhan_su_nen_tang_xem_va_thu_hoi_lan_cap() {
+    TestDatabase::run(async |test| {
+        let (setup, _) = setup(test).await;
+        let shop = setup.shop.id().as_uuid();
+        let (status, granted) = call(
+            &setup,
+            "POST",
+            "/support-grants",
+            &setup.platform_admin,
+            None,
+            Some(grant_body(&setup, "support", 2)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{granted}");
+        let id = granted["data"]["id"].as_str().unwrap().to_owned();
+
+        // Quản trị của khách thường có mọi permission (kể cả `auth.support.grant`) nhưng không phải
+        // nhân sự nền tảng: không xem, không thu hồi, không dò cài đặt của khách khác.
+        for (method, path) in [
+            ("GET", "/support-grants".to_owned()),
+            ("GET", format!("/support-grants?tenant_id={shop}")),
+            ("GET", format!("/support-grants/allowed?tenant_id={shop}")),
+            ("DELETE", format!("/support-grants/{id}?tenant_id={shop}")),
+        ] {
+            let (status, body) = call(&setup, method, &path, &setup.shop_admin, None, None).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{method} {path}: {body}");
+            assert_eq!(body["code"], "auth.support_platform_only");
+        }
+
+        // Nhân sự nền tảng: danh sách mọi khách (không cần `tenant_id`), và biết trước khách có cho
+        // vào để hỗ trợ không.
+        let (status, all) =
+            call(&setup, "GET", "/support-grants", &setup.platform_admin, None, None).await;
+        assert_eq!(status, StatusCode::OK, "{all}");
+        assert_eq!(all["data"][0]["id"], id.as_str());
+        let path = format!("/support-grants/allowed?tenant_id={shop}");
+        let (status, allowed) = call(&setup, "GET", &path, &setup.platform_admin, None, None).await;
+        assert_eq!(status, StatusCode::OK, "{allowed}");
+        assert_eq!(allowed["data"], json!({"tenant_id": shop, "support_access": true}));
+        let unknown = uuid::Uuid::now_v7();
+        let path = format!("/support-grants/allowed?tenant_id={unknown}");
+        let (status, _) = call(&setup, "GET", &path, &setup.platform_admin, None, None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+
+        // Trần thời hạn có trong cấu hình cho giao diện.
+        let config = setup.app.get("/api/v1/kernel/client-config").send().await.unwrap().json();
+        assert!(config["data"]["auth"]["support_access_max_hours"].as_u64().is_some(), "{config}");
+    })
+    .await
+    .unwrap();
+}

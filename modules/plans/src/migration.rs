@@ -25,6 +25,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![autoxide_kernel::job::tenant_table("plans")],
         ),
         Box::new(CreateBillingPeriods),
+        Box::new(CreateBillingProfiles),
     ]
 }
 
@@ -398,5 +399,44 @@ impl MigrationTrait for CreateBillingPeriods {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("plans_billing_period").to_owned()).await
+    }
+}
+
+/// Hồ sơ xuất hoá đơn của khách (bước 35 mục 4); địa chỉ theo quy ước `address_*` của `address`.
+struct CreateBillingProfiles;
+
+impl MigrationName for CreateBillingProfiles {
+    fn name(&self) -> &str {
+        "m0009_create_billing_profiles"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateBillingProfiles {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("plans_billing_profile")
+                    .col(schema::pk_uuid("tenant_id"))
+                    .col(schema::string_len("legal_name", 200))
+                    .col(schema::string_len_null("tax_code", 14))
+                    .col(schema::string_len("email", 254))
+                    .col(schema::string_len_null("phone", 20))
+                    .col(schema::string_len_null("address_country", 2))
+                    .col(schema::string_len_null("address_province_code", 10))
+                    .col(schema::string_len_null("address_province_name", 200))
+                    .col(schema::string_len_null("address_commune_code", 10))
+                    .col(schema::string_len_null("address_commune_name", 200))
+                    .col(schema::string_len_null("address_line", 300))
+                    .col(schema::uuid_null("updated_by"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager.drop_table(Table::drop().table("plans_billing_profile").to_owned()).await
     }
 }

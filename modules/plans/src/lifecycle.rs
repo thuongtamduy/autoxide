@@ -496,7 +496,15 @@ impl PlansService {
             else {
                 continue;
             };
-            let Some(email) = sub.billing_email.clone() else {
+            // Email riêng của thuê bao, không có thì email của hồ sơ xuất hoá đơn.
+            let email = match sub.billing_email.clone() {
+                Some(email) => Some(email),
+                None => self
+                    .billing_profile(TenantId::from_uuid(sub.tenant_id))
+                    .await?
+                    .map(|profile| profile.email),
+            };
+            let Some(email) = email else {
                 continue;
             };
             let Some(key) = self.reminder_due(&period, at) else {

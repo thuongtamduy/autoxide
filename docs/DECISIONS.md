@@ -8112,3 +8112,29 @@ Hai yêu cầu của giao diện (`docs/prompts/web-build-api-gaps.md`).
    định `AllowEnforceValue` của `PublicKeyCredentialCreationOptions::passkey`). Lý do: authenticator không hỗ trợ phần mở
    rộng (Chromium ảo, một số thiết bị) từ chối hẳn khi bị ép. Đăng nhập bằng passkey vẫn luôn đòi xác minh người dùng.
 5. Mô tả `TenantMovePlan.files`: `0` cả khi khách không có file nào.
+
+## D-335 · Bước 35, đợt cho giao diện: hồ sơ xuất hoá đơn, màn của nhân sự nền tảng, quyền vào hỗ trợ — 2026-11-17 — agent quyết
+
+1. **Hồ sơ xuất hoá đơn** (`plans_billing_profile`, mặt điều khiển, migration `m0009_create_billing_profiles`):
+   `GET/PUT /api/v1/plans/billing-profile` (khách, `plans.billing.read` / `.manage`), `GET
+   /plans/tenants/{tenant_id}/billing-profile` (nhân sự nền tảng). `PUT` thay cả hồ sơ; mã số thuế Việt Nam 10 chữ số
+   hay `10 chữ số-3 chữ số` (đơn vị phụ thuộc, Luật Quản lý thuế 38/2019 và Thông tư 105/2020/TT-BTC — cần đối chiếu văn
+   bản gốc nếu có thay đổi); địa chỉ kiểm qua `AdministrativeUnits` của `address` (không có `address`: không nhận địa
+   chỉ). Event `plans.billing_profile_updated` chỉ mang `tenant_id`, không mang email / số điện thoại. Mail nhắc thanh
+   toán gửi về email của hồ sơ khi thuê bao không có `billing_email` riêng. Bên mua của hoá đơn SaaS (bước 36) lấy từ đây.
+2. **Màn của nhân sự nền tảng**: `GET /plans/tenants/{id}/billing-periods` (cho "đánh dấu đã thu"), `GET
+   /plans/tenants/{id}/entitlements`, `GET /plans/overrides` (mọi khách, lọc `tenant_id` / `kind` / `key` / `active`,
+   theo trang), `subscriber_count` của gói (thuê bao chưa huỷ, gói chính hay gói thêm; hai câu `GROUP BY`; `null` ở
+   catalog công khai), `plan_code` / `plan_name` trong thuê bao (cả gói đã ngừng bán), `GET /plans/subscriptions` lọc
+   `tenant_id`. Lịch sử thuê bao không thêm bảng: event `plans.*` mang chủ thể `plans.subscription:<tenant_id>`, đọc qua
+   `GET /api/v1/audit?subject=…`.
+3. **`expand=subscription,usage` của `GET /kernel/tenants`** trước đây luôn `null`: thêm `Entitlements::describe_tenants`
+   (mặc định rỗng, D-038) — kernel hỏi bên cung cấp cho cả trang một lần; `plans` đọc thuê bao (hai câu) và lượng dùng
+   (một câu) cho cả trang, quyền dùng từng khách qua bộ nhớ đệm. Kernel chỉ chuyển JSON, không biết hình dạng.
+4. **Quyền vào hỗ trợ**: sửa lỗ — `GET /auth/support-grants` và `DELETE /auth/support-grants/{id}` chỉ kiểm permission,
+   mà role `admin` của khách nào cũng có mọi permission, nên quản trị một khách thường xem / thu hồi được lần cấp của khách
+   khác. Nay kiểm thêm khách nền tảng (`auth.support_platform_only`) như `POST`. `tenant_id` của danh sách thành tuỳ chọn
+   (bỏ: 200 lần cấp mới nhất mọi khách — giữ hình dạng `Data<Vec>` để không phá vỡ API). Thêm `GET
+   /auth/support-grants/allowed?tenant_id=` (cài đặt `auth.support_access` của khách) và
+   `auth.support_access_max_hours` trong `GET /kernel/client-config`.
+

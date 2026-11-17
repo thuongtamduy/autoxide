@@ -11,6 +11,18 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Billing profile of a tenant (legal name, tax code, email for invoices, phone, address):
+  `GET/PUT /api/v1/plans/billing-profile`, and `GET /api/v1/plans/tenants/{tenant_id}/billing-profile` for platform
+  staff. Billing reminders go to its email when the subscription has no `billing_email`.
+- For platform staff: `GET /api/v1/plans/tenants/{tenant_id}/billing-periods`, `GET
+  /api/v1/plans/tenants/{tenant_id}/entitlements`, `GET /api/v1/plans/overrides` (every tenant), `subscriber_count` on
+  plans, `tenant_id` filter on `GET /api/v1/plans/subscriptions`. Subscriptions include `plan_code` and `plan_name`.
+- `GET /api/v1/kernel/tenants?expand=subscription,usage` now fills `subscription` and `usage` when the `plans` module
+  is installed (they were always `null`).
+- `GET /api/v1/auth/support-grants` without `tenant_id` lists the newest grants of every tenant;
+  `GET /api/v1/auth/support-grants/allowed?tenant_id=` tells whether a tenant lets platform staff in;
+  `GET /api/v1/kernel/client-config` has `auth.support_access_max_hours`.
+
 - `POST /api/v1/kernel/placements/migrations` (platform staff, MCP `kernel.migrate_placements`): migrate the tenant
   databases from the API — `dry_run` lists the pending migrations, otherwise a run goes on in the background
   (`GET …/migrations/{id}`, `GET …/migrations`). One run at a time.
@@ -387,6 +399,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- Security: `GET /api/v1/auth/support-grants` and `DELETE /api/v1/auth/support-grants/{id}` checked only the
+  permission, so the administrator of an ordinary tenant (who holds every permission) could list or revoke support
+  grants of other tenants. They are now for platform staff in the platform tenant only, like granting
+  (`403 auth.support_platform_only`).
 - Adding a passkey failed on authenticators without the `credProtect` extension (the server required it): it is now
   asked for but not enforced. Signing in with a passkey still always verifies the user.
 - `GET /api/v1/kernel/modules/{name}` answered 500 for modules with data upgrades (`auth`, `webhooks`).

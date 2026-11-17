@@ -307,6 +307,35 @@ export type BillingPeriodResponse = {
   tenant_id: string;
 };
 
+/** The whole billing profile; it replaces the one there is. */
+export type BillingProfileRequest = {
+  address?: AddressInput | null;
+  /** Where invoices and billing reminders go. */
+  email: string;
+  /** Legal name, 1 to 200 characters. */
+  legal_name: string;
+  /** Up to 20 characters. */
+  phone?: string | null;
+  /** Tax code: 10 digits, or 10 digits, `-` and 3 digits; leave out for a person without one. */
+  tax_code?: string | null;
+};
+
+/** Who the platform invoices: your tenant's legal details. */
+export type BillingProfileResponse = {
+  address?: Address | null;
+  /** Where invoices and billing reminders go. */
+  email: string;
+  /** Legal name of the business or person invoiced. */
+  legal_name: string;
+  phone?: string | null;
+  /** Tax code (Vietnam: 10 digits, or 10 digits, a dash and 3 digits for a branch). */
+  tax_code?: string | null;
+  tenant_id: string;
+  updated_at: string;
+  /** User who last changed it. */
+  updated_by?: string | null;
+};
+
 /**
  * A mark of a `text` node: `bold`, `italic`, `underline`, `strike`, `code`, or `link`
  * (`attrs.href`: `http://`, `https://`, `mailto:` or a path starting with `/`).
@@ -504,6 +533,11 @@ export type ClientConfigResponse = {
      * show "create an account".
      */
     self_registration: boolean;
+    /**
+     * Longest support access to a tenant that platform staff can be granted, in hours
+     * (`AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS`; `hours` of `POST /api/v1/auth/support-grants`).
+     */
+    support_access_max_hours: number;
   };
   /** Content settings an interface needs. */
   content: {
@@ -1311,6 +1345,25 @@ export type Data_BillingPeriodResponse = {
     /** `open`, `paid` or `void`. */
     status: string;
     tenant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BillingProfileResponse = {
+  /** Who the platform invoices: your tenant's legal details. */
+  data: {
+    address?: Address | null;
+    /** Where invoices and billing reminders go. */
+    email: string;
+    /** Legal name of the business or person invoiced. */
+    legal_name: string;
+    phone?: string | null;
+    /** Tax code (Vietnam: 10 digits, or 10 digits, a dash and 3 digits for a branch). */
+    tax_code?: string | null;
+    tenant_id: string;
+    updated_at: string;
+    /** User who last changed it. */
+    updated_by?: string | null;
   };
 };
 
@@ -2441,6 +2494,8 @@ export type Data_OverrideResponse = {
     /** With `limit`: the new maximum; `null` is unlimited. */
     max_value?: number | null;
     reason: string;
+    /** The tenant it applies to. */
+    tenant_id: string;
   };
 };
 
@@ -2518,6 +2573,11 @@ export type Data_PlanResponse = {
     sample_data: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
+    /**
+     * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+     * platform staff: `null` in the public catalog.
+     */
+    subscriber_count?: number | null;
     /** Days a suspended (read-only) subscription waits before it is canceled. */
     suspend_days: number;
     /** Days of free trial for a tenant that never had one; 0 for none. */
@@ -2540,7 +2600,11 @@ export type Data_PlanSubscription = {
     delete_after?: string | null;
     grace_ends_at?: string | null;
     id: string;
+    /** Code of the plan (also when it is no longer sold). */
+    plan_code?: string | null;
     plan_id: string;
+    /** Name of the plan (also when it is no longer sold). */
+    plan_name?: string | null;
     price_id?: string | null;
     /** Plan the subscription moves to when the period ends (after a downgrade). */
     scheduled_plan_id?: string | null;
@@ -3085,6 +3149,19 @@ export type Data_SubscriberResponse = {
      */
     suppressed?: string | null;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportAllowedResponse = {
+  /** Whether a tenant lets platform staff in for support. */
+  data: {
+    /**
+     * The tenant's setting `auth.support_access`: `false` means only a `legal_request` grant can
+     * be made (a `support` one is refused with `auth.support_access_disabled`).
+     */
+    support_access: boolean;
+    tenant_id: string;
   };
 };
 
@@ -3833,6 +3910,8 @@ export type Data_Vec_OverrideResponse = {
     /** With `limit`: the new maximum; `null` is unlimited. */
     max_value?: number | null;
     reason: string;
+    /** The tenant it applies to. */
+    tenant_id: string;
   }[];
 };
 
@@ -3911,6 +3990,11 @@ export type Data_Vec_PlanResponse = {
     sample_data: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
+    /**
+     * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+     * platform staff: `null` in the public catalog.
+     */
+    subscriber_count?: number | null;
     /** Days a suspended (read-only) subscription waits before it is canceled. */
     suspend_days: number;
     /** Days of free trial for a tenant that never had one; 0 for none. */
@@ -5603,6 +5687,8 @@ export type OverrideResponse = {
   /** With `limit`: the new maximum; `null` is unlimited. */
   max_value?: number | null;
   reason: string;
+  /** The tenant it applies to. */
+  tenant_id: string;
 };
 
 /** One page of a list. */
@@ -6279,6 +6365,30 @@ export type Page_MembershipRowResponse = {
 };
 
 /** One page of a list. */
+export type Page_OverrideResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** User who set it. */
+    created_by?: string | null;
+    /** With `module` / `feature`. */
+    enabled?: boolean | null;
+    /** The override no longer applies from this time. */
+    expires_at?: string | null;
+    id: string;
+    key: string;
+    /** `module`, `feature` or `limit`. */
+    kind: string;
+    /** With `limit`: the new maximum; `null` is unlimited. */
+    max_value?: number | null;
+    reason: string;
+    /** The tenant it applies to. */
+    tenant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PasskeyResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -6341,6 +6451,11 @@ export type Page_PlanResponse = {
     sample_data: boolean;
     /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
     status: string;
+    /**
+     * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+     * platform staff: `null` in the public catalog.
+     */
+    subscriber_count?: number | null;
     /** Days a suspended (read-only) subscription waits before it is canceled. */
     suspend_days: number;
     /** Days of free trial for a tenant that never had one; 0 for none. */
@@ -6364,7 +6479,11 @@ export type Page_PlanSubscription = {
     delete_after?: string | null;
     grace_ends_at?: string | null;
     id: string;
+    /** Code of the plan (also when it is no longer sold). */
+    plan_code?: string | null;
     plan_id: string;
+    /** Name of the plan (also when it is no longer sold). */
+    plan_name?: string | null;
     price_id?: string | null;
     /** Plan the subscription moves to when the period ends (after a downgrade). */
     scheduled_plan_id?: string | null;
@@ -7181,6 +7300,11 @@ export type PlanResponse = {
   sample_data: boolean;
   /** `draft`, `active` (sold) or `retired` (no longer sold; tenants on it keep it). */
   status: string;
+  /**
+   * Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
+   * platform staff: `null` in the public catalog.
+   */
+  subscriber_count?: number | null;
   /** Days a suspended (read-only) subscription waits before it is canceled. */
   suspend_days: number;
   /** Days of free trial for a tenant that never had one; 0 for none. */
@@ -7200,7 +7324,11 @@ export type PlanSubscription = {
   delete_after?: string | null;
   grace_ends_at?: string | null;
   id: string;
+  /** Code of the plan (also when it is no longer sold). */
+  plan_code?: string | null;
   plan_id: string;
+  /** Name of the plan (also when it is no longer sold). */
+  plan_name?: string | null;
   price_id?: string | null;
   /** Plan the subscription moves to when the period ends (after a downgrade). */
   scheduled_plan_id?: string | null;
@@ -8509,6 +8637,16 @@ export type SubscriptionResponse = {
 /** Where a subscriber stands on one list. */
 export type SubscriptionStatus = "unconfirmed" | "confirmed" | "unsubscribed";
 
+/** Whether a tenant lets platform staff in for support. */
+export type SupportAllowedResponse = {
+  /**
+   * The tenant's setting `auth.support_access`: `false` means only a `legal_request` grant can
+   * be made (a `support` one is refused with `auth.support_access_disabled`).
+   */
+  support_access: boolean;
+  tenant_id: string;
+};
+
 /** A new support access grant. */
 export type SupportGrantRequest = {
   /**
@@ -8703,15 +8841,18 @@ export type TenantDomainRecord = {
 export type TenantExpanded = {
   placement?: Placement | null;
   /**
-   * The tenant's subscription (`expand=subscription`). Always `null` for now: subscriptions
-   * come with the plans module (step 35); without it no tenant has one.
+   * The tenant's subscription (`expand=subscription`), shaped like `GET
+   * /api/v1/plans/tenants/{tenant_id}/subscription` (`PlanSubscription`, with the plan's code
+   * and name, without add-ons). `null` when not asked for, when the tenant has no subscription,
+   * or without the plans module.
    */
   subscription?: Record<string, unknown> | null;
   /**
-   * The tenant's use of its plan's limits (`expand=usage`). Always `null` for now, like
-   * `subscription`.
+   * The tenant's use of every limit (`expand=usage`), shaped like `GET
+   * /api/v1/plans/tenants/{tenant_id}/usage` (a list of `LimitUse`). `null` when not asked for
+   * or without the plans module.
    */
-  usage?: Record<string, unknown> | null;
+  usage?: Record<string, unknown>[] | null;
 };
 
 /** An export of all the data of a tenant. */
@@ -10290,9 +10431,9 @@ export interface paths {
     };
   };
   "/api/v1/auth/support-grants": {
-    /** List the support access grants for a tenant (platform). */
+    /** List the support access grants (platform). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id?: string }; };
       responses: {
         200: Data_Vec_SupportGrantResponse;
         401: Problem;
@@ -10309,6 +10450,19 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/support-grants/allowed": {
+    /** Tell whether a tenant lets platform staff in for support (platform). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id: string }; };
+      responses: {
+        200: Data_SupportAllowedResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -13600,6 +13754,31 @@ export interface paths {
       };
     };
   };
+  "/api/v1/plans/billing-profile": {
+    /** Get your tenant's billing profile. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_BillingProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Set your tenant's billing profile. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: BillingProfileRequest;
+      responses: {
+        200: Data_BillingProfileResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/plans/catalog": {
     /** List the plans on sale, with their prices. */
     get: {
@@ -13617,6 +13796,18 @@ export interface paths {
       responses: {
         200: Data_EntitlementsResponse;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/overrides": {
+    /** List the overrides of every tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id?: string; kind?: string; key?: string; active?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_OverrideResponse;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -13776,11 +13967,49 @@ export interface paths {
   "/api/v1/plans/subscriptions": {
     /** List the subscriptions of every tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; plan_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; plan_id?: string; tenant_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_PlanSubscription;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/billing-periods": {
+    /** List a tenant's billing periods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_Vec_BillingPeriodResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/billing-profile": {
+    /** Get a tenant's billing profile. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_BillingProfileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/tenants/{tenant_id}/entitlements": {
+    /** Get what a tenant may use now. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { tenant_id: string }; };
+      responses: {
+        200: Data_EntitlementsResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

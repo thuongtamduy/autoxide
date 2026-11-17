@@ -17,7 +17,8 @@ pub(crate) const PLANS_MANAGE: Permission = Permission::new(
 
 pub(crate) const SUBSCRIPTIONS_READ: Permission = Permission::new(
     "plans.subscriptions.read",
-    "Platform staff: see the subscription, usage and overrides of every tenant.",
+    "Platform staff: see the subscription, usage, overrides, billing periods and billing profile \
+     of every tenant.",
 );
 
 pub(crate) const SUBSCRIPTIONS_MANAGE: Permission = Permission::new(
@@ -29,12 +30,12 @@ pub(crate) const SUBSCRIPTIONS_MANAGE: Permission = Permission::new(
 
 pub(crate) const BILLING_READ: Permission = Permission::new(
     "plans.billing.read",
-    "See the subscription of your tenant, its usage and billing periods.",
+    "See the subscription of your tenant, its usage, billing periods and billing profile.",
 );
 
 pub(crate) const BILLING_MANAGE: Permission = Permission::new(
     "plans.billing.manage",
-    "Change, cancel or resume the subscription of your tenant.",
+    "Change, cancel or resume the subscription of your tenant, and set its billing profile.",
 )
 .with_risk(Risk::Money);
 

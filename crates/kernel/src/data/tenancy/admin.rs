@@ -174,13 +174,16 @@ pub struct Tenant {
 pub struct TenantExpanded {
     /// The placement that keeps the tenant's data (`expand=placement`); `null` when not asked for.
     pub placement: Option<Placement>,
-    /// The tenant's subscription (`expand=subscription`). Always `null` for now: subscriptions
-    /// come with the plans module (step 35); without it no tenant has one.
+    /// The tenant's subscription (`expand=subscription`), shaped like `GET
+    /// /api/v1/plans/tenants/{tenant_id}/subscription` (`PlanSubscription`, with the plan's code
+    /// and name, without add-ons). `null` when not asked for, when the tenant has no subscription,
+    /// or without the plans module.
     #[schema(value_type = Option<Object>)]
     pub subscription: Option<serde_json::Value>,
-    /// The tenant's use of its plan's limits (`expand=usage`). Always `null` for now, like
-    /// `subscription`.
-    #[schema(value_type = Option<Object>)]
+    /// The tenant's use of every limit (`expand=usage`), shaped like `GET
+    /// /api/v1/plans/tenants/{tenant_id}/usage` (a list of `LimitUse`). `null` when not asked for
+    /// or without the plans module.
+    #[schema(value_type = Option<Vec<Object>>)]
     pub usage: Option<serde_json::Value>,
 }
 
@@ -524,12 +527,22 @@ impl TenantAdmin {
                 }
             }
         }
+        // Thuê bao và lượng dùng: hỏi module `plans` (qua tay cầm quyền dùng) cho cả trang một lần.
+        let ids: Vec<TenantId> = rows.data.iter().map(|row| TenantId::from_uuid(row.id)).collect();
+        let mut plans = self
+            .entitlements
+            .describe_tenants(&ids, expand.contains(&"subscription"), expand.contains(&"usage"))
+            .await?;
         Ok(rows.map(|row| {
             let placement = described.get(&row.placement_id).cloned();
+            let view = plans.remove(&TenantId::from_uuid(row.id)).unwrap_or_default();
             let mut tenant = describe(row, &placements);
             if !expand.is_empty() {
-                tenant.expanded =
-                    Some(TenantExpanded { placement, subscription: None, usage: None });
+                tenant.expanded = Some(TenantExpanded {
+                    placement,
+                    subscription: view.subscription,
+                    usage: view.usage,
+                });
             }
             tenant
         }))
