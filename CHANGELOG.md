@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Tenant lists of reasons (step 51): modules declare lists of reason codes (`Module::reason_lists`);
+  `GET /api/v1/kernel/reasons/{list}` merges them with the tenant's own labels, order, codes turned off and codes
+  added with `PUT /api/v1/kernel/reasons/{list}/{code}` (`kernel.reasons.manage`); codes required by law stay on;
+  services check a code with `ReasonCodes::ensure`.
+- Partner connections (step 51): the settings of a connection (`<module>.connection.<kind>.<field>`) carry
+  `last_used_at` and `last_error`, and `POST /api/v1/kernel/settings/{name}/test` tries the connection now. The mail
+  module records each delivery and tests its SMTP server.
 - Agents as actors and approvals (step 51, D-365): API keys have a `kind` (`human`, `agent`, `service`); the audit
   log records `actor_kind` `agent`, `service` and `support` besides `user`, and filters on several at once
   (`actor_kind=agent,service`). Commands marked `x-approval: "agent"` (first: deleting a post or page) answer an

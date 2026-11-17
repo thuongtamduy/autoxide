@@ -116,8 +116,10 @@ impl Module for MailModule {
         let transport = Arc::new(Transport::new(config.smtp_url.as_deref(), config.file_dir)?);
         self.probe = Some(Arc::new(doctor::SmtpProbe { transport: transport.clone() }));
         let settings = context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?;
-        self.sender =
-            Some(Arc::new(Sender::new(transport, config.from, context.outbox()?, settings)));
+        let sender = Arc::new(Sender::new(transport, config.from, context.outbox()?, settings));
+        // Thử kết nối SMTP từ trang cài đặt (`POST /kernel/settings/{name}/test`).
+        context.connection_probe(sender.clone())?;
+        self.sender = Some(sender);
         let service = MailService::new(context.jobs());
         context.provide::<dyn Mailer>(Arc::new(service))
     }

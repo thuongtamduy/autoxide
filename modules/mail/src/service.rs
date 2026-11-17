@@ -129,6 +129,9 @@ impl Mailer for MailService {
     }
 }
 
+/// Kết nối SMTP (của khách, hay của máy chủ) trong sổ kết nối ra ngoài của kernel.
+pub(crate) const CONNECTION: &str = "mail.connection.smtp";
+
 /// Bộ chạy job gửi mail.
 pub(crate) struct Sender {
     transport: Arc<Transport>,
@@ -211,7 +214,13 @@ impl JobHandler for Sender {
             None => builder.singlepart(SinglePart::plain(mail.text)),
         }
         .map_err(|error| Error::internal(format!("cannot build the mail: {error}")))?;
-        match transport.deliver(message).await? {
+        // Ghi lần dùng của kết nối SMTP (bước 51): người quản trị thấy lỗi cuối mà không đọc log.
+        let delivered = transport.deliver(message).await;
+        let error = delivered.as_ref().err().map(ToString::to_string);
+        autoxide_kernel::connections::ConnectionStatus
+            .record(tenant, CONNECTION, error.as_deref())
+            .await;
+        match delivered? {
             Delivery::Sent => {
                 tracing::info!(job_id = %job.id, "mail sent");
             }
@@ -226,5 +235,31 @@ impl JobHandler for Sender {
             }
         }
         Ok(())
+    }
+}
+
+/// Thử kết nối SMTP của khách (bước 51): mở kết nối và gửi NOOP, không gửi thư nào.
+#[async_trait::async_trait]
+impl autoxide_kernel::connections::ConnectionProbe for Sender {
+    fn connection(&self) -> &'static str {
+        CONNECTION
+    }
+
+    async fn test(&self, tenant: &TenantContext) -> Result<(), Error> {
+        let (transport, _) = self.delivery_for(tenant).await?;
+        let unreachable = |reason: String| {
+            Error::unavailable("mail.smtp_unreachable", "Cannot use the SMTP server: {reason}.")
+                .with_param("reason", reason)
+        };
+        match transport.as_ref() {
+            crate::transport::Transport::File(_) => {
+                Err(unreachable("no SMTP server is set; mail is written to files".to_owned()))
+            }
+            crate::transport::Transport::Smtp(smtp) => match smtp.test_connection().await {
+                Ok(true) => Ok(()),
+                Ok(false) => Err(unreachable("it did not answer a NOOP command".to_owned())),
+                Err(error) => Err(unreachable(error.to_string())),
+            },
+        }
     }
 }

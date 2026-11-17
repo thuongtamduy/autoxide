@@ -345,6 +345,42 @@ async fn smtp_va_nguoi_gui_rieng_cua_khach() {
         assert!(!lines.iter().any(|line| line.contains("bob@example.com")), "{lines:?}");
         let files: Vec<_> = std::fs::read_dir(&directory.0).unwrap().collect();
         assert_eq!(files.len(), 1, "the default tenant still writes files");
+
+        // Lần dùng của kết nối (bước 51): hiện ở cài đặt, thử được từ trang cài đặt.
+        let after = app
+            .get("/api/v1/kernel/settings?group=connection")
+            .token("owner")
+            .header("autoxide-tenant", "shop")
+            .send()
+            .await
+            .unwrap()
+            .json();
+        let url = after["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["name"] == "mail.connection.smtp.url")
+            .cloned()
+            .unwrap();
+        assert!(url["last_used_at"].is_string(), "{after}");
+        assert!(url.get("last_error").is_none(), "{after}");
+        let tested = app
+            .post("/api/v1/kernel/settings/mail.connection.smtp.url/test")
+            .token("owner")
+            .header("autoxide-tenant", "shop")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(tested.status(), StatusCode::OK, "{}", tested.json());
+        assert_eq!(tested.json()["data"]["connection"], "mail.connection.smtp");
+        let untestable = app
+            .post("/api/v1/kernel/settings/kernel.public_url/test")
+            .token("owner")
+            .header("autoxide-tenant", "shop")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(untestable.status(), StatusCode::NOT_FOUND);
     })
     .await
     .unwrap();

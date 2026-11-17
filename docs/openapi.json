@@ -6714,6 +6714,36 @@
         ],
         "type": "object"
       },
+      "ConnectionTest": {
+        "description": "The result of testing a connection.",
+        "properties": {
+          "connection": {
+            "description": "The connection tested, `<module>.connection.<kind>`.",
+            "example": "mail.connection.smtp",
+            "type": "string"
+          },
+          "error": {
+            "description": "Why it failed, for the administrator.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "tested_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection",
+          "ok",
+          "tested_at"
+        ],
+        "type": "object"
+      },
       "ContentTemplate": {
         "description": "A mandatory page template.",
         "properties": {
@@ -11616,6 +11646,45 @@
             },
             "required": [
               "lists"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ConnectionTest": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The result of testing a connection.",
+            "properties": {
+              "connection": {
+                "description": "The connection tested, `<module>.connection.<kind>`.",
+                "example": "mail.connection.smtp",
+                "type": "string"
+              },
+              "error": {
+                "description": "Why it failed, for the administrator.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "tested_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "connection",
+              "ok",
+              "tested_at"
             ],
             "type": "object"
           }
@@ -19959,6 +20028,21 @@
                 "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
                 "type": "boolean"
               },
+              "last_error": {
+                "description": "For a setting of a partner connection: why its last use failed; omitted when it worked.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last_used_at": {
+                "description": "For a setting of a partner connection: the last time the connection was used (or tested\nwith `POST /api/v1/kernel/settings/{name}/test`).",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "name": {
                 "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
                 "example": "kernel.public_url",
@@ -23206,6 +23290,66 @@
         ],
         "type": "object"
       },
+      "Data_Vec_ReasonView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "One reason of a list.",
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "builtin": {
+                  "description": "Declared by the module (else added by the tenant).",
+                  "type": "boolean"
+                },
+                "code": {
+                  "example": "customer_request",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "In the language of `Accept-Language`: the tenant's own label, else the default.",
+                  "type": "string"
+                },
+                "labels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "The tenant's own labels, by language.",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "legal": {
+                  "description": "Required by law: cannot be turned off.",
+                  "type": "boolean"
+                },
+                "position": {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "code",
+                "label",
+                "labels",
+                "active",
+                "position",
+                "builtin",
+                "legal"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_RecordNote": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -24189,6 +24333,21 @@
                 "is_set": {
                   "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
                   "type": "boolean"
+                },
+                "last_error": {
+                  "description": "For a setting of a partner connection: why its last use failed; omitted when it worked.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "last_used_at": {
+                  "description": "For a setting of a partner connection: the last time the connection was used (or tested\nwith `POST /api/v1/kernel/settings/{name}/test`).",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "name": {
                   "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
@@ -43333,6 +43492,86 @@
         ],
         "type": "string"
       },
+      "ReasonChange": {
+        "description": "Changes to a reason; omitted fields stay. A code the list does not have yet is added.",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The tenant's labels by language (`vi`, `en`…), up to 200 characters each; an empty label\ngoes back to the default. A new code needs at least one.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "position": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ReasonView": {
+        "description": "One reason of a list.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "builtin": {
+            "description": "Declared by the module (else added by the tenant).",
+            "type": "boolean"
+          },
+          "code": {
+            "example": "customer_request",
+            "type": "string"
+          },
+          "label": {
+            "description": "In the language of `Accept-Language`: the tenant's own label, else the default.",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The tenant's own labels, by language.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "legal": {
+            "description": "Required by law: cannot be turned off.",
+            "type": "boolean"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "labels",
+          "active",
+          "position",
+          "builtin",
+          "legal"
+        ],
+        "type": "object"
+      },
       "ReauthRequest": {
         "additionalProperties": false,
         "description": "Proof that you are the account owner, for one sensitive change.",
@@ -47471,6 +47710,21 @@
           "is_set": {
             "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
             "type": "boolean"
+          },
+          "last_error": {
+            "description": "For a setting of a partner connection: why its last use failed; omitted when it worked.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_used_at": {
+            "description": "For a setting of a partner connection: the last time the connection was used (or tested\nwith `POST /api/v1/kernel/settings/{name}/test`).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "name": {
             "description": "`<module>.<key>`, e.g. `kernel.public_url`; a partner connection is named\n`<module>.connection.<kind>.<field>`, e.g. `mail.connection.smtp.url`.",
@@ -90449,6 +90703,241 @@
         ]
       }
     },
+    "/api/v1/kernel/reasons/{list}": {
+      "get": {
+        "description": "Anyone who reads the module that owns the list (`<module>.read`), or holds\n`kernel.reasons.manage`. The module's reasons and the tenant's own, in order, with labels in the\nlanguage of `Accept-Language`.",
+        "operationId": "kernel_list_reasons",
+        "parameters": [
+          {
+            "description": "The list, e.g. `orders.cancel`.",
+            "in": "path",
+            "name": "list",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true`: also the reasons turned off.",
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ReasonView"
+                }
+              }
+            },
+            "description": "The reasons."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such list for you; code `kernel.reason_list_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the reasons of a list.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/reasons/{list}/{code}": {
+      "put": {
+        "description": "Requires `kernel.reasons.manage`. Changes the labels, order or on / off of a reason; a code the\nlist does not have yet becomes the tenant's own reason. Reasons required by law stay on\n(`kernel.reason_legal`). Codes are lower-case letters, digits and `_` (`kernel.reason_invalid`).",
+        "operationId": "kernel_set_reason",
+        "parameters": [
+          {
+            "description": "The list, e.g. `orders.cancel`.",
+            "in": "path",
+            "name": "list",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The reason's code, e.g. `customer_request`.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ReasonView"
+                }
+              }
+            },
+            "description": "The list after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.reasons.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such list; code `kernel.reason_list_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Turning off a reason required by law; code `kernel.reason_legal`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The code is malformed (`kernel.reason_invalid`), or a label is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change or add a reason.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.reasons.manage"
+        ]
+      }
+    },
     "/api/v1/kernel/records/{kind}/{id}/activity": {
       "get": {
         "description": "Requires being able to read the record. Its internal notes and the events recorded about it\n(when the program keeps an audit log), newest first.",
@@ -91265,6 +91754,112 @@
           }
         ],
         "summary": "Set one of this tenant's settings.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/kernel/settings/{name}/test": {
+      "post": {
+        "description": "Requires `kernel.settings.manage`. Tries the partner connection the setting `name` belongs to\n(e.g. `mail.connection.smtp.url` tests the mail server) with this tenant's settings — or the\nserver's, for the ones not set — and records the result as `last_used_at` / `last_error`.\nGives up after 15 seconds.",
+        "operationId": "kernel_test_tenant_connection",
+        "parameters": [
+          {
+            "description": "A setting of the connection, e.g. `mail.connection.smtp.url`.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConnectionTest"
+                }
+              }
+            },
+            "description": "The result, whether the connection works or not."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.settings.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The setting belongs to no connection that can be tested; code `kernel.connection_untestable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Test a connection.",
         "tags": [
           "kernel"
         ],

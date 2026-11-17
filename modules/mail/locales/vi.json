@@ -1,4 +1,5 @@
 {
   "field:must be a mail address, like `ada@example.com`": "phải là địa chỉ email, ví dụ `ada@example.com`",
+  "mail.smtp_unreachable": "Không dùng được máy chủ SMTP: {reason}.",
   "text:A mail was refused for good because of its recipient address (SMTP enhanced status 5.1.x or 5.2.x: no such mailbox, for example); `to` is the address, `dedupe_key` the sender's key.": "Một thư bị từ chối hẳn vì địa chỉ người nhận (mã SMTP 5.1.x hay 5.2.x, ví dụ không có hộp thư này); `to` là địa chỉ, `dedupe_key` là khoá của bên gửi."
 }

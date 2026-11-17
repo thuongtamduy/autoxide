@@ -246,6 +246,13 @@ pub trait Module: Send + Sync {
         navigation::Navigation::default()
     }
 
+    /// Danh sách lý do của module (bước 51 P18, D-223): tên `<module>.<việc>`, mã mặc định kèm nhãn
+    /// tiếng Anh. Khách đổi nhãn, bật / tắt, thêm mã riêng qua `/api/v1/kernel/reasons`. Mặc định:
+    /// không có.
+    fn reason_lists(&self) -> Vec<crate::ops::reasons::ReasonList> {
+        Vec::new()
+    }
+
     /// Lệnh quản trị của module cho `autoxide task` (D-169): việc người vận hành chạy tay,
     /// vd làm lại dữ liệu dẫn xuất sau khi đổi cấu hình. Gọi sau `start`. Tên khai ngắn
     /// (`refresh_variants`); kernel thêm tiền tố `<module>.`.
@@ -300,6 +307,8 @@ pub struct StartContext<'a> {
     bulk: &'a crate::ops::bulk::BulkActions,
     resolvers: &'a crate::ops::resolve::CodeResolvers,
     setup: &'a crate::ops::setup::SetupSteps,
+    reasons: &'a crate::ops::reasons::ReasonCodes,
+    probes: &'a crate::ops::connections::ConnectionProbes,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -475,6 +484,26 @@ impl StartContext<'_> {
     /// tiếng Anh dịch qua `text:` của module.
     pub fn setup_step(&mut self, step: Arc<dyn crate::ops::setup::SetupStep>) -> Result<(), Error> {
         self.setup.register(self.module, step)
+    }
+
+    /// Danh sách lý do của mọi module (bước 51 P18): service kiểm mã người dùng gửi bằng
+    /// `ReasonCodes::ensure`.
+    pub fn reason_codes(&self) -> crate::ops::reasons::ReasonCodes {
+        self.reasons.clone()
+    }
+
+    /// Đăng ký cách thử một kết nối ra ngoài (`<module>.connection.<loại>`) cho
+    /// `POST /api/v1/kernel/settings/{name}/test`.
+    pub fn connection_probe(
+        &mut self,
+        probe: Arc<dyn crate::ops::connections::ConnectionProbe>,
+    ) -> Result<(), Error> {
+        self.probes.register(self.module, probe)
+    }
+
+    /// Ghi lần dùng / lỗi cuối của kết nối ra ngoài (hiện ở `GET /api/v1/kernel/settings`).
+    pub fn connection_status(&self) -> crate::ops::connections::ConnectionStatus {
+        crate::ops::connections::ConnectionStatus
     }
 
     /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do

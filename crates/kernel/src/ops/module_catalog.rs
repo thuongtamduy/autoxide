@@ -70,6 +70,10 @@ pub(crate) struct ModuleCatalog {
     resolvers: crate::ops::resolve::CodeResolvers,
     /// Sổ bước thiết lập (bước 51 P10).
     setup: crate::ops::setup::SetupSteps,
+    /// Danh sách lý do (bước 51 P18).
+    reasons: crate::ops::reasons::ReasonCodes,
+    /// Cách thử kết nối ra ngoài (bước 51).
+    probes: crate::ops::connections::ConnectionProbes,
     /// Lịch sử theo bản ghi (bước 51 P13), module nhật ký công bố; điền sau khi mọi module khởi động.
     history: crate::ops::records::HistorySlot,
     /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
@@ -152,6 +156,14 @@ impl ModuleCatalog {
 
     pub(crate) fn history(&self) -> crate::ops::records::HistorySlot {
         self.history.clone()
+    }
+
+    pub(crate) fn reason_codes(&self) -> crate::ops::reasons::ReasonCodes {
+        self.reasons.clone()
+    }
+
+    pub(crate) fn connection_probes(&self) -> crate::ops::connections::ConnectionProbes {
+        self.probes.clone()
     }
 
     pub(crate) fn lists(&self) -> crate::ops::list_exports::ListsHandle {
