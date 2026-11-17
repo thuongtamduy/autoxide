@@ -28,6 +28,7 @@ use autoxide_kernel::migration::MigrationError;
 use autoxide_kernel::module::Module;
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::pagination::PageRequest;
+use autoxide_kernel::payment::PaymentGateway;
 use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::public_url::PublicUrl;
 use autoxide_kernel::reference::MAX_LENGTH as REFERENCE_MAX_LENGTH;

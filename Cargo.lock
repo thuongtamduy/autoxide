@@ -674,6 +674,8 @@ dependencies = [
  "axum",
  "chrono",
  "chrono-tz",
+ "futures-util",
+ "metrics",
  "sea-orm",
  "serde",
  "serde_json",

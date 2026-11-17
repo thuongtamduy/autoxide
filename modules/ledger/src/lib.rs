@@ -6,19 +6,25 @@
 
 pub mod api;
 mod chain;
+mod config;
 mod entity;
 mod events;
 mod http;
+mod http_payments;
 mod migration;
+mod payments;
 mod periods;
 mod permissions;
 mod posting;
 mod provider;
+mod reconcile;
 mod service;
 mod tools;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_payments;
 
 use std::sync::Arc;
 
@@ -39,6 +45,7 @@ pub fn module() -> impl Module {
 
 #[derive(Default)]
 struct LedgerModule {
+    config: config::LedgerConfig,
     service: Option<Arc<LedgerService>>,
 }
 
@@ -81,7 +88,29 @@ impl Module for LedgerModule {
             "ledger_period_balances",
             "ledger_chain_heads",
             "ledger_entry_seals",
+            "ledger_payments",
+            "ledger_refunds",
+            "ledger_gateway_events",
+            "ledger_statement_lines",
+            "ledger_exceptions",
+            "ledger_reconciliations",
         ]
+    }
+
+    fn configure(
+        &mut self,
+        reader: &mut autoxide_kernel::config::ConfigReader<'_>,
+    ) -> Result<(), autoxide_kernel::config::Invalid> {
+        self.config = config::read(reader)?;
+        Ok(())
+    }
+
+    fn body_limits(&self) -> Vec<autoxide_kernel::http::BodyLimit> {
+        vec![autoxide_kernel::http::BodyLimit::new(
+            axum::http::Method::POST,
+            "/webhooks/{provider}",
+            self.config.webhook_max_bytes,
+        )]
     }
 
     fn permissions(&self) -> Vec<Permission> {
@@ -101,13 +130,18 @@ impl Module for LedgerModule {
             databases: context.tenancy(),
             outbox: context.outbox()?,
             directory: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            gateways: context.contributions::<dyn autoxide_kernel::payment::PaymentGateway>(),
+            jobs: context.jobs(),
+            config: self.config,
         });
         self.service = Some(service.clone());
         context.provide::<dyn api::Ledger>(Arc::new(provider::Provider(service)))
     }
 
     fn routes(&self) -> OpenApiRouter {
-        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+        self.service.clone().map_or_else(OpenApiRouter::new, |service| {
+            http::routes(service.clone()).merge(http_payments::routes(service))
+        })
     }
 
     fn tools(&self) -> Vec<Tool> {
@@ -115,11 +149,39 @@ impl Module for LedgerModule {
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
-        vec![JobRegistration::new(SEAL_ENTRIES, Arc::new(SealEntries))]
+        let mut jobs = vec![JobRegistration::new(SEAL_ENTRIES, Arc::new(SealEntries))];
+        if let Some(service) = &self.service {
+            jobs.push(JobRegistration::new(
+                payments::PROCESS_GATEWAY_EVENT,
+                Arc::new(payments::ProcessGatewayEventJob(service.clone())),
+            ));
+            jobs.push(JobRegistration::new(
+                payments::EXPIRE_PAYMENTS,
+                Arc::new(payments::ExpirePaymentsJob(service.clone())),
+            ));
+            jobs.push(JobRegistration::new(
+                reconcile::RECONCILE_JOB,
+                Arc::new(reconcile::ReconcileJob(service.clone())),
+            ));
+        }
+        jobs
     }
 
     fn schedules(&self) -> Vec<Schedule> {
-        vec![Schedule::new(SEAL_ENTRIES, SEAL_ENTRIES, std::time::Duration::from_secs(10))]
+        use std::time::Duration;
+        vec![
+            Schedule::new(SEAL_ENTRIES, SEAL_ENTRIES, Duration::from_secs(10)),
+            Schedule::new(
+                payments::EXPIRE_PAYMENTS,
+                payments::EXPIRE_PAYMENTS,
+                Duration::from_secs(60),
+            ),
+            Schedule::new(
+                reconcile::RECONCILE_JOB,
+                reconcile::RECONCILE_JOB,
+                Duration::from_secs(86_400),
+            ),
+        ]
     }
 
     fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {

@@ -16,6 +16,17 @@ endpoints are marked deprecated with a sunset date first.
   `not_public`, `missing`, `unknown_kind`, with the title and path of public ones); `POST /api/v1/menus/import-content`
   imports the old menus of module `content` over REST, with `dry_run`.
 
+- Payments through licensed partners (step 36): kernel trait `autoxide_kernel::payment::PaymentGateway` (connector
+  modules contribute it; tests use `FakePaymentGateway` from the testkit). The `ledger` module creates payments
+  (`POST /api/v1/ledger/payments`, the partner's checkout page comes back; sending the same `reference` again after a
+  partner timeout retries safely), receives signed partner webhooks (`POST /api/v1/ledger/webhooks/{provider}`,
+  checked on the raw body, stored once, processed in the background), books collected and refunded money,
+  refunds (`POST /api/v1/ledger/payments/{id}/refunds`, never more than collected), expires unpaid payments
+  (`AUTOXIDE_LEDGER_PAYMENT_EXPIRY_MINUTES`) and reconciles each day with the partner statement
+  (`POST /api/v1/ledger/reconciliations`); differences wait in `GET /api/v1/ledger/exceptions` for a person. Events
+  `ledger.payment_succeeded` and friends let modules react. MCP `ledger.payment`, `ledger.exceptions`,
+  `ledger.resolve_exception`. The server never holds buyers' money.
+
 - New module `ledger` (step 36): a double-entry ledger. Each organization unit keeps a book; accounts by purpose
   (`cash.bank`, `revenue.sales`, `payable.seller_held`… or `<module>.<name>`), per counterparty and currency, with an
   optional floor; entries are append-only (debits equal credits, one currency) and corrected by reversing them

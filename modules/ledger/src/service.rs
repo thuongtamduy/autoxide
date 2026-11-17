@@ -29,6 +29,10 @@ pub(crate) struct LedgerService {
     pub outbox: Outbox,
     /// Múi giờ và tiền tệ mặc định của nút (module `organizations`); không có thì UTC và VND.
     pub directory: Option<Arc<dyn OrgDirectory>>,
+    /// Cổng thanh toán các module bộ nối góp vào (`StartContext::contribute`).
+    pub gateways: Vec<Arc<dyn autoxide_kernel::payment::PaymentGateway>>,
+    pub jobs: autoxide_kernel::job::JobQueue,
+    pub config: crate::config::LedgerConfig,
 }
 
 // ---- Lỗi ----------------------------------------------------------------------------------------

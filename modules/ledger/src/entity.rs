@@ -231,3 +231,185 @@ pub(crate) mod seal {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod payment {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_payments")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// Nút nhận tiền (sổ ghi bút toán).
+        pub org_id: Uuid,
+        pub book_id: Uuid,
+        pub provider: String,
+        pub provider_ref: Option<String>,
+        pub method: String,
+        pub description: String,
+        pub amount_minor: i64,
+        pub amount_currency: String,
+        /// Đã hoàn hay đang hoàn (giữ chỗ khi tạo lượt hoàn): không vượt `amount_minor`.
+        pub refunded_minor: i64,
+        /// `pending`, `succeeded`, `failed`, `expired`, `needs_review`.
+        pub status: String,
+        pub checkout_url: Option<String>,
+        pub qr_payload: Option<String>,
+        pub return_url: Option<String>,
+        pub expires_at: DateTimeUtc,
+        pub captured_at: Option<DateTimeUtc>,
+        pub source_module: String,
+        pub source_id: Option<String>,
+        pub reference: String,
+        pub reference_fingerprint: String,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod refund {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_refunds")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub payment_id: Uuid,
+        pub amount_minor: i64,
+        pub amount_currency: String,
+        /// `pending`, `succeeded`, `failed`.
+        pub status: String,
+        pub provider_ref: Option<String>,
+        pub reason: String,
+        pub reference: String,
+        pub reference_fingerprint: String,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod gateway_event {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_gateway_events")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub provider: String,
+        pub provider_event_id: String,
+        pub kind: String,
+        /// Thân webhook nguyên văn.
+        pub body: String,
+        /// Thông báo đã kiểm chữ ký, dạng JSON (để job xử lý mà không kiểm lại).
+        pub notification: String,
+        /// `pending`, `processed`, `ignored`, `failed`.
+        pub status: String,
+        pub error: Option<String>,
+        pub received_at: DateTimeUtc,
+        pub processed_at: Option<DateTimeUtc>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod statement_line {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_statement_lines")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub provider: String,
+        pub provider_line_id: String,
+        pub provider_ref: String,
+        pub kind: String,
+        pub amount_minor: i64,
+        pub amount_currency: String,
+        pub fee_minor: i64,
+        pub booked_on: Date,
+        /// `matched`, `unmatched`, `exception`.
+        pub match_status: String,
+        pub payment_id: Option<Uuid>,
+        pub reconciliation_id: Uuid,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod exception {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_exceptions")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// `amount_mismatch`, `unmatched_credit`, `duplicate_payment`, `missing_in_statement`,
+        /// `unknown_in_statement`, `late_payment`.
+        pub kind: String,
+        /// Bản ghi liên quan, vd `ledger.payment:<id>`.
+        pub subject: String,
+        /// JSON.
+        pub details: String,
+        /// Mở một lần cho mỗi vấn đề: chạy lại đối soát không mở trùng.
+        pub dedupe_key: String,
+        /// `open`, `resolved`, `ignored`.
+        pub status: String,
+        /// `match`, `ignore`, `refunded_outside`.
+        pub resolution: Option<String>,
+        pub note: Option<String>,
+        pub resolved_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod reconciliation {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "ledger_reconciliations")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub provider: String,
+        pub on_date: Date,
+        /// `completed` hay `failed`.
+        pub status: String,
+        pub lines: i64,
+        pub matched: i64,
+        pub exceptions: i64,
+        pub error: Option<String>,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

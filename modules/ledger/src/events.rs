@@ -42,6 +42,68 @@ impl Event for PeriodClosed {
     const NAME: &'static str = "ledger.period_closed";
 }
 
+pub(crate) const PAYMENT_CREATED: EventInfo = EventInfo::new(
+    "ledger.payment_created",
+    "A payment was created (`payment_id`, `org_id`, `provider`, `amount`, `source_module`, \
+     `source_id`, `reference`).",
+);
+
+pub(crate) const PAYMENT_SUCCEEDED: EventInfo = EventInfo::new(
+    "ledger.payment_succeeded",
+    "The partner collected a payment (`payment_id`, `org_id`, `provider`, `provider_ref`, `amount`, \
+     `source_module`, `source_id`, `reference`).",
+);
+
+pub(crate) const PAYMENT_FAILED: EventInfo = EventInfo::new(
+    "ledger.payment_failed",
+    "A payment failed or expired (`payment_id`, `org_id`, `reason`, `source_module`, `source_id`, \
+     `reference`).",
+);
+
+pub(crate) const PAYMENT_REFUNDED: EventInfo = EventInfo::new(
+    "ledger.payment_refunded",
+    "A refund was paid back (`payment_id`, `refund_id`, `amount`, `source_module`, `source_id`).",
+);
+
+pub(crate) const EXCEPTION_OPENED: EventInfo = EventInfo::new(
+    "ledger.exception_opened",
+    "A difference needs a person (`exception_id`, `kind`, `subject`).",
+);
+
+pub(crate) const EXCEPTION_RESOLVED: EventInfo = EventInfo::new(
+    "ledger.exception_resolved",
+    "A difference was resolved (`exception_id`, `kind`, `subject`, `resolution`).",
+);
+
+/// Một kiểu event (thân JSON) cho mỗi tên.
+macro_rules! event {
+    ($kind:ident, $name:literal) => {
+        #[derive(Debug, Serialize)]
+        pub(crate) struct $kind(pub Value);
+
+        impl Event for $kind {
+            const NAME: &'static str = $name;
+        }
+    };
+}
+
+event!(PaymentCreated, "ledger.payment_created");
+event!(PaymentSucceeded, "ledger.payment_succeeded");
+event!(PaymentFailed, "ledger.payment_failed");
+event!(PaymentRefunded, "ledger.payment_refunded");
+event!(ExceptionOpened, "ledger.exception_opened");
+event!(ExceptionResolved, "ledger.exception_resolved");
+
 pub(crate) fn all() -> Vec<EventInfo> {
-    vec![ENTRY_POSTED, ENTRY_REVERSED, PERIOD_CLOSED]
+    vec![
+        ENTRY_POSTED,
+        ENTRY_REVERSED,
+        PERIOD_CLOSED,
+        PAYMENT_CREATED,
+        PAYMENT_SUCCEEDED,
+        PAYMENT_FAILED,
+        PAYMENT_REFUNDED,
+        EXCEPTION_OPENED,
+        EXCEPTION_RESOLVED,
+    ]
 }
