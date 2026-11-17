@@ -145,7 +145,8 @@ pub(crate) struct UpdateDraftInput {
     /// [{"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]}]}`. Allowed
     /// nodes: paragraph, heading (level 2–4), bulletList, orderedList, listItem, blockquote,
     /// codeBlock, horizontalRule, hardBreak, table, tableRow, tableHeader, tableCell,
-    /// image (attrs `mediaId`, `alt`, `caption`), embed (attrs `url`), text; marks: bold,
+    /// image (attrs `mediaId`, `alt`, `caption`), embed (attrs `url`, or `kind` + `id` of a
+    /// record of another module), text; marks: bold,
     /// italic, code, strike, underline, link (attrs `href`).
     #[schema(value_type = Option<Object>)]
     body: Option<Value>,

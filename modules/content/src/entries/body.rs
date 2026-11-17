@@ -28,6 +28,8 @@ pub(crate) struct BodyInfo {
     pub plain_text: String,
     pub word_count: i32,
     pub media_ids: BTreeSet<Uuid>,
+    /// Bản ghi của module khác nhúng trong bài (node `embed` dạng `{kind, id}`, bước 51 P6).
+    pub records: BTreeSet<(String, String)>,
 }
 
 /// Thân bài trống (`{"type": "doc", "content": []}`).
@@ -82,6 +84,35 @@ pub(crate) fn stored_image_ids(body: &str) -> Vec<Uuid> {
                 .and_then(|id| Uuid::parse_str(id).ok());
             if let Some(id) = id.filter(|id| !found.contains(id)) {
                 found.push(id);
+            }
+        }
+        if let Some(children) = node.get("content").and_then(Value::as_array) {
+            pending.extend(children.iter().rev());
+        }
+    }
+    found
+}
+
+/// Bản ghi nhúng (node `embed` dạng `{kind, id}`) trong thân bài đã lưu `body`, theo thứ tự xuất
+/// hiện, không lặp. Như [`stored_image_ids`]: không có chữ `"kind"` thì khỏi đọc JSON.
+pub(crate) fn stored_records(body: &str) -> Vec<(String, String)> {
+    if !body.contains("\"kind\"") {
+        return Vec::new();
+    }
+    let Ok(root) = serde_json::from_str::<Value>(body) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    let mut pending = vec![&root];
+    while let Some(node) = pending.pop() {
+        if node.get("type").and_then(Value::as_str) == Some("embed") {
+            let kind = node.pointer("/attrs/kind").and_then(Value::as_str);
+            let id = node.pointer("/attrs/id").and_then(Value::as_str);
+            if let (Some(kind), Some(id)) = (kind, id) {
+                let record = (kind.to_owned(), id.to_owned());
+                if !found.contains(&record) {
+                    found.push(record);
+                }
             }
         }
         if let Some(children) = node.get("content").and_then(Value::as_array) {
@@ -469,6 +500,16 @@ impl Checker<'_> {
 
     fn embed(&mut self, node: &Map<String, Value>, path: &str) {
         self.keys(node, path, &["type", "attrs"]);
+        // Hai dạng: `{url}` (video, bản đồ… từ host cho phép) hay `{kind, id}` (bản ghi của module
+        // khác qua sổ đối tượng, D-123; service kiểm loại đã đăng ký và bản ghi có thật).
+        let is_record = node
+            .get("attrs")
+            .and_then(Value::as_object)
+            .is_some_and(|attrs| attrs.contains_key("kind") || attrs.contains_key("id"));
+        if is_record {
+            self.record(node, path);
+            return;
+        }
         let attrs = self.attrs(node, path, &["url"]).unwrap_or_default();
         let url = attrs.get("url").and_then(Value::as_str).unwrap_or_default();
         // Trình duyệt coi `\` như `/` trong địa chỉ `https:` (chuẩn WHATWG URL):
@@ -497,6 +538,41 @@ impl Checker<'_> {
                 )
                 .with_param("hosts", self.embed_hosts.join(", ")),
             );
+        }
+    }
+}
+
+impl Checker<'_> {
+    /// Node `embed` dạng bản ghi: `kind` là `<module>.<loại>`, `id` là chữ 1–200 ký tự.
+    fn record(&mut self, node: &Map<String, Value>, path: &str) {
+        let attrs = self.attrs(node, path, &["kind", "id"]).unwrap_or_default();
+        let kind = attrs.get("kind").and_then(Value::as_str).unwrap_or_default();
+        let id = attrs.get("id").and_then(Value::as_str).unwrap_or_default();
+        let kind_ok = kind.split_once('.').is_some_and(|(module, rest)| {
+            !module.is_empty()
+                && !rest.is_empty()
+                && kind.len() <= 100
+                && kind
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '.')
+        });
+        if !kind_ok {
+            self.error(FieldError::new(
+                format!("{path}.attrs.kind"),
+                "invalid",
+                "must be a record type such as `catalog.product`",
+            ));
+        }
+        let id_ok = !id.trim().is_empty() && id.chars().count() <= 200;
+        if !id_ok {
+            self.error(FieldError::new(
+                format!("{path}.attrs.id"),
+                "invalid",
+                "must be the id of the record, 1 to 200 characters",
+            ));
+        }
+        if kind_ok && id_ok {
+            self.info.records.insert((kind.to_owned(), id.to_owned()));
         }
     }
 }

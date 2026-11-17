@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Entries embed records of other modules (step 51): a body node `embed` with `kind` and `id` (e.g. a product) is
+  checked when saved (the type must be registered, the record must exist); public reads return `embeds` keyed
+  by `<kind>:<id>` with the title, summary, path and image of each record that is still public.
+
 - `GET /api/v1/kernel/whats-new` (no sign-in): the changelog of the running server by version. `GET
   /api/v1/kernel/ops/alerts` (platform staff): the `autoxide doctor` checks that are not fine, with what to do.
 - Tenant setting `kernel.business_model` (`independent`, `multi_store`, `chain`, `marketplace`, `saas`). Tenant
