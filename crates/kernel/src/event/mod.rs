@@ -169,7 +169,9 @@ impl From<&crate::access::Principal> for Actor {
             api_key_id: principal.api_key_id(),
             public: false,
             access: principal.access(),
-            kind: Some(principal.actor_kind()),
+            // Người (`Human`) suy được từ `user_id`: chỉ ghi loại khi khác (agent, service, hỗ trợ…).
+            kind: Some(principal.actor_kind())
+                .filter(|kind| *kind != crate::access::ActorKind::Human),
         }
     }
 }

@@ -294,7 +294,14 @@ impl Dispatcher {
                 user_id: row.try_get("", "actor_user_id")?,
                 api_key_id: row.try_get("", "actor_api_key_id")?,
                 public: actor_kind.as_deref() == Some("public"),
-                kind: actor_kind.as_deref().and_then(crate::access::ActorKind::parse),
+                kind: actor_kind.as_deref().and_then(crate::access::ActorKind::parse).filter(
+                    |kind| {
+                        !matches!(
+                            kind,
+                            crate::access::ActorKind::Human | crate::access::ActorKind::System
+                        )
+                    },
+                ),
                 access: access_of(
                     row.try_get::<Option<String>>("", "actor_access")?.as_deref(),
                     row.try_get("", "actor_access_id")?,
