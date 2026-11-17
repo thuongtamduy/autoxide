@@ -202,16 +202,16 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Cây tổ chức | `GET /organizations/settings`, `GET/PUT/DELETE /units/{id}/settings/{key}` | 34 | **Đã nối** (17/11). Sổ cài đặt chưa nói dạng giá trị (chuỗi, danh sách, đúng sai): giao diện đoán theo giá trị đang có và mặc định; có trường `type` / JSON Schema thì làm được ô nhập đúng loại. **Đã có** (17/11, D-332): mỗi cài đặt trong `GET /organizations/settings` có `schema` (JSON Schema: `type`, `enum`, `pattern`, `items`…) — **Đã dùng** (17/11, W-050 của web) |
 | [ ] | Cây tổ chức | Yêu cầu tách nhánh từ phía khách: `GET/POST /organizations/units/{id}/split-requests` | mới (bước 38 chỉ có CLI) | Đã bỏ nút khỏi màn (17/11) tới khi có API |
 | [x] | Cây tổ chức | `POST /auth/invitations` (mời vào một nút) | 34 | **Đã nối** (17/11, W-046 của web): nút "Mời" ở chi tiết nút, lời mời đang chờ hiện trong bảng người ở nút |
-| [ ] | Tuân thủ | `GET /compliance/rules?as_of=` kèm lịch sử phiên bản | 37 | Dữ liệu mẫu (`src/sample/compliance-rules.ts`) |
+| [ ] | Tuân thủ | `GET /compliance/rules?as_of=` kèm lịch sử phiên bản | 37 | Dữ liệu mẫu (`src/sample/compliance-rules.ts`) — **Có một phần** (D-347, #92): `GET /compliance/rules` (quy tắc có ngày hiệu lực), `POST /compliance/rules`. Còn thiếu: tham số `as_of` |
 | [ ] | Tuân thủ › Website | `GET /compliance/websites`, `GET …/{id}/checklist`, `GET …/{id}/dossier`, `POST …/{id}/status` (số hồ sơ, ngày nộp; kết quả: link và ảnh logo) | 37 (ngày nộp: mới) | Dữ liệu mẫu (`src/sample/compliance.ts`) |
 | [ ] | Tuân thủ | `GET /compliance/overview`: số việc chờ theo khu vực | mới | Tính từ hàm mẫu |
-| [ ] | Tuân thủ › KYC | `GET /kyc/profiles?status=` kèm tên chủ thể và cờ "thiếu giấy tờ"; `POST …/approve`, `POST …/reject {reason_code, note}` | 37 (tên và cờ: mới) | Dữ liệu mẫu |
+| [ ] | Tuân thủ › KYC | `GET /kyc/profiles?status=` kèm tên chủ thể và cờ "thiếu giấy tờ"; `POST …/approve`, `POST …/reject {reason_code, note}` | 37 (tên và cờ: mới) | Dữ liệu mẫu — **Có một phần** (D-347, #92): `GET /compliance/kyc/profiles?status=`, `POST …/approve`, `POST …/reject {reason_code}`, `POST …/request-info`. Còn thiếu: tên chủ thể trước khi xác minh (chỉ có `verified_name` sau khi xác minh), cờ "thiếu giấy tờ", `note` khi từ chối |
 | [ ] | Tuân thủ › Dữ liệu cá nhân | `GET/POST /incidents`, `PATCH /incidents/{id}`, `POST …/entries` | 37 | Dữ liệu mẫu |
-| [ ] | Hồ sơ | `GET/PATCH /legal-profiles`, `GET/PUT /policies` | 37 | Dữ liệu mẫu |
+| [ ] | Hồ sơ | `GET/PATCH /legal-profiles`, `GET/PUT /policies` | 37 | Dữ liệu mẫu — **Có một phần** (D-347, #92): `GET /compliance/policies`, `PUT /compliance/policies/{key}`. Còn thiếu: `legal-profiles` (hồ sơ pháp lý của chủ website, thuộc mục "Hồ sơ Bộ Công Thương" của bước 37) |
 | [ ] | Hồ sơ › Mục đích | `GET/POST/PATCH /purposes` kèm số người đồng ý / đã rút | 37 (số đếm: mới) | Dữ liệu mẫu (`src/sample/compliance-records.ts`) |
 | [ ] | Hồ sơ › Hạn lưu | `GET /retention`, `GET /processing-register` | 37 | Dữ liệu mẫu; route của giao diện xuất JSON |
 | [ ] | Hồ sơ › Đăng nội dung | Thống kê người mua đã xác thực số điện thoại / định danh | mới | Dữ liệu mẫu |
-| [ ] | Hồ sơ › Văn bản | `GET /documents`, `POST /documents/{id}/versions`, `GET …/acceptances`; số người đã chấp nhận theo phiên bản | 37 (số đếm: mới) | Dữ liệu mẫu; trang nguồn đọc thật |
+| [x] | Hồ sơ › Văn bản | `GET /documents`, `POST /documents/{id}/versions`, `GET …/acceptances`; số người đã chấp nhận theo phiên bản | 37 (số đếm: mới) | Dữ liệu mẫu; trang nguồn đọc thật — **Đã có** (D-347, #92): `GET/POST /compliance/documents`, `POST …/{id}/versions`, `GET …/{id}/acceptances` (Page), số người chấp nhận theo phiên bản ở `GET …/{id}/acceptance-stats`; công khai `GET /compliance/public/documents/{kind}` |
 | [ ] | Hồ sơ › Vụ việc | `GET /cases`, `POST /cases/{id}/restrict`, `…/restore`, `…/decision`, `POST …/entries` | 37 | Dữ liệu mẫu |
 | [x] | Hồ sơ › Nhãn AI | Bộ lọc `ai_generated=true` trên `GET /content/entries` | mới | Đọc 100 bài sửa gần nhất rồi lọc (API thật) |
 | [ ] | Hồ sơ › Nhãn AI | Lọc và bỏ nhãn AI cho sản phẩm và alt media | mới | Dữ liệu mẫu |
@@ -403,7 +403,7 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/market.ts`
 | [ ] | Tranh chấp | `GET /disputes?status=&seller=`, `POST /disputes/{id}/transitions` (`resolution`, `amount`, `reason`), tin nhắn | 46 |
 | [ ] | Trung tâm người bán | `GET /sellers/me` kèm điều kiện bán | 46 |
 | [ ] | Trung tâm người bán | `POST /sellers/me/submit` (422 kèm `errors[]`); `POST /sellers/me/documents` | 46 |
-| [ ] | Trung tâm người bán | Người bán tự chấp nhận văn bản: `POST /compliance/documents/{id}/acceptances` | 37 |
+| [x] | Trung tâm người bán | Người bán tự chấp nhận văn bản: `POST /compliance/documents/{id}/acceptances` | 37 — **Đã có** (D-347, #92), đường dẫn khác: `GET /compliance/me/pending-acceptances` rồi `POST /compliance/me/acceptances` |
 | [ ] | Gian hàng | `PUT /sellers/me` (cách giao, COD, tài khoản nhận tiền vào kho secret, chỉ trả 4 số cuối) | 46 |
 | [ ] | Sản phẩm của người bán | `POST /catalog/products` ở nút người bán; `GET /listing-reviews?seller=me` | 41, 46 |
 | [ ] | Đơn của người bán | `GET /orders?seller=me` | 45 |
