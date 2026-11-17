@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Tenant wording (step 51): modules mark the texts a tenant may replace (`Module::overridable_texts`; content: the
+  terms "Post" and "Page"); `GET /api/v1/kernel/texts`, `PUT/DELETE /api/v1/kernel/texts/{locale}/{key}`
+  (`kernel.texts.manage`) set the tenant's wording — plain text, the same placeholders as the default, never error
+  codes nor legal texts — and `ui.*` keys for the interface (`AUTOXIDE_TEXT_OVERRIDES_UI_MAX`, 1000).
+  `GET /api/v1/kernel/public/texts` serves them with an `ETag`; modules read them with `TextOverrides::text`.
 - Internal tags on records (step 51): modules make a record type taggable (`StartContext::taggable`);
   `/api/v1/kernel/tags` lists, creates, renames, merges and deletes the tenant's tags (`kernel.tags.manage`), and
   `PUT /api/v1/kernel/records/{kind}/{id}/tags` sets a record's tags (writing the record is needed; creating tags

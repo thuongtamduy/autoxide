@@ -2877,6 +2877,13 @@ export type Data_AuthorResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_BTreeMap_String_String = {
+  data: {
+    [key: string]: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_BillingPeriodResponse = {
   /** A billing period of a subscription: what is charged for which time, and whether it is paid. */
   data: {
@@ -6839,6 +6846,21 @@ export type Data_TermResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_TextView = {
+  /** One text a tenant may replace. */
+  data: {
+    /** The default wording in `locale` (`null` for `ui.*` keys: the interface owns it). */
+    default?: string | null;
+    key: string;
+    /** Required by law: cannot be replaced. */
+    legal: boolean;
+    locale: string;
+    /** The tenant's wording, when set. */
+    text?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TokenResponse = {
   /** A new pair of tokens. */
   data: {
@@ -8217,6 +8239,20 @@ export type Data_Vec_TenantSettingState = {
     updated_at?: string | null;
     /** The value, for settings that are not secret and are set. */
     value?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TextView = {
+  data: {
+    /** The default wording in `locale` (`null` for `ui.*` keys: the interface owns it). */
+    default?: string | null;
+    key: string;
+    /** Required by law: cannot be replaced. */
+    legal: boolean;
+    locale: string;
+    /** The tenant's wording, when set. */
+    text?: string | null;
   }[];
 };
 
@@ -16151,6 +16187,24 @@ export type TestRequest = {
   email: string;
 };
 
+/** The tenant's wording. */
+export type TextInput = {
+  /** Plain text (no HTML), 1 to 500 characters, with exactly the `{placeholders}` of the default. */
+  text: string;
+};
+
+/** One text a tenant may replace. */
+export type TextView = {
+  /** The default wording in `locale` (`null` for `ui.*` keys: the interface owns it). */
+  default?: string | null;
+  key: string;
+  /** Required by law: cannot be replaced. */
+  legal: boolean;
+  locale: string;
+  /** The tenant's wording, when set. */
+  text?: string | null;
+};
+
 /** A top-level comment with its first replies. */
 export type ThreadComment = PublicComment & {
   /**
@@ -21425,6 +21479,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/public/texts": {
+    /** Get the tenant's wording. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; prefix?: string }; };
+      responses: {
+        200: Data_BTreeMap_String_String;
+        304: void;
+        400: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/reasons/{list}": {
     /** List the reasons of a list. */
     get: {
@@ -21884,6 +21950,43 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/texts": {
+    /** List the texts a tenant may replace. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; prefix?: string; overridden?: boolean }; };
+      responses: {
+        200: Data_Vec_TextView;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/texts/{locale}/{key}": {
+    /** Replace a text. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { locale: string; key: string }; };
+      requestBody: TextInput;
+      responses: {
+        200: Data_TextView;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Go back to the default text. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { locale: string; key: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };

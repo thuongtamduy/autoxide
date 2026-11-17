@@ -186,6 +186,8 @@ pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
     found.extend(call_arguments(text, "SetupInfo::new(", 1));
     // Nhãn mặc định của lý do (bước 51 P18).
     found.extend(call_arguments(text, "ReasonDefault::new(", 1));
+    // Câu khách đổi được (bước 51 P21).
+    found.extend(call_arguments(text, "OverridableText::new(", 1));
     found.retain(
         |(_, site)| !matches!(site, FieldMessage::Built(expression) if expression.starts_with('$')),
     );

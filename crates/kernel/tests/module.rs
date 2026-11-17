@@ -309,6 +309,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/placements".to_owned(),
                     "/placements/migrations".to_owned(),
                     "/placements/migrations/{id}".to_owned(),
+                    "/public/texts".to_owned(),
                     "/reasons/{list}".to_owned(),
                     "/reasons/{list}/{code}".to_owned(),
                     "/records/{kind}/{id}/activity".to_owned(),
@@ -332,6 +333,8 @@ async fn module_nhan_database_va_khai_route() {
                     "/tenants/{id}/moves/{move_id}".to_owned(),
                     "/tenants/{id}/settings".to_owned(),
                     "/tenants/{id}/settings/{name}".to_owned(),
+                    "/texts".to_owned(),
+                    "/texts/{locale}/{key}".to_owned(),
                     "/whats-new".to_owned(),
                     "/work".to_owned(),
                     "/work/counts".to_owned()
@@ -412,6 +415,7 @@ async fn module_thay_danh_muc_permission_cua_moi_module() {
                 "kernel.tenants.move",
                 "kernel.tenants.operate",
                 "kernel.tenants.read",
+                "kernel.texts.manage",
                 "kernel.views.share",
                 "notes.write"
             ]
