@@ -11,6 +11,7 @@ mod links;
 mod menus;
 mod public;
 mod redirects;
+mod templates;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -74,6 +75,8 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
             redirects::update_redirect,
             redirects::delete_redirect
         ))
+        .routes(routes!(templates::list_templates))
+        .routes(routes!(templates::draft_from_template))
         .routes(routes!(public::preview_token))
         .routes(routes!(public::resolve))
         .routes(routes!(public::list_posts))

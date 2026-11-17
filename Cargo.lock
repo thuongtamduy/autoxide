@@ -558,6 +558,7 @@ name = "autoxide-content"
 version = "0.14.0"
 dependencies = [
  "async-trait",
+ "autoxide-compliance",
  "autoxide-kernel",
  "autoxide-media",
  "autoxide-organizations",

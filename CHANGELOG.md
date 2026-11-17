@@ -11,6 +11,15 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, mandatory page templates in `content` (Vietnam; every text says it needs review by a legal professional):
+  owner information, personal data protection, returns, shipping, payment, inspection, complaints, terms of use,
+  general conditions, and for a marketplace its regulations, the seller agreement and seller information, in English
+  and Vietnamese (`modules/content/templates/legal/`). `GET /api/v1/content/templates`,
+  `POST /api/v1/content/templates/{key}/drafts` make a draft page filled with the unit's legal profile (from
+  `compliance` through the new `LegalProfiles` contract) and the given `variables`, through the kernel template engine,
+  values only ever becoming text; errors `content.template_not_found`, `content.template_variables_missing`; MCP
+  `content.legal_templates`, `content.draft_from_template`. New contract `autoxide_content::api::PublishedEntries`
+  (snapshot of a published entry).
 - Step 37, website legal profile and the Ministry of Industry and Trade (Vietnam, Decree 52/2013 as amended by Decree
   85/2021 — check the original texts; guide `docs/COMPLIANCE.md`): legal (owner) profiles per tenant and per unit
   (`GET|POST /api/v1/compliance/legal-profiles`, `GET|PATCH /legal-profiles/{id}` with `ETag` / `If-Match`,

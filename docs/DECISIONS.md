@@ -8759,3 +8759,32 @@ Theo luật của dự án khi nguồn chưa thống nhất (CLAUDE.md, Luật s
    theo luật" cho website chưa `notified` / `registered`; `autoxide doctor` cảnh báo.
 3. Giá trị nằm trong dữ liệu (`sell_before_done` của quy tắc `moit.checklist.*`): nếu đối chiếu sau kết luận "cấm", nhập bản quy
    tắc mới với `"block"` và thêm cổng chặn (gọi từ checkout của bước 45) trong một quyết định mới — không đổi code đã có.
+
+## D-359 · Mẫu trang bắt buộc trong `content`, biến từ hồ sơ pháp lý qua `LegalProfiles`; `PublishedEntries` (bước 37, mục "Trang bắt buộc có mẫu") — 2026-11-17 — agent quyết
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: NĐ 52/2013/NĐ-CP sửa bởi NĐ 85/2021/NĐ-CP (thông tin
+phải công khai trên website TMĐT); Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP (chính sách dữ liệu cá nhân);
+Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15, NĐ 55/2024/NĐ-CP (điều kiện giao dịch chung, khiếu nại).
+
+1. **Mẫu ở `content`** (đặc tả C1, "Agent tự quyết" #1): một cách soạn trang. 12 khoá × 2 ngôn ngữ (EN + VI) trong
+   `modules/content/templates/legal/<khoá>.<en|vi>.json`: `owner_info`, `privacy_policy`, `return_policy`, `shipping_policy`,
+   `payment_policy`, `inspection_policy`, `complaint_policy`, `terms_of_use`, `general_conditions`; sàn thêm `platform_rules`,
+   `seller_agreement` và `seller_info` (khối thông tin người bán cho trang sản phẩm — không phải trang gắn website). Mỗi file:
+   tiêu đề, `marketplace`, danh sách biến (đường dẫn, bắt buộc, mô tả), thân ProseMirror theo allowlist của `content`. Đoạn
+   đầu mọi mẫu: "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng". Test kiểm mọi mẫu qua allowlist, mọi
+   biến dùng trong chữ đã khai, hai ngôn ngữ cùng danh sách biến.
+2. **Điền biến bằng bộ dựng mẫu của kernel** (D-351), ở chế độ chữ thuần, **chỉ trong từng text node**: giá trị không bao giờ
+   thành thẻ hay node mới (không cần thoát HTML vì thân là JSON). Biến tuỳ chọn có giá trị thay thế `[…]` trong chính mẫu.
+3. **Nguồn biến**: hồ sơ pháp lý của nút (hay nút cấp trên gần nhất) qua hợp đồng mới `autoxide_compliance::api::LegalProfiles`
+   (`compliance` đăng ký trước `content` nên `content` `require` được; tuỳ chọn — test riêng của `content` không có), rồi
+   `variables` người gọi gửi (gộp sâu, người gọi thắng). `content` không đọc bảng của `compliance`; khái niệm "chủ sở hữu"
+   vẫn ở `compliance`, `content` chỉ thấy JSON biến — trung lập với nghiệp vụ.
+4. **API**: `GET /api/v1/content/templates` (`content.read`), `POST /api/v1/content/templates/{key}/drafts {locale, variables,
+   parent_id?, org_id?}` (`content.write` hay `content.write_own`, đi qua `create` có sẵn: cùng kiểm ngôn ngữ, nút, slug) tạo
+   trang **nháp**. Thiếu biến bắt buộc → `content.template_variables_missing` (422) liệt kê đủ một lần (`variables.<đường dẫn>`);
+   khoá lạ → `content.template_not_found` (404). MCP `content.legal_templates` (đọc), `content.draft_from_template` (ghi).
+5. **`PublishedEntries`** (đặc tả C1b): `content::api` thêm trait `published_snapshot(tenant, entry_id)` (tiêu đề, ngôn ngữ, thân,
+   chữ thuần, `revision_id` của bản đã đăng, `published_at`), công bố trong `start`. **Chưa có bên dùng**: văn bản pháp lý có
+   phiên bản (D-347) đã làm với thân gửi thẳng, và `compliance` đăng ký TRƯỚC `content` (`notifications`, `plans` cần
+   `compliance`), nên `compliance` không `require` được trait này. Nối "phát hành phiên bản từ trang đã đăng" cần một chỗ góp
+   muộn (như `ComplianceFacts`) — để mục sau, ghi ở đây để không ai đảo thứ tự đăng ký module.

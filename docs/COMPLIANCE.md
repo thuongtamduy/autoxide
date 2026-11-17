@@ -160,3 +160,22 @@ to get `304`.
 
 The check `compliance.moit_readiness` warns (never fails) when no website has a legal profile yet, or
 when a website not yet submitted still lacks checklist items — with the checklist address of each.
+
+## Mandatory page templates (`content`)
+
+The `content` module ships starting texts for the mandatory pages, in English and Vietnamese:
+
+```http
+GET  /api/v1/content/templates
+POST /api/v1/content/templates/{key}/drafts
+{"locale": "vi", "variables": {"policy": {"return_days": 7}}}
+```
+
+- Keys: `owner_info`, `privacy_policy`, `return_policy`, `shipping_policy`, `payment_policy`,
+  `inspection_policy`, `complaint_policy`, `terms_of_use`, `general_conditions`; for a marketplace
+  `platform_rules`, `seller_agreement`, `seller_info`.
+- The draft is filled with the legal profile of the unit (`owner.*`, `contact.*`, read from `compliance`),
+  then with the `variables` you send (they win). Every value goes into text only — it can never add markup.
+  A required variable still missing gives `content.template_variables_missing` (422) listing them all.
+- The result is a **draft** page (`content.write`); review it, publish it, then link it to the website.
+- Every template starts with "Sample content — have a legal professional review it before use".

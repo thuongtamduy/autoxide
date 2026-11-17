@@ -154,3 +154,22 @@ tên miền gắn với nút). Cả hai gửi `ETag`; gửi lại trong `If-None
 
 Bước kiểm `compliance.moit_readiness` cảnh báo (không bao giờ báo hỏng) khi chưa website nào có hồ sơ pháp lý,
 hoặc website chưa nộp còn thiếu mục trong danh sách kiểm — kèm địa chỉ danh sách kiểm của từng website.
+
+## Mẫu trang bắt buộc (`content`)
+
+Module `content` có sẵn nội dung khởi đầu cho các trang bắt buộc, tiếng Anh và tiếng Việt:
+
+```http
+GET  /api/v1/content/templates
+POST /api/v1/content/templates/{key}/drafts
+{"locale": "vi", "variables": {"policy": {"return_days": 7}}}
+```
+
+- Khoá: `owner_info`, `privacy_policy`, `return_policy`, `shipping_policy`, `payment_policy`,
+  `inspection_policy`, `complaint_policy`, `terms_of_use`, `general_conditions`; với sàn thêm
+  `platform_rules`, `seller_agreement`, `seller_info`.
+- Bản nháp được điền bằng hồ sơ pháp lý của nút (`owner.*`, `contact.*`, đọc từ `compliance`), rồi bằng
+  `variables` bạn gửi (giá trị gửi thắng). Mọi giá trị chỉ vào phần chữ — không bao giờ thêm được thẻ. Còn
+  thiếu biến bắt buộc thì trả `content.template_variables_missing` (422) liệt kê đủ một lần.
+- Kết quả là trang **nháp** (`content.write`); duyệt, đăng, rồi gắn vào website.
+- Mẫu nào cũng mở đầu bằng "Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng".

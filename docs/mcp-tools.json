@@ -1975,6 +1975,58 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Make a draft page from a mandatory page template, filled with the unit's legal profile and the given variables. It stays a draft until a person reviews and publishes it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A draft page to make from a mandatory page template.",
+        "properties": {
+          "key": {
+            "description": "Key of the template (see `content.legal_templates`), e.g. `return_policy`.",
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`.",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variables": {
+            "description": "Values for the template, e.g. `{\"policy\": {\"return_days\": 7}}`; they complete the legal\nprofile of the unit."
+          }
+        },
+        "required": [
+          "key",
+          "locale"
+        ],
+        "type": "object"
+      },
+      "name": "content.draft_from_template",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -2031,6 +2083,26 @@
       "permissions": [
         "content.read",
         "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the mandatory page templates for a commerce website in Vietnam (owner information, privacy, returns, shipping, payment, inspection, complaints, terms, general conditions; marketplace regulations, seller agreement, seller information), with the variables each needs. Every text needs review by a legal professional.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "content.legal_templates",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
       ]
     },
     {

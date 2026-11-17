@@ -84,9 +84,11 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       logo, endpoint công khai trả về cho giao diện; đối chiếu "bán trước khi thông báo website" bị cấm hay bị
       phạt rồi mới chọn chặn hay nhãn (A-3.5) — D-357: `/websites/{id}/dossier`, `/websites/{id}/status` (đoạn mã logo
       đọc chặt, dựng lại), `/public/badge`, `/public/owner`; D-358: nhãn, không chặn (cần đối chiếu văn bản gốc)
-- [ ] Trang bắt buộc có mẫu (`content`): thông tin chủ sở hữu, chính sách dữ liệu cá nhân, đổi trả, vận chuyển,
+- [x] Trang bắt buộc có mẫu (`content`): thông tin chủ sở hữu, chính sách dữ liệu cá nhân, đổi trả, vận chuyển,
       thanh toán, kiểm hàng, giải quyết khiếu nại, điều khoản; sàn thêm quy chế, mẫu hợp đồng với người bán,
       thông tin người bán trên trang sản phẩm (EN + VI, ghi rõ cần người có chuyên môn pháp lý duyệt)
+      — D-359: `GET /content/templates`, `POST /content/templates/{key}/drafts` (biến từ `LegalProfiles` của
+      `compliance`, bộ dựng mẫu của kernel, chỉ vào text node), `content::api::PublishedEntries` (chưa có bên dùng)
 - [ ] Báo vi phạm sở hữu trí tuệ / hàng giả: tiếp nhận → ẩn → phản hồi của người bị báo → quyết định, có hạn xử
       lý, lưu vết; kênh khiếu nại của sàn; cung cấp thông tin người bán khi cơ quan có thẩm quyền yêu cầu (có
       audit)

@@ -1473,6 +1473,47 @@ export type ConfirmedList = {
   name: NewsletterText;
 };
 
+/** A mandatory page template. */
+export type ContentTemplate = {
+  /**
+   * e.g. `return_policy`; also the page kind to link in
+   * `PUT /api/v1/compliance/websites/{id}/pages/{page_kind}` (except `seller_info`, a block
+   * for product pages).
+   */
+  key: string;
+  /** Only a marketplace needs it. */
+  marketplace: boolean;
+  /** Always `true`: have a legal professional review the text before use. */
+  needs_legal_review: boolean;
+  /** Title per language, e.g. `{"en": "…", "vi": "…"}`. */
+  titles: Record<string, unknown>;
+  variables: ContentTemplateVariable[];
+};
+
+/** A draft page to make from a template. */
+export type ContentTemplateDraftRequest = {
+  /** `en` or `vi`; the tenant must write in that language. */
+  locale: string;
+  /** Organization unit of the page (and of the legal profile used); default as for a new page. */
+  org_id?: string | null;
+  /** Parent page. */
+  parent_id?: string | null;
+  /**
+   * Values for the template, e.g. `{"policy": {"return_days": 7}}`. They complete (and win
+   * over) the legal profile of the unit (`owner.*`, `contact.*`). Values only ever become text.
+   */
+  variables?: Record<string, unknown>;
+};
+
+/** A variable a template uses. */
+export type ContentTemplateVariable = {
+  description: string;
+  /** Dotted path, e.g. `owner.legal_name` or `policy.return_days`. */
+  path: string;
+  /** The draft cannot be made without it. */
+  required: boolean;
+};
+
 /** A key to create. */
 export type CreateApiKeyRequest = {
   /**
@@ -5698,6 +5739,25 @@ export type Data_Vec_ComplianceRule = {
     /** Check against the original text before relying on it. */
     needs_legal_review: boolean;
     version: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ContentTemplate = {
+  data: {
+    /**
+     * e.g. `return_policy`; also the page kind to link in
+     * `PUT /api/v1/compliance/websites/{id}/pages/{page_kind}` (except `seller_info`, a block
+     * for product pages).
+     */
+    key: string;
+    /** Only a marketplace needs it. */
+    marketplace: boolean;
+    /** Always `true`: have a legal professional review the text before use. */
+    needs_legal_review: boolean;
+    /** Title per language, e.g. `{"en": "…", "vi": "…"}`. */
+    titles: Record<string, unknown>;
+    variables: ContentTemplateVariable[];
   }[];
 };
 
@@ -17270,6 +17330,34 @@ export interface paths {
         200: Page_SearchHit;
         401: Problem;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/templates": {
+    /** List the mandatory page templates (Vietnam). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ContentTemplate;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/templates/{key}/drafts": {
+    /** Make a draft page from a mandatory page template. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: ContentTemplateDraftRequest;
+      responses: {
+        201: Data_EntryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
