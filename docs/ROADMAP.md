@@ -121,17 +121,18 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [x] Module nền `notifications` (D-194, D-348): kênh email, SMS, Zalo ZNS (trait), web push, đẩy di động, trong ứng
       dụng; mẫu theo i18n và theo khách; tuỳ chọn nhận của người dùng; hộp thư, nhật ký gửi, REST + MCP — bộ gửi ZNS,
       web push (VAPID) và đẩy di động (FCM / APNs) mới có trait ở kernel và bản giả ở testkit (bộ nối thật cần khoá của
-      nhà cung cấp — hỏi chủ dự án khi làm); chưa làm: `newsletter` chuyển sang sổ đồng ý chung, (thấp) báo cáo đã lưu và
-      lịch gửi qua email (A-b10), mẫu động D-206 (mục dưới)
+      nhà cung cấp — hỏi chủ dự án khi làm); `newsletter` trên sổ đồng ý chung và mẫu động D-206: mục dưới (D-365, D-366);
+      (thấp) báo cáo đã lưu và lịch gửi qua email (A-b10) dời sang bước 51 / 38 vì cần phần xuất chung (D-366)
 - [x] Tách tin giao dịch và tin quảng cáo (NĐ 91/2020 — cần đối chiếu bản thay thế đang dự thảo; D-348): tin quảng cáo
       chỉ gửi khi đã đồng ý trước (kiểm lại ngay trước khi gửi), rút đồng ý là huỷ tin đang chờ; khung giờ gửi và nhãn
       `QC` là quy tắc có ngày hiệu lực (`notifications.send_windows`, `notifications.marketing_labels`); chỉ một tin
       mời đăng ký đầu tiên; email quảng cáo có `List-Unsubscribe` và link rút đồng ý
-- [ ] Mẫu mail, thông báo khách tự soạn (D-206): bộ dựng mẫu an toàn ở kernel (biến, điều kiện, vòng lặp, giới
+- [x] Mẫu mail, thông báo khách tự soạn (D-206): bộ dựng mẫu an toàn ở kernel (biến, điều kiện, vòng lặp, giới
       hạn chạy, luôn thoát HTML, kiểm biến theo schema khi lưu); mail HTML khung MJML có thương hiệu khách + bản
       chữ thuần; nháp / xuất bản / quay lại, xem trước, gửi thử tới chính người gọi; `newsletter` cá nhân hoá
-      — phần bộ dựng mẫu ở kernel đã xong (D-351, `autoxide_kernel::template`, mẫu in của bước 36 dùng); còn khung
-      MJML, bản chữ thuần, nháp / xuất bản ở `notifications` và `newsletter`
+      — bộ dựng mẫu ở kernel (D-351); D-365: `/templates/{kind}/{channel}/{locale}/draft|publish|versions|rollback|published|
+      preview|test-send`, `/kinds/{kind}/schema`, `/branding`, khung MJML (`mrml`) cho mọi email; D-366: `newsletter` trên sổ
+      đồng ý chung (`ledger_state`, lịch `newsletter.backfill_consents`, hỏi sổ mỗi lô), chiến dịch `format = template`
 - [x] Mã theo dõi quảng cáo và đồng ý cookie (D-235): nhà cung cấp cho sẵn (GA4, GTM, Google Ads, Meta, TikTok,
       Zalo), khách chỉ điền mã ID; banner đồng ý theo nhóm, từ chối dễ như đồng ý, không tải gì trước khi đồng ý;
       bằng chứng đồng ý ẩn danh; nhà cung cấp tự vào danh sách bên nhận dữ liệu; tải sau, không chặn hiển thị

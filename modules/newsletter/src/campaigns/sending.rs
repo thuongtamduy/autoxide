@@ -344,6 +344,13 @@ impl NewsletterService {
                 Some("blocked")
             } else if !checks.confirmed.contains(&item.subscriber_id) {
                 Some("unsubscribed")
+            } else if checks
+                .consented
+                .as_ref()
+                .is_some_and(|ids| !ids.contains(&item.subscriber_id))
+            {
+                // Sổ đồng ý chung không còn đồng ý (rút ở `compliance`, D-366).
+                Some("consent_withdrawn")
             } else if row.advertising
                 && self.config.advertising_max_per_day > 0
                 && ads.get(&item.subscriber_id).copied().unwrap_or(0)
@@ -359,7 +366,8 @@ impl NewsletterService {
                 }
                 continue;
             }
-            match self.deliver(tenant, &row, &list, &item, &person.email).await? {
+            let to = (person.email.as_str(), person.name.as_deref());
+            match self.deliver(tenant, &row, &list, &item, to).await? {
                 Some(DeliveryStatus::Sent) => {
                     batch.sent += 1;
                     if row.advertising {
@@ -394,12 +402,21 @@ impl NewsletterService {
         row: &campaign::Model,
         list: &List,
         item: &delivery::Model,
-        email: &str,
+        to: (&str, Option<&str>),
     ) -> Result<Option<DeliveryStatus>, Error> {
         // Database giữ bản băm của phần thô; link mang khách (`autoxide_kernel::tenancy::link_token`).
         let token = autoxide_kernel::secret::random_token(32)?;
         let link = autoxide_kernel::tenancy::link_token(tenant, &token);
-        let mail = self.campaign_mail(tenant, row, list, email, &link, Some(item.id)).await?;
+        let mail = match self.campaign_mail(tenant, row, list, to, &link, Some(item.id)).await {
+            Ok(mail) => mail,
+            // Mẫu không dựng được với người nhận này (chiến dịch `template`): không thử lại.
+            Err(error) if error.kind() == ErrorKind::Validation => {
+                tracing::warn!(delivery_id = %item.id, code = error.code(), "newsletter campaign template failed for a recipient");
+                self.mark(tenant, item.id, DeliveryStatus::Failed, "template_error", false).await?;
+                return Ok(Some(DeliveryStatus::Failed));
+            }
+            Err(error) => return Err(error),
+        };
         let claimed = delivery::Entity::update_many()
             .scoped(tenant)
             .col_expr(
@@ -596,7 +613,17 @@ impl NewsletterService {
                 *ads.entry(id).or_insert(0u64) += 1;
             }
         }
-        Ok(Checks { subscribers, confirmed, suppressed, ads })
+        // Sổ đồng ý chung: hỏi lại ngay trước khi gửi; sổ lỗi thì cả lô lỗi (job thử lại) — không
+        // gửi khi không chứng minh được đồng ý.
+        let people: Vec<(Uuid, String)> = subscribers
+            .values()
+            .filter(|row| confirmed.contains(&row.id))
+            .map(|row| (row.id, row.email.clone()))
+            .collect();
+        let consented = self.consented(tenant, list.row.id, &people).await?.map(|answers| {
+            people.iter().zip(answers).filter(|(_, yes)| *yes).map(|((id, _), _)| *id).collect()
+        });
+        Ok(Checks { subscribers, confirmed, suppressed, ads, consented })
     }
 }
 
@@ -607,4 +634,6 @@ struct Checks {
     confirmed: HashSet<Uuid>,
     suppressed: HashSet<String>,
     ads: HashMap<Uuid, u64>,
+    /// Người còn đồng ý ở sổ chung; `None`: chương trình không có sổ.
+    consented: Option<HashSet<Uuid>>,
 }

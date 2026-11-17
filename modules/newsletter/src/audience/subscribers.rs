@@ -587,6 +587,7 @@ impl NewsletterService {
             .record(&transaction, tenant, actor, events::subscriber_subject(id), &event)
             .await?;
         transaction.commit().await?;
+        self.sync_consents_quietly(tenant, id).await;
         self.find_subscriber(tenant, id).await
     }
 
@@ -827,6 +828,7 @@ pub(crate) async fn set_subscription<C: ConnectionTrait>(
                 confirmed_at: Set(confirmed_at),
                 unsubscribed_at: Set(None),
                 updated_at: Set(now),
+                ledger_state: Set(String::new()),
             };
             let inserted = subscription::Entity::insert(fresh)
                 .on_conflict(

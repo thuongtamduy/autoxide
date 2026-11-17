@@ -6241,6 +6241,13 @@
             "description": "Plain-text body. A footer with the unsubscribe link is added to every mail.",
             "type": "string"
           },
+          "format": {
+            "description": "`static` (default) or `template` (`{{ subscriber.name }}`, `{{ subscriber.email }}`,\n`{{ list.name }}`, `{{ unsubscribe_url }}`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "list_id": {
             "description": "The list to send to.",
             "format": "uuid",

@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, the newsletter on the shared consent ledger of `compliance` (`docs/NEWSLETTER.md`): every confirmed subscription
+  is a consent (`marketing`, scope `newsletter.list:<id>`, channel `email`) and unsubscribing withdraws it; withdrawing in
+  `compliance` unsubscribes; each batch asks the ledger again and skips people without consent (`consent_withdrawn`, no
+  sending when the ledger cannot answer); existing confirmed subscriptions are recorded by the new hourly job
+  `newsletter.backfill_consents`. Campaigns take `format: "template"` to personalise the subject and bodies for each recipient
+  (`subscriber.name`, masked `subscriber.email`, `list.name`, `unsubscribe_url`), checked on save. Decision D-366.
 - Step 37, notification templates written by the tenant (`docs/NOTIFICATIONS.md`): drafts checked against the variables
   of the kind on save (syntax, unknown and required variables, every problem at once), publish into immutable versions (the
   last 20 kept), rollback and unpublish, preview with sample data, test send to the caller only (verified email or own

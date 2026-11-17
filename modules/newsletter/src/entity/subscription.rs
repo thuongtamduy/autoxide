@@ -24,6 +24,8 @@ pub struct Model {
     pub confirmed_at: Option<DateTimeUtc>,
     pub unsubscribed_at: Option<DateTimeUtc>,
     pub updated_at: DateTimeUtc,
+    /// Sổ đồng ý của `compliance` đã biết tới đâu: `''`, `granted` hay `withdrawn` (D-366).
+    pub ledger_state: String,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

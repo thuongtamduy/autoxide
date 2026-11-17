@@ -20,7 +20,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::audience::subscribers::SubscriberFilter;
-use crate::campaigns::{Action, Campaign, CampaignInput};
+use crate::campaigns::{Action, Campaign, CampaignFormat, CampaignInput};
 use crate::http::{CampaignResponse, ListResponse, SubscriberResponse, choice, page_request};
 use crate::permissions::{NEWSLETTER_MANAGE, NEWSLETTER_READ, NEWSLETTER_SEND};
 use crate::service::NewsletterService;
@@ -86,6 +86,9 @@ pub(crate) struct CreateCampaignInput {
     locale: Option<String>,
     /// An advertising mail (labelled, limited per day per address).
     advertising: Option<bool>,
+    /// `static` (default) or `template` (`{{ subscriber.name }}`, `{{ subscriber.email }}`,
+    /// `{{ list.name }}`, `{{ unsubscribe_url }}`).
+    format: Option<String>,
 }
 
 /// A campaign to read.
@@ -201,6 +204,18 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                     let mut problems = Vec::new();
                     let locale =
                         crate::text::locale_param(input.locale.as_deref(), "locale", &mut problems);
+                    let format = match input.format.as_deref() {
+                        None | Some("static") => Some(CampaignFormat::Static),
+                        Some("template") => Some(CampaignFormat::Template),
+                        Some(_) => {
+                            problems.push(autoxide_kernel::error::FieldError::new(
+                                "format",
+                                "invalid",
+                                "must be `static` or `template`",
+                            ));
+                            None
+                        }
+                    };
                     if !problems.is_empty() {
                         return Err(Error::validation(problems));
                     }
@@ -212,6 +227,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                         body_html: input.body_html.map(Some),
                         locale,
                         advertising: input.advertising,
+                        format,
                     };
                     Ok::<Versioned, Error>(versioned(
                         service.create_campaign(&tenant, &principal, input).await?,

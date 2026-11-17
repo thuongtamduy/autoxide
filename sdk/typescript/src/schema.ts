@@ -509,6 +509,8 @@ export type CampaignResponse = {
   body_text: string;
   created_at: string;
   finished_at?: string | null;
+  /** `static` (sent as written) or `template` (subject and bodies rendered for each recipient). */
+  format: NewsletterCampaignFormat;
   id: string;
   list_id: string;
   /** Language of the footer added to every mail. */
@@ -2397,6 +2399,7 @@ export type CreateCampaignRequest = {
    * sender's address is added to every mail.
    */
   body_text: string;
+  format?: NewsletterCampaignFormat | null;
   /** The list to send to. */
   list_id: string;
   locale?: NewsletterLocale | null;
@@ -2911,6 +2914,8 @@ export type Data_CampaignResponse = {
     body_text: string;
     created_at: string;
     finished_at?: string | null;
+    /** `static` (sent as written) or `template` (subject and bodies rendered for each recipient). */
+    format: NewsletterCampaignFormat;
     id: string;
     list_id: string;
     /** Language of the footer added to every mail. */
@@ -10698,6 +10703,9 @@ export type NewView = {
   scope?: string | null;
 };
 
+/** How the subject and bodies of a campaign are used. */
+export type NewsletterCampaignFormat = "static" | "template";
+
 /** One mail of a campaign to the person. */
 export type NewsletterDelivery = {
   campaign_id: string;
@@ -11318,6 +11326,8 @@ export type Page_CampaignResponse = {
     body_text: string;
     created_at: string;
     finished_at?: string | null;
+    /** `static` (sent as written) or `template` (subject and bodies rendered for each recipient). */
+    format: NewsletterCampaignFormat;
     id: string;
     list_id: string;
     /** Language of the footer added to every mail. */
@@ -16257,6 +16267,7 @@ export type UpdateCampaignRequest = {
    */
   body_html?: string | null;
   body_text?: string | null;
+  format?: NewsletterCampaignFormat | null;
   list_id?: string | null;
   locale?: NewsletterLocale | null;
   preheader?: string | null;

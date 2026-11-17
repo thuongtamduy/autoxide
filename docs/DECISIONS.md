@@ -9008,3 +9008,37 @@ mục 2 và phần B.
     `approval_required` cho key `agent` (P12 bước 51) mà kernel chưa có cơ chế đó — xuất bản qua REST.
 11. Event mới: `notifications.template_published`, `…template_rolled_back`, `…template_unpublished`, `…branding_updated`; lưu nháp phát
     `…template_updated` với `draft: true`.
+
+## D-366 · `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17 — agent quyết
+
+Căn cứ (cần đối chiếu văn bản gốc / người có chuyên môn pháp lý): Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP
+(hiệu lực 01/01/2026) — đồng ý chứng minh được, rút dễ như cho; NĐ 91/2020/NĐ-CP — thư quảng cáo chỉ gửi khi đã đồng ý trước.
+
+1. **Thứ tự đăng ký**: `newsletter` đã đứng sau `compliance` và `notifications` trong `crates/app/src/modules.rs` (sau `content`);
+   chỉ sửa chú thích. `newsletter` lấy `dyn ConsentLedger` bằng `require(...).ok()` — chương trình không có `compliance` thì chạy
+   như cũ (test của module dựng không có `compliance`).
+2. **Khoá trong sổ**: chủ thể `Email`, mục đích `marketing`, phạm vi `newsletter.list:<id>`, kênh `email`; bằng chứng là JSON `consent`
+   module đã lưu (thiếu chữ / phiên bản — đăng ký cũ, nhập không kèm chữ — thì ghi rõ "ghi sổ từ đăng ký đã xác nhận", phiên bản
+   `newsletter.legacy`). `source_ref` = `newsletter.subscription:<subscriber>:<list>:<confirmed_at micro giây>` (rút:
+   `newsletter.unsubscribe:…:<unsubscribed_at>`), nên ghi lại không trùng.
+3. **Lệch đặc tả — ghi sổ SAU commit, không trước**: đặc tả C3 đòi gọi `grant` trước transaction của module, nhưng người đăng ký
+   và danh sách (xác nhận bằng token, đăng ký qua job, trang lựa chọn) chỉ biết chắc bên trong transaction. Thay bằng: cột mới
+   `newsletter_subscriptions.ledger_state` (`''` / `granted` / `withdrawn`), đồng bộ ngay sau commit (lỗi chỉ ghi log), lịch hằng
+   giờ `newsletter.backfill_consents` làm phần còn sót, và **lúc gửi luôn hỏi sổ** (`granted_many` mỗi lô, đăng ký `confirmed` sổ
+   chưa biết được ghi sổ ngay trước khi hỏi; sổ lỗi → lô lỗi, job thử lại, không gửi). Tính chất an toàn của đặc tả giữ nguyên:
+   không gửi khi sổ không xác nhận đồng ý; đồng ý bị rút ở khoá rộng hơn (vd mọi quảng cáo) vẫn chặn vì đồng ý theo danh sách
+   không ghi đè rút ở khoá rộng.
+4. **Chuyển dữ liệu cũ**: migration mới `m0013_consent_ledger` thêm cột (dòng có sẵn nhận `''`); migration không gọi được module
+   khác nên việc ghi sổ cho đăng ký `confirmed` có sẵn do lịch `newsletter.backfill_consents` làm (500 dòng mỗi lượt, quét cả database
+   qua index `newsletter_subscriptions_ledger_sweep_idx`). Nhập hàng loạt cũng để lịch ghi sổ (không gọi sổ từng người trong lệnh
+   nhập).
+5. **Rút ở `compliance`**: nghe `compliance.consent_withdrawn` (mục đích `marketing`, kênh rỗng hay `email`, phạm vi rỗng hay
+   `newsletter.list:<id>`) → `ConsentLedger::get` lấy email → huỷ đăng ký khớp, ghi `ledger_state = withdrawn` luôn, không gọi lại sổ
+   (không vòng event). Lô gửi bỏ người không còn đồng ý với lý do `consent_withdrawn`.
+6. **Chiến dịch `format`** (`static` mặc định — hành vi cũ / `template`), trường mới, endpoint cũ giữ nguyên (D-059). Biến được phép:
+   `subscriber.name`, `subscriber.email` (che bớt `a***@example.com`), `list.name`, `unsubscribe_url` (trang lựa chọn của người nhận).
+   Kiểm khi lưu (gom lỗi một lần); dựng từng người nhận trong job gửi theo lô; người nhận dựng lỗi → lượt gửi `failed`
+   (`template_error`), không thử lại. Chưa dùng chung mẫu đã biên dịch cho cả lô: API của bộ dựng kernel biên dịch mỗi lần dựng —
+   đo trước khi tối ưu.
+7. Mục "(thấp) báo cáo đã lưu và lịch gửi qua email (A-b10)" **không làm ở bước này**: nó dùng phần xuất chung của bước 51 (D-213),
+   phần đó chưa có báo cáo đã lưu; làm cùng bước 51 / 38.

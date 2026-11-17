@@ -34,6 +34,8 @@ pub struct Model {
     pub created_by: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    /// `static` (gửi đúng như viết) hay `template` (mẫu dựng riêng cho từng người nhận, D-366).
+    pub format: String,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

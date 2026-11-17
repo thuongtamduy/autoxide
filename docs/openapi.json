@@ -1358,6 +1358,10 @@
               "null"
             ]
           },
+          "format": {
+            "$ref": "#/components/schemas/NewsletterCampaignFormat",
+            "description": "`static` (sent as written) or `template` (subject and bodies rendered for each recipient)."
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -1426,6 +1430,7 @@
           "body_text",
           "locale",
           "advertising",
+          "format",
           "status",
           "progress",
           "created_at",
@@ -6816,6 +6821,17 @@
             "description": "Plain-text body, up to 200000 characters. A footer with the unsubscribe link and the\nsender's address is added to every mail.",
             "type": "string"
           },
+          "format": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NewsletterCampaignFormat",
+                "description": "Omitted: `static`. `template`: subject and bodies use the template engine with\n`{{ subscriber.name }}`, `{{ subscriber.email }}` (masked), `{{ list.name }}` and\n`{{ unsubscribe_url }}`, checked on save."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "list_id": {
             "description": "The list to send to.",
             "format": "uuid",
@@ -8285,6 +8301,10 @@
                   "null"
                 ]
               },
+              "format": {
+                "$ref": "#/components/schemas/NewsletterCampaignFormat",
+                "description": "`static` (sent as written) or `template` (subject and bodies rendered for each recipient)."
+              },
               "id": {
                 "format": "uuid",
                 "type": "string"
@@ -8353,6 +8373,7 @@
               "body_text",
               "locale",
               "advertising",
+              "format",
               "status",
               "progress",
               "created_at",
@@ -31776,6 +31797,14 @@
         ],
         "type": "object"
       },
+      "NewsletterCampaignFormat": {
+        "description": "How the subject and bodies of a campaign are used.",
+        "enum": [
+          "static",
+          "template"
+        ],
+        "type": "string"
+      },
       "NewsletterDelivery": {
         "description": "One mail of a campaign to the person.",
         "properties": {
@@ -33529,6 +33558,10 @@
                     "null"
                   ]
                 },
+                "format": {
+                  "$ref": "#/components/schemas/NewsletterCampaignFormat",
+                  "description": "`static` (sent as written) or `template` (subject and bodies rendered for each recipient)."
+                },
                 "id": {
                   "format": "uuid",
                   "type": "string"
@@ -33597,6 +33630,7 @@
                 "body_text",
                 "locale",
                 "advertising",
+                "format",
                 "status",
                 "progress",
                 "created_at",
@@ -48519,6 +48553,17 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "format": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NewsletterCampaignFormat",
+                "description": "`static` or `template`."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "list_id": {

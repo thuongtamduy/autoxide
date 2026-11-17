@@ -17,11 +17,13 @@ use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-const OPS: [&str; 4] = [
+const OPS: [&str; 6] = [
     "notifications.platform_notices.send",
     "plans.plans.manage",
     "plans.subscriptions.manage",
     "kernel.tenants.read",
+    "newsletter.manage",
+    "newsletter.read",
 ];
 
 async fn app(test: &TestDatabase) -> TestApp {
@@ -260,6 +262,44 @@ async fn xoa_tai_khoan_thi_xoa_hop_thu_va_tuy_chon() {
         assert!(status.is_success(), "{status} {body}");
         settle(&app).await;
         assert!(inbox(&platform).await.is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+/// Bản tin trên sổ đồng ý chung (bước 37 C3, D-366), với `compliance` thật: đăng ký có sẵn được lịch
+/// đồng bộ ghi sổ; rút đồng ý quảng cáo qua email ở `compliance` huỷ đăng ký bản tin.
+#[tokio::test]
+async fn ban_tin_dung_so_dong_y_chung() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let list = json!({"key": "weekly", "name": {"en": "Weekly", "vi": "Hằng tuần"}, "double_opt_in": false});
+        let (status, list) = call(&app, Method::POST, "/newsletter/lists", "ops", Some(list)).await;
+        assert_eq!(status, StatusCode::CREATED, "{list}");
+        let list_id = list["data"]["id"].as_str().unwrap().to_owned();
+        let import = json!({"subscribers": [{"email": "reader@example.com"}], "list_ids": [list_id], "consent_source": "shop-checkout-2025", "consent_text": "Gửi tôi bản tin.", "consent_version": "1"});
+        let (status, body) = call(&app, Method::POST, "/newsletter/subscribers/import", "ops", Some(import)).await;
+        assert!(status.is_success(), "{status} {body}");
+
+        let ledger = app.api::<dyn ConsentLedger>().unwrap();
+        let subject = ConsentSubject::Email("reader@example.com".to_owned());
+        let key = ConsentKey::new("marketing", format!("newsletter.list:{list_id}"), "email");
+        assert!(!ledger.is_granted(DEFAULT_TENANT, &subject, &key).await.unwrap());
+        // Lịch hằng giờ `newsletter.backfill_consents` ghi sổ cho đăng ký có sẵn.
+        settle(&app).await;
+        assert!(ledger.is_granted(DEFAULT_TENANT, &subject, &key).await.unwrap());
+
+        // Rút mọi quảng cáo qua email ở `compliance`: đăng ký bản tin bị huỷ.
+        ledger
+            .withdraw(DEFAULT_TENANT, subject.clone(), ConsentKey::new("marketing", "", "email"), "settings", "e2e:newsletter")
+            .await
+            .unwrap();
+        settle(&app).await;
+        let (status, found) = call(&app, Method::GET, "/newsletter/subscribers?limit=10", "ops", None).await;
+        assert_eq!(status, StatusCode::OK, "{found}");
+        let text = found.to_string();
+        assert!(text.contains("unsubscribed"), "{text}");
+        assert!(!ledger.is_granted(DEFAULT_TENANT, &subject, &key).await.unwrap());
     })
     .await
     .unwrap();

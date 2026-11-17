@@ -172,6 +172,26 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
 - Một khe hở không đóng được: máy chủ chết ngay sau khi đưa mail vào hàng đợi, trước khi ghi lại,
   thì người nhận đó bị đánh `failed` (`interrupted`) thay vì liều gửi mail thứ hai.
 
+### Chiến dịch cá nhân hoá (`format: "template"`)
+
+Chiến dịch mặc định là `format: "static"` (gửi đúng như viết). Với `"format": "template"`, tiêu đề,
+`body_text` và `body_html` là mẫu của bộ dựng mẫu dùng chung, dựng riêng cho từng người nhận:
+`{{ subscriber.name }}`, `{{ subscriber.email }}` (đã che bớt, vd `a***@example.com`),
+`{{ list.name }}`, `{{ unsubscribe_url }}` (trang lựa chọn của người nhận này), cùng `{% if %}`,
+`{% for %}` và bộ lọc `money`, `number`, `date`. Không có biến nào khác. Mẫu được kiểm khi lưu chiến
+dịch (cú pháp và biến, báo mọi lỗi một lần kèm dòng và cột); giá trị chèn vào `body_html` luôn được
+thoát HTML. Xem trước và mail thử dùng người nhận mẫu (`Subscriber`, `s***@example.invalid`).
+
+## Sổ đồng ý
+
+Khi có module `compliance`, đăng ký dùng chung sổ đồng ý của nó (`docs/COMPLIANCE.vi.md`): mỗi đăng
+ký đã xác nhận là một đồng ý (chủ thể: email, mục đích `marketing`, phạm vi `newsletter.list:<id>`,
+kênh `email`, kèm chữ đồng ý, phiên bản và nguồn module đã lưu), huỷ đăng ký là rút đồng ý đó. Rút
+đồng ý quảng cáo ở `compliance` (cho danh sách này, hay mọi danh sách) thì người đó bị huỷ đăng ký ở
+đây. Ngay trước mỗi lô, sổ được hỏi lại: người đã rút đồng ý ở đó bị bỏ qua (`consent_withdrawn`);
+sổ không trả lời được thì lô chờ và thử lại. Đăng ký đã xác nhận trước bản này được ghi vào sổ bởi
+job hằng giờ `newsletter.backfill_consents` (chạy lại không ghi thêm).
+
 ## Danh sách chặn và bounce
 
 - Địa chỉ bị chặn không nhận mail chiến dịch nào, dù đăng ký thế nào.

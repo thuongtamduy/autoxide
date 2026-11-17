@@ -20,7 +20,7 @@ use validator::Validate;
 
 use super::{choice, page_request, present, uuid_param};
 use crate::campaigns::{
-    Action, Campaign, CampaignFilter, CampaignInput, CampaignStatus, DeliveryCounts,
+    Action, Campaign, CampaignFilter, CampaignFormat, CampaignInput, CampaignStatus, DeliveryCounts,
 };
 use crate::service::NewsletterService;
 use crate::text::Locale;
@@ -44,6 +44,8 @@ pub(crate) struct CampaignResponse {
     /// Advertising: the subject gets `AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL` and each address
     /// gets at most `AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY` such mails a day.
     pub advertising: bool,
+    /// `static` (sent as written) or `template` (subject and bodies rendered for each recipient).
+    pub format: CampaignFormat,
     pub status: CampaignStatus,
     pub scheduled_at: Option<DateTime<Utc>>,
     pub started_at: Option<DateTime<Utc>>,
@@ -62,6 +64,7 @@ impl From<Campaign> for CampaignResponse {
         let row = campaign.row;
         CampaignResponse {
             status: CampaignStatus::stored(&row.status),
+            format: CampaignFormat::stored(&row.format),
             locale: Locale::stored(&row.locale),
             id: row.id,
             list_id: row.list_id,
@@ -102,6 +105,10 @@ pub(crate) struct CreateCampaignRequest {
     locale: Option<Locale>,
     /// Omitted: `false`.
     advertising: Option<bool>,
+    /// Omitted: `static`. `template`: subject and bodies use the template engine with
+    /// `{{ subscriber.name }}`, `{{ subscriber.email }}` (masked), `{{ list.name }}` and
+    /// `{{ unsubscribe_url }}`, checked on save.
+    format: Option<CampaignFormat>,
 }
 
 /// Changes to a draft or scheduled campaign. Omitted fields stay as they are.
@@ -121,6 +128,8 @@ pub(crate) struct UpdateCampaignRequest {
     body_html: Option<Option<String>>,
     locale: Option<Locale>,
     advertising: Option<bool>,
+    /// `static` or `template`.
+    format: Option<CampaignFormat>,
 }
 
 impl From<UpdateCampaignRequest> for CampaignInput {
@@ -133,6 +142,7 @@ impl From<UpdateCampaignRequest> for CampaignInput {
             body_html: input.body_html,
             locale: input.locale,
             advertising: input.advertising,
+            format: input.format,
         }
     }
 }
@@ -236,6 +246,7 @@ pub(crate) async fn create_campaign(
         body_html: input.body_html.map(Some),
         locale: input.locale,
         advertising: input.advertising,
+        format: input.format,
     };
     let campaign = service.create_campaign(&tenant, &principal, input).await?;
     Ok(Created::new(format!("/newsletter/campaigns/{}", campaign.row.id), campaign.into()))
