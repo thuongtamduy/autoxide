@@ -11,6 +11,7 @@ publish.workspace = true
 async-trait.workspace = true
 autoxide-address.workspace = true
 autoxide-auth.workspace = true
+autoxide-compliance.workspace = true
 autoxide-invoices.workspace = true
 autoxide-kernel.workspace = true
 autoxide-ledger.workspace = true

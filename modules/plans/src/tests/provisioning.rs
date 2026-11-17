@@ -17,8 +17,8 @@ use super::lifecycle::{call, ok};
 
 /// Lời mời giả: ghi lại (khách, email, role); `fail` bật thì từ chối một lần.
 #[derive(Default)]
-struct FakeInvitations {
-    sent: Mutex<Vec<(TenantId, String, Vec<String>)>>,
+pub(super) struct FakeInvitations {
+    pub(super) sent: Mutex<Vec<(TenantId, String, Vec<String>)>>,
     fail: AtomicBool,
 }
 

@@ -67,8 +67,39 @@ It runs in the background: follow it with `GET /api/v1/plans/provisionings/{id}`
 From the server: `autoxide tenant create --slug acme --name "Acme Ltd" --plan <plan id>
 --admin-email owner@acme.example` does the same at once. A `dedicated` plan needs `placement`: a
 placement of kind `dedicated` added first with `autoxide placement add`. A plan that
-`requires_kyc` cannot be provisioned until identity checks exist (step 37); neither can tenants
-sign up by themselves yet.
+`requires_kyc` cannot be provisioned by staff: the tenant signs up by itself and passes the identity
+checks (next section).
+
+## Tenants sign up by themselves
+
+Turn it on with `AUTOXIDE_PLANS_SIGNUP=true` and mark the plans people may pick with
+`"self_signup": true` (active base plans). The sign-up page of your website talks to the API on the
+platform host (or sends `Autoxide-Tenant: <platform slug>`), without signing in:
+
+1. `GET /api/v1/antispam/token?scope=plans:signup` for a form token, then
+   `POST /api/v1/plans/signups` with `email`, `tenant_name`, `slug`, `plan_code`,
+   `"accept_terms": true` (the person accepts the platform's current terms of use and privacy
+   policy) and the `form_token`. The answer is always `202`; invalid values answer `422` with every
+   problem at once (`plan_code` not open to sign-up, `slug` taken…).
+2. A mail goes to the address with a link valid 24 hours (`AUTOXIDE_PLANS_SIGNUP_URL`, with
+   `{token}`; without it the mail carries the token). The page sends the token to
+   `POST /api/v1/plans/signups/confirm`: the acceptance of the terms is recorded (module
+   `compliance`), and
+   - for a plan that `requires_kyc`, the sign-up becomes `awaiting_kyc` and `kyc.url` is where the
+     person passes the identity checks (calling confirm again starts new checks; after them the
+     provider sends the person to `AUTOXIDE_PLANS_SIGNUP_RETURN_URL`). Passed → the tenant is
+     created; failed → `rejected` (`kyc_rejected`);
+   - otherwise the tenant is created at once.
+3. Creating the tenant is the same provisioning staff run (`provisioning_id`); the person is
+   invited by mail as the administrator (role `admin`). Follow it with
+   `GET /api/v1/plans/signups/{id}?token=…`: `pending_email` → (`awaiting_kyc`) → `provisioning` →
+   `completed` (`tenant_id`), or `rejected` (`reason`) / `expired`.
+
+Sending the same email and slug again while waiting sends a new mail (the old link stops working).
+Two people waiting for the same slug: the first to reach the provisioning keeps it, the other is
+`rejected` (`tenant_slug_taken`). Unconfirmed sign-ups expire after 24 hours, unfinished identity
+checks after 30 days; ended sign-ups are deleted 30 days later. Staff list them with
+`GET /api/v1/plans/signups` (`plans.subscriptions.read`, MCP `plans.list_signups`).
 
 ## Put a tenant on a plan
 
@@ -154,5 +185,8 @@ subscription that passes its retention period does this by itself.
 | `AUTOXIDE_PLANS_CACHE_SECONDS` | `30` | How long each server keeps a tenant's entitlements in memory |
 | `AUTOXIDE_PLANS_HOLD_MINUTES` | `15` | How long an unconfirmed reservation against a limit is held |
 | `AUTOXIDE_PLANS_REMINDER_DAYS` | `7,1` | Days before a period is due that a reminder is mailed |
+| `AUTOXIDE_PLANS_SIGNUP` | `false` | Let new tenants sign up by themselves |
+| `AUTOXIDE_PLANS_SIGNUP_URL` | — | Page that confirms a sign-up, with `{token}` |
+| `AUTOXIDE_PLANS_SIGNUP_RETURN_URL` | — | Page people come back to after the identity checks, `{id}` = sign-up |
 | `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS` | `3600` | How long a job of a module the plan excludes waits |
 | `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` | `30` | How long a tenant data export is kept |

@@ -34,12 +34,46 @@ pub(crate) const REMINDER_DAYS: Setting = Setting::new(
 )
 .with_default("7,1");
 
+pub(crate) const SIGNUP: Setting = Setting::new(
+    "AUTOXIDE_PLANS_SIGNUP",
+    "`true` lets new tenants sign up by themselves (`POST /api/v1/plans/signups`) on plans marked \
+     `self_signup`; `false` (the default) answers `plans.signup_disabled` and only platform staff \
+     create tenants.",
+)
+.with_default("false");
+
+pub(crate) const SIGNUP_URL: Setting = Setting::new(
+    "AUTOXIDE_PLANS_SIGNUP_URL",
+    "Page of the sign-up website that confirms a sign-up, with `{token}` where the token goes; the \
+     page sends it to `POST /api/v1/plans/signups/confirm`. Without it the confirmation mail \
+     carries the token itself.",
+)
+.with_example("https://www.example.com/signup/confirm?token={token}");
+
+pub(crate) const SIGNUP_RETURN_URL: Setting = Setting::new(
+    "AUTOXIDE_PLANS_SIGNUP_RETURN_URL",
+    "Page the identity provider sends people back to after the identity checks of a sign-up \
+     (plans that `requires_kyc`); `{id}` is replaced by the sign-up id. Optional.",
+)
+.with_example("https://www.example.com/signup/{id}/checked");
+
+/// Cấu hình đăng ký công khai (D-349).
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SignupConfig {
+    pub enabled: bool,
+    /// Trang xác nhận có `{token}`; `None`: mail chứa token.
+    pub url: Option<String>,
+    /// Trang quay về sau định danh, có thể có `{id}`.
+    pub return_url: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct PlansConfig {
     pub tax_category: String,
     pub cache: Duration,
     pub hold: chrono::Duration,
     pub reminder_days: Vec<u32>,
+    pub signup: SignupConfig,
 }
 
 impl PlansConfig {
@@ -64,11 +98,29 @@ impl PlansConfig {
                 Err("must be a tax category code, e.g. `vat.standard`".to_owned())
             }
         });
+        let enabled = reader.get::<bool>(&SIGNUP);
+        let url = reader.optional_with(&SIGNUP_URL, |raw| http_url(raw, Some("{token}")));
+        let return_url = reader.optional_with(&SIGNUP_RETURN_URL, |raw| http_url(raw, None));
         Ok(PlansConfig {
             tax_category: tax_category?,
             cache: Duration::from_secs(cache?),
             hold: chrono::Duration::minutes(hold?),
             reminder_days: reminder_days?,
+            signup: SignupConfig { enabled: enabled?, url: url?, return_url: return_url? },
         })
+    }
+}
+
+/// Địa chỉ http(s); `needs`: chuỗi phải có (vd `{token}`).
+fn http_url(raw: &str, needs: Option<&str>) -> Result<String, String> {
+    let url = raw.trim();
+    let lower = url.to_ascii_lowercase();
+    let scheme = lower.starts_with("https://") || lower.starts_with("http://");
+    match needs {
+        Some(part) if !(scheme && url.contains(part)) => {
+            Err(format!("must be an http(s) URL containing `{part}`"))
+        }
+        None if !scheme => Err("must be an http(s) URL".to_owned()),
+        _ => Ok(url.to_owned()),
     }
 }

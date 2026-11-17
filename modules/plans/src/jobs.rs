@@ -1,5 +1,6 @@
 //! Job của module `plans`: trả chỗ giữ quá hạn (mỗi phút), đối soát số đang dùng (hằng ngày), vòng
-//! đời thuê bao (mỗi 5 phút), lập kỳ thanh toán sắp tới và mail nhắc (mỗi giờ). Chỉ chạm bảng mặt
+//! đời thuê bao (mỗi 5 phút), lập kỳ thanh toán sắp tới và mail nhắc (mỗi giờ), đăng ký khách quá
+//! hạn (mỗi giờ). Chỉ chạm bảng mặt
 //! điều khiển nên chỉ chạy trên database điều khiển.
 
 use std::sync::Arc;
@@ -81,6 +82,14 @@ pub(crate) fn registrations(service: &Arc<PlansService>) -> Vec<JobRegistration>
             Arc::new(crate::provisioning::ProvisionRunner(service.clone())),
         ),
         JobRegistration::new(
+            crate::signup::SIGNUP_JOB,
+            Arc::new(crate::signup::SignupLinkJob(service.clone())),
+        ),
+        JobRegistration::new(
+            crate::signup::EXPIRE_SIGNUPS,
+            Arc::new(crate::signup::ExpireSignupsJob(service.clone())),
+        ),
+        JobRegistration::new(
             crate::billing::INVOICE_PERIOD,
             Arc::new(crate::billing::InvoicePeriodJob(service.clone())),
         ),
@@ -95,5 +104,7 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         Schedule::new(LIFECYCLE, LIFECYCLE, every(300)).on_control_only(),
         Schedule::new(RENEWALS, RENEWALS, every(3600)).on_control_only(),
         Schedule::new(REMINDERS, REMINDERS, every(3600)).on_control_only(),
+        Schedule::new(crate::signup::EXPIRE_SIGNUPS, crate::signup::EXPIRE_SIGNUPS, every(3600))
+            .on_control_only(),
     ]
 }

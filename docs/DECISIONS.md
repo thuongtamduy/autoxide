@@ -8443,3 +8443,45 @@ pháp lý dưới đây — **cần đối chiếu văn bản gốc / người c
    (180). Link huỷ nhận hết dùng được khi địa chỉ đã bị xoá khỏi nhật ký.
 8. **Dữ liệu cá nhân**: module đăng ký `PersonalData` (hộp thư, tuỳ chọn, thiết bị không kèm secret, nhật ký gửi) và nghe
    `auth.user_deleted` để xoá hộp thư, tuỳ chọn, đăng ký đẩy, bỏ địa chỉ / tham số trong nhật ký và huỷ tin đang chờ.
+
+## D-349 · Khách tự đăng ký → định danh → cấp phát (bước 35 mục 5, phần cuối) — 2026-11-17 — agent quyết
+
+Bối cảnh: mục cuối của bước 35; phần nhân sự vận hành đã có (D-338), `compliance` (D-347) và `notifications` (D-348) đã
+merge. Căn cứ pháp lý dưới đây — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**.
+
+1. **Một đường cấp phát.** Đăng ký xong (email xác nhận, định danh nếu gói cần) thì gọi `start_provisioning` của D-338 (job
+   `plans.provision`) với email đăng ký làm quản trị viên; lượt cấp phát và việc chuyển đăng ký sang `provisioning` ghi trong
+   CÙNG một transaction (chạy lại / hai request cùng lúc không tạo hai lượt). Lượt xong → đăng ký `completed`. Cấp phát từ chối
+   (slug vừa bị lấy, gói thôi bán…) → đăng ký `rejected`, `reason` = mã lỗi. Nhân sự vẫn không cấp phát thẳng gói
+   `requires_kyc` (`plans.kyc_required`, câu chữ đổi: khách tự đăng ký và định danh ở đó).
+2. **Bật hai tầng**: `AUTOXIDE_PLANS_SIGNUP` (mặc định `false`, người lạ cài không mở cửa ngoài ý muốn) và cờ `self_signup` của
+   gói (migration mới `m0011_create_signups`, chỉ gói `base`). Endpoint công khai chỉ nhận request tới khách nền tảng (tên miền
+   hay `Autoxide-Tenant`) — đăng ký thuộc nhà vận hành; khác → `plans.signup_disabled` (404). Không có bên gửi mail cũng vậy.
+3. **Chống lộ dữ liệu và spam (như D-154)**: `POST /signups` kiểm dữ liệu (gom lỗi, D-083), `SpamGuard::check` (token form
+   phạm vi `plans:signup`, bẫy, đề; giới hạn 10 / giờ / khối IP băm, 3 / giờ / email — hằng số, bảng `plans_throttle`,
+   `plans_antispam_nonces` mới), rồi một transaction giống nhau cho mọi địa chỉ chỉ xếp job `plans.send_signup_link`; luôn 202.
+   Kiểm slug chỉ với sự thật công khai (khách đã có, lượt cấp phát) — không với đăng ký đang chờ: hai người cùng chờ một slug
+   thì người đến bước cấp phát sau bị `rejected` (`tenant_slug_taken`), không ai dò được email nào đang chờ slug nào. Cùng email
+   + slug còn chờ → giữ một dòng, token mới (link cũ hết dùng), thư mới.
+4. **Token**: 32 byte ngẫu nhiên, chỉ lưu SHA-256 trong `plans_signup.token_hash` (không dùng bảng `<module>_tokens`: token này
+   còn là chìa khoá xem trạng thái `GET /signups/{id}?token=` suốt vòng đời đăng ký, không phải dùng một lần). Xác nhận gọi
+   lại vô hại (trả trạng thái hiện tại). Link sống 24 giờ; chờ định danh tối đa 30 ngày; job hằng giờ `plans.expire_signups`
+   đánh dấu `expired`, xoá dòng `expired` / `rejected` sau 30 ngày (Luật BVDLCN 91/2025/QH15: không giữ quá mục đích), dọn bộ
+   đếm và nonce. Thư qua `dyn Mailer` + `MailTemplate` (như thư xác minh của `auth`), **không** qua `dyn Notifier`: token không
+   được nằm trong nhật ký gửi (giữ 90 ngày) của `notifications`.
+5. **Điều khoản (Luật Giao dịch điện tử 20/2023/QH15)**: request mang `accept_terms: true` (khác đặc tả: không nhận
+   `terms_version` của client — bản hiện hành do `compliance` quyết); chấp nhận ghi lúc **xác nhận email** (lúc địa chỉ đã được
+   chứng minh) qua `AcceptanceGate::accept_current(khách nền tảng, Subject::Email, terms_of_use | privacy_policy, "web")`; loại
+   chưa đăng thì bỏ qua; ID phiên bản đã chấp nhận lưu ở `plans_signup.terms`. Thiếu `compliance`: bỏ qua.
+6. **Định danh (Luật TMĐT 122/2025/QH15 Điều 17, từ 01/7/2026)**: gói `requires_kyc` → `awaiting_kyc`,
+   `KycGate::start(khách nền tảng, Subject::Reference("plans.signup:<id>"), party_type, AUTOXIDE_PLANS_SIGNUP_RETURN_URL)`, trả
+   trang cho client trong câu trả lời của `confirm` (gọi lại khi đang chờ: hỏi `KycGate::status` trước — đã có kết quả thì đi
+   tiếp ngay, phòng event chưa tới; không thì mở lượt mới). Nghe `compliance.kyc_verified` / `kyc_rejected` chỉ khi có
+   `KycGate`, chỉ nhận event của khách nền tảng (khách khác không giả được). Không có `compliance` thì gói `requires_kyc` không
+   mở cho tự đăng ký (422 trường `plan_code`).
+7. **Tên khác đặc tả**: trạng thái `pending_email`, `awaiting_kyc`, `provisioning`, `completed`, `rejected`, `expired` (theo đặc
+   tả, không theo bản giao việc); request dùng `tenant_name` + `slug` (cấp phát cần slug), `plan_code`, `price_id?`,
+   `party_type?`, `locale?` (`en` / `vi`, ngôn ngữ của thư). Không có trường `reference` (D-184): chống gửi trùng bằng nonce của
+   token form và dòng giữ theo email + slug. Event mới `plans.signup_created`, `signup_completed`, `signup_rejected` (không
+   mang email). Danh sách cho nhân sự `GET /signups` + tool MCP chỉ đọc `plans.list_signups` (`plans.subscriptions.read`, như
+   danh sách cấp phát; không thêm permission).

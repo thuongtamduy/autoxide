@@ -11,8 +11,8 @@
 //! - Vị trí dữ liệu theo gói: `shared` → placement `main` (hay placement nêu); `dedicated` → phải nêu
 //!   một placement `dedicated` đã thêm bằng `autoxide placement add` (URL có mật khẩu, không qua
 //!   API — đặc tả 33).
-//! - Gói `requires_kyc` chưa cấp phát được tới khi có KYC của bước 37 (`plans.kyc_required`).
-//! - Khách tự đăng ký (`POST /signups`) chờ bước 37 (KYC, chấp nhận điều khoản).
+//! - Gói `requires_kyc`: nhân sự không cấp phát thẳng được (`plans.kyc_required`) — khách tự đăng ký
+//!   và qua định danh ở `signup.rs` (D-349), rồi đến đây bằng chính đường này.
 
 use std::sync::Arc;
 
@@ -117,8 +117,8 @@ fn kyc_required(code: &str) -> Error {
     Error::new(
         ErrorKind::Conflict,
         "plans.kyc_required",
-        "Plan `{code}` requires identity checks before a tenant is created; this comes with the \
-         compliance module (step 37).",
+        "Plan `{code}` requires identity checks before a tenant is created: the tenant signs up by \
+         itself (`POST /api/v1/plans/signups`) and passes them there.",
     )
     .with_param("code", code)
 }
@@ -143,7 +143,7 @@ fn step_failed(step: &str, error: &Error) -> Error {
     .with_param("reason", error.message())
 }
 
-fn is_slug(slug: &str) -> bool {
+pub(crate) fn is_slug(slug: &str) -> bool {
     (1..=63).contains(&slug.len())
         && !slug.starts_with('-')
         && !slug.ends_with('-')
@@ -162,6 +162,19 @@ impl PlansService {
         actor: Actor,
         request: ProvisionRequest,
         enqueue: bool,
+    ) -> Result<entity::Model, Error> {
+        self.start_provisioning_for(actor, request, enqueue, None).await
+    }
+
+    /// Như [`start_provisioning`](Self::start_provisioning); `signup`: lượt này cho một đăng ký của
+    /// khách tự đăng ký (D-349) — định danh (nếu gói cần) đã xong ở đó, và đăng ký chuyển sang
+    /// `provisioning` trong cùng transaction (đăng ký không còn chờ → `plans.signup_not_waiting`).
+    pub(crate) async fn start_provisioning_for(
+        &self,
+        actor: Actor,
+        request: ProvisionRequest,
+        enqueue: bool,
+        signup: Option<crate::signup::SignupLink>,
     ) -> Result<entity::Model, Error> {
         let mut problems = Vec::new();
         let slug = request.slug.trim().to_owned();
@@ -197,7 +210,7 @@ impl PlansService {
         if plan.status != "active" || plan.kind != "base" {
             return Err(crate::service::plan_not_active(&plan.code));
         }
-        if plan.requires_kyc {
+        if plan.requires_kyc && signup.is_none() {
             return Err(kyc_required(&plan.code));
         }
         if let Some(price_id) = request.price_id {
@@ -276,6 +289,16 @@ impl PlansService {
                 Error::from(error)
             }
         })?;
+        if let Some(link) = &signup
+            && !crate::signup::claim_for_provisioning(&transaction, link, row.id).await?
+        {
+            transaction.rollback().await?;
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "plans.signup_not_waiting",
+                "This sign-up already went on; read it again.",
+            ));
+        }
         if enqueue {
             self.jobs
                 .enqueue_database(
@@ -334,7 +357,7 @@ impl PlansService {
             .await
     }
 
-    fn tenant_admin(&self) -> Result<Arc<autoxide_kernel::tenancy::TenantAdmin>, Error> {
+    pub(crate) fn tenant_admin(&self) -> Result<Arc<autoxide_kernel::tenancy::TenantAdmin>, Error> {
         self.tenants
             .clone()
             .ok_or_else(|| Error::internal("the kernel did not provide the tenant service"))
@@ -385,6 +408,8 @@ impl PlansService {
         let row =
             self.update_provisioning(row, |active| active.status = Set("done".to_owned())).await?;
         tracing::info!(provisioning_id = %id, tenant_id = ?row.tenant_id, "tenant provisioned");
+        // Lượt của một khách tự đăng ký: đăng ký xong.
+        self.complete_signup(&row).await?;
         Ok(row)
     }
 
@@ -641,8 +666,8 @@ pub(crate) struct ProvisioningsQuery {
 /// Platform staff with `plans.provision`. Runs in the background: creates the tenant, puts it on the
 /// plan, adds the sample data of the modules the plan turns on (when asked) and invites the
 /// administrator by email with the role `admin`. Follow it with `GET /provisionings/{id}`
-/// (`plans.subscriptions.read`). A plan that
-/// requires identity checks cannot be provisioned yet (`plans.kyc_required`).
+/// (`plans.subscriptions.read`). A plan that requires identity checks cannot be provisioned here
+/// (`plans.kyc_required`): the tenant signs up by itself (`POST /signups`) and passes them there.
 #[utoipa::path(
     post,
     path = "/provisionings",
