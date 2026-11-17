@@ -289,12 +289,43 @@ pub struct Document {
     pub rejection_reason: Option<String>,
     /// Kept at least until this day (Accounting Law 88/2015, Article 41).
     pub retention_until: Option<NaiveDate>,
+    /// For a document in a foreign currency: the rate used at issue (1 `currency` = `exchange_rate`
+    /// of the book currency), kept as issued; `null` in the book currency or while a draft.
+    pub exchange_rate: Option<String>,
+    /// Id of the ledger exchange rate used.
+    pub exchange_rate_id: Option<Uuid>,
+    /// The total in the book currency, converted with `exchange_rate`.
+    pub base_total: Option<Money>,
     pub source_module: String,
     pub source_id: Option<String>,
     pub reference: String,
     pub issued_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// Định dạng bản in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenderFormat {
+    /// HTML dựng từ mẫu của khách (hay mẫu mặc định).
+    Html,
+    /// PDF bố cục cố định từ cùng view model.
+    Pdf,
+}
+
+/// Một bản in: kiểu nội dung, tên file gợi ý, nội dung.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Rendered {
+    pub content_type: &'static str,
+    pub file_name: String,
+    pub body: Vec<u8>,
+}
+
+impl Rendered {
+    pub fn new(content_type: &'static str, file_name: String, body: Vec<u8>) -> Self {
+        Rendered { content_type, file_name, body }
+    }
 }
 
 /// Lập, phát hành và đọc chứng từ.
@@ -330,4 +361,19 @@ pub trait Invoices: Send + Sync {
         document: Uuid,
         reason: String,
     ) -> Result<Document, Error>;
+
+    /// Bản in của chứng từ (D-353): module khác (đơn hàng, kho) lập phiếu giao hàng, phiếu nhập,
+    /// phiếu thu… qua [`Invoices::create_document`] rồi in qua đây — một chỗ giữ mẫu in theo khách.
+    /// `locale`: `vi` hay `en`. Không có chứng từ: `invoices.document_not_found`.
+    async fn render(
+        &self,
+        tenant: &TenantContext,
+        document: Uuid,
+        format: RenderFormat,
+        locale: &str,
+    ) -> Result<Rendered, Error>;
+
+    /// Gói lưu trữ kế toán của khách (sổ nhật ký chung, chứng từ, `manifest.json` có SHA-256 từng
+    /// file) vào nơi lưu chung, ngoài thư mục của khách — còn lại sau khi xoá hẳn khách. Trả ID bản lưu.
+    async fn archive(&self, tenant: &TenantContext, actor: Actor) -> Result<Uuid, Error>;
 }

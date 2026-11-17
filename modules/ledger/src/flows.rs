@@ -747,7 +747,7 @@ impl LedgerService {
                         ],
                     )
                     .source_id(row.source_id.clone());
-                    let draft = draft_for(entry, book.clone(), day, None, None)?;
+                    let draft = draft_for(entry, book.clone(), day, None, None, None)?;
                     let written = write_in(&transaction, tenant, actor, &draft, outbox).await?;
                     entry_id = Some(written.into_inner().id);
                 }
@@ -975,7 +975,7 @@ async fn settle_in(
     )
     .source_id(input.source_id.clone());
     entry.effective_date = Some(plan.day);
-    let draft = draft_for(entry, plan.book.clone(), plan.day, None, None)?;
+    let draft = draft_for(entry, plan.book.clone(), plan.day, None, None, None)?;
     let written = write_in(transaction, tenant, actor, &draft, outbox).await?.into_inner();
     if let Some((hold_id, minor)) = reduce {
         let changed = rows::adjust::<hold::Entity, _>(

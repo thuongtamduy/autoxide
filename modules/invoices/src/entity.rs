@@ -86,6 +86,15 @@ pub(crate) mod document {
         pub created_by: Option<Uuid>,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
+        /// Chứng từ ngoại tệ: ảnh chụp tỉ giá (1 `currency` = `exchange_rate` `base_currency`), chữ
+        /// thập phân; không tính lại khi tỉ giá đổi.
+        pub exchange_rate: Option<String>,
+        /// Dòng tỉ giá của `ledger` đã dùng (chỉ giữ ID — không foreign key xuyên module).
+        pub exchange_rate_id: Option<Uuid>,
+        pub base_currency: Option<String>,
+        pub base_total_minor: Option<i64>,
+        /// Lúc ảnh chụp người mua cá nhân được ẩn danh (hết hạn lưu).
+        pub buyer_purged_at: Option<DateTimeUtc>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -148,6 +157,95 @@ pub(crate) mod mandate {
         pub created_by: Option<Uuid>,
         pub created_at: DateTimeUtc,
         pub revoked_at: Option<DateTimeUtc>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod template {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "invoices_templates")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// UUID nil: mẫu của cả khách.
+        pub org_id: Uuid,
+        pub kind: String,
+        pub locale: String,
+        /// Tăng mỗi lần sửa.
+        pub version: i32,
+        pub body: String,
+        pub updated_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod export {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "invoices_exports")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub org_id: Uuid,
+        /// `generic_journal`, `vn_double_entry` hay `generic_documents`.
+        pub profile: String,
+        /// `csv` hay `xlsx`.
+        pub format: String,
+        pub period_from: Date,
+        pub period_to: Date,
+        /// `pending`, `running`, `ready` hay `failed`.
+        pub status: String,
+        pub file_key: Option<String>,
+        pub size: Option<i64>,
+        pub row_count: Option<i64>,
+        pub error: Option<String>,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod archive {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "invoices_archives")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// `ready` hay `failed`.
+        pub status: String,
+        /// `manual` hay `tenant_deleted`.
+        pub reason: String,
+        /// Tiền tố của các file ở nơi lưu chung (`archives/<khách>/<id>/`).
+        pub storage_prefix: String,
+        /// SHA-256 của `manifest.json`.
+        pub manifest_sha256: Option<String>,
+        /// JSON `[{"path", "sha256", "size"}]`.
+        pub files: Option<String>,
+        pub retain_until: Option<Date>,
+        pub error: Option<String>,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

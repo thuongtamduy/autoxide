@@ -41,6 +41,34 @@ pub(crate) const MANDATES_MANAGE: Permission = Permission::new(
 .scoped()
 .with_risk(Risk::Money);
 
+pub(crate) const TEMPLATES_MANAGE: Permission = Permission::new(
+    "invoices.templates_manage",
+    "Write and change the print templates of documents for the units in your scope.",
+)
+.scoped();
+
+pub(crate) const EXPORT: Permission = Permission::new(
+    "invoices.export",
+    "Export the general journal and documents of a period for accounting software.",
+)
+.with_risk(Risk::SensitiveData);
+
+pub(crate) const ARCHIVE: Permission = Permission::new(
+    "invoices.archive",
+    "Make an archive copy of the tenant's accounting records (journal and documents).",
+)
+.with_risk(Risk::SensitiveData);
+
 pub(crate) fn all() -> Vec<Permission> {
-    vec![READ, WRITE, ISSUE, CORRECT, SERIES_MANAGE, MANDATES_MANAGE]
+    vec![
+        READ,
+        WRITE,
+        ISSUE,
+        CORRECT,
+        SERIES_MANAGE,
+        MANDATES_MANAGE,
+        TEMPLATES_MANAGE,
+        EXPORT,
+        ARCHIVE,
+    ]
 }

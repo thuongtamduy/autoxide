@@ -11,6 +11,33 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 36 finished — exchange rates, printing, accounting exports, record keeping:
+  - Exchange rates with effective dates per currency pair in the ledger: `GET|POST /api/v1/ledger/exchange-rates`,
+    `GET /exchange-rates/effective?base=&quote=&on=`, `POST /exchange-rates/fetch` (new kernel trait
+    `ExchangeRateSource`, testkit `FakeExchangeRateSource`), MCP `ledger.exchange_rate`, `ledger.record_exchange_rate`.
+    Entries in a currency other than the book's are converted with the rate of their day (or the rate the caller
+    passes, `NewEntry::exchange_rate`) and keep it on every line; foreign-currency documents keep the rate of their
+    issue date (`exchange_rate`, `exchange_rate_id`, `base_total`; `invoices.rate_missing` without one).
+    `dyn Ledger` gains `exchange_rate`, `book_currency` and `journal`.
+  - Kernel template engine `autoxide_kernel::template` (`minijinja`, sandboxed: no files or other templates, limits
+    on size, steps and output, HTML-escaped values, no `safe` filter, variable check on save with every problem at
+    once — `template.syntax_error`, `template.unknown_variable`, `template.required_variable_missing`,
+    `template.limit_exceeded`); new setting `AUTOXIDE_TEMPLATE_MAX_BYTES`.
+  - Print templates per tenant, unit, document kind and language: `GET|POST /api/v1/invoices/templates`,
+    `GET|PUT|DELETE /templates/{id}`, `POST /templates/preview`, `GET /template-defaults`; print with
+    `GET /documents/{id}/render?format=html|pdf&locale=vi|en` (PDF in a fixed A4 layout with an embedded font for
+    Vietnamese), `Invoices::render` for other modules, MCP `invoices.print`. New permission `invoices.templates_manage`.
+  - Accounting exports of a period as CSV or XLSX (`generic_journal`, `vn_double_entry`, `generic_documents`):
+    `GET /export-profiles`, `GET|POST /exports`, `GET /exports/{id}`, `GET /exports/{id}/download`, job
+    `invoices.build_export`, event `invoices.export_ready`, MCP `invoices.create_export`, `invoices.export`, permission
+    `invoices.export`. Account numbers follow the Vietnamese chart of accounts (`modules/ledger/data/vn-accounts.json`,
+    to be checked by an accountant).
+  - Record keeping: `POST|GET /invoices/archives` (permission `invoices.archive`) writes the journal, every document
+    and a SHA-256 manifest outside the tenant's folder so it outlives tenant deletion; the daily job
+    `invoices.purge_expired` removes consumer buyers' personal data from documents past their retention date and, for
+    deleted tenants, deletes expired documents — never one still inside its retention period.
+  - Guide `docs/MONEY.md` (and `MONEY.vi.md`): ledger, payments, flow modes, VietQR, documents, exchange rates,
+    printing, exports, retention, writing partner connectors.
 - Summary figures (step 51): modules declare figures with a mandatory definition (`StartContext::summary_metric`);
   `GET /api/v1/kernel/summary?group=` returns those the caller may see, each with how it is computed in the
   caller's language. Figures: comments waiting, new submissions, entries waiting for a review, media items,

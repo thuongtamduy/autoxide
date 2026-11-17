@@ -8,13 +8,18 @@ pub mod api;
 mod documents;
 mod entity;
 mod events;
+mod exports;
 mod http;
 mod http_documents;
+mod http_print;
 mod issue;
 mod migration;
 mod permissions;
+mod print;
 mod provider;
+mod retention;
 mod service;
+mod templates;
 mod tools;
 
 #[cfg(test)]
@@ -66,7 +71,13 @@ impl Module for InvoicesModule {
 
     // Chứng từ kế toán lưu ít nhất 10 năm, kể cả khi xoá hẳn khách (Luật Kế toán 88/2015, Điều 41).
     fn retained_tables(&self) -> Vec<&'static str> {
-        vec!["invoices_series", "invoices_documents", "invoices_lines", "invoices_mandates"]
+        vec![
+            "invoices_series",
+            "invoices_documents",
+            "invoices_lines",
+            "invoices_mandates",
+            "invoices_archives",
+        ]
     }
 
     fn permissions(&self) -> Vec<Permission> {
@@ -89,6 +100,8 @@ impl Module for InvoicesModule {
             tax: context.require::<dyn autoxide_tax::api::TaxEngine>()?,
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>()?,
             providers: context.contributions::<dyn autoxide_kernel::einvoice::EInvoiceProvider>(),
+            templates: context.require::<autoxide_kernel::template::TemplateEngine>()?,
+            storage: context.require::<dyn autoxide_kernel::storage::Storage>().ok(),
         });
         self.service = Some(service.clone());
         context.provide::<dyn api::Invoices>(Arc::new(provider::Provider(service)))
@@ -96,7 +109,9 @@ impl Module for InvoicesModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
-            http::routes(service.clone()).merge(http_documents::routes(service))
+            http::routes(service.clone())
+                .merge(http_documents::routes(service.clone()))
+                .merge(http_print::routes(service))
         })
     }
 
@@ -111,16 +126,34 @@ impl Module for InvoicesModule {
                     issue::SUBMIT_EINVOICE,
                     Arc::new(issue::SubmitJob(service.clone())),
                 ),
-                JobRegistration::new(issue::POLL_EINVOICES, Arc::new(issue::PollJob(service))),
+                JobRegistration::new(
+                    issue::POLL_EINVOICES,
+                    Arc::new(issue::PollJob(service.clone())),
+                ),
+                JobRegistration::new(
+                    exports::BUILD_EXPORT,
+                    Arc::new(exports::BuildExportJob(service.clone())),
+                ),
+                JobRegistration::new(
+                    retention::PURGE_EXPIRED,
+                    Arc::new(retention::PurgeExpiredJob(service)),
+                ),
             ]
         })
     }
 
     fn schedules(&self) -> Vec<Schedule> {
-        vec![Schedule::new(
-            issue::POLL_EINVOICES,
-            issue::POLL_EINVOICES,
-            std::time::Duration::from_secs(300),
-        )]
+        vec![
+            Schedule::new(
+                issue::POLL_EINVOICES,
+                issue::POLL_EINVOICES,
+                std::time::Duration::from_secs(300),
+            ),
+            Schedule::new(
+                retention::PURGE_EXPIRED,
+                retention::PURGE_EXPIRED,
+                std::time::Duration::from_secs(86_400),
+            ),
+        ]
     }
 }

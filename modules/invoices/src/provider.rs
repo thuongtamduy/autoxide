@@ -9,9 +9,9 @@ use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::EntityTrait;
 use uuid::Uuid;
 
-use crate::api::{Document, Invoices, NewDocument};
+use crate::api::{Document, Invoices, NewDocument, RenderFormat, Rendered};
 use crate::entity::document;
-use crate::service::{InvoicesService, describe};
+use crate::service::{InvoicesService, describe, document_not_found};
 
 pub(crate) struct Provider(pub Arc<InvoicesService>);
 
@@ -51,5 +51,20 @@ impl Invoices for Provider {
         reason: String,
     ) -> Result<Document, Error> {
         self.0.cancel(tenant, actor, document, reason).await
+    }
+
+    async fn render(
+        &self,
+        tenant: &TenantContext,
+        document: Uuid,
+        format: RenderFormat,
+        locale: &str,
+    ) -> Result<Rendered, Error> {
+        let found = self.document(tenant, document).await?.ok_or_else(document_not_found)?;
+        self.0.render_document(tenant, &found, format, locale).await
+    }
+
+    async fn archive(&self, tenant: &TenantContext, actor: Actor) -> Result<Uuid, Error> {
+        Ok(self.0.archive_tenant(tenant, actor, "manual").await?.id)
     }
 }

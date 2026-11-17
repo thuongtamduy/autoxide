@@ -2609,10 +2609,30 @@ export type Data_InvitationResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_InvoicesArchive = {
+  /** An archive copy of the tenant's accounting records. */
+  data: {
+    created_at: string;
+    id: string;
+    /** SHA-256 of `manifest.json`, which lists the SHA-256 of every file. */
+    manifest_sha256?: string | null;
+    /** `manual` or `tenant_deleted`. */
+    reason: string;
+    /** Keep the archive at least until this day. */
+    retain_until?: string | null;
+    /** `ready` or `failed`. */
+    status: string;
+    /** Where the files are in the shared file storage (outside the tenant's folder). */
+    storage_prefix: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_InvoicesDocument = {
   /** An accounting document (invoice, receipt, note…). */
   data: {
     authority_code?: string | null;
+    base_total?: Money | null;
     buyer: InvoicesBuyer;
     created_at: string;
     currency: string;
@@ -2620,6 +2640,13 @@ export type Data_InvoicesDocument = {
     direction: string;
     /** E-invoice: provider, its reference and number, tax authority code, lookup code. */
     einvoice_provider?: string | null;
+    /**
+     * For a document in a foreign currency: the rate used at issue (1 `currency` = `exchange_rate`
+     * of the book currency), kept as issued; `null` in the book currency or while a draft.
+     */
+    exchange_rate?: string | null;
+    /** Id of the ledger exchange rate used. */
+    exchange_rate_id?: string | null;
     id: string;
     issue_date?: string | null;
     issued_at?: string | null;
@@ -2654,6 +2681,29 @@ export type Data_InvoicesDocument = {
     symbol?: string | null;
     tax: Money;
     total: Money;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InvoicesExport = {
+  /** An accounting export. */
+  data: {
+    created_at: string;
+    error?: string | null;
+    /** `csv` or `xlsx`. */
+    format: string;
+    id: string;
+    /** Only the book of this unit; `null`: every book of the tenant. */
+    org_id?: string | null;
+    period_from: string;
+    period_to: string;
+    profile: string;
+    /** Rows in the file, without the header row. */
+    row_count?: number | null;
+    size?: number | null;
+    /** `pending`, `running`, `ready` (download it) or `failed` (ask for a new one). */
+    status: string;
     updated_at: string;
   };
 };
@@ -2694,6 +2744,51 @@ export type Data_InvoicesSeries = {
     symbol: string;
     updated_at: string;
     year: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InvoicesTemplate = {
+  /** A print template of a document kind and language. */
+  data: {
+    /** The template (Jinja syntax; see `GET /api/v1/invoices/template-defaults`). */
+    body: string;
+    created_at: string;
+    id: string;
+    kind: string;
+    /** `en` or `vi`. */
+    locale: string;
+    /** The unit the template is for; `null`: every unit of the tenant. */
+    org_id?: string | null;
+    updated_at: string;
+    /** Goes up by one on each change. */
+    version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InvoicesTemplateDefaults = {
+  /** The built-in print template and the variables templates may use. */
+  data: {
+    /** The built-in template, for every kind and language (words come from `labels`). */
+    body: string;
+    /**
+     * Filters: `money` (an `{amount, currency}` value), `number` (a decimal string), `date`
+     * (`YYYY-MM-DD`) format in the language of the print; built-in Jinja filters and tests work too.
+     * There is no `safe` filter: every value is HTML-escaped.
+     */
+    filters: string[];
+    kinds: string[];
+    locales: string[];
+    variables: InvoicesTemplateVariable[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InvoicesTemplatePreview = {
+  /** The HTML a template gives. */
+  data: {
+    html: string;
   };
 };
 
@@ -2830,6 +2925,25 @@ export type Data_LedgerExceptionResponse = {
     /** The record concerned, e.g. `ledger.payment:<id>`. */
     subject: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerExchangeRate = {
+  /** An exchange rate in force from a day: 1 `base` = `rate` `quote`. */
+  data: {
+    /** ISO 4217 code, e.g. `USD`. */
+    base: string;
+    created_at: string;
+    /** First day the rate is used; it stays in force until a later rate of the same pair. */
+    effective_date: string;
+    id: string;
+    /** ISO 4217 code, e.g. `VND`. */
+    quote: string;
+    /** Units of `quote` for one unit of `base`, as a decimal string, e.g. `"25345.5"`. */
+    rate: DecimalString;
+    /** `manual` (entered by a person) or `provider:<name>` (fetched from a rate source). */
+    source: string;
   };
 };
 
@@ -5099,6 +5213,33 @@ export type Data_Vec_EventTypeResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_InvoicesExportProfile = {
+  data: {
+    description: string;
+    formats: string[];
+    name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_LedgerExchangeRate = {
+  data: {
+    /** ISO 4217 code, e.g. `USD`. */
+    base: string;
+    created_at: string;
+    /** First day the rate is used; it stays in force until a later rate of the same pair. */
+    effective_date: string;
+    id: string;
+    /** ISO 4217 code, e.g. `VND`. */
+    quote: string;
+    /** Units of `quote` for one unit of `base`, as a decimal string, e.g. `"25345.5"`. */
+    rate: DecimalString;
+    /** `manual` (entered by a person) or `provider:<name>` (fetched from a rate source). */
+    source: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_LimitUse = {
   data: {
     /**
@@ -6533,6 +6674,22 @@ export type InvoicesAdjustRequest = {
   reference: string;
 };
 
+/** An archive copy of the tenant's accounting records. */
+export type InvoicesArchive = {
+  created_at: string;
+  id: string;
+  /** SHA-256 of `manifest.json`, which lists the SHA-256 of every file. */
+  manifest_sha256?: string | null;
+  /** `manual` or `tenant_deleted`. */
+  reason: string;
+  /** Keep the archive at least until this day. */
+  retain_until?: string | null;
+  /** `ready` or `failed`. */
+  status: string;
+  /** Where the files are in the shared file storage (outside the tenant's folder). */
+  storage_prefix: string;
+};
+
 /** The buyer printed on a document (a copy taken when the document is written). */
 export type InvoicesBuyer = {
   /** One line, up to 400 characters. */
@@ -6555,6 +6712,7 @@ export type InvoicesCancelRequest = {
 /** An accounting document (invoice, receipt, note…). */
 export type InvoicesDocument = {
   authority_code?: string | null;
+  base_total?: Money | null;
   buyer: InvoicesBuyer;
   created_at: string;
   currency: string;
@@ -6562,6 +6720,13 @@ export type InvoicesDocument = {
   direction: string;
   /** E-invoice: provider, its reference and number, tax authority code, lookup code. */
   einvoice_provider?: string | null;
+  /**
+   * For a document in a foreign currency: the rate used at issue (1 `currency` = `exchange_rate`
+   * of the book currency), kept as issued; `null` in the book currency or while a draft.
+   */
+  exchange_rate?: string | null;
+  /** Id of the ledger exchange rate used. */
+  exchange_rate_id?: string | null;
   id: string;
   issue_date?: string | null;
   issued_at?: string | null;
@@ -6633,6 +6798,47 @@ export type InvoicesDocumentRequest = {
   series_id?: string | null;
   /** Id of your source document (order…). */
   source_id?: string | null;
+};
+
+/** An accounting export. */
+export type InvoicesExport = {
+  created_at: string;
+  error?: string | null;
+  /** `csv` or `xlsx`. */
+  format: string;
+  id: string;
+  /** Only the book of this unit; `null`: every book of the tenant. */
+  org_id?: string | null;
+  period_from: string;
+  period_to: string;
+  profile: string;
+  /** Rows in the file, without the header row. */
+  row_count?: number | null;
+  size?: number | null;
+  /** `pending`, `running`, `ready` (download it) or `failed` (ask for a new one). */
+  status: string;
+  updated_at: string;
+};
+
+/** An export profile (file layout). */
+export type InvoicesExportProfile = {
+  description: string;
+  formats: string[];
+  name: string;
+};
+
+/** An export to make. */
+export type InvoicesExportRequest = {
+  /** `csv` (UTF-8 with BOM, opens in Excel) or `xlsx`. */
+  format: string;
+  /** First day, `YYYY-MM-DD`. */
+  from: string;
+  /** Only the book (or documents) of this unit; omit for the whole tenant. */
+  org_id?: string | null;
+  /** See `GET /api/v1/invoices/export-profiles`. */
+  profile: string;
+  /** Last day, `YYYY-MM-DD`; at most 366 days after `from`. */
+  to: string;
 };
 
 /** One line of a document. */
@@ -6743,6 +6949,78 @@ export type InvoicesSeriesRequest = {
   symbol: string;
   /** Year the numbers run in. */
   year: number;
+};
+
+/** A print template of a document kind and language. */
+export type InvoicesTemplate = {
+  /** The template (Jinja syntax; see `GET /api/v1/invoices/template-defaults`). */
+  body: string;
+  created_at: string;
+  id: string;
+  kind: string;
+  /** `en` or `vi`. */
+  locale: string;
+  /** The unit the template is for; `null`: every unit of the tenant. */
+  org_id?: string | null;
+  updated_at: string;
+  /** Goes up by one on each change. */
+  version: number;
+};
+
+/** A new body for a print template. */
+export type InvoicesTemplateChange = {
+  body: string;
+};
+
+/** The built-in print template and the variables templates may use. */
+export type InvoicesTemplateDefaults = {
+  /** The built-in template, for every kind and language (words come from `labels`). */
+  body: string;
+  /**
+   * Filters: `money` (an `{amount, currency}` value), `number` (a decimal string), `date`
+   * (`YYYY-MM-DD`) format in the language of the print; built-in Jinja filters and tests work too.
+   * There is no `safe` filter: every value is HTML-escaped.
+   */
+  filters: string[];
+  kinds: string[];
+  locales: string[];
+  variables: InvoicesTemplateVariable[];
+};
+
+/** The HTML a template gives. */
+export type InvoicesTemplatePreview = {
+  html: string;
+};
+
+/** A template body to try. */
+export type InvoicesTemplatePreviewRequest = {
+  body: string;
+  /** A document to print with it; omit to use a built-in sample document. */
+  document_id?: string | null;
+  kind: string;
+  /** `en` or `vi`. */
+  locale: string;
+};
+
+/** A print template to save. */
+export type InvoicesTemplateRequest = {
+  /** The template, at most `AUTOXIDE_TEMPLATE_MAX_BYTES` bytes. */
+  body: string;
+  /** Document kind, e.g. `retail_receipt`, `delivery_note`, `goods_receipt`, `cash_receipt`. */
+  kind: string;
+  /** `en` or `vi`. */
+  locale: string;
+  /** The unit; omit for every unit of the tenant. */
+  org_id?: string | null;
+};
+
+/** A variable a print template may use. */
+export type InvoicesTemplateVariable = {
+  description: string;
+  /** Dotted path, e.g. `document.number`; a declared object allows all its fields. */
+  name: string;
+  /** The template must use it. */
+  required: boolean;
 };
 
 /** What an entry is. */
@@ -6986,6 +7264,44 @@ export type LedgerExceptionResponse = {
   /** The record concerned, e.g. `ledger.payment:<id>`. */
   subject: string;
   updated_at: string;
+};
+
+/** An exchange rate in force from a day: 1 `base` = `rate` `quote`. */
+export type LedgerExchangeRate = {
+  /** ISO 4217 code, e.g. `USD`. */
+  base: string;
+  created_at: string;
+  /** First day the rate is used; it stays in force until a later rate of the same pair. */
+  effective_date: string;
+  id: string;
+  /** ISO 4217 code, e.g. `VND`. */
+  quote: string;
+  /** Units of `quote` for one unit of `base`, as a decimal string, e.g. `"25345.5"`. */
+  rate: DecimalString;
+  /** `manual` (entered by a person) or `provider:<name>` (fetched from a rate source). */
+  source: string;
+};
+
+/** Rates to fetch from a rate source. */
+export type LedgerExchangeRateFetch = {
+  /** Currency to price, e.g. `USD`. */
+  base: string;
+  /** The day, `YYYY-MM-DD`; omit for today in the tenant's time zone. */
+  on?: string | null;
+  /** Name of the rate source set up on this server; omit when there is only one. */
+  provider?: string | null;
+};
+
+/** An exchange rate to record. */
+export type LedgerExchangeRateRequest = {
+  /** ISO 4217 code of the currency being priced, e.g. `USD`. */
+  base: string;
+  /** First day the rate is used, `YYYY-MM-DD`. */
+  effective_date: string;
+  /** ISO 4217 code of the currency the price is in, e.g. `VND`. */
+  quote: string;
+  /** Units of `quote` for one unit of `base`, as a decimal string (never a JSON number). */
+  rate: string;
 };
 
 /** How money flows for a unit (D-187: the platform never holds buyers' money). */
@@ -8999,10 +9315,31 @@ export type Page_InvitationResponse = {
 };
 
 /** One page of a list. */
+export type Page_InvoicesArchive = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    /** SHA-256 of `manifest.json`, which lists the SHA-256 of every file. */
+    manifest_sha256?: string | null;
+    /** `manual` or `tenant_deleted`. */
+    reason: string;
+    /** Keep the archive at least until this day. */
+    retain_until?: string | null;
+    /** `ready` or `failed`. */
+    status: string;
+    /** Where the files are in the shared file storage (outside the tenant's folder). */
+    storage_prefix: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InvoicesDocument = {
   /** The items of this page, in the requested order. */
   data: {
     authority_code?: string | null;
+    base_total?: Money | null;
     buyer: InvoicesBuyer;
     created_at: string;
     currency: string;
@@ -9010,6 +9347,13 @@ export type Page_InvoicesDocument = {
     direction: string;
     /** E-invoice: provider, its reference and number, tax authority code, lookup code. */
     einvoice_provider?: string | null;
+    /**
+     * For a document in a foreign currency: the rate used at issue (1 `currency` = `exchange_rate`
+     * of the book currency), kept as issued; `null` in the book currency or while a draft.
+     */
+    exchange_rate?: string | null;
+    /** Id of the ledger exchange rate used. */
+    exchange_rate_id?: string | null;
     id: string;
     issue_date?: string | null;
     issued_at?: string | null;
@@ -9044,6 +9388,30 @@ export type Page_InvoicesDocument = {
     symbol?: string | null;
     tax: Money;
     total: Money;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InvoicesExport = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    error?: string | null;
+    /** `csv` or `xlsx`. */
+    format: string;
+    id: string;
+    /** Only the book of this unit; `null`: every book of the tenant. */
+    org_id?: string | null;
+    period_from: string;
+    period_to: string;
+    profile: string;
+    /** Rows in the file, without the header row. */
+    row_count?: number | null;
+    size?: number | null;
+    /** `pending`, `running`, `ready` (download it) or `failed` (ask for a new one). */
+    status: string;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -9086,6 +9454,26 @@ export type Page_InvoicesSeries = {
     symbol: string;
     updated_at: string;
     year: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InvoicesTemplate = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The template (Jinja syntax; see `GET /api/v1/invoices/template-defaults`). */
+    body: string;
+    created_at: string;
+    id: string;
+    kind: string;
+    /** `en` or `vi`. */
+    locale: string;
+    /** The unit the template is for; `null`: every unit of the tenant. */
+    org_id?: string | null;
+    updated_at: string;
+    /** Goes up by one on each change. */
+    version: number;
   }[];
   pagination: Pagination;
 };
@@ -9222,6 +9610,26 @@ export type Page_LedgerExceptionResponse = {
     /** The record concerned, e.g. `ledger.payment:<id>`. */
     subject: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LedgerExchangeRate = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** ISO 4217 code, e.g. `USD`. */
+    base: string;
+    created_at: string;
+    /** First day the rate is used; it stays in force until a later rate of the same pair. */
+    effective_date: string;
+    id: string;
+    /** ISO 4217 code, e.g. `VND`. */
+    quote: string;
+    /** Units of `quote` for one unit of `base`, as a decimal string, e.g. `"25345.5"`. */
+    rate: DecimalString;
+    /** `manual` (entered by a person) or `provider:<name>` (fetched from a rate source). */
+    source: string;
   }[];
   pagination: Pagination;
 };
@@ -16394,6 +16802,30 @@ export interface paths {
       };
     };
   };
+  "/api/v1/invoices/archives": {
+    /** List archive copies of the accounting records. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_InvoicesArchive;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Make an archive copy of the accounting records. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        201: Data_InvoicesArchive;
+        401: Problem;
+        403: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/invoices/documents": {
     /** List documents in your scope. */
     get: {
@@ -16523,6 +16955,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/invoices/documents/{id}/render": {
+    /** Print a document as HTML or PDF. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { format?: string; locale?: string }; };
+      responses: {
+        200: Blob;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/invoices/documents/{id}/replace": {
     /** Write a replacement of an issued document. */
     post: {
@@ -16536,6 +16982,71 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/export-profiles": {
+    /** List the export profiles. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_InvoicesExportProfile;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/exports": {
+    /** List accounting exports. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_InvoicesExport;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Export the general journal or the documents of a period. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InvoicesExportRequest;
+      responses: {
+        201: Data_InvoicesExport;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/exports/{id}": {
+    /** Get an accounting export. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvoicesExport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/exports/{id}/download": {
+    /** Download the file of an accounting export. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Blob;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
@@ -16615,6 +17126,97 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/template-defaults": {
+    /** Get the built-in print template and the variables templates may use. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_InvoicesTemplateDefaults;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/templates": {
+    /** List the print templates of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_InvoicesTemplate;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Save a print template. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InvoicesTemplateRequest;
+      responses: {
+        201: Data_InvoicesTemplate;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/templates/preview": {
+    /** Try a print template without saving it. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InvoicesTemplatePreviewRequest;
+      responses: {
+        200: Data_InvoicesTemplatePreview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/templates/{id}": {
+    /** Get a print template. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvoicesTemplate;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a print template. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InvoicesTemplateChange;
+      responses: {
+        200: Data_InvoicesTemplate;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a print template. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -17391,6 +17993,62 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/exchange-rates": {
+    /** List recorded exchange rates. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { base?: string; quote?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_LedgerExchangeRate;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Record an exchange rate by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerExchangeRateRequest;
+      responses: {
+        200: Data_LedgerExchangeRate;
+        201: Data_LedgerExchangeRate;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/exchange-rates/effective": {
+    /** Get the exchange rate in force on a day. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { base: string; quote: string; on: string }; };
+      responses: {
+        200: Data_LedgerExchangeRate;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/exchange-rates/fetch": {
+    /** Fetch exchange rates from a rate source. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: LedgerExchangeRateFetch;
+      responses: {
+        200: Data_Vec_LedgerExchangeRate;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };

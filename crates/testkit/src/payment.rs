@@ -505,3 +505,61 @@ impl BankFeed for FakeBankFeed {
         Ok(BankBatch::new(fresh, Some(mine.len().to_string())))
     }
 }
+
+/// Tên của nguồn tỉ giá giả (`provider:fake` trong cột nguồn).
+pub const FAKE_RATE_PROVIDER: &str = "fake";
+
+/// Nguồn tỉ giá giả cho test: trả các tỉ giá đã nạp cho đúng `base` (ngày của lời gọi), hay lỗi
+/// `payment.provider_unavailable` khi [`FakeExchangeRateSource::fail`].
+#[derive(Debug, Default)]
+pub struct FakeExchangeRateSource {
+    rates: Mutex<Vec<(Currency, Currency, rust_decimal::Decimal)>>,
+    failing: AtomicBool,
+    /// Số lời gọi `rates`.
+    pub calls: AtomicUsize,
+}
+
+impl FakeExchangeRateSource {
+    pub fn new() -> Self {
+        FakeExchangeRateSource::default()
+    }
+
+    /// Nạp tỉ giá 1 `base` = `rate` `quote` (chữ thập phân, vd `"25345.5"`).
+    pub fn set(&self, base: Currency, quote: Currency, rate: &str) {
+        let Ok(rate) = autoxide_kernel::decimal::parse(rate) else { return };
+        if let Ok(mut rates) = self.rates.lock() {
+            rates.retain(|(b, q, _)| !(*b == base && *q == quote));
+            rates.push((base, quote, rate));
+        }
+    }
+
+    /// `true`: mọi lời gọi sau đó trả lỗi đối tác không trả lời.
+    pub fn fail(&self, failing: bool) {
+        self.failing.store(failing, Ordering::SeqCst);
+    }
+}
+
+#[async_trait::async_trait]
+impl autoxide_kernel::payment::ExchangeRateSource for FakeExchangeRateSource {
+    fn provider(&self) -> &'static str {
+        FAKE_RATE_PROVIDER
+    }
+
+    async fn rates(
+        &self,
+        _tenant: TenantId,
+        base: Currency,
+        on: NaiveDate,
+    ) -> Result<Vec<autoxide_kernel::payment::QuotedRate>, Error> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        if self.failing.load(Ordering::SeqCst) {
+            return Err(provider_unavailable());
+        }
+        let rates = self.rates.lock().map(|rates| rates.clone()).unwrap_or_default();
+        Ok(rates
+            .into_iter()
+            .filter(|(b, _, _)| *b == base)
+            .map(|(b, q, rate)| autoxide_kernel::payment::QuotedRate::new(b, q, rate, on))
+            .collect())
+    }
+}

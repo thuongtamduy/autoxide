@@ -28,7 +28,7 @@ pub use ops::{doctor, find, logging, metrics, summary, task, telemetry, work};
 pub use security::{
     access, antispam, entitlement, idempotency, ip_hash, secret, throttle, tls, tokens,
 };
-pub use values::{decimal, email, money, public_url};
+pub use values::{decimal, email, money, public_url, template};
 
 pub mod config;
 pub mod error;

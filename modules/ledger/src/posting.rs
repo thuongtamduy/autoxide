@@ -15,6 +15,7 @@
 use std::collections::BTreeMap;
 
 use autoxide_kernel::access::{OrgTarget, Permission, Principal};
+use autoxide_kernel::decimal::{self, Decimal, Rounding};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::{Currency, Money};
@@ -180,12 +181,15 @@ pub(crate) fn draft_for(
     effective_date: NaiveDate,
     reverses: Option<Uuid>,
     guard: Option<(Principal, Permission)>,
+    rate: Option<Decimal>,
 ) -> Result<Draft, Error> {
     let Checked { description, reference, fingerprint, currency } = checked(&entry, reverses)?;
-    if book.base_currency != currency.code() {
+    let rate = if book.base_currency == currency.code() {
+        None
+    } else {
         let base = Currency::parse(&book.base_currency)?;
-        return Err(exchange_rate_missing(base, currency, effective_date));
-    }
+        Some(rate.ok_or_else(|| exchange_rate_missing(currency, base, effective_date))?)
+    };
     Ok(Draft {
         book,
         effective_date,
@@ -199,6 +203,7 @@ pub(crate) fn draft_for(
         lines: entry.lines,
         reverses,
         guard,
+        rate,
     })
 }
 
@@ -235,6 +240,31 @@ pub(crate) struct Draft {
     /// REST / MCP: người gọi phải có permission này ở nút của sổ, nút không bị đóng băng — kiểm
     /// TRONG transaction ghi (`require_write_at` khoá dòng của cây tổ chức).
     guard: Option<(Principal, Permission)>,
+    /// Bút toán ngoại tệ: 1 tiền của bút toán = `rate` tiền của sổ (ảnh chụp lưu trên từng dòng).
+    rate: Option<Decimal>,
+}
+
+/// Tiền của sổ cho từng dòng của bút toán ngoại tệ: quy đổi TỔNG nợ (= tổng có) một lần, làm tròn
+/// `HalfUp` tới đơn vị nhỏ nhất của tiền sổ, rồi chia về các dòng mỗi bên theo tỉ lệ bằng
+/// `Money::allocate` — bút toán cân ở cả tiền gốc và tiền sổ, không làm tròn hai lần.
+fn base_amounts(lines: &[NewLine], rate: Decimal, base: Currency) -> Result<Vec<Money>, Error> {
+    let mut out = vec![Money::zero(base); lines.len()];
+    for side in [Side::Debit, Side::Credit] {
+        let picked: Vec<usize> =
+            (0..lines.len()).filter(|index| lines[*index].side == side).collect();
+        let Some(first) = picked.first() else { continue };
+        let total = Money::sum(
+            lines[*first].amount.currency(),
+            picked.iter().map(|index| lines[*index].amount),
+        )?;
+        let converted = total.convert(rate, base, Rounding::HalfUp)?;
+        let ratios: Vec<u64> =
+            picked.iter().map(|index| lines[*index].amount.minor().unsigned_abs()).collect();
+        for (index, share) in picked.iter().zip(converted.allocate(&ratios)?) {
+            out[*index] = share;
+        }
+    }
+    Ok(out)
 }
 
 /// Khoá sắp xếp của một khoá tài khoản (thứ tự mở tài khoản trong transaction).
@@ -272,7 +302,7 @@ fn fingerprint_of(entry: &NewEntry, reverses: Option<Uuid>) -> Result<String, Er
                    "currency": line.amount.currency().code()})
         })
         .collect();
-    reference::fingerprint(&json!({
+    let mut content = json!({
         "book": entry.book.as_uuid(),
         "effective_date": entry.effective_date,
         "description": entry.description,
@@ -280,7 +310,12 @@ fn fingerprint_of(entry: &NewEntry, reverses: Option<Uuid>) -> Result<String, Er
         "source_id": entry.source_id,
         "reverses": reverses,
         "lines": lines,
-    }))
+    });
+    // Chỉ thêm khi có: dấu vân tay của bút toán cũ (không tỉ giá) giữ nguyên.
+    if let Some(rate) = entry.exchange_rate {
+        content["exchange_rate"] = json!(decimal::to_column(rate));
+    }
+    reference::fingerprint(&content)
 }
 
 impl LedgerService {
@@ -324,7 +359,21 @@ impl LedgerService {
             Some(day) => day,
             None => self.today(tenant, entry.book).await,
         };
-        let draft = draft_for(entry, book, effective_date, reverses, guard)?;
+        // Bút toán ngoại tệ: tỉ giá của bên gọi (ảnh chụp trên chứng từ) hay tỉ giá hiệu lực ngày
+        // hạch toán — đọc TRƯỚC transaction ghi.
+        let currency = entry.lines.first().map(|item| item.amount.currency());
+        let rate = match (entry.exchange_rate, currency) {
+            (Some(rate), _) => Some(rate),
+            (None, Some(currency)) if currency.code() != book.base_currency => {
+                let base = Currency::parse(&book.base_currency)?;
+                self.exchange_rate(tenant, currency, base, effective_date)
+                    .await?
+                    .map(|found| decimal::from_column(&found.rate))
+                    .transpose()?
+            }
+            _ => None,
+        };
+        let draft = draft_for(entry, book, effective_date, reverses, guard, rate)?;
         let (database, draft) = (tenant.database(), &draft);
         reference::submit_once(database, move || async move {
             let transaction = database.begin_write().await?;
@@ -384,6 +433,13 @@ impl LedgerService {
         )
         .source_id(original.id.to_string());
         entry.effective_date = reversal.effective_date;
+        // Bút toán ngoại tệ đảo bằng đúng tỉ giá của bút toán gốc: hai bút toán triệt tiêu nhau ở cả
+        // tiền sổ.
+        entry.exchange_rate = lines
+            .iter()
+            .find_map(|row| row.exchange_rate.as_deref())
+            .map(decimal::from_column)
+            .transpose()?;
         self.post_inner(tenant, actor, entry, Some(original.id), guard).await
     }
 
@@ -612,12 +668,19 @@ async fn write(
         actor_kind: Set(actor_kind(&actor).to_owned()),
     };
     entry::Entity::insert(row).exec_without_returning(transaction).await?;
+    let base_currency = Currency::parse(&book.base_currency)?;
+    let bases = match draft.rate {
+        Some(rate) => base_amounts(&draft.lines, rate, base_currency)?,
+        None => draft.lines.iter().map(|item| item.amount).collect(),
+    };
+    let rate_text = draft.rate.map(decimal::to_column);
     let lines: Vec<line::ActiveModel> = draft
         .lines
         .iter()
         .zip(&resolved)
+        .zip(&bases)
         .enumerate()
-        .map(|(index, (item, found))| line::ActiveModel {
+        .map(|(index, ((item, found), base))| line::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),
             entry_id: Set(entry_id),
@@ -626,9 +689,9 @@ async fn write(
             side: Set(item.side.as_str().to_owned()),
             amount_minor: Set(item.amount.minor()),
             amount_currency: Set(draft.currency.code().to_owned()),
-            base_minor: Set(item.amount.minor()),
+            base_minor: Set(base.minor()),
             base_currency: Set(book.base_currency.clone()),
-            exchange_rate: Set(None),
+            exchange_rate: Set(rate_text.clone()),
             effective_date: Set(draft.effective_date),
         })
         .collect();
