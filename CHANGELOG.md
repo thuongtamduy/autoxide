@@ -11,6 +11,20 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `notifications` (step 37): notification kinds declared by modules through `Notifier` (security,
+  transactional, advertising), sent over email, SMS, Zalo ZNS, web push, mobile push and an in-app inbox
+  (`/api/v1/notifications/me/inbox`, unread count, mark read). People choose what they get (`/me/preferences`;
+  security notifications cannot be turned off). Advertising needs a consent in the `compliance` ledger, checked again
+  right before sending; it waits for the allowed hours and carries the advertising label — both legal rules with
+  effective dates (`notifications.send_windows`, `notifications.marketing_labels`) — and advertising emails carry
+  `List-Unsubscribe` and a link to `POST /public/unsubscribe`. Tenant texts per kind, channel and language
+  (`/templates`), a send log (`/messages`), push subscriptions and device tokens (stored encrypted), and notices from
+  platform staff to the admins of every tenant (`POST /platform-notices`); the `plans` module uses it to tell tenant
+  admins when a subscription is past due or suspended or close to a limit. Kernel traits `ZnsSender`,
+  `WebPushSender`, `MobilePushSender` (providers are separate modules; the testkit has fakes) and `auth` trait
+  `TenantAdmins`. New settings `AUTOXIDE_NOTIFICATIONS_RETENTION_DAYS`, `…_INBOX_RETENTION_DAYS`,
+  `…_UNSUBSCRIBE_URL`, `…_PER_RECIPIENT_PER_HOUR`. See `docs/NOTIFICATIONS.md`.
+
 - New module `compliance` (step 37): identity verification (KYC) through a provider (`IdentityVerifier`, callbacks
   checked by signature, processed in the background) or by manual review (signed-in reviewers only); duplicate
   documents wait for review; only the result, the provider reference, the verified name and the last four digits are

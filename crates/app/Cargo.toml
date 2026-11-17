@@ -29,6 +29,7 @@ autoxide-tax.workspace = true
 autoxide-ledger.workspace = true
 autoxide-invoices.workspace = true
 autoxide-compliance.workspace = true
+autoxide-notifications.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true

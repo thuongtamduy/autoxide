@@ -279,3 +279,7 @@ pub trait ComplianceRules: Send + Sync {
 /// `subject_id`, `status`. Module gọi (vd `plans` với `Subject::Reference`) nghe để đi tiếp.
 pub const KYC_VERIFIED: &str = "compliance.kyc_verified";
 pub const KYC_REJECTED: &str = "compliance.kyc_rejected";
+
+/// Event phát khi một đồng ý bị rút: payload có `consent_id`, `purpose`, `scope`, `channel`. Module
+/// gửi tin quảng cáo (vd `notifications`) nghe để huỷ tin đang chờ.
+pub const CONSENT_WITHDRAWN: &str = "compliance.consent_withdrawn";

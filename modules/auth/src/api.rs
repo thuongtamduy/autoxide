@@ -54,6 +54,15 @@ pub trait Users: Send + Sync {
     async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<User>, Error>;
 }
 
+/// Quản trị viên của một khách: người dùng còn hoạt động có role mang mọi permission (role `admin`).
+/// Module `notifications` dùng để gửi thông báo của nền tảng (thuê bao quá hạn, sắp chạm hạn mức…)
+/// tới người quản trị mọi khách (bước 35, D-348).
+#[async_trait::async_trait]
+pub trait TenantAdmins: Send + Sync {
+    /// Quản trị viên còn hoạt động của khách `tenant`, theo thứ tự ID.
+    async fn admins(&self, tenant: &TenantContext) -> Result<Vec<User>, Error>;
+}
+
 /// Dữ liệu để tạo một tài khoản.
 #[derive(Debug, Clone)]
 pub struct NewAccount {

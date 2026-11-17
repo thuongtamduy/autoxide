@@ -180,6 +180,11 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `newsletter.list_lists` | `newsletter.read` | read-only |
 | `newsletter.schedule_campaign` | `newsletter.send` | writes |
 | `newsletter.send_campaign` | `newsletter.send` | writes |
+| `notifications.list_kinds` | — | read-only |
+| `notifications.list_messages` | `notifications.messages.read` | read-only |
+| `notifications.list_my_inbox` | — | read-only |
+| `notifications.mark_inbox_read` | — | writes |
+| `notifications.send_notification` | `notifications.send` | writes |
 | `organizations.change_unit_status` | `organizations.units.manage` | destructive |
 | `organizations.create_unit` | `organizations.units.write` | writes |
 | `organizations.get_settings` | `organizations.units.read` | read-only |
