@@ -540,6 +540,7 @@ dependencies = [
  "autoxide-testkit",
  "axum",
  "chrono",
+ "getrandom 0.4.3",
  "sea-orm",
  "serde",
  "serde_json",

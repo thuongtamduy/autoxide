@@ -928,6 +928,19 @@ export type ComplianceAcceptanceCount = {
   version: number;
 };
 
+/** How far your account is verified, for posting content (Vietnam, Decree 147/2024/ND-CP). */
+export type ComplianceAccountVerification = {
+  identity_verified_at?: string | null;
+  /**
+   * `none`, `phone` (a mobile number confirmed with a code) or `identity` (identity verified; it
+   * includes `phone`).
+   */
+  level: ComplianceVerificationLevel;
+  /** The verified phone number, masked (e.g. `+8491****678`). */
+  phone?: string | null;
+  phone_verified_at?: string | null;
+};
+
 /** A consent, as it stands. */
 export type ComplianceConsent = {
   channel: string;
@@ -1090,6 +1103,31 @@ export type CompliancePendingAcceptance = {
   version: ComplianceDocumentVersion;
 };
 
+/** A code to confirm. */
+export type CompliancePhoneConfirmRequest = {
+  /** The 6-digit code from the SMS. */
+  code: string;
+};
+
+/** A one-time code sent by SMS. */
+export type CompliancePhoneVerification = {
+  /** Wrong codes entered so far. */
+  attempts: number;
+  /** `true` once the code was used. */
+  confirmed: boolean;
+  created_at: string;
+  expires_at: string;
+  id: string;
+  /** The number the code went to, masked. */
+  phone: string;
+};
+
+/** A phone number to verify. */
+export type CompliancePhoneVerificationRequest = {
+  /** A mobile number, e.g. `0912 345 678` or `+84912345678`. */
+  phone: string;
+};
+
 /** A compliance policy of the tenant. */
 export type CompliancePolicy = {
   key: string;
@@ -1127,6 +1165,9 @@ export type ComplianceRulesRequest = {
   /** A rules pack in the format of `modules/compliance/rules/vn.json`. */
   pack: Record<string, unknown>;
 };
+
+/** How far an account is verified for posting content; `identity` includes `phone`. */
+export type ComplianceVerificationLevel = "none" | "phone" | "identity";
 
 /** A version to publish. */
 export type ComplianceVersionRequest = {
@@ -1999,6 +2040,22 @@ export type Data_ComplianceAcceptance = {
 };
 
 /** Envelope of a single result. */
+export type Data_ComplianceAccountVerification = {
+  /** How far your account is verified, for posting content (Vietnam, Decree 147/2024/ND-CP). */
+  data: {
+    identity_verified_at?: string | null;
+    /**
+     * `none`, `phone` (a mobile number confirmed with a code) or `identity` (identity verified; it
+     * includes `phone`).
+     */
+    level: ComplianceVerificationLevel;
+    /** The verified phone number, masked (e.g. `+8491****678`). */
+    phone?: string | null;
+    phone_verified_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceConsent = {
   /** A consent, as it stands. */
   data: {
@@ -2110,6 +2167,22 @@ export type Data_ComplianceMyKyc = {
     profile?: ComplianceKycProfile | null;
     /** `none` when you have no profile yet. */
     status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CompliancePhoneVerification = {
+  /** A one-time code sent by SMS. */
+  data: {
+    /** Wrong codes entered so far. */
+    attempts: number;
+    /** `true` once the code was used. */
+    confirmed: boolean;
+    created_at: string;
+    expires_at: string;
+    id: string;
+    /** The number the code went to, masked. */
+    phone: string;
   };
 };
 
@@ -15650,6 +15723,72 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_Vec_CompliancePendingAcceptance;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/phone": {
+    /** Remove your verified phone number. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/phone-verifications": {
+    /** Send a code to verify a phone number. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CompliancePhoneVerificationRequest;
+      responses: {
+        201: Data_CompliancePhoneVerification;
+        401: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/phone-verifications/{id}": {
+    /** Get one of your phone verifications. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CompliancePhoneVerification;
+        401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/phone-verifications/{id}/confirm": {
+    /** Confirm a phone number with the code. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CompliancePhoneConfirmRequest;
+      responses: {
+        200: Data_ComplianceAccountVerification;
+        401: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/verification": {
+    /** Get your account verification level. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_ComplianceAccountVerification;
         401: Problem;
         default: Problem;
       };

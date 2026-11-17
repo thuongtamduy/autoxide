@@ -1,4 +1,5 @@
-//! Trait module `compliance` công bố: `KycGate`, `AcceptanceGate`, `ConsentLedger`, `ComplianceRules`.
+//! Trait module `compliance` công bố: `KycGate`, `AcceptanceGate`, `ConsentLedger`, `ComplianceRules`,
+//! `PostingGate`, `AccountVerification`; và bộ hỏi `PostingVerifier` của kernel (D-202).
 
 use std::sync::Arc;
 
@@ -9,9 +10,14 @@ use autoxide_kernel::tenancy::TenantId;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use autoxide_kernel::access::{PostingVerifier, Principal};
+use autoxide_kernel::sms::PhoneNumber;
+use autoxide_kernel::tenancy::TenantContext;
+
 use crate::api::{
-    AcceptanceGate, Activity, ComplianceRules, Consent, ConsentEvidence, ConsentKey, ConsentLedger,
-    ConsentSubject, KycGate, KycSession, KycStatus, Rule, Subject,
+    AcceptanceGate, AccountVerification, Activity, ComplianceRules, Consent, ConsentEvidence,
+    ConsentKey, ConsentLedger, ConsentSubject, KycGate, KycSession, KycStatus, PostingGate,
+    PostingSurface, Rule, Subject, VerificationLevel,
 };
 use crate::service::{ComplianceService, describe_rule};
 
@@ -137,5 +143,54 @@ impl ComplianceRules for Provider {
     ) -> Result<Option<Rule>, Error> {
         let tenant = self.0.tenant(tenant).await?;
         Ok(self.0.rule_for(&tenant, key, at).await?.as_ref().map(describe_rule))
+    }
+}
+
+#[async_trait::async_trait]
+impl PostingGate for Provider {
+    async fn check(
+        &self,
+        tenant: TenantId,
+        principal: Option<&Principal>,
+        surface: PostingSurface,
+    ) -> Result<(), Error> {
+        let tenant = self.0.tenant(tenant).await?;
+        self.0.check_posting(&tenant, principal, surface).await
+    }
+}
+
+#[async_trait::async_trait]
+impl AccountVerification for Provider {
+    async fn level(&self, tenant: TenantId, user_id: Uuid) -> Result<VerificationLevel, Error> {
+        let tenant = self.0.tenant(tenant).await?;
+        Ok(self.0.verification(&tenant, user_id).await?.level)
+    }
+
+    async fn verified_phone(
+        &self,
+        tenant: TenantId,
+        user_id: Uuid,
+    ) -> Result<Option<PhoneNumber>, Error> {
+        let tenant = self.0.tenant(tenant).await?;
+        Ok(self.0.verification(&tenant, user_id).await?.phone)
+    }
+}
+
+/// Bộ hỏi của kernel cho `comments`: "đã xác thực" nghĩa là đạt mức `posting.comments` của khách, và
+/// ít nhất là số điện thoại — loại đích nằm trong `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` vẫn cần xác
+/// thực khi khách để chính sách là `none`.
+#[async_trait::async_trait]
+impl PostingVerifier for Provider {
+    async fn is_verified(&self, tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
+        let required = self
+            .0
+            .posting_level(tenant, PostingSurface::Comments)
+            .await?
+            .max(VerificationLevel::Phone);
+        Ok(self.0.verification(tenant, user_id).await?.level >= required)
+    }
+
+    async fn required_everywhere(&self, tenant: &TenantContext) -> Result<bool, Error> {
+        Ok(self.0.posting_level(tenant, PostingSurface::Comments).await? != VerificationLevel::None)
     }
 }

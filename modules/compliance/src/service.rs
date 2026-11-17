@@ -37,6 +37,12 @@ pub(crate) struct ComplianceService {
     pub verifier: Option<Arc<dyn IdentityVerifier>>,
     /// `AUTOXIDE_COMPLIANCE_KYC_CALLBACK_RETENTION_DAYS`.
     pub callback_retention_days: i64,
+    /// Nhà cung cấp SMS (gửi mã một lần); `None` thì xác thực số trả `sms_disabled`.
+    pub sms: Option<Arc<dyn autoxide_kernel::sms::SmsSender>>,
+    /// Khoá gốc, để dẫn pepper của mã một lần.
+    pub secret: autoxide_kernel::secret::SecretKey,
+    /// Giới hạn của mã một lần (`AUTOXIDE_COMPLIANCE_OTP_*`).
+    pub otp: crate::config::Otp,
 }
 
 /// Duyệt hay quyết định cần phiên đăng nhập của người, không nhận API key.

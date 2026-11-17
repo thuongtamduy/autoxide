@@ -11,6 +11,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, account verification for posting (Vietnam, Decree 147/2024 — check the original text): verification levels
+  `none` / `phone` / `identity` (identity = verified KYC profile). `GET /api/v1/compliance/me/verification`,
+  `POST /me/phone-verifications` (6-digit SMS code through `dyn SmsSender`; Vietnamese mobile numbers only, from the
+  new version 2 of the `posting.phone_countries` rule; limited per number, account and IP), `GET
+  /me/phone-verifications/{id}`, `POST /me/phone-verifications/{id}/confirm` (single use, expiry, attempt limit,
+  `posting.max_accounts_per_phone`), `DELETE /me/phone`; MCP `compliance.account_verification`; events
+  `compliance.phone_verified`, `compliance.phone_removed`; new contracts `AccountVerification` and `PostingGate`
+  (policies `posting.comments|reviews|livestream`). Error codes `compliance.verification_required`,
+  `compliance.otp_invalid`, `compliance.otp_attempts_exceeded`, `compliance.otp_throttled`,
+  `compliance.phone_not_allowed`, `compliance.phone_in_use`, `compliance.challenge_not_found`,
+  `compliance.sms_timeout`. Settings `AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, `…_OTP_MAX_ATTEMPTS`,
+  `…_OTP_PER_PHONE_PER_HOUR`, `…_OTP_PER_USER_PER_DAY`, `…_OTP_PER_IP_PER_HOUR`. `compliance` now registers the
+  kernel's `PostingVerifier`, so `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` checks real phone / identity verification,
+  and a tenant's `posting.comments` policy other than `none` makes every comment target need it (kernel:
+  `PostingVerifier::required_everywhere`, default `false`). No real SMS provider connector yet (test fake only).
 - Step 36 finished — exchange rates, printing, accounting exports, record keeping:
   - Exchange rates with effective dates per currency pair in the ledger: `GET|POST /api/v1/ledger/exchange-rates`,
     `GET /exchange-rates/effective?base=&quote=&on=`, `POST /exchange-rates/fetch` (new kernel trait

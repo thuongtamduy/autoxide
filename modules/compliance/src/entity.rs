@@ -284,3 +284,51 @@ pub(crate) mod consent_record {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod account_verification {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_account_verifications")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub tenant_id: Uuid,
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub user_id: Uuid,
+        /// E.164; `None` khi chưa có hay đã gỡ.
+        pub phone: Option<String>,
+        /// SHA-256 của số; `''` khi chưa có.
+        pub phone_key: String,
+        pub phone_verified_at: Option<DateTimeUtc>,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod phone_challenge {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_phone_challenges")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub user_id: Uuid,
+        /// E.164.
+        pub phone: String,
+        /// SHA-256 của (pepper của khách, ID, mã) — mã không bao giờ lưu nguyên văn.
+        pub code_hash: String,
+        pub attempts: i32,
+        pub expires_at: DateTimeUtc,
+        pub consumed_at: Option<DateTimeUtc>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

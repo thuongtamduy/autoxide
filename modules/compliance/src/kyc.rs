@@ -855,7 +855,9 @@ pub(crate) struct ExpiryJob(pub Arc<ComplianceService>);
 #[async_trait::async_trait]
 impl JobHandler for ExpiryJob {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        self.0.expire_profiles(&job.database).await.map(|_| ())
+        self.0.expire_profiles(&job.database).await?;
+        // Mã một lần xác thực số điện thoại đã quá hạn giữ: xoá cùng lượt hằng ngày.
+        self.0.purge_challenges(&job.database).await.map(|_| ())
     }
 }
 

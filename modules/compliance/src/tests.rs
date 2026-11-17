@@ -50,7 +50,7 @@ async fn app(test: &TestDatabase) -> (TestApp, Arc<FakeIdentityVerifier>) {
     (app, verifier)
 }
 
-async fn call(
+pub(crate) async fn call(
     app: &TestApp,
     method: &str,
     uri: &str,
@@ -67,12 +67,12 @@ async fn call(
     (answer.status(), body)
 }
 
-async fn run_jobs(app: &TestApp) {
+pub(crate) async fn run_jobs(app: &TestApp) {
     app.modules().worker(4).unwrap().blocked_delay(Duration::ZERO).run_once().await.unwrap();
 }
 
 /// Mở hồ sơ của `who`, bắt đầu lượt xác thực; trả (id hồ sơ, mã ở nhà cung cấp).
-async fn start(app: &TestApp, who: &str) -> (String, String) {
+pub(crate) async fn start(app: &TestApp, who: &str) -> (String, String) {
     let (status, opened) = call(app, "POST", "/me/kyc", who, Some(json!({}))).await;
     assert!(status.is_success(), "{opened}");
     let (status, session) =
@@ -86,7 +86,7 @@ async fn start(app: &TestApp, who: &str) -> (String, String) {
     )
 }
 
-async fn callback(app: &TestApp, reference: &str) -> StatusCode {
+pub(crate) async fn callback(app: &TestApp, reference: &str) -> StatusCode {
     let (headers, body) = FakeIdentityVerifier::callback(reference);
     let mut request = app.post("/api/v1/compliance/kyc/callbacks/fake").bytes(body);
     for (name, value) in &headers {

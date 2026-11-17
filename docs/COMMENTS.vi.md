@@ -55,6 +55,33 @@ cho từng mã.
   (`comments.verification_required`, 403). Chưa cài module đó thì mọi tài khoản đăng nhập tính là đã
   xác thực.
 
+## Tài khoản đã xác thực (Việt Nam, Nghị định 147/2024)
+
+Module `compliance` giữ trạng thái xác thực tài khoản và trả lời câu hỏi đó cho module này:
+
+- **Các mức:** `none`, `phone` (số di động Việt Nam đã xác nhận bằng mã 6 số gửi qua SMS) và
+  `identity` (hồ sơ định danh đã xác thực, `GET /api/v1/compliance/me/kyc`; bao gồm `phone`). Người
+  dùng xem mức của mình bằng `GET /api/v1/compliance/me/verification` (MCP
+  `compliance.account_verification`).
+- **Xác thực số điện thoại:** `POST /api/v1/compliance/me/phone-verifications {"phone": "0912 345 678"}`
+  gửi mã (số cố định và số nước ngoài nhận `compliance.phone_not_allowed`), rồi
+  `POST /api/v1/compliance/me/phone-verifications/{id}/confirm {"code": "123456"}`. Mã dùng được một
+  lần, có hạn (`AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, 5 phút) và chỉ cho nhập sai vài lần
+  (`AUTOXIDE_COMPLIANCE_OTP_MAX_ATTEMPTS`); số mã theo số điện thoại, tài khoản và địa chỉ bị giới
+  hạn. Một số chỉ xác thực cho một tài khoản, trừ khi khách nâng chính sách
+  `posting.max_accounts_per_phone` (`compliance.phone_in_use`). `DELETE /api/v1/compliance/me/phone`
+  gỡ số. Gửi mã cần nhà cung cấp SMS; chưa có thì máy chủ trả `sms_disabled` (503). Hiện chưa có bộ
+  nối nhà cung cấp SMS thật — cài module nối cho nhà cung cấp của bạn.
+- **Hai cấu hình kết hợp thế nào:**
+  - Loại đích trong `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` cần ít nhất `phone`, hoặc mức của chính
+    sách `posting.comments` của khách khi mức đó cao hơn (`identity`).
+  - Khi khách đặt `posting.comments` là `phone` hay `identity`
+    (`PUT /api/v1/compliance/policies/posting.comments`, permission `compliance.policies.manage`),
+    **mọi** loại đích cần mức đó, và khách vãng lai không bình luận được ở đâu nữa.
+  - `posting.comments` = `none` (mặc định) giữ nguyên các loại đích khác.
+  - Bài bị từ chối trả `comments.verification_required` (403); đưa người dùng đi xác thực rồi đăng
+    lại.
+
 ## Website
 
 1. `GET /api/v1/comments/public/settings` — giới hạn và công tắc (có nhận khách không, số phút

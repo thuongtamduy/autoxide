@@ -154,7 +154,11 @@ impl CommentsService {
         }
         // Loại đích chỉ cho tài khoản đã xác thực (NĐ 147/2024, D-202): khách bị từ chối, người
         // dùng hỏi qua điểm nối của kernel (module giữ trạng thái xác thực, bước 37).
-        if self.config.verified_only.contains(&kind) {
+        // Khách cũng có thể đòi xác thực ở mọi loại đích (chính sách của module giữ trạng thái xác
+        // thực, vd `posting.comments` của `compliance`).
+        let verified_only = self.config.verified_only.contains(&kind)
+            || self.verification.required_everywhere(tenant).await?;
+        if verified_only {
             let verified = match principal {
                 Some(principal) => {
                     self.verification.is_verified(tenant, principal.user_id()).await?

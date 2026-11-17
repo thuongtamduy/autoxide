@@ -8,6 +8,90 @@ pub(crate) const KYC_CALLBACK_RETENTION_DAYS: Setting = Setting::new(
 )
 .with_default("90");
 
-pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<i64, Invalid> {
-    reader.get_with(&KYC_CALLBACK_RETENTION_DAYS, |raw| parse_in_range(raw, 1i64, 3650))
+pub(crate) const OTP_TTL_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS",
+    "Seconds a one-time code sent by SMS to verify a phone number stays valid, 60 to 3600.",
+)
+.with_default("300");
+
+pub(crate) const OTP_MAX_ATTEMPTS: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_OTP_MAX_ATTEMPTS",
+    "Wrong entries allowed for one phone verification code before a new code is needed, 1 to 20.",
+)
+.with_default("5");
+
+pub(crate) const OTP_PER_PHONE_PER_HOUR: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR",
+    "Phone verification codes sent to one phone number per hour, 1 to 100.",
+)
+.with_default("3");
+
+pub(crate) const OTP_PER_USER_PER_DAY: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_OTP_PER_USER_PER_DAY",
+    "Phone verification codes one account may ask for per day, 1 to 1000.",
+)
+.with_default("10");
+
+pub(crate) const OTP_PER_IP_PER_HOUR: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_OTP_PER_IP_PER_HOUR",
+    "Phone verification codes asked for from one IP address per hour, 1 to 10000.",
+)
+.with_default("20");
+
+/// Giới hạn của mã một lần xác thực số điện thoại.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Otp {
+    pub ttl_seconds: i64,
+    pub max_attempts: i32,
+    pub per_phone_per_hour: u32,
+    pub per_user_per_day: u32,
+    pub per_ip_per_hour: u32,
+}
+
+impl Default for Otp {
+    fn default() -> Self {
+        Otp {
+            ttl_seconds: 300,
+            max_attempts: 5,
+            per_phone_per_hour: 3,
+            per_user_per_day: 10,
+            per_ip_per_hour: 20,
+        }
+    }
+}
+
+/// Cấu hình đã đọc.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Config {
+    pub callback_retention_days: i64,
+    pub otp: Otp,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config { callback_retention_days: 90, otp: Otp::default() }
+    }
+}
+
+pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Config, Invalid> {
+    let callback_retention_days =
+        reader.get_with(&KYC_CALLBACK_RETENTION_DAYS, |raw| parse_in_range(raw, 1i64, 3650));
+    let ttl_seconds = reader.get_with(&OTP_TTL_SECONDS, |raw| parse_in_range(raw, 60i64, 3600));
+    let max_attempts = reader.get_with(&OTP_MAX_ATTEMPTS, |raw| parse_in_range(raw, 1i32, 20));
+    let per_phone_per_hour =
+        reader.get_with(&OTP_PER_PHONE_PER_HOUR, |raw| parse_in_range(raw, 1u32, 100));
+    let per_user_per_day =
+        reader.get_with(&OTP_PER_USER_PER_DAY, |raw| parse_in_range(raw, 1u32, 1000));
+    let per_ip_per_hour =
+        reader.get_with(&OTP_PER_IP_PER_HOUR, |raw| parse_in_range(raw, 1u32, 10_000));
+    Ok(Config {
+        callback_retention_days: callback_retention_days?,
+        otp: Otp {
+            ttl_seconds: ttl_seconds?,
+            max_attempts: max_attempts?,
+            per_phone_per_hour: per_phone_per_hour?,
+            per_user_per_day: per_user_per_day?,
+            per_ip_per_hour: per_ip_per_hour?,
+        },
+    })
 }

@@ -733,6 +733,14 @@ pub trait Authenticator: Send + Sync {
 pub trait PostingVerifier: Send + Sync {
     /// Người dùng `user_id` của khách `tenant` đã xác thực để đăng nội dung chưa.
     async fn is_verified(&self, tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error>;
+
+    /// Khách `tenant` đòi xác thực ở MỌI chỗ đăng nội dung (không chỉ các loại đích bên hỏi tự cấu
+    /// hình là "chỉ tài khoản đã xác thực") — vd khách đặt chính sách đăng bình luận cần số điện
+    /// thoại. Mặc định `false` (D-038): bộ hỏi cũ không phải sửa.
+    async fn required_everywhere(&self, tenant: &TenantContext) -> Result<bool, Error> {
+        let _ = tenant;
+        Ok(false)
+    }
 }
 
 /// Chỗ giữ bộ [`PostingVerifier`] duy nhất của chương trình. Clone rẻ: mọi bản clone thấy cùng
@@ -787,6 +795,19 @@ impl PostingVerification {
         match verifier {
             Some(verifier) => verifier.is_verified(tenant, user_id).await,
             None => Ok(true),
+        }
+    }
+
+    /// Khách `tenant` có đòi xác thực ở mọi chỗ đăng nội dung không; `false` khi chưa module nào
+    /// đăng ký bộ hỏi.
+    pub async fn required_everywhere(&self, tenant: &TenantContext) -> Result<bool, Error> {
+        let verifier = {
+            let slot = self.verifier.read().map_err(|_| poisoned_verification())?;
+            slot.as_ref().map(|(_, verifier)| verifier.clone())
+        };
+        match verifier {
+            Some(verifier) => verifier.required_everywhere(tenant).await,
+            None => Ok(false),
         }
     }
 }
