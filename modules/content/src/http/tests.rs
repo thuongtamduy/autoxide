@@ -695,3 +695,84 @@ async fn tim_xuyen_phan_he_tim_bai_khong_dau() {
     .await
     .unwrap();
 }
+
+/// Schema bộ lọc và view đã lưu (bước 51 P7): danh sách bài có `x-autoxide-filters` sinh từ tham
+/// số của nó; view lưu `params` sai schema thì 422 nêu từng tham số; view chung cần quyền.
+#[tokio::test]
+async fn view_da_luu_kiem_theo_schema_bo_loc() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let document = serde_json::to_value(app.openapi()).unwrap();
+        let list = &document["paths"]["/api/v1/content/entries"]["get"];
+        assert_eq!(list["x-autoxide-list"], "content.list_content_entries");
+        let filters = list["x-autoxide-filters"].as_array().unwrap();
+        let named = |name: &str| filters.iter().find(|filter| filter["name"] == name).cloned();
+        assert_eq!(named("status").unwrap()["values"], json!(["draft", "published", "archived"]));
+        assert_eq!(named("scheduled").unwrap()["kind"], "boolean");
+        assert_eq!(named("q").unwrap()["operator"], "contains");
+        assert!(named("cursor").is_none() && named("sort").is_none(), "không phải bộ lọc");
+
+        let views = |method: Method, uri: &str, who: &str, body: Option<Value>| {
+            let mut request = app.request(method, &format!("/api/v1/me/views{uri}")).token(who);
+            if let Some(body) = body {
+                request = request.json(body);
+            }
+            request.send()
+        };
+        let wrong = views(
+            Method::POST,
+            "",
+            "reader",
+            Some(json!({"resource": "content.list_content_entries", "name": "Sai",
+                "params": {"status": "gone", "scheduled": "maybe", "colour": "red"}})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", wrong.json());
+        let mut fields: Vec<String> = wrong.json()["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|error| error["field"].as_str().unwrap().to_owned())
+            .collect();
+        fields.sort();
+        assert_eq!(fields, ["params.colour", "params.scheduled", "params.status"]);
+
+        let saved = views(
+            Method::POST,
+            "",
+            "reader",
+            Some(json!({"resource": "content.list_content_entries", "name": "Chờ duyệt",
+                "params": {"review_requested": true, "sort": "updated_at"},
+                "columns": ["title", "status"], "density": "compact"})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved.status(), StatusCode::CREATED, "{}", saved.json());
+        let id = saved.json()["data"]["id"].as_str().unwrap().to_owned();
+        let shared = views(
+            Method::POST,
+            "",
+            "reader",
+            Some(json!({"resource": "content.list_content_entries", "name": "Cả nhà", "scope": "tenant"})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(shared.status(), StatusCode::FORBIDDEN, "cần kernel.views.share");
+
+        let mine = views(Method::GET, "?resource=content.list_content_entries", "reader", None)
+            .await
+            .unwrap()
+            .json();
+        assert_eq!(mine["data"][0]["params"]["review_requested"], true);
+        let renamed =
+            views(Method::PATCH, &format!("/{id}"), "reader", Some(json!({"name": "Duyệt"})))
+                .await
+                .unwrap();
+        assert_eq!(renamed.json()["data"]["name"], "Duyệt");
+        let deleted = views(Method::DELETE, &format!("/{id}"), "reader", None).await.unwrap();
+        assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+    })
+    .await
+    .unwrap();
+}

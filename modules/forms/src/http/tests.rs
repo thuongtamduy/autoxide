@@ -392,8 +392,20 @@ async fn xuat_csv_lon_qua_http() {
         let busy = app.post(&path).token("admin").json(json!({})).send().await.unwrap();
         assert_eq!((busy.status(), busy.json()["code"].as_str()), (StatusCode::CONFLICT, Some("forms.export_in_progress")));
 
+        // Bước 51 P15: job hiện trong danh sách job của người yêu cầu, chưa chạy thì `queued`.
+        let jobs = app.get("/api/v1/kernel/jobs").token("admin").send().await.unwrap().json();
+        assert_eq!(jobs["data"][0]["kind"], "forms.export", "{jobs}");
+        assert_eq!(jobs["data"][0]["status"], "queued");
+        let job = jobs["data"][0]["id"].as_str().unwrap().to_owned();
+        let others = app.get("/api/v1/kernel/jobs").token("reader").send().await.unwrap().json();
+        assert_eq!(others["data"], json!([]), "không thấy job của người khác");
+
         let worker = app.modules().worker(4).unwrap();
         while worker.run_once().await.unwrap() > 0 {}
+        let done = app.get(&format!("/api/v1/kernel/jobs/{job}")).token("admin").send().await.unwrap().json();
+        assert_eq!(done["data"]["status"], "succeeded", "{done}");
+        let retry = app.post(&format!("/api/v1/kernel/jobs/{job}/retry")).token("admin").send().await.unwrap();
+        assert_eq!(retry.status(), StatusCode::FORBIDDEN, "cần `kernel.jobs.manage`");
         let ready = send(&app, "GET", &format!("/forms/exports/{export}"), Some("admin"), &[], None).await;
         assert_eq!(ready.status(), StatusCode::OK, "{}", ready.json());
         assert_eq!((ready.json()["data"]["state"].as_str(), ready.json()["data"]["row_count"].as_i64()), (Some("ready"), Some(1)));

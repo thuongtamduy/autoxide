@@ -30,6 +30,8 @@ pub(crate) struct KernelModule {
     public_url: PublicUrl,
     /// Sổ module, do `Modules::start` điền sau khi mọi module khởi động.
     catalog: ModuleCatalog,
+    /// Outbox của kernel; có sau `start` (event `kernel.job_retried`).
+    outbox: Option<crate::event::Outbox>,
     /// Quyền dùng theo gói (bước 35); có sau `start` (sổ điều hướng lọc theo đó).
     entitlements: Option<crate::entitlement::EntitlementsHandle>,
     /// Cảnh báo vận hành (bước kiểm của mọi module, giữ kết quả một phút).
@@ -104,6 +106,7 @@ impl KernelModule {
             public_url: PublicUrl::default(),
             alerts: Arc::new(crate::ops::alerts::Alerts::new(catalog.clone())),
             entitlements: None,
+            outbox: None,
             catalog,
             client_configs,
             database: None,
@@ -209,6 +212,10 @@ impl Module for KernelModule {
             Box::new(crate::numbering::CreateSequences),
             // Lượt migrate placement bằng API (D-334, mặt điều khiển).
             Box::new(crate::tenancy::migration_runs::CreateMigrationRuns),
+            // Job người dùng theo dõi được (bước 51 P15): cấp khách hàng, mọi database dữ liệu.
+            Box::new(crate::job::runs::CreateJobRuns),
+            // View đã lưu của danh sách (bước 51 P7): cấp khách hàng, mọi database dữ liệu.
+            Box::new(crate::ops::views::CreateSavedViews),
         ]
     }
 
@@ -265,12 +272,16 @@ impl Module for KernelModule {
             crate::tenancy::TENANTS_MOVE,
             crate::tenancy::DATA_EXPORT,
             crate::tenancy::TENANTS_DELETE,
+            crate::job::runs::JOBS_READ,
+            crate::ops::views::VIEWS_SHARE,
+            crate::job::runs::JOBS_MANAGE,
         ]
     }
 
     fn events(&self) -> Vec<crate::event::EventInfo> {
         vec![
             crate::tenancy::settings::SETTING_CHANGED,
+            crate::job::runs::JOB_RETRIED,
             crate::tenancy::admin::TENANT_CREATED,
             crate::tenancy::admin::TENANT_UPDATED,
             crate::tenancy::domains::DOMAIN_ADDED,
@@ -299,6 +310,11 @@ impl Module for KernelModule {
             .merge(crate::ops::alerts::routes(self.alerts.clone()));
         if let Some(state) = self.navigation_state() {
             routes = routes.merge(crate::ops::navigation::routes(state));
+        }
+        if let Some(outbox) = &self.outbox {
+            routes = routes.merge(crate::job::runs::routes(crate::job::runs::JobsState {
+                outbox: outbox.clone(),
+            }));
         }
         if let Some(entitlements) = &self.entitlements {
             let state = crate::ops::work::WorkState::new(
@@ -431,6 +447,7 @@ impl Module for KernelModule {
         self.database = Some(context.database().clone());
         self.translations = context.translations().clone();
         self.entitlements = Some(context.entitlements());
+        self.outbox = Some(context.outbox()?);
         let flags = Arc::new(UserFlags::new(self.max_flags));
         context.personal_data(flags.clone())?;
         self.flags.fill(flags);

@@ -7684,6 +7684,95 @@
         ],
         "type": "object"
       },
+      "Data_JobRunView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A tracked background job.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "error": {
+                "description": "Why it failed, when `failed`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "label": {
+                "description": "What it does, in English.",
+                "type": "string"
+              },
+              "module": {
+                "description": "Module that runs it.",
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "progress": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/JobProgress",
+                    "description": "`{done, total}` once the job reports it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requested_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "result": {
+                "description": "What the job produced (counts, ids, per-record results…), once it reports it."
+              },
+              "status": {
+                "description": "`queued`, `running`, `succeeded` or `failed`.",
+                "example": "running",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "module",
+              "kind",
+              "label",
+              "status",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_LedgerAccountResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -12036,6 +12125,92 @@
         ],
         "type": "object"
       },
+      "Data_SavedView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A saved list view.",
+            "properties": {
+              "columns": {
+                "description": "The columns shown, in order.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "density": {
+                "description": "`compact` or `comfortable`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "group_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "owner": {
+                "description": "Who saved it.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "params": {
+                "description": "The query parameters of the list (filters, `sort`, `order`).",
+                "type": "object"
+              },
+              "resource": {
+                "description": "The list, as `x-autoxide-list` of its endpoint in this document, e.g.\n`content.list_content_entries`.",
+                "type": "string"
+              },
+              "scope": {
+                "description": "`personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`.",
+                "example": "personal",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "resource",
+              "name",
+              "scope",
+              "owner",
+              "params",
+              "columns",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ScheduleResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -14902,6 +15077,98 @@
         ],
         "type": "object"
       },
+      "Data_Vec_JobRunView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A tracked background job.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "error": {
+                  "description": "Why it failed, when `failed`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "finished_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "label": {
+                  "description": "What it does, in English.",
+                  "type": "string"
+                },
+                "module": {
+                  "description": "Module that runs it.",
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "progress": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/JobProgress",
+                      "description": "`{done, total}` once the job reports it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requested_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "result": {
+                  "description": "What the job produced (counts, ids, per-record results…), once it reports it."
+                },
+                "status": {
+                  "description": "`queued`, `running`, `succeeded` or `failed`.",
+                  "example": "running",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "module",
+                "kind",
+                "label",
+                "status",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_LimitUse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -16315,6 +16582,95 @@
                 "requires_mfa",
                 "permissions",
                 "grants",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_SavedView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A saved list view.",
+              "properties": {
+                "columns": {
+                  "description": "The columns shown, in order.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "density": {
+                  "description": "`compact` or `comfortable`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "group_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "owner": {
+                  "description": "Who saved it.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "params": {
+                  "description": "The query parameters of the list (filters, `sort`, `order`).",
+                  "type": "object"
+                },
+                "resource": {
+                  "description": "The list, as `x-autoxide-list` of its endpoint in this document, e.g.\n`content.list_content_entries`.",
+                  "type": "string"
+                },
+                "scope": {
+                  "description": "`personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`.",
+                  "example": "personal",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "resource",
+                "name",
+                "scope",
+                "owner",
+                "params",
+                "columns",
                 "created_at",
                 "updated_at"
               ],
@@ -20037,6 +20393,104 @@
         ],
         "type": "object"
       },
+      "JobProgress": {
+        "description": "How far a job is.",
+        "properties": {
+          "done": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "done",
+          "total"
+        ],
+        "type": "object"
+      },
+      "JobRunView": {
+        "description": "A tracked background job.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "description": "Why it failed, when `failed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "description": "What it does, in English.",
+            "type": "string"
+          },
+          "module": {
+            "description": "Module that runs it.",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/JobProgress",
+                "description": "`{done, total}` once the job reports it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requested_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "description": "What the job produced (counts, ids, per-record results…), once it reports it."
+          },
+          "status": {
+            "description": "`queued`, `running`, `succeeded` or `failed`.",
+            "example": "running",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "module",
+          "kind",
+          "label",
+          "status",
+          "created_at"
+        ],
+        "type": "object"
+      },
       "Kind": {
         "description": "What an entry is.",
         "enum": [
@@ -23724,6 +24178,60 @@
         },
         "required": [
           "domain"
+        ],
+        "type": "object"
+      },
+      "NewView": {
+        "description": "A view to save.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "density": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 100 characters.",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "params": {
+            "description": "Query parameters of the list; each is checked against `x-autoxide-filters` and the\nparameters of the endpoint.",
+            "type": "object"
+          },
+          "resource": {
+            "description": "The list, as `x-autoxide-list` of its endpoint.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "`personal` (the default), `node` (needs `org_id`) or `tenant`; the last two need\n`kernel.views.share`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "resource",
+          "name"
         ],
         "type": "object"
       },
@@ -34739,6 +35247,83 @@
         ],
         "type": "object"
       },
+      "SavedView": {
+        "description": "A saved list view.",
+        "properties": {
+          "columns": {
+            "description": "The columns shown, in order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "density": {
+            "description": "`compact` or `comfortable`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "description": "Who saved it.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "params": {
+            "description": "The query parameters of the list (filters, `sort`, `order`).",
+            "type": "object"
+          },
+          "resource": {
+            "description": "The list, as `x-autoxide-list` of its endpoint in this document, e.g.\n`content.list_content_entries`.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "`personal` (only its owner sees it), `node` (everyone at `org_id`) or `tenant`.",
+            "example": "personal",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "resource",
+          "name",
+          "scope",
+          "owner",
+          "params",
+          "columns",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "ScheduleRequest": {
         "additionalProperties": false,
         "description": "A new schedule.",
@@ -39381,6 +39966,47 @@
         ],
         "type": "object"
       },
+      "ViewChanges": {
+        "description": "Changes to a saved view; omitted fields stay as they are.",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "density": {
+            "description": "`\"\"` clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group_by": {
+            "description": "`\"\"` clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "params": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "Visibility": {
         "description": "Who may load the content without signing in.",
         "enum": [
@@ -39864,6 +40490,32 @@
         "tags": [
           "address"
         ],
+        "x-autoxide-filters": [
+          {
+            "kind": "string",
+            "name": "country",
+            "operator": "eq"
+          },
+          {
+            "description": "Part of the name, with or without accents (`ha noi` also finds the accented name).",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "description": "Only units of this province (and the province itself).",
+            "kind": "string",
+            "name": "province",
+            "operator": "eq"
+          },
+          {
+            "description": "`1`: provinces; `2`: communes.",
+            "kind": "integer",
+            "name": "level",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "address.search_administrative_units",
         "x-public": true
       }
     },
@@ -40359,6 +41011,39 @@
         "tags": [
           "audit"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only changes made by this user.",
+            "kind": "uuid",
+            "name": "actor_user_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only changes to this record, e.g. `auth.user:<id>`.",
+            "kind": "string",
+            "name": "subject",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this kind of change, e.g. `auth.user_updated`.",
+            "kind": "string",
+            "name": "action",
+            "operator": "eq"
+          },
+          {
+            "description": "Only changes in this module, e.g. `auth`.",
+            "kind": "string",
+            "name": "module",
+            "operator": "eq"
+          },
+          {
+            "description": "Only changes made by this kind of actor: `user`, `system` or `public` (see `actor_kind`).",
+            "kind": "string",
+            "name": "actor_kind",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "audit.list_entries",
         "x-permissions": [
           "audit.read"
         ]
@@ -40666,6 +41351,15 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the keys of this user.",
+            "kind": "uuid",
+            "name": "user_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "auth.list_all_api_keys",
         "x-permissions": [
           "auth.api_keys.manage"
         ]
@@ -40876,6 +41570,8 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "auth.list_api_keys",
         "x-permissions": []
       },
       "post": {
@@ -41246,6 +41942,25 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only customers whose email or name contains this text, without regard to case or accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "description": "Only `active` or only `disabled` accounts.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "active",
+              "disabled"
+            ]
+          }
+        ],
+        "x-autoxide-list": "auth.list_customers",
         "x-permissions": [
           "auth.customers.read"
         ]
@@ -42160,6 +42875,15 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only `pending`, `accepted` or `revoked` invitations.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "auth.list_invitations",
         "x-permissions": [
           "auth.invitations.manage"
         ]
@@ -44562,6 +45286,8 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "auth.list_passkeys",
         "x-permissions": []
       },
       "post": {
@@ -45387,6 +46113,8 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "auth.list_sessions",
         "x-permissions": []
       }
     },
@@ -45704,6 +46432,33 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only memberships on this unit (with `inherited=true`: also on the units above it).",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only memberships with this role.",
+            "kind": "uuid",
+            "name": "role_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only the memberships of this user.",
+            "kind": "uuid",
+            "name": "user_id",
+            "operator": "eq"
+          },
+          {
+            "description": "With `org_id`: also list memberships on the units above it, which reach it through\n`subtree` or `tenant` scopes. Default `false`.",
+            "kind": "boolean",
+            "name": "inherited",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "auth.list_memberships",
         "x-permissions": [
           "auth.users.read"
         ]
@@ -46284,6 +47039,8 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "auth.list_roles",
         "x-permissions": [
           "auth.roles.read"
         ]
@@ -47601,6 +48358,25 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only users whose email or name contains this text, in any case (`ada` finds\n`Ada Lovelace` and `ada@example.com`). Up to 200 characters.",
+            "kind": "string",
+            "name": "search",
+            "operator": "eq"
+          },
+          {
+            "description": "Only `active` or only `disabled` accounts.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "active",
+              "disabled"
+            ]
+          }
+        ],
+        "x-autoxide-list": "auth.list_users",
         "x-permissions": [
           "auth.users.read"
         ]
@@ -48776,6 +49552,8 @@
         "tags": [
           "auth"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "auth.list_user_passkeys",
         "x-permissions": [
           "auth.passkeys.manage"
         ]
@@ -49525,6 +50303,46 @@
         "tags": [
           "comments"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`pending` (the default: the moderation queue), `published`, `rejected`, `spam` or\n`deleted`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "pending",
+              "published",
+              "rejected",
+              "spam",
+              "deleted"
+            ]
+          },
+          {
+            "description": "Only comments on targets of this kind.",
+            "kind": "string",
+            "name": "target_type",
+            "operator": "eq"
+          },
+          {
+            "description": "Only comments on this target (with `target_type`).",
+            "kind": "string",
+            "name": "target_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only comments whose text or author name contains this, ignoring case and accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "description": "`true`: only top-level comments without a shown reply yet, e.g. unanswered questions\n(use with `status=published`). Defaults to `false` (no such filter).",
+            "kind": "boolean",
+            "name": "unanswered",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "comments.list_comments",
         "x-permissions": [
           "comments.read"
         ]
@@ -49663,6 +50481,21 @@
         "tags": [
           "comments"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`user`, `email` or `ip`.",
+            "kind": "string",
+            "name": "kind",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only bans still in force.",
+            "kind": "boolean",
+            "name": "active",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "comments.list_comment_bans",
         "x-permissions": [
           "comments.manage"
         ]
@@ -50882,6 +51715,8 @@
         "tags": [
           "comments"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "comments.list_comment_replies",
         "x-public": true
       }
     },
@@ -51434,6 +52269,33 @@
         "tags": [
           "comments"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Kind of the target, e.g. `content.entry`.",
+            "kind": "string",
+            "name": "target_type",
+            "operator": "eq"
+          },
+          {
+            "description": "Id of the target in its module.",
+            "kind": "string",
+            "name": "target_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Replies to include with each top-level comment, 0 to 10. Defaults to 3.",
+            "kind": "integer",
+            "name": "replies_limit",
+            "operator": "eq"
+          },
+          {
+            "description": "Only top-level comments (e.g. questions) whose text or author name contains this, 1 to\n100 characters, ignoring case and accents. Matches with the exact accents come first,\nthen the others; within each group the usual `order` applies.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          }
+        ],
+        "x-autoxide-list": "comments.list_comment_thread",
         "x-public": true
       }
     },
@@ -51766,6 +52628,31 @@
         "tags": [
           "comments"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only targets of this kind, e.g. `content.entry`.",
+            "kind": "string",
+            "name": "target_type",
+            "operator": "eq"
+          },
+          {
+            "description": "`open` or `closed`: the state that applies now (hidden targets and those past `closes_at`\nare `closed`).",
+            "kind": "string",
+            "name": "state",
+            "operator": "eq",
+            "values": [
+              "open",
+              "closed"
+            ]
+          },
+          {
+            "description": "`true`: only targets with comments waiting for approval; `false`: only those without.",
+            "kind": "boolean",
+            "name": "pending",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "comments.list_comment_targets",
         "x-permissions": [
           "comments.read"
         ]
@@ -52568,6 +53455,8 @@
         "tags": [
           "comments"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "comments.list_comment_reports",
         "x-permissions": [
           "comments.read"
         ]
@@ -53093,6 +53982,8 @@
         "tags": [
           "compliance"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "compliance.list_compliance_acceptances",
         "x-permissions": [
           "compliance.documents.read"
         ]
@@ -53447,6 +54338,15 @@
         "tags": [
           "compliance"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only profiles with this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "compliance.list_kyc_profiles",
         "x-permissions": [
           "compliance.kyc.read"
         ]
@@ -55756,6 +56656,15 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only profiles whose display name contains this text, ignoring case and accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_authors",
         "x-permissions": [
           "content.read"
         ]
@@ -56530,6 +57439,108 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`post` or `page`.",
+            "kind": "string",
+            "name": "kind",
+            "operator": "eq",
+            "values": [
+              "post",
+              "page"
+            ]
+          },
+          {
+            "description": "Only this language.",
+            "kind": "string",
+            "name": "locale",
+            "operator": "eq"
+          },
+          {
+            "description": "`draft`, `published` or `archived`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          },
+          {
+            "description": "Only entries directly under this page: an entry id, or `root` (every post and the\ntop-level pages).",
+            "kind": "string",
+            "name": "parent_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries whose title, summary or body contains this text, ignoring case and accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "description": "Only entries with this category or tag.",
+            "kind": "uuid",
+            "name": "term_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries by this author.",
+            "kind": "uuid",
+            "name": "author_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only the translations of one entry (its `translation_group_id`).",
+            "kind": "uuid",
+            "name": "translation_group_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only entries waiting for a review (`review_requested_at` set); `false`: only the\nothers.",
+            "kind": "boolean",
+            "name": "review_requested",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only entries with a scheduled publish or unpublish waiting; `false`: only the\nothers.",
+            "kind": "boolean",
+            "name": "scheduled",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries created by this user: a user id, or `me` for the caller.",
+            "kind": "string",
+            "name": "created_by",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only entries marked as generated by AI; `false`: only the others.",
+            "kind": "boolean",
+            "name": "ai_generated",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries with no translation into this language yet (a BCP 47 code).",
+            "kind": "string",
+            "name": "missing_locale",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries of this organization unit (store, seller).",
+            "kind": "uuid",
+            "name": "owner_org",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries shown on the website of this organization unit: its own and those of the\nunits above it.",
+            "kind": "uuid",
+            "name": "site",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_entries",
         "x-permissions": [
           "content.read"
         ]
@@ -58222,6 +59233,8 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "content.list_content_revisions",
         "x-permissions": [
           "content.read"
         ]
@@ -59397,6 +60410,8 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "content.list_content_translation_requests",
         "x-permissions": [
           "content.read"
         ]
@@ -60489,6 +61504,39 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Language of the posts.",
+            "kind": "string",
+            "name": "locale",
+            "operator": "eq"
+          },
+          {
+            "description": "Only posts with this category or tag (its id; find it by slug with\n`GET /api/v1/content/public/terms/{taxonomy}/{slug}`).",
+            "kind": "uuid",
+            "name": "term_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only posts by this author.",
+            "kind": "uuid",
+            "name": "author_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only posts whose title, summary or body contains this text, ignoring case and accents.\nAt most 200 characters.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "kind": "uuid",
+            "name": "site",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_public_content_posts",
         "x-public": true
       }
     },
@@ -60968,6 +62016,21 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only this language; omitted: every language.",
+            "kind": "string",
+            "name": "locale",
+            "operator": "eq"
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "kind": "uuid",
+            "name": "site",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_public_content_sitemap",
         "x-public": true
       }
     },
@@ -61096,6 +62159,25 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Language of the posts counted, and of the names returned (the default language when a\nterm is not translated).",
+            "kind": "string",
+            "name": "locale",
+            "operator": "eq"
+          },
+          {
+            "description": "`category` or `tag`; omitted: both.",
+            "kind": "string",
+            "name": "taxonomy",
+            "operator": "eq",
+            "values": [
+              "category",
+              "tag"
+            ]
+          }
+        ],
+        "x-autoxide-list": "content.list_public_content_terms",
         "x-public": true
       }
     },
@@ -61351,6 +62433,27 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only this language.",
+            "kind": "string",
+            "name": "locale",
+            "operator": "eq"
+          },
+          {
+            "description": "Only `auto`, `gone` or `manual` redirects.",
+            "kind": "string",
+            "name": "source",
+            "operator": "eq"
+          },
+          {
+            "description": "Only redirects whose old path or target address contains this text, in any case and with\nor without accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_redirects",
         "x-permissions": [
           "content.manage"
         ]
@@ -61968,6 +63071,15 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`scheduled` (waiting), `succeeded`, `failed` or `canceled`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_all_content_schedules",
         "x-permissions": [
           "content.read"
         ]
@@ -62357,6 +63469,25 @@
         "tags": [
           "content"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`category` or `tag`.",
+            "kind": "string",
+            "name": "taxonomy",
+            "operator": "eq",
+            "values": [
+              "category",
+              "tag"
+            ]
+          },
+          {
+            "description": "Only terms whose name (in any language) contains this text, ignoring case and accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_terms",
         "x-permissions": [
           "content.read"
         ]
@@ -63070,6 +64201,8 @@
         "tags": [
           "files"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "files.list_files",
         "x-permissions": [
           "files.upload"
         ]
@@ -63667,6 +64800,25 @@
         "tags": [
           "forms"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`open` or `closed`; omitted: both.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "open",
+              "closed"
+            ]
+          },
+          {
+            "description": "Only the forms of this organization unit.",
+            "kind": "uuid",
+            "name": "owner_org",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "forms.list_forms",
         "x-permissions": [
           "forms.read"
         ]
@@ -65560,6 +66712,27 @@
         "tags": [
           "forms"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`new`, `read`, `archived` or `spam`; omitted: every status but `spam`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "new",
+              "read",
+              "archived",
+              "spam"
+            ]
+          },
+          {
+            "description": "Only submissions whose answers contain this text, ignoring case and accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          }
+        ],
+        "x-autoxide-list": "forms.list_form_submissions",
         "x-permissions": [
           "forms.read"
         ]
@@ -66016,6 +67189,36 @@
         "tags": [
           "invoices"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only documents written by this unit.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "kind": "string",
+            "name": "kind",
+            "operator": "eq"
+          },
+          {
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only documents created by this module (`invoices` for documents made through this API).",
+            "kind": "string",
+            "name": "source_module",
+            "operator": "eq"
+          },
+          {
+            "kind": "string",
+            "name": "source_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "invoices.list_invoice_documents",
         "x-permissions": [
           "invoices.read"
         ]
@@ -67308,6 +68511,8 @@
         "tags": [
           "invoices"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "invoices.list_invoice_mandates",
         "x-permissions": [
           "invoices.read"
         ]
@@ -67648,6 +68853,8 @@
         "tags": [
           "invoices"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "invoices.list_invoice_series",
         "x-permissions": [
           "invoices.read"
         ]
@@ -68101,6 +69308,8 @@
         "tags": [
           "kernel"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "kernel.list_tenant_domains",
         "x-permissions": [
           "kernel.domains.manage"
         ]
@@ -68833,6 +70042,306 @@
           "kernel"
         ],
         "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/jobs": {
+      "get": {
+        "description": "Any signed-in user sees the jobs they started (exports, bulk changes…); with\n`kernel.jobs.read`, every tracked job of the tenant. Newest first.",
+        "operationId": "kernel_list_jobs",
+        "parameters": [
+          {
+            "description": "Only `queued`, `running`, `succeeded` or `failed` jobs.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this kind of job, e.g. `forms.export`.",
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "At most this many, 1 to 200, newest first. Defaults to 50.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_JobRunView"
+                }
+              }
+            },
+            "description": "The jobs."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List background jobs.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/jobs/{id}": {
+      "get": {
+        "description": "Your own job, or any tracked job of the tenant with `kernel.jobs.read`: its status, progress\nand result.",
+        "operationId": "kernel_get_job",
+        "parameters": [
+          {
+            "description": "Id of the job.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_JobRunView"
+                }
+              }
+            },
+            "description": "The job."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such job, or not yours; code `kernel.job_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a background job.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/jobs/{id}/retry": {
+      "post": {
+        "description": "Requires `kernel.jobs.manage`. Puts a job that failed for good back in the queue, as new; the\nretry is recorded in the audit log (event `kernel.job_retried`).",
+        "operationId": "kernel_retry_job",
+        "parameters": [
+          {
+            "description": "Id of the job.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_JobRunView"
+                }
+              }
+            },
+            "description": "The job, queued again."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.jobs.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such job; code `kernel.job_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The job has not failed; code `kernel.job_not_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run a failed background job again.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.jobs.manage"
+        ]
       }
     },
     "/api/v1/kernel/modules": {
@@ -70175,6 +71684,57 @@
         "tags": [
           "kernel"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only tenants in this state: `provisioning`, `active`, `suspended`, `maintenance` or\n`moving`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only children of this tenant.",
+            "kind": "uuid",
+            "name": "parent_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only read-only tenants (`true`) or writable ones (`false`).",
+            "kind": "boolean",
+            "name": "read_only",
+            "operator": "eq"
+          },
+          {
+            "description": "Only tenants whose placement is of this kind: `shared` or `dedicated`.",
+            "kind": "string",
+            "name": "placement_kind",
+            "operator": "eq"
+          },
+          {
+            "description": "Only tenants whose placement is in this state: `ready`, `behind` (migrations pending) or\n`migrating`.",
+            "kind": "string",
+            "name": "schema_state",
+            "operator": "eq"
+          },
+          {
+            "description": "Only tenants whose subscription is in this state: `trialing`, `active`, `past_due`,\n`suspended`, `canceled` or `deleted`. Subscriptions come with the plans module (step 35);\nwithout it no tenant has one, so the page is empty.",
+            "kind": "string",
+            "name": "subscription_status",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only tenants close to a limit of their plan. Limits come with the plans module\n(step 35); without it no tenant has limits, so the page is empty. `false` filters nothing.",
+            "kind": "boolean",
+            "name": "near_limit",
+            "operator": "eq"
+          },
+          {
+            "description": "Related records to add to each tenant under `expanded`, comma-separated: `placement`,\n`subscription`, `usage`. Fetched for the whole page at once.",
+            "kind": "string",
+            "name": "expand",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "kernel.list_tenants",
         "x-permissions": [
           "kernel.tenants.read"
         ]
@@ -72303,6 +73863,33 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "The book (required).",
+            "kind": "uuid",
+            "name": "book_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this purpose.",
+            "kind": "string",
+            "name": "purpose",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this kind of counterparty (`org`, `customer`…).",
+            "kind": "string",
+            "name": "counterparty_kind",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this counterparty.",
+            "kind": "string",
+            "name": "counterparty_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "ledger.list_ledger_accounts",
         "x-permissions": [
           "ledger.read"
         ]
@@ -72899,6 +74486,8 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "ledger.list_ledger_account_lines",
         "x-permissions": [
           "ledger.read"
         ]
@@ -73019,6 +74608,8 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "ledger.list_ledger_bank_accounts",
         "x-permissions": [
           "ledger.read"
         ]
@@ -73359,6 +74950,8 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "ledger.list_ledger_books",
         "x-permissions": [
           "ledger.read"
         ]
@@ -73848,6 +75441,39 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the book of this unit.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries written by this module (`ledger` for manual entries, `orders`…).",
+            "kind": "string",
+            "name": "source_module",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries for this source document.",
+            "kind": "string",
+            "name": "source_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries dated on or after this day.",
+            "kind": "date",
+            "name": "from",
+            "operator": "eq"
+          },
+          {
+            "description": "Only entries dated on or before this day.",
+            "kind": "date",
+            "name": "to",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "ledger.list_ledger_entries",
         "x-permissions": [
           "ledger.read"
         ]
@@ -74369,6 +75995,15 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`open`, `resolved` or `ignored`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "ledger.list_ledger_exceptions",
         "x-permissions": [
           "ledger.read"
         ]
@@ -74852,6 +76487,33 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`held` or `released`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only for this seller (unit id).",
+            "kind": "uuid",
+            "name": "seller_org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only for documents of this module (e.g. `orders`).",
+            "kind": "string",
+            "name": "source_module",
+            "operator": "eq"
+          },
+          {
+            "description": "Only for this document.",
+            "kind": "string",
+            "name": "source_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "ledger.list_ledger_holds",
         "x-permissions": [
           "ledger.read"
         ]
@@ -75116,6 +76778,27 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only payments with this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only payments created by this module (`ledger` for payments created through this API).",
+            "kind": "string",
+            "name": "source_module",
+            "operator": "eq"
+          },
+          {
+            "description": "Only payments for this document.",
+            "kind": "string",
+            "name": "source_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "ledger.list_ledger_payments",
         "x-permissions": [
           "ledger.read"
         ]
@@ -75782,6 +77465,21 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`pending`, `sent`, `succeeded` or `failed`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only payouts to this seller.",
+            "kind": "uuid",
+            "name": "payee_org_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "ledger.list_ledger_payouts",
         "x-permissions": [
           "ledger.read"
         ]
@@ -76159,6 +77857,15 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "The book (required).",
+            "kind": "uuid",
+            "name": "book_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "ledger.list_ledger_periods",
         "x-permissions": [
           "ledger.read"
         ]
@@ -76396,6 +78103,8 @@
         "tags": [
           "ledger"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "ledger.list_ledger_reconciliations",
         "x-permissions": [
           "ledger.reconcile"
         ]
@@ -77088,6 +78797,419 @@
         "x-permissions": []
       }
     },
+    "/api/v1/me/views": {
+      "get": {
+        "description": "Any signed-in user. Your personal views, and the views shared with the whole tenant or with an\norganization unit, newest first.",
+        "operationId": "me_list_views",
+        "parameters": [
+          {
+            "description": "Only the views of this list, e.g. `content.list_content_entries`.",
+            "in": "query",
+            "name": "resource",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_SavedView"
+                }
+              }
+            },
+            "description": "The views."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List my saved views.",
+        "tags": [
+          "me"
+        ],
+        "x-permissions": []
+      },
+      "post": {
+        "description": "Any signed-in user for a `personal` view; `kernel.views.share` at `org_id` (or the tenant) for a\n`node` or `tenant` view. `params` must be parameters of the list, each with a value it accepts\n(see `x-autoxide-filters` on the list's endpoint); every problem is listed at once.",
+        "operationId": "me_create_view",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewView"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SavedView"
+                }
+              }
+            },
+            "description": "Saved.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A shared view without `kernel.views.share`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many saved views; code `kernel.view_limit_reached`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid fields or parameters; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save a list view.",
+        "tags": [
+          "me"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/me/views/{id}": {
+      "delete": {
+        "description": "Your own personal view, or a shared view with `kernel.views.share` at its unit.",
+        "operationId": "me_delete_view",
+        "parameters": [
+          {
+            "description": "Id of the view.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A shared view without `kernel.views.share`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such view; code `kernel.view_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a saved view.",
+        "tags": [
+          "me"
+        ],
+        "x-permissions": []
+      },
+      "patch": {
+        "description": "Your own personal view, or a shared view with `kernel.views.share` at its unit.",
+        "operationId": "me_update_view",
+        "parameters": [
+          {
+            "description": "Id of the view.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewChanges"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SavedView"
+                }
+              }
+            },
+            "description": "The view."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A shared view without `kernel.views.share`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such view; code `kernel.view_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid fields or parameters; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a saved view.",
+        "tags": [
+          "me"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/media": {
       "get": {
         "description": "Requires `media.read`. Filter by folder, type, visibility, trash, name, tag and missing\ntext alternative; sort by upload time, name or size. With `include=uploader`, each item\ncarries the name of who uploaded it. Keep the same filters, `sort` and `order` while following\n`next_cursor`.",
@@ -77313,6 +79435,61 @@
         "tags": [
           "media"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only items in this folder (not in its subfolders): a folder id, or `root`. Omit for\nevery folder.",
+            "kind": "string",
+            "name": "folder_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this media type (`image/png`) or family (`image/*`).",
+            "kind": "string",
+            "name": "type",
+            "operator": "eq"
+          },
+          {
+            "description": "Only `public` or only `private` items.",
+            "kind": "string",
+            "name": "visibility",
+            "operator": "eq",
+            "values": [
+              "private",
+              "public"
+            ]
+          },
+          {
+            "description": "`true`: only items in the trash. Default `false`: only items not in the trash.",
+            "kind": "boolean",
+            "name": "trashed",
+            "operator": "eq"
+          },
+          {
+            "description": "Only items whose name contains this text, ignoring case and accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "description": "Only items with this tag, ignoring case.",
+            "kind": "string",
+            "name": "tag",
+            "operator": "eq"
+          },
+          {
+            "description": "Only the items of this organization unit (store, seller).",
+            "kind": "uuid",
+            "name": "owner_org",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only images missing a text alternative (an image whose default `alt` is empty and\nthat is not marked `decorative`). `false`: every other item.",
+            "kind": "boolean",
+            "name": "alt_missing",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "media.list_media_items",
         "x-permissions": [
           "media.read"
         ]
@@ -77646,6 +79823,15 @@
         "tags": [
           "media"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the folders directly inside this one: a folder id, or `root`. Omit for every\nfolder.",
+            "kind": "string",
+            "name": "parent_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "media.list_media_folders",
         "x-permissions": [
           "media.read"
         ]
@@ -78368,6 +80554,15 @@
         "tags": [
           "media"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only tags whose name contains this text, ignoring case and accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          }
+        ],
+        "x-autoxide-list": "media.list_media_tags",
         "x-permissions": [
           "media.read"
         ]
@@ -80530,6 +82725,15 @@
         "tags": [
           "menus"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the menus of this website (organization unit).",
+            "kind": "uuid",
+            "name": "owner_org",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "menus.list_menus",
         "x-permissions": [
           "menus.read"
         ]
@@ -81519,6 +83723,27 @@
         "tags": [
           "newsletter"
         ],
+        "x-autoxide-filters": [
+          {
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "draft",
+              "scheduled",
+              "sending",
+              "paused",
+              "sent",
+              "cancelled"
+            ]
+          },
+          {
+            "kind": "uuid",
+            "name": "list_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "newsletter.list_newsletter_campaigns",
         "x-permissions": [
           "newsletter.read"
         ]
@@ -83386,6 +85611,8 @@
         "tags": [
           "newsletter"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "newsletter.list_newsletter_lists",
         "x-permissions": [
           "newsletter.read"
         ]
@@ -84784,6 +87011,38 @@
         "tags": [
           "newsletter"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Part of the email address, any case.",
+            "kind": "string",
+            "name": "email",
+            "operator": "eq"
+          },
+          {
+            "description": "Only subscribers of this list.",
+            "kind": "uuid",
+            "name": "list_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only subscriptions in this status (in `list_id`, or in any list).",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "unconfirmed",
+              "confirmed",
+              "unsubscribed"
+            ]
+          },
+          {
+            "description": "`true`: only blocked subscribers (they get no mail); `false`: only the others.",
+            "kind": "boolean",
+            "name": "blocked",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "newsletter.list_newsletter_subscribers",
         "x-permissions": [
           "newsletter.read"
         ]
@@ -85382,6 +87641,15 @@
         "tags": [
           "newsletter"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Part of the email address, any case.",
+            "kind": "string",
+            "name": "email",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "newsletter.list_newsletter_suppressions",
         "x-permissions": [
           "newsletter.read"
         ]
@@ -85967,6 +88235,15 @@
         "tags": [
           "notifications"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true`: only unread notifications.",
+            "kind": "boolean",
+            "name": "unread",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "notifications.list_my_notifications",
         "x-permissions": []
       }
     },
@@ -86698,6 +88975,31 @@
         "tags": [
           "notifications"
         ],
+        "x-autoxide-filters": [
+          {
+            "kind": "string",
+            "name": "kind",
+            "operator": "eq"
+          },
+          {
+            "description": "`queued`, `deferred`, `sent`, `failed`, `skipped` or `canceled`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "e.g. `email`.",
+            "kind": "string",
+            "name": "channel",
+            "operator": "eq"
+          },
+          {
+            "kind": "uuid",
+            "name": "user_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "notifications.list_notification_messages",
         "x-permissions": [
           "notifications.messages.read"
         ]
@@ -88249,6 +90551,39 @@
         "tags": [
           "organizations"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the units directly below this unit.",
+            "kind": "uuid",
+            "name": "parent_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only units of this type (code).",
+            "kind": "string",
+            "name": "type",
+            "operator": "eq"
+          },
+          {
+            "description": "Only units with this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "pending",
+              "active",
+              "suspended",
+              "archived"
+            ]
+          },
+          {
+            "description": "Words in the name; accents and case are ignored (`cafe` also finds `Café`).",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          }
+        ],
+        "x-autoxide-list": "organizations.list_units",
         "x-permissions": [
           "organizations.units.read"
         ]
@@ -90584,6 +92919,33 @@
         "tags": [
           "plans"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the overrides of this tenant.",
+            "kind": "uuid",
+            "name": "tenant_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only `module`, `feature` or `limit` overrides.",
+            "kind": "string",
+            "name": "kind",
+            "operator": "eq"
+          },
+          {
+            "description": "Only overrides of this module, feature or limit key.",
+            "kind": "string",
+            "name": "key",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only overrides that still apply; `false`: only expired ones.",
+            "kind": "boolean",
+            "name": "active",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "plans.list_all_overrides",
         "x-permissions": [
           "plans.subscriptions.read"
         ]
@@ -90694,6 +93056,8 @@
         "tags": [
           "plans"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "plans.list_plans",
         "x-permissions": [
           "plans.plans.read"
         ]
@@ -91562,6 +93926,15 @@
         "tags": [
           "plans"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only provisionings in this state: `pending`, `running`, `failed` or `done`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "plans.list_provisionings",
         "x-permissions": [
           "plans.subscriptions.read"
         ]
@@ -92035,6 +94408,15 @@
         "tags": [
           "plans"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only sign-ups in this state: `pending_email`, `awaiting_kyc`, `provisioning`, `completed`,\n`rejected` or `expired`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "plans.list_signups",
         "x-permissions": [
           "plans.subscriptions.read"
         ]
@@ -92867,6 +95249,27 @@
         "tags": [
           "plans"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only subscriptions with this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only subscriptions on this plan.",
+            "kind": "uuid",
+            "name": "plan_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only the subscription of this tenant.",
+            "kind": "uuid",
+            "name": "tenant_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "plans.list_subscriptions",
         "x-permissions": [
           "plans.subscriptions.read"
         ]
@@ -94585,6 +96988,8 @@
         "tags": [
           "tax"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "tax.list_tax_profiles",
         "x-permissions": [
           "tax.read"
         ]
@@ -95516,6 +97921,19 @@
         "tags": [
           "webhooks"
         ],
+        "x-autoxide-filters": [
+          {
+            "description": "`active`: only endpoints that receive events; `disabled`: only turned-off ones.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "active",
+              "disabled"
+            ]
+          }
+        ],
+        "x-autoxide-list": "webhooks.list_webhook_endpoints",
         "x-permissions": [
           "webhooks.manage"
         ]
@@ -96198,6 +98616,8 @@
         "tags": [
           "webhooks"
         ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "webhooks.list_webhook_deliveries",
         "x-permissions": [
           "webhooks.manage"
         ]

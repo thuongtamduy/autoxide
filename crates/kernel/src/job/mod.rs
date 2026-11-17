@@ -19,7 +19,8 @@
 
 mod claim;
 mod migration;
-mod queue;
+pub(crate) mod queue;
+pub mod runs;
 mod worker;
 
 use std::sync::Arc;

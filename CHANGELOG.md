@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Filter schemas and saved views (step 51): every list endpoint carries `x-autoxide-list` (its id) and
+  `x-autoxide-filters` (name, type, allowed values and operator of each filter) in the API document, generated
+  from its own query parameters. `GET/POST /api/v1/me/views` and `PATCH/DELETE /api/v1/me/views/{id}` save list
+  views (filters, sort, columns, grouping, density) checked against that schema; views shared with a unit or the
+  whole tenant need `kernel.views.share`.
+- Background jobs (step 51): modules track the jobs people start (`job::runs::track`, with `progress` and
+  `set_result`); `GET /api/v1/kernel/jobs?status=` and `GET /api/v1/kernel/jobs/{id}` show status, progress,
+  who asked and the last error (your own jobs, or every job with `kernel.jobs.read`), and `POST
+  /api/v1/kernel/jobs/{id}/retry` (`kernel.jobs.manage`) runs a failed job again and records an audit event. The
+  CSV export of form submissions is tracked.
 - Summary figures (step 51): modules declare figures with a mandatory definition (`StartContext::summary_metric`);
   `GET /api/v1/kernel/summary?group=` returns those the caller may see, each with how it is computed in the
   caller's language. Figures: comments waiting, new submissions, entries waiting for a review, media items,
