@@ -465,6 +465,21 @@ impl NotificationsService {
         Ok(saved)
     }
 
+    /// Thiết bị di động người gọi đã đăng ký, mới nhất trước (không trả token).
+    pub(crate) async fn my_device_tokens(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+    ) -> Result<Vec<device_token::Model>, Error> {
+        use sea_orm::QueryOrder;
+        Ok(device_token::Entity::find()
+            .scoped(tenant)
+            .filter(device_token::Column::UserId.eq(principal.user_id()))
+            .order_by_desc(device_token::Column::Id)
+            .all(tenant.database().read())
+            .await?)
+    }
+
     pub(crate) async fn remove_device_token(
         &self,
         tenant: &TenantContext,

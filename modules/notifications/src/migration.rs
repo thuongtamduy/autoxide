@@ -25,6 +25,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0008_tenancy_throttle",
             vec![autoxide_kernel::throttle::tenant_table("notifications")],
         ),
+        // Mẫu khách tự soạn có nháp / xuất bản / quay lại và thương hiệu của mail (D-206, D-366).
+        Box::new(CreateTemplateVersions),
     ]
 }
 
@@ -295,6 +297,112 @@ impl MigrationTrait for CreateNotifications {
             "notifications_preferences",
             "notifications_inbox",
             "notifications_messages",
+        ] {
+            manager.drop_table(Table::drop().table(Alias::new(table)).to_owned()).await?;
+        }
+        Ok(())
+    }
+}
+
+/// Mẫu khách tự soạn (cú pháp của bộ dựng mẫu kernel): bản nháp, các bản đã xuất bản (không đổi
+/// sau khi ghi), bản đang dùng, và thương hiệu của mail HTML (D-206, D-366).
+struct CreateTemplateVersions;
+
+impl MigrationName for CreateTemplateVersions {
+    fn name(&self) -> &str {
+        "m0009_create_template_versions"
+    }
+}
+
+/// Cột nội dung chung của bản nháp và bản đã xuất bản.
+fn template_content(table: &mut TableCreateStatement) -> &mut TableCreateStatement {
+    table
+        .col(schema::string_len("subject", 300))
+        .col(schema::text("body_text"))
+        .col(schema::text_null("body_html"))
+        .col(schema::string_len("short", 500))
+        .col(schema::string_len_null("zns_template_id", 64))
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateTemplateVersions {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let mut drafts = Table::create();
+        drafts
+            .table("notifications_template_drafts")
+            .col(schema::uuid("tenant_id"))
+            .col(schema::string_len("kind", 100))
+            .col(schema::string_len("channel", 16))
+            .col(schema::string_len("locale", 16));
+        template_content(&mut drafts)
+            .col(schema::uuid_null("updated_by"))
+            .col(schema::timestamp_with_time_zone("updated_at"))
+            .primary_key(Index::create().col("tenant_id").col("kind").col("channel").col("locale"));
+        manager.create_table(drafts.to_owned()).await?;
+
+        let mut versions = Table::create();
+        versions
+            .table("notifications_template_versions")
+            .col(schema::pk_uuid("id"))
+            .col(schema::uuid("tenant_id"))
+            .col(schema::string_len("kind", 100))
+            .col(schema::string_len("channel", 16))
+            .col(schema::string_len("locale", 16))
+            .col(schema::integer("version"));
+        template_content(&mut versions)
+            .col(schema::uuid_null("published_by"))
+            .col(schema::timestamp_with_time_zone("published_at"));
+        manager.create_table(versions.to_owned()).await?;
+        index(
+            manager,
+            "notifications_template_versions",
+            "notifications_template_versions_key_idx",
+            &["tenant_id", "kind", "channel", "locale", "version"],
+            true,
+        )
+        .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("notifications_template_live")
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("kind", 100))
+                    .col(schema::string_len("channel", 16))
+                    .col(schema::string_len("locale", 16))
+                    .col(schema::integer("version"))
+                    .col(schema::uuid_null("updated_by"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .primary_key(
+                        Index::create().col("tenant_id").col("kind").col("channel").col("locale"),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table("notifications_branding")
+                    .col(schema::pk_uuid("tenant_id"))
+                    .col(schema::string_len_null("brand_name", 100))
+                    .col(schema::string_len_null("logo_url", 2000))
+                    .col(schema::string_len("primary_color", 7))
+                    .col(schema::string_len("background_color", 7))
+                    .col(schema::string_len_null("footer_text", 1000))
+                    .col(schema::uuid_null("updated_by"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for table in [
+            "notifications_branding",
+            "notifications_template_live",
+            "notifications_template_versions",
+            "notifications_template_drafts",
         ] {
             manager.drop_table(Table::drop().table(Alias::new(table)).to_owned()).await?;
         }

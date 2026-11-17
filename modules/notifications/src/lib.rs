@@ -10,12 +10,16 @@
 //! - Thông báo của nền tảng tới quản trị viên mọi khách (bước 35).
 
 pub mod api;
+mod branding;
 mod config;
+mod custom;
 mod delivery;
 mod entity;
 mod events;
 mod http_admin;
 mod http_me;
+mod http_templates;
+mod layout;
 mod me;
 mod messages;
 mod migration;
@@ -48,6 +52,9 @@ use utoipa_axum::router::OpenApiRouter;
 use crate::config::NotificationsConfig;
 use crate::registry::Kinds;
 use crate::service::{Deliver, NotificationsService};
+
+/// Số lần gửi thử mẫu mỗi người mỗi giờ.
+const TEST_SENDS_PER_HOUR: u32 = 10;
 
 pub fn module() -> impl Module {
     NotificationsModule {
@@ -159,6 +166,16 @@ impl Module for NotificationsModule {
             zns: context.require::<dyn autoxide_kernel::zns::ZnsSender>().ok(),
             web_push: context.require::<dyn autoxide_kernel::push::WebPushSender>().ok(),
             mobile_push: context.require::<dyn autoxide_kernel::push::MobilePushSender>().ok(),
+            templates: context
+                .require::<autoxide_kernel::template::TemplateEngine>()
+                .map(|engine| (*engine).clone())
+                .unwrap_or_default(),
+            legal: context.require::<dyn autoxide_compliance::api::LegalProfiles>().ok(),
+            test_throttle: Throttle::new(
+                "notifications",
+                TEST_SENDS_PER_HOUR,
+                Duration::from_secs(3_600),
+            )?,
         });
         self.listen_consents = service.consents.is_some()
             && context.events().contains(autoxide_compliance::api::CONSENT_WITHDRAWN);
@@ -170,7 +187,9 @@ impl Module for NotificationsModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
-            http_me::routes(service.clone()).merge(http_admin::routes(service))
+            http_me::routes(service.clone())
+                .merge(http_templates::routes(service.clone()))
+                .merge(http_admin::routes(service))
         })
     }
 

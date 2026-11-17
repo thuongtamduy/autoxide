@@ -374,6 +374,7 @@ impl NewsletterService {
         };
         transaction.commit().await?;
         tracing::info!(subscriber_id = %row.id, lists = lists.len(), confirming = to_confirm.len(), "newsletter subscription request stored");
+        self.sync_consents_quietly(tenant, row.id).await;
         // Sau commit, mọi yêu cầu đã lưu đều đếm một lần vào bộ đếm mail xác nhận của địa chỉ
         // (cần mail hay không). Lỗi ở đây chỉ ghi log, không làm job chạy lại: người đăng ký
         // gửi lại là có link mới.
@@ -496,6 +497,9 @@ impl NewsletterService {
         }
         transaction.commit().await?;
         tracing::info!(subscriber_id = %subscriber_id, lists = confirmed.len(), "newsletter subscription confirmed");
+        // Sổ đồng ý chung ghi sau commit (người đăng ký chỉ biết chắc trong transaction); lúc gửi
+        // luôn hỏi lại sổ (D-367).
+        self.sync_consents_quietly(tenant, subscriber_id).await;
         Ok(confirmed)
     }
 
@@ -550,6 +554,7 @@ impl NewsletterService {
         transaction.commit().await?;
         if changed {
             tracing::info!(subscriber_id = %found.subscriber_id, list_id = %list.row.id, "newsletter one-click unsubscribe");
+            self.sync_consents_quietly(tenant, found.subscriber_id).await;
         }
         Ok(())
     }
@@ -752,6 +757,7 @@ impl NewsletterService {
             }
         }
         transaction.commit().await?;
+        self.sync_consents_quietly(tenant, id).await;
         let row = subscriber::Entity::find_by_id(id)
             .scoped(tenant)
             .one(tenant.database().read())

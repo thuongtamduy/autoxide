@@ -8994,3 +8994,91 @@ duyệt khi agent gọi, như nhau cho REST và MCP.
 
 **Hệ quả.** Lệnh đầu tiên cần duyệt: xoá bài viết / trang của `content`. Module khác đánh dấu lệnh rủi ro của mình
 bằng cùng phần mở rộng.
+
+## D-366 · Mẫu thông báo khách tự soạn: nháp / xuất bản / quay lại, khung mail MJML (`mrml`), thương hiệu (bước 37, D-206) — 2026-11-17 — agent quyết
+
+Bối cảnh: mục "Mẫu mail, thông báo khách tự soạn" của bước 37; bộ dựng mẫu kernel đã có (D-351). Đặc tả: `docs/steps/37-compliance.md`
+mục 2 và phần B.
+
+1. **Thư viện khung mail: `mrml` 6.0.1** (MIT), chỉ feature `parse` + `render` (không loader nên `mj-include` không đọc file hay
+   mạng). `cargo deny check` xanh (license, lỗ hổng, nguồn). Ghi ở `STACK.md`. Khung nằm trong `notifications` (`layout.rs`) — chỉ
+   module này dựng mail HTML; `newsletter` giữ HTML chiến dịch như cũ.
+2. **Nội dung của khách không qua bộ phân tích MJML**: khung được dựng với chỗ giữ chỗ rồi thay bằng HTML đã dựng (giá trị đã thoát
+   bởi bộ dựng kernel). HTML khách viết sai không làm hỏng khung; giá trị thương hiệu được kiểm (màu `#rrggbb`, logo `https://`) rồi
+   thoát XML trước khi vào MJML. Không font ngoài (không tải Google Fonts), không chú thích.
+3. **Mọi email của `notifications` có HTML trong khung** (cả mẫu mặc định: HTML sinh từ chữ thuần) kèm bản chữ thuần.
+4. **Lưu trữ** (migration mới `m0009_create_template_versions`, không sửa migration cũ): `notifications_template_drafts` (một bản
+   nháp mỗi loại/kênh/ngôn ngữ), `notifications_template_versions` (bản đã xuất bản, chỉ ghi một lần, giữ 20 bản gần nhất),
+   `notifications_template_live` (bản đang dùng), `notifications_branding` (theo khách). Bảng câu thay thế cũ `notifications_templates`
+   và `PUT/DELETE /templates/{kind}/{channel}/{locale}` giữ nguyên hành vi (D-059). Thứ tự dựng lúc gửi: mẫu đã xuất bản đang dùng →
+   câu thay thế cũ → mẫu mặc định theo i18n. Lệch đặc tả: đặc tả gợi ý thêm cột `format` vào `notifications_templates`; tách bảng
+   đơn giản hơn và không đổi bảng cũ.
+5. **Quay lại** chỉ trỏ bản đang dùng về phiên bản cũ (bản đó không đổi, không tạo phiên bản mới, bản nháp giữ nguyên). Thêm `DELETE
+   …/published` để thôi dùng mẫu (đặc tả không nêu; cần để khách trở về mẫu mặc định).
+6. **Schema biến**: `NotificationKind::variables(&[Variable])` và `.sample(json)` (builder, không phá module cũ); không khai thì suy
+   ra từ chỗ điền `{tên}` của mẫu mặc định (không bắt buộc) cộng `link`. Biến bắt buộc chỉ đòi ở phần chính của kênh (email / hộp
+   thư: `body_text`; SMS / ZNS / đẩy: `short`). Ngữ cảnh lúc gửi = tham số của tin + `link`. Kernel sửa thêm: hàm dựng sẵn
+   (`range`, `dict`…) không tính là biến lạ khi kiểm.
+7. **Mẫu hỏng lúc gửi** (lưu được nhưng không dựng được với dữ liệu thật): dùng mẫu mặc định, tin vẫn gửi, `error_code =
+   template_fallback`. Tin quảng cáo: nhãn và chân thư huỷ nhận (chữ + HTML + `List-Unsubscribe`) do bộ gửi chèn, mẫu không gỡ được.
+8. **Gửi thử** chỉ tới chính người gọi: kênh `email` (email đã xác minh của họ) và `in_app` (hộp thư của họ); kênh khác 422
+   `notifications.test_send_unsupported`. Không nhận địa chỉ tuỳ ý; tối đa 10 lần / giờ (`notifications_throttle`, khoá `test:<user>`).
+9. **Permission**: thêm `notifications.templates.read` (`read` — xem nháp, phiên bản, xem trước, thương hiệu; để tool MCP chỉ đọc
+   `preview_template` có permission mức xem) và `notifications.branding.manage` (`write`). `notifications.templates.manage` gồm cả
+   xem. Thương hiệu theo khách, chưa theo nút (cài đặt kế thừa `storefront.*` của bước 55 chưa có); chân thư thêm tên + địa chỉ chủ
+   sở hữu từ `LegalProfiles` của `compliance` khi có.
+10. **MCP**: `get_template_schema`, `preview_template` (chỉ đọc), `update_template_draft`. Không có tool xuất bản: đặc tả đòi
+    `approval_required` cho key `agent` (P12 bước 51) mà kernel chưa có cơ chế đó — xuất bản qua REST.
+11. Event mới: `notifications.template_published`, `…template_rolled_back`, `…template_unpublished`, `…branding_updated`; lưu nháp phát
+    `…template_updated` với `draft: true`.
+
+## D-367 · `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17 — agent quyết
+
+Căn cứ (cần đối chiếu văn bản gốc / người có chuyên môn pháp lý): Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP
+(hiệu lực 01/01/2026) — đồng ý chứng minh được, rút dễ như cho; NĐ 91/2020/NĐ-CP — thư quảng cáo chỉ gửi khi đã đồng ý trước.
+
+1. **Thứ tự đăng ký**: `newsletter` đã đứng sau `compliance` và `notifications` trong `crates/app/src/modules.rs` (sau `content`);
+   chỉ sửa chú thích. `newsletter` lấy `dyn ConsentLedger` bằng `require(...).ok()` — chương trình không có `compliance` thì chạy
+   như cũ (test của module dựng không có `compliance`).
+2. **Khoá trong sổ**: chủ thể `Email`, mục đích `marketing`, phạm vi `newsletter.list:<id>`, kênh `email`; bằng chứng là JSON `consent`
+   module đã lưu (thiếu chữ / phiên bản — đăng ký cũ, nhập không kèm chữ — thì ghi rõ "ghi sổ từ đăng ký đã xác nhận", phiên bản
+   `newsletter.legacy`). `source_ref` = `newsletter.subscription:<subscriber>:<list>:<confirmed_at micro giây>` (rút:
+   `newsletter.unsubscribe:…:<unsubscribed_at>`), nên ghi lại không trùng.
+3. **Lệch đặc tả — ghi sổ SAU commit, không trước**: đặc tả C3 đòi gọi `grant` trước transaction của module, nhưng người đăng ký
+   và danh sách (xác nhận bằng token, đăng ký qua job, trang lựa chọn) chỉ biết chắc bên trong transaction. Thay bằng: cột mới
+   `newsletter_subscriptions.ledger_state` (`''` / `granted` / `withdrawn`), đồng bộ ngay sau commit (lỗi chỉ ghi log), lịch hằng
+   giờ `newsletter.backfill_consents` làm phần còn sót, và **lúc gửi luôn hỏi sổ** (`granted_many` mỗi lô, đăng ký `confirmed` sổ
+   chưa biết được ghi sổ ngay trước khi hỏi; sổ lỗi → lô lỗi, job thử lại, không gửi). Tính chất an toàn của đặc tả giữ nguyên:
+   không gửi khi sổ không xác nhận đồng ý; đồng ý bị rút ở khoá rộng hơn (vd mọi quảng cáo) vẫn chặn vì đồng ý theo danh sách
+   không ghi đè rút ở khoá rộng.
+4. **Chuyển dữ liệu cũ**: migration mới `m0013_consent_ledger` thêm cột (dòng có sẵn nhận `''`); migration không gọi được module
+   khác nên việc ghi sổ cho đăng ký `confirmed` có sẵn do lịch `newsletter.backfill_consents` làm (500 dòng mỗi lượt, quét cả database
+   qua index `newsletter_subscriptions_ledger_sweep_idx`). Nhập hàng loạt cũng để lịch ghi sổ (không gọi sổ từng người trong lệnh
+   nhập).
+5. **Rút ở `compliance`**: nghe `compliance.consent_withdrawn` (mục đích `marketing`, kênh rỗng hay `email`, phạm vi rỗng hay
+   `newsletter.list:<id>`) → `ConsentLedger::get` lấy email → huỷ đăng ký khớp, ghi `ledger_state = withdrawn` luôn, không gọi lại sổ
+   (không vòng event). Lô gửi bỏ người không còn đồng ý với lý do `consent_withdrawn`.
+6. **Chiến dịch `format`** (`static` mặc định — hành vi cũ / `template`), trường mới, endpoint cũ giữ nguyên (D-059). Biến được phép:
+   `subscriber.name`, `subscriber.email` (che bớt `a***@example.com`), `list.name`, `unsubscribe_url` (trang lựa chọn của người nhận).
+   Kiểm khi lưu (gom lỗi một lần); dựng từng người nhận trong job gửi theo lô; người nhận dựng lỗi → lượt gửi `failed`
+   (`template_error`), không thử lại. Chưa dùng chung mẫu đã biên dịch cho cả lô: API của bộ dựng kernel biên dịch mỗi lần dựng —
+   đo trước khi tối ưu.
+7. Mục "(thấp) báo cáo đã lưu và lịch gửi qua email (A-b10)" **không làm ở bước này**: nó dùng phần xuất chung của bước 51 (D-213),
+   phần đó chưa có báo cáo đã lưu; làm cùng bước 51 / 38.
+
+## D-368 · Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17 — agent quyết
+
+Bối cảnh: mục cuối của bước 37. Trait `MobilePushSender` (kernel) và bản giả (testkit) có từ D-348; `notifications` đã có bảng
+`notifications_device_tokens` (token mã hoá bằng `Sealer`, `token_key` SHA-256), `POST` / `DELETE /me/device-tokens`, gửi qua trait,
+xoá token khi nhà cung cấp trả `Gone`, cùng luật đồng ý (kênh `push`) và khung giờ (`notifications.send_windows`, khoá `push`) như web
+push.
+
+1. Thêm `GET /me/device-tokens` và tool MCP `notifications.list_my_devices` (chỉ đọc, chỉ thiết bị của chính mình, không trả token).
+2. Dọn token hỏng: lỗi vĩnh viễn của nhà cung cấp (`Validation` / `BadRequest` / `NotFound` / `Forbidden` — token sai dạng, sai app)
+   → xoá ngay (lý do `invalid`); lỗi tạm thời → tăng `failures`, gửi được thì về 0, 10 lần liên tiếp → xoá (lý do `failing`). Một thiết
+   bị lỗi không làm hỏng việc gửi tới thiết bị khác; không thiết bị nào nhận mà có lỗi tạm thời → trả lỗi để job queue thử lại.
+   Event `notifications.push_subscription_removed` mang lý do.
+3. **Không dựng** bộ nối Firebase Cloud Messaging / Apple Push Notification service: cần khoá của nhà cung cấp (CLAUDE.md "chỉ dừng lại
+   hỏi khi cần secret thật"); là module riêng cài `MobilePushSender`, làm khi chủ dự án cấp khoá.
+4. Đóng bước 37: mọi mục `[x]`, chuyển sang `docs/roadmap/done.md` như bước 35 / 36. Còn lại có ghi: báo cáo đã lưu (A-b10) dời sang
+   bước 51 / 38 (D-367); bộ nối thật (SMS brandname, Zalo ZNS, web push VAPID, FCM / APNs, VNeID / eKYC) chờ khoá của nhà cung cấp.

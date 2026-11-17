@@ -78,6 +78,16 @@ bên nào (test dùng bản giả). Không có bên gửi thì kênh bị bỏ q
 (khoá `auth` của trình duyệt, token thiết bị) được lưu đã mã hoá. Dịch vụ đẩy báo đăng ký hay token đã
 mất thì nó bị xoá.
 
+Đẩy di động: ứng dụng đăng ký token FCM / APNs bằng `POST /me/device-tokens`
+(`{"platform": "android", "token": "…", "app_id": "com.example.shop"}`; đăng ký lại cùng token thì cập
+nhật), xem các thiết bị của người dùng bằng `GET /me/device-tokens` (không bao giờ trả token) và gỡ một
+thiết bị bằng `DELETE /me/device-tokens/{id}`. Đẩy di động theo cùng luật như web push: tuỳ chọn nhận theo
+loại, tin quảng cáo cần đồng ý (kênh `push` trong sổ đồng ý) và trong khung giờ của
+`notifications.send_windows` (khoá `push`). Token nhà cung cấp báo đã mất hay từ chối bị xoá ngay; token
+lỗi 10 lần liên tiếp cũng bị xoá. Module nhà cung cấp cài trait `MobilePushSender` của kernel; bộ nối
+Firebase Cloud Messaging và Apple Push Notification service cần khoá của nhà cung cấp, không có trong bản
+này.
+
 ## Cho người dùng: hộp thư và tuỳ chọn
 
 - `GET /me/inbox` (một trang, `unread=true` để chỉ lấy tin chưa đọc), `GET /me/inbox/unread-count`,
@@ -103,7 +113,40 @@ Thông báo của nền tảng chạy nền, mỗi lượt 50 khách, tới hộ
 quá hạn, và mỗi tháng một lần khi dùng tới 80% một hạn mức.
 
 Tool MCP: `notifications.list_kinds`, `notifications.send_notification`, `notifications.list_messages`,
-`notifications.list_my_inbox`, `notifications.mark_inbox_read`.
+`notifications.list_my_inbox`, `notifications.mark_inbox_read`, `notifications.list_my_devices`,
+`notifications.get_template_schema`,
+`notifications.preview_template`, `notifications.update_template_draft`.
+
+## Mẫu do khách tự soạn
+
+Khách tự soạn mẫu cho từng loại, kênh và ngôn ngữ, theo cú pháp của bộ dựng mẫu dùng chung: `{{ code }}`,
+`{% if link %}…{% endif %}`, `{% for line in lines %}…{% endfor %}`, bộ lọc `money`, `number`, `date`. Mẫu là
+dữ liệu không tin cậy: không đọc file, không gọi mạng, giới hạn độ dài, số bước chạy và kết quả
+(`template.limit_exceeded`), và mọi giá trị chèn vào HTML đều được thoát.
+
+| Endpoint (dưới `/templates/{kind}/{channel}/{locale}`) | Permission |
+|---|---|
+| `GET /kinds/{kind}/schema` — biến mẫu được dùng (đánh dấu biến bắt buộc) và dữ liệu mẫu | đăng nhập |
+| `GET` / `PUT` / `DELETE …/draft` — bản nháp; lưu thì kiểm cú pháp, biến lạ và biến bắt buộc, báo mọi lỗi một lần kèm dòng và cột | xem: `notifications.templates.read`; ghi: `notifications.templates.manage` |
+| `POST …/publish` — bản nháp thành phiên bản mới (không đổi được nữa) và được dùng từ tin kế tiếp | `notifications.templates.manage` |
+| `GET …/versions` — 20 phiên bản gần nhất, `live` đánh dấu bản đang dùng; `POST …/rollback {"version": 1}` dùng lại bản cũ; `DELETE …/published` thôi dùng mẫu | xem / `notifications.templates.manage` |
+| `POST …/preview {"source": "draft", "data": {…}}` — dựng bằng dữ liệu mẫu hay giá trị của bạn (chỉ biến của loại); không gửi gì | `notifications.templates.read` |
+| `POST …/test-send` — chỉ gửi tới chính bạn: email đã xác minh (`email`) hay hộp thư của bạn (`in_app`); 10 lần mỗi giờ | `notifications.templates.manage` |
+| `GET` / `PUT /branding` — tên, logo (https), màu, chân thư của mail HTML | xem / `notifications.branding.manage` |
+
+Trường: `subject` (chủ đề email, tiêu đề đẩy và hộp thư), `body_text` (chữ thuần: phần chữ của email, hộp
+thư), `body_html` (chỉ email; bỏ trống → sinh từ `body_text`), `short` (SMS, ZNS, đẩy), `zns_template_id`.
+
+Mọi email có phần HTML trong khung MJML có thương hiệu (dựng bằng `mrml`, chạy đúng trên Outlook, Gmail và
+điện thoại) và phần chữ thuần. Chân thư có chân thư của thương hiệu cùng tên và địa chỉ chủ sở hữu (hồ sơ
+pháp lý của `compliance`). Tin quảng cáo luôn có nhãn và chân thư huỷ nhận; mẫu không gỡ được. Câu chữ dùng
+khi gửi: mẫu đã xuất bản đang dùng, không có thì câu thay thế (`PUT /templates/{kind}/{channel}/{locale}`),
+không có nữa thì câu mặc định theo ngôn ngữ của người nhận. Mẫu đã xuất bản không dựng được với dữ liệu thật
+thì dùng câu mặc định; tin vẫn gửi và ghi `error_code = template_fallback`.
+
+Module khai biến của loại bằng `.variables(&[Variable::required("link", "…")])` và dữ liệu mẫu bằng
+`.sample(r#"{"link": "https://…"}"#)`; không khai thì được dùng chỗ điền `{tên}` của câu mặc định và
+`link`.
 
 ## Khai một loại trong module
 

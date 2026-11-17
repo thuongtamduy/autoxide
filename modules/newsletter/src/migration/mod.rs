@@ -4,6 +4,7 @@
 mod m0001_create_newsletter;
 mod m0009_delivery_unsubscribed;
 mod m0012_subscriber_sort;
+mod m0013_consent_ledger;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -105,5 +106,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "newsletter"),
         // Sắp người đăng ký theo email / trạng thái như nhau trên hai database (W-058 của giao diện).
         Box::new(m0012_subscriber_sort::Migration),
+        // Đăng ký trên sổ đồng ý chung của `compliance`, chiến dịch dạng mẫu (bước 37 C3, D-367).
+        Box::new(m0013_consent_ledger::Migration),
     ]
 }

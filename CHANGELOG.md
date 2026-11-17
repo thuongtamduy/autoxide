@@ -11,6 +11,29 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 37, mobile push (`docs/NOTIFICATIONS.md`): `GET /api/v1/notifications/me/device-tokens` lists your registered
+  devices (tokens are stored encrypted and never returned) and the MCP tool `notifications.list_my_devices`; a device token
+  the provider rejects is removed at once, one that fails 10 times in a row too, and one failing device no longer blocks the
+  others. Firebase Cloud Messaging / Apple Push Notification service connectors still need the provider's keys. Step 37 is
+  complete. Decision D-368.
+- Step 37, the newsletter on the shared consent ledger of `compliance` (`docs/NEWSLETTER.md`): every confirmed subscription
+  is a consent (`marketing`, scope `newsletter.list:<id>`, channel `email`) and unsubscribing withdraws it; withdrawing in
+  `compliance` unsubscribes; each batch asks the ledger again and skips people without consent (`consent_withdrawn`, no
+  sending when the ledger cannot answer); existing confirmed subscriptions are recorded by the new hourly job
+  `newsletter.backfill_consents`. Campaigns take `format: "template"` to personalise the subject and bodies for each recipient
+  (`subscriber.name`, masked `subscriber.email`, `list.name`, `unsubscribe_url`), checked on save. Decision D-367.
+- Step 37, notification templates written by the tenant (`docs/NOTIFICATIONS.md`): drafts checked against the variables
+  of the kind on save (syntax, unknown and required variables, every problem at once), publish into immutable versions (the
+  last 20 kept), rollback and unpublish, preview with sample data, test send to the caller only (verified email or own
+  inbox, 10 per hour), under `/api/v1/notifications/templates/{kind}/{channel}/{locale}/` (`draft`, `publish`, `versions`,
+  `rollback`, `published`, `preview`, `test-send`), `GET /kinds/{kind}/schema`, and mail branding `GET|PUT /branding`. Every
+  email now has an HTML part in a branded MJML layout (new library `mrml`) next to the plain-text part; the footer adds the
+  owner's legal name and address from the legal profile. Kinds may declare `variables` and `sample`. A published template
+  that fails with real data falls back to the default text (`error_code = template_fallback`). Permissions
+  `notifications.templates.read`, `notifications.branding.manage`; MCP tools `notifications.get_template_schema`,
+  `notifications.preview_template`, `notifications.update_template_draft`; events `notifications.template_published`,
+  `…template_rolled_back`, `…template_unpublished`, `…branding_updated`. The kernel template check no longer reports built-in
+  functions (`range`, `dict`…) as unknown variables. Decision D-366.
 - Tenant wording (step 51): modules mark the texts a tenant may replace (`Module::overridable_texts`; content: the
   terms "Post" and "Page"); `GET /api/v1/kernel/texts`, `PUT/DELETE /api/v1/kernel/texts/{locale}/{key}`
   (`kernel.texts.manage`) set the tenant's wording — plain text, the same placeholders as the default, never error

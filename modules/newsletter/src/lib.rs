@@ -11,6 +11,7 @@ mod audience;
 mod bulk;
 mod campaigns;
 mod config;
+mod consents;
 mod entity;
 mod events;
 mod http;
@@ -61,6 +62,8 @@ struct NewsletterModule {
     /// Event của module khác có trong chương trình (chỉ nghe khi có người phát).
     listens_published: bool,
     listens_failures: bool,
+    /// Có sổ đồng ý và event rút đồng ý của `compliance`.
+    listens_consents: bool,
     /// Sổ database, có sau `start`: job dọn dẹp tra ngữ cảnh từng khách.
     databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
@@ -125,7 +128,20 @@ impl Module for NewsletterModule {
             .require::<dyn autoxide_kernel::tenancy::TenantSettings>()
             .map(autoxide_kernel::tenancy::SiteLinks::new)
             .unwrap_or_default();
-        let service = Arc::new(NewsletterService::new(parts, config).with_links(links));
+        // Sổ đồng ý chung (bước 37 C3, D-367): `newsletter` đăng ký SAU `compliance`.
+        let consents = context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok();
+        self.listens_consents = consents.is_some()
+            && context.events().contains(autoxide_compliance::api::CONSENT_WITHDRAWN);
+        let templates = context
+            .require::<autoxide_kernel::template::TemplateEngine>()
+            .map(|engine| (*engine).clone())
+            .unwrap_or_default();
+        let service = Arc::new(
+            NewsletterService::new(parts, config)
+                .with_links(links)
+                .with_consents(consents)
+                .with_templates(templates),
+        );
         context.personal_data(service.clone())?;
         context.summary_metric(Arc::new(summary::Subscribers))?;
         context.summary_metric(Arc::new(summary::Suppressed))?;
@@ -149,6 +165,12 @@ impl Module for NewsletterModule {
             subscriptions.push(Subscription::new(
                 campaigns::new_posts::ENTRY_PUBLISHED,
                 Arc::new(campaigns::new_posts::NewPostHandler(service.clone())),
+            ));
+        }
+        if self.listens_consents {
+            subscriptions.push(Subscription::new(
+                autoxide_compliance::api::CONSENT_WITHDRAWN,
+                Arc::new(consents::ConsentWithdrawn(service.clone())),
             ));
         }
         if self.listens_failures {
@@ -176,6 +198,10 @@ impl Module for NewsletterModule {
                     Arc::new(public::Subscriber(service.clone())),
                 ),
                 JobRegistration::new(
+                    consents::BACKFILL,
+                    Arc::new(consents::Backfill(service.clone())),
+                ),
+                JobRegistration::new(
                     retention::CLEANUP,
                     Arc::new(retention::Cleanup { service, databases }),
                 ),
@@ -186,7 +212,12 @@ impl Module for NewsletterModule {
 
     fn schedules(&self) -> Vec<Schedule> {
         let day = std::time::Duration::from_secs(24 * 3600);
-        vec![Schedule::new(retention::CLEANUP, retention::CLEANUP, day)]
+        let hour = std::time::Duration::from_secs(3600);
+        vec![
+            Schedule::new(retention::CLEANUP, retention::CLEANUP, day),
+            // Ghi sổ đồng ý cho đăng ký sổ chưa biết (đăng ký có sẵn, lần gọi sổ bị lỗi) — D-367.
+            Schedule::new(consents::BACKFILL, consents::BACKFILL, hour),
+        ]
     }
 
     fn routes(&self) -> OpenApiRouter {
@@ -295,7 +326,17 @@ pub(crate) mod testing {
         config: NewsletterConfig,
         antispam: AntispamConfig,
     ) -> Harness {
-        build(test, config, antispam, None).await
+        build(test, config, antispam, None, None).await
+    }
+
+    /// Như [`service`], với sổ đồng ý `ledger` (bản giả của test).
+    pub async fn service_with_ledger(
+        test: &TestDatabase,
+        config: NewsletterConfig,
+        ledger: Arc<dyn autoxide_compliance::api::ConsentLedger>,
+    ) -> Harness {
+        let antispam = AntispamConfig::default().min_fill(Duration::ZERO);
+        build(test, config, antispam, None, Some(ledger)).await
     }
 
     /// Như [`service`], tra khách qua sổ `registry` (vd sổ nhiều khách của một `TestApp`).
@@ -305,7 +346,7 @@ pub(crate) mod testing {
         registry: DatabaseRegistry,
     ) -> Harness {
         let antispam = AntispamConfig::default().min_fill(Duration::ZERO);
-        build(test, config, antispam, Some(registry)).await
+        build(test, config, antispam, Some(registry), None).await
     }
 
     async fn build(
@@ -313,6 +354,7 @@ pub(crate) mod testing {
         config: NewsletterConfig,
         antispam: AntispamConfig,
         registry: Option<DatabaseRegistry>,
+        ledger: Option<Arc<dyn autoxide_compliance::api::ConsentLedger>>,
     ) -> Harness {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
@@ -347,7 +389,7 @@ pub(crate) mod testing {
             resources: resources.clone(),
             databases: registry.unwrap_or_else(|| DatabaseRegistry::single(database.clone())),
         };
-        let service = Arc::new(NewsletterService::new(parts, config));
+        let service = Arc::new(NewsletterService::new(parts, config).with_consents(ledger));
         let tenant = TenantContext::default_on(database.clone());
         Harness { service, mailer, database, tenant, resources }
     }
