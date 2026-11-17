@@ -72,18 +72,20 @@ impl ResourceResolver for EntryResolver {
                 // Đang công khai: thông tin của bản công khai (thứ người đọc thấy). Không thì
                 // `public` là `false` và không đưa tiêu đề, tóm tắt của bản nháp ra ngoài — module
                 // khác có thể chép chúng vào mail gửi người lạ (D-150).
-                let resource = match live.remove(&draft.id) {
-                    Some(live) => Resource::new(live.title)
-                        .public(true)
-                        .summary(live.excerpt)
-                        .url(Some(live.path))
-                        .locale(Some(live.locale))
-                        .image(live.featured_media_id)
-                        .owner_user_ids(owners),
-                    None => Resource::new(String::new())
-                        .locale(Some(draft.locale))
-                        .owner_user_ids(owners),
-                };
+                // Mục bị ẩn vì vụ việc (D-363) không công khai với module khác.
+                let resource =
+                    match live.remove(&draft.id).filter(|live| live.restricted_at.is_none()) {
+                        Some(live) => Resource::new(live.title)
+                            .public(true)
+                            .summary(live.excerpt)
+                            .url(Some(live.path))
+                            .locale(Some(live.locale))
+                            .image(live.featured_media_id)
+                            .owner_user_ids(owners),
+                        None => Resource::new(String::new())
+                            .locale(Some(draft.locale))
+                            .owner_user_ids(owners),
+                    };
                 (draft.id.to_string(), resource)
             })
             .collect())

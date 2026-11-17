@@ -479,6 +479,7 @@ mod tests {
             title: String::new(),
             caption: String::new(),
             decorative: false,
+            alt_ai_assisted: false,
             visibility: "private".into(),
             version_id: Uuid::nil(),
             uploaded_by: None,

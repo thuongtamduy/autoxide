@@ -848,7 +848,8 @@ async fn trang_thu_vien_cua_giao_dien() {
 
         for (item, body) in [
             (&decorative, json!({"decorative": true})),
-            (&described, json!({"alt": "A red square"})),
+            // `alt` viết từ gợi ý của AI mang nhãn (Luật 134/2025/QH15, D-362).
+            (&described, json!({"alt": "A red square", "alt_ai_assisted": true})),
         ] {
             let id = item["id"].as_str().unwrap();
             let got = send(
@@ -871,6 +872,9 @@ async fn trang_thu_vien_cua_giao_dien() {
         assert_eq!(others["data"].as_array().unwrap().len(), 3);
         let one = get(&format!("/{}", decorative["id"].as_str().unwrap())).await;
         assert_eq!(one["data"]["decorative"], true);
+        assert_eq!(one["data"]["alt_ai_assisted"], false);
+        let labelled = get(&format!("/{}", described["id"].as_str().unwrap())).await;
+        assert_eq!(labelled["data"]["alt_ai_assisted"], true);
 
         let summary = get("/summary").await;
         assert_eq!(summary["data"]["items"], 4);

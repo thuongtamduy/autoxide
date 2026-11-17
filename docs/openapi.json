@@ -2838,6 +2838,433 @@
         ],
         "type": "object"
       },
+      "ComplianceCase": {
+        "description": "A report of an infringement (intellectual property, counterfeit, prohibited goods) or a\nconsumer complaint, as the people who handle it see it.",
+        "properties": {
+          "ack_due_at": {
+            "description": "Acknowledge the case before this time (legal rule `cases.deadlines`).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "acknowledged_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channel": {
+            "description": "`public` (the public form) or `staff` (entered by staff).",
+            "type": "string"
+          },
+          "claim": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decide_by": {
+            "description": "Decide before this time (working days of the legal rule `cases.deadlines`; 24 hours for\na request of an authority).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "decided_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decided_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decision": {
+            "description": "`upheld`, `rejected`, `partially_upheld`, or empty before the decision.",
+            "type": "string"
+          },
+          "decision_reason": {
+            "description": "Reason of the decision; shown to the reporter and the reported party.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entries": {
+            "description": "The log, oldest first (only when reading one case).",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceCaseEntry"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "held_reason": {
+            "description": "Why the anti-spam checks held it; `null` when not held.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint` or `other`.",
+            "type": "string"
+          },
+          "overdue": {
+            "description": "`true` while open and past `decide_by`.",
+            "type": "boolean"
+          },
+          "reference": {
+            "description": "Short reference for people, e.g. `C-1A2B3C4D`.",
+            "type": "string"
+          },
+          "reporter_email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reporter_kind": {
+            "description": "`guest`, `user`, `rights_holder` or `authority`.",
+            "type": "string"
+          },
+          "reporter_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reporter_phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reporter_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "respond_by": {
+            "description": "The reported party may answer until this time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "respondent_org_id": {
+            "description": "The reported unit (seller), when given.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "respondent_user_ids": {
+            "description": "Users who may answer: the owners of the target.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "restricted": {
+            "description": "The target is hidden while the case is handled (or after an upheld decision).",
+            "type": "boolean"
+          },
+          "rights": {
+            "description": "Certificates, registrations, links given as evidence.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "description": "`received` (held by the anti-spam checks), `under_review`, `awaiting_response`, `decided`,\n`closed` or `withdrawn`.",
+            "type": "string"
+          },
+          "target": {
+            "description": "The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); empty when none.",
+            "type": "string"
+          },
+          "tracking_token": {
+            "description": "The tracking code for the reporter — only in the answer that created the case.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "kind",
+          "target",
+          "respondent_user_ids",
+          "reporter_kind",
+          "channel",
+          "claim",
+          "rights",
+          "status",
+          "restricted",
+          "decision",
+          "ack_due_at",
+          "respond_by",
+          "decide_by",
+          "overdue",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceCaseClose": {
+        "additionalProperties": false,
+        "description": "Closing a case.",
+        "properties": {
+          "reason": {
+            "description": "1 to 20000 characters; kept in the log.",
+            "type": "string"
+          },
+          "withdrawn": {
+            "description": "`true` when the reporter withdrew it (open cases only).",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "ComplianceCaseDecision": {
+        "additionalProperties": false,
+        "description": "The decision on a case.",
+        "properties": {
+          "decision": {
+            "description": "`upheld` (the target stays hidden, or is hidden now), `partially_upheld` (same) or\n`rejected` (the target is shown again).",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Shown to the reporter and the reported party; 1 to 20000 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "ComplianceCaseEntry": {
+        "description": "A line of the log of a case.",
+        "properties": {
+          "author_kind": {
+            "description": "`staff`, `respondent` or `system`.",
+            "type": "string"
+          },
+          "author_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "files": {
+            "description": "Ids of files (module `files`).",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`note` (internal), `evidence`, `status`, `restriction`, `response` (of the reported\nparty), `decision` or `disclosure`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "author_kind",
+          "body",
+          "files",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceCaseEntryRequest": {
+        "additionalProperties": false,
+        "description": "A line to add to the log of a case.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "files": {
+            "description": "Ids of files uploaded to the module `files`.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "description": "`note` (internal, the default) or `evidence`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
+      "ComplianceCaseReason": {
+        "additionalProperties": false,
+        "description": "Why.",
+        "properties": {
+          "reason": {
+            "description": "1 to 20000 characters; kept in the log.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "ComplianceCaseRequest": {
+        "additionalProperties": false,
+        "description": "A case to record (e.g. a letter of an authority or of a rights holder).",
+        "properties": {
+          "claim": {
+            "description": "What is reported, 10 to 20000 characters.",
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint` or `other`.",
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reporter_kind": {
+            "description": "`guest`, `user`, `rights_holder` or `authority` (a request of a competent authority:\nthe target is hidden at once and the decision is due in the hours of the rule).",
+            "type": "string"
+          },
+          "reporter_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "respondent_org_id": {
+            "description": "The reported unit (seller), if known.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rights": {
+            "description": "Certificates, registrations, links (objects; at most 20).",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "target": {
+            "description": "The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); required except\nfor `consumer_complaint` and `other`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "reporter_kind",
+          "claim"
+        ],
+        "type": "object"
+      },
+      "ComplianceCaseResponseRequest": {
+        "additionalProperties": false,
+        "description": "An answer of the reported party.",
+        "properties": {
+          "body": {
+            "description": "Your answer, 1 to 20000 characters.",
+            "type": "string"
+          },
+          "files": {
+            "description": "Ids of files (e.g. invoices, licences) uploaded to the module `files`.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
+      "ComplianceCaseStep": {
+        "description": "A step of a case, as the reporter sees it.",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`status`, `restriction` or `decision`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "at"
+        ],
+        "type": "object"
+      },
       "ComplianceChecklist": {
         "description": "What a website still lacks before it is notified to, or registered with, the Ministry of\nIndustry and Trade (data: the rule `moit.checklist.<kind>` in force).",
         "properties": {
@@ -2956,6 +3383,53 @@
           "status",
           "legal_basis",
           "needs_legal_review"
+        ],
+        "type": "object"
+      },
+      "ComplianceComplaintChannel": {
+        "description": "How consumers can complain, and how fast they get an answer.",
+        "properties": {
+          "acknowledge_within_hours": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "contact": {
+            "description": "The tenant's `complaints.contact` policy (e.g. email, phone, address, hours); `null` when\nnot set.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "decide_within_working_days": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "general_conditions_path": {
+            "description": "The general conditions of trade, when published:\n`GET /api/v1/compliance/public/documents/general_conditions`.",
+            "type": "string"
+          },
+          "legal_basis": {
+            "description": "The legal basis of the deadlines (to check against the original texts).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "respond_within_working_days": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "submit_path": {
+            "description": "Send complaints with `POST /api/v1/compliance/public/complaints`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submit_path",
+          "acknowledge_within_hours",
+          "respond_within_working_days",
+          "decide_within_working_days",
+          "general_conditions_path"
         ],
         "type": "object"
       },
@@ -3346,6 +3820,127 @@
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "ComplianceDisclosure": {
+        "description": "A disclosure of information to a competent authority.",
+        "properties": {
+          "authority": {
+            "type": "string"
+          },
+          "case_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disclosed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "disclosed_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fields": {
+            "description": "Names of the fields given (the values are not kept).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legal_basis": {
+            "type": "string"
+          },
+          "request_reference": {
+            "description": "Number of the authority's request.",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "subject": {
+            "description": "`org:<unit id>` or `user:<user id>`.",
+            "type": "string"
+          },
+          "values": {
+            "description": "The values given — only in the answer that recorded the disclosure.",
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "authority",
+          "request_reference",
+          "legal_basis",
+          "requested_at",
+          "subject",
+          "fields",
+          "disclosed_by",
+          "disclosed_at"
+        ],
+        "type": "object"
+      },
+      "ComplianceDisclosureRequest": {
+        "additionalProperties": false,
+        "description": "A request of a competent authority for information about a seller.",
+        "properties": {
+          "authority": {
+            "description": "The authority, e.g. the market surveillance office of a province.",
+            "type": "string"
+          },
+          "case_id": {
+            "description": "The case it belongs to, if any (a line is added to its log).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fields": {
+            "description": "Fields to give. Units: `legal_name`, `trade_name`, `tax_code`, `registration_number`,\n`address`, `representative_name`, `phone`, `email`, `verified_name`. Users:\n`verified_name`, `document_kind`, `document_last4`, `kyc_status`, `phone`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "legal_basis": {
+            "description": "The legal basis the authority cites.",
+            "type": "string"
+          },
+          "request_reference": {
+            "description": "Number of the authority's written request.",
+            "type": "string"
+          },
+          "requested_at": {
+            "description": "When the request was received; defaults to now.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "description": "`org:<unit id>` (a seller's legal profile and identity verification) or `user:<user id>`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authority",
+          "request_reference",
+          "legal_basis",
+          "subject",
+          "fields"
         ],
         "type": "object"
       },
@@ -4393,6 +4988,33 @@
         ],
         "type": "object"
       },
+      "ComplianceModerationReasons": {
+        "description": "The reasons for which content of consumers may be hidden.",
+        "properties": {
+          "legal_basis": {
+            "description": "The legal basis (to check against the original texts).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reasons": {
+            "description": "Reason codes, e.g. `spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "surface": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "reasons"
+        ],
+        "type": "object"
+      },
       "ComplianceMyKyc": {
         "description": "Your verification profile, or none yet.",
         "properties": {
@@ -4590,6 +5212,98 @@
         ],
         "type": "object"
       },
+      "CompliancePublicCaseReceipt": {
+        "description": "What the sender of a report or complaint gets back.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "tracking_token": {
+            "description": "Keep it: with `id` it shows the state at `GET /public/cases/{id}?token=`. Not shown again.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "tracking_token"
+        ],
+        "type": "object"
+      },
+      "CompliancePublicComplaint": {
+        "additionalProperties": false,
+        "description": "A consumer complaint from the public form.",
+        "properties": {
+          "challenge": {
+            "description": "The value of the `altcha` widget, when the server uses a challenge.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "claim": {
+            "description": "The complaint, 10 to 20000 characters.",
+            "type": "string"
+          },
+          "email": {
+            "description": "Your email address or phone number (one of them when not signed in).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "form_token": {
+            "description": "Ask `GET /api/v1/antispam/token?scope=compliance:complaints` when the form is shown.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Your name (required when not signed in).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "respondent_org_id": {
+            "description": "The seller complained about (marketplace), if known.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "description": "What the complaint is about, `<module>.<type>:<id>` (e.g. an order or a product), if any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trap": {
+            "description": "The hidden trap field: people leave it empty.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "claim"
+        ],
+        "type": "object"
+      },
       "CompliancePublicOwner": {
         "description": "The website owner's information for a footer (what the law requires a commerce website to show).",
         "properties": {
@@ -4662,6 +5376,92 @@
         "required": [
           "entity_type",
           "legal_name"
+        ],
+        "type": "object"
+      },
+      "CompliancePublicReport": {
+        "additionalProperties": false,
+        "description": "A report of an infringement from the public form.",
+        "properties": {
+          "challenge": {
+            "description": "The value of the `altcha` widget, when the server uses a challenge.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "claim": {
+            "description": "What is wrong, 10 to 20000 characters.",
+            "type": "string"
+          },
+          "email": {
+            "description": "Your email address or phone number (one of them when not signed in) to be told the outcome.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "form_token": {
+            "description": "Ask `GET /api/v1/antispam/token?scope=compliance:reports` when the form is shown.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`ip_infringement`, `counterfeit`, `prohibited_goods` or `other`.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Your name (required when not signed in).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "respondent_org_id": {
+            "description": "The reported unit (seller on a marketplace), if known.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rights": {
+            "description": "Certificates, registrations, links (objects; at most 20).",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "rights_holder": {
+            "description": "`true` when you hold the right (or act for its holder).",
+            "type": "boolean"
+          },
+          "target": {
+            "description": "The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); required except for\n`other`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trap": {
+            "description": "The hidden trap field: people leave it empty.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "claim"
         ],
         "type": "object"
       },
@@ -4891,6 +5691,102 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "ComplianceRespondentCase": {
+        "description": "A case about you (or your unit), as the reported party sees it: no contact details of the\nreporter, no internal notes.",
+        "properties": {
+          "claim": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decide_by": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "decision_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entries": {
+            "description": "Status changes, restrictions, answers and the decision, oldest first.",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceCaseEntry"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "reporter_kind": {
+            "type": "string"
+          },
+          "reporter_name": {
+            "description": "Name of the reporter when it is a rights holder or an authority; `null` otherwise.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "respond_by": {
+            "description": "Answer with `POST /cases/{id}/responses` before this time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "respondent_org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "restricted": {
+            "type": "boolean"
+          },
+          "rights": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "kind",
+          "target",
+          "reporter_kind",
+          "claim",
+          "rights",
+          "status",
+          "restricted",
+          "decision",
+          "respond_by",
+          "decide_by",
+          "created_at",
+          "entries"
+        ],
         "type": "object"
       },
       "ComplianceRetentionItem": {
@@ -5255,6 +6151,85 @@
           "provider",
           "tracking_id",
           "category"
+        ],
+        "type": "object"
+      },
+      "ComplianceTrackedCase": {
+        "description": "The state of a report or complaint, for the person who sent it.",
+        "properties": {
+          "ack_due_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "acknowledged_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decide_by": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decided_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decision": {
+            "type": "string"
+          },
+          "decision_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "restricted": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceCaseStep"
+            },
+            "type": "array"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "kind",
+          "target",
+          "status",
+          "restricted",
+          "decision",
+          "ack_due_at",
+          "decide_by",
+          "created_at",
+          "steps"
         ],
         "type": "object"
       },
@@ -8378,6 +9353,264 @@
         ],
         "type": "object"
       },
+      "Data_ComplianceCase": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A report of an infringement (intellectual property, counterfeit, prohibited goods) or a\nconsumer complaint, as the people who handle it see it.",
+            "properties": {
+              "ack_due_at": {
+                "description": "Acknowledge the case before this time (legal rule `cases.deadlines`).",
+                "format": "date-time",
+                "type": "string"
+              },
+              "acknowledged_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "channel": {
+                "description": "`public` (the public form) or `staff` (entered by staff).",
+                "type": "string"
+              },
+              "claim": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "decide_by": {
+                "description": "Decide before this time (working days of the legal rule `cases.deadlines`; 24 hours for\na request of an authority).",
+                "format": "date-time",
+                "type": "string"
+              },
+              "decided_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "decided_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "decision": {
+                "description": "`upheld`, `rejected`, `partially_upheld`, or empty before the decision.",
+                "type": "string"
+              },
+              "decision_reason": {
+                "description": "Reason of the decision; shown to the reporter and the reported party.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "entries": {
+                "description": "The log, oldest first (only when reading one case).",
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceCaseEntry"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "held_reason": {
+                "description": "Why the anti-spam checks held it; `null` when not held.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint` or `other`.",
+                "type": "string"
+              },
+              "overdue": {
+                "description": "`true` while open and past `decide_by`.",
+                "type": "boolean"
+              },
+              "reference": {
+                "description": "Short reference for people, e.g. `C-1A2B3C4D`.",
+                "type": "string"
+              },
+              "reporter_email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reporter_kind": {
+                "description": "`guest`, `user`, `rights_holder` or `authority`.",
+                "type": "string"
+              },
+              "reporter_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reporter_phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reporter_user_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "respond_by": {
+                "description": "The reported party may answer until this time.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "respondent_org_id": {
+                "description": "The reported unit (seller), when given.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "respondent_user_ids": {
+                "description": "Users who may answer: the owners of the target.",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "restricted": {
+                "description": "The target is hidden while the case is handled (or after an upheld decision).",
+                "type": "boolean"
+              },
+              "rights": {
+                "description": "Certificates, registrations, links given as evidence.",
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": {
+                "description": "`received` (held by the anti-spam checks), `under_review`, `awaiting_response`, `decided`,\n`closed` or `withdrawn`.",
+                "type": "string"
+              },
+              "target": {
+                "description": "The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); empty when none.",
+                "type": "string"
+              },
+              "tracking_token": {
+                "description": "The tracking code for the reporter — only in the answer that created the case.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "reference",
+              "kind",
+              "target",
+              "respondent_user_ids",
+              "reporter_kind",
+              "channel",
+              "claim",
+              "rights",
+              "status",
+              "restricted",
+              "decision",
+              "ack_due_at",
+              "respond_by",
+              "decide_by",
+              "overdue",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceCaseEntry": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A line of the log of a case.",
+            "properties": {
+              "author_kind": {
+                "description": "`staff`, `respondent` or `system`.",
+                "type": "string"
+              },
+              "author_user_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "body": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "files": {
+                "description": "Ids of files (module `files`).",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`note` (internal), `evidence`, `status`, `restriction`, `response` (of the reported\nparty), `decision` or `disclosure`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "author_kind",
+              "body",
+              "files",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceChecklist": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -8455,6 +9688,62 @@
               "selling_before_done",
               "selling_note",
               "items"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceComplaintChannel": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "How consumers can complain, and how fast they get an answer.",
+            "properties": {
+              "acknowledge_within_hours": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "contact": {
+                "description": "The tenant's `complaints.contact` policy (e.g. email, phone, address, hours); `null` when\nnot set.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "decide_within_working_days": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "general_conditions_path": {
+                "description": "The general conditions of trade, when published:\n`GET /api/v1/compliance/public/documents/general_conditions`.",
+                "type": "string"
+              },
+              "legal_basis": {
+                "description": "The legal basis of the deadlines (to check against the original texts).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "respond_within_working_days": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "submit_path": {
+                "description": "Send complaints with `POST /api/v1/compliance/public/complaints`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "submit_path",
+              "acknowledge_within_hours",
+              "respond_within_working_days",
+              "decide_within_working_days",
+              "general_conditions_path"
             ],
             "type": "object"
           }
@@ -8683,6 +9972,83 @@
               "since",
               "total",
               "accepted"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceDisclosure": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A disclosure of information to a competent authority.",
+            "properties": {
+              "authority": {
+                "type": "string"
+              },
+              "case_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "disclosed_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "disclosed_by": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "fields": {
+                "description": "Names of the fields given (the values are not kept).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "legal_basis": {
+                "type": "string"
+              },
+              "request_reference": {
+                "description": "Number of the authority's request.",
+                "type": "string"
+              },
+              "requested_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "subject": {
+                "description": "`org:<unit id>` or `user:<user id>`.",
+                "type": "string"
+              },
+              "values": {
+                "description": "The values given — only in the answer that recorded the disclosure.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "authority",
+              "request_reference",
+              "legal_basis",
+              "requested_at",
+              "subject",
+              "fields",
+              "disclosed_by",
+              "disclosed_at"
             ],
             "type": "object"
           }
@@ -9350,6 +10716,42 @@
         ],
         "type": "object"
       },
+      "Data_ComplianceModerationReasons": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The reasons for which content of consumers may be hidden.",
+            "properties": {
+              "legal_basis": {
+                "description": "The legal basis (to check against the original texts).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reasons": {
+                "description": "Reason codes, e.g. `spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive`.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "surface": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "surface",
+              "reasons"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ComplianceMyKyc": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -9508,6 +10910,37 @@
               "residency",
               "generated_at",
               "disclaimer"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CompliancePublicCaseReceipt": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What the sender of a report or complaint gets back.",
+            "properties": {
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "tracking_token": {
+                "description": "Keep it: with `id` it shows the state at `GET /public/cases/{id}?token=`. Not shown again.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "reference",
+              "tracking_token"
             ],
             "type": "object"
           }
@@ -9873,6 +11306,94 @@
             },
             "required": [
               "request"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ComplianceTrackedCase": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The state of a report or complaint, for the person who sent it.",
+            "properties": {
+              "ack_due_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "acknowledged_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "decide_by": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "decided_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "decision": {
+                "type": "string"
+              },
+              "decision_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "restricted": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string"
+              },
+              "steps": {
+                "items": {
+                  "$ref": "#/components/schemas/ComplianceCaseStep"
+                },
+                "type": "array"
+              },
+              "target": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "reference",
+              "kind",
+              "target",
+              "status",
+              "restricted",
+              "decision",
+              "ack_due_at",
+              "decide_by",
+              "created_at",
+              "steps"
             ],
             "type": "object"
           }
@@ -10584,6 +12105,10 @@
           "data": {
             "description": "A post or page — its working draft.",
             "properties": {
+              "ai_assisted": {
+                "description": "A person wrote or edited the content from AI suggestions (e.g. applied\n`seo-suggestions`). Public endpoints return it so the interface labels the content\n(Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).",
+                "type": "boolean"
+              },
               "ai_generated": {
                 "description": "The content was generated by AI (set by the writer; set by the server when it translated\nthe entry, and always when the writer has only `content.write_own`). Shown to readers by\nthe public endpoints.",
                 "type": "boolean"
@@ -10788,6 +12313,7 @@
               "canonical_url",
               "noindex",
               "ai_generated",
+              "ai_assisted",
               "translation_outdated",
               "created_via",
               "created_at",
@@ -13718,6 +15244,10 @@
                 "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset. This is\nthe default language's text, used for any language without a translation in `alts`.",
                 "type": "string"
               },
+              "alt_ai_assisted": {
+                "description": "The default `alt` was written from an AI suggestion: label it where it is shown (Vietnam's\nLaw on Artificial Intelligence 134/2025/QH15).",
+                "type": "boolean"
+              },
               "alts": {
                 "additionalProperties": {
                   "type": "string"
@@ -13868,6 +15398,7 @@
               "title",
               "caption",
               "decorative",
+              "alt_ai_assisted",
               "visibility",
               "version_id",
               "url",
@@ -15457,6 +16988,10 @@
           "data": {
             "description": "The draft of a post or page, as a preview link shows it: the content the website renders,\nwithout the internal fields of the admin view (who created it, who asked for a review, how it\nwas created).",
             "properties": {
+              "ai_assisted": {
+                "description": "The content was written or edited from AI suggestions.",
+                "type": "boolean"
+              },
               "ai_generated": {
                 "description": "The content was generated by AI.",
                 "type": "boolean"
@@ -15601,6 +17136,7 @@
               "canonical_url",
               "noindex",
               "ai_generated",
+              "ai_assisted",
               "updated_at",
               "term_ids",
               "author_ids",
@@ -21353,6 +22889,10 @@
             "items": {
               "description": "A published post or page, as readers see it.",
               "properties": {
+                "ai_assisted": {
+                  "description": "A person wrote or edited the content from AI suggestions: label it as AI-assisted (Vietnam's\nLaw on Artificial Intelligence 134/2025/QH15, from 2026-03-01).",
+                  "type": "boolean"
+                },
                 "ai_generated": {
                   "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one.",
                   "type": "boolean"
@@ -21501,6 +23041,7 @@
                 "authors",
                 "ai_generated",
                 "ai_reviewed",
+                "ai_assisted",
                 "embeds"
               ],
               "type": "object"
@@ -23597,6 +25138,13 @@
         "additionalProperties": false,
         "description": "The editable fields of an entry. Omitted fields stay as they are.",
         "properties": {
+          "ai_assisted": {
+            "description": "Send `true` when the content was written or edited from AI suggestions (applied\n`seo-suggestions`, rewritten from an AI draft); public endpoints return it so the interface\nlabels it (Vietnam's Law on Artificial Intelligence 134/2025/QH15). Removing the label\n(`false` while it is `true`) needs `content.publish` (else 403\n`content.ai_label_requires_publish`).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "ai_generated": {
             "description": "The content was generated by AI. AI agents should always send `true`; readers may be\ntold (public endpoints return it). With only `content.write_own` the server always sets\n`true`, whatever is sent.",
             "type": [
@@ -23693,6 +25241,10 @@
       "EntryResponse": {
         "description": "A post or page — its working draft.",
         "properties": {
+          "ai_assisted": {
+            "description": "A person wrote or edited the content from AI suggestions (e.g. applied\n`seo-suggestions`). Public endpoints return it so the interface labels the content\n(Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).",
+            "type": "boolean"
+          },
           "ai_generated": {
             "description": "The content was generated by AI (set by the writer; set by the server when it translated\nthe entry, and always when the writer has only `content.write_own`). Shown to readers by\nthe public endpoints.",
             "type": "boolean"
@@ -23897,6 +25449,7 @@
           "canonical_url",
           "noindex",
           "ai_generated",
+          "ai_assisted",
           "translation_outdated",
           "created_via",
           "created_at",
@@ -28652,6 +30205,10 @@
             "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset. This is\nthe default language's text, used for any language without a translation in `alts`.",
             "type": "string"
           },
+          "alt_ai_assisted": {
+            "description": "The default `alt` was written from an AI suggestion: label it where it is shown (Vietnam's\nLaw on Artificial Intelligence 134/2025/QH15).",
+            "type": "boolean"
+          },
           "alts": {
             "additionalProperties": {
               "type": "string"
@@ -28802,6 +30359,7 @@
           "title",
           "caption",
           "decorative",
+          "alt_ai_assisted",
           "visibility",
           "version_id",
           "url",
@@ -32104,6 +33662,300 @@
         ],
         "type": "object"
       },
+      "Page_ComplianceCase": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A report of an infringement (intellectual property, counterfeit, prohibited goods) or a\nconsumer complaint, as the people who handle it see it.",
+              "properties": {
+                "ack_due_at": {
+                  "description": "Acknowledge the case before this time (legal rule `cases.deadlines`).",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "acknowledged_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "channel": {
+                  "description": "`public` (the public form) or `staff` (entered by staff).",
+                  "type": "string"
+                },
+                "claim": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "decide_by": {
+                  "description": "Decide before this time (working days of the legal rule `cases.deadlines`; 24 hours for\na request of an authority).",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "decided_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decided_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decision": {
+                  "description": "`upheld`, `rejected`, `partially_upheld`, or empty before the decision.",
+                  "type": "string"
+                },
+                "decision_reason": {
+                  "description": "Reason of the decision; shown to the reporter and the reported party.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "entries": {
+                  "description": "The log, oldest first (only when reading one case).",
+                  "items": {
+                    "$ref": "#/components/schemas/ComplianceCaseEntry"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "held_reason": {
+                  "description": "Why the anti-spam checks held it; `null` when not held.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint` or `other`.",
+                  "type": "string"
+                },
+                "overdue": {
+                  "description": "`true` while open and past `decide_by`.",
+                  "type": "boolean"
+                },
+                "reference": {
+                  "description": "Short reference for people, e.g. `C-1A2B3C4D`.",
+                  "type": "string"
+                },
+                "reporter_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reporter_kind": {
+                  "description": "`guest`, `user`, `rights_holder` or `authority`.",
+                  "type": "string"
+                },
+                "reporter_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reporter_phone": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reporter_user_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "respond_by": {
+                  "description": "The reported party may answer until this time.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "respondent_org_id": {
+                  "description": "The reported unit (seller), when given.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "respondent_user_ids": {
+                  "description": "Users who may answer: the owners of the target.",
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "restricted": {
+                  "description": "The target is hidden while the case is handled (or after an upheld decision).",
+                  "type": "boolean"
+                },
+                "rights": {
+                  "description": "Certificates, registrations, links given as evidence.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "description": "`received` (held by the anti-spam checks), `under_review`, `awaiting_response`, `decided`,\n`closed` or `withdrawn`.",
+                  "type": "string"
+                },
+                "target": {
+                  "description": "The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); empty when none.",
+                  "type": "string"
+                },
+                "tracking_token": {
+                  "description": "The tracking code for the reporter — only in the answer that created the case.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "reference",
+                "kind",
+                "target",
+                "respondent_user_ids",
+                "reporter_kind",
+                "channel",
+                "claim",
+                "rights",
+                "status",
+                "restricted",
+                "decision",
+                "ack_due_at",
+                "respond_by",
+                "decide_by",
+                "overdue",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_ComplianceDisclosure": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A disclosure of information to a competent authority.",
+              "properties": {
+                "authority": {
+                  "type": "string"
+                },
+                "case_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "disclosed_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "disclosed_by": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "fields": {
+                  "description": "Names of the fields given (the values are not kept).",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "legal_basis": {
+                  "type": "string"
+                },
+                "request_reference": {
+                  "description": "Number of the authority's request.",
+                  "type": "string"
+                },
+                "requested_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "subject": {
+                  "description": "`org:<unit id>` or `user:<user id>`.",
+                  "type": "string"
+                },
+                "values": {
+                  "description": "The values given — only in the answer that recorded the disclosure.",
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "authority",
+                "request_reference",
+                "legal_basis",
+                "requested_at",
+                "subject",
+                "fields",
+                "disclosed_by",
+                "disclosed_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_ComplianceIncident": {
         "description": "One page of a list.",
         "properties": {
@@ -32470,6 +34322,119 @@
                 "legal_name",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_ComplianceRespondentCase": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A case about you (or your unit), as the reported party sees it: no contact details of the\nreporter, no internal notes.",
+              "properties": {
+                "claim": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "decide_by": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "decision": {
+                  "type": "string"
+                },
+                "decision_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "entries": {
+                  "description": "Status changes, restrictions, answers and the decision, oldest first.",
+                  "items": {
+                    "$ref": "#/components/schemas/ComplianceCaseEntry"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "reporter_kind": {
+                  "type": "string"
+                },
+                "reporter_name": {
+                  "description": "Name of the reporter when it is a rights holder or an authority; `null` otherwise.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "respond_by": {
+                  "description": "Answer with `POST /cases/{id}/responses` before this time.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "respondent_org_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "restricted": {
+                  "type": "boolean"
+                },
+                "rights": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "reference",
+                "kind",
+                "target",
+                "reporter_kind",
+                "claim",
+                "rights",
+                "status",
+                "restricted",
+                "decision",
+                "respond_by",
+                "decide_by",
+                "created_at",
+                "entries"
               ],
               "type": "object"
             },
@@ -33017,6 +34982,10 @@
             "items": {
               "description": "A post or page — its working draft.",
               "properties": {
+                "ai_assisted": {
+                  "description": "A person wrote or edited the content from AI suggestions (e.g. applied\n`seo-suggestions`). Public endpoints return it so the interface labels the content\n(Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).",
+                  "type": "boolean"
+                },
                 "ai_generated": {
                   "description": "The content was generated by AI (set by the writer; set by the server when it translated\nthe entry, and always when the writer has only `content.write_own`). Shown to readers by\nthe public endpoints.",
                   "type": "boolean"
@@ -33221,6 +35190,7 @@
                 "canonical_url",
                 "noindex",
                 "ai_generated",
+                "ai_assisted",
                 "translation_outdated",
                 "created_via",
                 "created_at",
@@ -35413,6 +37383,10 @@
                   "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset. This is\nthe default language's text, used for any language without a translation in `alts`.",
                   "type": "string"
                 },
+                "alt_ai_assisted": {
+                  "description": "The default `alt` was written from an AI suggestion: label it where it is shown (Vietnam's\nLaw on Artificial Intelligence 134/2025/QH15).",
+                  "type": "boolean"
+                },
                 "alts": {
                   "additionalProperties": {
                     "type": "string"
@@ -35563,6 +37537,7 @@
                 "title",
                 "caption",
                 "decorative",
+                "alt_ai_assisted",
                 "visibility",
                 "version_id",
                 "url",
@@ -36554,6 +38529,10 @@
             "items": {
               "description": "A published post or page, as readers see it.",
               "properties": {
+                "ai_assisted": {
+                  "description": "A person wrote or edited the content from AI suggestions: label it as AI-assisted (Vietnam's\nLaw on Artificial Intelligence 134/2025/QH15, from 2026-03-01).",
+                  "type": "boolean"
+                },
                 "ai_generated": {
                   "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one.",
                   "type": "boolean"
@@ -36702,6 +38681,7 @@
                 "authors",
                 "ai_generated",
                 "ai_reviewed",
+                "ai_assisted",
                 "embeds"
               ],
               "type": "object"
@@ -39379,6 +41359,10 @@
       "PreviewEntryResponse": {
         "description": "The draft of a post or page, as a preview link shows it: the content the website renders,\nwithout the internal fields of the admin view (who created it, who asked for a review, how it\nwas created).",
         "properties": {
+          "ai_assisted": {
+            "description": "The content was written or edited from AI suggestions.",
+            "type": "boolean"
+          },
           "ai_generated": {
             "description": "The content was generated by AI.",
             "type": "boolean"
@@ -39523,6 +41507,7 @@
           "canonical_url",
           "noindex",
           "ai_generated",
+          "ai_assisted",
           "updated_at",
           "term_ids",
           "author_ids",
@@ -40178,6 +42163,10 @@
       "PublicEntryResponse": {
         "description": "A published post or page, as readers see it.",
         "properties": {
+          "ai_assisted": {
+            "description": "A person wrote or edited the content from AI suggestions: label it as AI-assisted (Vietnam's\nLaw on Artificial Intelligence 134/2025/QH15, from 2026-03-01).",
+            "type": "boolean"
+          },
           "ai_generated": {
             "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one.",
             "type": "boolean"
@@ -40326,6 +42315,7 @@
           "authors",
           "ai_generated",
           "ai_reviewed",
+          "ai_assisted",
           "embeds"
         ],
         "type": "object"
@@ -40516,6 +42506,10 @@
             "description": "Text alternative.",
             "type": "string"
           },
+          "alt_ai_assisted": {
+            "description": "`alt` is the media library's and was written from an AI suggestion: label it (Vietnam's\nLaw on Artificial Intelligence 134/2025/QH15). An `alt` set on the entry follows the\nentry's `ai_assisted`.",
+            "type": "boolean"
+          },
           "height": {
             "format": "int32",
             "type": [
@@ -40551,6 +42545,7 @@
           "id",
           "url",
           "alt",
+          "alt_ai_assisted",
           "variants"
         ],
         "type": "object"
@@ -46359,6 +48354,13 @@
             "description": "Text alternative, up to 1000 characters; `\"\"` clears it.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "alt_ai_assisted": {
+            "description": "`true` when the default `alt` was written from an AI suggestion\n(`POST /media/{id}/alt-suggestion`), so the interface can label it (Vietnam's Law on\nArtificial Intelligence 134/2025/QH15, from 2026-03-01). Send `true` when you apply a\nsuggestion; send `false` once a person rewrote it.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -60280,7 +62282,7 @@
                 }
               }
             },
-            "description": "The author deleted it; code `comments.deleted`."
+            "description": "The author deleted it (code `comments.deleted`), or it is hidden while a case of the module `compliance` is handled (code `comments.restricted`)."
           },
           "412": {
             "content": {
@@ -60476,6 +62478,1287 @@
         "x-autoxide-list": "comments.list_comment_reports",
         "x-permissions": [
           "comments.read"
+        ]
+      }
+    },
+    "/api/v1/compliance/cases": {
+      "get": {
+        "description": "Requires `compliance.cases.read`.",
+        "operationId": "compliance_list_compliance_cases",
+        "parameters": [
+          {
+            "description": "Only cases with this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only cases of this kind.",
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only cases about this object (`<module>.<type>:<id>`).",
+            "in": "query",
+            "name": "target",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only open cases past `decide_by`.",
+            "in": "query",
+            "name": "overdue",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "`true`: only cases the anti-spam checks held (status `received`); default: the others.",
+            "in": "query",
+            "name": "held",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ComplianceCase"
+                }
+              }
+            },
+            "description": "One page of cases."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.cases.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List cases.",
+        "tags": [
+          "compliance"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only cases with this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only cases of this kind.",
+            "kind": "string",
+            "name": "kind",
+            "operator": "eq"
+          },
+          {
+            "description": "Only cases about this object (`<module>.<type>:<id>`).",
+            "kind": "string",
+            "name": "target",
+            "operator": "eq"
+          },
+          {
+            "description": "Only open cases past `decide_by`.",
+            "kind": "boolean",
+            "name": "overdue",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only cases the anti-spam checks held (status `received`); default: the others.",
+            "kind": "boolean",
+            "name": "held",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "compliance.list_compliance_cases",
+        "x-permissions": [
+          "compliance.cases.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `compliance.cases.handle`. Deadlines come from the legal rule `cases.deadlines`. A\nrequest of a competent authority hides the target at once; so does an intellectual property\nor counterfeit report when the tenant's `cases.auto_restrict` policy is `true`. The answer\ncarries `tracking_token` once: give it to the reporter.",
+        "operationId": "compliance_open_compliance_case",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCase"
+                }
+              }
+            },
+            "description": "The case, with `tracking_token`.",
+            "headers": {
+              "Location": {
+                "description": "Path of the case.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.cases.handle`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid or the target does not exist; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a case received outside the public forms.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.cases.handle"
+        ]
+      }
+    },
+    "/api/v1/compliance/cases/{id}": {
+      "get": {
+        "description": "Requires `compliance.cases.read`.",
+        "operationId": "compliance_get_compliance_case",
+        "parameters": [
+          {
+            "description": "Id of the case.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCase"
+                }
+              }
+            },
+            "description": "The case."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.cases.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case; code `compliance.case_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a case with its log.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.cases.read"
+        ]
+      }
+    },
+    "/api/v1/compliance/cases/{id}/close": {
+      "post": {
+        "description": "Requires `compliance.cases.handle`. A hidden target is shown again unless the decision was\n`upheld` or `partially_upheld`.",
+        "operationId": "compliance_close_compliance_case",
+        "parameters": [
+          {
+            "description": "Id of the case.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCaseClose"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCase"
+                }
+              }
+            },
+            "description": "The case."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.cases.handle`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case; code `compliance.case_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case is already closed; code `compliance.case_state_invalid`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case changed meanwhile; code `precondition_failed`: try again."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`reason` is empty or too long; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close a case (spam, duplicate, withdrawn, or done after the decision).",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.cases.handle"
+        ]
+      }
+    },
+    "/api/v1/compliance/cases/{id}/decision": {
+      "post": {
+        "description": "Requires `compliance.cases.handle` and a signed-in person (API keys get 403\n`compliance.session_required`). The reporter is told by mail when they gave an address.",
+        "operationId": "compliance_decide_compliance_case",
+        "parameters": [
+          {
+            "description": "Id of the case.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCaseDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCase"
+                }
+              }
+            },
+            "description": "The case."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.cases.handle` (code `permission_denied`) or not a signed-in person (code `compliance.session_required`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case; code `compliance.case_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case is not open; code `compliance.case_state_invalid`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case changed meanwhile; code `precondition_failed`: try again."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Decide a case.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.cases.handle"
+        ]
+      }
+    },
+    "/api/v1/compliance/cases/{id}/entries": {
+      "post": {
+        "description": "Requires `compliance.cases.handle`. The log only grows. The first action on a new case\nrecords that it was acknowledged; on a case held by the anti-spam checks it releases it.",
+        "operationId": "compliance_add_compliance_case_entry",
+        "parameters": [
+          {
+            "description": "Id of the case.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCaseEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCaseEntry"
+                }
+              }
+            },
+            "description": "The line.",
+            "headers": {
+              "Location": {
+                "description": "Path of the case.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.cases.handle`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case; code `compliance.case_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case changed meanwhile; code `precondition_failed`: try again."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a note or evidence to a case.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.cases.handle"
+        ]
+      }
+    },
+    "/api/v1/compliance/cases/{id}/responses": {
+      "post": {
+        "description": "Signed in, as the reported party (see `GET /respondent/cases`), before `respond_by`.",
+        "operationId": "compliance_respond_compliance_case",
+        "parameters": [
+          {
+            "description": "Id of the case.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCaseResponseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCaseEntry"
+                }
+              }
+            },
+            "description": "Your answer.",
+            "headers": {
+              "Location": {
+                "description": "Path of your cases.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case about you; code `compliance.case_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Past `respond_by`, or the case is decided; code `compliance.response_closed`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case changed meanwhile; code `precondition_failed`: try again."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Answer a case about you or your unit.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/compliance/cases/{id}/restore": {
+      "post": {
+        "description": "Requires `compliance.cases.handle`. Sends `compliance.target_restored` unless another case\nstill hides the same target.",
+        "operationId": "compliance_restore_compliance_case_target",
+        "parameters": [
+          {
+            "description": "Id of the case.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCaseReason"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCase"
+                }
+              }
+            },
+            "description": "The case."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.cases.handle`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case; code `compliance.case_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case is not open or its target is not hidden; code `compliance.case_state_invalid`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case changed meanwhile; code `precondition_failed`: try again."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`reason` is empty or too long; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Show the target of a case again before the decision.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.cases.handle"
+        ]
+      }
+    },
+    "/api/v1/compliance/cases/{id}/restrict": {
+      "post": {
+        "description": "Requires `compliance.cases.handle`. Sends the event `compliance.target_restricted`: the module\nthat owns the target hides it (e.g. a content page answers 451, a comment is hidden). Already\nhidden: nothing changes.",
+        "operationId": "compliance_restrict_compliance_case_target",
+        "parameters": [
+          {
+            "description": "Id of the case.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceCaseReason"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceCase"
+                }
+              }
+            },
+            "description": "The case."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.cases.handle`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case; code `compliance.case_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case is not open or has no target; code `compliance.case_state_invalid`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The case changed meanwhile; code `precondition_failed`: try again."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`reason` is empty or too long; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hide the target of a case while it is handled.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.cases.handle"
         ]
       }
     },
@@ -60789,6 +64072,268 @@
         ],
         "x-permissions": [
           "compliance.tracking.manage"
+        ]
+      }
+    },
+    "/api/v1/compliance/disclosures": {
+      "get": {
+        "description": "Requires `compliance.disclosures.manage`.",
+        "operationId": "compliance_list_compliance_disclosures",
+        "parameters": [
+          {
+            "description": "Only the disclosures of this case.",
+            "in": "query",
+            "name": "case_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ComplianceDisclosure"
+                }
+              }
+            },
+            "description": "One page of disclosures (field names, no values)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.disclosures.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List disclosures to authorities.",
+        "tags": [
+          "compliance"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the disclosures of this case.",
+            "kind": "uuid",
+            "name": "case_id",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "compliance.list_compliance_disclosures",
+        "x-permissions": [
+          "compliance.disclosures.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `compliance.disclosures.manage` and a signed-in person (API keys get 403\n`compliance.session_required`). The answer has the values once; the record keeps the\nauthority, its request, the legal basis and the names of the fields, and the event\n`compliance.disclosure_recorded` goes to the audit log.",
+        "operationId": "compliance_record_compliance_disclosure",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceDisclosureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceDisclosure"
+                }
+              }
+            },
+            "description": "The record, with `values`.",
+            "headers": {
+              "Location": {
+                "description": "Path of the list of disclosures.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `compliance.disclosures.manage` (code `permission_denied`) or not a signed-in person (code `compliance.session_required`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case; code `compliance.case_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Give a competent authority information about a seller, and record it.",
+        "tags": [
+          "compliance"
+        ],
+        "x-permissions": [
+          "compliance.disclosures.manage"
         ]
       }
     },
@@ -65641,6 +69186,222 @@
         "x-public": true
       }
     },
+    "/api/v1/compliance/public/cases/{id}": {
+      "get": {
+        "description": "No sign-in: the tracking code is the permission. A wrong code answers 404, like a case that\ndoes not exist.",
+        "operationId": "compliance_get_public_compliance_case",
+        "parameters": [
+          {
+            "description": "Id of the case.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `tracking_token` given when the case was sent.",
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceTrackedCase"
+                }
+              }
+            },
+            "description": "The state of the case."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such case, or wrong code; code `compliance.case_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Follow a report or complaint you sent.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/compliance/public/complaints": {
+      "get": {
+        "description": "No sign-in (the tenant comes from the domain). For the website's complaint page (Consumer\nProtection Law 19/2023/QH15, Decree 55/2024/ND-CP).",
+        "operationId": "compliance_get_public_compliance_complaint_channel",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceComplaintChannel"
+                }
+              }
+            },
+            "description": "The channel."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Get the consumer complaint channel.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      },
+      "post": {
+        "description": "No sign-in (the tenant comes from the domain). Send `form_token` from `GET\n/api/v1/antispam/token?scope=compliance:complaints`. Deadlines come from the legal rule\n`cases.deadlines` (Consumer Protection Law 19/2023/QH15, Decree 55/2024/ND-CP).",
+        "operationId": "compliance_send_public_compliance_complaint",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompliancePublicComplaint"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CompliancePublicCaseReceipt"
+                }
+              }
+            },
+            "description": "Received; keep `tracking_token`.",
+            "headers": {
+              "Location": {
+                "description": "Path to follow it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid or the target does not exist; every problem in `errors`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many complaints; code `antispam.rate_limited`, wait `Retry-After` seconds."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Send a consumer complaint.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/compliance/public/consent-config": {
       "get": {
         "description": "No sign-in (the tenant and website come from the domain or `?site=`). Without `granted` no tag is\nreturned: nothing loads before consent. Rejecting all is as easy as accepting all, and no\ncategory is preselected. Load the tags after the page renders.",
@@ -65889,6 +69650,62 @@
         "x-public": true
       }
     },
+    "/api/v1/compliance/public/moderation-reasons": {
+      "get": {
+        "description": "No sign-in (the tenant comes from the domain). Moderation may hide content of consumers only\nfor these reasons (legal rule `moderation.hide_reasons`; Consumer Protection Law 19/2023/QH15,\nDecree 55/2024/ND-CP): a negative but lawful review stays visible.",
+        "operationId": "compliance_list_public_compliance_moderation_reasons",
+        "parameters": [
+          {
+            "description": "Where content is moderated, e.g. `reviews` or `comments`; default `reviews`.",
+            "in": "query",
+            "name": "surface",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ComplianceModerationReasons"
+                }
+              }
+            },
+            "description": "The reasons."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List the reasons for which reviews and other content of consumers may be hidden.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/compliance/public/owner": {
       "get": {
         "description": "No sign-in (the tenant and website come from the domain or `?site=`): the legal profile of the\nwebsite's unit, or of the nearest unit above with one.",
@@ -66005,6 +69822,101 @@
           }
         },
         "summary": "List the processing purposes, for the public privacy notice.",
+        "tags": [
+          "compliance"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/compliance/public/reports": {
+      "post": {
+        "description": "No sign-in (the tenant comes from the domain). Send `form_token` from `GET\n/api/v1/antispam/token?scope=compliance:reports`; limited per network block and email per\nhour. Signed-in senders are recorded as the reporter. The answer is the same whether the\nreport is kept or dropped by the anti-spam checks.",
+        "operationId": "compliance_send_public_compliance_report",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompliancePublicReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CompliancePublicCaseReceipt"
+                }
+              }
+            },
+            "description": "Received; keep `tracking_token`.",
+            "headers": {
+              "Location": {
+                "description": "Path to follow it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid or the target does not exist; every problem in `errors`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many reports; code `antispam.rate_limited`, wait `Retry-After` seconds."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Send a report of an infringement (intellectual property, counterfeit, prohibited goods).",
         "tags": [
           "compliance"
         ],
@@ -66531,6 +70443,116 @@
         "x-permissions": [
           "compliance.privacy.manage"
         ]
+      }
+    },
+    "/api/v1/compliance/respondent/cases": {
+      "get": {
+        "description": "Signed in. You are the reported party when you own the target (e.g. the author of the page)\nor have `compliance.cases.respond` on the reported unit (a seller on a marketplace).",
+        "operationId": "compliance_list_my_compliance_cases",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ComplianceRespondentCase"
+                }
+              }
+            },
+            "description": "One page of cases."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the cases about you or your unit.",
+        "tags": [
+          "compliance"
+        ],
+        "x-autoxide-filters": [],
+        "x-autoxide-list": "compliance.list_my_compliance_cases",
+        "x-permissions": []
       }
     },
     "/api/v1/compliance/retention": {
@@ -74428,6 +78450,16 @@
               }
             },
             "description": "The language is not supported or the path is malformed; see `errors`."
+          },
+          "451": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Hidden for now while a report of an infringement is handled (module `compliance`); code `content.restricted`. Answer 451 to the reader and leave the page out of caches."
           },
           "default": {
             "content": {

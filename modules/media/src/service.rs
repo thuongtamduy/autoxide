@@ -129,6 +129,8 @@ pub(crate) struct ItemChanges {
     pub caption: Option<String>,
     /// Ảnh trang trí (`alt` trống có chủ ý).
     pub decorative: Option<bool>,
+    /// `alt` viết từ gợi ý của AI (D-362).
+    pub alt_ai_assisted: Option<bool>,
     /// `Some(None)`: chuyển về thư mục gốc.
     pub folder_id: Option<Option<Uuid>>,
     pub visibility: Option<Visibility>,
@@ -470,6 +472,9 @@ impl MediaService {
         }
         if let Some(decorative) = changes.decorative {
             row.decorative = Set(decorative);
+        }
+        if let Some(assisted) = changes.alt_ai_assisted {
+            row.alt_ai_assisted = Set(assisted);
         }
         if let Some(visibility) = changes.visibility {
             row.visibility = Set(visibility.as_str().to_owned());
@@ -841,6 +846,7 @@ pub(crate) fn snapshot(item: &Item) -> Value {
         "title": item.title,
         "caption": item.caption,
         "decorative": item.decorative,
+        "alt_ai_assisted": item.alt_ai_assisted,
         "visibility": item.visibility,
         "version_id": item.version_id,
         "trashed_at": item.trashed_at,
@@ -964,6 +970,7 @@ impl crate::api::Media for MediaService {
                     width: item.width,
                     height: item.height,
                     alt: item.alt,
+                    alt_ai_assisted: item.alt_ai_assisted,
                 }
             })
             .collect())

@@ -124,6 +124,9 @@ pub(crate) struct EntryFields {
     pub noindex: Option<bool>,
     /// Nội dung do AI tạo (D-109). Agent nên luôn đặt `true`.
     pub ai_generated: Option<bool>,
+    /// Viết hay sửa từ gợi ý của AI (Luật 134/2025/QH15, D-362). Bỏ (`false` khi đang `true`) cần
+    /// `content.publish`.
+    pub ai_assisted: Option<bool>,
     /// Chỉ máy chủ đặt (khi tự dịch): revision của bản gốc đã dịch. Không có trong API.
     pub translated_from: Option<Uuid>,
 }
@@ -541,6 +544,10 @@ impl ContentService {
         let mut problems = Vec::new();
         let mut candidate = before.clone();
         let slug_changed = fields.slug.as_ref().is_some_and(|slug| slug.trim() != before.slug);
+        // Bỏ nhãn "viết từ gợi ý của AI" là quyết định biên tập: chỉ người được đăng (D-362).
+        if before.ai_assisted && fields.ai_assisted == Some(false) {
+            principal.require(&permissions::CONTENT_PUBLISH).map_err(|_| ai_label_locked())?;
+        }
         self.apply(tenant, &mut candidate, fields, &mut problems).await?;
         mark_agent_written(principal, &mut candidate);
         if !problems.is_empty() {
@@ -676,6 +683,9 @@ impl ContentService {
         }
         if let Some(ai_generated) = fields.ai_generated {
             candidate.ai_generated = ai_generated;
+        }
+        if let Some(ai_assisted) = fields.ai_assisted {
+            candidate.ai_assisted = ai_assisted;
         }
         if let Some(revision) = fields.translated_from {
             candidate.translated_from_revision_id = Some(revision);
@@ -927,6 +937,8 @@ impl ContentService {
         // Bản dịch là mục mới: không mang cờ của bản gốc; ai tạo bằng AI thì tự khai (hay máy
         // chủ đặt khi nó dịch).
         candidate.ai_generated = false;
+        candidate.ai_assisted = false;
+        candidate.restricted_at = None;
         candidate.review_requested_at = None;
         candidate.review_requested_by = None;
         candidate.translated_from_revision_id = None;
@@ -957,6 +969,14 @@ impl ContentService {
             .await?
             .is_some())
     }
+}
+
+/// Bỏ nhãn `ai_assisted` mà không có `content.publish`.
+fn ai_label_locked() -> Error {
+    Error::forbidden(
+        "content.ai_label_requires_publish",
+        "Only someone with permission `content.publish` may remove the `ai_assisted` label.",
+    )
 }
 
 /// Người chỉ có `content.write_own` (thường là AI agent) không tự khai được `ai_generated`: máy
@@ -1007,6 +1027,8 @@ pub(crate) fn blank(
         created_by: Some(by),
         created_by_api_key_id: None,
         ai_generated: false,
+        ai_assisted: false,
+        restricted_at: None,
         review_requested_at: None,
         review_requested_by: None,
         translated_from_revision_id: None,
@@ -1048,6 +1070,7 @@ pub(crate) fn changed_columns(before: &Entry, after: &Entry) -> entry::ActiveMod
         created_by,
         created_by_api_key_id,
         ai_generated,
+        ai_assisted,
         review_requested_at,
         review_requested_by,
         translated_from_revision_id,
@@ -1074,6 +1097,7 @@ pub(crate) fn summary(entry: &Entry) -> Value {
         "meta_description": entry.meta_description,
         "noindex": entry.noindex,
         "ai_generated": entry.ai_generated,
+        "ai_assisted": entry.ai_assisted,
     })
 }
 

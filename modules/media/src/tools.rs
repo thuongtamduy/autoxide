@@ -90,6 +90,9 @@ pub(crate) struct UpdateMediaInput {
     caption: Option<String>,
     /// `true` marks a purely decorative image, whose empty `alt` is on purpose.
     decorative: Option<bool>,
+    /// `true` when the default `alt` was written from an AI suggestion (`suggest_alt`), so the
+    /// interface labels it (Vietnam's Law on Artificial Intelligence 134/2025/QH15).
+    alt_ai_assisted: Option<bool>,
     /// Move to this folder; `null` moves to the root.
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<Uuid>, nullable)]
@@ -226,6 +229,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         title: input.title,
                         caption: input.caption,
                         decorative: input.decorative,
+                        alt_ai_assisted: input.alt_ai_assisted,
                         folder_id: input.folder_id,
                         visibility,
                         tags: input.tags,

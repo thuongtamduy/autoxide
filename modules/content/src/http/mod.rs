@@ -15,6 +15,8 @@ mod templates;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_compliance;
+#[cfg(test)]
 mod tests_tenancy;
 #[cfg(test)]
 mod tests_web;

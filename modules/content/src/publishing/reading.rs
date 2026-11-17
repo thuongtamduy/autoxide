@@ -85,6 +85,7 @@ impl ContentService {
             published::Entity::find()
                 .scoped(tenant)
                 .filter(published::Column::TranslationGroupId.is_in(groups))
+                .filter(published::Column::RestrictedAt.is_null())
                 .all(tenant.database().read())
                 .await?
         };
@@ -218,6 +219,7 @@ impl ContentService {
     ) -> Result<Page<Published>, Error> {
         let mut select = published::Entity::find()
             .scoped(tenant)
+            .filter(published::Column::RestrictedAt.is_null())
             .filter(published::Column::Kind.eq("post"))
             .filter(published::Column::Locale.eq(filter.locale.as_str()))
             .filter(on_site(&filter.site));
@@ -253,8 +255,10 @@ impl ContentService {
         locales: Option<&[String]>,
         page: &PageRequest,
     ) -> Result<Page<Published>, Error> {
-        let mut select =
-            published::Entity::find().scoped(tenant).filter(on_site(&site.lineage_ids()));
+        let mut select = published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::RestrictedAt.is_null())
+            .filter(on_site(&site.lineage_ids()));
         if let Some(locales) = locales {
             select = select.filter(published::Column::Locale.is_in(locales.iter().cloned()));
         }
@@ -303,6 +307,7 @@ impl ContentService {
         let siblings = published::Entity::find()
             .scoped(tenant)
             .filter(published::Column::TranslationGroupId.is_in(groups))
+            .filter(published::Column::RestrictedAt.is_null())
             .all(tenant.database().read())
             .await?;
         Ok(rows

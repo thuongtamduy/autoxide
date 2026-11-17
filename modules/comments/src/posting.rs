@@ -357,6 +357,7 @@ impl CommentsService {
                     reply_count: 0,
                     report_count: 0,
                     reports_held_at: None,
+                    restricted_status: None,
                     created_at: now,
                     updated_at: now,
                 };
@@ -435,6 +436,7 @@ impl CommentsService {
             reply_count: 0,
             report_count: 0,
             reports_held_at: None,
+            restricted_status: None,
             created_at: now,
             updated_at: now,
         };

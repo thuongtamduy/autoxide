@@ -17,6 +17,7 @@
   "comments.not_found": "Không có bình luận nào có id `{id}`.",
   "comments.parent_not_found": "Bình luận định trả lời không có, chưa hiện, hoặc thuộc đích khác.",
   "comments.profile_required": "Hãy chọn tên hiển thị cho bình luận của bạn trước.",
+  "comments.restricted": "Bình luận này đang bị ẩn trong lúc xử lý một vụ việc của module tuân thủ; vụ việc quyết định khi nào hiện lại.",
   "comments.target_closed": "Đích này không nhận bình luận mới.",
   "comments.target_not_found": "Không nhận bình luận ở đích này: loại đích không nằm trong `AUTOXIDE_COMMENTS_TARGET_TYPES`, hoặc đích không có hay chưa công khai.",
   "comments.verification_required": "Chỉ tài khoản đã xác thực số điện thoại hoặc định danh mới được viết ở đây. Hãy đăng nhập và xác thực tài khoản trước.",

@@ -89,9 +89,11 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       thông tin người bán trên trang sản phẩm (EN + VI, ghi rõ cần người có chuyên môn pháp lý duyệt)
       — D-359: `GET /content/templates`, `POST /content/templates/{key}/drafts` (biến từ `LegalProfiles` của
       `compliance`, bộ dựng mẫu của kernel, chỉ vào text node), `content::api::PublishedEntries` (chưa có bên dùng)
-- [ ] Báo vi phạm sở hữu trí tuệ / hàng giả: tiếp nhận → ẩn → phản hồi của người bị báo → quyết định, có hạn xử
+- [x] Báo vi phạm sở hữu trí tuệ / hàng giả: tiếp nhận → ẩn → phản hồi của người bị báo → quyết định, có hạn xử
       lý, lưu vết; kênh khiếu nại của sàn; cung cấp thông tin người bán khi cơ quan có thẩm quyền yêu cầu (có
-      audit)
+      audit) — D-363: `/cases` (+ `/restrict`, `/restore`, `/decision`, `/close`), `/respondent/cases`, `/public/reports`,
+      `/public/cases/{id}`, `/disclosures`; quy tắc `cases.deadlines` (ngày làm việc), lịch `compliance.case_deadlines`; ẩn đích qua
+      hợp đồng kernel `autoxide_kernel::moderation` (`content` trả 451, `comments` ẩn); chưa gửi thư cho bên bị phản ánh
 - [x] Xác thực tài khoản đăng nội dung (NĐ 147/2024): cờ "đã xác thực số điện thoại / định danh", khách bật cho
       bình luận, đánh giá, livestream; mã một lần qua `SmsSender` (SMS brandname, D-190) + bản giả; đăng ký
       `PostingVerifier` (D-202) cho `comments` (`AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`) dùng trạng thái thật
@@ -108,12 +110,14 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       nhân, quy chế sàn, hợp đồng người bán, điều kiện giao dịch chung — số phiên bản, ngày hiệu lực; ai chấp
       nhận bản nào, lúc nào, kênh nào; chấp nhận lại khi cần; số người chấp nhận theo phiên bản — `compliance`
       (D-347): bản đã đăng không đổi, SHA-256 của bản chấp nhận, `dyn AcceptanceGate`
-- [ ] Bảo vệ người tiêu dùng (D-190; Luật 19/2023/QH15 + NĐ 55/2024, từ 01/7/2024): nền tảng không chặn, không
+- [x] Bảo vệ người tiêu dùng (D-190; Luật 19/2023/QH15 + NĐ 55/2024, từ 01/7/2024): nền tảng không chặn, không
       ẩn đánh giá trái quy định; minh bạch điều kiện giao dịch chung; kênh tiếp nhận và hạn xử lý khiếu nại của
-      người tiêu dùng — cần đối chiếu văn bản gốc từng điều
-- [ ] Gắn nhãn nội dung do AI tạo (D-190; Luật Trí tuệ nhân tạo 134/2025/QH15, từ 01/3/2026, và nghị định hướng
+      người tiêu dùng — cần đối chiếu văn bản gốc từng điều — D-364: `ModerationPolicy` + `moderation.hide_reasons`,
+      `/public/moderation-reasons`, `/public/complaints` (gửi + kênh), vụ việc `consumer_complaint`; bước 45 dùng cho đánh giá
+- [x] Gắn nhãn nội dung do AI tạo (D-190; Luật Trí tuệ nhân tạo 134/2025/QH15, từ 01/3/2026, và nghị định hướng
       dẫn — cần đối chiếu): nội dung tạo hay sửa từ gợi ý AI mang `ai_assisted`, API trả về để giao diện gắn
-      nhãn khi công khai
+      nhãn khi công khai — D-362: `content` `ai_assisted` (bỏ nhãn cần `content.publish`), `media` `alt_ai_assisted`, trả ở
+      API quản trị, xem trước, công khai và MCP
 - [x] Module nền `notifications` (D-194, D-348): kênh email, SMS, Zalo ZNS (trait), web push, đẩy di động, trong ứng
       dụng; mẫu theo i18n và theo khách; tuỳ chọn nhận của người dùng; hộp thư, nhật ký gửi, REST + MCP — bộ gửi ZNS,
       web push (VAPID) và đẩy di động (FCM / APNs) mới có trait ở kernel và bản giả ở testkit (bộ nối thật cần khoá của
@@ -224,7 +228,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [x] Agent là người dùng thật (P12): API key `agent`; `ActorKind` chung cho audit, nhật ký, event (D-224);
       lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) agent gọi trả `202 approval_required`, yêu cầu
       duyệt có hạn, đủ duyệt / từ chối / event / tool MCP, như nhau REST và MCP; việc chờ vào hộp việc — xong
-      (17/11, D-362): `x-approval: "agent"`, `/kernel/approvals`, gửi lại kèm `Autoxide-Approval`; MCP từ chối agent
+      (17/11, D-365): `x-approval: "agent"`, `/kernel/approvals`, gửi lại kèm `Autoxide-Approval`; MCP từ chối agent
       và chỉ sang REST. Còn: yêu cầu chờ vào hộp việc, tool MCP `list_approvals` / `decide_approval`
 - [x] Cờ theo người dùng cho trợ giúp trong giao diện (P14, D-207): `/api/v1/me/flags` (`kernel_user_flags`),
       chỉ cờ của mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản xuất dữ liệu, xoá khi xoá tài khoản;

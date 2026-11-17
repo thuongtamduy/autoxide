@@ -1,4 +1,5 @@
 {
+  "content.ai_label_requires_publish": "Chỉ người có quyền `content.publish` mới bỏ được nhãn `ai_assisted` (viết từ gợi ý của AI).",
   "content.ai_review_requires_human": "Chỉ một người đăng nhập (không phải API key) mới xác nhận được rằng nội dung do AI tạo đã được duyệt.",
   "content.archived": "Một biên tập viên đã lưu trữ mục này; với `content.publish_own` bạn không đăng lại được. Hãy nhờ người có `content.publish`.",
   "content.author_not_found": "Không tìm thấy tác giả này.",
@@ -20,6 +21,7 @@
   "content.redirect_exists": "Đã có chuyển hướng từ địa chỉ này; hãy sửa chuyển hướng đó.",
   "content.redirect_loop": "Chuyển hướng này sẽ tạo vòng lặp hoặc chuỗi quá 10 lần chuyển.",
   "content.redirect_not_found": "Không có chuyển hướng `{id}`.",
+  "content.restricted": "Nội dung tạm ẩn do có phản ánh vi phạm đang được xử lý.",
   "content.revision_not_found": "Mục này không có revision `{id}`.",
   "content.schedule_conflict": "Mục này đã có một lịch `{action}` đang chờ. Hãy huỷ lịch đó trước.",
   "content.schedule_not_found": "Không có lịch `{id}`.",

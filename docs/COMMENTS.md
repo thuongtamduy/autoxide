@@ -190,6 +190,15 @@ Every decision is an event (`comments.comment_status_changed`, `comments.comment
 `comments.ban_created`, `comments.target_closed`…) that the `audit` module records with who and
 when.
 
+### Hidden by a case
+
+A comment can be the target of a case of the `compliance` module (`comments.comment:<id>`; `comments`
+registers this type in the kernel's resource directory, with the author as owner). When the case hides
+it (event `compliance.target_restricted`), the comment becomes `rejected` with hold reason `compliance`
+and remembers its former status; `compliance.target_restored` puts that status back. Meanwhile
+moderators cannot change its status (`comments.restricted`, 409). See
+[`COMPLIANCE.md`](COMPLIANCE.md#reports-of-infringements-and-consumer-complaints).
+
 ## Reply mails
 
 Off until both `AUTOXIDE_COMMENTS_VERIFY_URL` and `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` are set.

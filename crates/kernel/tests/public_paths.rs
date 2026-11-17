@@ -30,6 +30,7 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::metrics::Metrics;
 use autoxide_kernel::migration::MigrationError;
+use autoxide_kernel::moderation::TARGET_RESTRICTED;
 use autoxide_kernel::module::Module;
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::pagination::PageRequest;

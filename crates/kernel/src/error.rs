@@ -58,6 +58,8 @@ pub enum ErrorKind {
     PreconditionRequired,
     /// Gọi quá nhiều. HTTP 429.
     TooManyRequests,
+    /// Tạm ẩn vì lý do pháp lý (vd vụ việc vi phạm đang xử lý). HTTP 451 (RFC 7725).
+    UnavailableForLegalReasons,
     /// Lỗi phía máy chủ; chi tiết chỉ nằm trong log. HTTP 500.
     Internal,
     /// Tạm thời chưa phục vụ được (database chưa sẵn sàng, đang tắt). HTTP 503.
@@ -80,6 +82,7 @@ impl ErrorKind {
             ErrorKind::Validation => 422,
             ErrorKind::PreconditionRequired => 428,
             ErrorKind::TooManyRequests => 429,
+            ErrorKind::UnavailableForLegalReasons => 451,
             ErrorKind::Internal => 500,
             ErrorKind::Unavailable => 503,
         }

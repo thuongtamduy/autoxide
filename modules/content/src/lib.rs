@@ -25,6 +25,7 @@ mod permissions;
 mod privacy;
 mod publishing;
 mod resource;
+mod restriction;
 mod service;
 mod setup;
 mod taxonomy;
@@ -212,7 +213,18 @@ impl Module for ContentModule {
     fn subscriptions(&self) -> Vec<Subscription> {
         // Tài khoản bị xoá: gỡ hồ sơ tác giả, bỏ liên kết, huỷ lịch (xem `privacy.rs`).
         self.service.clone().map_or_else(Vec::new, |service| {
-            vec![Subscription::new(autoxide_kernel::privacy::USER_DELETED, service)]
+            vec![
+                Subscription::new(autoxide_kernel::privacy::USER_DELETED, service),
+                // Vụ việc của `compliance` ẩn / hiện lại mục (D-363, `restriction.rs`).
+                Subscription::new(
+                    autoxide_kernel::moderation::TARGET_RESTRICTED,
+                    Arc::new(restriction::Listener),
+                ),
+                Subscription::new(
+                    autoxide_kernel::moderation::TARGET_RESTORED,
+                    Arc::new(restriction::Listener),
+                ),
+            ]
         })
     }
 
@@ -306,6 +318,7 @@ pub(crate) mod testing {
                         width: Some(10),
                         height: Some(10),
                         alt: String::new(),
+                        alt_ai_assisted: false,
                         url: format!("/api/v1/media/{id}/content?v=1"),
                         variants: Vec::new(),
                     })

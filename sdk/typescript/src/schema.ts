@@ -1055,6 +1055,160 @@ export type ComplianceBadge = {
 };
 
 /**
+ * A report of an infringement (intellectual property, counterfeit, prohibited goods) or a
+ * consumer complaint, as the people who handle it see it.
+ */
+export type ComplianceCase = {
+  /** Acknowledge the case before this time (legal rule `cases.deadlines`). */
+  ack_due_at: string;
+  acknowledged_at?: string | null;
+  /** `public` (the public form) or `staff` (entered by staff). */
+  channel: string;
+  claim: string;
+  created_at: string;
+  /**
+   * Decide before this time (working days of the legal rule `cases.deadlines`; 24 hours for
+   * a request of an authority).
+   */
+  decide_by: string;
+  decided_at?: string | null;
+  decided_by?: string | null;
+  /** `upheld`, `rejected`, `partially_upheld`, or empty before the decision. */
+  decision: string;
+  /** Reason of the decision; shown to the reporter and the reported party. */
+  decision_reason?: string | null;
+  /** The log, oldest first (only when reading one case). */
+  entries?: ComplianceCaseEntry[] | null;
+  /** Why the anti-spam checks held it; `null` when not held. */
+  held_reason?: string | null;
+  id: string;
+  /** `ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint` or `other`. */
+  kind: string;
+  /** `true` while open and past `decide_by`. */
+  overdue: boolean;
+  /** Short reference for people, e.g. `C-1A2B3C4D`. */
+  reference: string;
+  reporter_email?: string | null;
+  /** `guest`, `user`, `rights_holder` or `authority`. */
+  reporter_kind: string;
+  reporter_name?: string | null;
+  reporter_phone?: string | null;
+  reporter_user_id?: string | null;
+  /** The reported party may answer until this time. */
+  respond_by: string;
+  /** The reported unit (seller), when given. */
+  respondent_org_id?: string | null;
+  /** Users who may answer: the owners of the target. */
+  respondent_user_ids: string[];
+  /** The target is hidden while the case is handled (or after an upheld decision). */
+  restricted: boolean;
+  /** Certificates, registrations, links given as evidence. */
+  rights: Record<string, unknown>[];
+  /**
+   * `received` (held by the anti-spam checks), `under_review`, `awaiting_response`, `decided`,
+   * `closed` or `withdrawn`.
+   */
+  status: string;
+  /** The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); empty when none. */
+  target: string;
+  /** The tracking code for the reporter — only in the answer that created the case. */
+  tracking_token?: string | null;
+  updated_at: string;
+};
+
+/** Closing a case. */
+export type ComplianceCaseClose = {
+  /** 1 to 20000 characters; kept in the log. */
+  reason: string;
+  /** `true` when the reporter withdrew it (open cases only). */
+  withdrawn?: boolean;
+};
+
+/** The decision on a case. */
+export type ComplianceCaseDecision = {
+  /**
+   * `upheld` (the target stays hidden, or is hidden now), `partially_upheld` (same) or
+   * `rejected` (the target is shown again).
+   */
+  decision: string;
+  /** Shown to the reporter and the reported party; 1 to 20000 characters. */
+  reason: string;
+};
+
+/** A line of the log of a case. */
+export type ComplianceCaseEntry = {
+  /** `staff`, `respondent` or `system`. */
+  author_kind: string;
+  author_user_id?: string | null;
+  body: string;
+  created_at: string;
+  /** Ids of files (module `files`). */
+  files: string[];
+  id: string;
+  /**
+   * `note` (internal), `evidence`, `status`, `restriction`, `response` (of the reported
+   * party), `decision` or `disclosure`.
+   */
+  kind: string;
+};
+
+/** A line to add to the log of a case. */
+export type ComplianceCaseEntryRequest = {
+  body: string;
+  /** Ids of files uploaded to the module `files`. */
+  files?: string[];
+  /** `note` (internal, the default) or `evidence`. */
+  kind?: string;
+};
+
+/** Why. */
+export type ComplianceCaseReason = {
+  /** 1 to 20000 characters; kept in the log. */
+  reason: string;
+};
+
+/** A case to record (e.g. a letter of an authority or of a rights holder). */
+export type ComplianceCaseRequest = {
+  /** What is reported, 10 to 20000 characters. */
+  claim: string;
+  email?: string | null;
+  /** `ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint` or `other`. */
+  kind: string;
+  name?: string | null;
+  phone?: string | null;
+  /**
+   * `guest`, `user`, `rights_holder` or `authority` (a request of a competent authority:
+   * the target is hidden at once and the decision is due in the hours of the rule).
+   */
+  reporter_kind: string;
+  reporter_user_id?: string | null;
+  /** The reported unit (seller), if known. */
+  respondent_org_id?: string | null;
+  /** Certificates, registrations, links (objects; at most 20). */
+  rights?: Record<string, unknown>[];
+  /**
+   * The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); required except
+   * for `consumer_complaint` and `other`.
+   */
+  target?: string | null;
+};
+
+/** An answer of the reported party. */
+export type ComplianceCaseResponseRequest = {
+  /** Your answer, 1 to 20000 characters. */
+  body: string;
+  /** Ids of files (e.g. invoices, licences) uploaded to the module `files`. */
+  files?: string[];
+};
+
+/** A step of a case, as the reporter sees it. */
+export type ComplianceCaseStep = {
+  at: string;
+  /** `status`, `restriction` or `decision`. */
+  kind: string;
+};
+
+/**
  * What a website still lacks before it is notified to, or registered with, the Ministry of
  * Industry and Trade (data: the rule `moit.checklist.<kind>` in force).
  */
@@ -1104,6 +1258,27 @@ export type ComplianceChecklistItem = {
   status: string;
   /** `{"en": "…", "vi": "…"}`. */
   title: Record<string, unknown>;
+};
+
+/** How consumers can complain, and how fast they get an answer. */
+export type ComplianceComplaintChannel = {
+  acknowledge_within_hours: number;
+  /**
+   * The tenant's `complaints.contact` policy (e.g. email, phone, address, hours); `null` when
+   * not set.
+   */
+  contact?: Record<string, unknown> | null;
+  decide_within_working_days: number;
+  /**
+   * The general conditions of trade, when published:
+   * `GET /api/v1/compliance/public/documents/general_conditions`.
+   */
+  general_conditions_path: string;
+  /** The legal basis of the deadlines (to check against the original texts). */
+  legal_basis?: string | null;
+  respond_within_working_days: number;
+  /** Send complaints with `POST /api/v1/compliance/public/complaints`. */
+  submit_path: string;
 };
 
 /** A consent, as it stands. */
@@ -1248,6 +1423,47 @@ export type ComplianceDataRecipient = {
   name: string;
   /** Where it comes from: `purpose` (set on the purpose) or `tracking` (an active tag). */
   source?: string;
+};
+
+/** A disclosure of information to a competent authority. */
+export type ComplianceDisclosure = {
+  authority: string;
+  case_id?: string | null;
+  disclosed_at: string;
+  disclosed_by: string;
+  /** Names of the fields given (the values are not kept). */
+  fields: string[];
+  id: string;
+  legal_basis: string;
+  /** Number of the authority's request. */
+  request_reference: string;
+  requested_at: string;
+  /** `org:<unit id>` or `user:<user id>`. */
+  subject: string;
+  /** The values given — only in the answer that recorded the disclosure. */
+  values?: Record<string, unknown> | null;
+};
+
+/** A request of a competent authority for information about a seller. */
+export type ComplianceDisclosureRequest = {
+  /** The authority, e.g. the market surveillance office of a province. */
+  authority: string;
+  /** The case it belongs to, if any (a line is added to its log). */
+  case_id?: string | null;
+  /**
+   * Fields to give. Units: `legal_name`, `trade_name`, `tax_code`, `registration_number`,
+   * `address`, `representative_name`, `phone`, `email`, `verified_name`. Users:
+   * `verified_name`, `document_kind`, `document_last4`, `kyc_status`, `phone`.
+   */
+  fields: string[];
+  /** The legal basis the authority cites. */
+  legal_basis: string;
+  /** Number of the authority's written request. */
+  request_reference: string;
+  /** When the request was received; defaults to now. */
+  requested_at?: string | null;
+  /** `org:<unit id>` (a seller's legal profile and identity verification) or `user:<user id>`. */
+  subject: string;
 };
 
 /** A legal document of the tenant. */
@@ -1544,6 +1760,15 @@ export type ComplianceLegalProfileRequest = {
   trade_name?: string | null;
 };
 
+/** The reasons for which content of consumers may be hidden. */
+export type ComplianceModerationReasons = {
+  /** The legal basis (to check against the original texts). */
+  legal_basis?: string | null;
+  /** Reason codes, e.g. `spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive`. */
+  reasons: string[];
+  surface: string;
+};
+
 /** Your verification profile, or none yet. */
 export type ComplianceMyKyc = {
   profile?: ComplianceKycProfile | null;
@@ -1612,6 +1837,35 @@ export type ComplianceProcessingRegister = {
   retention: ComplianceRetentionItem[];
 };
 
+/** What the sender of a report or complaint gets back. */
+export type CompliancePublicCaseReceipt = {
+  id: string;
+  reference: string;
+  /** Keep it: with `id` it shows the state at `GET /public/cases/{id}?token=`. Not shown again. */
+  tracking_token: string;
+};
+
+/** A consumer complaint from the public form. */
+export type CompliancePublicComplaint = {
+  /** The value of the `altcha` widget, when the server uses a challenge. */
+  challenge?: string | null;
+  /** The complaint, 10 to 20000 characters. */
+  claim: string;
+  /** Your email address or phone number (one of them when not signed in). */
+  email?: string | null;
+  /** Ask `GET /api/v1/antispam/token?scope=compliance:complaints` when the form is shown. */
+  form_token?: string | null;
+  /** Your name (required when not signed in). */
+  name?: string | null;
+  phone?: string | null;
+  /** The seller complained about (marketplace), if known. */
+  respondent_org_id?: string | null;
+  /** What the complaint is about, `<module>.<type>:<id>` (e.g. an order or a product), if any. */
+  target?: string | null;
+  /** The hidden trap field: people leave it empty. */
+  trap?: string | null;
+};
+
 /** The website owner's information for a footer (what the law requires a commerce website to show). */
 export type CompliancePublicOwner = {
   address?: Address | null;
@@ -1626,6 +1880,36 @@ export type CompliancePublicOwner = {
   representative_name?: string | null;
   tax_code?: string | null;
   trade_name?: string | null;
+};
+
+/** A report of an infringement from the public form. */
+export type CompliancePublicReport = {
+  /** The value of the `altcha` widget, when the server uses a challenge. */
+  challenge?: string | null;
+  /** What is wrong, 10 to 20000 characters. */
+  claim: string;
+  /** Your email address or phone number (one of them when not signed in) to be told the outcome. */
+  email?: string | null;
+  /** Ask `GET /api/v1/antispam/token?scope=compliance:reports` when the form is shown. */
+  form_token?: string | null;
+  /** `ip_infringement`, `counterfeit`, `prohibited_goods` or `other`. */
+  kind: string;
+  /** Your name (required when not signed in). */
+  name?: string | null;
+  phone?: string | null;
+  /** The reported unit (seller on a marketplace), if known. */
+  respondent_org_id?: string | null;
+  /** Certificates, registrations, links (objects; at most 20). */
+  rights?: Record<string, unknown>[];
+  /** `true` when you hold the right (or act for its holder). */
+  rights_holder?: boolean;
+  /**
+   * The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); required except for
+   * `other`.
+   */
+  target?: string | null;
+  /** The hidden trap field: people leave it empty. */
+  trap?: string | null;
 };
 
 /** A processing purpose, with its legal basis. */
@@ -1699,6 +1983,33 @@ export type ComplianceResidencyRequest = {
   data_residency?: string | null;
   /** The tenant; defaults to the caller's (the platform tenant). */
   tenant_id?: string | null;
+};
+
+/**
+ * A case about you (or your unit), as the reported party sees it: no contact details of the
+ * reporter, no internal notes.
+ */
+export type ComplianceRespondentCase = {
+  claim: string;
+  created_at: string;
+  decide_by: string;
+  decision: string;
+  decision_reason?: string | null;
+  /** Status changes, restrictions, answers and the decision, oldest first. */
+  entries: ComplianceCaseEntry[];
+  id: string;
+  kind: string;
+  reference: string;
+  reporter_kind: string;
+  /** Name of the reporter when it is a rights holder or an authority; `null` otherwise. */
+  reporter_name?: string | null;
+  /** Answer with `POST /cases/{id}/responses` before this time. */
+  respond_by: string;
+  respondent_org_id?: string | null;
+  restricted: boolean;
+  rights: Record<string, unknown>[];
+  status: string;
+  target: string;
 };
 
 /** A kind of personal data and how long it is kept. */
@@ -1822,6 +2133,24 @@ export type ComplianceTagToLoad = {
    */
   script?: string | null;
   tracking_id: string;
+};
+
+/** The state of a report or complaint, for the person who sent it. */
+export type ComplianceTrackedCase = {
+  ack_due_at: string;
+  acknowledged_at?: string | null;
+  created_at: string;
+  decide_by: string;
+  decided_at?: string | null;
+  decision: string;
+  decision_reason?: string | null;
+  id: string;
+  kind: string;
+  reference: string;
+  restricted: boolean;
+  status: string;
+  steps: ComplianceCaseStep[];
+  target: string;
 };
 
 /** A built-in tracking provider. */
@@ -2955,6 +3284,91 @@ export type Data_ComplianceBadge = {
 };
 
 /** Envelope of a single result. */
+export type Data_ComplianceCase = {
+  /**
+   * A report of an infringement (intellectual property, counterfeit, prohibited goods) or a
+   * consumer complaint, as the people who handle it see it.
+   */
+  data: {
+    /** Acknowledge the case before this time (legal rule `cases.deadlines`). */
+    ack_due_at: string;
+    acknowledged_at?: string | null;
+    /** `public` (the public form) or `staff` (entered by staff). */
+    channel: string;
+    claim: string;
+    created_at: string;
+    /**
+     * Decide before this time (working days of the legal rule `cases.deadlines`; 24 hours for
+     * a request of an authority).
+     */
+    decide_by: string;
+    decided_at?: string | null;
+    decided_by?: string | null;
+    /** `upheld`, `rejected`, `partially_upheld`, or empty before the decision. */
+    decision: string;
+    /** Reason of the decision; shown to the reporter and the reported party. */
+    decision_reason?: string | null;
+    /** The log, oldest first (only when reading one case). */
+    entries?: ComplianceCaseEntry[] | null;
+    /** Why the anti-spam checks held it; `null` when not held. */
+    held_reason?: string | null;
+    id: string;
+    /** `ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint` or `other`. */
+    kind: string;
+    /** `true` while open and past `decide_by`. */
+    overdue: boolean;
+    /** Short reference for people, e.g. `C-1A2B3C4D`. */
+    reference: string;
+    reporter_email?: string | null;
+    /** `guest`, `user`, `rights_holder` or `authority`. */
+    reporter_kind: string;
+    reporter_name?: string | null;
+    reporter_phone?: string | null;
+    reporter_user_id?: string | null;
+    /** The reported party may answer until this time. */
+    respond_by: string;
+    /** The reported unit (seller), when given. */
+    respondent_org_id?: string | null;
+    /** Users who may answer: the owners of the target. */
+    respondent_user_ids: string[];
+    /** The target is hidden while the case is handled (or after an upheld decision). */
+    restricted: boolean;
+    /** Certificates, registrations, links given as evidence. */
+    rights: Record<string, unknown>[];
+    /**
+     * `received` (held by the anti-spam checks), `under_review`, `awaiting_response`, `decided`,
+     * `closed` or `withdrawn`.
+     */
+    status: string;
+    /** The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); empty when none. */
+    target: string;
+    /** The tracking code for the reporter — only in the answer that created the case. */
+    tracking_token?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceCaseEntry = {
+  /** A line of the log of a case. */
+  data: {
+    /** `staff`, `respondent` or `system`. */
+    author_kind: string;
+    author_user_id?: string | null;
+    body: string;
+    created_at: string;
+    /** Ids of files (module `files`). */
+    files: string[];
+    id: string;
+    /**
+     * `note` (internal), `evidence`, `status`, `restriction`, `response` (of the reported
+     * party), `decision` or `disclosure`.
+     */
+    kind: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceChecklist = {
   /**
    * What a website still lacks before it is notified to, or registered with, the Ministry of
@@ -2987,6 +3401,30 @@ export type Data_ComplianceChecklist = {
     /** Items `unknown`. */
     unknown: number;
     website_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceComplaintChannel = {
+  /** How consumers can complain, and how fast they get an answer. */
+  data: {
+    acknowledge_within_hours: number;
+    /**
+     * The tenant's `complaints.contact` policy (e.g. email, phone, address, hours); `null` when
+     * not set.
+     */
+    contact?: Record<string, unknown> | null;
+    decide_within_working_days: number;
+    /**
+     * The general conditions of trade, when published:
+     * `GET /api/v1/compliance/public/documents/general_conditions`.
+     */
+    general_conditions_path: string;
+    /** The legal basis of the deadlines (to check against the original texts). */
+    legal_basis?: string | null;
+    respond_within_working_days: number;
+    /** Send complaints with `POST /api/v1/compliance/public/complaints`. */
+    submit_path: string;
   };
 };
 
@@ -3071,6 +3509,28 @@ export type Data_ComplianceCookieStats = {
     since: string;
     /** Choices recorded. */
     total: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceDisclosure = {
+  /** A disclosure of information to a competent authority. */
+  data: {
+    authority: string;
+    case_id?: string | null;
+    disclosed_at: string;
+    disclosed_by: string;
+    /** Names of the fields given (the values are not kept). */
+    fields: string[];
+    id: string;
+    legal_basis: string;
+    /** Number of the authority's request. */
+    request_reference: string;
+    requested_at: string;
+    /** `org:<unit id>` or `user:<user id>`. */
+    subject: string;
+    /** The values given — only in the answer that recorded the disclosure. */
+    values?: Record<string, unknown> | null;
   };
 };
 
@@ -3266,6 +3726,18 @@ export type Data_ComplianceLegalProfile = {
 };
 
 /** Envelope of a single result. */
+export type Data_ComplianceModerationReasons = {
+  /** The reasons for which content of consumers may be hidden. */
+  data: {
+    /** The legal basis (to check against the original texts). */
+    legal_basis?: string | null;
+    /** Reason codes, e.g. `spam`, `illegal_content`, `personal_data`, `unrelated`, `offensive`. */
+    reasons: string[];
+    surface: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ComplianceMyKyc = {
   /** Your verification profile, or none yet. */
   data: {
@@ -3316,6 +3788,17 @@ export type Data_ComplianceProcessingRegister = {
     purposes: CompliancePurpose[];
     residency: ComplianceResidency;
     retention: ComplianceRetentionItem[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CompliancePublicCaseReceipt = {
+  /** What the sender of a report or complaint gets back. */
+  data: {
+    id: string;
+    reference: string;
+    /** Keep it: with `id` it shows the state at `GET /public/cases/{id}?token=`. Not shown again. */
+    tracking_token: string;
   };
 };
 
@@ -3426,6 +3909,27 @@ export type Data_ComplianceSubjectRequestResult = {
     /** What a person still has to do, if anything. */
     next_steps?: string | null;
     request: ComplianceSubjectRequest;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceTrackedCase = {
+  /** The state of a report or complaint, for the person who sent it. */
+  data: {
+    ack_due_at: string;
+    acknowledged_at?: string | null;
+    created_at: string;
+    decide_by: string;
+    decided_at?: string | null;
+    decision: string;
+    decision_reason?: string | null;
+    id: string;
+    kind: string;
+    reference: string;
+    restricted: boolean;
+    status: string;
+    steps: ComplianceCaseStep[];
+    target: string;
   };
 };
 
@@ -3665,6 +4169,12 @@ export type Data_EntryAuthors = {
 export type Data_EntryResponse = {
   /** A post or page — its working draft. */
   data: {
+    /**
+     * A person wrote or edited the content from AI suggestions (e.g. applied
+     * `seo-suggestions`). Public endpoints return it so the interface labels the content
+     * (Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).
+     */
+    ai_assisted: boolean;
     /**
      * The content was generated by AI (set by the writer; set by the server when it translated
      * the entry, and always when the writer has only `content.write_own`). Shown to readers by
@@ -4676,6 +5186,11 @@ export type Data_MediaItemResponse = {
      */
     alt: string;
     /**
+     * The default `alt` was written from an AI suggestion: label it where it is shown (Vietnam's
+     * Law on Artificial Intelligence 134/2025/QH15).
+     */
+    alt_ai_assisted: boolean;
+    /**
      * Translations of `alt` by language (BCP 47 code → text), set with
      * `PUT /api/v1/media/{id}/alts/{locale}`. Show `alts[locale]` when present, else `alt`.
      */
@@ -5268,6 +5783,8 @@ export type Data_PreviewEntryResponse = {
    * was created).
    */
   data: {
+    /** The content was written or edited from AI suggestions. */
+    ai_assisted: boolean;
     /** The content was generated by AI. */
     ai_generated: boolean;
     /** Authors, in order (the first is the main one). */
@@ -7198,6 +7715,11 @@ export type Data_Vec_PlanResponse = {
 export type Data_Vec_PublicEntryResponse = {
   data: {
     /**
+     * A person wrote or edited the content from AI suggestions: label it as AI-assisted (Vietnam's
+     * Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).
+     */
+    ai_assisted: boolean;
+    /**
      * The content was generated by AI. Show readers a notice when your rules (for example
      * Article 50 of the EU AI Act) ask for one.
      */
@@ -7904,6 +8426,14 @@ export type EntryAuthors = {
 /** The editable fields of an entry. Omitted fields stay as they are. */
 export type EntryFieldsInput = {
   /**
+   * Send `true` when the content was written or edited from AI suggestions (applied
+   * `seo-suggestions`, rewritten from an AI draft); public endpoints return it so the interface
+   * labels it (Vietnam's Law on Artificial Intelligence 134/2025/QH15). Removing the label
+   * (`false` while it is `true`) needs `content.publish` (else 403
+   * `content.ai_label_requires_publish`).
+   */
+  ai_assisted?: boolean | null;
+  /**
    * The content was generated by AI. AI agents should always send `true`; readers may be
    * told (public endpoints return it). With only `content.write_own` the server always sets
    * `true`, whatever is sent.
@@ -7937,6 +8467,12 @@ export type EntryFieldsInput = {
 
 /** A post or page — its working draft. */
 export type EntryResponse = {
+  /**
+   * A person wrote or edited the content from AI suggestions (e.g. applied
+   * `seo-suggestions`). Public endpoints return it so the interface labels the content
+   * (Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).
+   */
+  ai_assisted: boolean;
   /**
    * The content was generated by AI (set by the writer; set by the server when it translated
    * the entry, and always when the writer has only `content.write_own`). Shown to readers by
@@ -9575,6 +10111,11 @@ export type MediaItemResponse = {
    */
   alt: string;
   /**
+   * The default `alt` was written from an AI suggestion: label it where it is shown (Vietnam's
+   * Law on Artificial Intelligence 134/2025/QH15).
+   */
+  alt_ai_assisted: boolean;
+  /**
    * Translations of `alt` by language (BCP 47 code → text), set with
    * `PUT /api/v1/media/{id}/alts/{locale}`. Show `alts[locale]` when present, else `alt`.
    */
@@ -10801,6 +11342,92 @@ export type Page_ComplianceAcceptance = {
 };
 
 /** One page of a list. */
+export type Page_ComplianceCase = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Acknowledge the case before this time (legal rule `cases.deadlines`). */
+    ack_due_at: string;
+    acknowledged_at?: string | null;
+    /** `public` (the public form) or `staff` (entered by staff). */
+    channel: string;
+    claim: string;
+    created_at: string;
+    /**
+     * Decide before this time (working days of the legal rule `cases.deadlines`; 24 hours for
+     * a request of an authority).
+     */
+    decide_by: string;
+    decided_at?: string | null;
+    decided_by?: string | null;
+    /** `upheld`, `rejected`, `partially_upheld`, or empty before the decision. */
+    decision: string;
+    /** Reason of the decision; shown to the reporter and the reported party. */
+    decision_reason?: string | null;
+    /** The log, oldest first (only when reading one case). */
+    entries?: ComplianceCaseEntry[] | null;
+    /** Why the anti-spam checks held it; `null` when not held. */
+    held_reason?: string | null;
+    id: string;
+    /** `ip_infringement`, `counterfeit`, `prohibited_goods`, `consumer_complaint` or `other`. */
+    kind: string;
+    /** `true` while open and past `decide_by`. */
+    overdue: boolean;
+    /** Short reference for people, e.g. `C-1A2B3C4D`. */
+    reference: string;
+    reporter_email?: string | null;
+    /** `guest`, `user`, `rights_holder` or `authority`. */
+    reporter_kind: string;
+    reporter_name?: string | null;
+    reporter_phone?: string | null;
+    reporter_user_id?: string | null;
+    /** The reported party may answer until this time. */
+    respond_by: string;
+    /** The reported unit (seller), when given. */
+    respondent_org_id?: string | null;
+    /** Users who may answer: the owners of the target. */
+    respondent_user_ids: string[];
+    /** The target is hidden while the case is handled (or after an upheld decision). */
+    restricted: boolean;
+    /** Certificates, registrations, links given as evidence. */
+    rights: Record<string, unknown>[];
+    /**
+     * `received` (held by the anti-spam checks), `under_review`, `awaiting_response`, `decided`,
+     * `closed` or `withdrawn`.
+     */
+    status: string;
+    /** The reported object, `<module>.<type>:<id>` (e.g. `content.entry:…`); empty when none. */
+    target: string;
+    /** The tracking code for the reporter — only in the answer that created the case. */
+    tracking_token?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceDisclosure = {
+  /** The items of this page, in the requested order. */
+  data: {
+    authority: string;
+    case_id?: string | null;
+    disclosed_at: string;
+    disclosed_by: string;
+    /** Names of the fields given (the values are not kept). */
+    fields: string[];
+    id: string;
+    legal_basis: string;
+    /** Number of the authority's request. */
+    request_reference: string;
+    requested_at: string;
+    /** `org:<unit id>` or `user:<user id>`. */
+    subject: string;
+    /** The values given — only in the answer that recorded the disclosure. */
+    values?: Record<string, unknown> | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ComplianceIncident = {
   /** The items of this page, in the requested order. */
   data: {
@@ -10889,6 +11516,34 @@ export type Page_ComplianceLegalProfile = {
     tax_code?: string | null;
     trade_name?: string | null;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceRespondentCase = {
+  /** The items of this page, in the requested order. */
+  data: {
+    claim: string;
+    created_at: string;
+    decide_by: string;
+    decision: string;
+    decision_reason?: string | null;
+    /** Status changes, restrictions, answers and the decision, oldest first. */
+    entries: ComplianceCaseEntry[];
+    id: string;
+    kind: string;
+    reference: string;
+    reporter_kind: string;
+    /** Name of the reporter when it is a rights holder or an authority; `null` otherwise. */
+    reporter_name?: string | null;
+    /** Answer with `POST /cases/{id}/responses` before this time. */
+    respond_by: string;
+    respondent_org_id?: string | null;
+    restricted: boolean;
+    rights: Record<string, unknown>[];
+    status: string;
+    target: string;
   }[];
   pagination: Pagination;
 };
@@ -11041,6 +11696,12 @@ export type Page_EndpointResponse = {
 export type Page_EntryResponse = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * A person wrote or edited the content from AI suggestions (e.g. applied
+     * `seo-suggestions`). Public endpoints return it so the interface labels the content
+     * (Vietnam's Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).
+     */
+    ai_assisted: boolean;
     /**
      * The content was generated by AI (set by the writer; set by the server when it translated
      * the entry, and always when the writer has only `content.write_own`). Shown to readers by
@@ -11745,6 +12406,11 @@ export type Page_MediaItemResponse = {
      */
     alt: string;
     /**
+     * The default `alt` was written from an AI suggestion: label it where it is shown (Vietnam's
+     * Law on Artificial Intelligence 134/2025/QH15).
+     */
+    alt_ai_assisted: boolean;
+    /**
      * Translations of `alt` by language (BCP 47 code → text), set with
      * `PUT /api/v1/media/{id}/alts/{locale}`. Show `alts[locale]` when present, else `alt`.
      */
@@ -12096,6 +12762,11 @@ export type Page_PublicComment = {
 export type Page_PublicEntryResponse = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * A person wrote or edited the content from AI suggestions: label it as AI-assisted (Vietnam's
+     * Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).
+     */
+    ai_assisted: boolean;
     /**
      * The content was generated by AI. Show readers a notice when your rules (for example
      * Article 50 of the EU AI Act) ask for one.
@@ -13063,6 +13734,8 @@ export type PreferencesResponse = {
  * was created).
  */
 export type PreviewEntryResponse = {
+  /** The content was written or edited from AI suggestions. */
+  ai_assisted: boolean;
   /** The content was generated by AI. */
   ai_generated: boolean;
   /** Authors, in order (the first is the main one). */
@@ -13330,6 +14003,11 @@ export type PublicEmbed = {
 /** A published post or page, as readers see it. */
 export type PublicEntryResponse = {
   /**
+   * A person wrote or edited the content from AI suggestions: label it as AI-assisted (Vietnam's
+   * Law on Artificial Intelligence 134/2025/QH15, from 2026-03-01).
+   */
+  ai_assisted: boolean;
+  /**
    * The content was generated by AI. Show readers a notice when your rules (for example
    * Article 50 of the EU AI Act) ask for one.
    */
@@ -13452,6 +14130,12 @@ export type PublicListsResponse = {
 export type PublicMedia = {
   /** Text alternative. */
   alt: string;
+  /**
+   * `alt` is the media library's and was written from an AI suggestion: label it (Vietnam's
+   * Law on Artificial Intelligence 134/2025/QH15). An `alt` set on the entry follows the
+   * entry's `ai_assisted`.
+   */
+  alt_ai_assisted: boolean;
   height?: number | null;
   /** Media item id. */
   id: string;
@@ -15510,6 +16194,13 @@ export type UpdateFormRequest = {
 export type UpdateItemRequest = {
   /** Text alternative, up to 1000 characters; `""` clears it. */
   alt?: string | null;
+  /**
+   * `true` when the default `alt` was written from an AI suggestion
+   * (`POST /media/{id}/alt-suggestion`), so the interface can label it (Vietnam's Law on
+   * Artificial Intelligence 134/2025/QH15, from 2026-03-01). Send `true` when you apply a
+   * suggestion; send `false` once a person rewrote it.
+   */
+  alt_ai_assisted?: boolean | null;
   /** Caption, up to 2000 characters; `""` clears it. */
   caption?: string | null;
   /** `true` marks a purely decorative image, whose empty `alt` is on purpose. */
@@ -17372,6 +18063,144 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/cases": {
+    /** List cases. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; kind?: string; target?: string; overdue?: boolean; held?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceCase;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Record a case received outside the public forms. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceCaseRequest;
+      responses: {
+        201: Data_ComplianceCase;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/cases/{id}": {
+    /** Get a case with its log. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceCase;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/cases/{id}/close": {
+    /** Close a case (spam, duplicate, withdrawn, or done after the decision). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceCaseClose;
+      responses: {
+        200: Data_ComplianceCase;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/cases/{id}/decision": {
+    /** Decide a case. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceCaseDecision;
+      responses: {
+        200: Data_ComplianceCase;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/cases/{id}/entries": {
+    /** Add a note or evidence to a case. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceCaseEntryRequest;
+      responses: {
+        201: Data_ComplianceCaseEntry;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/cases/{id}/responses": {
+    /** Answer a case about you or your unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceCaseResponseRequest;
+      responses: {
+        201: Data_ComplianceCaseEntry;
+        401: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/cases/{id}/restore": {
+    /** Show the target of a case again before the decision. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceCaseReason;
+      responses: {
+        200: Data_ComplianceCase;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/cases/{id}/restrict": {
+    /** Hide the target of a case while it is handled. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceCaseReason;
+      responses: {
+        200: Data_ComplianceCase;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/cookie-consents/stats": {
     /** Get cookie consent counts of a website. */
     get: {
@@ -17403,6 +18232,32 @@ export interface paths {
       requestBody: ComplianceCookieSettingsRequest;
       responses: {
         200: Data_ComplianceCookieSettings;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/disclosures": {
+    /** List disclosures to authorities. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { case_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceDisclosure;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Give a competent authority information about a seller, and record it. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceDisclosureRequest;
+      responses: {
+        201: Data_ComplianceDisclosure;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -18001,6 +18856,39 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/public/cases/{id}": {
+    /** Follow a report or complaint you sent. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { token?: string }; };
+      responses: {
+        200: Data_ComplianceTrackedCase;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/public/complaints": {
+    /** Get the consumer complaint channel. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_ComplianceComplaintChannel;
+        default: Problem;
+      };
+    };
+    /** Send a consumer complaint. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: CompliancePublicComplaint;
+      responses: {
+        201: Data_CompliancePublicCaseReceipt;
+        400: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/public/consent-config": {
     /** Get the cookie banner and the tags to load, for a website. */
     get: {
@@ -18036,6 +18924,16 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/public/moderation-reasons": {
+    /** List the reasons for which reviews and other content of consumers may be hidden. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { surface?: string }; };
+      responses: {
+        200: Data_ComplianceModerationReasons;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/public/owner": {
     /** Get the owner of the website being viewed. */
     get: {
@@ -18053,6 +18951,20 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_Vec_CompliancePurpose;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/public/reports": {
+    /** Send a report of an infringement (intellectual property, counterfeit, prohibited goods). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: CompliancePublicReport;
+      responses: {
+        201: Data_CompliancePublicCaseReceipt;
+        400: Problem;
+        422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -18118,6 +19030,18 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/respondent/cases": {
+    /** List the cases about you or your unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceRespondentCase;
+        401: Problem;
         422: Problem;
         default: Problem;
       };
@@ -18961,6 +19885,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        451: Problem;
         default: Problem;
       };
     };

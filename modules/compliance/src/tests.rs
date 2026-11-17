@@ -68,7 +68,8 @@ pub(crate) async fn call(
 }
 
 pub(crate) async fn run_jobs(app: &TestApp) {
-    app.modules().worker(4).unwrap().blocked_delay(Duration::ZERO).run_once().await.unwrap();
+    // Đủ chỗ cho mọi lịch của module chạy trong một lượt.
+    app.modules().worker(8).unwrap().blocked_delay(Duration::ZERO).run_once().await.unwrap();
 }
 
 /// Mở hồ sơ của `who`, bắt đầu lượt xác thực; trả (id hồ sơ, mã ở nhà cung cấp).

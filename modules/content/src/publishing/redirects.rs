@@ -411,6 +411,10 @@ impl ContentService {
             .iter()
             .find_map(|org| found.iter().find(|row| row.org_id == Some(*org)).cloned())
         {
+            // Ẩn tạm vì vụ việc (D-363): 451, không 404 — người đọc biết vì sao.
+            if found.restricted_at.is_some() {
+                return Err(crate::restriction::restricted());
+            }
             return Ok(Resolved::Entry(Box::new(found)));
         }
         let Some(found) = redirect::Entity::find()

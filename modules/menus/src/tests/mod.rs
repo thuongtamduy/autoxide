@@ -149,6 +149,7 @@ impl Media for FakeMedia {
                 width: Some(640),
                 height: Some(480),
                 alt: String::new(),
+                alt_ai_assisted: false,
                 url: format!("/api/v1/media/{id}/content?v=1"),
                 variants: Vec::new(),
             })

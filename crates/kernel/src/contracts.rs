@@ -7,6 +7,7 @@ pub mod ai;
 pub mod einvoice;
 pub mod identity;
 pub mod mail;
+pub mod moderation;
 pub mod payment;
 pub mod privacy;
 pub mod push;

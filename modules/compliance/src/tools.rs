@@ -98,6 +98,7 @@ pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
     let mut tools = base(service);
     tools.extend(moit(service));
     tools.extend(crate::tools_privacy::all(service));
+    tools.extend(crate::tools_cases::all(service));
     tools
 }
 

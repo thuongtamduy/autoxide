@@ -181,7 +181,7 @@ pub(crate) struct UpdateCommentRequest {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `comments.moderate`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No comment has this id; code `comments.not_found`.", body = Problem),
-        (status = 409, description = "The author deleted it; code `comments.deleted`.", body = Problem),
+        (status = 409, description = "The author deleted it (code `comments.deleted`), or it is hidden while a case of the module `compliance` is handled (code `comments.restricted`).", body = Problem),
         (status = 412, description = "The comment changed since you read it; code `precondition_failed`.", body = Problem),
         (status = 422, description = "The status is invalid; see `errors`.", body = Problem),
         (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
