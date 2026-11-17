@@ -276,6 +276,16 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
+    /// Góp một bộ cài đặt cho trait nhiều bên cùng cung cấp (`StartContext::contribute`), vd
+    /// `.contribute::<dyn PaymentGateway>(Arc::new(FakePaymentGateway::new()))`.
+    pub fn contribute<T>(mut self, api: Arc<T>) -> Self
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.provided.push(Box::new(move |context| context.contribute::<T>(api)));
+        self
+    }
+
     /// Thêm một người dùng giả: request mang `Authorization: Bearer <token>` được xác thực
     /// là `user_id` với đúng các permission này. Khai ít nhất một `user` (hay `principal`) thì
     /// app dùng bộ xác thực giả thay cho bộ một module công bố.

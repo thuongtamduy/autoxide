@@ -8010,3 +8010,23 @@ Quyết định:
 
 Lý do: dùng lại đường đọc bảng của việc dời khách thay vì bắt mỗi module viết hàm xuất; JSON Lines đọc được bằng công cụ
 phổ biến và nạp lại theo từng dòng.
+
+## D-329 · Đánh số tuần tự, khoá chia sẻ, nhiều module cùng góp một trait (bước 36 phần 2) — 2026-11-17 — agent quyết
+
+Quyết định:
+
+1. **`autoxide_kernel::numbering`**: bảng `kernel_sequences` (`tenant_id`, `scope`, `last_value`, `updated_at`; khoá
+   chính `(tenant_id, scope)`) là bảng cấp khách hàng của module nội bộ `kernel` (migration `m0016_create_sequences`),
+   có ở mọi database dữ liệu. `next` là **một câu** `INSERT … ON CONFLICT (tenant_id, scope) DO UPDATE SET last_value =
+   kernel_sequences.last_value + 1 RETURNING last_value` thay cho hai câu (INSERT … DO NOTHING rồi UPDATE … RETURNING)
+   của đặc tả: cùng tác dụng, ít một lượt đi về; chạy trên Postgres và SQLite ≥ 3.35. Số cấp trong transaction ghi của
+   bên gọi: rollback thì không tiêu số; các bên cùng dãy nối đuôi nhau tới commit. Không dùng `SEQUENCE` (nhảy số khi
+   rollback, SQLite không có).
+2. **`rows::lock_one_shared`**: `SELECT … FOR SHARE` trên Postgres, câu thường trên SQLite (một bên ghi). Dùng cho dòng
+   kỳ kế toán: bút toán giữ khoá chia sẻ, khoá sổ giữ khoá độc quyền.
+3. **`StartContext::contribute` / `contributions`** (và `TestAppBuilder::contribute`): trait nhiều module cùng cung
+   cấp (bộ nối `PaymentGateway`, `BankFeed`…), khác `provide` chỉ một bên. Mỗi module góp mỗi trait một lần; bên đọc
+   thấy các bộ góp của module đăng ký TRƯỚC, theo thứ tự đăng ký. Hàm mới, không bắt module cũ sửa (D-038).
+
+Test trên cả hai database: 32 transaction đồng thời nhận đúng 1..32; rollback không tiêu số; dãy và khách độc lập;
+khoá độc quyền chờ khoá chia sẻ.

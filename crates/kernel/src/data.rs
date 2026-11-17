@@ -1,10 +1,11 @@
 //! Làm việc với database: kết nối đọc / ghi, migration, pagination, khoá dòng, tham chiếu, phiên
 //! bản (ETag), tìm không dấu, chuyển dữ liệu.
 //!
-//! Bước 33+ thêm vào đây: `tenancy`, `numbering`.
+//! Bước 33+ thêm vào đây: `tenancy`; bước 36: `numbering` (đánh số tuần tự không nhảy số).
 
 pub mod database;
 pub mod migration;
+pub mod numbering;
 pub mod pagination;
 pub mod reference;
 pub mod rows;

@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- For module authors (step 36): `autoxide_kernel::numbering` hands out gapless sequential numbers (invoice and receipt
+  numbers) inside the caller's write transaction — concurrent requests get 1, 2, 3… with no duplicates, and a rolled
+  back transaction does not use up a number; `rows::lock_one_shared` takes a shared row lock; `StartContext::contribute`
+  / `contributions` let several modules supply the same trait (e.g. one payment gateway connector each).
 - Export all the data of a tenant as one JSON Lines file, in the background: `POST /api/v1/kernel/tenants/{id}/exports`
   (platform staff, or the tenant's own administrators with the new permission `kernel.data.export`), status, download
   with a bearer token or a 24-hour link; MCP tools `kernel.export_tenant`, `kernel.get_tenant_export`. Secrets and

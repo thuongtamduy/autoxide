@@ -19,7 +19,7 @@ mod values;
 
 pub use contracts::{ai, mail, privacy, resource, storage};
 pub use data::{
-    database, migration, pagination, reference, rows, search, tenancy, transfer, version,
+    database, migration, numbering, pagination, reference, rows, search, tenancy, transfer, version,
 };
 pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use ops::{doctor, logging, metrics, task, telemetry};
