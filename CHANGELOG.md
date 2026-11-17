@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `tax` (step 36): taxes from data. Tax categories and rates with effective dates, withholding rates
+  for platforms and rules come in a tax data pack; the Vietnam pack ships with the server (VAT 0/5/10%, the 8% rate
+  until 2026-12-31, a special consumption tax sample, marketplace withholding for household businesses — every rate
+  with its legal basis, to check before production use) and is imported by itself. `POST /api/v1/tax/quote` computes
+  the taxes of a document (exclusive or inclusive prices; rounded once per rate, lines always add up), `POST
+  /api/v1/tax/withholding` the taxes a platform withholds; tax profiles per organization unit, inherited down the
+  tree (`/api/v1/tax/profiles/{org_id}`); `GET /api/v1/tax/rates`, `/withholding-rates`, `/rules`, `/packs`; MCP
+  `tax.quote`, `tax.rates`; `autoxide task tax.import_pack`; `autoxide doctor` warns about rates ending with no rate
+  after them (`AUTOXIDE_TAX_EXPIRY_WARNING_DAYS`). Other modules use `autoxide_tax::api::TaxEngine`.
+
 - Create a tenant on a plan in one call: `POST /api/v1/plans/provisionings` (platform staff, new permission
   `plans.provision`; MCP `plans.provision_tenant`, `plans.get_provisioning`) creates the tenant, its subscription, the
   sample data of the modules the plan turns on, and invites its administrator; it runs in the background, failed

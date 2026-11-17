@@ -8215,3 +8215,32 @@ quầy". Quyết định thiết kế: quầy chỉ cần `orders.pos.sell` — 
 tại quầy (tìm khách chỉ trả tên, SĐT đã che, hạng, điểm — tối thiểu dữ liệu cá nhân, Luật 91/2025); mã không áp được thì
 bỏ qua kèm lý do, không chặn đơn; `tendered` lưu ở `orders_payments.tendered_minor`, sổ cái chỉ ghi `amount`.
 
+## D-341 · Module `tax` — engine thuế từ dữ liệu — 2026-11-17 — agent quyết
+
+Bước 36 mục 3 (ROADMAP mục "Engine thuế").
+
+1. **Bảng**: sáu bảng mặt điều khiển (`tax_packs`, `tax_jurisdictions`, `tax_categories`, `tax_rates`,
+   `tax_withholding_rates`, `tax_rules`) — dữ liệu luật dùng chung mọi khách như `address`; `tax_profiles` cấp khách
+   (PK `tenant_id, org_id`). Thuế suất lưu chữ thập phân chuẩn hoá (`decimal::to_column`), ngày `YYYY-MM-DD` dạng chữ
+   so sánh như chữ, hiệu lực nửa mở `[from, to)`.
+2. **Gói dữ liệu** (`modules/tax/packs/vn.json`, `version`, `checked_on`, `source_note`, mỗi dòng `legal_basis`): một gói
+   thay hẳn dữ liệu các vùng thuế nó nêu trong một transaction; chỉ nhận `version` lớn hơn (`tax.pack_outdated`); SHA-256
+   của JSON chuẩn hoá để nhập lại cùng gói (qua file hay API) không đổi gì. Kiểm: thuế suất cùng nhóm, cùng tầng không
+   chồng ngày. Gói đi kèm tự nhập bằng job `tax.import_bundled` (hằng giờ, chỉ database điều khiển) khi mới hơn bản đã
+   có — người vận hành không phải nhớ lệnh; vẫn có `autoxide task tax.import_pack` và `POST /tax/packs`.
+3. **Tính**: dòng gom theo chuỗi thuế suất; thuế mỗi nhóm tính trên tổng nhóm, `HalfUp` một lần, chia về dòng bằng
+   `Money::allocate`; tầng sau tính trên giá + thuế tầng trước; giá đã gồm thuế tách ngược, làm tròn giá chưa thuế một
+   lần, tầng cuối nhận phần dư (dòng: tổng dòng − phần còn lại). Basis `exempt` = "không chịu thuế" (khác 0%).
+   Không có thuế suất → `tax.rate_missing`, không đoán. Kết quả mang `snapshot` (ID thuế suất, phiên bản gói, cách làm
+   tròn) để chứng từ lưu.
+4. **Chế độ thuế** theo hồ sơ của nút bán (gần nhất trên cây, `OrgTree::ancestors` + `nearest`): `vat_credit` → hoá đơn
+   GTGT; `vat_direct` / `household` → hoá đơn bán hàng, bỏ tầng GTGT trên dòng (thuế trên doanh thu thuộc kê khai, ngoài
+   phạm vi); `exempt` → không thuế. Không có hồ sơ → coi như `vat_credit`.
+5. **Mã số thuế** nhận 10, 13 (`10-3`) và 12 số (số định danh cá nhân dùng làm MST, TT 86/2024/TT-BTC — cần đối chiếu
+   văn bản gốc). Khấu trừ thay chỉ cho chế độ khai trong gói (hộ kinh doanh), doanh nghiệp tự kê khai.
+6. **Bộ nhớ đệm** bảng thuế 60 giây trong mỗi tiến trình, xoá ngay khi nhập gói ở máy đó. Tên schema OpenAPI của module
+   mang tiền tố `Tax…` (trùng `ProfileRequest` của `comments`).
+7. Căn cứ trong gói "vn" (đối chiếu qua báo chí / công ty luật — **cần đối chiếu văn bản gốc**): Luật Thuế GTGT
+   48/2024/QH15; nghị quyết giảm 2% GTGT tới 31/12/2026; Luật Thuế TTĐB 66/2025/QH15 (nhóm mẫu); NĐ 117/2025/NĐ-CP
+   (khấu trừ thay của sàn); NĐ 123/2020/NĐ-CP sửa bởi NĐ 70/2025/NĐ-CP (máy tính tiền, ngưỡng 1 tỷ đ/năm).
+
