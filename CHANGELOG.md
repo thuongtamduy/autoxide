@@ -19,6 +19,10 @@ endpoints are marked deprecated with a sunset date first.
   Off by default: new settings `AUTOXIDE_PLANS_SIGNUP`, `AUTOXIDE_PLANS_SIGNUP_URL`,
   `AUTOXIDE_PLANS_SIGNUP_RETURN_URL`. New events `plans.signup_created`, `plans.signup_completed`,
   `plans.signup_rejected`. See `docs/PLANS.md`.
+- Entries embed records of other modules (step 51): a body node `embed` with `kind` and `id` (e.g. a product) is
+  checked when saved (the type must be registered, the record must exist); public reads return `embeds` keyed
+  by `<kind>:<id>` with the title, summary, path and image of each record that is still public.
+
 - New module `notifications` (step 37): notification kinds declared by modules through `Notifier` (security,
   transactional, advertising), sent over email, SMS, Zalo ZNS, web push, mobile push and an in-app inbox
   (`/api/v1/notifications/me/inbox`, unread count, mark read). People choose what they get (`/me/preferences`;

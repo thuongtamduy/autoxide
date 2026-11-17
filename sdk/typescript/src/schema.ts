@@ -385,7 +385,9 @@ export type BodyMark = {
  *   (`attrs.start`), `listItem`, `blockquote`, `codeBlock` (`attrs.language`; plain
  *   `text` only), `horizontalRule`, `image` (`attrs.mediaId` — a media item id — `alt`,
  *   `caption`; no `src`), `table`, `tableRow`, `tableHeader`, `tableCell` (`attrs.colspan`,
- *   `rowspan`, `colwidth`), `embed` (`attrs.url`, an `https://` address on an allowed host);
+ *   `rowspan`, `colwidth`), `embed` (`attrs.url`, an `https://` address on an allowed host; or
+ *   `attrs.kind` + `attrs.id`, a record of another module such as `catalog.product`, which must
+ *   exist — public reads list it in `embeds`);
  * - inline: `text` (with `marks`), `hardBreak`.
  * 
  * The root is `{"type": "doc", "content": [...]}`.
@@ -5251,6 +5253,15 @@ export type Data_Vec_PublicEntryResponse = {
     body_schema_version: number;
     /** Last change of the published content (sitemap `lastmod`, feed `updated`). */
     content_modified_at: string;
+    /**
+     * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
+     * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
+     * (any more) is left out: skip its node. Prices and stock are not here — read them from the
+     * owning module's public API, so they are always current.
+     */
+    embeds: {
+      [key: string]: PublicEmbed;
+    };
     excerpt: string;
     featured_media?: PublicMedia | null;
     first_published_at: string;
@@ -9217,6 +9228,15 @@ export type Page_PublicEntryResponse = {
     body_schema_version: number;
     /** Last change of the published content (sitemap `lastmod`, feed `updated`). */
     content_modified_at: string;
+    /**
+     * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
+     * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
+     * (any more) is left out: skip its node. Prices and stock are not here — read them from the
+     * owning module's public API, so they are always current.
+     */
+    embeds: {
+      [key: string]: PublicEmbed;
+    };
     excerpt: string;
     featured_media?: PublicMedia | null;
     first_published_at: string;
@@ -10399,6 +10419,18 @@ export type PublicComment = {
   target_type: string;
 };
 
+/** A record of another module embedded in an entry. */
+export type PublicEmbed = {
+  id: string;
+  /** Representative image: the id of a public media item (its file: `GET /api/v1/media/{id}/content`). */
+  image?: string | null;
+  kind: string;
+  summary: string;
+  title: string;
+  /** Public path of the record, without domain. */
+  url?: string | null;
+};
+
 /** A published post or page, as readers see it. */
 export type PublicEntryResponse = {
   /**
@@ -10424,6 +10456,15 @@ export type PublicEntryResponse = {
   body_schema_version: number;
   /** Last change of the published content (sitemap `lastmod`, feed `updated`). */
   content_modified_at: string;
+  /**
+   * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
+   * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
+   * (any more) is left out: skip its node. Prices and stock are not here — read them from the
+   * owning module's public API, so they are always current.
+   */
+  embeds: {
+    [key: string]: PublicEmbed;
+  };
   excerpt: string;
   featured_media?: PublicMedia | null;
   first_published_at: string;

@@ -94,7 +94,9 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
 ///   (`attrs.start`), `listItem`, `blockquote`, `codeBlock` (`attrs.language`; plain
 ///   `text` only), `horizontalRule`, `image` (`attrs.mediaId` — a media item id — `alt`,
 ///   `caption`; no `src`), `table`, `tableRow`, `tableHeader`, `tableCell` (`attrs.colspan`,
-///   `rowspan`, `colwidth`), `embed` (`attrs.url`, an `https://` address on an allowed host);
+///   `rowspan`, `colwidth`), `embed` (`attrs.url`, an `https://` address on an allowed host; or
+///   `attrs.kind` + `attrs.id`, a record of another module such as `catalog.product`, which must
+///   exist — public reads list it in `embeds`);
 /// - inline: `text` (with `marks`), `hardBreak`.
 ///
 /// The root is `{"type": "doc", "content": [...]}`.

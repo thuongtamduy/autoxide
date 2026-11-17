@@ -615,6 +615,7 @@ impl ContentService {
             }
         };
         self.check_media(tenant, entry, &info.media_ids, true, &mut problems).await?;
+        self.check_records(tenant, &info.records, &mut problems).await?;
         if problems.is_empty() { Ok(()) } else { Err(invalid(problems)) }
     }
 
