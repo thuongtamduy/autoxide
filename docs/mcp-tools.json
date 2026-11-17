@@ -1526,6 +1526,162 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the legal documents of the tenant (terms of use, privacy policy…) with their current version number.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "compliance.documents",
+      "output_schema": null,
+      "permissions": [
+        "compliance.documents.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the identity verification profiles of the tenant (results only, never document images or full numbers).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which profiles.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of profiles, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `in_review`, `info_requested`, `verified`, `rejected`, `expired` or `revoked`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "compliance.kyc_profiles",
+      "output_schema": null,
+      "permissions": [
+        "compliance.kyc.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "The legal documents you must accept (again) before going on.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "compliance.pending_acceptances",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Publish a new version (or a translation) of a legal document. A published version never changes. Draft texts with AI only as suggestions for a person to review.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A version to publish.",
+        "properties": {
+          "body": {
+            "description": "Full text. Have a legal professional review it first.",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "description": "e.g. `vi`.",
+            "type": "string"
+          },
+          "requires_reacceptance": {
+            "description": "Everyone must accept it again.",
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          },
+          "version": {
+            "description": "To add a translation of a version already published, its number.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "document_id",
+          "locale",
+          "title",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "compliance.publish_document_version",
+      "output_schema": null,
+      "permissions": [
+        "compliance.documents.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Your identity verification (KYC) status: `none`, `pending`, `in_review`, `info_requested`, `verified`, `rejected`, `expired` or `revoked`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "compliance.verification_status",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false

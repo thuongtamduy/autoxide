@@ -371,6 +371,7 @@ dependencies = [
  "autoxide-audit",
  "autoxide-auth",
  "autoxide-comments",
+ "autoxide-compliance",
  "autoxide-content",
  "autoxide-files",
  "autoxide-forms",
@@ -511,6 +512,26 @@ dependencies = [
  "chrono",
  "proptest",
  "pulldown-cmark",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-compliance"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
  "sea-orm",
  "serde",
  "serde_json",

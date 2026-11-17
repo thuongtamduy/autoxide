@@ -856,6 +856,251 @@ export type CommentsUnsubscribed = {
   unsubscribed: boolean;
 };
 
+/** An acceptance to record. */
+export type ComplianceAcceptRequest = {
+  /** `web` (default), `mobile_app`, `api`, `mcp` or `in_store`. */
+  channel?: string | null;
+  /** `checkbox` (default), `click_wrap` or `signature`. */
+  method?: string | null;
+  /** The version shown to the person. */
+  version_id: string;
+};
+
+/** Proof that a version was accepted. */
+export type ComplianceAcceptance = {
+  accepted_at: string;
+  channel: string;
+  document_id: string;
+  id: string;
+  method: string;
+  /** SHA-256 of the text accepted. */
+  sha256: string;
+  subject_id: string;
+  subject_kind: string;
+  version: number;
+  version_id: string;
+};
+
+/** How many accepted one version. */
+export type ComplianceAcceptanceCount = {
+  accepted: number;
+  version: number;
+};
+
+/** A consent, as it stands. */
+export type ComplianceConsent = {
+  channel: string;
+  granted_at?: string | null;
+  id: string;
+  purpose: string;
+  scope: string;
+  /** `granted` or `withdrawn`. */
+  state: string;
+  /** The email or phone number (`null` for a user, or after erasure). */
+  subject_value?: string | null;
+  withdrawn_at?: string | null;
+};
+
+/** A consent to give or withdraw. */
+export type ComplianceConsentRequest = {
+  channel?: string;
+  /** `true` to give consent, `false` to withdraw it. */
+  granted: boolean;
+  purpose: string;
+  scope?: string;
+  /** The sentence shown to you (required to give consent). */
+  text?: string | null;
+  /** Version of that sentence. */
+  text_version?: string | null;
+};
+
+/** A legal document of the tenant. */
+export type ComplianceDocument = {
+  /** `user`, `buyer` or `seller`. */
+  audience: string;
+  created_at: string;
+  current_version?: number | null;
+  id: string;
+  /**
+   * `terms_of_use`, `privacy_policy`, `general_conditions`, `platform_rules`, `seller_agreement`
+   * or `developer_agreement`.
+   */
+  kind: string;
+  title: string;
+  updated_at: string;
+  /** Every version and translation, newest first (only on `GET /documents/{id}`). */
+  versions?: ComplianceDocumentVersion[] | null;
+};
+
+/** A legal document to create. */
+export type ComplianceDocumentRequest = {
+  /** `user` (default), `buyer` or `seller`. */
+  audience?: string | null;
+  kind: string;
+  title: string;
+};
+
+/** A version of a legal document (never changes once published). */
+export type ComplianceDocumentVersion = {
+  body: string;
+  document_id: string;
+  effective_from: string;
+  id: string;
+  locale: string;
+  published_at: string;
+  /** People must accept this version again before going on. */
+  requires_reacceptance: boolean;
+  /** SHA-256 of title and body: proof of the exact text accepted. */
+  sha256: string;
+  title: string;
+  version: number;
+};
+
+/** Files for a manual review. */
+export type ComplianceKycDocumentsRequest = {
+  /** Ids of files uploaded with `POST /api/v1/files` (ID card, business registration), 1 to 10. */
+  file_ids: string[];
+};
+
+/** What more is needed. */
+export type ComplianceKycInfoRequest = {
+  /** Fields or documents to send again. */
+  fields: string[];
+  /** Message for the person, up to 1000 characters. */
+  message: string;
+};
+
+/** An identity verification (KYC) profile. */
+export type ComplianceKycProfile = {
+  assurance?: string | null;
+  created_at: string;
+  /** Files sent for a manual review. */
+  document_file_ids: string[];
+  document_kind?: string | null;
+  /** Last four characters of the document number (the number itself is never kept). */
+  document_last4?: string | null;
+  expires_at?: string | null;
+  id: string;
+  /** What the reviewer asked for (`needs_info`): `fields` and `message`. */
+  info_request?: Record<string, unknown> | null;
+  method?: string | null;
+  /** `individual`, `household_business` or `organization`. */
+  party_type: string;
+  provider?: string | null;
+  reason_code?: string | null;
+  /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
+  status: string;
+  subject_id: string;
+  /** `user`, `org`, `email` or `reference`. */
+  subject_kind: string;
+  updated_at: string;
+  verified_at?: string | null;
+  verified_name?: string | null;
+};
+
+/** A profile to open. */
+export type ComplianceKycProfileRequest = {
+  /** The unit (seller) to verify; default the tenant's root. Ignored for `POST /me/kyc`. */
+  org_id?: string | null;
+  /** `individual` (default), `household_business` or `organization`. */
+  party_type?: string | null;
+};
+
+/** Why a profile is refused or revoked. */
+export type ComplianceKycReasonRequest = {
+  /** Short code, e.g. `document_unreadable`, `name_mismatch`, `fraud_suspected`. */
+  reason_code: string;
+};
+
+/** A started verification: where the person goes next. */
+export type ComplianceKycSession = {
+  attempt_id: string;
+  expires_at?: string | null;
+  /**
+   * `redirect` (open `url`), `sdk` (start the mobile SDK with `token`) or `pending` (nothing to
+   * do; the result comes later).
+   */
+  kind: string;
+  profile_id: string;
+  token?: string | null;
+  url?: string | null;
+};
+
+/** A verification to start. */
+export type ComplianceKycSessionRequest = {
+  /** `vneid`, `ekyc` or `business_registry`; default the provider's first method. */
+  method?: string | null;
+  /** Page to come back to after the provider's steps. */
+  return_url?: string | null;
+};
+
+/** Your verification profile, or none yet. */
+export type ComplianceMyKyc = {
+  profile?: ComplianceKycProfile | null;
+  /** `none` when you have no profile yet. */
+  status: string;
+};
+
+/** A document you still have to accept. */
+export type CompliancePendingAcceptance = {
+  document_id: string;
+  kind: string;
+  title: string;
+  version: ComplianceDocumentVersion;
+};
+
+/** A compliance policy of the tenant. */
+export type CompliancePolicy = {
+  key: string;
+  updated_at: string;
+  /** Any JSON value, checked by the policy (see `PUT /policies/{key}`). */
+  value: unknown;
+};
+
+/** A policy value. */
+export type CompliancePolicyRequest = {
+  /** Any JSON value, checked by the policy (see `PUT /policies/{key}`). */
+  value: unknown;
+};
+
+/** A legal rule in force. */
+export type ComplianceRule = {
+  body: Record<string, unknown>;
+  effective_from: string;
+  effective_to?: string | null;
+  jurisdiction: string;
+  key: string;
+  legal_basis: string;
+  /** Check against the original text before relying on it. */
+  needs_legal_review: boolean;
+  version: number;
+};
+
+/** How many rules were new. */
+export type ComplianceRulesImported = {
+  imported: number;
+};
+
+/** Rules to import. */
+export type ComplianceRulesRequest = {
+  /** A rules pack in the format of `modules/compliance/rules/vn.json`. */
+  pack: Record<string, unknown>;
+};
+
+/** A version to publish. */
+export type ComplianceVersionRequest = {
+  /** Full text (Markdown or HTML as the interface shows it). Have a legal professional review it. */
+  body: string;
+  /** When it takes effect; default now. */
+  effective_from?: string | null;
+  locale: string;
+  /** Everyone must accept it again (the first version always must). */
+  requires_reacceptance?: boolean;
+  title: string;
+  /** To add a translation of a version already published, its number. */
+  version?: number | null;
+};
+
 /** The token of a confirmation link. */
 export type ConfirmBody = {
   /**
@@ -1678,6 +1923,158 @@ export type Data_CommentsUnsubscribed = {
   data: {
     /** Always `true`, even for an unknown or used token (nothing is revealed). */
     unsubscribed: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceAcceptance = {
+  /** Proof that a version was accepted. */
+  data: {
+    accepted_at: string;
+    channel: string;
+    document_id: string;
+    id: string;
+    method: string;
+    /** SHA-256 of the text accepted. */
+    sha256: string;
+    subject_id: string;
+    subject_kind: string;
+    version: number;
+    version_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceConsent = {
+  /** A consent, as it stands. */
+  data: {
+    channel: string;
+    granted_at?: string | null;
+    id: string;
+    purpose: string;
+    scope: string;
+    /** `granted` or `withdrawn`. */
+    state: string;
+    /** The email or phone number (`null` for a user, or after erasure). */
+    subject_value?: string | null;
+    withdrawn_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceDocument = {
+  /** A legal document of the tenant. */
+  data: {
+    /** `user`, `buyer` or `seller`. */
+    audience: string;
+    created_at: string;
+    current_version?: number | null;
+    id: string;
+    /**
+     * `terms_of_use`, `privacy_policy`, `general_conditions`, `platform_rules`, `seller_agreement`
+     * or `developer_agreement`.
+     */
+    kind: string;
+    title: string;
+    updated_at: string;
+    /** Every version and translation, newest first (only on `GET /documents/{id}`). */
+    versions?: ComplianceDocumentVersion[] | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceDocumentVersion = {
+  /** A version of a legal document (never changes once published). */
+  data: {
+    body: string;
+    document_id: string;
+    effective_from: string;
+    id: string;
+    locale: string;
+    published_at: string;
+    /** People must accept this version again before going on. */
+    requires_reacceptance: boolean;
+    /** SHA-256 of title and body: proof of the exact text accepted. */
+    sha256: string;
+    title: string;
+    version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceKycProfile = {
+  /** An identity verification (KYC) profile. */
+  data: {
+    assurance?: string | null;
+    created_at: string;
+    /** Files sent for a manual review. */
+    document_file_ids: string[];
+    document_kind?: string | null;
+    /** Last four characters of the document number (the number itself is never kept). */
+    document_last4?: string | null;
+    expires_at?: string | null;
+    id: string;
+    /** What the reviewer asked for (`needs_info`): `fields` and `message`. */
+    info_request?: Record<string, unknown> | null;
+    method?: string | null;
+    /** `individual`, `household_business` or `organization`. */
+    party_type: string;
+    provider?: string | null;
+    reason_code?: string | null;
+    /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
+    status: string;
+    subject_id: string;
+    /** `user`, `org`, `email` or `reference`. */
+    subject_kind: string;
+    updated_at: string;
+    verified_at?: string | null;
+    verified_name?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceKycSession = {
+  /** A started verification: where the person goes next. */
+  data: {
+    attempt_id: string;
+    expires_at?: string | null;
+    /**
+     * `redirect` (open `url`), `sdk` (start the mobile SDK with `token`) or `pending` (nothing to
+     * do; the result comes later).
+     */
+    kind: string;
+    profile_id: string;
+    token?: string | null;
+    url?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceMyKyc = {
+  /** Your verification profile, or none yet. */
+  data: {
+    profile?: ComplianceKycProfile | null;
+    /** `none` when you have no profile yet. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CompliancePolicy = {
+  /** A compliance policy of the tenant. */
+  data: {
+    key: string;
+    updated_at: string;
+    /** Any JSON value, checked by the policy (see `PUT /policies/{key}`). */
+    value: unknown;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceRulesImported = {
+  /** How many rules were new. */
+  data: {
+    imported: number;
   };
 };
 
@@ -4172,6 +4569,85 @@ export type Data_Vec_CommentCount = {
     target_id: string;
     /** Shown top-level comments only (e.g. the number of questions on a product tab). */
     thread_count: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ComplianceAcceptanceCount = {
+  data: {
+    accepted: number;
+    version: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ComplianceConsent = {
+  data: {
+    channel: string;
+    granted_at?: string | null;
+    id: string;
+    purpose: string;
+    scope: string;
+    /** `granted` or `withdrawn`. */
+    state: string;
+    /** The email or phone number (`null` for a user, or after erasure). */
+    subject_value?: string | null;
+    withdrawn_at?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ComplianceDocument = {
+  data: {
+    /** `user`, `buyer` or `seller`. */
+    audience: string;
+    created_at: string;
+    current_version?: number | null;
+    id: string;
+    /**
+     * `terms_of_use`, `privacy_policy`, `general_conditions`, `platform_rules`, `seller_agreement`
+     * or `developer_agreement`.
+     */
+    kind: string;
+    title: string;
+    updated_at: string;
+    /** Every version and translation, newest first (only on `GET /documents/{id}`). */
+    versions?: ComplianceDocumentVersion[] | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CompliancePendingAcceptance = {
+  data: {
+    document_id: string;
+    kind: string;
+    title: string;
+    version: ComplianceDocumentVersion;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CompliancePolicy = {
+  data: {
+    key: string;
+    updated_at: string;
+    /** Any JSON value, checked by the policy (see `PUT /policies/{key}`). */
+    value: unknown;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ComplianceRule = {
+  data: {
+    body: Record<string, unknown>;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    key: string;
+    legal_basis: string;
+    /** Check against the original text before relying on it. */
+    needs_legal_review: boolean;
+    version: number;
   }[];
 };
 
@@ -7200,6 +7676,57 @@ export type Page_CommentTarget = {
     title?: string | null;
     /** Public path of the target (without the domain), like `title`. */
     url?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceAcceptance = {
+  /** The items of this page, in the requested order. */
+  data: {
+    accepted_at: string;
+    channel: string;
+    document_id: string;
+    id: string;
+    method: string;
+    /** SHA-256 of the text accepted. */
+    sha256: string;
+    subject_id: string;
+    subject_kind: string;
+    version: number;
+    version_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ComplianceKycProfile = {
+  /** The items of this page, in the requested order. */
+  data: {
+    assurance?: string | null;
+    created_at: string;
+    /** Files sent for a manual review. */
+    document_file_ids: string[];
+    document_kind?: string | null;
+    /** Last four characters of the document number (the number itself is never kept). */
+    document_last4?: string | null;
+    expires_at?: string | null;
+    id: string;
+    /** What the reviewer asked for (`needs_info`): `fields` and `message`. */
+    info_request?: Record<string, unknown> | null;
+    method?: string | null;
+    /** `individual`, `household_business` or `organization`. */
+    party_type: string;
+    provider?: string | null;
+    reason_code?: string | null;
+    /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
+    status: string;
+    subject_id: string;
+    /** `user`, `org`, `email` or `reference`. */
+    subject_kind: string;
+    updated_at: string;
+    verified_at?: string | null;
+    verified_name?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -12962,6 +13489,394 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/documents": {
+    /** List the legal documents of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ComplianceDocument;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a legal document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceDocumentRequest;
+      responses: {
+        201: Data_ComplianceDocument;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/documents/{id}": {
+    /** Get a legal document with its versions. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/documents/{id}/acceptance-stats": {
+    /** Count acceptances per version of a document. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_ComplianceAcceptanceCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/documents/{id}/acceptances": {
+    /** List who accepted a document. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceAcceptance;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/documents/{id}/versions": {
+    /** Publish a new version (or a translation) of a legal document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceVersionRequest;
+      responses: {
+        201: Data_ComplianceDocumentVersion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/callbacks/{provider}": {
+    /** Receive a result from the identity provider. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { provider: string }; };
+      requestBody: string;
+      responses: {
+        204: void;
+        401: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles": {
+    /** List identity verification profiles. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Open the identity verification profile of a unit (a seller). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceKycProfileRequest;
+      responses: {
+        201: Data_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles/{id}": {
+    /** Get an identity verification profile. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles/{id}/approve": {
+    /** Approve a profile. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles/{id}/documents": {
+    /** Send documents for a manual review. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceKycDocumentsRequest;
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles/{id}/reject": {
+    /** Refuse a profile. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceKycReasonRequest;
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles/{id}/request-info": {
+    /** Ask for more information. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceKycInfoRequest;
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles/{id}/revoke": {
+    /** Revoke a verified profile. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceKycReasonRequest;
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles/{id}/sessions": {
+    /** Start a verification of a unit's profile with the provider. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceKycSessionRequest;
+      responses: {
+        200: Data_ComplianceKycSession;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/acceptances": {
+    /** Accept a version of a legal document. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceAcceptRequest;
+      responses: {
+        200: Data_ComplianceAcceptance;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/consents": {
+    /** List your consents. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ComplianceConsent;
+        401: Problem;
+        default: Problem;
+      };
+    };
+    /** Give or withdraw a consent. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceConsentRequest;
+      responses: {
+        200: Data_ComplianceConsent;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/kyc": {
+    /** Get your identity verification. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_ComplianceMyKyc;
+        401: Problem;
+        default: Problem;
+      };
+    };
+    /** Open your identity verification profile. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceKycProfileRequest;
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/kyc/documents": {
+    /** Send your documents for a manual review. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceKycDocumentsRequest;
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/kyc/sessions": {
+    /** Start verifying your identity with the provider. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceKycSessionRequest;
+      responses: {
+        200: Data_ComplianceKycSession;
+        401: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/me/pending-acceptances": {
+    /** List the legal documents you must accept (again). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CompliancePendingAcceptance;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/policies": {
+    /** List the compliance policies set by the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CompliancePolicy;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/policies/{key}": {
+    /** Set a compliance policy. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: CompliancePolicyRequest;
+      responses: {
+        200: Data_CompliancePolicy;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/public/documents/{kind}": {
+    /** Get the current text of a legal document. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string }; query: { locale?: string }; };
+      responses: {
+        200: Data_ComplianceDocumentVersion;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/rules": {
+    /** List the legal rules (every version). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ComplianceRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Import legal rules. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ComplianceRulesRequest;
+      responses: {
+        200: Data_ComplianceRulesImported;
+        401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };

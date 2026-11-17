@@ -11,6 +11,17 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `compliance` (step 37): identity verification (KYC) through a provider (`IdentityVerifier`, callbacks
+  checked by signature, processed in the background) or by manual review (signed-in reviewers only); duplicate
+  documents wait for review; only the result, the provider reference, the verified name and the last four digits are
+  kept. Legal rules are dated data (bundled `vn` pack, imported by platform staff with `POST /api/v1/compliance/rules`);
+  selling, livestreaming and affiliate marketing require a verified identity from 1 July 2026. Versioned legal documents
+  with translations, a SHA-256 of each text and proof of acceptance (`/api/v1/compliance/documents`,
+  `/me/pending-acceptances`, `/me/acceptances`, public `GET /public/documents/{kind}`); a consent ledger per purpose
+  (`/me/consents`). Other modules use it through `KycGate`, `AcceptanceGate`, `ConsentLedger` and `ComplianceRules`.
+  New setting `AUTOXIDE_COMPLIANCE_KYC_CALLBACK_RETENTION_DAYS`. The legal bases are recorded but must be checked
+  against the original texts by a legal professional.
+
 - Subscription billing (step 35): each billing period becomes an invoice the operator issues to the tenant
   (numbered with no gaps, taxes computed — `AUTOXIDE_PLANS_TAX_CATEGORY`, booked in the operator's ledger); tenants
   pay online with `POST /api/v1/plans/billing-periods/{id}/pay` (the operator's payment partner, checkout page

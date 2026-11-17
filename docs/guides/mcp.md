@@ -102,6 +102,11 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `comments.queue` | `comments.read` | read-only |
 | `comments.set_target_state` | `comments.manage` | writes |
 | `comments.unanswered` | `comments.read` | read-only |
+| `compliance.documents` | `compliance.documents.read` | read-only |
+| `compliance.kyc_profiles` | `compliance.kyc.read` | read-only |
+| `compliance.pending_acceptances` | — | read-only |
+| `compliance.publish_document_version` | `compliance.documents.manage` | writes |
+| `compliance.verification_status` | — | read-only |
 | `content.create_draft` | `content.write` or `content.write_own` | writes |
 | `content.get` | `content.read` | read-only |
 | `content.get_translation_request` | `content.read` or `content.write_own` | read-only |

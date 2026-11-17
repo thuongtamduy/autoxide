@@ -151,9 +151,11 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 Thiết kế: trụ 5 và mục 4 (đăng ký Bộ Công Thương). Bắt đầu SAU bước 34. Mỗi mục ghi căn cứ pháp lý
 trong quyết định của nó; quy định hay đổi để dạng dữ liệu có ngày hiệu lực.
 
-- [ ] Định danh (KYC): hồ sơ cá nhân / tổ chức, `IdentityVerifier` (VNeID qua nhà cung cấp, eKYC), trạng thái,
+- [x] Định danh (KYC): hồ sơ cá nhân / tổ chức, `IdentityVerifier` (VNeID qua nhà cung cấp, eKYC), trạng thái,
       hạn, `needs_info`, lưu tối thiểu (kết quả, mã tham chiếu; hạn chế ảnh giấy tờ, sinh trắc học); người bán,
       livestream, tiếp thị liên kết chưa xác thực bị chặn bán / phát (Luật TMĐT 122/2025 Điều 17, từ 01/7/2026)
+      — module `compliance` (D-347): `dyn KycGate`, quy tắc `kyc.required_activities` là dữ liệu có ngày hiệu lực;
+      nhà cung cấp thật (VNeID / eKYC) là module riêng cắm `IdentityVerifier`, hiện chỉ có bản giả
 - [ ] Hồ sơ pháp lý website và logo Bộ Công Thương: hồ sơ chủ sở hữu theo khách và theo người bán; loại website
       theo tên miền (bán hàng → thông báo, logo xanh; sàn / trung gian → đăng ký, logo đỏ); danh sách kiểm là dữ
       liệu có phiên bản, API và `autoxide doctor` báo thứ còn thiếu
@@ -172,9 +174,12 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [ ] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn lưu theo
       loại dữ liệu; nơi lưu theo khách (chọn lưu tại VN); sự cố có mốc 72 giờ từ khi phát hiện trong sổ tay vận
       hành, kèm bản nháp thông báo; sổ yêu cầu của chủ thể qua kênh khác, hạn là dữ liệu (D-217, cần đối chiếu)
-- [ ] Văn bản pháp lý có phiên bản (D-190; Luật Giao dịch điện tử 20/2023): điều khoản, chính sách dữ liệu cá
+      — đã có: sổ đồng ý theo mục đích `dyn ConsentLedger` (D-347); còn: căn cứ xử lý, thời hạn lưu, nơi lưu, sự
+      cố, yêu cầu của chủ thể
+- [x] Văn bản pháp lý có phiên bản (D-190; Luật Giao dịch điện tử 20/2023): điều khoản, chính sách dữ liệu cá
       nhân, quy chế sàn, hợp đồng người bán, điều kiện giao dịch chung — số phiên bản, ngày hiệu lực; ai chấp
-      nhận bản nào, lúc nào, kênh nào; chấp nhận lại khi cần; số người chấp nhận theo phiên bản
+      nhận bản nào, lúc nào, kênh nào; chấp nhận lại khi cần; số người chấp nhận theo phiên bản — `compliance`
+      (D-347): bản đã đăng không đổi, SHA-256 của bản chấp nhận, `dyn AcceptanceGate`
 - [ ] Bảo vệ người tiêu dùng (D-190; Luật 19/2023/QH15 + NĐ 55/2024, từ 01/7/2024): nền tảng không chặn, không
       ẩn đánh giá trái quy định; minh bạch điều kiện giao dịch chung; kênh tiếp nhận và hạn xử lý khiếu nại của
       người tiêu dùng — cần đối chiếu văn bản gốc từng điều
