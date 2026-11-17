@@ -27,6 +27,8 @@ pub(crate) struct PublicView {
     pub translations: Vec<(String, String)>,
     pub terms: Vec<TermRef>,
     pub authors: Vec<AuthorRef>,
+    /// Bản ghi nhúng (`<kind>:<id>` → đối tượng) còn công khai, theo ngôn ngữ của bài (bước 51 P6).
+    pub embeds: BTreeMap<String, autoxide_kernel::resource::Resource>,
 }
 
 impl ContentService {
@@ -94,6 +96,30 @@ impl ContentService {
             &rows,
         )
         .await?;
+        // Bản ghi nhúng: mỗi (ngôn ngữ, loại) một lần tra; chỉ giữ đối tượng còn công khai.
+        let body_records: Vec<Vec<(String, String)>> =
+            rows.iter().map(|row| crate::entries::body::stored_records(&row.body)).collect();
+        let mut wanted_records: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+        for (row, records) in rows.iter().zip(&body_records) {
+            for (kind, id) in records {
+                wanted_records
+                    .entry((row.locale.clone(), kind.clone()))
+                    .or_default()
+                    .insert(id.clone());
+            }
+        }
+        let mut objects: HashMap<(String, String, String), autoxide_kernel::resource::Resource> =
+            HashMap::new();
+        for ((locale, kind), ids) in wanted_records {
+            if !self.resources.knows(&kind) {
+                continue;
+            }
+            let ids: Vec<String> = ids.into_iter().collect();
+            let found = self.resources.resolve_many(tenant, &kind, &ids, Some(&locale)).await?;
+            for (id, resource) in found.into_iter().filter(|(_, resource)| resource.public) {
+                objects.insert((locale.clone(), kind.clone(), id), resource);
+            }
+        }
         for author in authors.values_mut().flatten() {
             if author.avatar_media_id.is_some_and(|id| !public.contains(&id)) {
                 author.avatar_media_id = None;
@@ -102,7 +128,16 @@ impl ContentService {
         Ok(rows
             .into_iter()
             .zip(body_images)
-            .map(|(row, images)| {
+            .zip(body_records)
+            .map(|((row, images), records)| {
+                let embeds = records
+                    .into_iter()
+                    .filter_map(|(kind, id)| {
+                        let resource =
+                            objects.get(&(row.locale.clone(), kind.clone(), id.clone()))?.clone();
+                        Some((format!("{kind}:{id}"), resource))
+                    })
+                    .collect();
                 let translations = siblings
                     .iter()
                     .filter(|other| {
@@ -119,6 +154,7 @@ impl ContentService {
                     translations,
                     terms: terms.remove(&row.entry_id).unwrap_or_default(),
                     authors: authors.remove(&row.entry_id).unwrap_or_default(),
+                    embeds,
                     row,
                 }
             })

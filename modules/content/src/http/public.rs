@@ -155,11 +155,45 @@ pub(crate) struct PublicEntryResponse {
     /// A person reviewed the AI-generated content and took editorial responsibility when it
     /// was published. Always `false` when `ai_generated` is `false`.
     ai_reviewed: bool,
+    /// Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
+    /// product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
+    /// (any more) is left out: skip its node. Prices and stock are not here — read them from the
+    /// owning module's public API, so they are always current.
+    embeds: std::collections::BTreeMap<String, PublicEmbed>,
+}
+
+/// A record of another module embedded in an entry.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct PublicEmbed {
+    #[schema(example = "catalog.product")]
+    kind: String,
+    id: String,
+    title: String,
+    summary: String,
+    /// Public path of the record, without domain.
+    url: Option<String>,
+    /// Representative image: the id of a public media item (its file: `GET /api/v1/media/{id}/content`).
+    image: Option<Uuid>,
 }
 
 pub(crate) fn public_entry(view: PublicView) -> PublicEntryResponse {
-    let PublicView { row, featured, og, body_media, translations, terms, authors } = view;
+    let PublicView { row, featured, og, body_media, translations, terms, authors, embeds } = view;
     PublicEntryResponse {
+        embeds: embeds
+            .into_iter()
+            .map(|(key, resource)| {
+                let (kind, id) = key.split_once(':').unwrap_or((key.as_str(), ""));
+                let embed = PublicEmbed {
+                    kind: kind.to_owned(),
+                    id: id.to_owned(),
+                    title: resource.title,
+                    summary: resource.summary,
+                    url: resource.url,
+                    image: resource.image,
+                };
+                (key, embed)
+            })
+            .collect(),
         featured_media: media(featured, &row.featured_media_alt),
         body_media: body_media.into_iter().filter_map(|item| media(Some(item), "")).collect(),
         seo: PublicSeo {

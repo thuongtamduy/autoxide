@@ -707,7 +707,45 @@ impl ContentService {
             candidate.title, candidate.excerpt, info.plain_text
         ));
         candidate.plain_text = info.plain_text;
-        self.check_media(tenant, candidate, &info.media_ids, false, problems).await
+        self.check_media(tenant, candidate, &info.media_ids, false, problems).await?;
+        self.check_records(tenant, &info.records, problems).await
+    }
+
+    /// Bản ghi nhúng trong bài (bước 51 P6): loại phải có module đăng ký trong sổ đối tượng
+    /// (D-123) và bản ghi phải có thật. Không đòi công khai lúc lưu: đọc công khai tự bỏ bản ghi
+    /// chưa (hay không còn) công khai. Tra theo lô, mỗi loại một lần, ngoài transaction.
+    pub(crate) async fn check_records(
+        &self,
+        tenant: &TenantContext,
+        records: &BTreeSet<(String, String)>,
+        problems: &mut Vec<FieldError>,
+    ) -> Result<(), Error> {
+        let mut by_kind: std::collections::BTreeMap<&str, Vec<String>> = Default::default();
+        for (kind, id) in records {
+            by_kind.entry(kind.as_str()).or_default().push(id.clone());
+        }
+        for (kind, ids) in by_kind {
+            if !self.resources.knows(kind) {
+                problems.push(
+                    FieldError::new(
+                        "body",
+                        "embed_kind_unknown",
+                        "no installed module provides records of type `{kind}`",
+                    )
+                    .with_param("kind", kind),
+                );
+                continue;
+            }
+            let found = self.resources.resolve_many(tenant, kind, &ids, None).await?;
+            for id in ids.iter().filter(|id| !found.contains_key(*id)) {
+                problems.push(
+                    FieldError::new("body", "embed_not_found", "there is no `{kind}` `{id}`")
+                        .with_param("kind", kind)
+                        .with_param("id", id),
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Ảnh mục dùng (ảnh đại diện, ảnh chia sẻ, ảnh trong bài) có tồn tại — và, khi

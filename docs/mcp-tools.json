@@ -2325,7 +2325,7 @@
             ]
           },
           "body": {
-            "description": "The body: a ProseMirror / Tiptap JSON document, e.g. `{\"type\": \"doc\", \"content\":\n[{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Hello\"}]}]}`. Allowed\nnodes: paragraph, heading (level 2–4), bulletList, orderedList, listItem, blockquote,\ncodeBlock, horizontalRule, hardBreak, table, tableRow, tableHeader, tableCell,\nimage (attrs `mediaId`, `alt`, `caption`), embed (attrs `url`), text; marks: bold,\nitalic, code, strike, underline, link (attrs `href`).",
+            "description": "The body: a ProseMirror / Tiptap JSON document, e.g. `{\"type\": \"doc\", \"content\":\n[{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Hello\"}]}]}`. Allowed\nnodes: paragraph, heading (level 2–4), bulletList, orderedList, listItem, blockquote,\ncodeBlock, horizontalRule, hardBreak, table, tableRow, tableHeader, tableCell,\nimage (attrs `mediaId`, `alt`, `caption`), embed (attrs `url`, or `kind` + `id` of a\nrecord of another module), text; marks: bold,\nitalic, code, strike, underline, link (attrs `href`).",
             "type": [
               "object",
               "null"

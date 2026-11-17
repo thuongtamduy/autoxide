@@ -1042,7 +1042,7 @@
         "type": "object"
       },
       "BodyNode": {
-        "description": "A node of a body, in the ProseMirror / Tiptap JSON shape. The server accepts only these\n`type`s (anything else is refused):\n\n- blocks: `paragraph`, `heading` (`attrs.level` 2–4), `bulletList`, `orderedList`\n  (`attrs.start`), `listItem`, `blockquote`, `codeBlock` (`attrs.language`; plain\n  `text` only), `horizontalRule`, `image` (`attrs.mediaId` — a media item id — `alt`,\n  `caption`; no `src`), `table`, `tableRow`, `tableHeader`, `tableCell` (`attrs.colspan`,\n  `rowspan`, `colwidth`), `embed` (`attrs.url`, an `https://` address on an allowed host);\n- inline: `text` (with `marks`), `hardBreak`.\n\nThe root is `{\"type\": \"doc\", \"content\": [...]}`.",
+        "description": "A node of a body, in the ProseMirror / Tiptap JSON shape. The server accepts only these\n`type`s (anything else is refused):\n\n- blocks: `paragraph`, `heading` (`attrs.level` 2–4), `bulletList`, `orderedList`\n  (`attrs.start`), `listItem`, `blockquote`, `codeBlock` (`attrs.language`; plain\n  `text` only), `horizontalRule`, `image` (`attrs.mediaId` — a media item id — `alt`,\n  `caption`; no `src`), `table`, `tableRow`, `tableHeader`, `tableCell` (`attrs.colspan`,\n  `rowspan`, `colwidth`), `embed` (`attrs.url`, an `https://` address on an allowed host; or\n  `attrs.kind` + `attrs.id`, a record of another module such as `catalog.product`, which must\n  exist — public reads list it in `embeds`);\n- inline: `text` (with `marks`), `hardBreak`.\n\nThe root is `{\"type\": \"doc\", \"content\": [...]}`.",
         "properties": {
           "attrs": {
             "additionalProperties": {},
@@ -15146,6 +15146,16 @@
                   "format": "date-time",
                   "type": "string"
                 },
+                "embeds": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/PublicEmbed"
+                  },
+                  "description": "Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a\nproduct), keyed by `<kind>:<id>`, in the entry's language. A record that is not public\n(any more) is left out: skip its node. Prices and stock are not here — read them from the\nowning module's public API, so they are always current.",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
                 "excerpt": {
                   "type": "string"
                 },
@@ -15249,7 +15259,8 @@
                 "terms",
                 "authors",
                 "ai_generated",
-                "ai_reviewed"
+                "ai_reviewed",
+                "embeds"
               ],
               "type": "object"
             },
@@ -27390,6 +27401,16 @@
                   "format": "date-time",
                   "type": "string"
                 },
+                "embeds": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/PublicEmbed"
+                  },
+                  "description": "Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a\nproduct), keyed by `<kind>:<id>`, in the entry's language. A record that is not public\n(any more) is left out: skip its node. Prices and stock are not here — read them from the\nowning module's public API, so they are always current.",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
                 "excerpt": {
                   "type": "string"
                 },
@@ -27493,7 +27514,8 @@
                 "terms",
                 "authors",
                 "ai_generated",
-                "ai_reviewed"
+                "ai_reviewed",
+                "embeds"
               ],
               "type": "object"
             },
@@ -30773,6 +30795,46 @@
         ],
         "type": "object"
       },
+      "PublicEmbed": {
+        "description": "A record of another module embedded in an entry.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "image": {
+            "description": "Representative image: the id of a public media item (its file: `GET /api/v1/media/{id}/content`).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "example": "catalog.product",
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "description": "Public path of the record, without domain.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "title",
+          "summary"
+        ],
+        "type": "object"
+      },
       "PublicEntryResponse": {
         "description": "A published post or page, as readers see it.",
         "properties": {
@@ -30809,6 +30871,16 @@
             "description": "Last change of the published content (sitemap `lastmod`, feed `updated`).",
             "format": "date-time",
             "type": "string"
+          },
+          "embeds": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PublicEmbed"
+            },
+            "description": "Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a\nproduct), keyed by `<kind>:<id>`, in the entry's language. A record that is not public\n(any more) is left out: skip its node. Prices and stock are not here — read them from the\nowning module's public API, so they are always current.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
           },
           "excerpt": {
             "type": "string"
@@ -30913,7 +30985,8 @@
           "terms",
           "authors",
           "ai_generated",
-          "ai_reviewed"
+          "ai_reviewed",
+          "embeds"
         ],
         "type": "object"
       },
