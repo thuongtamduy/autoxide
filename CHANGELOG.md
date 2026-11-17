@@ -11,6 +11,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `GET /api/v1/organizations/public/site`: the public profile of the website being visited — the unit its domain is
+  bound to (or `?site=`), else the whole tenant — so a store's own domain shows the store, not the head office.
 - Plans can cap organization units per unit type: `"organizations.units.store": 2` next to the overall
   `organizations.units`. Modules declare such limits with `Limit::per` and reserve parts with
   `reserve_part` / `confirm_part` / `release_part`; `GET /api/v1/kernel/modules` shows `parts`, and

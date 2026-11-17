@@ -77,7 +77,8 @@ impl Site {
     }
 }
 
-fn site_not_found(org: OrgId) -> Error {
+/// `site_not_found` (404): khách không có nút `org` (module trả cùng mã khi nút không dùng được).
+pub fn site_not_found(org: OrgId) -> Error {
     Error::not_found(
         "site_not_found",
         "There is no website (organization unit) `{site}` in this tenant. Leave `site` out for the \

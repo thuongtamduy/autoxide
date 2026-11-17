@@ -98,6 +98,8 @@ impl Module for OrganizationsModule {
         let service = Arc::new(service);
         context.resource_type(profile::STORE, Arc::new(profile::StoreResolver))?;
         self.service = Some(service.clone());
+        // Kernel hỏi "nút này có thuộc khách không" (gắn tên miền với một cửa hàng…).
+        context.provide::<dyn autoxide_kernel::tenancy::OrgNodes>(service.clone())?;
         context.provide::<dyn api::OrgDirectory>(service)
     }
 

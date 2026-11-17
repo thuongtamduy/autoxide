@@ -418,6 +418,46 @@ impl OrgService {
     }
 
     /// Các nút công khai của khách đang hoạt động, theo thứ tự khách đặt rồi theo tên (đọc công khai).
+    /// Hồ sơ công khai của website `site` (nút của tên miền đang gọi, hay nút gốc): ai cũng đọc được.
+    /// Nút không còn hoạt động → `site_not_found` như nút không có.
+    pub(crate) async fn site_profile(
+        &self,
+        tenant: &TenantContext,
+        site: &autoxide_kernel::tenancy::Site,
+    ) -> Result<Profile, Error> {
+        let id = site.org().as_uuid();
+        let read = tenant.database().read();
+        let unit = unit::Entity::find_by_id(id).scoped(tenant).one(read).await?;
+        let unit = match unit {
+            Some(unit) if unit.status == "active" => unit,
+            // Khách chưa từng mở cây tổ chức: chưa có dòng của nút gốc — trả tên khách, không ghi gì
+            // (request công khai, khách có thể đang chỉ đọc).
+            None if site.is_whole() => {
+                return Ok(Profile {
+                    unit_id: id,
+                    unit_type: crate::service::ROOT_TYPE.to_owned(),
+                    public: false,
+                    position: 0,
+                    display_name: tenant.name().to_owned(),
+                    address: None,
+                    opening_hours: Vec::new(),
+                    special_days: Vec::new(),
+                    pickup: false,
+                    cover_media_id: None,
+                    updated_at: None,
+                });
+            }
+            _ => {
+                return Err(autoxide_kernel::tenancy::site_not_found(site.org()));
+            }
+        };
+        let row = entity::Entity::find_by_id((tenant.id().as_uuid(), id))
+            .scoped(tenant)
+            .one(read)
+            .await?;
+        Ok(profile_of(&unit, row.as_ref()))
+    }
+
     pub(crate) async fn public_stores(
         &self,
         tenant: &TenantContext,

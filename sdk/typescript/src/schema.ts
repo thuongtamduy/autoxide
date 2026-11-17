@@ -12976,6 +12976,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/organizations/public/site": {
+    /** Get the profile of the website being visited. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string }; };
+      responses: {
+        200: Data_PublicProfileResponse;
+        400: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/organizations/public/stores": {
     /** List the stores of this tenant shown on its websites. */
     get: {

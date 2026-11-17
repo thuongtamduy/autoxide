@@ -8049,3 +8049,22 @@ Quyết định:
    bản ghi hay đã có dòng lượng dùng. `organizations` đếm bằng một câu `GROUP BY unit_type`.
 5. API: `GET /api/v1/kernel/modules` thêm `parts` cho hạn mức; `GET /api/v1/plans/entitlements` liệt kê dòng của từng phần
    gói đặt mức hay khách đang dùng. Chỉ thêm trường, không phá vỡ.
+
+## D-331 · Hồ sơ của website đang được gọi; `organizations` công bố `OrgNodes` — 2026-11-17 — agent quyết
+
+Bối cảnh: giao diện (`docs/prompts/web-build-api-gaps.md`) không biết tên miền đang mở là website của nút nào, nên tên
+miền gắn với cửa hàng con vẫn hiện tên của trụ sở. Khi làm thì thấy thêm hai lỗi: `organizations` chưa công bố
+`dyn OrgNodes` (D-305 dựa vào nó), nên `PATCH /kernel/domains/{id}` với `org_id` luôn trả `unsupported`; và gắn nút xong
+cache tên miền → (khách, nút) của sổ database vẫn giữ nút cũ tới khi hết hạn.
+
+Quyết định:
+
+1. `GET /api/v1/organizations/public/site` (công khai, tham số `site` tuỳ chọn): hồ sơ công khai của nút website theo
+   extractor `Site` của kernel — tên miền gắn nút → nút đó; `?site=` → nút đó; không có → nút gốc. Khách chưa mở cây tổ
+   chức: trả hồ sơ mang tên khách, không ghi gì (request công khai, khách có thể đang chỉ đọc). Nút không có hay không
+   hoạt động → `site_not_found`.
+2. `organizations` công bố `dyn OrgNodes`: nút có trong cây của khách và chưa lưu trữ.
+3. `TenantDomains::assign_org` quên dòng cache của tên miền (máy khác thấy khi cache hết hạn).
+4. Thông tin pháp lý và logo Bộ Công Thương không thêm vào hồ sơ công khai: thuộc `compliance` (bước 37,
+   `GET /public/owner`, `/public/badge`); logo thương hiệu thuộc dòng "Thông tin cửa hàng công khai" (bước 68) — không
+   lưu hai chỗ.

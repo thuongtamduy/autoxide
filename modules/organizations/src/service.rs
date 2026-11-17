@@ -942,6 +942,19 @@ fn unit_reference(id: Uuid) -> String {
 }
 
 /// Bộ đếm thật cho job đối soát của `plans`: số nút không lưu trữ, trừ gốc.
+/// Phần hẹp kernel cần về cây tổ chức (`OrgNodes`): vd gắn tên miền với một cửa hàng. Nút lưu trữ
+/// không còn dùng được.
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::OrgNodes for OrgService {
+    async fn has_node(&self, tenant: &TenantContext, org: OrgId) -> Result<bool, Error> {
+        let found = unit::Entity::find_by_id(org.as_uuid())
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
+        Ok(found.is_some_and(|unit| unit.status != UnitStatus::Archived.as_str()))
+    }
+}
+
 pub(crate) struct UnitCounter;
 
 #[async_trait::async_trait]
