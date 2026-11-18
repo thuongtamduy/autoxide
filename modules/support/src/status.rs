@@ -120,6 +120,12 @@ vocabulary! {
     }
 }
 
+impl Priority {
+    /// Mọi mức, thấp tới cao.
+    pub(crate) const ORDER: [Priority; 4] =
+        [Priority::Low, Priority::Normal, Priority::High, Priority::Urgent];
+}
+
 /// Kiểm bước `from` → `to`. Bước giữ nguyên trạng thái luôn hợp lệ (gọi lại không lỗi), trừ phiếu
 /// đã đóng.
 pub(crate) fn transition(from: Status, to: Status) -> Result<(), Error> {

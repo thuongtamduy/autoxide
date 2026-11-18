@@ -10,7 +10,8 @@ use crate::service::InventoryService;
 
 pub(crate) mod dto;
 pub(crate) mod levels;
+pub(crate) mod reservations;
 
 pub(crate) fn routes(service: Arc<InventoryService>) -> OpenApiRouter {
-    OpenApiRouter::new().merge(levels::routes(service))
+    OpenApiRouter::new().merge(levels::routes(service.clone())).merge(reservations::routes(service))
 }

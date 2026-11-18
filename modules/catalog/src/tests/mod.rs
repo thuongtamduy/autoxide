@@ -2,6 +2,7 @@
 //! như binary bằng `TestApp` của testkit; gọi qua REST, MCP và `dyn Catalog`.
 
 mod categories;
+mod changes;
 mod pricing;
 mod products;
 mod readiness;

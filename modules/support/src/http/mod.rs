@@ -3,6 +3,7 @@
 //! khoản (`/me/…`, chỉ phiếu của mình), khách vãng lai (`/public/…`, bằng token phiếu).
 
 mod me;
+mod policy;
 mod public;
 mod settings;
 mod staff;
@@ -34,5 +35,7 @@ pub(crate) fn routes(service: Arc<SupportService>) -> OpenApiRouter {
         .routes(routes!(settings::set_member, settings::remove_member))
         .routes(routes!(settings::list_rules, settings::create_rule))
         .routes(routes!(settings::delete_rule))
+        .routes(routes!(policy::get_policy, policy::set_policy, policy::reset_policy))
+        .routes(routes!(policy::report_summary))
         .with_state(service)
 }

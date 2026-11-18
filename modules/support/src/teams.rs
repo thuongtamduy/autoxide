@@ -438,7 +438,7 @@ impl SupportService {
         let mut problems = Vec::new();
         let category = input.category.map(|category| category.trim().to_owned());
         if let Some(category) = &category
-            && !self.category_known(tenant, category).await?
+            && !self.category_known(tenant, input.org_id, category).await?
         {
             problems.push(crate::tickets::category_unknown());
         }

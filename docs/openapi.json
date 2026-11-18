@@ -2964,6 +2964,51 @@
         ],
         "type": "object"
       },
+      "CatalogCreatePriceChange": {
+        "additionalProperties": false,
+        "description": "A new bulk price change.",
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/CatalogPriceChangeFilter"
+          },
+          "operation": {
+            "description": "`set` (the new price is `value`), `percent` (`value` in basis points, signed: `-1000` =\n10% off) or `amount` (`value` minor units added, signed).",
+            "type": "string"
+          },
+          "rounding_rule_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "valid_from": {
+            "description": "When the new prices start; omitted: now. A future time schedules them.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "valid_to": {
+            "description": "End of a temporary change.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "operation",
+          "value"
+        ],
+        "type": "object"
+      },
       "CatalogCreatePriceGuard": {
         "additionalProperties": false,
         "description": "A new price floor.",
@@ -3021,6 +3066,19 @@
         "additionalProperties": false,
         "description": "A new price list.",
         "properties": {
+          "adjust_bp": {
+            "description": "Adjustment of a derived list in basis points, signed (`-1500` = 15% off), -10000 to 100000.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "adjust_minor": {
+            "description": "Amount added after the percentage, in minor units, signed.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "audience": {
             "description": "`consumer` (default) or `business`.",
             "type": "string"
@@ -3032,6 +3090,14 @@
           },
           "customer_group": {
             "description": "Only for this customer group (a free code until customer groups exist, step 47).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "derived_from": {
+            "description": "Make a derived list: its prices are written from this source list (which cannot itself be\nderived; `catalog.derived_chain`), adjusted and rounded. Same currency as the source.",
+            "format": "uuid",
             "type": [
               "string",
               "null"
@@ -3053,6 +3119,14 @@
             "description": "Higher wins among lists that tie on unit and filters. Default 0.",
             "format": "int32",
             "type": "integer"
+          },
+          "rounding_rule_id": {
+            "description": "Rounding rule of a derived list (`GET /rounding-rules`).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "tax_inclusive": {
             "description": "Prices include tax; consumer prices in Viet Nam must.",
@@ -3297,6 +3371,39 @@
         ],
         "type": "object"
       },
+      "CatalogCreateRoundingRule": {
+        "additionalProperties": false,
+        "description": "A new rounding rule.",
+        "properties": {
+          "ending_minor": {
+            "description": "Ending in minor units, 0 or more and below `step_minor`, e.g. `9000`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mode": {
+            "description": "`up`, `down` or `nearest`.",
+            "type": "string"
+          },
+          "name": {
+            "example": "Ends in 9,000",
+            "type": "string"
+          },
+          "step_minor": {
+            "description": "Step in minor units, above 0, e.g. `10000`.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "step_minor",
+          "mode"
+        ],
+        "type": "object"
+      },
       "CatalogFloorAction": {
         "description": "What to do with a price below the floor: `warn` (saved, with a warning) or `block`.",
         "enum": [
@@ -3469,6 +3576,129 @@
         ],
         "type": "object"
       },
+      "CatalogPriceChange": {
+        "description": "A bulk price change.",
+        "properties": {
+          "affected": {
+            "description": "Variants changed (known after the preview).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "approved_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "filter": {
+            "$ref": "#/components/schemas/CatalogPriceChangeFilter"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "operation": {
+            "description": "`set`, `percent` or `amount`.",
+            "type": "string"
+          },
+          "preview": {
+            "description": "The preview: `samples` (up to 20 rows of `variant_id`, `before`, `after`), `floor_violations`,\n`blocked` and `warned` counts. Prices below a `block` floor are not written.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "price_list_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rounding_rule_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft`, `previewed`, `approved`, `applied` or `cancelled`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "valid_from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "valid_to": {
+            "description": "End of a temporary change; the earlier prices apply again after it.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "description": "New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "price_list_id",
+          "filter",
+          "operation",
+          "value",
+          "valid_from",
+          "status",
+          "affected",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "CatalogPriceChangeFilter": {
+        "additionalProperties": false,
+        "description": "Which variants a bulk change covers: the union of the categories (with their subcategories),\nproducts and variants listed. All empty: every variant with a price in the list.",
+        "properties": {
+          "category_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "product_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "variant_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "CatalogPriceGuard": {
         "description": "A price floor rule.",
         "properties": {
@@ -3617,6 +3847,18 @@
           "active": {
             "type": "boolean"
           },
+          "adjust_bp": {
+            "description": "Adjustment of a derived list, basis points.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "adjust_minor": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "audience": {
             "description": "`consumer` or `business`.",
             "type": "string"
@@ -3651,6 +3893,14 @@
               "null"
             ]
           },
+          "derived_from": {
+            "description": "Source list of a derived list.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -3675,6 +3925,13 @@
             "format": "int32",
             "type": "integer"
           },
+          "rounding_rule_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "tax_inclusive": {
             "type": "boolean"
           },
@@ -3691,6 +3948,7 @@
           "tax_inclusive",
           "audience",
           "priority",
+          "adjust_bp",
           "active",
           "created_at",
           "updated_at"
@@ -4193,6 +4451,45 @@
           "source_url",
           "effective_from",
           "pack_version"
+        ],
+        "type": "object"
+      },
+      "CatalogRoundingRule": {
+        "description": "A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +\nending_minor` (step 10000 and ending 9000 give 129000, 199000…).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ending_minor": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mode": {
+            "description": "`up`, `down` or `nearest`.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "step_minor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "step_minor",
+          "mode",
+          "created_at"
         ],
         "type": "object"
       },
@@ -13486,6 +13783,110 @@
         ],
         "type": "object"
       },
+      "Data_CatalogPriceChange": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A bulk price change.",
+            "properties": {
+              "affected": {
+                "description": "Variants changed (known after the preview).",
+                "format": "int64",
+                "type": "integer"
+              },
+              "approved_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "filter": {
+                "$ref": "#/components/schemas/CatalogPriceChangeFilter"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "operation": {
+                "description": "`set`, `percent` or `amount`.",
+                "type": "string"
+              },
+              "preview": {
+                "description": "The preview: `samples` (up to 20 rows of `variant_id`, `before`, `after`), `floor_violations`,\n`blocked` and `warned` counts. Prices below a `block` floor are not written.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "price_list_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "rounding_rule_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`draft`, `previewed`, `approved`, `applied` or `cancelled`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "valid_from": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "valid_to": {
+                "description": "End of a temporary change; the earlier prices apply again after it.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "description": "New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed).",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "price_list_id",
+              "filter",
+              "operation",
+              "value",
+              "valid_from",
+              "status",
+              "affected",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CatalogPriceGuard": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -13561,6 +13962,18 @@
               "active": {
                 "type": "boolean"
               },
+              "adjust_bp": {
+                "description": "Adjustment of a derived list, basis points.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "adjust_minor": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "audience": {
                 "description": "`consumer` or `business`.",
                 "type": "string"
@@ -13595,6 +14008,14 @@
                   "null"
                 ]
               },
+              "derived_from": {
+                "description": "Source list of a derived list.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "id": {
                 "format": "uuid",
                 "type": "string"
@@ -13619,6 +14040,13 @@
                 "format": "int32",
                 "type": "integer"
               },
+              "rounding_rule_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "tax_inclusive": {
                 "type": "boolean"
               },
@@ -13635,6 +14063,7 @@
               "tax_inclusive",
               "audience",
               "priority",
+              "adjust_bp",
               "active",
               "created_at",
               "updated_at"
@@ -13878,6 +14307,54 @@
             "required": [
               "variant_id",
               "candidates"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogRoundingRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +\nending_minor` (step 10000 and ending 9000 give 129000, 199000…).",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "ending_minor": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "mode": {
+                "description": "`up`, `down` or `nearest`.",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "step_minor": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "step_minor",
+              "mode",
+              "created_at"
             ],
             "type": "object"
           }
@@ -19065,6 +19542,110 @@
               "reserved",
               "incoming",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventoryReservation": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Stock held for one order.",
+            "properties": {
+              "expires_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lines": {
+                "items": {
+                  "$ref": "#/components/schemas/InventoryReservedLine"
+                },
+                "type": "array"
+              },
+              "order_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "selling_org_id": {
+                "description": "The store or channel that sold.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "status": {
+                "description": "`held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "order_id",
+              "selling_org_id",
+              "status",
+              "lines"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventorySources": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Warehouses serving a store.",
+            "properties": {
+              "sources": {
+                "items": {
+                  "$ref": "#/components/schemas/InventorySource"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "sources"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventoryStoreSettings": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "How a store picks warehouses.",
+            "properties": {
+              "allow_split": {
+                "description": "Split an order over several warehouses when no single one has every line. Default\n`false`: one order, one warehouse.",
+                "type": "boolean"
+              },
+              "prefer_nearby": {
+                "description": "Try warehouses in the buyer's province first (province from the units' public profile).",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "prefer_nearby",
+              "allow_split"
             ],
             "type": "object"
           }
@@ -26700,6 +27281,120 @@
         ],
         "type": "object"
       },
+      "Data_SupportPolicyInForce": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SupportPolicy"
+              },
+              {
+                "properties": {
+                  "defined_at": {
+                    "description": "The unit whose own policy applies; empty: the defaults.",
+                    "format": "uuid",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "org_id": {
+                    "description": "The unit asked about.",
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "org_id"
+                ],
+                "type": "object"
+              }
+            ],
+            "description": "The policy in force at a unit, and where it comes from."
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_SupportReport": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Support figures for tickets created in a period.",
+            "properties": {
+              "breach_rate_bp": {
+                "description": "`breached` per 10000 tickets.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "breached": {
+                "description": "Of those, that missed a response-time target.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "median_first_response_minutes": {
+                "description": "Median minutes from opening to the first answer (wall clock), of answered tickets.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "median_resolve_minutes": {
+                "description": "Median minutes from opening to solved (wall clock), of solved tickets.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "satisfaction_avg_x100": {
+                "description": "Average rating × 100 (e.g. 450 = 4.5).",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "satisfaction_count": {
+                "description": "Ratings given (1 to 5).",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "solved": {
+                "description": "Of those, solved or closed.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "tickets": {
+                "description": "Tickets created in the period.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "tickets",
+              "solved",
+              "breached",
+              "breach_rate_bp",
+              "satisfaction_count"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_SupportRoutingRule": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -29627,6 +30322,57 @@
                 "source_url",
                 "effective_from",
                 "pack_version"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogRoundingRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +\nending_minor` (step 10000 and ending 9000 give 129000, 199000…).",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "ending_minor": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "mode": {
+                  "description": "`up`, `down` or `nearest`.",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "step_minor": {
+                  "format": "int64",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "step_minor",
+                "mode",
+                "created_at"
               ],
               "type": "object"
             },
@@ -37474,6 +38220,183 @@
           "source_type",
           "source_id",
           "created_at"
+        ],
+        "type": "object"
+      },
+      "InventoryReservation": {
+        "description": "Stock held for one order.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryReservedLine"
+            },
+            "type": "array"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "selling_org_id": {
+            "description": "The store or channel that sold.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order_id",
+          "selling_org_id",
+          "status",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InventoryReservedLine": {
+        "description": "Part of an order line reserved in one warehouse.",
+        "properties": {
+          "backordered": {
+            "description": "Reserved beyond the available stock (the product may be sold out of stock).",
+            "type": "boolean"
+          },
+          "bundle_variant_id": {
+            "description": "The bundle variant of the order line, when it is a bundle.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fulfilled_quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "line_key": {
+            "description": "The order's line key.",
+            "type": "string"
+          },
+          "preordered": {
+            "description": "Pre-order line.",
+            "type": "boolean"
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "released_quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "variant_id": {
+            "description": "The variant taken from stock (a component when the line is a bundle).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "warehouse_org_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_key",
+          "variant_id",
+          "warehouse_org_id",
+          "quantity",
+          "fulfilled_quantity",
+          "released_quantity",
+          "backordered",
+          "preordered"
+        ],
+        "type": "object"
+      },
+      "InventorySource": {
+        "additionalProperties": false,
+        "description": "One warehouse serving a store or channel.",
+        "properties": {
+          "active": {
+            "description": "`false` keeps the row but stops using the warehouse.",
+            "type": "boolean"
+          },
+          "priority": {
+            "description": "Lower is tried first.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "warehouse_org_id": {
+            "description": "The warehouse or store whose stock is sold.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "warehouse_org_id",
+          "priority",
+          "active"
+        ],
+        "type": "object"
+      },
+      "InventorySources": {
+        "description": "Warehouses serving a store.",
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/InventorySource"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources"
+        ],
+        "type": "object"
+      },
+      "InventorySourcesRequest": {
+        "additionalProperties": false,
+        "description": "The warehouses serving a store, replacing the current list.",
+        "properties": {
+          "sources": {
+            "description": "Up to 100 warehouses; empty: the store sells only its own stock.",
+            "items": {
+              "$ref": "#/components/schemas/InventorySource"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources"
+        ],
+        "type": "object"
+      },
+      "InventoryStoreSettings": {
+        "additionalProperties": false,
+        "description": "How a store picks warehouses.",
+        "properties": {
+          "allow_split": {
+            "description": "Split an order over several warehouses when no single one has every line. Default\n`false`: one order, one warehouse.",
+            "type": "boolean"
+          },
+          "prefer_nearby": {
+            "description": "Try warehouses in the buyer's province first (province from the units' public profile).",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "prefer_nearby",
+          "allow_split"
         ],
         "type": "object"
       },
@@ -46161,6 +47084,18 @@
                 "active": {
                   "type": "boolean"
                 },
+                "adjust_bp": {
+                  "description": "Adjustment of a derived list, basis points.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "adjust_minor": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
                 "audience": {
                   "description": "`consumer` or `business`.",
                   "type": "string"
@@ -46195,6 +47130,14 @@
                     "null"
                   ]
                 },
+                "derived_from": {
+                  "description": "Source list of a derived list.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "id": {
                   "format": "uuid",
                   "type": "string"
@@ -46219,6 +47162,13 @@
                   "format": "int32",
                   "type": "integer"
                 },
+                "rounding_rule_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "tax_inclusive": {
                   "type": "boolean"
                 },
@@ -46235,6 +47185,7 @@
                 "tax_inclusive",
                 "audience",
                 "priority",
+                "adjust_bp",
                 "active",
                 "created_at",
                 "updated_at"
@@ -48919,6 +49870,66 @@
                 "source_type",
                 "source_id",
                 "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventoryReservation": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "Stock held for one order.",
+              "properties": {
+                "expires_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "$ref": "#/components/schemas/InventoryReservedLine"
+                  },
+                  "type": "array"
+                },
+                "order_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "selling_org_id": {
+                  "description": "The store or channel that sold.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "order_id",
+                "selling_org_id",
+                "status",
+                "lines"
               ],
               "type": "object"
             },
@@ -60198,6 +61209,14 @@
         ],
         "type": "object"
       },
+      "SetSupportPolicyRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SupportPolicy"
+          }
+        ],
+        "description": "A policy to set on a unit (every field; units below without their own policy inherit it)."
+      },
       "SetSupportTeamMemberRequest": {
         "additionalProperties": false,
         "description": "A member's setting.",
@@ -62192,6 +63211,127 @@
         ],
         "description": "A ticket just opened. Guests get `access_token` once: keep it to see and answer the ticket."
       },
+      "SupportPolicy": {
+        "description": "Support policy of an organization unit. Units without their own policy use the nearest unit\nabove that has one, else the defaults.",
+        "properties": {
+          "auto_close_days": {
+            "description": "A solved ticket closes after this many days without a new message (1 to 90).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "auto_reply": {
+            "description": "Automatic answers to simple questions (off by default).",
+            "type": "boolean"
+          },
+          "auto_reply_blocked_terms": {
+            "description": "Words that always stop an automatic answer.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "auto_reply_max_per_thread": {
+            "description": "At most this many automatic answers in a row on one ticket, then a person takes over.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "auto_reply_min_confidence_bp": {
+            "description": "Lowest confidence (basis points, 0 to 10000) of the classification to answer automatically.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "business_hours": {
+            "description": "When staff work.",
+            "items": {
+              "$ref": "#/components/schemas/SupportWorkingHours"
+            },
+            "type": "array"
+          },
+          "categories": {
+            "description": "Ticket categories customers choose from (codes; labels are translated by the website).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "first_response_minutes": {
+            "description": "Business minutes to the first answer, per priority (`low`, `normal`, `high`, `urgent`).",
+            "type": "object"
+          },
+          "guest_tickets": {
+            "description": "Guests (no account) may open tickets.",
+            "type": "boolean"
+          },
+          "holidays": {
+            "description": "Days off (`YYYY-MM-DD`, local date).",
+            "example": [
+              "2026-09-02"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "inbound_email": {
+            "description": "Email replies to ticket notifications go back into the ticket (needs an inbound mail module).",
+            "type": "boolean"
+          },
+          "resolve_minutes": {
+            "description": "Business minutes to solve the ticket, per priority; time waiting for the customer does not\ncount.",
+            "type": "object"
+          },
+          "utc_offset_minutes": {
+            "description": "Offset of the unit's local time from UTC, in minutes (Vietnam: 420).",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "categories",
+          "first_response_minutes",
+          "resolve_minutes",
+          "business_hours",
+          "holidays",
+          "utc_offset_minutes",
+          "auto_close_days",
+          "guest_tickets",
+          "inbound_email",
+          "auto_reply",
+          "auto_reply_min_confidence_bp",
+          "auto_reply_max_per_thread",
+          "auto_reply_blocked_terms"
+        ],
+        "type": "object"
+      },
+      "SupportPolicyInForce": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SupportPolicy"
+          },
+          {
+            "properties": {
+              "defined_at": {
+                "description": "The unit whose own policy applies; empty: the defaults.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "org_id": {
+                "description": "The unit asked about.",
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "org_id"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "The policy in force at a unit, and where it comes from."
+      },
       "SupportPriority": {
         "description": "How urgent a ticket is.",
         "enum": [
@@ -62201,6 +63341,73 @@
           "urgent"
         ],
         "type": "string"
+      },
+      "SupportReport": {
+        "description": "Support figures for tickets created in a period.",
+        "properties": {
+          "breach_rate_bp": {
+            "description": "`breached` per 10000 tickets.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "breached": {
+            "description": "Of those, that missed a response-time target.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "median_first_response_minutes": {
+            "description": "Median minutes from opening to the first answer (wall clock), of answered tickets.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "median_resolve_minutes": {
+            "description": "Median minutes from opening to solved (wall clock), of solved tickets.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "satisfaction_avg_x100": {
+            "description": "Average rating × 100 (e.g. 450 = 4.5).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "satisfaction_count": {
+            "description": "Ratings given (1 to 5).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "solved": {
+            "description": "Of those, solved or closed.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "tickets": {
+            "description": "Tickets created in the period.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tickets",
+          "solved",
+          "breached",
+          "breach_rate_bp",
+          "satisfaction_count"
+        ],
+        "type": "object"
       },
       "SupportRequester": {
         "description": "Who asked. Customers and guests see their own email or phone number masked.",
@@ -62594,6 +63801,34 @@
           "closed"
         ],
         "type": "string"
+      },
+      "SupportWorkingHours": {
+        "description": "One range of working time on a day of the week.",
+        "properties": {
+          "closes": {
+            "description": "Local time `HH:MM`, after `opens`.",
+            "example": "17:00",
+            "type": "string"
+          },
+          "day": {
+            "description": "1 = Monday … 7 = Sunday.",
+            "format": "int32",
+            "maximum": 7,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "opens": {
+            "description": "Local time `HH:MM`.",
+            "example": "08:00",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "opens",
+          "closes"
+        ],
+        "type": "object"
       },
       "SuppressionResponse": {
         "description": "An address that gets no campaign mail.",
@@ -86786,6 +88021,16 @@
             },
             "description": "Missing `catalog.prices.write` or the plan feature (`feature_not_enabled`), or the unit is outside your scope (`org_out_of_scope`, `org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The source list (`catalog.price_list_not_found`) or rounding rule (`catalog.rounding_rule_not_found`) does not exist."
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -86794,7 +88039,7 @@
                 }
               }
             },
-            "description": "A value is invalid (see `errors`), the currency is unknown (`money.currency_unknown`), or the consumer rules are broken (`catalog.consumer_price_rules`)."
+            "description": "A value is invalid (see `errors`), the currency is unknown (`money.currency_unknown`) or differs from the source list (`catalog.currency_mismatch`), the source list is derived (`catalog.derived_chain`), or the consumer rules are broken (`catalog.consumer_price_rules`)."
           },
           "default": {
             "content": {
@@ -86970,6 +88215,509 @@
           }
         ],
         "summary": "Change a price list.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.prices.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/price-lists/{id}/changes": {
+      "post": {
+        "description": "Requires `catalog.prices.write` covering the list. Nothing changes until it is previewed and\napproved.",
+        "operationId": "catalog_create_catalog_price_change",
+        "parameters": [
+          {
+            "description": "Id of the price list.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCreatePriceChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogPriceChange"
+                }
+              }
+            },
+            "description": "Created as a draft.",
+            "headers": {
+              "Location": {
+                "description": "Path of the change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.prices.write`, or it does not cover the list; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such price list (`catalog.price_list_not_found`) or rounding rule (`catalog.rounding_rule_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a bulk price change for a price list, as a draft.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.prices.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/price-lists/{id}/changes/{change_id}": {
+      "get": {
+        "description": "Requires `catalog.prices.read` covering the list.",
+        "operationId": "catalog_get_catalog_price_change",
+        "parameters": [
+          {
+            "description": "Id of the price list.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the change.",
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogPriceChange"
+                }
+              }
+            },
+            "description": "The change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.prices.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such price list (`catalog.price_list_not_found`) or change (`catalog.price_change_not_found`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a bulk price change.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.prices.read"
+        ]
+      }
+    },
+    "/api/v1/catalog/price-lists/{id}/changes/{change_id}/approve": {
+      "post": {
+        "description": "Requires `catalog.prices.approve` covering the list. When the unit setting\n`catalog.price_change_requires_second_person` is on, the approver must not be the person who\nmade the change.",
+        "operationId": "catalog_approve_catalog_price_change",
+        "parameters": [
+          {
+            "description": "Id of the price list.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the change.",
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogPriceChange"
+                }
+              }
+            },
+            "description": "Approved; the prices are written by a job (status becomes `applied`)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.prices.approve` (`permission_denied`, `org_out_of_scope`), or you made the change and a second person must approve it (`catalog.self_approval`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such price list or change; codes `catalog.price_list_not_found`, `catalog.price_change_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not previewed yet (`catalog.price_change_not_previewed`) or already approved (`catalog.price_change_state`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a previewed bulk price change; a job writes the prices.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.prices.approve"
+        ]
+      }
+    },
+    "/api/v1/catalog/price-lists/{id}/changes/{change_id}/preview": {
+      "post": {
+        "description": "Requires `catalog.prices.write` covering the list. Counts the variants, shows up to 20 rows\nbefore / after and the price-floor violations; no price is written.",
+        "operationId": "catalog_preview_catalog_price_change",
+        "parameters": [
+          {
+            "description": "Id of the price list.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the change.",
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogPriceChange"
+                }
+              }
+            },
+            "description": "The change with its preview."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.prices.write`, or it does not cover the list; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such price list or change; codes `catalog.price_list_not_found`, `catalog.price_change_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The change was approved already; code `catalog.price_change_state`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The filter matches too many variants; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview a bulk price change.",
         "tags": [
           "catalog"
         ],
@@ -89740,6 +91488,193 @@
         ],
         "x-permissions": [
           "catalog.products.read"
+        ]
+      }
+    },
+    "/api/v1/catalog/rounding-rules": {
+      "get": {
+        "description": "Requires `catalog.prices.read`.",
+        "operationId": "catalog_list_catalog_rounding_rules",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogRoundingRule"
+                }
+              }
+            },
+            "description": "Every rounding rule."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.prices.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the rounding rules of the tenant.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.prices.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `catalog.prices.write`. Rounding is done on whole minor units, never with floating\npoint.",
+        "operationId": "catalog_create_catalog_rounding_rule",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCreateRoundingRule"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogRoundingRule"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Path of the rule.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.prices.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a rounding rule.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.prices.write"
         ]
       }
     },
@@ -117134,6 +119069,696 @@
         "x-autoxide-list": "inventory.list_inventory_movements",
         "x-permissions": [
           "inventory.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/reservations": {
+      "get": {
+        "description": "Requires `inventory.reservations.read`; its scope applies to the selling unit. Newest first\nunless `order=asc`.",
+        "operationId": "inventory_list_inventory_reservations",
+        "parameters": [
+          {
+            "description": "Only the reservation of this order.",
+            "in": "query",
+            "name": "order_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only reservations in this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "description": "Status of a stock reservation.",
+                  "enum": [
+                    "held",
+                    "confirmed",
+                    "fulfilled",
+                    "released",
+                    "expired"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryReservation"
+                }
+              }
+            },
+            "description": "One page of reservations."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.reservations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List stock reservations of orders sold by units in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the reservation of this order.",
+            "kind": "uuid",
+            "name": "order_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only reservations in this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "held",
+              "confirmed",
+              "fulfilled",
+              "released",
+              "expired"
+            ]
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_reservations",
+        "x-permissions": [
+          "inventory.reservations.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/reservations/{id}/release": {
+      "post": {
+        "description": "Requires `inventory.adjust` covering the selling unit. Units not shipped yet go back to the\navailable stock; the release is recorded (`inventory.reservation_released` with your user\nid, reason `manual`). Releasing again returns the reservation as it is.",
+        "operationId": "inventory_release_inventory_reservation",
+        "parameters": [
+          {
+            "description": "Id of the reservation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryReservation"
+                }
+              }
+            },
+            "description": "The reservation after the release."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.adjust` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No reservation with this id in your scope; code `inventory.reservation_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Release a stuck reservation by hand.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.adjust"
+        ]
+      }
+    },
+    "/api/v1/inventory/settings/{org_id}": {
+      "get": {
+        "description": "Requires `inventory.settings.manage` covering the unit.",
+        "operationId": "inventory_get_inventory_settings",
+        "parameters": [
+          {
+            "description": "The selling unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryStoreSettings"
+                }
+              }
+            },
+            "description": "The settings (defaults when never set)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`) or the unit is outside your scope (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get how a store picks warehouses.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `inventory.settings.manage` covering the unit.",
+        "operationId": "inventory_put_inventory_settings",
+        "parameters": [
+          {
+            "description": "The selling unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryStoreSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryStoreSettings"
+                }
+              }
+            },
+            "description": "The settings."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change how a store picks warehouses.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/sources/{selling_org_id}": {
+      "get": {
+        "description": "Requires `inventory.settings.manage` covering the selling unit. Without rows the store sells\nits own stock (when it is a warehouse or store).",
+        "operationId": "inventory_get_inventory_sources",
+        "parameters": [
+          {
+            "description": "The selling unit.",
+            "in": "path",
+            "name": "selling_org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySources"
+                }
+              }
+            },
+            "description": "The warehouses."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`) or the unit is outside your scope (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the warehouses serving a store or channel, in the order they are tried.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `inventory.settings.manage` covering the selling unit. Every warehouse must be a\nwarehouse or store.",
+        "operationId": "inventory_put_inventory_sources",
+        "parameters": [
+          {
+            "description": "The selling unit.",
+            "in": "path",
+            "name": "selling_org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventorySourcesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySources"
+                }
+              }
+            },
+            "description": "The warehouses now serving the unit."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A unit holds no stock (`inventory.not_a_warehouse`), a warehouse is listed twice, or the list is too long; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the warehouses serving a store or channel.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
         ]
       }
     },
@@ -159626,6 +162251,300 @@
         "x-permissions": []
       }
     },
+    "/api/v1/support/policies/{org_id}": {
+      "delete": {
+        "description": "Requires `support.settings.manage` at the unit. The unit then inherits the policy of the units\nabove (or the defaults).",
+        "operationId": "support_reset_support_policy",
+        "parameters": [
+          {
+            "description": "The unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportPolicyInForce"
+                }
+              }
+            },
+            "description": "The policy now in force."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or not active (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the own support policy of a unit.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `support.tickets.reply` or `support.settings.manage` (staff need the categories and\nresponse-time targets). Units without their own policy show the inherited one (`defined_at`).",
+        "operationId": "support_get_support_policy",
+        "parameters": [
+          {
+            "description": "The unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportPolicyInForce"
+                }
+              }
+            },
+            "description": "The policy in force."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.tickets.reply`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the support policy in force at a unit.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.tickets.reply"
+        ]
+      },
+      "put": {
+        "description": "Requires `support.settings.manage` at the unit. Every error of the policy is reported at once.\nNew tickets use it at once; open tickets keep their deadlines until their priority changes.",
+        "operationId": "support_set_support_policy",
+        "parameters": [
+          {
+            "description": "The unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSupportPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportPolicyInForce"
+                }
+              }
+            },
+            "description": "The policy now in force."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or not active (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the support policy of a unit.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
+      }
+    },
     "/api/v1/support/public/tickets": {
       "post": {
         "description": "Public. Signed in: the ticket belongs to your account (see `/me/tickets`). Guest: give `email`\nor `phone`; the answer carries `access_token` once — keep it to see and answer the ticket — and\na code is sent to confirm your contact, needed before your second message. Guests are limited\nper network address, email and phone number. Sending the same `form_token` again returns the\nsame ticket.",
@@ -160101,6 +163020,120 @@
           "support"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/support/reports/summary": {
+      "get": {
+        "description": "Requires `support.tickets.read`; counts the tickets in your scope created in the period: how\nmany, how many solved and late, median minutes to the first answer and to solved, and the\naverage customer rating.",
+        "operationId": "support_support_report_summary",
+        "parameters": [
+          {
+            "description": "Tickets created from this moment (included).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "… to this moment (excluded).",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this unit and the units below it.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportReport"
+                }
+              }
+            },
+            "description": "The figures."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.tickets.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`to` is not after `from`; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Support figures for a period.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.tickets.read"
+        ]
       }
     },
     "/api/v1/support/routing-rules": {

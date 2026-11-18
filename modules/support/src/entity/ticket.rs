@@ -33,6 +33,7 @@ pub struct Model {
     pub resolve_due_at: Option<DateTimeUtc>,
     pub first_responded_at: Option<DateTimeUtc>,
     pub sla_paused_at: Option<DateTimeUtc>,
+    pub sla_paused_minutes: i64,
     pub solved_at: Option<DateTimeUtc>,
     pub closed_at: Option<DateTimeUtc>,
     pub breached: bool,

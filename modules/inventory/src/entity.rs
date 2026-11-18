@@ -92,3 +92,139 @@ pub(crate) mod adjustment {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod settings {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_settings")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub org_id: Uuid,
+        pub prefer_nearby: bool,
+        pub allow_split: bool,
+        pub province_code: Option<String>,
+        pub pickup: bool,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod source {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_sources")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub selling_org_id: Uuid,
+        pub warehouse_org_id: Uuid,
+        pub priority: i32,
+        pub active: bool,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod reservation {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_reservations")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub order_id: Uuid,
+        pub selling_org_id: Uuid,
+        pub status: String,
+        pub expires_at: Option<DateTimeUtc>,
+        pub fingerprint: String,
+        pub release_reason: Option<String>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod reservation_line {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_reservation_lines")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub reservation_id: Uuid,
+        pub line_key: String,
+        pub variant_id: Uuid,
+        pub bundle_variant_id: Option<Uuid>,
+        pub per_unit: i64,
+        pub level_id: Uuid,
+        pub org_id: Uuid,
+        pub quantity: i64,
+        pub fulfilled_quantity: i64,
+        pub released_quantity: i64,
+        pub backordered: bool,
+        pub preordered: bool,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod fulfilment {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_fulfilments")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub reservation_id: Uuid,
+        pub fulfilment_key: String,
+        pub fingerprint: String,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod restock {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_restocks")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub reference: String,
+        pub reference_fingerprint: String,
+        pub order_id: Option<Uuid>,
+        pub org_id: Uuid,
+        pub lines: String,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

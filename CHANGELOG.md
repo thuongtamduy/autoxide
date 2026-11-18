@@ -11,6 +11,14 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` (step 42): stock reservations for orders through `autoxide_inventory::api::Inventory`
+  (`reserve` / `confirm` / `fulfil` / `release` / `restock`, `availability`, `in_stock_at`) that never oversell under
+  concurrent requests; bundles take stock from components; warehouse choice per store (`PUT /sources/{store}`,
+  `PUT /settings/{store}`: nearby first, split); the minute job `inventory.expire_reservations`;
+  `GET /reservations`, `POST /reservations/{id}/release`, MCP tool `inventory.release_reservation`.
+- `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
+  (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
+  temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).
 - `GET /api/v1/kernel/ops/backlog` and MCP tool `kernel.ops_backlog` (permission `kernel.ops.read`, platform staff
   only): job and event backlogs by module, the dead-letter queue, database connections and the newest backup of every
   database (step 39).
@@ -55,6 +63,10 @@ endpoints are marked deprecated with a sunset date first.
   tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
 - `support`: support teams of an organization unit (`/teams`, members who take tickets), routing rules by category and
   channel (`/routing-rules`, inherited down the tree) and round-robin assignment to members who can answer the ticket.
+- `support`: support policies per organization unit (`/policies/{org_id}`, inherited down the tree: categories,
+  response-time targets per priority in business minutes, business hours, days off, auto-close days, guest tickets).
+  Deadlines count business time and stop while waiting for the customer; jobs `support.sla_check` (marks late tickets,
+  event `support.ticket_breached`) and `support.auto_close`; work source `support.tickets`; `GET /reports/summary`.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions

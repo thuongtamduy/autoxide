@@ -1,9 +1,12 @@
 //! Test đầu-cuối của module `inventory` trên chương trình thật (bước 42): biến thể là của module
 //! `catalog` thật, tồn đầu kỳ nhập bằng điều chỉnh có giá vốn qua REST, đọc lại tồn và sổ. Chạy
-//! trên cả SQLite và Postgres.
+//! trên cả SQLite và Postgres; giữ hàng qua `dyn Inventory` như `orders` sẽ gọi.
 
+use autoxide_inventory::api::{Inventory, ReserveLine, ReserveRequest};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext, root_of};
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
+use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -48,6 +51,22 @@ async fn ton_dau_ky_cho_bien_the_cua_catalog_that() {
         let level = &levels["data"][0];
         assert_eq!((level["on_hand"].as_i64(), level["available"].as_i64()), (Some(12), Some(12)));
         assert_eq!(level["average_cost"], json!({"amount": "85000", "currency": "VND"}));
+
+        // Giữ hàng như `orders` (bước 45) sẽ giữ: qua `dyn Inventory`, biến thể đọc từ `catalog` thật.
+        let inventory = runtime.modules.api::<dyn Inventory>().unwrap();
+        let tenant = TenantContext::default_on(runtime.database.clone());
+        let variant_id: Uuid = variant.parse().unwrap();
+        let request = ReserveRequest::new(
+            Uuid::now_v7(),
+            root_of(DEFAULT_TENANT),
+            Utc::now() + chrono::Duration::minutes(15),
+            vec![ReserveLine::new("1", variant_id, 5)],
+        );
+        let held = inventory.reserve(&tenant, &request).await.unwrap().into_inner();
+        assert_eq!(held.lines[0].warehouse_org_id, root_of(DEFAULT_TENANT));
+        let (_, _, levels) = call(&runtime, "GET", &uri, &headers, Vec::new()).await;
+        assert_eq!(levels["data"][0]["available"], 7);
+        assert_eq!(levels["data"][0]["reserved"], 5);
     })
     .await
     .unwrap();

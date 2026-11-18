@@ -89,6 +89,21 @@ price and the ordered candidate lists.
 profile (Price Law 16/2023/QH15 — check the source text with a legal professional before relying on
 it).
 
+**Derived price lists** take their prices from a source list (`derived_from`; one level only,
+`catalog.derived_chain`), adjusted by `adjust_bp` (basis points, signed: `-1000` = 10% off) and
+`adjust_minor`, then rounded by a **rounding rule** (`/rounding-rules`: multiples of `step_minor`, or
+`k × step_minor + ending_minor`, e.g. step 10,000 and ending 9,000 give 129,000 and 199,000). A job
+writes real price rows into the derived list whenever the source gets prices, so reading a price
+never computes a formula. A manual row in the derived list pins that variant's price while it is in
+effect.
+
+**Bulk price changes** (`/price-lists/{id}/changes`): create (`set`, `percent` or `amount`, for
+categories, products or variants, optionally temporary with `valid_to`) → preview (counts, 20
+sample rows, price-floor violations; nothing is written) → approve (`catalog.prices.approve`; with the
+unit setting `catalog.price_change_requires_second_person` on, someone other than the maker must
+approve) → a job writes the rows (`source = bulk`). Undo a change with a new change back to the old
+prices.
+
 **Price floors** (`/price-guards`): a minimum price and / or a minimum margin over unit cost, per unit
 and optionally per category, acting as `warn` (the price is saved with a warning) or `block`
 (`catalog.price_below_floor`). The rule of the closest unit wins; within a unit, the rule of the
