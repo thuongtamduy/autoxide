@@ -251,6 +251,10 @@ debug = "line-tables-only"
 # Hàm băm mật khẩu cố tình chậm nên tối ưu hết cỡ. Số đo ở D-299.
 [profile.dev.package."*"]
 opt-level = 1
+# Không giữ thông tin debug của thư viện ngoài: mỗi chương trình test link toàn bộ thư viện, nên phần
+# này nhân lên theo số chương trình và chiếm phần lớn `target/`. Stack trace trong code của mình vẫn có
+# số dòng; trong thư viện ngoài chỉ còn tên hàm (D-20261118-build-size).
+debug = false
 
 [profile.dev.package.argon2]
 opt-level = 3

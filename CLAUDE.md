@@ -187,6 +187,10 @@ sẵn lệnh.
 - `unwrap` / `expect` trong test: viết trong `#[cfg(test)] mod tests` (clippy tự
   miễn) hoặc trong `tests/` với dòng `#![allow(…)]` đầu file như các file sẵn có.
   Trong `src/` không được tắt các lint này — `cargo xtask check` chặn.
+- Test tích hợp của một crate nằm trong **một** chương trình: thêm file vào
+  `tests/integration/` và khai `mod <tên>;` ở `tests/integration/main.rs`. Không tạo
+  `tests/<tên>.rs` rời — mỗi file đó là một chương trình link lại toàn bộ thư viện (D-20261118-build-size);
+  `cargo xtask check` chặn cả file rời lẫn file quên khai `mod`.
 - Xong một mục: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Xong trọn một
   bước (mọi mục `[x]`, gate nhanh xanh) thì merge vào `main`, **không** phát hành: gom nhiều
   bước thành một bản lớn, phát hành khi xong một giai đoạn của lộ trình hay khi chủ dự án bảo
