@@ -225,14 +225,25 @@ impl TestApp {
     ///
     /// Mở một cổng TCP cục bộ: transport Streamable HTTP của client cần máy chủ thật.
     pub async fn mcp(&self, token: &str) -> Result<RunningService<RoleClient, ()>, TestAppError> {
+        self.mcp_at(token, "/mcp").await
+    }
+
+    /// Như [`TestApp::mcp`], tới endpoint MCP ở `path` — vd `/mcp/notes`, endpoint riêng của một
+    /// module.
+    pub async fn mcp_at(
+        &self,
+        token: &str,
+        path: &str,
+    ) -> Result<RunningService<RoleClient, ()>, TestAppError> {
         let listener =
             tokio::net::TcpListener::bind("127.0.0.1:0").await.map_err(|e| fail("mcp", e))?;
         let address = listener.local_addr().map_err(|e| fail("mcp", e))?;
         let router = self.router.clone();
         tokio::spawn(async move { axum::serve(listener, router).await });
         autoxide_kernel::tls::install_crypto_provider();
-        let config = StreamableHttpClientTransportConfig::with_uri(format!("http://{address}/mcp"))
-            .auth_header(token.to_owned());
+        let config =
+            StreamableHttpClientTransportConfig::with_uri(format!("http://{address}{path}"))
+                .auth_header(token.to_owned());
         ().serve(StreamableHttpClientTransport::from_config(config))
             .await
             .map_err(|e| fail("mcp client", e))

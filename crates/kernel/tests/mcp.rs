@@ -207,6 +207,69 @@ async fn chi_liet_ke_va_goi_duoc_tool_co_permission() {
 }
 
 #[tokio::test]
+async fn endpoint_rieng_cua_module_chi_co_tool_cua_module() {
+    TestDatabase::run(async |test| {
+        let url = serve(test).await;
+        let notes = client(&format!("{url}/notes"), "writer").await;
+        let names: Vec<String> = notes
+            .list_all_tools()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|tool| tool.name.into_owned())
+            .collect();
+        assert_eq!(names, ["notes.whoami", "notes.add", "notes.issue_key", "notes.who"]);
+        let call = CallToolRequestParams::new("notes.add")
+            .with_arguments(arguments(json!({"a": 2, "b": 3})));
+        assert_eq!(
+            notes.call_tool(call).await.unwrap().structured_content,
+            Some(json!({"data": 5}))
+        );
+        // Tool của module khác không có ở đây, kể cả khi người gọi được dùng nó ở `/mcp`.
+        let other = notes
+            .call_tool(CallToolRequestParams::new("kernel.list_custom_fields"))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(other.contains("Unknown tool `kernel.list_custom_fields`"), "{other}");
+        notes.cancel().await.unwrap();
+
+        let kernel = client(&format!("{url}/kernel"), "reader").await;
+        let names: Vec<String> = kernel
+            .list_all_tools()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|tool| tool.name.into_owned())
+            .collect();
+        assert_eq!(names, ["kernel.list_custom_fields"]);
+        kernel.cancel().await.unwrap();
+
+        // Cùng lớp xác thực như `/mcp`; module không có thì không có endpoint.
+        let http = post_tools_list(test, "/mcp/notes", None).await;
+        assert_eq!(http, StatusCode::UNAUTHORIZED);
+        let missing = post_tools_list(test, "/mcp/orders", Some("Bearer writer")).await;
+        assert_eq!(missing, StatusCode::NOT_FOUND);
+    })
+    .await
+    .unwrap();
+}
+
+/// `POST` một lệnh `tools/list` thẳng vào router, trả mã trạng thái.
+async fn post_tools_list(test: &TestDatabase, path: &str, token: Option<&str>) -> StatusCode {
+    let mut request = Request::post(path)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::ACCEPT, "application/json, text/event-stream");
+    if let Some(token) = token {
+        request = request.header(header::AUTHORIZATION, token);
+    }
+    let body = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+    let response =
+        router(test).await.oneshot(request.body(Body::from(body)).unwrap()).await.unwrap();
+    response.status()
+}
+
+#[tokio::test]
 async fn loi_cua_tool_co_code_va_thong_bao() {
     TestDatabase::run(async |test| {
         let url = serve(test).await;

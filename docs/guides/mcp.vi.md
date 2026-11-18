@@ -51,6 +51,8 @@ Client MCP khác nhận một máy chủ Streamable HTTP kèm header, vd:
 }
 ```
 
+Agent chỉ làm việc với một module thì nối thẳng tới endpoint riêng của module đó, `/mcp/<module>` (vd `https://api.example.com/mcp/content`): cùng xác thực và permission, nhưng chỉ có tool, resource và prompt của module đó, nên mô hình không phải đọc mô tả của mọi tool trên máy chủ. `/llms.txt` có link tới endpoint của từng module.
+
 ## 3. Agent làm được gì
 
 `tools/list` chỉ hiện tool mà permission của key cho phép. Mô tả của mỗi tool kết thúc bằng permission cần có, và chú thích cho biết tool chỉ đọc hay phá huỷ (client hỏi người dùng trước khi gọi loại này). Tool deprecated ghi rõ trong mô tả và trong mọi kết quả (`_meta.autoxide/deprecation`), kèm tool dùng thay.
@@ -300,4 +302,11 @@ Resource và prompt của phiên bản này (`docs/mcp-tools.json` cũng liệt 
 <!-- example: llms-txt -->
 ```bash
 curl -sS "$API/llms.txt"
+```
+
+Dưới mỗi module, `/llms.txt` có link tới tài liệu OpenAPI và endpoint MCP riêng của nó và nêu tên các tool. Tài liệu OpenAPI của một module chỉ có các endpoint dưới `/api/v1/<module>` và các schema chúng dùng, cùng quy ước chung như tài liệu đầy đủ — đủ để gọi đúng module đó mà không phải nạp phần còn lại của API:
+
+<!-- example: module-openapi -->
+```bash
+curl -sS "$API/api/v1/openapi/content.json"
 ```

@@ -4,8 +4,8 @@
 //! Route của module `notes` nằm dưới `/api/v1/notes`. Số `v1` là phiên bản của
 //! API: thay đổi phá vỡ thì mở `/api/v2`, không sửa `v1`.
 //!
-//! Tài liệu OpenAPI của mọi route nằm ở `/api/v1/openapi.json`; trang xem tài liệu
-//! ở `/api/docs` khi được bật bằng cấu hình.
+//! Tài liệu OpenAPI của mọi route nằm ở `/api/v1/openapi.json`, của từng module ở
+//! `/api/v1/openapi/<module>.json`; trang xem tài liệu ở `/api/docs` khi được bật bằng cấu hình.
 //!
 //! Mọi request đi qua, theo thứ tự từ ngoài vào:
 //!
@@ -42,6 +42,7 @@ mod log;
 mod mcp;
 mod metrics;
 mod openapi;
+mod openapi_modules;
 mod problem;
 mod rate_limit;
 mod rate_limit_store;
@@ -232,6 +233,12 @@ pub fn build(
     let openapi_slot: Arc<std::sync::OnceLock<String>> = Arc::default();
     let llms_slot: Arc<std::sync::OnceLock<String>> = Arc::default();
     resources.extend(kernel_resources(&openapi_slot, &llms_slot));
+    // Module có đường dẫn: có tài liệu OpenAPI riêng (`/api/v1/openapi/<module>.json`).
+    let documented: Vec<&'static str> = modules
+        .iter()
+        .filter(|(_, routes)| !routes.get_openapi().paths.paths.is_empty())
+        .map(|(name, _)| *name)
+        .collect();
     let llms_text = llms::render(&llms::LlmsInputs {
         base: extras.public_url.as_deref().unwrap_or_default(),
         api_docs: config.api_docs,
@@ -242,11 +249,16 @@ pub fn build(
                 && routes.get_openapi().paths.paths.contains_key("/modules/{name}")
         }),
         modules: &extras.modules,
+        documented: &documented,
+        tools: &extras.tools,
         resources: &resources,
         prompts: &extras.prompts,
     });
     let _ = llms_slot.set(llms_text.clone());
-    let root = root.merge(llms::routes(llms_text));
+    let module_documents = openapi_modules::ModuleDocuments::default();
+    let root = root
+        .merge(llms::routes(llms_text))
+        .merge(openapi_modules::routes(module_documents.clone()));
 
     let schema_conflicts = openapi::schema_conflicts(
         std::iter::once(("kernel", root.get_openapi()))
@@ -287,6 +299,9 @@ pub fn build(
     // chỉ tăng bộ đếm tham chiếu, không chép cả tài liệu (hơn 1 MB) mỗi request (D-158).
     let json = openapi.to_json().unwrap_or_default();
     let _ = openapi_slot.set(json.clone());
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
+        let _ = module_documents.set(openapi_modules::split(&value, &documented));
+    }
     let document = axum::body::Bytes::from(json);
     let mut router = router.route(
         OPENAPI_PATH,

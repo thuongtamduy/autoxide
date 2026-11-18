@@ -26,7 +26,8 @@ hứng, đừng nhảy cóc.
 
 - Đọc lại phần liên quan trong `CLAUDE.md` (luật kiến trúc, dữ liệu, code) và
   `STACK.md` (thư viện dành cho việc này).
-- Tìm trong `docs/DECISIONS.md` quyết định nào đã chốt cho mảng này.
+- Tìm trong mục lục `docs/decisions/INDEX.md` (theo chủ đề, có đánh dấu mục đã bị thay)
+  quyết định nào đã chốt cho mảng này, rồi đọc đúng mục đó.
 - Mục cần một thư viện chưa từng dùng trong repo: chạy skill `check-library-api`
   **trước** khi viết code dùng nó.
 - Repo đã có code: dùng CodeGraph (`codegraph explore "<tên hoặc câu hỏi>"`) để

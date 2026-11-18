@@ -10,7 +10,8 @@ Autoxide: lõi backend Rust, core trước, module cắm vào sau.
 - **Dùng gì, vì sao** → [`STACK.md`](STACK.md)
 - **Làm gì tiếp** → [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - **Làm một bước thế nào** → [`docs/steps/`](docs/steps/README.md) (đặc tả bước 30–56)
-- **Đã quyết gì** → [`docs/DECISIONS.md`](docs/DECISIONS.md)
+- **Đã quyết gì** → mục lục theo chủ đề [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) trước (biết mục nào đã bị
+  thay), rồi mở đúng mục trong [`docs/DECISIONS.md`](docs/DECISIONS.md)
 
 ## Mục tiêu — không được quên
 
@@ -104,10 +105,13 @@ thiệp**, và kết quả phải chuẩn chỉnh, đầy đủ.
 
 - **Tự quyết, không hỏi.** Việc có nhiều cách thì chọn cách đơn giản nhất mà giải
   quyết trọn vấn đề, làm, rồi sang bước kế trong lộ trình.
-- **Quyết định có ảnh hưởng lâu dài phải ghi lại** vào `docs/DECISIONS.md` (thêm
-  mục mới ở cuối, không sửa mục cũ): đổi thư viện, đổi quy ước, thêm ngoại lệ cho
-  một luật ở file này.
-- **Quyết định đã chốt trong `docs/DECISIONS.md` không tự đảo.** Thấy cần đổi thì
+- **Quyết định có ảnh hưởng lâu dài phải ghi lại** bằng skill `record-decision`: đổi thư
+  viện, đổi quy ước, thêm ngoại lệ cho một luật ở file này. Mỗi mục mới là **một file**
+  `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (ID theo ngày và tên, không theo số tuần tự: hai
+  phiên song song không chọn trùng), rồi `cargo xtask decisions` sinh lại mục lục. Không thêm
+  mục vào `docs/DECISIONS.md` (nhật ký cũ D-001…D-381, đóng), không sửa mục cũ. Gate chặn ID
+  trùng và tham chiếu tới ID không có (D-20261118-decision-ids).
+- **Quyết định đã chốt không tự đảo.** Thấy cần đổi thì
   ghi mục mới nêu lý do và mục bị thay; riêng các mục ghi "chủ dự án quyết" thì
   dừng lại hỏi.
 - **Chỉ dừng lại hỏi khi:** cần secret thật (mật khẩu database production, access key
@@ -172,7 +176,7 @@ bảng. Đổi cấu hình hay API thì sinh lại file tương ứng — thông
 sẵn lệnh.
 
 - Gate đỏ thì sửa code, **không** nới gate, không tắt lint, không đánh dấu test
-  bỏ qua. Ngoại lệ thật sự cần thiết phải ghi vào `docs/DECISIONS.md`.
+  bỏ qua. Ngoại lệ thật sự cần thiết phải ghi thành một quyết định (skill `record-decision`).
 - Code mới phải có test. Thứ liên quan ghi đồng thời (job, idempotency, refresh
   token) phải có test đồng thời chạy trên cả hai database.
 - Test chạm database lấy database qua `TestDatabase::run(async |database| { … })`
@@ -268,6 +272,9 @@ sẵn lệnh.
 ## Luật code
 
 - `unsafe` bị cấm. Không `unwrap()` / `expect()` / `panic!` ngoài test — trả lỗi.
+- File `.rs` trên 800 dòng: gate cảnh báo; trên 1200: chặn, trừ file trong
+  `xtask/file-length-baseline.txt` (không được dài thêm). Tách theo trách nhiệm thành module con,
+  chỉ di chuyển code (D-20261118-file-length).
 - Một kiểu lỗi chung cho mọi layer: `autoxide_kernel::error::Error`. Mã lỗi
   (`code`) là hợp đồng với client, đổi mã là thay đổi phá vỡ. Mã viết `snake_case`;
   lỗi của module mang tiền tố `<module>.` (vd `notes.title_taken`).

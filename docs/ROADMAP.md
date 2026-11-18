@@ -890,6 +890,25 @@ Bắt đầu SAU bước 46 và 57 (`analytics`).
       thu dịch vụ của sàn thu qua quyết toán hay hoá đơn, không giữ ví trả trước; báo cáo hiệu quả cho người bán;
       test trên cả hai database
 
+## Dọn cho agent (việc ngoài bước, chủ dự án duyệt ngày 18/11/2026)
+
+Làm Autoxide dễ đọc hiểu cho AI agent, cả khi phát triển repo lẫn khi dùng API. Không phải một bước của lộ trình;
+không chặn bước nào.
+
+- [x] Mục lục quyết định tự sinh (`cargo xtask decisions` → `docs/decisions/INDEX.md`, theo chủ đề, đánh dấu mục đã bị
+      thay); gate báo khi lệch (D-20261118-decision-ids)
+- [x] Quyết định mới mỗi mục một file, ID theo ngày và tên (`D-<YYYYMMDD>-<tên>`) để các phiên song song không chọn
+      trùng; gate chặn ID trùng và tham chiếu tới ID không có (D-20261118-decision-ids)
+- [x] OpenAPI theo module (`GET /api/v1/openapi/<module>.json`), endpoint MCP theo module (`/mcp/<module>`), `/llms.txt`
+      trỏ tới cả hai; test trên cả hai database (D-20261118-module-contracts)
+- [x] Gate cảnh báo file `.rs` trên 800 dòng, chặn trên 1200 trừ danh sách miễn không được dài thêm; tách sáu file dài
+      nhất (D-20261118-file-length)
+
+Ghi nhận, làm sau nếu đáng: `./gate.sh --quick` chậm khi sửa kernel — mọi crate phụ thuộc kernel nên `test-affected`
+build và chạy test của cả workspace (ở đợt này, một lượt gate nhanh sau khi sửa `crates/kernel/src/http` lâu hơn nhiều
+lần lượt chỉ sửa `xtask`, phần lớn là test e2e của binary). Hướng có thể xét: chỉ chạy test của crate phụ thuộc vào đúng phần
+công khai bị đổi, hay tách phần ít đổi của kernel thành crate riêng. Chưa làm.
+
 ## Chờ chủ dự án
 
 ## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-199)

@@ -21,7 +21,7 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 68,
    | Đặc tả của module **cung cấp** một hợp đồng | Lệch với đặc tả của module **dùng** hợp đồng đó, vd bước 45 giả định chữ ký `api` của bước 41–44: theo 41–44 |
    | Code thật | Lệch với chữ ký phác thảo trong đặc tả: tra bằng skill `check-library-api`, theo code |
 
-3. Phần "Agent làm bước này tự quyết" của mỗi đặc tả: người làm chọn, rồi ghi vào `docs/DECISIONS.md`.
+3. Phần "Agent làm bước này tự quyết" của mỗi đặc tả: người làm chọn, rồi ghi bằng skill `record-decision`.
    Không dừng lại hỏi trừ khi `CLAUDE.md` bảo phải hỏi (secret thật, việc không hoàn tác được ở bên ngoài).
 4. Thấy đặc tả sai hay thiếu thì sửa đặc tả trong cùng PR, ghi một dòng lý do trong commit.
 5. **Một đặc tả, một phiên bản đúng (D-228).** Quyết định mới làm đổi đặc tả thì sửa thẳng vào thân (đúng
