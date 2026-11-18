@@ -3038,6 +3038,26 @@ export type CreateSiteMenuRequest = {
   org_id?: string | null;
 };
 
+/** A new routing rule. */
+export type CreateSupportRoutingRuleRequest = {
+  /** Only tickets of this category; omitted: any. */
+  category?: string | null;
+  channel?: SupportChannel | null;
+  org_id: string;
+  /** Order among the unit's rules (lower first). */
+  position?: number;
+  /** A team of the unit or of a unit above it. */
+  team_id: string;
+};
+
+/** A new team. */
+export type CreateSupportTeamRequest = {
+  /** 1 to 100 characters; unique in the unit. */
+  name: string;
+  /** Unit of the team. */
+  org_id: string;
+};
+
 /** A ticket staff open for a customer (a phone call, a visit…). */
 export type CreateSupportTicketRequest = {
   /** What the customer asked. */
@@ -7737,6 +7757,51 @@ export type Data_SupportOpenedTicket = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportRoutingRule = {
+  /** A routing rule: new tickets of the unit (and the units below) that match go to the team. */
+  data: {
+    /** Only tickets of this category; empty: any. */
+    category?: string | null;
+    channel?: SupportChannel | null;
+    id: string;
+    org_id: string;
+    /** Rules of one unit are tried in this order; rules of nearer units first. */
+    position: number;
+    team_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeam = {
+  /** A support team of an organization unit; it covers tickets of the unit and the units below. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeamDetail = {
+  /** A team with its members. */
+  data: SupportTeam & {
+    members: SupportTeamMember[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeamMember = {
+  /** A member of a support team. */
+  data: {
+    /** Takes new tickets in round-robin assignment. */
+    accepting: boolean;
+    last_assigned_at?: string | null;
+    user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportTicket = {
   /** A support ticket. */
   data: {
@@ -9646,6 +9711,20 @@ export type Data_Vec_SupportGrantResponse = {
     starts_at: string;
     /** The tenant the staff may enter. */
     tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportRoutingRule = {
+  data: {
+    /** Only tickets of this category; empty: any. */
+    category?: string | null;
+    channel?: SupportChannel | null;
+    id: string;
+    org_id: string;
+    /** Rules of one unit are tried in this order; rules of nearer units first. */
+    position: number;
+    team_id: string;
   }[];
 };
 
@@ -15702,6 +15781,18 @@ export type Page_SubscriberResponse = {
 };
 
 /** One page of a list. */
+export type Page_SupportTeam = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    org_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SupportTicket = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17845,6 +17936,12 @@ export type SetPasswordRequest = {
   password: string;
 };
 
+/** A member's setting. */
+export type SetSupportTeamMemberRequest = {
+  /** Takes new tickets in round-robin assignment. */
+  accepting: boolean;
+};
+
 /** A setting that units can set and the units below them inherit. */
 export type SettingResponse = {
   /** The value when no unit sets it; `null`: none. */
@@ -18526,6 +18623,39 @@ export type SupportRequesterInput = {
 
 /** How a ticket ended. */
 export type SupportResolution = "answered" | "escalated" | "duplicate" | "spam" | "no_reply";
+
+/** A routing rule: new tickets of the unit (and the units below) that match go to the team. */
+export type SupportRoutingRule = {
+  /** Only tickets of this category; empty: any. */
+  category?: string | null;
+  channel?: SupportChannel | null;
+  id: string;
+  org_id: string;
+  /** Rules of one unit are tried in this order; rules of nearer units first. */
+  position: number;
+  team_id: string;
+};
+
+/** A support team of an organization unit; it covers tickets of the unit and the units below. */
+export type SupportTeam = {
+  created_at: string;
+  id: string;
+  name: string;
+  org_id: string;
+};
+
+/** A team with its members. */
+export type SupportTeamDetail = SupportTeam & {
+  members: SupportTeamMember[];
+};
+
+/** A member of a support team. */
+export type SupportTeamMember = {
+  /** Takes new tickets in round-robin assignment. */
+  accepting: boolean;
+  last_assigned_at?: string | null;
+  user_id: string;
+};
 
 /** A support ticket. */
 export type SupportTicket = {
@@ -29266,6 +29396,119 @@ export interface paths {
         422: Problem;
         429: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/routing-rules": {
+    /** List the routing rules of a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      responses: {
+        200: Data_Vec_SupportRoutingRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a routing rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateSupportRoutingRuleRequest;
+      responses: {
+        201: Data_SupportRoutingRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/routing-rules/{id}": {
+    /** Delete a routing rule. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams": {
+    /** List support teams in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SupportTeam;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a support team. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateSupportTeamRequest;
+      responses: {
+        201: Data_SupportTeam;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams/{id}": {
+    /** Get a support team with its members. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportTeamDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a support team. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams/{id}/members/{user_id}": {
+    /** Add a member to a support team, or change whether they take new tickets. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; user_id: string }; };
+      requestBody: SetSupportTeamMemberRequest;
+      responses: {
+        200: Data_SupportTeamMember;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a member from a support team. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; user_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
