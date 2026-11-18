@@ -113,7 +113,11 @@ impl SupportService {
 
     /// Phiếu mới chưa giao: tìm quy tắc khớp, giao cho nhóm và (chia vòng) một thành viên làm được
     /// phiếu. Không có quy tắc khớp → để nguyên. Gọi sau khi phiếu đã ghi (ngoài transaction tạo).
-    pub(crate) async fn route(&self, tenant: &TenantContext, ticket: &Ticket) -> Result<(), Error> {
+    pub(crate) async fn auto_assign(
+        &self,
+        tenant: &TenantContext,
+        ticket: &Ticket,
+    ) -> Result<(), Error> {
         let read = tenant.database().read();
         let org = OrgId::from_uuid(ticket.org_id);
         let mut lineage = OrgTree::ancestors(read, tenant.id(), org).await?;

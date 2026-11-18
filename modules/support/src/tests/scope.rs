@@ -23,7 +23,8 @@ pub(crate) struct Directory(pub HashMap<Uuid, Principal>);
 #[async_trait::async_trait]
 impl Authenticator for Directory {
     async fn authenticate(&self, _: Option<&str>, _: &TenantHint) -> Result<Principal, Error> {
-        Err(Error::unauthenticated("auth.invalid_token", "The token is not valid."))
+        // Test chỉ cần `principal_of`; xác thực request do bộ xác thực của `TestApp` làm.
+        Err(Error::internal("not used in tests"))
     }
 
     async fn principal_of(

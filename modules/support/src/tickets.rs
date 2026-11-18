@@ -267,7 +267,7 @@ impl SupportService {
         tracing::info!(ticket_id = %id, channel = opening.channel.as_str(), "support ticket opened");
         // Tự phân công theo quy tắc của nút (ngoài transaction tạo: hỏi quyền người nhận). Lỗi chỉ
         // ghi log — phiếu đã có, nhân viên giao tay được.
-        let ticket = match self.route(tenant, &inserted).await {
+        let ticket = match self.auto_assign(tenant, &inserted).await {
             Ok(()) => ticket::Entity::find_by_id(id)
                 .scoped(tenant)
                 .one(tenant.database().read())
