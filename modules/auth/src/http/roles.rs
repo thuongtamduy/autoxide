@@ -586,4 +586,49 @@ mod tests {
         .await
         .unwrap();
     }
+
+    // Bước 54 mục 1 (P11): quyền không nằm trong access token — đổi role, đổi permission của
+    // role có hiệu lực ngay ở request kế tiếp với CÙNG token, không chờ token hết hạn.
+    #[tokio::test]
+    async fn doi_role_co_hieu_luc_o_request_ke_tiep() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
+            let input = |permissions: &[&str]| crate::role::RoleInput {
+                requires_mfa: false,
+                grants: Vec::new(),
+                name: "reader".to_owned(),
+                description: String::new(),
+                permissions: permissions.iter().map(|name| (*name).to_owned()).collect(),
+            };
+            let reader =
+                services.roles.create(&tenant, Actor::system(), input(&["auth.roles.read"])).await;
+            let reader = reader.unwrap();
+            let user =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
+            let assign = |roles: Vec<uuid::Uuid>| {
+                services.roles.set_user_roles(&tenant, Actor::system(), user.id, roles)
+            };
+            assign(vec![reader.id]).await.unwrap();
+            let ada = bearer(&app, "ada@example.com", PASSWORD).await;
+            let status = async || call(&app, "GET", "/roles", Some(&ada), None).await.0;
+            assert_eq!(status().await, StatusCode::OK);
+
+            // Gỡ role: cùng token, request kế tiếp bị từ chối.
+            assign(Vec::new()).await.unwrap();
+            assert_eq!(status().await, StatusCode::FORBIDDEN);
+            // Gán lại: có quyền lại ngay.
+            assign(vec![reader.id]).await.unwrap();
+            assert_eq!(status().await, StatusCode::OK);
+            // Bớt permission của role (người dùng vẫn giữ role): mất quyền ngay.
+            services
+                .roles
+                .update(&tenant, Actor::system(), reader.id, input(&[]), None)
+                .await
+                .unwrap();
+            assert_eq!(status().await, StatusCode::FORBIDDEN);
+        })
+        .await
+        .unwrap();
+    }
 }
