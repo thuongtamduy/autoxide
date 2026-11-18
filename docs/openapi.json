@@ -16114,6 +16114,10 @@
                 },
                 "type": "array"
               },
+              "description": {
+                "description": "One sentence about what the module does; empty when the module gives none.",
+                "type": "string"
+              },
               "events": {
                 "description": "Events the module emits.",
                 "items": {
@@ -16178,10 +16182,24 @@
                 "minimum": 0,
                 "type": "integer"
               },
+              "prompts": {
+                "description": "MCP prompts (templates for common jobs) the module offers at `/mcp`.",
+                "items": {
+                  "$ref": "#/components/schemas/ModulePrompt"
+                },
+                "type": "array"
+              },
               "requires": {
                 "description": "Modules this module uses; a plan that turns this module on must turn them on too.",
                 "items": {
                   "type": "string"
+                },
+                "type": "array"
+              },
+              "resources": {
+                "description": "MCP resources (read-only documents) the module offers at `/mcp`.",
+                "items": {
+                  "$ref": "#/components/schemas/ModuleResource"
                 },
                 "type": "array"
               },
@@ -16209,6 +16227,7 @@
             },
             "required": [
               "name",
+              "description",
               "internal",
               "position",
               "permissions",
@@ -16217,6 +16236,8 @@
               "jobs",
               "schedules",
               "tools",
+              "resources",
+              "prompts",
               "deprecations",
               "languages",
               "migrations",
@@ -23208,6 +23229,10 @@
                   },
                   "type": "array"
                 },
+                "description": {
+                  "description": "One sentence about what the module does; empty when the module gives none.",
+                  "type": "string"
+                },
                 "events": {
                   "description": "Events the module emits.",
                   "items": {
@@ -23272,10 +23297,24 @@
                   "minimum": 0,
                   "type": "integer"
                 },
+                "prompts": {
+                  "description": "MCP prompts (templates for common jobs) the module offers at `/mcp`.",
+                  "items": {
+                    "$ref": "#/components/schemas/ModulePrompt"
+                  },
+                  "type": "array"
+                },
                 "requires": {
                   "description": "Modules this module uses; a plan that turns this module on must turn them on too.",
                   "items": {
                     "type": "string"
+                  },
+                  "type": "array"
+                },
+                "resources": {
+                  "description": "MCP resources (read-only documents) the module offers at `/mcp`.",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleResource"
                   },
                   "type": "array"
                 },
@@ -23303,6 +23342,7 @@
               },
               "required": [
                 "name",
+                "description",
                 "internal",
                 "position",
                 "permissions",
@@ -23311,6 +23351,8 @@
                 "jobs",
                 "schedules",
                 "tools",
+                "resources",
+                "prompts",
                 "deprecations",
                 "languages",
                 "migrations",
@@ -32776,6 +32818,10 @@
             },
             "type": "array"
           },
+          "description": {
+            "description": "One sentence about what the module does; empty when the module gives none.",
+            "type": "string"
+          },
           "events": {
             "description": "Events the module emits.",
             "items": {
@@ -32840,10 +32886,24 @@
             "minimum": 0,
             "type": "integer"
           },
+          "prompts": {
+            "description": "MCP prompts (templates for common jobs) the module offers at `/mcp`.",
+            "items": {
+              "$ref": "#/components/schemas/ModulePrompt"
+            },
+            "type": "array"
+          },
           "requires": {
             "description": "Modules this module uses; a plan that turns this module on must turn them on too.",
             "items": {
               "type": "string"
+            },
+            "type": "array"
+          },
+          "resources": {
+            "description": "MCP resources (read-only documents) the module offers at `/mcp`.",
+            "items": {
+              "$ref": "#/components/schemas/ModuleResource"
             },
             "type": "array"
           },
@@ -32871,6 +32931,7 @@
         },
         "required": [
           "name",
+          "description",
           "internal",
           "position",
           "permissions",
@@ -32879,6 +32940,8 @@
           "jobs",
           "schedules",
           "tools",
+          "resources",
+          "prompts",
           "deprecations",
           "languages",
           "migrations",
@@ -32973,6 +33036,95 @@
           "name",
           "description",
           "risk"
+        ],
+        "type": "object"
+      },
+      "ModulePrompt": {
+        "description": "An MCP prompt: a template for a common job, fetched with `prompts/get`.",
+        "properties": {
+          "arguments": {
+            "items": {
+              "$ref": "#/components/schemas/ModulePromptArgument"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "description": "Full prompt name, `<module>.<prompt>`.",
+            "example": "content.draft_post",
+            "type": "string"
+          },
+          "tools": {
+            "description": "Full names of the tools the prompt leads to; only callers who may call all of them see\nthe prompt.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "arguments",
+          "tools"
+        ],
+        "type": "object"
+      },
+      "ModulePromptArgument": {
+        "description": "An argument of an MCP prompt.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "example": "topic",
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "required"
+        ],
+        "type": "object"
+      },
+      "ModuleResource": {
+        "description": "An MCP resource: a read-only document an agent reads with `resources/read`.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "mime_type": {
+            "example": "text/markdown",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "permissions": {
+            "description": "The caller needs this permission to see and read the resource; empty means any\nsigned-in caller.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "uri": {
+            "description": "Full URI, `autoxide://<module>/<path>`.",
+            "example": "autoxide://content/guide",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uri",
+          "name",
+          "description",
+          "mime_type",
+          "permissions"
         ],
         "type": "object"
       },
@@ -127006,6 +127158,53 @@
           }
         },
         "summary": "Readiness probe: can the service handle requests?",
+        "tags": [
+          "health"
+        ],
+        "x-public": true
+      }
+    },
+    "/llms.txt": {
+      "get": {
+        "description": "Plain text in the llmstxt.org format: where the OpenAPI document and the MCP endpoint are,\nhow to authenticate, the conventions every endpoint follows, the installed modules, and the\nMCP prompts and resources. Generated from the code at start-up.",
+        "operationId": "llms_txt",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The overview, as Markdown text."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Overview of this server for AI agents.",
         "tags": [
           "health"
         ],

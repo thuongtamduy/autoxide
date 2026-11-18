@@ -264,6 +264,9 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
             *notes,
             json!({
                 "name": "notes",
+                "description": "",
+                "resources": [],
+                "prompts": [],
                 "internal": false,
                 "position": 2,
                 "permissions": [{ "name": "notes.write", "description": "Write notes.", "risk": "write" }],

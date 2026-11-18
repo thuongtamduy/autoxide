@@ -49,6 +49,10 @@ impl Module for NotesModule {
         "notes"
     }
 
+    fn description(&self) -> &'static str {
+        "Sample module: personal notes, showing every part of the module contract."
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }

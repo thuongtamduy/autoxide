@@ -49,6 +49,10 @@ impl Module for MailModule {
         "mail"
     }
 
+    fn description(&self) -> &'static str {
+        "Outgoing mail for every module, queued and retried, over SMTP or to files in development."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true

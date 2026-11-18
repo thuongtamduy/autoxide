@@ -12,7 +12,8 @@
 //!   khoản quản trị `admin@example.com` / `correct horse battery staple`.
 //! - Khối code của bản tiếng Việt phải giống hệt bản tiếng Anh.
 //! - Bảng tool của `mcp.md` (giữa `<!-- tools:start -->` và `<!-- tools:end -->`) phải khớp
-//!   `Modules::tools()`.
+//!   `Modules::tools()`; bảng resource và prompt (`resources:` / `prompts:`) khớp
+//!   `Modules::mcp_resources()` / `Modules::prompts()`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -420,6 +421,63 @@ async fn bang_tool_mcp_khop_voi_code() {
                 "the tool table of docs/guides/{file} is out of date; the rows must be:\n{}",
                 expected.join("\n")
             );
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// Dòng giữa `<!-- {marker}:start -->` và `<!-- {marker}:end -->` của `file` bắt đầu bằng "| `".
+fn table_rows(file: &str, marker: &str) -> Vec<String> {
+    let text = std::fs::read_to_string(guides_dir().join(file)).unwrap();
+    let start = text.find(&format!("<!-- {marker}:start -->")).expect("start marker");
+    let end = text.find(&format!("<!-- {marker}:end -->")).expect("end marker");
+    text[start..end].lines().filter(|line| line.starts_with("| `")).map(str::to_owned).collect()
+}
+
+/// Bảng resource và prompt trong `mcp.md` (cả bản tiếng Việt) khớp khai báo của mọi module.
+#[tokio::test]
+async fn bang_resource_va_prompt_mcp_khop_voi_code() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let mut resources = app.modules().mcp_resources().unwrap();
+        resources.sort_by(|a, b| a.uri().cmp(b.uri()));
+        let resource_rows: Vec<String> = resources
+            .iter()
+            .map(|resource| {
+                let permission = resource
+                    .permission()
+                    .map_or_else(|| "—".to_owned(), |permission| format!("`{}`", permission.name()));
+                format!("| `{}` | {permission} | {} |", resource.uri(), resource.mime_type())
+            })
+            .collect();
+        let mut prompts = app.modules().prompts().unwrap();
+        prompts.sort_by(|a, b| a.name().cmp(b.name()));
+        let prompt_rows: Vec<String> = prompts
+            .iter()
+            .map(|prompt| {
+                let arguments: Vec<String> = prompt
+                    .arguments()
+                    .iter()
+                    .map(|argument| {
+                        let required = if argument.required { " (required)" } else { "" };
+                        format!("`{}`{required}", argument.name)
+                    })
+                    .collect();
+                let tools: Vec<String> =
+                    prompt.tools().iter().map(|tool| format!("`{tool}`")).collect();
+                format!("| `{}` | {} | {} |", prompt.name(), arguments.join(", "), tools.join(", "))
+            })
+            .collect();
+        for file in ["mcp.md", "mcp.vi.md"] {
+            for (marker, expected) in [("resources", &resource_rows), ("prompts", &prompt_rows)] {
+                assert_eq!(
+                    &table_rows(file, marker),
+                    expected,
+                    "the {marker} table of docs/guides/{file} is out of date; the rows must be:\n{}",
+                    expected.join("\n")
+                );
+            }
         }
     })
     .await

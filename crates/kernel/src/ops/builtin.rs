@@ -515,6 +515,15 @@ impl Module for KernelModule {
         })
     }
 
+    fn description(&self) -> &'static str {
+        "The core: tenants and their databases, domains, settings, the module catalog, \
+         navigation, background jobs and the shared tools of every module."
+    }
+
+    fn mcp_resources(&self) -> Vec<crate::mcp::McpResource> {
+        self.catalog_state().map_or_else(Vec::new, module_catalog::resources)
+    }
+
     fn tools(&self) -> Vec<crate::mcp::Tool> {
         let mut tools = self.catalog_state().map_or_else(Vec::new, module_catalog::tools);
         if let Some(state) = self.navigation_state() {

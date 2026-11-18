@@ -90,6 +90,11 @@ impl Module for LedgerModule {
         "ledger"
     }
 
+    fn description(&self) -> &'static str {
+        "Double-entry ledger per organization unit: accounts, append-only entries, balances, \
+         holds, payouts and payments through licensed partners."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true

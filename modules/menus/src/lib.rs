@@ -69,6 +69,11 @@ impl Module for MenusModule {
         "menus"
     }
 
+    fn description(&self) -> &'static str {
+        "Website menus (top bar, mega menu, footer) whose items point to addresses or to \
+         records of any module."
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }

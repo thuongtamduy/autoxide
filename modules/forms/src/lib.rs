@@ -75,6 +75,11 @@ impl Module for FormsModule {
         "forms"
     }
 
+    fn description(&self) -> &'static str {
+        "Forms with typed fields, public submissions behind spam protection, an inbox, CSV \
+         export and retention."
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }

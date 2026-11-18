@@ -85,6 +85,11 @@ impl Module for PlansModule {
         "plans"
     }
 
+    fn description(&self) -> &'static str {
+        "Plans that sell modules, features and limits per tenant, with add-ons, overrides, \
+         subscriptions and usage."
+    }
+
     // Gói không tự tắt được chính module quản lý gói.
     fn always_enabled(&self) -> bool {
         true

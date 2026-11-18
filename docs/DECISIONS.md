@@ -9138,3 +9138,34 @@ liệu cá nhân.
 3. `GET /api/v1/kernel/devtools/events?object=<kind>:<id>` đọc từ audit qua `RecordHistory` (outbox bị dọn sau khi giao); chưa
    cài audit thì trả rỗng. Chạy lại job trong dead-letter queue đã có từ bước 51 P15 (`POST /kernel/jobs/{id}/retry`, event
    `kernel.job_retried`).
+
+## D-372 · MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18 — agent quyết
+
+1. **Hai hàm mới của `Module`, mặc định rỗng (D-038):** `mcp_resources()` → `McpResource`, `prompts()` → `Prompt`, cùng
+   `description()` (một câu tiếng Anh, mặc định `""`). Tên `McpResource` để không lẫn với `autoxide_kernel::resource` (sổ loại
+   bản ghi của D-123). Kernel đặt URI `autoxide://<module>/<path>` và tên prompt `<module>.<tên>`; `Modules` kiểm lúc khởi động
+   như tool: tên / path đúng dạng, không trùng, permission có người khai, `uses` trỏ tới tool có thật của cùng module, mô tả
+   không có chữ chưa dịch. Như tool (D-245), resource phải `requires(…)` hoặc `for_any_signed_in()`; prompt phải có `uses` hoặc
+   `for_any_signed_in()` — thiếu là lỗi khởi động.
+2. **Quyền:** resource theo permission của nó; prompt hiện với người gọi được **mọi** tool của `uses` — không lộ việc người gọi
+   không làm được; cả hai bị ẩn khi gói của khách không có module (như tool, bước 35). `resources/read` / `prompts/get` với URI /
+   tên không có, không được dùng hay module bị gói tắt trả **cùng một** lỗi `invalid_params` ("Unknown resource … call
+   `resources/list`"). Lỗi khác (đối số thiếu / lạ, giá trị sai) là lỗi giao thức `invalid_params` với `data` cùng hình dạng
+   Problem (`code`, `message` đã dịch, `errors`); MCP không có "kết quả lỗi" cho resource / prompt như `isError` của tool.
+3. **Đối số là dữ liệu (D-109):** `PromptArguments::fenced` đặt giá trị trong `<tên>…</tên>` và thay `<` `>` của giá trị bằng `‹`
+   `›` để giá trị không tự đóng khối; mẫu nói rõ phần trong thẻ không phải chỉ dẫn. Prompt không gọi gì — chỉ trả tin nhắn; mọi
+   việc vẫn qua tool với permission của người gọi (luật kiến trúc 8). `content.draft_post` dặn không đăng.
+4. **Resource có sẵn:** `autoxide://kernel/llms.txt` và `autoxide://kernel/openapi.json` (ai đăng nhập cũng đọc, cùng nội dung với
+   hai trang công khai, dựng trong `http::build` vì cần tài liệu đã ghép), `autoxide://kernel/modules` (`kernel.modules.read`),
+   `autoxide://content/guide`, `autoxide://content/schema/entry` (= `EntryResponse`), `autoxide://comments/guide`. Hướng dẫn viết
+   trong `mcp_guide.md` cạnh code (`include_str!`). Schema dùng `McpResource::schema::<T>`: schema của `T` với kiểu con nhúng
+   trong `$defs` (`$ref` đổi `#/components/schemas/X` → `#/$defs/X`) để agent đọc một mình là đủ; test so với `openapi.json`.
+5. **`/llms.txt`** (llmstxt.org): sinh một lần lúc dựng router từ module đã đăng ký, `description()`, resource và prompt, đường
+   dẫn OpenAPI / MCP / trang tài liệu (chỉ khi bật); link tuyệt đối khi có `AUTOXIDE_HTTP_PUBLIC_URL`. Công khai,
+   `Cache-Control: public, max-age=300`. Liệt kê **mọi** resource / prompt kèm permission (không chỉ cái không cần quyền): đó là
+   thông tin về code, cùng mức với `openapi.json` và `docs/mcp-tools.json` vốn công khai. Liệt kê module của **bản cài**, không
+   lọc theo gói của khách (đặc tả để TODO tới sau bước 35): trang công khai không biết người gọi, lọc theo khách thì phải đọc
+   database mỗi request; endpoint / tool của module gói không có vẫn trả `module_not_enabled`, `tools/list` vẫn lọc. Chưa làm
+   `/llms-full.txt` (theo khuyến nghị của đặc tả) — hướng dẫn cho agent đã là resource MCP.
+6. `docs/mcp-tools.json` thêm `resources` và `prompts` (khoá mới, `api-diff` chỉ so `tools`); `docs/guides/mcp.md` có bảng
+   resource / prompt, test giữ khớp code như bảng tool.

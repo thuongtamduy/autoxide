@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 40, MCP: the endpoint `/mcp` also serves **resources** (`resources/list`, `resources/read`) and **prompts**
+  (`prompts/list`, `prompts/get`), filtered by permission like tools; one the caller may not use answers like one that
+  does not exist. Resources: `autoxide://kernel/llms.txt`, `autoxide://kernel/openapi.json`, `autoxide://kernel/modules`
+  (`kernel.modules.read`), `autoxide://content/guide` and `autoxide://content/schema/entry` (`content.read`),
+  `autoxide://comments/guide` (`comments.moderate`). Prompts: `content.draft_post` (writes a draft, never publishes) and
+  `comments.moderate_queue`. `GET /llms.txt` (public, llmstxt.org format) tells agents where the OpenAPI document and
+  `/mcp` are, how to authenticate, the conventions and the installed modules; it is generated from the code at start.
+  The module catalog gains `description`, `resources` and `prompts`; `docs/mcp-tools.json` lists resources and prompts.
+  For module authors: `Module::{mcp_resources, prompts, description}` (empty by default), `McpResource`
+  (`text`, `schema::<T>`, `new`), `Prompt`, `PromptArgument`, `PromptArguments::fenced`.
 - Step 52, developer tools: `GET /api/v1/webhooks/deliveries` lists the deliveries of every endpoint (filter `status`,
   `endpoint_id`); `POST /api/v1/webhooks/deliveries/{id}/redeliver` sends a finished delivery again with the same body and
   `webhook-id` (event `webhooks.delivery_redelivered`); MCP tools `webhooks.list_deliveries` and `webhooks.redeliver`.

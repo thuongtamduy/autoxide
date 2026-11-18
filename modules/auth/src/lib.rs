@@ -117,6 +117,11 @@ impl Module for AuthModule {
         "auth"
     }
 
+    fn description(&self) -> &'static str {
+        "User accounts, sign-in with passwords, passkeys and TOTP, access and refresh tokens, \
+         API keys, roles and permissions."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
         vec![api_key::API_KEYS_FEATURE]

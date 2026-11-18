@@ -69,6 +69,11 @@ impl Module for WebhooksModule {
         "webhooks"
     }
 
+    fn description(&self) -> &'static str {
+        "Signed webhooks (Standard Webhooks) that send module events to other systems, with \
+         retries and delivery history."
+    }
+
     fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
         use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
         // Số ngày là hằng số của job dọn, không phải cấu hình.

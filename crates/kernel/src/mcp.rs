@@ -12,6 +12,10 @@
 //!   được gì mà REST với cùng permission không làm được, và lệnh ghi đi qua event /
 //!   audit log như REST (luật kiến trúc 8).
 //!
+//! Ngoài tool, module khai thêm **resource** ([`McpResource`]: tài liệu chỉ đọc, vd hướng dẫn hay
+//! JSON Schema của một loại bản ghi) và **prompt** ([`Prompt`]: mẫu lời nhắc cho việc hay làm) qua
+//! `Module::mcp_resources` và `Module::prompts` (bước 40 P2). Cả hai lọc theo permission như tool.
+//!
 //! ```
 //! use autoxide_kernel::access::{Permission, Principal};
 //! use autoxide_kernel::mcp::{NoInput, Tool};
@@ -31,6 +35,12 @@
 //! .requires(NOTES_READ)
 //! .read_only();
 //! ```
+
+mod prompts;
+mod resources;
+
+pub use prompts::{Prompt, PromptArgument, PromptArguments, PromptMessage};
+pub use resources::{McpResource, RESOURCE_SCHEME, SCHEMA_MIME, schema_document};
 
 use std::future::Future;
 use std::marker::PhantomData;

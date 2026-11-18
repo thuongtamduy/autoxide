@@ -252,3 +252,40 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `webhooks.redeliver` | `webhooks.manage` | writes |
 
 <!-- tools:end -->
+
+## 4. Resource và prompt
+
+Ngoài tool, `/mcp` có **resource** (tài liệu chỉ đọc: `resources/list`, `resources/read`) và **prompt** (mẫu lời nhắc cho việc hay làm: `prompts/list`, `prompts/get`). Cả hai theo permission như tool: resource chỉ hiện với người gọi có permission của nó, prompt chỉ hiện với người gọi được mọi tool mà prompt dẫn tới. Resource hay prompt người gọi không được dùng trả lời y hệt cái không tồn tại.
+
+Ai đăng nhập cũng đọc được `autoxide://kernel/llms.txt` (cùng nội dung với `/llms.txt`) và `autoxide://kernel/openapi.json` (hợp đồng REST). Prompt không tự gọi gì: nó trả tin nhắn nói mô hình nên gọi tool nào, và đối số của người dùng nằm trong thẻ như `<topic>…</topic>`, được đánh dấu là dữ liệu.
+
+Resource và prompt của phiên bản này (`docs/mcp-tools.json` cũng liệt kê):
+
+<!-- resources:start -->
+
+| Resource | Permission | Loại |
+|---|---|---|
+| `autoxide://comments/guide` | `comments.moderate` | text/markdown |
+| `autoxide://content/guide` | `content.read` | text/markdown |
+| `autoxide://content/schema/entry` | `content.read` | application/schema+json |
+| `autoxide://kernel/modules` | `kernel.modules.read` | application/json |
+
+<!-- resources:end -->
+
+<!-- prompts:start -->
+
+| Prompt | Đối số | Dẫn tới |
+|---|---|---|
+| `comments.moderate_queue` | `limit` | `comments.queue`, `comments.moderate` |
+| `content.draft_post` | `topic` (required), `locale`, `audience` | `content.create_draft` |
+
+<!-- prompts:end -->
+
+## 5. Cho agent tự tìm đường: `/llms.txt`
+
+`/llms.txt` là trang công khai theo định dạng [llmstxt.org](https://llmstxt.org): tài liệu OpenAPI và `/mcp` ở đâu, xác thực thế nào, quy ước chung của mọi endpoint, các module đã cài và prompt, resource MCP. Trang sinh từ code lúc máy chủ khởi động nên luôn khớp phiên bản này. Link là tuyệt đối khi đặt `AUTOXIDE_HTTP_PUBLIC_URL`.
+
+<!-- example: llms-txt -->
+```bash
+curl -sS "$API/llms.txt"
+```

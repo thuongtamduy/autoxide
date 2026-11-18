@@ -79,6 +79,11 @@ impl Module for MediaModule {
         "media"
     }
 
+    fn description(&self) -> &'static str {
+        "Media library: images, video, audio and documents in nested folders, with tags, alt \
+         text and resized copies."
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }
