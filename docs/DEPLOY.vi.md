@@ -608,6 +608,52 @@ chạy từ placement mới và chỉ còn bản cũ chờ xoá.
 bằng `PUT /api/v1/compliance/residency`) không dời được sang placement ở nước khác hay chưa rõ nước: lượt dời
 trả `tenant_residency_violation`. Xem [COMPLIANCE.vi.md](COMPLIANCE.vi.md#nơi-lưu-dữ-liệu).
 
+## Tách một nhánh thành khách riêng, và gộp khách
+
+Cây tổ chức của một khách có thể lớn hơn khách đó: một vùng thành công ty riêng, hay một cửa hàng
+đang có khách riêng nhập vào chuỗi. Nhân sự nền tảng tách một nhánh thành khách mới ở database
+khác, hoặc gộp một khách vào khách khác dưới một nút của nó. Mọi dòng giữ nguyên ID, nên tách rồi
+gộp lại cho đúng dữ liệu ban đầu.
+
+```bash
+# Tách nút <north> của `acme` thành khách `acme-north` ở placement `acme-north-db`.
+autoxide tenant split acme --org <north> --slug acme-north --name "Acme North" \
+  --placement acme-north-db --reason "Hợp đồng 2026-11: vùng thành công ty riêng" --dry-run
+# Gộp `acme-north` trở lại `acme` dưới nút <gốc-hay-nút-khác>.
+autoxide tenant merge acme-north --into acme --under-org <unit> --reason "…" --dry-run
+```
+
+- **Chạy thử trước.** Kế hoạch liệt kê, cho từng bảng, số dòng đi, được chép, ở lại, hay phải chạy
+  xong trước (event chưa giao, job đến hạn); những gì chặn (khách không hoạt động, một lần tách /
+  gộp / dời khác đang dở, thiếu migration, đích là cùng database); và **xung đột**: dòng trỏ vắt qua
+  ranh giới (dòng đi trỏ tới dòng ở lại, hay ngược lại) và giá trị unique khách nhận đã có (hai
+  trang cùng slug). Sửa xong thì chạy lại đúng lệnh đó, bỏ `--dry-run`.
+- **Hai database.** Placement đích phải là database khác database của khách nguồn. Muốn tách vào
+  database chung, hay gộp hai khách cùng database, hãy dời một khách trước (`autoxide tenant move`).
+- **Chuyện gì xảy ra.** Khách (cả hai khách khi gộp) trả `503 tenant_maintenance`; event chưa giao
+  và job đến hạn của khách chạy hết trước (`AUTOXIDE_RELOCATION_DRAIN_SECONDS`, mặc định 300). Rồi
+  các dòng được chép trong một transaction ở đích, giữ nguyên ID; khách mới mang ID của nút gốc
+  nhánh, nút đó thành gốc của nó. Các dòng được kiểm, hai khách chuyển trong một transaction (tên
+  miền gắn nút trong nhánh đi theo; khách bị gộp thành `merged`), rồi dòng đã đi bị xoá ở nguồn. File
+  của thứ đi theo được chép sang tiền tố của khách mới. Audit log về thứ đi theo được ghi lại vào
+  chuỗi băm của đích; nguồn giữ nguyên chuỗi của mình. Sổ cái đi theo nút của sổ và chuỗi niêm phong
+  vẫn kiểm được. Kho báo cáo của cây đi theo (`reporting.rehome`).
+- **Thứ ở lại.** Mỗi module khai bảng của mình đi thế nào (`Module::relocation`): dữ liệu cá nhân
+  của khách (người đăng ký, đồng ý, định danh, bình luận) ở lại khách nguồn khi tách và đi theo khi
+  gộp; tài khoản nhân viên có role ở nút trong nhánh được chép (đăng nhập lại); role và cấu hình
+  tương tự được chép; thuê bao, phiên đăng nhập, bộ đếm ở lại.
+- **Căn cứ pháp lý.** Chuyển dữ liệu giữa hai khách có thể là chuyển dữ liệu cá nhân giữa hai bên
+  kiểm soát; `--reason` là bắt buộc, được lưu cùng lần chạy và vào audit log.
+- **Chạy tiếp.** Dừng giữa chừng thì chạy `autoxide tenant split --resume <id>` (hay `merge`); mọi
+  bước chạy lại được. `autoxide tenant relocation-status <id>` cho biết trạng thái và lỗi.
+
+Qua API, nhân sự nền tảng có `kernel.tenants.relocate` gọi `POST /api/v1/kernel/relocations`
+(`{"kind": "split", "tenant": "acme", "org_id": "…", "slug": "…", "name": "…", "placement": "…",
+"reason": "…"}`): đó là chạy thử; thêm `"dry_run": false` để chạy bằng job nền và theo dõi ở
+`GET /api/v1/kernel/relocations/{id}`. Khách không tự tách / gộp: quản trị viên của khách
+(`kernel.relocations.request`) gửi yêu cầu bằng `POST /api/v1/kernel/tenant/relocation-requests`,
+yêu cầu vào hộp việc của nhân sự nền tảng, người chạy nó bằng `"request_id"`.
+
 ## Sự cố dữ liệu cá nhân
 
 Khi dữ liệu cá nhân có thể đã lộ (mất bản backup, database bị mở ra ngoài, gửi nhầm mail), ở Việt Nam báo cáo

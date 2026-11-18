@@ -32,13 +32,14 @@
 //!   rồi tìm ở nguồn: hai cấu hình khác nhau mà cùng một chỗ (vd nơi lưu riêng trỏ đúng thư mục của
 //!   nơi lưu chung) thì coi là cùng nơi lưu — không bao giờ xoá file đang dùng.
 
+mod claims;
 mod http;
 
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Query};
+use sea_orm::sea_query::{Condition, Expr};
 use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -60,6 +61,7 @@ use crate::migration::prelude::*;
 use crate::storage::Storage;
 use crate::transfer::{CopiedTable, TableKind, TenantTables, TransferError, same_database};
 
+pub(super) use claims::wait_claims;
 pub(crate) use http::{routes, tools};
 
 /// Dời dữ liệu của khách sang placement khác.
@@ -87,10 +89,6 @@ const UNFINISHED: [&str; 3] = [COPYING, COPIED, SWITCHED];
 
 /// Một bên giữ lượt dời tối đa chừng này mà không gia hạn; đang chạy thì gia hạn mỗi một phần ba.
 const LEASE: Duration = Duration::from_secs(120);
-/// Hỏi lại job / event còn bị giữ ở nguồn sau chừng này.
-const CLAIM_POLL: Duration = Duration::from_millis(500);
-/// Chờ job / event ở nguồn hết bị giữ tối đa chừng này (job giữ tối đa 5 phút).
-const CLAIM_WAIT: Duration = Duration::from_secs(330);
 /// Bảng outbox của `kernel`: có thêm event `kernel.tenant_moved` ở đích.
 const KERNEL_EVENTS: &str = "kernel_events";
 
@@ -298,6 +296,8 @@ struct Setup {
     placements: super::Placements,
     /// Bảng giữ lại khi xoá hẳn khách (`Module::retained_tables`, D-337).
     retained: Vec<&'static str>,
+    /// Chính sách tách / gộp của mọi module (`Module::relocation`, bước 38).
+    policies: super::relocate::Policies,
 }
 
 impl MoveSetup {
@@ -308,8 +308,26 @@ impl MoveSetup {
         migrator: Migrator,
         placements: super::Placements,
         retained: Vec<&'static str>,
+        policies: super::relocate::Policies,
     ) {
-        let _ = self.0.set(Setup { modules, control_plane, migrator, placements, retained });
+        let _ =
+            self.0.set(Setup { modules, control_plane, migrator, placements, retained, policies });
+    }
+
+    /// Chính sách tách / gộp của mọi module.
+    pub(crate) fn policies(&self) -> Result<super::relocate::Policies, Error> {
+        Ok(self.get()?.policies.clone())
+    }
+
+    /// Migration còn thiếu ở `database`, theo mọi module đã đăng ký.
+    pub(crate) async fn pending(
+        &self,
+        database: &Database,
+    ) -> Result<usize, crate::migration::MigrationError> {
+        match self.get() {
+            Ok(setup) => Ok(setup.migrator.pending(database).await?.len()),
+            Err(_) => Ok(0),
+        }
     }
 
     /// Bảng mọi module khai giữ lại khi xoá hẳn khách.
@@ -367,7 +385,7 @@ fn transfer(error: TransferError) -> Error {
 }
 
 /// Lỗi kèm nguyên nhân gốc, cho người vận hành đọc (cột `error`, log).
-fn describe(error: &Error) -> String {
+pub(super) fn describe(error: &Error) -> String {
     match std::error::Error::source(error) {
         Some(source) => format!("{}: {source}", error.code()),
         None => format!("{}: {}", error.code(), error.message()),
@@ -1279,48 +1297,6 @@ async fn verify(
         }
     }
     Ok(())
-}
-
-/// Chờ tới khi không job hay event nào của khách `tenant` ở `source` còn bị giữ (worker hay bộ phát
-/// đang chạy nó). Worker và bộ phát không nhận việc mới của khách `moving`, nên chỉ phải chờ phần đã
-/// nhận trước đó — tối đa thời hạn giữ của job.
-async fn wait_claims(
-    source: &Database,
-    tables: &TenantTables,
-    tenant: TenantId,
-) -> Result<(), Error> {
-    let started = std::time::Instant::now();
-    loop {
-        let at = now();
-        let mut busy = 0u64;
-        for (table, kind) in tables.queues() {
-            let finished = match kind {
-                TableKind::Jobs => "completed_at",
-                _ => "delivered_at",
-            };
-            let select = Query::select()
-                .expr_as(Expr::cust("COUNT(*)"), Alias::new("busy"))
-                .from(Alias::new(table))
-                .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.as_uuid()))
-                .and_where(Expr::col(Alias::new("claimed_until")).gt(at))
-                .and_where(Expr::col(Alias::new(finished)).is_null())
-                .and_where(Expr::col(Alias::new("failed_at")).is_null())
-                .to_owned();
-            let row = source.write().query_one(&select).await?;
-            let count: i64 = match row {
-                Some(row) => row.try_get("", "busy")?,
-                None => 0,
-            };
-            busy += <u64 as TryFrom<i64>>::try_from(count).unwrap_or(0);
-        }
-        if busy == 0 {
-            return Ok(());
-        }
-        if started.elapsed() > CLAIM_WAIT {
-            return Err(errors::tenant_move_busy(busy));
-        }
-        tokio::time::sleep(CLAIM_POLL).await;
-    }
 }
 
 /// Bộ chạy job `kernel.move_tenant` (job của database điều khiển, không thuộc khách nào): chạy lượt

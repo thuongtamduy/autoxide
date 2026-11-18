@@ -241,9 +241,14 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
       liệu cha → con (vd danh mục, bảng giá) gọi service của con, chạy lại được, không trùng — xong (18/11,
       D-20261118-step38-distribution): test đầu-cuối uỷ quyền vào con có database riêng (audit hai phía, thu hồi);
       kernel `tenancy::distribution` (`Distributor`, `DistributionApply`, `distribution_migration`) với module mẫu
-- [ ] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
-      test trên cả hai database
-- [ ] Đối chiếu thiết kế 2 (D-210): tách / gộp khách qua API chỉ cho nhân sự nền tảng, khách chỉ gửi yêu cầu
+- [x] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
+      test trên cả hai database — xong (18/11, D-20261118-step38-relocation): kernel `tenancy::relocate` (chính sách theo
+      bảng `Module::relocation` cho mọi module, kế hoạch / dry-run với xung đột tham chiếu và unique, chép có lọc + đổi
+      `tenant_id` giữ khoá chính, trạng thái chạy lại được, chuyển mặt điều khiển, dọn, file theo khách), audit ghi lại vào
+      chuỗi của đích, `reporting.rehome`, CLI `autoxide tenant split|merge|relocation-status`; test khứ hồi so mọi bảng
+- [x] Đối chiếu thiết kế 2 (D-210): tách / gộp khách qua API chỉ cho nhân sự nền tảng, khách chỉ gửi yêu cầu — xong
+      (18/11, D-20261118-step38-relocation): `POST /api/v1/kernel/relocations` (dry-run mặc định, job) +
+      `GET …/{id}`; khách gửi `POST /api/v1/kernel/tenant/relocation-requests`, yêu cầu vào hộp việc của nhân sự nền tảng
 - [ ] Khách thử nghiệm (sandbox, D-232): sao cấu hình không sao dữ liệu cá nhân, đối tác buộc dùng bộ giả, mail
       chỉ tới nhân viên, `noindex`, tự hết hạn; đẩy trang / theme / mẫu / luật sang khách thật thành bản nháp
 - [ ] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền

@@ -10,7 +10,7 @@ use autoxide_kernel::i18n::Language;
 use autoxide_kernel::pagination::{PageQuery, PageRequest};
 use autoxide_kernel::tenancy::{
     NewTenant, Tenant, TenantAdmin, TenantChanges, TenantFilter, TenantMove, TenantMovePlan,
-    TenantMoves,
+    TenantMoves, TenantRelocations,
 };
 
 use autoxide_plans::api::{ProvisionRequest, Provisioning};
@@ -96,6 +96,61 @@ enum Action {
         #[arg(long, conflicts_with_all = ["to", "keep_source"])]
         abort: bool,
     },
+    /// Split a branch of a tenant's organization tree into a tenant of its own on another
+    /// database, keeping every id and the history (platform staff). Try `--dry-run` first.
+    Split {
+        /// Id or slug of the tenant.
+        #[arg(required_unless_present = "resume")]
+        tenant: Option<String>,
+        /// Root unit of the branch; the new tenant gets this id.
+        #[arg(long, required_unless_present = "resume")]
+        org: Option<uuid::Uuid>,
+        /// Slug of the new tenant.
+        #[arg(long, required_unless_present = "resume")]
+        slug: Option<String>,
+        /// Name of the new tenant.
+        #[arg(long, required_unless_present = "resume")]
+        name: Option<String>,
+        /// Placement (database) of the new tenant; another database than the tenant's.
+        #[arg(long, required_unless_present = "resume")]
+        placement: Option<String>,
+        /// The new tenant is not a child of the tenant (a tree of its own).
+        #[arg(long)]
+        no_keep_parent: bool,
+        /// Why the data moves (contract, consent); required.
+        #[arg(long, required_unless_present = "resume")]
+        reason: Option<String>,
+        /// Only show what would happen and what blocks it; change nothing.
+        #[arg(long, conflicts_with = "resume")]
+        dry_run: bool,
+        /// Continue a split that stopped half-way.
+        #[arg(long)]
+        resume: Option<uuid::Uuid>,
+    },
+    /// Merge a tenant into another one under one of its units, keeping every id and the history
+    /// (platform staff). Try `--dry-run` first.
+    Merge {
+        /// Id or slug of the tenant to merge.
+        #[arg(required_unless_present = "resume")]
+        tenant: Option<String>,
+        /// Id or slug of the tenant that receives it.
+        #[arg(long, required_unless_present = "resume")]
+        into: Option<String>,
+        /// Unit of `--into` that the merged tenant's root goes under.
+        #[arg(long, required_unless_present = "resume")]
+        under_org: Option<uuid::Uuid>,
+        /// Why the data moves (contract, consent); required.
+        #[arg(long, required_unless_present = "resume")]
+        reason: Option<String>,
+        /// Only show what would happen and what blocks it; change nothing.
+        #[arg(long, conflicts_with = "resume")]
+        dry_run: bool,
+        /// Continue a merge that stopped half-way.
+        #[arg(long)]
+        resume: Option<uuid::Uuid>,
+    },
+    /// Show a split or merge of tenants.
+    RelocationStatus { id: uuid::Uuid },
     /// Delete a copy of a tenant's data left on a placement it no longer uses (by
     /// `move --keep-source`, or an aborted move).
     PurgeCopy {
@@ -119,10 +174,13 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         let services =
             runtime.modules.api::<TenantAdmin>().zip(runtime.modules.api::<TenantMoves>());
         let provisioning = runtime.modules.api::<dyn Provisioning>();
+        let relocations = runtime.modules.api::<TenantRelocations>();
         let outcome = match services {
-            Some((admin, moves)) => execute(&admin, &moves, provisioning.as_deref(), action)
-                .await
-                .map_err(|error| super::describe_error(&error)),
+            Some((admin, moves)) => {
+                execute(&admin, &moves, relocations.as_deref(), provisioning.as_deref(), action)
+                    .await
+                    .map_err(|error| super::describe_error(&error))
+            }
             None => Err("the kernel did not start its tenant services".to_owned()),
         };
         runtime.database.close().await.map_err(|error| format!("database: {error}"))?;
@@ -144,10 +202,46 @@ pub fn run(arguments: &Arguments) -> ExitCode {
 async fn execute(
     admin: &TenantAdmin,
     moves: &TenantMoves,
+    relocations: Option<&TenantRelocations>,
     provisioning: Option<&dyn Provisioning>,
     action: Action,
 ) -> Result<String, autoxide_kernel::error::Error> {
+    let relocations = || {
+        relocations.ok_or_else(|| {
+            autoxide_kernel::error::Error::internal("the kernel did not start tenant relocations")
+        })
+    };
     match action {
+        Action::Split {
+            tenant,
+            org,
+            slug,
+            name,
+            placement,
+            no_keep_parent,
+            reason,
+            dry_run,
+            resume,
+        } => {
+            let input = tenant.map(|tenant| {
+                super::tenant_relocate::split_input(
+                    tenant,
+                    org,
+                    slug,
+                    name,
+                    placement,
+                    no_keep_parent,
+                    reason,
+                )
+            });
+            super::tenant_relocate::relocate(relocations()?, input, dry_run, resume).await
+        }
+        Action::Merge { tenant, into, under_org, reason, dry_run, resume } => {
+            let input = tenant
+                .map(|tenant| super::tenant_relocate::merge_input(tenant, into, under_org, reason));
+            super::tenant_relocate::relocate(relocations()?, input, dry_run, resume).await
+        }
+        Action::RelocationStatus { id } => super::tenant_relocate::status(relocations()?, id).await,
         Action::Create {
             slug,
             name,
@@ -381,7 +475,7 @@ mod tests {
             let runtime = runtime::start(settings, Migrations::RequireApplied).await.unwrap();
             let admin = runtime.modules.api::<TenantAdmin>().unwrap();
             let moves = runtime.modules.api::<TenantMoves>().unwrap();
-            let execute = async |action| execute(&admin, &moves, None, action).await;
+            let execute = async |action| execute(&admin, &moves, None, None, action).await;
             let listed = execute(Action::List).await.unwrap();
             assert!(listed.contains("default  active  placement=main"), "{listed}");
             let shown = execute(Action::Show { tenant: "default".to_owned() }).await.unwrap();
@@ -436,7 +530,7 @@ mod tests {
             placements.up_all().await.unwrap();
             let admin = runtime.modules.api::<TenantAdmin>().unwrap();
             let moves = runtime.modules.api::<TenantMoves>().unwrap();
-            let execute = async |action| execute(&admin, &moves, None, action).await;
+            let execute = async |action| execute(&admin, &moves, None, None, action).await;
             let create = Action::Create {
                 slug: "acme".to_owned(),
                 name: "Acme".to_owned(),

@@ -62,6 +62,16 @@ impl Module for FilesModule {
         "files"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            // File không gắn nút: ở lại khách nguồn khi tách; file của thứ đi theo (media…) được
+            // kernel chép theo khoá `tenants/<khách>/<module>/<id>/…`.
+            .stay(&["files_file"])
+            .ephemeral(&["files_uploads"])
+    }
+
     fn description(&self) -> &'static str {
         "File storage for every module, on disk or on S3-compatible storage."
     }

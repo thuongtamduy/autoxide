@@ -221,6 +221,31 @@ họ), `subtree` (nút của họ và mọi nút bên dưới) hay `tenant` (m�
 
   Xem `modules/notes/src/branch_tests.rs`.
 
+### Tách và gộp khách
+
+Nhân sự nền tảng tách được một nhánh của khách thành khách riêng, hoặc gộp khách
+(`autoxide tenant split|merge`, [DEPLOY.vi.md](DEPLOY.vi.md#tách-một-nhánh-thành-khách-riêng-và-gộp-khách)).
+Khai cách từng bảng cấp khách của module đi theo trong `Module::relocation`; bảng quên khai được
+suy từ cột (có `org_id`: theo nút; không thì ở lại) và test đầu-cuối của binary hỏng cho tới khi
+bạn khai.
+
+```rust
+fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+    autoxide_kernel::tenancy::Relocation::new()
+        .by_org(&["shop_orders"])                          // đi theo nút ở `org_id`
+        .follow("shop_order_lines", "order_id", "shop_orders") // đi theo dòng cha
+        .copy_on_split(&["shop_settings"])                 // cấu hình: khách mới nhận bản sao
+        .stay(&["shop_customers"])                         // dữ liệu cá nhân ở lại khách nguồn
+        .ephemeral(&["shop_throttle"])                     // bộ đếm, phiên: không bao giờ đi
+        .sealed("shop_settings", "api_key", "shop.api_key", "id") // mã hoá bằng `Sealer`
+}
+```
+
+Dòng giữ nguyên khoá chính, chỉ `tenant_id` đổi, nên giữ tham chiếu trong module bằng ID. Bảng hàng
+đợi (`<module>_jobs`, `<module>_events`) không cần khai: dòng đến hạn chạy xong trước khi chép. Bảng
+cần xử lý riêng (chuỗi băm, bộ đếm theo tên dạng chữ) cài `RelocateTable` (`TablePolicy::Custom`),
+như `audit`.
+
 ### 3. Permission
 
 Khai trong `src/permissions.rs` dạng `<module>.<việc>` và trả từ `Module::permissions`.

@@ -91,6 +91,34 @@ impl Module for NotificationsModule {
         "notifications"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            .copy_on_split(&[
+                "notifications_templates",
+                "notifications_template_drafts",
+                "notifications_template_versions",
+                "notifications_template_live",
+                "notifications_branding",
+            ])
+            .stay(&[
+                "notifications_messages",
+                "notifications_inbox",
+                "notifications_preferences",
+                "notifications_push_subscriptions",
+                "notifications_device_tokens",
+            ])
+            .ephemeral(&["notifications_invitations", "notifications_throttle"])
+            .sealed(
+                "notifications_push_subscriptions",
+                "auth_secret",
+                "notifications.push_auth",
+                "id",
+            )
+            .sealed("notifications_device_tokens", "token", "notifications.device_token", "id")
+    }
+
     fn description(&self) -> &'static str {
         "Notifications to users by email, SMS, Zalo ZNS, web push, mobile push and an in-app \
          inbox, with templates and preferences."
