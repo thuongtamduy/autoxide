@@ -9240,3 +9240,12 @@ liệu cá nhân.
    sẻ, ID trong thân bài (ảnh, bản ghi nhúng — tìm `LIKE` trên thân bài, không index, chỉ chạy khi người dùng hỏi, có giới hạn);
    `menus`: đích và ô gợi ý của mục. `media` đăng ký loại `media.item` vào sổ đối tượng (tệp riêng tư không đưa tên ra ngoài) để
    kernel kiểm bản ghi được hỏi có thật và đọc được.
+
+## D-377 · Báo khi job xong và khi được nhắc trong ghi chú (bước 51 P13, P16) — 2026-11-18 — agent quyết
+
+1. Kernel phát `kernel.job_finished` (`job_id`, `kind`, `label`, `status`, `requested_by`) khi job **có người yêu cầu** (bảng
+   theo dõi P15) chạy xong hay hỏng hẳn — mọi loại job theo dõi (bản xuất, thao tác hàng loạt…), không riêng bản xuất. Ghi sau
+   khi đánh dấu xong, transaction riêng; ghi event lỗi thì chỉ ghi log, không làm job chạy lại (job đã xong).
+2. `notifications` đăng ký `kernel.job_finished` và `kernel.record_note_added` (có sẵn từ P13 nhưng chưa ai gửi tin): tin **chỉ
+   trong ứng dụng** (`notifications.job_finished`, `notifications.mentioned`, giao dịch), vì là việc vận hành hằng ngày — email
+   cho mỗi bản xuất là thừa. `dedupe_key` theo ID event (và người được nhắc), nên event giao lại không tạo tin thứ hai.

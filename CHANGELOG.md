@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 51: a tracked background job someone asked for (list export, bulk action…) emits `kernel.job_finished` when it
+  finishes or fails for good; `notifications` turns it into an in-app message for that person, and turns
+  `kernel.record_note_added` into an in-app message for each person mentioned in a note.
 - Step 51 P11: `POST /api/v1/me/can` takes `feature` and `limit` per question and answers `feature_not_in_plan` and
   `quota_exceeded` (with the real usage), each with `upgrade_to`: the plans on sale that would allow it
   (`Entitlements::plans_offering`, answered by `plans`).

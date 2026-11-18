@@ -823,3 +823,72 @@ async fn tool_mcp_dung_chung_service() {
     .await
     .unwrap();
 }
+
+/// Việc của kernel thành tin trong ứng dụng (bước 51): job người dùng yêu cầu đã xong → tin cho người
+/// yêu cầu; ghi chú có nhắc @ → tin cho người được nhắc; event giao lại không tạo tin thứ hai.
+#[tokio::test]
+async fn job_xong_va_nhac_ten_thanh_tin_trong_ung_dung() {
+    #[derive(serde::Serialize)]
+    struct JobFinished {
+        job_id: Uuid,
+        kind: &'static str,
+        label: &'static str,
+        status: &'static str,
+        requested_by: Uuid,
+    }
+    impl autoxide_kernel::event::Event for JobFinished {
+        const NAME: &'static str = "kernel.job_finished";
+    }
+    #[derive(serde::Serialize)]
+    struct NoteAdded {
+        kind: &'static str,
+        record_id: &'static str,
+        note_id: Uuid,
+        mentions: Vec<Uuid>,
+    }
+    impl autoxide_kernel::event::Event for NoteAdded {
+        const NAME: &'static str = "kernel.record_note_added";
+    }
+
+    TestDatabase::run(async |test| {
+        let fx = fixture(test).await;
+        let tenant = autoxide_kernel::tenancy::DatabaseRegistry::single(fx.app.database().clone())
+            .default_tenant();
+        let outbox = autoxide_kernel::event::Outbox::standalone("kernel");
+        let alice = Uuid::from_u128(2);
+        let transaction = tenant.database().begin_write().await.unwrap();
+        let actor = autoxide_kernel::event::Actor::system();
+        let job = JobFinished {
+            job_id: Uuid::now_v7(),
+            kind: "kernel.export_list",
+            label: "CSV export of content-entries",
+            status: "succeeded",
+            requested_by: alice,
+        };
+        outbox.record(&transaction, &tenant, actor.clone(), None, &job).await.unwrap();
+        let note = NoteAdded {
+            kind: "content.entry",
+            record_id: "e1",
+            note_id: Uuid::now_v7(),
+            mentions: vec![alice],
+        };
+        outbox.record(&transaction, &tenant, actor, None, &note).await.unwrap();
+        transaction.commit().await.unwrap();
+        let dispatcher = fx.app.modules().dispatcher().unwrap();
+        while dispatcher.run_once().await.unwrap() > 0 {}
+        run_jobs(&fx.app).await;
+
+        let (status, inbox) = call(&fx.app, "GET", "/me/inbox", "alice", None).await;
+        assert_eq!(status, StatusCode::OK, "{inbox}");
+        let titles: Vec<&str> =
+            inbox["data"].as_array().unwrap().iter().map(|m| m["title"].as_str().unwrap()).collect();
+        assert_eq!(titles.len(), 2, "{inbox}");
+        assert!(titles.contains(&"CSV export of content-entries: succeeded"), "{titles:?}");
+        assert!(titles.contains(&"You were mentioned in a note"), "{titles:?}");
+        let (_, admin) = call(&fx.app, "GET", "/me/inbox", "admin", None).await;
+        assert_eq!(admin["data"], json!([]), "tin chỉ tới đúng người");
+        assert!(fx.mails.all().is_empty(), "chỉ tin trong ứng dụng");
+    })
+    .await
+    .unwrap();
+}
