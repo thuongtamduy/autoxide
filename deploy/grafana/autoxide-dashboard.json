@@ -397,6 +397,44 @@
           "legendFormat": "{{database}} {{pool}}"
         }
       ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Age of the newest backup",
+      "description": "Time since the last successful scheduled backup of each database. Alert AutoxideBackupTooOld fires above 48 hours.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - max without(instance) (backup_last_success_timestamp_seconds{database=~\"$database\"})",
+          "legendFormat": "{{database}}"
+        }
+      ]
     }
   ]
 }

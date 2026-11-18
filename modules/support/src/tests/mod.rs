@@ -2,6 +2,7 @@
 //! `TestApp` dựng module như binary: migration → start → route → lớp HTTP của kernel.
 
 mod guests;
+mod scope;
 mod tickets;
 
 use std::sync::{Arc, Mutex};

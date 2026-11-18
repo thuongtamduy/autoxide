@@ -64,9 +64,10 @@ async fn canh_bao_van_hanh_chi_lieu_buoc_chua_dat() {
         let body = answer.json();
         let alerts = body["data"]["alerts"].as_array().unwrap();
         let names: Vec<&str> = alerts.iter().map(|alert| alert["name"].as_str().unwrap()).collect();
+        // `kernel.backup_age`: app thử không có nơi lưu file nên backup theo lịch không có chỗ ghi.
         assert_eq!(
             names,
-            ["demo.server", "demo.key"],
+            ["demo.server", "demo.key", "kernel.backup_age"],
             "hỏng trước, cảnh báo sau; bước đạt không có"
         );
         assert_eq!(alerts[0]["severity"], "failed");

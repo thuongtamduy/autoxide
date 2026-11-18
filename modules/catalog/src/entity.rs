@@ -381,3 +381,169 @@ pub(crate) mod variant_cost {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod attribute {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_attributes")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub code: String,
+        /// `text`, `integer`, `decimal`, `boolean`, `date`, `option`, `options`.
+        pub data_type: String,
+        pub scale: i32,
+        pub unit: Option<String>,
+        /// JSON `{locale: tên}`.
+        pub names: String,
+        pub filterable: bool,
+        pub legal_basis: Option<String>,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod attribute_option {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_attribute_options")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub attribute_id: Uuid,
+        pub code: String,
+        /// JSON `{locale: nhãn}`.
+        pub labels: String,
+        pub position: i32,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod category_attribute {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_category_attributes")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub category_id: Uuid,
+        pub attribute_id: Uuid,
+        pub required: bool,
+        pub applies_to_descendants: bool,
+        pub effective_from: Date,
+        pub effective_to: Option<Date>,
+        pub legal_basis: Option<String>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod product_attribute {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_product_attributes")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub product_id: Uuid,
+        pub attribute_id: Uuid,
+        pub value_text: Option<String>,
+        /// Số nguyên, hay số thập phân nhân theo `scale` của thuộc tính.
+        pub value_integer: Option<i64>,
+        pub value_boolean: Option<bool>,
+        pub value_date: Option<Date>,
+        pub option_id: Option<Uuid>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+/// Dữ liệu luật dùng chung mọi khách (mặt điều khiển, D-198): không có `tenant_id`, đọc ở database
+/// điều khiển.
+pub(crate) mod restriction_rule {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_restriction_rules")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub jurisdiction: String,
+        pub code: String,
+        /// `prohibited` hay `conditional`.
+        pub level: String,
+        /// JSON `{locale: tên}`.
+        pub names: String,
+        /// JSON: mã loại giấy tờ phải có.
+        pub required_documents: String,
+        pub legal_basis: String,
+        pub source_url: String,
+        pub effective_from: Date,
+        pub effective_to: Option<Date>,
+        pub pack_version: String,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub(crate) mod category_restriction {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_category_restrictions")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub category_id: Uuid,
+        pub rule_code: String,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod product_document {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_product_documents")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub product_id: Uuid,
+        pub org_id: Uuid,
+        pub document_type: String,
+        pub number: String,
+        pub issued_by: String,
+        pub issued_on: Date,
+        pub expires_on: Option<Date>,
+        pub file_key: Option<String>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

@@ -1,0 +1,16 @@
+//! REST của module `inventory`, dưới `/api/v1/inventory`. Mọi route đăng ký qua `routes!` để có
+//! tài liệu OpenAPI (luật kiến trúc 6). Handler chỉ: lấy dữ liệu vào → kiểm permission → gọi
+//! service → trả envelope.
+
+use std::sync::Arc;
+
+use utoipa_axum::router::OpenApiRouter;
+
+use crate::service::InventoryService;
+
+pub(crate) mod dto;
+pub(crate) mod levels;
+
+pub(crate) fn routes(service: Arc<InventoryService>) -> OpenApiRouter {
+    OpenApiRouter::new().merge(levels::routes(service))
+}

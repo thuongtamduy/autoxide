@@ -9,6 +9,7 @@ mod antispam;
 mod approvals_work;
 mod backlog;
 mod backup;
+mod backup_schedule;
 mod can;
 mod can_plan;
 mod client_config;

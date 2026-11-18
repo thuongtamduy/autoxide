@@ -92,4 +92,19 @@ impl BookingsService {
         let select = filter.apply(select.scoped(tenant))?;
         fetch_page(select, booking::Column::Id, |row| row.id, page, read).await
     }
+
+    /// Lịch của chính người dùng (khách có tài khoản).
+    pub(crate) async fn my_bookings(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        filter: &BookingFilter,
+        page: &PageRequest,
+    ) -> Result<Page<Booking>, Error> {
+        let select = booking::Entity::find()
+            .filter(booking::Column::CustomerUserId.eq(principal.user_id()))
+            .scoped(tenant);
+        let select = filter.apply(select)?;
+        fetch_page(select, booking::Column::Id, |row| row.id, page, tenant.database().read()).await
+    }
 }
