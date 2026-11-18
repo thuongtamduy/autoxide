@@ -80,7 +80,7 @@ pub(crate) async fn call(
     (status, headers, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
 }
 
-async fn raw(
+pub(crate) async fn raw(
     runtime: &Runtime,
     method: &str,
     uri: &str,
