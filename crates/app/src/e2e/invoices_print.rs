@@ -531,3 +531,62 @@ async fn luu_tru_va_don_chung_tu_het_han() {
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
+
+#[tokio::test]
+async fn lap_lai_ban_xuat_bi_loi() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let today = Utc::now().date_naive();
+        let body = json!({"profile": "generic_journal", "format": "csv",
+                          "from": today.with_day(1).unwrap(), "to": today});
+        let (status, created) =
+            call(&app, "clerk", "POST", "/api/v1/invoices/exports", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let id = created["data"]["id"].as_str().unwrap().to_owned();
+        let retry = format!("/api/v1/invoices/exports/{id}/retry");
+
+        // Đang chờ: lập lại trả nguyên, không xếp thêm job.
+        let (status, same) = call(&app, "clerk", "POST", &retry, None).await;
+        assert_eq!(status, StatusCode::OK, "{same}");
+        assert_eq!(same["data"]["status"], "pending");
+        drain(&app).await;
+
+        // Đã xong: không lập lại.
+        let (status, problem) = call(&app, "clerk", "POST", &retry, None).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert_eq!(problem["code"], "invoices.export_not_retryable");
+
+        // Giả như job đã hỏng.
+        let tenant = app.default_tenant();
+        let write = tenant.database().begin_write().await.unwrap();
+        let backend = write.get_database_backend();
+        let sql = "UPDATE invoices_exports SET status = 'failed', error = 'boom', file_key = NULL \
+                   WHERE id = $1";
+        let uuid: uuid::Uuid = id.parse().unwrap();
+        write
+            .execute_raw(Statement::from_sql_and_values(backend, sql, [uuid.into()]))
+            .await
+            .unwrap();
+        write.commit().await.unwrap();
+
+        let (status, again) = call(&app, "clerk", "POST", &retry, None).await;
+        assert_eq!(status, StatusCode::OK, "{again}");
+        assert_eq!(again["data"]["status"], "pending");
+        assert_eq!(again["data"]["error"], Value::Null);
+        let (status, _) = call(&app, "clerk", "POST", &retry, None).await;
+        assert_eq!(status, StatusCode::OK);
+        drain(&app).await;
+        let (_, done) =
+            call(&app, "clerk", "GET", &format!("/api/v1/invoices/exports/{id}"), None).await;
+        assert_eq!(done["data"]["status"], "ready", "{done}");
+
+        let (status, _) = call(&app, "reader", "POST", &retry, None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let missing = format!("/api/v1/invoices/exports/{}/retry", uuid::Uuid::now_v7());
+        let (status, problem) = call(&app, "clerk", "POST", &missing, None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(problem["code"], "invoices.export_not_found");
+    })
+    .await
+    .unwrap();
+}

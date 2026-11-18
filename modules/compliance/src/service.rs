@@ -312,17 +312,47 @@ impl ComplianceService {
         self.effective_rule(&jurisdiction, key, at).await
     }
 
+    /// Quy tắc theo bộ lọc. Có `as_of`: mỗi khoá (vùng pháp lý, tên) chỉ còn bản có hiệu lực lúc đó,
+    /// chọn như [`Self::effective_rule`] (hiệu lực muộn nhất, rồi phiên bản lớn nhất); không có thì mọi
+    /// phiên bản (lịch sử), mới trước.
     pub(crate) async fn list_rules(
         &self,
         principal: &Principal,
+        filter: RuleFilter,
     ) -> Result<Vec<rule::Model>, Error> {
         principal.require(&crate::permissions::RULES_READ)?;
-        Ok(rule::Entity::find()
+        let mut select = rule::Entity::find();
+        if let Some(jurisdiction) = filter.jurisdiction {
+            select = select.filter(rule::Column::Jurisdiction.eq(jurisdiction));
+        }
+        if let Some(key) = filter.key {
+            select = select.filter(rule::Column::Key.eq(key));
+        }
+        if let Some(at) = filter.as_of {
+            select = select.filter(rule::Column::EffectiveFrom.lte(at));
+        }
+        let rows = select
             .order_by_asc(rule::Column::Jurisdiction)
             .order_by_asc(rule::Column::Key)
+            .order_by_desc(rule::Column::EffectiveFrom)
             .order_by_desc(rule::Column::Version)
             .all(self.databases.control().read())
-            .await?)
+            .await?;
+        let Some(at) = filter.as_of else {
+            return Ok(rows);
+        };
+        // Đã sắp theo khoá rồi theo hiệu lực / phiên bản giảm dần: bản đầu tiên còn hiệu lực của
+        // mỗi khoá là bản cần.
+        let mut effective: Vec<rule::Model> = Vec::new();
+        for row in rows {
+            let same_key = effective
+                .last()
+                .is_some_and(|last| last.jurisdiction == row.jurisdiction && last.key == row.key);
+            if !same_key && row.effective_to.is_none_or(|to| at < to) {
+                effective.push(row);
+            }
+        }
+        Ok(effective)
     }
 
     pub(crate) async fn tenant(&self, id: TenantId) -> Result<TenantContext, Error> {
@@ -427,4 +457,12 @@ impl ComplianceService {
         transaction.commit().await?;
         Ok(saved)
     }
+}
+
+/// Bộ lọc danh sách quy tắc.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct RuleFilter {
+    pub jurisdiction: Option<String>,
+    pub key: Option<String>,
+    pub as_of: Option<DateTime<Utc>>,
 }

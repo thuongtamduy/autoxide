@@ -23,8 +23,8 @@ use validator::Validate;
 use crate::api::{
     AccountKey, Counterparty, Entry, LineAccount, NewEntry, NewLine, NewReversal, Side,
 };
-use crate::entity::{book, line, period};
-use crate::periods::TrialRow;
+use crate::entity::{book, line};
+use crate::periods::{PeriodView, TrialRow};
 use crate::permissions::READ;
 use crate::service::{
     AccountChange, AccountFilter, AccountView, EntryFilter, LedgerService, money,
@@ -48,7 +48,7 @@ pub(crate) fn routes(service: Arc<LedgerService>) -> OpenApiRouter {
 }
 
 // Trường JSON có ba trạng thái: không gửi (`None`), `null` (`Some(None)`), có giá trị.
-fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+pub(crate) fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
@@ -802,10 +802,18 @@ pub(crate) struct PeriodResponse {
     status: String,
     closed_at: Option<DateTime<Utc>>,
     closed_by: Option<Uuid>,
+    /// Number of entries dated in the period.
+    #[schema(example = 120)]
+    entries: i64,
+    /// How many of them are already sealed into the book's hash chain (sealing runs in the
+    /// background shortly after posting).
+    #[schema(example = 118)]
+    sealed_entries: i64,
 }
 
-impl From<period::Model> for PeriodResponse {
-    fn from(row: period::Model) -> Self {
+impl From<PeriodView> for PeriodResponse {
+    fn from(view: PeriodView) -> Self {
+        let row = view.period;
         PeriodResponse {
             id: row.id,
             book_id: row.book_id,
@@ -814,6 +822,8 @@ impl From<period::Model> for PeriodResponse {
             status: row.status,
             closed_at: row.closed_at,
             closed_by: row.closed_by,
+            entries: view.entries,
+            sealed_entries: view.sealed,
         }
     }
 }
@@ -883,7 +893,8 @@ async fn close_period(
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<PeriodResponse>, Error> {
-    Ok(Data { data: service.close_period(&tenant, &principal, id).await?.into() })
+    let row = service.close_period(&tenant, &principal, id).await?;
+    Ok(Data { data: LedgerService::period_view(&tenant, row).await?.into() })
 }
 
 /// One account in a trial balance.

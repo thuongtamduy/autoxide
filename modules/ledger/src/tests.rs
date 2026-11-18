@@ -827,3 +827,62 @@ async fn so_tai_khoan_va_tool_mcp() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn danh_sach_ky_kem_so_but_toan_va_so_da_niem_phong() {
+    TestDatabase::run(async |test| {
+        let (app, _) = app(test).await;
+        let tenant = app.default_tenant();
+        let ledger = ledger(&app);
+        let mut book = None;
+        for (reference, on) in [("J-1", "2026-01-05"), ("J-2", "2026-01-20"), ("F-1", "2026-02-03")]
+        {
+            let posted = ledger
+                .post(
+                    &tenant,
+                    Actor::system(),
+                    transfer("cash.bank", "revenue.sales", 10, reference).on(day(on)),
+                )
+                .await
+                .unwrap()
+                .into_inner();
+            book = Some(posted.book_id);
+        }
+        let uri = format!("/periods?book_id={}&order=asc", book.unwrap());
+        let counts = |listed: &Value| -> Vec<(String, i64, i64)> {
+            listed["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| {
+                    (
+                        row["starts_on"].as_str().unwrap().to_owned(),
+                        row["entries"].as_i64().unwrap(),
+                        row["sealed_entries"].as_i64().unwrap(),
+                    )
+                })
+                .collect()
+        };
+        let (status, listed) = call(&app, "GET", &uri, "acct", None).await;
+        assert_eq!(status, StatusCode::OK, "{listed}");
+        assert_eq!(
+            counts(&listed),
+            [("2026-01-01".to_owned(), 2, 0), ("2026-02-01".to_owned(), 1, 0)]
+        );
+        LedgerService::seal_entries(app.database()).await.unwrap();
+        let (_, listed) = call(&app, "GET", &uri, "acct", None).await;
+        assert_eq!(
+            counts(&listed),
+            [("2026-01-01".to_owned(), 2, 2), ("2026-02-01".to_owned(), 1, 1)]
+        );
+        // Khoá kỳ cũng trả số đếm.
+        let january = listed["data"][0]["id"].as_str().unwrap().to_owned();
+        let (status, closed) =
+            call(&app, "POST", &format!("/periods/{january}/close"), "acct", None).await;
+        assert_eq!(status, StatusCode::OK, "{closed}");
+        assert_eq!(closed["data"]["entries"], 2);
+        assert_eq!(closed["data"]["sealed_entries"], 2);
+    })
+    .await
+    .unwrap();
+}

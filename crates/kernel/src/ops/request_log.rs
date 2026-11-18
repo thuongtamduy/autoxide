@@ -392,6 +392,10 @@ pub(crate) struct RequestFilter {
     pub path: Option<String>,
     /// Only calls that ended with this HTTP status.
     pub status: Option<u16>,
+    /// Only calls whose HTTP status is in this class: `2xx`, `3xx`, `4xx` or `5xx` (e.g. `5xx` for
+    /// server errors).
+    #[param(example = "5xx")]
+    pub status_class: Option<String>,
     /// Only calls at or after this time (RFC 3339).
     pub from: Option<DateTime<Utc>>,
     /// Only calls before this time (RFC 3339).
@@ -429,6 +433,22 @@ pub(crate) async fn list(
     }
     if let Some(status) = filter.status {
         select = select.filter(Column::Status.eq(i32::from(status)));
+    }
+    if let Some(class) = filter.status_class.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+        let hundreds = match class {
+            "2xx" => 200,
+            "3xx" => 300,
+            "4xx" => 400,
+            "5xx" => 500,
+            _ => {
+                return Err(Error::validation(vec![FieldError::new(
+                    "status_class",
+                    "invalid",
+                    "must be `2xx`, `3xx`, `4xx` or `5xx`",
+                )]));
+            }
+        };
+        select = select.filter(Column::Status.between(hundreds, hundreds + 99));
     }
     if let Some(from) = filter.from {
         select = select.filter(Column::At.gte(from));
@@ -490,6 +510,8 @@ pub(crate) struct RequestLogInput {
     path: Option<String>,
     /// Only calls that ended with this HTTP status.
     status: Option<u16>,
+    /// Only calls whose status is in this class: `2xx`, `3xx`, `4xx` or `5xx`.
+    status_class: Option<String>,
     /// At or after this time (RFC 3339).
     from: Option<DateTime<Utc>>,
     /// Before this time (RFC 3339).
@@ -506,7 +528,8 @@ pub(crate) fn tools() -> Vec<Tool> {
             "request_log",
             "List the recent API and MCP calls made in this tenant (who, which route or tool, \
              status, error code), newest first. Filter by `actor_kind` (e.g. `agent`), \
-             `api_key_id`, exact `path` (e.g. `mcp:content.publish_entry`) or `status`.",
+             `api_key_id`, exact `path` (e.g. `mcp:content.publish_entry`), `status` or \
+             `status_class` (e.g. `5xx`).",
             |tenant: TenantContext, principal: Principal, input: RequestLogInput| async move {
                 principal.require(&DEVTOOLS_READ)?;
                 let filter = RequestFilter {
@@ -514,6 +537,7 @@ pub(crate) fn tools() -> Vec<Tool> {
                     api_key_id: input.api_key_id,
                     path: input.path,
                     status: input.status,
+                    status_class: input.status_class,
                     from: input.from,
                     to: input.to,
                 };

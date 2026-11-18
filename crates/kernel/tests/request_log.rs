@@ -191,3 +191,54 @@ async fn loc_nhat_ky_theo_actor_kind_va_key() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn loc_nhat_ky_theo_nhom_ma_trang_thai() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["kernel.devtools.read"])
+            .user("nobody", 2, &[])
+            .build()
+            .await
+            .unwrap();
+        // Một lần 200, một lần 403.
+        app.get("/api/v1/me/flags").token("nobody").send().await.unwrap();
+        let denied =
+            app.get("/api/v1/kernel/devtools/requests").token("nobody").send().await.unwrap();
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+
+        let client_errors = logged(&app, "status_class=4xx", 1).await;
+        assert!(
+            client_errors.iter().all(|row| (400..500).contains(&row["status"].as_u64().unwrap()))
+        );
+        assert!(client_errors.iter().any(|row| row["status"] == 403));
+        let ok = logged(&app, "status_class=2xx&path=/api/v1/me/flags", 1).await;
+        assert!(ok.iter().all(|row| row["status"] == 200));
+        // Không có lỗi máy chủ nào.
+        let none = app
+            .get("/api/v1/kernel/devtools/requests?status_class=5xx")
+            .token("admin")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(none.status(), StatusCode::OK);
+        assert!(
+            none.json()["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|row| row["status"].as_u64().unwrap() >= 500)
+        );
+
+        let wrong = app
+            .get("/api/v1/kernel/devtools/requests?status_class=6xx")
+            .token("admin")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(wrong.json()["errors"][0]["field"], "status_class");
+    })
+    .await
+    .unwrap();
+}

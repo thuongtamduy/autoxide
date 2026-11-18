@@ -74,6 +74,15 @@ pub(crate) struct NewBankAccount {
     pub feed_provider: Option<String>,
 }
 
+/// Thay đổi tài khoản ngân hàng (REST). `None` là giữ nguyên; `feed_provider: Some(None)` là bỏ
+/// nguồn biến động.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct BankAccountChange {
+    pub account_name: Option<String>,
+    pub feed_provider: Option<Option<String>>,
+    pub status: Option<String>,
+}
+
 impl LedgerService {
     pub(crate) fn bank_feed(&self, provider: &str) -> Result<Arc<dyn BankFeed>, Error> {
         self.bank_feeds
@@ -171,6 +180,85 @@ impl LedgerService {
             .one(&transaction)
             .await?
             .ok_or_else(|| Error::internal("a bank account vanished after it was written"))?;
+        transaction.commit().await?;
+        Ok(saved)
+    }
+
+    /// Sửa tài khoản ngân hàng: tên chủ tài khoản, nguồn biến động, trạng thái. Mã ngân hàng và số
+    /// tài khoản không đổi — tài khoản khác thì đăng ký mới (khoá chống trùng dựa vào hai cột đó).
+    pub(crate) async fn update_bank_account(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        change: BankAccountChange,
+    ) -> Result<bank_account::Model, Error> {
+        principal.require(&SETTINGS_MANAGE)?;
+        let read = tenant.database().read();
+        // Ngoài phạm vi đọc thì như không có (404); đọc được mà không có quyền sửa ở nút → 403.
+        let condition = principal.scope_condition(&READ, bank_account::Column::OrgId, None)?;
+        let found = bank_account::Entity::find_by_id(id)
+            .scoped(tenant)
+            .filter(condition)
+            .one(read)
+            .await?
+            .ok_or_else(bank_account_not_found)?;
+        let org = OrgTarget::new(OrgId::from_uuid(found.org_id), None);
+        principal.require_at(read, &SETTINGS_MANAGE, org).await?;
+
+        let mut problems = Vec::new();
+        let name = change.account_name.as_deref().map(|name| name.trim().to_owned());
+        if let Some(name) = &name
+            && !(1..=50).contains(&name.chars().count())
+        {
+            problems.push(FieldError::new(
+                "account_name",
+                "length",
+                "must be 1 to 50 characters long",
+            ));
+        }
+        if let Some(Some(provider)) = change.feed_provider.as_ref()
+            && self.bank_feed(provider).is_err()
+        {
+            problems.push(FieldError::new(
+                "feed_provider",
+                "unknown",
+                "is not a bank feed set up on this server",
+            ));
+        }
+        if let Some(status) = &change.status
+            && !["active", "disabled"].contains(&status.as_str())
+        {
+            problems.push(FieldError::new("status", "invalid", "must be `active` or `disabled`"));
+        }
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
+        }
+
+        let transaction = tenant.database().begin_write().await?;
+        principal.require_write_at(&transaction, &SETTINGS_MANAGE, org).await?;
+        let mut update = bank_account::Entity::update_many()
+            .col_expr(bank_account::Column::UpdatedAt, now().into())
+            .filter(bank_account::Column::Id.eq(found.id))
+            .filter(bank_account::Column::TenantId.eq(tenant.id().as_uuid()));
+        if let Some(name) = name {
+            update = update.col_expr(bank_account::Column::AccountName, name.into());
+        }
+        if let Some(provider) = change.feed_provider {
+            // Đổi nguồn biến động thì con trỏ của nguồn cũ vô nghĩa với nguồn mới: đọc lại từ đầu.
+            if provider != found.feed_provider {
+                update = update.col_expr(bank_account::Column::FeedCursor, None::<String>.into());
+            }
+            update = update.col_expr(bank_account::Column::FeedProvider, provider.into());
+        }
+        if let Some(status) = change.status {
+            update = update.col_expr(bank_account::Column::Status, status.into());
+        }
+        update.exec(&transaction).await?;
+        let saved = bank_account::Entity::find_by_id(found.id)
+            .one(&transaction)
+            .await?
+            .ok_or_else(bank_account_not_found)?;
         transaction.commit().await?;
         Ok(saved)
     }

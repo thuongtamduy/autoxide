@@ -38,6 +38,7 @@ pub(crate) fn routes(service: Arc<InvoicesService>) -> OpenApiRouter {
         .routes(routes!(export_profiles))
         .routes(routes!(list_exports, create_export))
         .routes(routes!(get_export))
+        .routes(routes!(retry_export))
         .routes(routes!(download_export))
         .routes(routes!(list_archives, create_archive))
         .with_state(service)
@@ -647,6 +648,36 @@ async fn get_export(
     Path(id): Path<Uuid>,
 ) -> Result<Data<ExportResponse>, Error> {
     Ok(Data { data: service.get_export(&tenant, &principal, id).await?.into() })
+}
+
+/// Make a failed accounting export again.
+///
+/// Requires `invoices.export`. Puts the export back to `pending` with the same profile, format and
+/// period, and starts the job again; follow it with `GET /api/v1/invoices/exports/{id}`. Safe to call
+/// again: an export already `pending` or `running` is returned as it is.
+#[utoipa::path(
+    post,
+    path = "/exports/{id}/retry",
+    extensions(("x-permissions" = json!(["invoices.export"]))),
+    operation_id = "retry_invoice_export",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the export.")),
+    responses(
+        (status = 200, description = "The export, `pending` again (or still `pending` / `running`).", body = Data<ExportResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `invoices.export`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No such export; code `invoices.export_not_found`.", body = Problem),
+        (status = 409, description = "The export is `ready`; ask for a new one. Code `invoices.export_not_retryable`.", body = Problem),
+        (status = 503, description = "No file storage is set up; code `invoices.storage_unavailable`.", body = Problem),
+    )
+)]
+async fn retry_export(
+    State(service): State<Arc<InvoicesService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Data<ExportResponse>, Error> {
+    Ok(Data { data: service.retry_export(&tenant, &principal, id).await?.into() })
 }
 
 /// Download the file of an accounting export.

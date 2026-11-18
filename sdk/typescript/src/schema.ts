@@ -2007,6 +2007,17 @@ export type CompliancePurposeRequest = {
   retention?: string | null;
 };
 
+/** A processing purpose with how many people consented to it and how many withdrew. */
+export type CompliancePurposeWithCounts = CompliancePurpose & {
+  /**
+   * People (distinct email, phone or account) with a consent to this purpose now given, on at
+   * least one channel.
+   */
+  consented: number;
+  /** People with a consent to this purpose withdrawn, on at least one channel. */
+  withdrawn: number;
+};
+
 /** Where the tenant's data is kept. */
 export type ComplianceResidency = {
   /** `true` when there is no requirement or the placement is in the required country. */
@@ -5211,7 +5222,14 @@ export type Data_LedgerPeriodResponse = {
     closed_at?: string | null;
     closed_by?: string | null;
     ends_on: string;
+    /** Number of entries dated in the period. */
+    entries: number;
     id: string;
+    /**
+     * How many of them are already sealed into the book's hash chain (sealing runs in the
+     * background shortly after posting).
+     */
+    sealed_entries: number;
     starts_on: string;
     /** `open` or `closed`. */
     status: string;
@@ -7704,6 +7722,19 @@ export type Data_Vec_CompliancePurpose = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CompliancePurposeWithCounts = {
+  data: (CompliancePurpose & {
+    /**
+     * People (distinct email, phone or account) with a consent to this purpose now given, on at
+     * least one channel.
+     */
+    consented: number;
+    /** People with a consent to this purpose withdrawn, on at least one channel. */
+    withdrawn: number;
+  })[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ComplianceRetentionItem = {
   data: {
     /** `basic`, `sensitive`, `security` or `accounting`. */
@@ -10188,6 +10219,22 @@ export type LedgerBankAccount = {
   updated_at: string;
 };
 
+/** Changes to a bank account. Fields left out stay as they are. */
+export type LedgerBankAccountChangeRequest = {
+  /** Name on the account, 1 to 50 characters. */
+  account_name?: string | null;
+  /**
+   * Bank feed that reports transfers into this account; `null` stops reading a feed. Changing
+   * it reads the new feed from its start.
+   */
+  feed_provider?: string | null;
+  /**
+   * `active`, or `disabled`: new VietQR payments no longer go to it and its feed is not read;
+   * payments already created are still matched.
+   */
+  status?: string | null;
+};
+
 /** A bank account to register. */
 export type LedgerBankAccountRequest = {
   /** Name on the account, 1 to 50 characters. */
@@ -10546,7 +10593,14 @@ export type LedgerPeriodResponse = {
   closed_at?: string | null;
   closed_by?: string | null;
   ends_on: string;
+  /** Number of entries dated in the period. */
+  entries: number;
   id: string;
+  /**
+   * How many of them are already sealed into the book's hash chain (sealing runs in the
+   * background shortly after posting).
+   */
+  sealed_entries: number;
   starts_on: string;
   /** `open` or `closed`. */
   status: string;
@@ -13387,7 +13441,14 @@ export type Page_LedgerPeriodResponse = {
     closed_at?: string | null;
     closed_by?: string | null;
     ends_on: string;
+    /** Number of entries dated in the period. */
+    entries: number;
     id: string;
+    /**
+     * How many of them are already sealed into the book's hash chain (sealing runs in the
+     * background shortly after posting).
+     */
+    sealed_entries: number;
     starts_on: string;
     /** `open` or `closed`. */
     status: string;
@@ -14498,6 +14559,11 @@ export type Pagination = {
    * page.
    */
   next_cursor?: string | null;
+  /**
+   * Number of items matching the filters, over all pages. Only on the first page of a request
+   * with `count=true`; left out otherwise.
+   */
+  total?: number | null;
 };
 
 /** A sentence to turn into the filters of a list. */
@@ -17961,7 +18027,7 @@ export interface paths {
   "/api/v1/address/units": {
     /** Search administrative units by name. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { country?: string; q?: string; province?: string; level?: number; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { country?: string; q?: string; province?: string; level?: number; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_AdministrativeUnit;
         422: Problem;
@@ -18019,7 +18085,7 @@ export interface paths {
   "/api/v1/audit": {
     /** List the audit log. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; actor_kind?: string; include?: "actor"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; actor_kind?: string; include?: "actor"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_AuditEntryResponse;
         401: Problem;
@@ -18057,7 +18123,7 @@ export interface paths {
   "/api/v1/auth/all-api-keys": {
     /** List the API keys of every user. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ManagedApiKeyResponse;
         401: Problem;
@@ -18083,7 +18149,7 @@ export interface paths {
   "/api/v1/auth/api-keys": {
     /** List your API keys. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ApiKeyResponse;
         401: Problem;
@@ -18122,7 +18188,7 @@ export interface paths {
   "/api/v1/auth/customers": {
     /** List or search the customer accounts of the shop. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; status?: "active" | "disabled"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; status?: "active" | "disabled"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_CustomerResponse;
         401: Problem;
@@ -18238,7 +18304,7 @@ export interface paths {
   "/api/v1/auth/invitations": {
     /** List invitations. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_InvitationResponse;
         401: Problem;
@@ -18636,7 +18702,7 @@ export interface paths {
   "/api/v1/auth/me/passkeys": {
     /** List your passkeys. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_PasskeyResponse;
         401: Problem;
@@ -18723,7 +18789,7 @@ export interface paths {
   "/api/v1/auth/me/sessions": {
     /** List your signed-in sessions. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_SessionResponse;
         401: Problem;
@@ -18771,7 +18837,7 @@ export interface paths {
   "/api/v1/auth/memberships": {
     /** List who works in which organization unit, with which role. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; role_id?: string; user_id?: string; inherited?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; role_id?: string; user_id?: string; inherited?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_MembershipRowResponse;
         401: Problem;
@@ -18967,7 +19033,7 @@ export interface paths {
   "/api/v1/auth/roles": {
     /** List roles. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_RoleResponse;
         401: Problem;
@@ -19120,7 +19186,7 @@ export interface paths {
   "/api/v1/auth/users": {
     /** List or search user accounts. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { search?: string; status?: "active" | "disabled"; include?: "roles"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { search?: string; status?: "active" | "disabled"; include?: "roles"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_UserResponse;
         401: Problem;
@@ -19240,7 +19306,7 @@ export interface paths {
   "/api/v1/auth/users/{id}/passkeys": {
     /** List the passkeys of a user. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_PasskeyResponse;
         401: Problem;
@@ -19334,7 +19400,7 @@ export interface paths {
   "/api/v1/comments": {
     /** List comments for moderation. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: "pending" | "published" | "rejected" | "spam" | "deleted"; target_type?: string; target_id?: string; q?: string; unanswered?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: "pending" | "published" | "rejected" | "spam" | "deleted"; target_type?: string; target_id?: string; q?: string; unanswered?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_CommentDetail;
         401: Problem;
@@ -19347,7 +19413,7 @@ export interface paths {
   "/api/v1/comments/bans": {
     /** List bans. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; active?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; active?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_CommentBan;
         401: Problem;
@@ -19492,7 +19558,7 @@ export interface paths {
   "/api/v1/comments/public/comments/{id}/replies": {
     /** List the replies of a comment (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_PublicComment;
         403: Problem;
@@ -19557,7 +19623,7 @@ export interface paths {
   "/api/v1/comments/public/threads": {
     /** List the comments of a target (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; target_id?: string; replies_limit?: number; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; target_id?: string; replies_limit?: number; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ThreadComment;
         403: Problem;
@@ -19595,7 +19661,7 @@ export interface paths {
   "/api/v1/comments/targets": {
     /** List the targets that have comments. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; state?: "open" | "closed"; pending?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; state?: "open" | "closed"; pending?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_CommentTarget;
         401: Problem;
@@ -19676,7 +19742,7 @@ export interface paths {
   "/api/v1/comments/{id}/reports": {
     /** List the reports of a comment. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_CommentReport;
         401: Problem;
@@ -19690,7 +19756,7 @@ export interface paths {
   "/api/v1/compliance/cases": {
     /** List cases. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; kind?: string; target?: string; overdue?: boolean; held?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; kind?: string; target?: string; overdue?: boolean; held?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceCase;
         401: Problem;
@@ -19867,7 +19933,7 @@ export interface paths {
   "/api/v1/compliance/disclosures": {
     /** List disclosures to authorities. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { case_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { case_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceDisclosure;
         401: Problem;
@@ -19944,7 +20010,7 @@ export interface paths {
   "/api/v1/compliance/documents/{id}/acceptances": {
     /** List who accepted a document. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceAcceptance;
         401: Problem;
@@ -19974,7 +20040,7 @@ export interface paths {
   "/api/v1/compliance/incidents": {
     /** List personal data breaches. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; overdue?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; overdue?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceIncident;
         401: Problem;
@@ -20068,7 +20134,7 @@ export interface paths {
   "/api/v1/compliance/kyc/profiles": {
     /** List identity verification profiles. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceKycProfile;
         401: Problem;
@@ -20200,7 +20266,7 @@ export interface paths {
   "/api/v1/compliance/legal-profiles": {
     /** List the legal profiles you can see. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceLegalProfile;
         401: Problem;
@@ -20598,7 +20664,7 @@ export interface paths {
     get: {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
-        200: Data_Vec_CompliancePurpose;
+        200: Data_Vec_CompliancePurposeWithCounts;
         401: Problem;
         403: Problem;
         default: Problem;
@@ -20662,7 +20728,7 @@ export interface paths {
   "/api/v1/compliance/respondent/cases": {
     /** List the cases about you or your unit. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceRespondentCase;
         401: Problem;
@@ -20684,13 +20750,14 @@ export interface paths {
     };
   };
   "/api/v1/compliance/rules": {
-    /** List the legal rules (every version). */
+    /** List the legal rules: every version, or those in effect at a time. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { jurisdiction?: string; key?: string; as_of?: string }; };
       responses: {
         200: Data_Vec_ComplianceRule;
         401: Problem;
         403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -20710,7 +20777,7 @@ export interface paths {
   "/api/v1/compliance/subject-requests": {
     /** List the requests of data subjects received through other channels. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; overdue?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; overdue?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceSubjectRequest;
         401: Problem;
@@ -20792,7 +20859,7 @@ export interface paths {
   "/api/v1/compliance/tracking-tags": {
     /** List the tracking tags of websites. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceTrackingTag;
         401: Problem;
@@ -20857,7 +20924,7 @@ export interface paths {
   "/api/v1/compliance/websites": {
     /** List the websites you can see. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ComplianceWebsite;
         401: Problem;
@@ -20980,7 +21047,7 @@ export interface paths {
   "/api/v1/content/authors": {
     /** List author profiles. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_AuthorResponse;
         401: Problem;
@@ -21046,7 +21113,7 @@ export interface paths {
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; tags_any?: string; tags_all?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; owner_org?: string; site?: string; tags_any?: string; tags_all?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_EntryResponse;
         401: Problem;
@@ -21225,7 +21292,7 @@ export interface paths {
   "/api/v1/content/entries/{id}/revisions": {
     /** List the revisions of an entry. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_RevisionResponse;
         401: Problem;
@@ -21357,7 +21424,7 @@ export interface paths {
   "/api/v1/content/entries/{id}/translation-requests": {
     /** List the AI translation requests of an entry. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_TranslationRequestResponse;
         401: Problem;
@@ -21494,7 +21561,7 @@ export interface paths {
   "/api/v1/content/public/posts": {
     /** List published posts (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; term_id?: string; author_id?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; term_id?: string; author_id?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
       responses: {
         200: Page_PublicEntryResponse;
         403: Problem;
@@ -21546,7 +21613,7 @@ export interface paths {
   "/api/v1/content/public/sitemap": {
     /** List every published address, for a sitemap (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; site?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
       responses: {
         200: Page_SitemapItem;
         403: Problem;
@@ -21558,7 +21625,7 @@ export interface paths {
   "/api/v1/content/public/terms": {
     /** List categories and tags that have published posts (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_PublicTermCount;
         403: Problem;
@@ -21583,7 +21650,7 @@ export interface paths {
   "/api/v1/content/redirects": {
     /** List redirects. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; source?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; source?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_RedirectResponse;
         401: Problem;
@@ -21649,7 +21716,7 @@ export interface paths {
   "/api/v1/content/schedules": {
     /** List the schedules of every entry. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ScheduleResponse;
         401: Problem;
@@ -21717,7 +21784,7 @@ export interface paths {
   "/api/v1/content/terms": {
     /** List categories and tags. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { taxonomy?: "category" | "tag"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { taxonomy?: "category" | "tag"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_TermResponse;
         401: Problem;
@@ -21797,7 +21864,7 @@ export interface paths {
   "/api/v1/files": {
     /** List your files. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_FileResponse;
         401: Problem;
@@ -21893,7 +21960,7 @@ export interface paths {
   "/api/v1/forms": {
     /** List forms. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: "open" | "closed"; owner_org?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: "open" | "closed"; owner_org?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_FormResponse;
         401: Problem;
@@ -22098,7 +22165,7 @@ export interface paths {
   "/api/v1/forms/{id}/submissions": {
     /** List the submissions of a form. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { status?: "new" | "read" | "archived" | "spam"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { status?: "new" | "read" | "archived" | "spam"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_SubmissionResponse;
         401: Problem;
@@ -22142,7 +22209,7 @@ export interface paths {
   "/api/v1/invoices/archives": {
     /** List archive copies of the accounting records. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_InvoicesArchive;
         401: Problem;
@@ -22166,7 +22233,7 @@ export interface paths {
   "/api/v1/invoices/documents": {
     /** List documents in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; kind?: string; status?: string; source_module?: string; source_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; kind?: string; status?: string; source_module?: string; source_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_InvoicesDocument;
         401: Problem;
@@ -22338,7 +22405,7 @@ export interface paths {
   "/api/v1/invoices/exports": {
     /** List accounting exports. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_InvoicesExport;
         401: Problem;
@@ -22388,10 +22455,25 @@ export interface paths {
       };
     };
   };
+  "/api/v1/invoices/exports/{id}/retry": {
+    /** Make a failed accounting export again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvoicesExport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/invoices/mandates": {
     /** List the mandates of sellers in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_InvoicesMandate;
         401: Problem;
@@ -22429,7 +22511,7 @@ export interface paths {
   "/api/v1/invoices/series": {
     /** List the series in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_InvoicesSeries;
         401: Problem;
@@ -22482,7 +22564,7 @@ export interface paths {
   "/api/v1/invoices/templates": {
     /** List the print templates of the tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_InvoicesTemplate;
         401: Problem;
@@ -22722,7 +22804,7 @@ export interface paths {
   "/api/v1/kernel/devtools/requests": {
     /** List the calls made in this tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; actor_kind?: string; api_key_id?: string; path?: string; status?: number; from?: string; to?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; actor_kind?: string; api_key_id?: string; path?: string; status?: number; status_class?: string; from?: string; to?: string }; };
       responses: {
         200: Page_LoggedRequest;
         401: Problem;
@@ -22735,7 +22817,7 @@ export interface paths {
   "/api/v1/kernel/domains": {
     /** List this tenant's domains. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_TenantDomain;
         401: Problem;
@@ -23330,7 +23412,7 @@ export interface paths {
   "/api/v1/kernel/tenants": {
     /** List the tenants of the platform. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; parent_id?: string; read_only?: boolean; placement_kind?: string; schema_state?: string; subscription_status?: string; near_limit?: boolean; expand?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; status?: string; parent_id?: string; read_only?: boolean; placement_kind?: string; schema_state?: string; subscription_status?: string; near_limit?: boolean; expand?: string }; };
       responses: {
         200: Page_Tenant;
         401: Problem;
@@ -23609,7 +23691,7 @@ export interface paths {
   "/api/v1/ledger/accounts": {
     /** List the accounts of a book. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { book_id: string; purpose?: string; counterparty_kind?: string; counterparty_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { book_id: string; purpose?: string; counterparty_kind?: string; counterparty_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerAccountResponse;
         401: Problem;
@@ -23676,7 +23758,7 @@ export interface paths {
   "/api/v1/ledger/accounts/{id}/lines": {
     /** List the entry lines on an account. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerAccountLine;
         401: Problem;
@@ -23690,7 +23772,7 @@ export interface paths {
   "/api/v1/ledger/bank-accounts": {
     /** List the bank accounts in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerBankAccount;
         401: Problem;
@@ -23713,6 +23795,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/ledger/bank-accounts/{id}": {
+    /** Change a bank account: name, bank feed, status. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: LedgerBankAccountChangeRequest;
+      responses: {
+        200: Data_LedgerBankAccount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ledger/bank-feeds/{provider}": {
     /** Receive bank account transactions from a bank feed. */
     post: {
@@ -23730,7 +23827,7 @@ export interface paths {
   "/api/v1/ledger/books": {
     /** List the books in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerBookResponse;
         401: Problem;
@@ -23782,7 +23879,7 @@ export interface paths {
   "/api/v1/ledger/entries": {
     /** List entries in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; source_module?: string; source_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; source_module?: string; source_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerEntry;
         401: Problem;
@@ -23840,7 +23937,7 @@ export interface paths {
   "/api/v1/ledger/exceptions": {
     /** List the differences waiting for a person. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerExceptionResponse;
         401: Problem;
@@ -23868,7 +23965,7 @@ export interface paths {
   "/api/v1/ledger/exchange-rates": {
     /** List recorded exchange rates. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { base?: string; quote?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { base?: string; quote?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerExchangeRate;
         401: Problem;
@@ -23948,7 +24045,7 @@ export interface paths {
   "/api/v1/ledger/holds": {
     /** List seller money held until the return window ends. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; seller_org_id?: string; source_module?: string; source_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; seller_org_id?: string; source_module?: string; source_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerHold;
         401: Problem;
@@ -23975,7 +24072,7 @@ export interface paths {
   "/api/v1/ledger/payments": {
     /** List payments in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; source_module?: string; source_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; source_module?: string; source_id?: string; amount?: string; currency?: string; org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerPayment;
         401: Problem;
@@ -24049,7 +24146,7 @@ export interface paths {
   "/api/v1/ledger/payouts": {
     /** List payouts in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; payee_org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; payee_org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerPayout;
         401: Problem;
@@ -24090,7 +24187,7 @@ export interface paths {
   "/api/v1/ledger/periods": {
     /** List the periods of a book. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { book_id: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { book_id: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerPeriodResponse;
         401: Problem;
@@ -24118,7 +24215,7 @@ export interface paths {
   "/api/v1/ledger/reconciliations": {
     /** List reconciliation runs. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_LedgerReconciliationResponse;
         401: Problem;
@@ -24369,7 +24466,7 @@ export interface paths {
   "/api/v1/media": {
     /** List media items. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; owner_org?: string; alt_missing?: boolean; include?: "uploader"; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; owner_org?: string; alt_missing?: boolean; include?: "uploader"; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_MediaItemResponse;
         401: Problem;
@@ -24397,7 +24494,7 @@ export interface paths {
   "/api/v1/media/folders": {
     /** List media folders. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { parent_id?: string; sort?: "created_at" | "name"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { parent_id?: string; sort?: "created_at" | "name"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_FolderResponse;
         401: Problem;
@@ -24476,7 +24573,7 @@ export interface paths {
   "/api/v1/media/tags": {
     /** List media tags. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; sort?: "name" | "created_at"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; sort?: "name" | "created_at"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_TagResponse;
         401: Problem;
@@ -24718,7 +24815,7 @@ export interface paths {
   "/api/v1/menus": {
     /** List website menus. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { owner_org?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { owner_org?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_SiteMenuSummary;
         401: Problem;
@@ -24825,7 +24922,7 @@ export interface paths {
   "/api/v1/newsletter/campaigns": {
     /** List campaigns. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: "draft" | "scheduled" | "sending" | "paused" | "sent" | "cancelled"; list_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: "draft" | "scheduled" | "sending" | "paused" | "sent" | "cancelled"; list_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_CampaignResponse;
         401: Problem;
@@ -25029,7 +25126,7 @@ export interface paths {
   "/api/v1/newsletter/lists": {
     /** List the newsletter lists. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ListResponse;
         401: Problem;
@@ -25188,7 +25285,7 @@ export interface paths {
   "/api/v1/newsletter/subscribers": {
     /** List subscribers. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; list_id?: string; status?: "unconfirmed" | "confirmed" | "unsubscribed"; blocked?: boolean; sort?: "created_at" | "email" | "status"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; list_id?: string; status?: "unconfirmed" | "confirmed" | "unsubscribed"; blocked?: boolean; sort?: "created_at" | "email" | "status"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_SubscriberResponse;
         401: Problem;
@@ -25254,7 +25351,7 @@ export interface paths {
   "/api/v1/newsletter/suppressions": {
     /** List the suppressed addresses. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_SuppressionResponse;
         401: Problem;
@@ -25373,7 +25470,7 @@ export interface paths {
   "/api/v1/notifications/me/inbox": {
     /** List your in-app notifications. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { unread?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { unread?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_NotificationInboxItem;
         401: Problem;
@@ -25466,7 +25563,7 @@ export interface paths {
   "/api/v1/notifications/messages": {
     /** List the send log. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; status?: string; channel?: string; user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; status?: string; channel?: string; user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_NotificationMessage;
         401: Problem;
@@ -25801,7 +25898,7 @@ export interface paths {
   "/api/v1/organizations/units": {
     /** List the organization units in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { parent_id?: string; type?: string; status?: "pending" | "active" | "suspended" | "archived"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { parent_id?: string; type?: string; status?: "pending" | "active" | "suspended" | "archived"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_UnitResponse;
         401: Problem;
@@ -26083,7 +26180,7 @@ export interface paths {
   "/api/v1/plans/overrides": {
     /** List the overrides of every tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id?: string; kind?: string; key?: string; active?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { tenant_id?: string; kind?: string; key?: string; active?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_OverrideResponse;
         401: Problem;
@@ -26095,7 +26192,7 @@ export interface paths {
   "/api/v1/plans/plans": {
     /** List every plan, including drafts and retired plans. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_PlanResponse;
         401: Problem;
@@ -26189,7 +26286,7 @@ export interface paths {
   "/api/v1/plans/provisionings": {
     /** List tenant provisionings. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ProvisioningResponse;
         401: Problem;
@@ -26243,7 +26340,7 @@ export interface paths {
   "/api/v1/plans/signups": {
     /** List tenant sign-ups. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_SignupResponse;
         401: Problem;
@@ -26352,7 +26449,7 @@ export interface paths {
   "/api/v1/plans/subscriptions": {
     /** List the subscriptions of every tenant. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; plan_id?: string; tenant_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; plan_id?: string; tenant_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_PlanSubscription;
         401: Problem;
@@ -26570,7 +26667,7 @@ export interface paths {
   "/api/v1/tax/profiles": {
     /** List the tax profiles in your scope. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_TaxProfileResponse;
         401: Problem;
@@ -26676,7 +26773,7 @@ export interface paths {
   "/api/v1/webhooks": {
     /** List webhook endpoints. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: "active" | "disabled"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: "active" | "disabled"; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_EndpointResponse;
         401: Problem;
@@ -26701,7 +26798,7 @@ export interface paths {
   "/api/v1/webhooks/deliveries": {
     /** List the deliveries of every endpoint, e.g. the failed ones. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; endpoint_id?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; status?: string; endpoint_id?: string }; };
       responses: {
         200: Page_DeliveryResponse;
         401: Problem;
@@ -26778,7 +26875,7 @@ export interface paths {
   "/api/v1/webhooks/{id}/deliveries": {
     /** List the deliveries of an endpoint, to see what was sent and what failed. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_DeliveryResponse;
         401: Problem;

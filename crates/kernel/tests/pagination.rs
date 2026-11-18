@@ -364,3 +364,65 @@ async fn trang_theo_tang_xep_tang_truoc_lat_khong_trung_khong_sot() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn count_tra_tong_so_khop_bo_loc_o_trang_dau() {
+    use autoxide_kernel::pagination::{PageQuery, SortValue, fetch_page_by, fetch_page_tiers};
+    use sea_orm::Condition;
+
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        insert_items(&db, 7).await;
+        let only_a = || item::Entity::find().filter(item::Column::Kind.eq("a"));
+        let request = PageRequest::try_from(
+            PageQuery::new(Some("2".to_owned()), None, None).with_count(true),
+        )
+        .unwrap();
+
+        let first = fetch_page(only_a(), item::Column::Id, |row| row.id, &request, db.read())
+            .await
+            .unwrap();
+        assert_eq!(first.data.len(), 2);
+        assert_eq!(first.pagination.total, Some(4));
+        // Trang sau không đếm lại.
+        let cursor = first.pagination.next_cursor.unwrap();
+        let next = PageQuery::new(Some("2".to_owned()), Some(cursor), None).with_count(true);
+        let next = PageRequest::try_from(next).unwrap();
+        let second =
+            fetch_page(only_a(), item::Column::Id, |row| row.id, &next, db.read()).await.unwrap();
+        assert_eq!(second.pagination.total, None);
+        // Không hỏi thì không đếm.
+        let plain = PageRequest::first(2, Order::Desc);
+        let page =
+            fetch_page(only_a(), item::Column::Id, |row| row.id, &plain, db.read()).await.unwrap();
+        assert_eq!(page.pagination.total, None);
+
+        let sorted = fetch_page_by(
+            item::Entity::find(),
+            item::Column::Kind,
+            |row| SortValue::Text(row.kind.clone()),
+            item::Column::Id,
+            |row| row.id,
+            &request,
+            db.read(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(sorted.pagination.total, Some(7));
+
+        let tiers = [Condition::all().add(item::Column::Kind.eq("b"))];
+        let tiered = fetch_page_tiers(
+            item::Entity::find(),
+            &tiers,
+            item::Column::Id,
+            |row| row.id,
+            &request,
+            db.read(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(tiered.pagination.total, Some(3));
+    })
+    .await
+    .unwrap();
+}

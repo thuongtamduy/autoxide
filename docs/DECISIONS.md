@@ -9389,3 +9389,32 @@ liệu cá nhân.
 5. **Chưa đo:** chưa module nào dùng chỉ mục (module tự chuyển khi bảng lớn — catalog bước 41 là chỗ đầu tiên); số đo
    trên bộ dữ liệu lớn của bước 39 và khuyến nghị bộ máy ngoài ghi vào `docs/BENCHMARKS.md` khi đó. Test (SQLite và
    Postgres): `tests/search_index.rs` với module mẫu và bộ máy giả.
+
+## D-382 · Trả nợ giao diện đợt 2: tổng số của danh sách và các chỗ thiếu trên module đã xong — 2026-11-18 — agent quyết
+
+Chủ dự án bảo "trả nợ trước" (trước bước 40). Nguồn: các dòng còn thiếu của `docs/prompts/web-build-api-gaps.md` thuộc
+module đã xong (bước 36, 37 và kernel). Như đợt 1 (`web-api-requests.md`), làm ngoài lộ trình, chỉ thêm, không phá vỡ (D-059).
+
+1. **Tổng số của danh sách (kernel):** tham số chung `count=true` (cùng nhóm `limit` / `cursor` / `order`, có cả trong
+   `PageInput` của tool MCP) → `pagination.total` = số dòng khớp bộ lọc. Chỉ đếm khi được hỏi và **chỉ ở trang đầu** (lật
+   trang tiếp không đếm lại); một câu `SELECT COUNT(*)` bọc ngoài câu của danh sách, nên mọi danh sách dùng `fetch_page`,
+   `fetch_page_by`, `fetch_page_tiers` có ngay. Không hỏi thì `total` vắng mặt (response cũ không đổi). Không làm
+   `total_estimate`: ước lượng khác nhau giữa SQLite và Postgres, số chính xác đủ cho màn quản trị; khi đo thấy chậm trên bộ
+   dữ liệu lớn (bước 39) thì xét lại.
+2. **`ledger`:** `PATCH /bank-accounts/{id}` (tên chủ tài khoản, nguồn biến động, `active` / `disabled`; ngân hàng và số tài
+   khoản không đổi — tài khoản khác thì đăng ký mới; đổi nguồn biến động thì đọc lại từ đầu). Kỳ kế toán trả thêm `entries`,
+   `sealed_entries` (hai câu đếm gộp theo kỳ cho cả trang). `GET /payments` lọc thêm `amount` (đơn vị nhỏ nhất), `currency`,
+   `org_id` (đúng nút). Migration `m0010_add_list_indexes`: index `(tenant_id, amount_minor, id)` của thanh toán và
+   `(tenant_id, period_id)` của bút toán.
+3. **`invoices`:** `POST /exports/{id}/retry` lập lại bản xuất `failed` (về `pending`, xếp lại job, một transaction; chỉ
+   đổi khi còn `failed` nên gọi đồng thời chỉ xếp một job). Bản đang chờ / chạy trả nguyên; bản `ready` →
+   409 `invoices.export_not_retryable`.
+4. **`compliance`:** `GET /purposes` trả thêm `consented`, `withdrawn` (số người — khoá chủ thể khác nhau — theo trạng thái,
+   một câu đếm; schema mới `CompliancePurposeWithCounts`, trang công khai không có số đếm). Migration
+   `m0018_consent_stats_index`. `GET /rules` nhận `as_of` (mỗi quy tắc chỉ còn bản có hiệu lực lúc đó, chọn như
+   `effective_rule`), `jurisdiction`, `key`; không có `as_of` vẫn là lịch sử mọi phiên bản.
+5. **Nhật ký request:** `status_class` (`2xx`…`5xx`) cho `GET /kernel/devtools/requests` và tool `request_log`.
+
+Để đợt sau (đã ghi trong bảng nợ): tên chủ thể và cờ "thiếu giấy tờ" của hồ sơ KYC, `note` khi từ chối (cần đọc tên nút qua
+trait của `organizations` và thêm cột); hoàn tác thao tác hàng loạt; xoá dữ liệu cá nhân theo email ở mọi module; số lần tự
+xuất / tự xoá; xem trước VietQR, tổng hợp GTGT, kiểm chuỗi băm theo yêu cầu, hỏi lại hoá đơn điện tử; tổng quan tuân thủ.

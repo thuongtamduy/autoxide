@@ -65,8 +65,8 @@ pub struct NoInput {}
 
 // Phân trang của tool liệt kê — cùng ý nghĩa với tham số `limit` / `cursor` / `order`
 // của endpoint danh sách REST.
-/// Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of
-/// the REST list endpoints.
+/// Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters
+/// of the REST list endpoints.
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
@@ -78,21 +78,23 @@ pub struct PageInput {
     pub cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc` (oldest first).
     pub order: Option<String>,
+    /// `true` to also get `pagination.total` (the number of matching items) on the first page.
+    pub count: Option<bool>,
 }
 
 impl PageInput {
     /// Paging with this limit, cursor and order (each optional, as a client sends them).
     pub const fn new(limit: Option<u32>, cursor: Option<String>, order: Option<String>) -> Self {
-        PageInput { limit, cursor, order }
+        PageInput { limit, cursor, order, count: None }
     }
 
     /// Yêu cầu trang đã kiểm, như của REST.
     pub fn page(self) -> Result<PageRequest, Error> {
-        PageRequest::try_from(PageQuery {
-            limit: self.limit.map(|limit| limit.to_string()),
-            cursor: self.cursor,
-            order: self.order,
-        })
+        let count = self.count.unwrap_or(false);
+        PageRequest::try_from(
+            PageQuery::new(self.limit.map(|limit| limit.to_string()), self.cursor, self.order)
+                .with_count(count),
+        )
     }
 }
 

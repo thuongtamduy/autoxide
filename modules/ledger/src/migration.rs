@@ -21,6 +21,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreatePayments),
         Box::new(CreateFlows),
         Box::new(CreateExchangeRates),
+        Box::new(AddListIndexes),
     ]
 }
 
@@ -973,5 +974,49 @@ impl MigrationTrait for CreateExchangeRates {
             )
             .await?;
         manager.drop_table(Table::drop().table("ledger_fx_rates").to_owned()).await
+    }
+}
+
+/// Index cho hai đường đọc của màn kế toán (đề bài giao diện, D-382): lọc thanh toán theo số tiền
+/// (hàng chờ sai lệch) và đếm bút toán theo kỳ (danh sách kỳ).
+struct AddListIndexes;
+
+impl MigrationName for AddListIndexes {
+    fn name(&self) -> &str {
+        "m0010_add_list_indexes"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddListIndexes {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        index(
+            manager,
+            "ledger_payments",
+            "ledger_payments_amount_idx",
+            &["tenant_id", "amount_minor", "id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            "ledger_entries",
+            "ledger_entries_period_idx",
+            &["tenant_id", "period_id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for (table, name) in [
+            ("ledger_entries", "ledger_entries_period_idx"),
+            ("ledger_payments", "ledger_payments_amount_idx"),
+        ] {
+            manager
+                .drop_index(Index::drop().name(name).table(Alias::new(table)).to_owned())
+                .await?;
+        }
+        Ok(())
     }
 }
