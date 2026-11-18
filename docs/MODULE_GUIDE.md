@@ -307,6 +307,19 @@ An event a client screen should see at once can be pushed over the real-time str
 REST — the payload goes to everyone with that permission in the tenant. Events are not
 streamed unless declared.
 
+**Report figures.** An event that carries a business figure (an amount sold, a count of documents) can feed the
+reports of the whole customer tree (`/api/v1/reporting`, also from tenants on other databases): return a
+`FactSource` from `Module::facts` — the event (one of your own), the kinds it produces
+(`FactKind::new("notes.created_count", "…", Measure::Quantity, &[])`) and a pure function that turns the event
+into `Fact`s (helpers `org_field`, `money_field`). Facts never hold personal data: no names, emails or user ids.
+
+**Sending records to child tenants.** A parent tenant (a chain head office) can push a record (a category, a price
+list) to its child tenants, also those on other databases: add `tenancy::distribution::distribution_migration`, call
+`context.distributor()` in `start`, `publish` in the write transaction of the parent's record, and register
+`distributor.job("<module>.distribute", apply)` in `Module::jobs`. Your `DistributionApply` writes the child's copy
+through your own service and must be safe to run again: find the copy by `item.reference()` and update it only when
+`item.version` is newer than the version it keeps.
+
 ### 7. MCP tools
 
 `Module::tools` returns `autoxide_kernel::mcp::Tool`s. Each tool takes an input type

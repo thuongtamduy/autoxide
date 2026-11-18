@@ -397,6 +397,30 @@ impl OrgTree {
             .collect())
     }
 
+    /// Mọi nút trong nhánh của một trong `roots` (gồm chính các nút đó), không trùng — cho chỗ phải
+    /// lọc theo nhánh ở một database KHÁC database chứa cây (vd kho báo cáo gộp ở database của
+    /// khách gốc, bước 38), nơi subquery của [`subtree_condition`](Self::subtree_condition) không
+    /// chạy được.
+    pub async fn descendants<C: ConnectionTrait>(
+        connection: &C,
+        tenant: TenantId,
+        roots: &[OrgId],
+    ) -> Result<Vec<OrgId>, Error> {
+        if roots.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows: Vec<Uuid> = closure::Entity::find()
+            .select_only()
+            .column(closure::Column::DescendantId)
+            .filter(closure::Column::TenantId.eq(tenant.as_uuid()))
+            .filter(closure::Column::AncestorId.is_in(roots.iter().map(OrgId::as_uuid)))
+            .distinct()
+            .into_tuple()
+            .all(connection)
+            .await?;
+        Ok(rows.into_iter().map(OrgId::from_uuid).collect())
+    }
+
     /// Điều kiện SeaORM "cột `column` là một nút trong nhánh của một trong `roots`": `column IN
     /// (SELECT descendant_id FROM kernel_org_closure WHERE tenant_id = … AND ancestor_id IN …)`.
     /// Một subquery có index, không đổ danh sách ID ra bộ nhớ.

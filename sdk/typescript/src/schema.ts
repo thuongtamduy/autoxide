@@ -2777,6 +2777,18 @@ export type CreatedEndpointResponse = EndpointResponse & {
 /** ISO 4217 currency code in upper case, e.g. `USD`, `EUR`, `VND`. Only codes in circulation that have minor units are accepted. */
 export type Currency = string;
 
+/** The total of one currency (or of a figure without money: `currency` is null). */
+export type CurrencyTotalResponse = {
+  /** Sum in minor units of `currency`, as a base-10 integer string. */
+  amount: string;
+  /** Number of facts. */
+  count: number;
+  /** ISO 4217 code; null for figures that count things. */
+  currency?: string | null;
+  /** Sum of the counts. */
+  quantity: number;
+};
+
 /** The tenant of the caller. */
 export type CurrentTenant = {
   id: string;
@@ -6594,6 +6606,14 @@ export type Data_ReauthResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_RebuildResponse = {
+  /** How many facts will be pushed again. */
+  data: {
+    requeued: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RecordNote = {
   /** An internal note on a record. */
   data: {
@@ -6989,6 +7009,21 @@ export type Data_SubscriberResponse = {
      */
     suppressed?: string | null;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SummaryResponse = {
+  /** Sums of one fact kind over a period. */
+  data: {
+    from: string;
+    group_by: string;
+    groups: SummaryGroupResponse[];
+    kind: string;
+    /** Amounts in these currencies on these days had no rate and are not in `converted`. */
+    missing_rates: MissingRateResponse[];
+    to: string;
+    totals: SummaryGroupResponse;
   };
 };
 
@@ -8069,6 +8104,34 @@ export type Data_Vec_JobRunView = {
     result?: unknown;
     /** `queued`, `running`, `succeeded` or `failed`. */
     status: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_KindResponse = {
+  data: {
+    description: string;
+    /** Dimensions the facts carry, usable in the `dimensions` filter of `GET /facts`. */
+    dimensions: string[];
+    /** `<module>.<figure>`. */
+    kind: string;
+    /** `amount` (sums of money, per currency) or `quantity` (counts). */
+    measure: string;
+    /** The module that declares it. */
+    module: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_LagResponse = {
+  data: {
+    /** When the store last received a fact of this tenant. */
+    last_received_at?: string | null;
+    /** When the oldest fact not yet pushed was taken. */
+    oldest_pending_at?: string | null;
+    /** Facts not yet pushed to the store. */
+    pending: number;
+    tenant_id: string;
   }[];
 };
 
@@ -9545,6 +9608,26 @@ export type ExportResponse = {
  */
 export type ExportState = "pending" | "running" | "ready" | "failed";
 
+/** One report fact. */
+export type FactResponse = {
+  amount?: Money | null;
+  /** Dimension values, e.g. `{"kind": "vat_invoice"}`. */
+  dimensions: {
+    [key: string]: string;
+  };
+  id: string;
+  kind: string;
+  /** The day in the time zone of the unit, when the fact was taken. */
+  local_day: string;
+  occurred_at: string;
+  /** The organization unit of that tenant; the root unit has the id of the tenant. */
+  org_id: string;
+  /** For figures that count things. */
+  quantity?: number | null;
+  /** The tenant the fact comes from. */
+  tenant_id: string;
+};
+
 /** A menu that could not be imported, and why. */
 export type FailedMenu = {
   key: string;
@@ -10288,6 +10371,30 @@ export type JobRunView = {
 
 /** What an entry is. */
 export type Kind = "post" | "page";
+
+/** A kind of report figure a module declares. */
+export type KindResponse = {
+  description: string;
+  /** Dimensions the facts carry, usable in the `dimensions` filter of `GET /facts`. */
+  dimensions: string[];
+  /** `<module>.<figure>`. */
+  kind: string;
+  /** `amount` (sums of money, per currency) or `quantity` (counts). */
+  measure: string;
+  /** The module that declares it. */
+  module: string;
+};
+
+/** How far behind the report store is for one tenant. */
+export type LagResponse = {
+  /** When the store last received a fact of this tenant. */
+  last_received_at?: string | null;
+  /** When the oldest fact not yet pushed was taken. */
+  oldest_pending_at?: string | null;
+  /** Facts not yet pushed to the store. */
+  pending: number;
+  tenant_id: string;
+};
 
 /** The newest delivery to an endpoint. */
 export type LastDelivery = {
@@ -11497,6 +11604,12 @@ export type MigrationRunRequest = {
    * before it starts).
    */
   placement?: string | null;
+};
+
+/** A currency and day without an exchange rate to the asked currency. */
+export type MissingRateResponse = {
+  currency: string;
+  day: string;
 };
 
 /** Where an item goes on a phone. */
@@ -13128,6 +13241,30 @@ export type Page_EntryResponse = {
     version: string;
     /** Words in the body (for Vietnamese: syllables). */
     word_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_FactResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    amount?: Money | null;
+    /** Dimension values, e.g. `{"kind": "vat_invoice"}`. */
+    dimensions: {
+      [key: string]: string;
+    };
+    id: string;
+    kind: string;
+    /** The day in the time zone of the unit, when the fact was taken. */
+    local_day: string;
+    occurred_at: string;
+    /** The organization unit of that tenant; the root unit has the id of the tenant. */
+    org_id: string;
+    /** For figures that count things. */
+    quantity?: number | null;
+    /** The tenant the fact comes from. */
+    tenant_id: string;
   }[];
   pagination: Pagination;
 };
@@ -16007,6 +16144,17 @@ export type ReauthResponse = {
   reauth_token?: string | null;
 };
 
+/** Push the kept facts of a tenant to the report store again. */
+export type RebuildRequest = {
+  /** A tenant of your customer tree; omit for your own tenant. */
+  tenant_id?: string | null;
+};
+
+/** How many facts will be pushed again. */
+export type RebuildResponse = {
+  requeued: number;
+};
+
 /** An event recorded about a record. */
 export type RecordEvent = {
   actor_id?: string | null;
@@ -16979,6 +17127,30 @@ export type SubscriptionResponse = {
 
 /** Where a subscriber stands on one list. */
 export type SubscriptionStatus = "unconfirmed" | "confirmed" | "unsubscribed";
+
+/** One group of the summary. */
+export type SummaryGroupResponse = {
+  /** Sums per original currency; money of two currencies is never added together. */
+  by_currency: CurrencyTotalResponse[];
+  converted?: Money | null;
+  /**
+   * The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id or a unit id;
+   * `total` for the totals.
+   */
+  key: string;
+};
+
+/** Sums of one fact kind over a period. */
+export type SummaryResponse = {
+  from: string;
+  group_by: string;
+  groups: SummaryGroupResponse[];
+  kind: string;
+  /** Amounts in these currencies on these days had no rate and are not in `converted`. */
+  missing_rates: MissingRateResponse[];
+  to: string;
+  totals: SummaryGroupResponse;
+};
 
 /** The figures. */
 export type SummaryView = {
@@ -26927,6 +27099,75 @@ export interface paths {
         200: Data_Vec_LimitUse;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/reporting/facts": {
+    /** List report facts. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; dimensions?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_FactResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/reporting/kinds": {
+    /** List the kinds of report figures. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_KindResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/reporting/lag": {
+    /** See how far behind the report store is. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_LagResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/reporting/rebuild": {
+    /** Push the facts of a tenant to the report store again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RebuildRequest;
+      responses: {
+        200: Data_RebuildResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/reporting/summary": {
+    /** Sum a report figure over a period. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; dimensions?: string; group_by?: string; currency?: string }; };
+      responses: {
+        200: Data_SummaryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };

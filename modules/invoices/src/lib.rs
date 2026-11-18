@@ -94,6 +94,10 @@ impl Module for InvoicesModule {
         events::all()
     }
 
+    fn facts(&self) -> Vec<autoxide_kernel::report::FactSource> {
+        events::facts()
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }

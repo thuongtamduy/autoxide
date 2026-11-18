@@ -702,11 +702,20 @@ async fn write(
     )?;
     let subject = Some(format!("ledger.entry:{entry_id}"));
     let day = draft.effective_date.format("%Y-%m-%d").to_string();
+    // Dòng theo mục đích tài khoản (không có đối tượng): báo cáo gộp (bước 38) tính doanh thu, thuế.
+    let event_lines: Vec<serde_json::Value> = draft
+        .lines
+        .iter()
+        .zip(&resolved)
+        .map(|(item, found)| {
+            json!({"purpose": found.purpose, "side": item.side.as_str(), "amount": item.amount})
+        })
+        .collect();
     match draft.reverses {
         Some(original) => {
             let event = events::EntryReversed(json!({
                 "entry_id": entry_id, "reversed_entry_id": original, "book_id": book.id,
-                "org_id": book.org_id, "effective_date": day,
+                "org_id": book.org_id, "effective_date": day, "lines": event_lines,
             }));
             outbox.record(transaction, tenant, actor, subject, &event).await?;
         }
@@ -715,7 +724,7 @@ async fn write(
                 "entry_id": entry_id, "book_id": book.id, "org_id": book.org_id,
                 "effective_date": day, "source_module": draft.source_module,
                 "source_kind": draft.source_kind, "source_id": draft.source_id,
-                "reference": draft.reference.as_str(), "total": total,
+                "reference": draft.reference.as_str(), "total": total, "lines": event_lines,
             }));
             outbox.record(transaction, tenant, actor, subject, &event).await?;
         }

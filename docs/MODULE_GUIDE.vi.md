@@ -299,6 +299,18 @@ Event mà màn hình của client cần thấy ngay thì đẩy qua stream thờ
 nêu permission đọc bản ghi qua REST — payload tới mọi người có permission đó trong khách.
 Event không khai thì không được stream.
 
+**Số liệu báo cáo.** Event mang một số liệu nghiệp vụ (số tiền bán, số chứng từ) có thể đổ vào báo cáo của cả cây khách
+hàng (`/api/v1/reporting`, kể cả từ khách ở database khác): trả một `FactSource` từ `Module::facts` — event (của chính
+module), các loại số liệu nó sinh (`FactKind::new("notes.created_count", "…", Measure::Quantity, &[])`) và một hàm thuần
+đổi event thành `Fact` (hàm phụ `org_field`, `money_field`). Số liệu không bao giờ chứa dữ liệu cá nhân: không tên, email
+hay ID người dùng.
+
+**Gửi bản ghi xuống khách con.** Khách cha (trụ sở của chuỗi) đẩy được một bản ghi (danh mục, bảng giá) xuống các khách
+con, kể cả khách ở database khác: thêm `tenancy::distribution::distribution_migration`, gọi `context.distributor()` trong
+`start`, `publish` trong transaction ghi bản ghi của khách cha, và khai `distributor.job("<module>.distribute", apply)` ở
+`Module::jobs`. `DistributionApply` của module ghi bản sao ở khách con qua service của chính module và phải chạy lại
+được: tìm bản sao bằng `item.reference()`, chỉ cập nhật khi `item.version` mới hơn phiên bản bản sao đang giữ.
+
 ### 7. Tool MCP
 
 `Module::tools` trả các `autoxide_kernel::mcp::Tool`. Mỗi tool nhận một kiểu đầu vào
