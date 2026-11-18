@@ -584,19 +584,32 @@ export type CampaignStatus = "draft" | "scheduled" | "sending" | "paused" | "sen
 /** The answer to one question. */
 export type CanAnswer = {
   allowed: boolean;
+  /** With `quota_exceeded`: the limit, how much is used and the most allowed. */
+  limit?: string | null;
+  max?: number | null;
   org_id?: string | null;
   permission: string;
   /**
    * Why not: `unknown_permission`, `module_not_enabled` (the tenant's plan does not include the
-   * module) or `missing_permission` (none of your roles grants it at this unit).
+   * module), `feature_not_in_plan`, `quota_exceeded` or `missing_permission` (none of your
+   * roles grants it at this unit).
    */
   reason?: string | null;
+  /** With `feature_not_in_plan`: the feature the plan must include. */
+  required_feature?: string | null;
   /** With `module_not_enabled`: the module the plan must include. */
   required_module?: string | null;
+  /** With a plan reason: codes of the plans on sale that would allow it (empty when unknown). */
+  upgrade_to?: string[];
+  used?: number | null;
 };
 
 /** One question: may I use `permission` at `org_id`? */
 export type CanCheck = {
+  /** A plan feature the action needs (as a navigation item's `required_feature`), e.g. `shop.pos`. */
+  feature?: string | null;
+  /** A counted limit the action uses one more of, e.g. `kernel.custom_fields`. */
+  limit?: string | null;
   /** The organization unit; omitted: the whole tenant. */
   org_id?: string | null;
   permission: string;
@@ -7482,15 +7495,24 @@ export type Data_Vec_BillingPeriodResponse = {
 export type Data_Vec_CanAnswer = {
   data: {
     allowed: boolean;
+    /** With `quota_exceeded`: the limit, how much is used and the most allowed. */
+    limit?: string | null;
+    max?: number | null;
     org_id?: string | null;
     permission: string;
     /**
      * Why not: `unknown_permission`, `module_not_enabled` (the tenant's plan does not include the
-     * module) or `missing_permission` (none of your roles grants it at this unit).
+     * module), `feature_not_in_plan`, `quota_exceeded` or `missing_permission` (none of your
+     * roles grants it at this unit).
      */
     reason?: string | null;
+    /** With `feature_not_in_plan`: the feature the plan must include. */
+    required_feature?: string | null;
     /** With `module_not_enabled`: the module the plan must include. */
     required_module?: string | null;
+    /** With a plan reason: codes of the plans on sale that would allow it (empty when unknown). */
+    upgrade_to?: string[];
+    used?: number | null;
   }[];
 };
 
@@ -8347,6 +8369,19 @@ export type Data_Vec_RecordNote = {
     id: string;
     /** Users the note mentions. */
     mentions: string[];
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_Referrer = {
+  data: {
+    /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
+    field: string;
+    id: string;
+    /** Type of the pointing record, e.g. `content.entry`. */
+    kind: string;
+    /** What staff call it (title, name). */
+    title: string;
   }[];
 };
 
@@ -15483,6 +15518,17 @@ export type RedirectResponse = {
   /** Target address (a path in the site, or a full URL). */
   to_url?: string | null;
   updated_at: string;
+};
+
+/** A record that points to the record asked about. */
+export type Referrer = {
+  /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
+  field: string;
+  id: string;
+  /** Type of the pointing record, e.g. `content.entry`. */
+  kind: string;
+  /** What staff call it (title, name). */
+  title: string;
 };
 
 /** A refresh token, as returned by sign-in or by the previous refresh. */
@@ -22631,6 +22677,19 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/records/{kind}/{id}/usages": {
+    /** Get where a record is used. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { kind: string; id: string }; query: { limit?: number }; };
+      responses: {
+        200: Data_Vec_Referrer;
+        401: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };

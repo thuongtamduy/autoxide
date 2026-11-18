@@ -344,6 +344,7 @@ pub struct StartContext<'a> {
     taggables: &'a crate::ops::tags::Taggables,
     texts: &'a crate::ops::texts::TextOverrides,
     custom_fields: &'a crate::ops::custom_fields::CustomFields,
+    references: &'a crate::ops::usages::ReferenceSources,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
     tenancy: &'a crate::tenancy::DatabaseRegistry,
@@ -540,6 +541,11 @@ impl StartContext<'_> {
     /// tượng); `write`: permission ghi bản ghi — cần để gắn / gỡ nhãn.
     pub fn taggable(&mut self, kind: &'static str, write: Permission) -> Result<(), Error> {
         self.taggables.register(self.module, kind, write)
+    }
+
+    /// Khai bản ghi của module trỏ tới bản ghi khác (bước 51, D-267): "đang dùng ở đâu".
+    pub fn reference_source(&mut self, source: Arc<dyn crate::ops::usages::ReferenceSource>) {
+        self.references.register(self.module, source);
     }
 
     /// Trường tự định nghĩa (bước 51 P19): kiểm giá trị, ghi index lọc, dựng điều kiện lọc.

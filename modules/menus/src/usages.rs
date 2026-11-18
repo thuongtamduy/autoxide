@@ -1,0 +1,69 @@
+//! "Đang dùng ở đâu" (bước 51, D-267): menu có mục trỏ tới một bản ghi (đích của mục, hay ô gợi ý).
+
+use std::collections::BTreeMap;
+
+use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::usages::{ReferenceSource, Referrer};
+use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QuerySelect};
+
+use crate::entity::{item, menu};
+
+pub(crate) struct Menus;
+
+#[async_trait::async_trait]
+impl ReferenceSource for Menus {
+    async fn referrers(
+        &self,
+        tenant: &TenantContext,
+        kind: &str,
+        id: &str,
+        limit: usize,
+    ) -> Result<Vec<Referrer>, Error> {
+        let read = tenant.database().read();
+        let items = item::Entity::find()
+            .filter(
+                Condition::any()
+                    .add(
+                        Condition::all()
+                            .add(item::Column::RefKind.eq(kind))
+                            .add(item::Column::RefId.eq(id)),
+                    )
+                    .add(
+                        Condition::all()
+                            .add(item::Column::FeatureKind.eq(kind))
+                            .add(item::Column::FeatureId.eq(id)),
+                    ),
+            )
+            .scoped(tenant)
+            .limit(u64::try_from(limit).unwrap_or(u64::MAX))
+            .all(read)
+            .await?;
+        if items.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ids: Vec<uuid::Uuid> = items.iter().map(|item| item.menu_id).collect();
+        let menus: BTreeMap<uuid::Uuid, menu::Model> = menu::Entity::find()
+            .filter(menu::Column::Id.is_in(ids))
+            .scoped(tenant)
+            .all(read)
+            .await?
+            .into_iter()
+            .map(|menu| (menu.id, menu))
+            .collect();
+        Ok(items
+            .into_iter()
+            .filter_map(|item| {
+                let menu = menus.get(&item.menu_id)?;
+                let field =
+                    if item.ref_id.as_deref() == Some(id) { "menu_item" } else { "menu_feature" };
+                Some(Referrer::new(
+                    "menus.menu",
+                    menu.id.to_string(),
+                    format!("{} ({}) · {}", menu.key, menu.locale, item.label),
+                    field,
+                ))
+            })
+            .collect())
+    }
+}

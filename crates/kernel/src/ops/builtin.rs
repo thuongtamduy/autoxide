@@ -450,6 +450,7 @@ impl Module for KernelModule {
                 permissions: permissions.clone(),
                 outbox: outbox.clone(),
                 history: self.catalog.history(),
+                references: self.catalog.references(),
             }));
         }
         if let (Some(jobs), Some(entitlements), Some(registry)) =

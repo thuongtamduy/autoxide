@@ -296,6 +296,7 @@ impl Modules {
         let taggables = self.catalog.taggables();
         let texts = self.catalog.text_overrides();
         let custom_fields = self.catalog.custom_fields();
+        let references = self.catalog.references();
         let mut apis = Apis::default();
         let mut counters = std::collections::BTreeMap::new();
         // Gọi sau `configure` của mọi module: thời hạn đọc từ cấu hình.
@@ -333,6 +334,7 @@ impl Modules {
                 taggables: &taggables,
                 texts: &texts,
                 custom_fields: &custom_fields,
+                references: &references,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
                 tenancy: registry,

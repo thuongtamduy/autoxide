@@ -264,6 +264,14 @@ pub trait Entitlements: Send + Sync {
         reference: &str,
     ) -> Result<(), Error>;
 
+    /// Mã các gói đang bán có `module` / `feature` / mức của hạn mức `limit` lớn hơn `above`
+    /// (`None`: không giới hạn) — để giao diện chỉ "nâng lên gói nào thì mở" (bước 51 P11). Mặc
+    /// định: không biết gói nào.
+    async fn plans_offering(&self, need: &PlanNeed) -> Result<Vec<String>, Error> {
+        let _ = need;
+        Ok(Vec::new())
+    }
+
     /// Khách có thuê bao ở trạng thái `status` (bộ lọc của danh sách khách). Mặc định: không ai.
     async fn tenants_with_status(&self, status: &str) -> Result<Vec<TenantId>, Error> {
         let _ = status;
@@ -285,6 +293,30 @@ pub trait Entitlements: Send + Sync {
     ) -> Result<BTreeMap<TenantId, TenantPlanView>, Error> {
         let _ = (tenants, subscription, usage);
         Ok(BTreeMap::new())
+    }
+}
+
+/// Điều cần có ở gói (xem [`Entitlements::plans_offering`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PlanNeed {
+    pub module: Option<String>,
+    pub feature: Option<String>,
+    /// Hạn mức và mức hiện tại: gói phải cho nhiều hơn mức này.
+    pub limit: Option<(String, i64)>,
+}
+
+impl PlanNeed {
+    pub fn module(module: &str) -> Self {
+        PlanNeed { module: Some(module.to_owned()), ..PlanNeed::default() }
+    }
+
+    pub fn feature(feature: &str) -> Self {
+        PlanNeed { feature: Some(feature.to_owned()), ..PlanNeed::default() }
+    }
+
+    pub fn limit(limit: &str, above: i64) -> Self {
+        PlanNeed { limit: Some((limit.to_owned(), above)), ..PlanNeed::default() }
     }
 }
 
@@ -412,6 +444,18 @@ impl EntitlementsHandle {
         match self.provider_for(tenant) {
             Some(provider) => provider.snapshot(tenant).await,
             None => Ok(Arc::new(TenantEntitlements::unrestricted())),
+        }
+    }
+
+    /// Gói đang bán đáp ứng `need` (rỗng khi không có module gói).
+    pub async fn plans_offering(
+        &self,
+        tenant: TenantId,
+        need: &PlanNeed,
+    ) -> Result<Vec<String>, Error> {
+        match self.provider_for(tenant) {
+            Some(provider) => provider.plans_offering(need).await,
+            None => Ok(Vec::new()),
         }
     }
 

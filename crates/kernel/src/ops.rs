@@ -29,6 +29,7 @@ pub mod tags;
 pub mod task;
 pub mod telemetry;
 pub mod texts;
+pub mod usages;
 pub(crate) mod user_flags;
 pub(crate) mod views;
 pub(crate) mod whats_new;

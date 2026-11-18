@@ -34,6 +34,12 @@ endpoints are marked deprecated with a sunset date first.
   `AUTOXIDE_EVENTS_STREAM`, `…_POLL_MS`, `…_MAX_CONNECTIONS`, `…_MAX_PER_TENANT`, `…_MAX_PER_USER`. The module catalog
   gives each event's `stream_permission`. Guide: `docs/guides/realtime-events.md`. For module authors:
   `EventInfo::streamable(permission)`.
+- Step 51 P11: `POST /api/v1/me/can` takes `feature` and `limit` per question and answers `feature_not_in_plan` and
+  `quota_exceeded` (with the real usage), each with `upgrade_to`: the plans on sale that would allow it
+  (`Entitlements::plans_offering`, answered by `plans`).
+- Step 51: `GET /api/v1/kernel/records/{kind}/{id}/usages` lists the records using a record — posts using an image or
+  embedding a record, menus linking to it — from modules whose `<module>.read` you hold (`ReferenceSource`). Media items
+  are now a record type (`media.item`) of the resource directory.
 - Step 40, rate limits on several servers: `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` shares the limit per API key between
   every server through the database (`kernel_throttle`, key per tenant and API key), taking requests in lots of
   max(1, burst / 4), so a key gets at most one lot per server more than its limit each minute. `memory` stays the
