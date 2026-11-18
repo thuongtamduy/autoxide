@@ -68,7 +68,7 @@
   "field:must be 0 to 6": "phải từ 0 đến 6",
   "field:must be 1 to 1000 characters": "phải dài 1 đến 1000 ký tự",
   "field:must be 1 to 10000": "phải từ 1 đến 10000",
-  "field:must be 1 to 5": "phải từ 1 tới 5",
+  "field:must be 1 to 5": "phải từ 1 đến 5",
   "field:must be 1 to 600 months": "phải từ 1 đến 600 tháng",
   "field:must be 1 to 64 letters, digits, `_`, `-` or `.`": "phải gồm 1 đến 64 chữ, số, `_`, `-` hay `.`",
   "field:must be 1 to 64 lower-case letters, digits or `_`": "phải gồm 1 đến 64 chữ thường, chữ số hoặc `_`",
