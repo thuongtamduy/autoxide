@@ -91,7 +91,7 @@ async fn luat_goi_tool_that_voi_quyen_nguoi_tao_va_audit_thay_lan_chay() {
         assert_eq!(body["data"]["status"], "succeeded", "{body}");
         assert_eq!(body["data"]["steps"][0]["result"]["name"], "Renamed by a rule", "{body}");
         // Audit: thay đổi do lần chạy gây ra mang đường vào `automation` và ID lần chạy.
-        let entries = app.get("/api/v1/audit/entries?limit=200").token(&token).send().await.unwrap();
+        let entries = app.get("/api/v1/audit?limit=200").token(&token).send().await.unwrap();
         assert_eq!(entries.status(), 200, "{}", entries.text());
         let text = entries.text();
         assert!(text.contains("\"automation\""), "{text}");
