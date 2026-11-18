@@ -232,10 +232,13 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
 Bắt đầu SAU bước 51. Những điều nên có theo nghiên cứu các trang quản trị hàng đầu (Stripe, Shopify,
 Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
 
-- [ ] Bàn kỹ thuật: nhật ký request theo khách (API key, đường dẫn mẫu, status, `code`, `request_id` /
+- [x] Bàn kỹ thuật: nhật ký request theo khách (API key, đường dẫn mẫu, status, `code`, `request_id` /
       `trace_id`, có hạn lưu, không lưu thân request); lần giao webhook kèm gửi lại; event theo bản ghi đọc
       từ audit; chạy lại job trong dead-letter queue; `kernel.devtools.read` / `kernel.devtools.manage`
-- [ ] Nhật ký lệnh của agent (D-202): lệnh MCP ghi `mcp:<tên tool>`, không ghi tham số; lọc theo
+      - [x] `GET /webhooks/deliveries?status=`, `POST /webhooks/deliveries/{id}/redeliver` (+ tool MCP, event audit);
+            `GET /kernel/devtools/events?object=` đọc từ audit; chạy lại job hỏng đã có từ P15 (`POST /kernel/jobs/{id}/retry`,
+            event `kernel.job_retried` vào audit). Còn: tool MCP cho event theo bản ghi.
+- [x] Nhật ký lệnh của agent (D-202): lệnh MCP ghi `mcp:<tên tool>`, không ghi tham số; lọc theo
       `actor_kind` (đủ `ActorKind`, D-224) và theo key; dòng của lệnh `202 approval_required` giữ `approval_id`
       - [x] Bảng `kernel_request_log`, ghi bất đồng bộ, `GET /kernel/devtools/requests`, tool `kernel.request_log`,
             lệnh MCP `mcp:<tool>`, `approval_id`, hạn lưu `AUTOXIDE_REQUEST_LOG_DAYS` (D-370)

@@ -13,6 +13,8 @@ pub(crate) const ENDPOINT_UPDATED: EventInfo = EventInfo::new(
 );
 pub(crate) const ENDPOINT_DELETED: EventInfo =
     EventInfo::new("webhooks.endpoint_deleted", "A webhook endpoint was deleted.");
+pub(crate) const DELIVERY_REDELIVERED: EventInfo =
+    EventInfo::new("webhooks.delivery_redelivered", "A webhook delivery was sent again by hand.");
 
 /// Dữ liệu chung của mọi event của module.
 #[derive(Debug, Default, Serialize)]
@@ -38,9 +40,10 @@ macro_rules! event {
 event!(EndpointCreated, "webhooks.endpoint_created");
 event!(EndpointUpdated, "webhooks.endpoint_updated");
 event!(EndpointDeleted, "webhooks.endpoint_deleted");
+event!(DeliveryRedelivered, "webhooks.delivery_redelivered");
 
 pub(crate) fn all() -> Vec<EventInfo> {
-    vec![ENDPOINT_CREATED, ENDPOINT_UPDATED, ENDPOINT_DELETED]
+    vec![ENDPOINT_CREATED, ENDPOINT_UPDATED, ENDPOINT_DELETED, DELIVERY_REDELIVERED]
 }
 
 /// Chủ thể (subject) của event về endpoint `id`.

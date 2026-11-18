@@ -14,9 +14,11 @@ use sea_orm::{
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use crate::delivery::{MAX_ATTEMPTS, STATUS_FAILED, STATUS_PENDING, STATUS_SUCCEEDED, Send};
 use crate::entity::{delivery, endpoint};
 use crate::events::{self, Change};
 use crate::signature;
+use autoxide_kernel::job::{EnqueueOptions, JobQueue};
 
 /// Tên event đặc biệt: nhận mọi event.
 pub(crate) const ALL_EVENTS: &str = "*";
@@ -394,6 +396,80 @@ impl WebhookService {
         fetch_page(select, delivery::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
+    /// Một trang lần gửi của cả khách (bàn kỹ thuật, bước 52), lọc theo trạng thái và endpoint.
+    pub(crate) async fn all_deliveries(
+        &self,
+        tenant: &TenantContext,
+        status: Option<&str>,
+        endpoint_id: Option<Uuid>,
+        page: &PageRequest,
+    ) -> Result<Page<Delivery>, Error> {
+        let mut select = delivery::Entity::find().scoped(tenant);
+        if let Some(status) = status {
+            if ![STATUS_PENDING, STATUS_SUCCEEDED, STATUS_FAILED].contains(&status) {
+                return Err(Error::validation(vec![FieldError::new(
+                    "status",
+                    "invalid",
+                    "must be `pending`, `succeeded` or `failed`",
+                )]));
+            }
+            select = select.filter(delivery::Column::Status.eq(status));
+        }
+        if let Some(endpoint_id) = endpoint_id {
+            select = select.filter(delivery::Column::EndpointId.eq(endpoint_id));
+        }
+        fetch_page(select, delivery::Column::Id, |row| row.id, page, tenant.database().read()).await
+    }
+
+    /// Gửi lại lần gửi `id` (đã xong hay đã hỏng hẳn): mở lại thành `pending` và xếp job gửi,
+    /// cùng transaction với event. Thân và `webhook-id` giữ nguyên, nên bên nhận lọc trùng được.
+    /// Lần gửi đang chờ thì từ chối: job của nó vẫn đang thử.
+    pub(crate) async fn redeliver(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<Delivery, Error> {
+        let row = delivery::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(|| delivery_not_found(id))?;
+        let transaction = tenant.database().begin_write().await?;
+        // Cập nhật có điều kiện: hai lần bấm cùng lúc chỉ một lần mở lại được.
+        let reopened = delivery::Entity::update_many()
+            .col_expr(delivery::Column::Status, sea_orm::sea_query::Expr::value(STATUS_PENDING))
+            .filter(delivery::Column::Id.eq(id))
+            .filter(delivery::Column::Status.ne(STATUS_PENDING))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
+        if reopened.rows_affected == 0 {
+            transaction.rollback().await?;
+            return Err(Error::conflict(
+                "webhooks.delivery_in_progress",
+                "Delivery `{id}` is still being sent or retried; wait until it succeeds or fails.",
+            )
+            .with_param("id", id));
+        }
+        let options = EnqueueOptions::default().max_attempts(MAX_ATTEMPTS);
+        JobQueue::new("webhooks")
+            .enqueue(&transaction, tenant, &Send { delivery_id: id }, options)
+            .await?;
+        let event = events::DeliveryRedelivered(Change {
+            before: Some(json!({"delivery_id": id, "status": row.status})),
+            after: Some(
+                json!({"delivery_id": id, "status": STATUS_PENDING, "event_name": row.event_name}),
+            ),
+        });
+        self.outbox
+            .record(&transaction, tenant, actor, events::endpoint_subject(row.endpoint_id), &event)
+            .await?;
+        transaction.commit().await?;
+        tracing::info!(delivery_id = %id, "webhook delivery sent again by hand");
+        Ok(Delivery { status: STATUS_PENDING.to_owned(), ..row })
+    }
+
     /// Mã hoá secret ký của endpoint `id` thuộc khách `tenant`.
     async fn seal(&self, tenant: &TenantContext, id: Uuid, secret: &str) -> Result<String, Error> {
         let sealer = self.secrets.sealer().await?;
@@ -523,6 +599,11 @@ fn origin(url: &str) -> String {
     reqwest::Url::parse(url)
         .map(|url| url.origin().ascii_serialization())
         .unwrap_or_else(|_| "invalid".to_owned())
+}
+
+fn delivery_not_found(id: Uuid) -> Error {
+    Error::not_found("webhooks.delivery_not_found", "No webhook delivery `{id}`.")
+        .with_param("id", id)
 }
 
 fn endpoint_not_found(id: Uuid) -> Error {

@@ -611,6 +611,46 @@ mod tests {
         .unwrap();
     }
 
+    /// Bàn kỹ thuật (bước 52): event theo bản ghi đọc từ audit, cần `kernel.devtools.read`.
+    #[tokio::test]
+    async fn ban_ky_thuat_xem_event_theo_ban_ghi() {
+        TestDatabase::run(async |test| {
+            let app = TestApp::builder(test)
+                .user("dev", 0, &["kernel.devtools.read"])
+                .user("nobody", 0, &[])
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let recorder = crate::recorder::Recorder;
+            let ada = Uuid::now_v7();
+            for (name, subject) in
+                [("auth.user_updated", "auth.user:1"), ("auth.role_created", "auth.role:1")]
+            {
+                recorder.handle(&event(app.database(), name, ada, subject)).await.unwrap();
+            }
+            let (status, body) =
+                get(&app, "/api/v1/kernel/devtools/events?object=auth.user:1", "dev").await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let names: Vec<&str> = body["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|e| e["name"].as_str().unwrap())
+                .collect();
+            assert_eq!(names, ["auth.user_updated"]);
+            assert_eq!(body["data"][0]["actor_id"], ada.to_string());
+            let (denied, _) =
+                get(&app, "/api/v1/kernel/devtools/events?object=auth.user:1", "nobody").await;
+            assert_eq!(denied, StatusCode::FORBIDDEN);
+            let (wrong, _) =
+                get(&app, "/api/v1/kernel/devtools/events?object=nothing", "dev").await;
+            assert_eq!(wrong, StatusCode::UNPROCESSABLE_ENTITY);
+        })
+        .await
+        .unwrap();
+    }
+
     /// Lịch sử theo bản ghi (bước 51 P13): chỉ event có đúng chủ thể, mới trước, kèm người làm.
     #[tokio::test]
     async fn lich_su_theo_ban_ghi() {

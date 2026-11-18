@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 52, developer tools: `GET /api/v1/webhooks/deliveries` lists the deliveries of every endpoint (filter `status`,
+  `endpoint_id`); `POST /api/v1/webhooks/deliveries/{id}/redeliver` sends a finished delivery again with the same body and
+  `webhook-id` (event `webhooks.delivery_redelivered`); MCP tools `webhooks.list_deliveries` and `webhooks.redeliver`.
+  `GET /api/v1/kernel/devtools/events?object=<kind>:<id>` lists the events of a record from the audit log
+  (`kernel.devtools.read`).
 - Step 52, developer tools: a per-tenant log of signed-in REST calls and MCP tool calls (`mcp:<tool>`), with the route template,
   status, error `code`, duration, `Idempotency-Key`, approval id, request id and trace id — never bodies, tokens, query strings
   or tool arguments. `GET /api/v1/kernel/devtools/requests` and the MCP tool `kernel.request_log` (`kernel.devtools.read`) filter

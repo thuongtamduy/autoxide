@@ -4223,6 +4223,28 @@ export type Data_DelegationResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_DeliveryResponse = {
+  /** One attempt to deliver one event to one endpoint, with its retries. */
+  data: {
+    attempts: number;
+    created_at: string;
+    delivered_at?: string | null;
+    /** Id of the event (`data.id` in the body). */
+    event_id: string;
+    event_name: string;
+    /** Also the `webhook-id` header: the same on every retry, to drop duplicates. */
+    id: string;
+    last_attempt_at?: string | null;
+    /** Why the last attempt failed. */
+    last_error?: string | null;
+    /** HTTP status of the last answer; `null` when there was none. */
+    response_status?: number | null;
+    /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_EditedComment = {
   /** A comment just changed, for its author. */
   data: PublicComment & {
@@ -8206,6 +8228,23 @@ export type Data_Vec_ReasonView = {
     /** Required by law: cannot be turned off. */
     legal: boolean;
     position: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_RecordEvent = {
+  data: {
+    actor_id?: string | null;
+    actor_name?: string | null;
+    at: string;
+    id: string;
+    /** Name of the event, e.g. `content.entry_published`. */
+    name: string;
+    /**
+     * What happened, in the language of `Accept-Language`, when the event has a readable
+     * sentence.
+     */
+    text?: string | null;
   }[];
 };
 
@@ -15201,6 +15240,21 @@ export type ReauthResponse = {
   reauth_token?: string | null;
 };
 
+/** An event recorded about a record. */
+export type RecordEvent = {
+  actor_id?: string | null;
+  actor_name?: string | null;
+  at: string;
+  id: string;
+  /** Name of the event, e.g. `content.entry_published`. */
+  name: string;
+  /**
+   * What happened, in the language of `Accept-Language`, when the event has a readable
+   * sentence.
+   */
+  text?: string | null;
+};
+
 /** An internal note on a record. */
 export type RecordNote = {
   author_id: string;
@@ -21881,6 +21935,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/devtools/events": {
+    /** List the events of a record. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { object: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_RecordEvent;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/devtools/requests": {
     /** List the calls made in this tenant. */
     get: {
@@ -25753,6 +25820,33 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/webhooks/deliveries": {
+    /** List the deliveries of every endpoint, e.g. the failed ones. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; endpoint_id?: string }; };
+      responses: {
+        200: Page_DeliveryResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/webhooks/deliveries/{id}/redeliver": {
+    /** Send a delivery again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        202: Data_DeliveryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };

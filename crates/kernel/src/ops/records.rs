@@ -474,8 +474,104 @@ async fn get_record_activity(
     Ok(Data { data: items })
 }
 
+/// Which record's events.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct RecordEventsQuery {
+    /// The record, as `<kind>:<id>`, e.g. `content.entry:0190…`.
+    #[param(example = "content.entry:0190a4c2-0000-7000-8000-000000000001")]
+    object: String,
+    /// At most this many events, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+}
+
+/// An event recorded about a record.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct RecordEvent {
+    pub id: Uuid,
+    pub at: DateTime<Utc>,
+    /// Name of the event, e.g. `content.entry_published`.
+    #[schema(example = "content.entry_published")]
+    pub name: String,
+    pub actor_id: Option<Uuid>,
+    pub actor_name: Option<String>,
+    /// What happened, in the language of `Accept-Language`, when the event has a readable
+    /// sentence.
+    pub text: Option<String>,
+}
+
+/// List the events of a record.
+///
+/// Requires `kernel.devtools.read`. The events recorded about the record in the audit log
+/// (events themselves are removed once delivered), newest first; empty when the program keeps no
+/// audit log.
+#[utoipa::path(
+    get,
+    path = "/devtools/events",
+    extensions(("x-permissions" = json!(["kernel.devtools.read"]))),
+    operation_id = "list_record_events",
+    security(("bearer" = [])),
+    params(RecordEventsQuery),
+    responses(
+        (status = 200, description = "The events, newest first.", body = Data<Vec<RecordEvent>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `kernel.devtools.read`.", body = Problem),
+        (status = 422, description = "`object` is not `<kind>:<id>` or `limit` is not between 1 and 200; see `errors`.", body = Problem),
+    )
+)]
+async fn list_record_events(
+    State(state): State<Arc<RecordsState>>,
+    tenant: TenantContext,
+    principal: Principal,
+    language: Language,
+    Query(query): Query<RecordEventsQuery>,
+) -> Result<Data<Vec<RecordEvent>>, Error> {
+    principal.require(&crate::ops::request_log::DEVTOOLS_READ)?;
+    let mut problems = Vec::new();
+    let valid = query.object.len() <= 300
+        && query.object.split_once(':').is_some_and(|(kind, id)| {
+            !kind.is_empty()
+                && !id.is_empty()
+                && kind
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._".contains(&b))
+        });
+    if !valid {
+        problems.push(FieldError::new(
+            "object",
+            "invalid",
+            "must be `<record kind>:<id>`, e.g. `content.entry:0190…`",
+        ));
+    }
+    let limit = query.limit.unwrap_or(50);
+    if !(1..=200).contains(&limit) {
+        problems.push(FieldError::new("limit", "invalid", "must be between 1 and 200"));
+    }
+    if !problems.is_empty() {
+        return Err(Error::validation(problems));
+    }
+    let Some(history) = state.history.get() else {
+        return Ok(Data { data: Vec::new() });
+    };
+    let lines = history.history(&tenant, &query.object, limit, language).await?;
+    Ok(Data {
+        data: lines
+            .into_iter()
+            .map(|line| RecordEvent {
+                id: line.id,
+                at: line.at,
+                name: line.action,
+                actor_id: line.actor_user_id,
+                actor_name: line.actor_name,
+                text: line.sentence,
+            })
+            .collect(),
+    })
+}
+
 pub(crate) fn routes(state: RecordsState) -> OpenApiRouter {
     OpenApiRouter::new()
+        .routes(routes!(list_record_events))
         .routes(routes!(list_record_notes, create_record_note))
         .routes(routes!(delete_record_note))
         .routes(routes!(get_record_activity))

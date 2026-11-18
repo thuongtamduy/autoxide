@@ -294,6 +294,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/client-config".to_owned(),
                     "/custom-fields".to_owned(),
                     "/custom-fields/{id}".to_owned(),
+                    "/devtools/events".to_owned(),
                     "/devtools/requests".to_owned(),
                     "/domains".to_owned(),
                     "/domains/allowed".to_owned(),
