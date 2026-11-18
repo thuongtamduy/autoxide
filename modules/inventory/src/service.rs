@@ -76,12 +76,10 @@ pub(crate) struct Parts {
 pub(crate) struct InventoryService {
     pub(crate) outbox: Outbox,
     pub(crate) entitlements: EntitlementsHandle,
-    #[allow(dead_code)]
     pub(crate) databases: DatabaseRegistry,
     pub(crate) catalog: Arc<dyn Catalog>,
     pub(crate) orgs: Option<Arc<dyn OrgDirectory>>,
     pub(crate) reasons: ReasonCodes,
-    #[allow(dead_code)]
     pub(crate) config: InventoryConfig,
 }
 
@@ -139,18 +137,7 @@ impl InventoryService {
         tenant: &TenantContext,
         org: Uuid,
     ) -> Result<(), Error> {
-        let org_id = OrgId::from_uuid(org);
-        if org_id != root_of(tenant.id())
-            && let Some(orgs) = &self.orgs
-        {
-            let unit = orgs.unit(tenant, org_id).await?;
-            let is_stock_unit = unit.is_some_and(|unit| {
-                unit.parent_id.is_none() || STOCK_UNIT_TYPES.contains(&unit.unit_type.as_str())
-            });
-            if !is_stock_unit {
-                return Err(errors::not_a_warehouse(org));
-            }
-        }
+        self.check_stock_unit(tenant, org).await?;
         let read = tenant.database().read();
         let has_stock = level::Entity::find()
             .filter(level::Column::OrgId.eq(org))
@@ -168,6 +155,27 @@ impl InventoryService {
         let key = format!("warehouse:{org}");
         self.entitlements.reserve(tenant.id(), &WAREHOUSES_LIMIT, 1, &key).await?;
         self.entitlements.confirm(tenant.id(), &WAREHOUSES_LIMIT, &key).await
+    }
+}
+
+impl InventoryService {
+    /// Nút `org` giữ được tồn: nút gốc, hay nút loại `warehouse` / `store` (khi có
+    /// `organizations`); không thì `inventory.not_a_warehouse`.
+    pub(crate) async fn check_stock_unit(
+        &self,
+        tenant: &TenantContext,
+        org: Uuid,
+    ) -> Result<(), Error> {
+        let org_id = OrgId::from_uuid(org);
+        if org_id == root_of(tenant.id()) {
+            return Ok(());
+        }
+        let Some(orgs) = &self.orgs else { return Ok(()) };
+        let unit = orgs.unit(tenant, org_id).await?;
+        let is_stock_unit = unit.is_some_and(|unit| {
+            unit.parent_id.is_none() || STOCK_UNIT_TYPES.contains(&unit.unit_type.as_str())
+        });
+        if is_stock_unit { Ok(()) } else { Err(errors::not_a_warehouse(org)) }
     }
 }
 

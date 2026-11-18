@@ -2,6 +2,10 @@
 //! như binary bằng `TestApp` của testkit; gọi qua REST và qua trait trong `api`.
 
 mod addresses;
+mod cod;
+mod fake_ledger;
+pub(crate) mod rates;
+mod shipments;
 
 use std::sync::Arc;
 
@@ -87,9 +91,39 @@ pub(crate) async fn app(test: &TestDatabase) -> TestApp {
         .unwrap()
 }
 
-/// Service của module trên database của `app` (gọi thẳng, vd handler event, `PersonalData`).
-pub(crate) fn service() -> Arc<crate::service::ShippingService> {
-    Arc::new(crate::service::ShippingService::new(Default::default(), Some(Arc::new(FakeUnits))))
+/// Service của module trên database của `app` (gọi thẳng, vd handler event, `PersonalData`), dùng
+/// chung sổ hãng của app.
+pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::ShippingService> {
+    let registry = app.api::<dyn crate::api::CarrierRegistry>().unwrap();
+    use crate::api::CarrierRegistry as _;
+    let carriers = Arc::new(crate::registry::Registry::default());
+    for code in registry.codes() {
+        carriers.register(registry.get(code).unwrap()).unwrap();
+    }
+    let parts = crate::service::Parts {
+        outbox: autoxide_kernel::event::Outbox::standalone("shipping"),
+        jobs: autoxide_kernel::job::JobQueue::new("shipping"),
+        entitlements: Default::default(),
+        databases: app.registry().clone(),
+        secret: (*app.api::<autoxide_kernel::secret::SecretKey>().unwrap()).clone(),
+        carriers,
+        ledger: None,
+        reasons: Default::default(),
+        units: Some(Arc::new(FakeUnits)),
+    };
+    Arc::new(crate::service::ShippingService::new(parts, Default::default()))
+}
+
+/// Chạy hết event và job đang chờ.
+pub(crate) async fn drain(app: &TestApp) {
+    let worker = app.modules().worker(4).unwrap().blocked_delay(std::time::Duration::ZERO);
+    let dispatcher = app.modules().dispatcher().unwrap();
+    for _ in 0..10 {
+        let events = dispatcher.run_once().await.unwrap();
+        if worker.run_once().await.unwrap() + events == 0 {
+            break;
+        }
+    }
 }
 
 /// Gọi `/api/v1/shipping{uri}`; trả trạng thái và thân JSON (`null` khi rỗng).
