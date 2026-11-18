@@ -51,6 +51,9 @@ pub struct Model {
     /// Lần cuối nội dung công khai đổi (cho sitemap `lastmod`, feed `updated`).
     pub content_modified_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    /// Trường tự định nghĩa chép từ mục khi đăng (bước 51 P19); đọc công khai chỉ trả trường mức
+    /// `public` đang bật.
+    pub custom_fields: Option<String>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

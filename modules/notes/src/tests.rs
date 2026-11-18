@@ -147,7 +147,15 @@ async fn permission_va_du_lieu_rieng_tung_nguoi() {
         let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_ref()).collect();
         assert_eq!(
             names,
-            ["kernel.navigation", "kernel.current_tenant", "notes.list_notes", "notes.get_note"]
+            [
+                "kernel.navigation",
+                "kernel.current_tenant",
+                "kernel.list_custom_fields",
+                "kernel.list_approvals",
+                "kernel.decide_approval",
+                "notes.list_notes",
+                "notes.get_note"
+            ]
         );
         let (status, problem) = rest(&app, "POST", "", "bob", Some(json!({"title": "x"}))).await;
         assert_eq!(

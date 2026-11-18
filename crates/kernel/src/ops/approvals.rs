@@ -395,35 +395,112 @@ async fn list_approvals(
     principal: Principal,
     Query(query): Query<ApprovalsQuery>,
 ) -> Result<Data<Vec<ApprovalView>>, Error> {
+    Ok(Data { data: list_for(&tenant, &principal, query.status.as_deref()).await? })
+}
+
+/// Yêu cầu người gọi được thấy, mới trước, tối đa 200; `status` lọc theo trạng thái.
+pub(crate) async fn list_for(
+    tenant: &TenantContext,
+    principal: &Principal,
+    status: Option<&str>,
+) -> Result<Vec<ApprovalView>, Error> {
     const STATUSES: [&str; 5] = ["pending", "approved", "rejected", "expired", "used"];
-    if query.status.as_deref().is_some_and(|status| !STATUSES.contains(&status)) {
+    if status.is_some_and(|status| !STATUSES.contains(&status)) {
         return Err(Error::validation(vec![FieldError::new(
             "status",
             "invalid",
             "must be `pending`, `approved`, `rejected`, `expired` or `used`",
         )]));
     }
-    let select = SqlQuery::select()
+    let mut select = SqlQuery::select()
         .columns(COLUMNS)
         .from(Alias::new(TABLE))
         .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
         .order_by(Alias::new("id"), Order::Desc)
         .limit(500)
         .to_owned();
+    if status == Some("pending") {
+        // Hộp việc đếm thường xuyên: chỉ đọc dòng còn chờ và còn hạn.
+        select
+            .and_where(Expr::col(Alias::new("status")).eq("pending"))
+            .and_where(Expr::col(Alias::new("expires_at")).gt(now()));
+    }
     let rows = tenant.database().read().query_all(&select).await?;
     let mut found = Vec::new();
     for row in &rows {
         let approval = view(row)?;
-        if may_see(&principal, &approval)
-            && query.status.as_deref().is_none_or(|status| status == approval.status)
-        {
+        if may_see(principal, &approval) && status.is_none_or(|status| status == approval.status) {
             found.push(approval);
         }
         if found.len() == 200 {
             break;
         }
     }
-    Ok(Data { data: found })
+    Ok(found)
+}
+
+/// Hộp việc (P2): yêu cầu đang chờ mà người gọi quyết được.
+pub(crate) struct ApprovalsWork;
+
+#[async_trait::async_trait]
+impl crate::ops::work::WorkSource for ApprovalsWork {
+    fn id(&self) -> &'static str {
+        "kernel.approvals"
+    }
+
+    // Không dùng (nguồn cho mọi người đã đăng nhập, tự lọc theo quyền duyệt).
+    fn permission(&self) -> crate::access::Permission {
+        crate::ops::module_catalog::MODULES_READ
+    }
+
+    fn for_any_signed_in(&self) -> bool {
+        true
+    }
+
+    async fn count(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        _target: crate::access::OrgTarget,
+    ) -> Result<u64, Error> {
+        let mine = decidable(tenant, principal).await?;
+        Ok(<u64 as TryFrom<usize>>::try_from(mine.len()).unwrap_or(u64::MAX))
+    }
+
+    async fn items(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        _target: crate::access::OrgTarget,
+        limit: u16,
+    ) -> Result<Vec<crate::ops::work::WorkItem>, Error> {
+        let mine = decidable(tenant, principal).await?;
+        Ok(mine
+            .into_iter()
+            .take(usize::from(limit))
+            .map(|approval| {
+                crate::ops::work::WorkItem::new(
+                    approval.id.to_string(),
+                    crate::ops::work::Severity::Attention,
+                    "An AI agent asks to run {command}",
+                    "home.work",
+                )
+                .param("command", approval.summary)
+                .due_at(Some(approval.expires_at))
+            })
+            .collect())
+    }
+}
+
+async fn decidable(
+    tenant: &TenantContext,
+    principal: &Principal,
+) -> Result<Vec<ApprovalView>, Error> {
+    Ok(list_for(tenant, principal, Some("pending"))
+        .await?
+        .into_iter()
+        .filter(|approval| may_decide(principal, approval))
+        .collect())
 }
 
 /// Get an approval request.
@@ -577,6 +654,82 @@ async fn reject_request(
         )]));
     }
     Ok(Data { data: decide(&state, &tenant, &principal, id, "rejected", Some(reason)).await? })
+}
+
+/// Which approval requests to list.
+#[derive(Debug, Default, Deserialize, validator::Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListApprovalsInput {
+    /// Only `pending`, `approved`, `rejected`, `expired` or `used` requests.
+    status: Option<String>,
+}
+
+/// A decision on an approval request.
+#[derive(Debug, Deserialize, validator::Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DecideApprovalInput {
+    /// Id of the request.
+    id: Uuid,
+    /// `approve` or `reject`.
+    #[schema(example = "approve")]
+    decision: String,
+    /// Required to reject (1 to 500 characters, shown to the agent).
+    reason: Option<String>,
+}
+
+pub(crate) fn tools(state: ApprovalsState) -> Vec<crate::mcp::Tool> {
+    use crate::mcp::Tool;
+    let state = Arc::new(state);
+    vec![
+        Tool::new(
+            "list_approvals",
+            "List approval requests: those of your own AI agents, and those you may decide. An \
+             agent sees here whether a person approved its command yet.",
+            |tenant: TenantContext, principal: Principal, input: ListApprovalsInput| async move {
+                list_for(&tenant, &principal, input.status.as_deref()).await
+            },
+        )
+        .for_any_signed_in()
+        .read_only(),
+        Tool::new(
+            "decide_approval",
+            "Approve or reject a command an AI agent asked to run. Only a person holding one of \
+             the command's permissions decides; an agent cannot.",
+            move |tenant: TenantContext, principal: Principal, input: DecideApprovalInput| {
+                let state = state.clone();
+                async move {
+                    match input.decision.as_str() {
+                        "approve" => {
+                            decide(&state, &tenant, &principal, input.id, "approved", None).await
+                        }
+                        "reject" => {
+                            let reason = input
+                                .reason
+                                .as_deref()
+                                .map(str::trim)
+                                .unwrap_or_default()
+                                .to_owned();
+                            if reason.is_empty() || reason.chars().count() > 500 {
+                                return Err(Error::validation(vec![FieldError::new(
+                                    "reason",
+                                    "invalid",
+                                    "must be 1 to 500 characters long",
+                                )]));
+                            }
+                            decide(&state, &tenant, &principal, input.id, "rejected", Some(reason))
+                                .await
+                        }
+                        _ => Err(Error::validation(vec![FieldError::new(
+                            "decision",
+                            "invalid",
+                            "must be `approve` or `reject`",
+                        )])),
+                    }
+                }
+            },
+        )
+        .for_any_signed_in(),
+    ]
 }
 
 pub(crate) fn routes(state: ApprovalsState) -> OpenApiRouter {

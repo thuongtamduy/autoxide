@@ -557,6 +557,7 @@ impl ContentService {
             first_published_at: old.as_ref().map_or(now, |old| old.first_published_at),
             content_modified_at: now,
             updated_at: now,
+            custom_fields: version.custom_fields.clone(),
         };
         let mut moved = Vec::new();
         match &old {

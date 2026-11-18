@@ -189,7 +189,7 @@ impl WorkStatesState {
         }
         let (module, found) = self.sources.find(source).ok_or_else(not_found)?;
         if !self.entitlements.module_enabled(tenant.id(), module).await?
-            || principal.require(&found.permission()).is_err()
+            || (!found.for_any_signed_in() && principal.require(&found.permission()).is_err())
         {
             return Err(not_found());
         }
@@ -331,10 +331,11 @@ async fn assign_work(
         None => remove(&tenant, &key, Uuid::nil()).await?,
         Some(assignee) => {
             let allowed = match &authenticator {
-                Some(Extension(authenticator)) => authenticator
-                    .principal_of(&tenant, assignee)
-                    .await?
-                    .is_some_and(|them| them.require(&source.permission()).is_ok()),
+                Some(Extension(authenticator)) => {
+                    authenticator.principal_of(&tenant, assignee).await?.is_some_and(|them| {
+                        source.for_any_signed_in() || them.require(&source.permission()).is_ok()
+                    })
+                }
                 None => false,
             };
             if !allowed {

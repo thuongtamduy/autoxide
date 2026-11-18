@@ -29,6 +29,8 @@ pub(crate) struct PublicView {
     pub authors: Vec<AuthorRef>,
     /// Bản ghi nhúng (`<kind>:<id>` → đối tượng) còn công khai, theo ngôn ngữ của bài (bước 51 P6).
     pub embeds: BTreeMap<String, autoxide_kernel::resource::Resource>,
+    /// Trường tự định nghĩa mức `public` (bước 51 P19).
+    pub custom_fields: serde_json::Map<String, serde_json::Value>,
 }
 
 impl ContentService {
@@ -41,6 +43,12 @@ impl ContentService {
     ) -> Result<Vec<PublicView>, Error> {
         let ids: Vec<Uuid> = rows.iter().map(|row| row.entry_id).collect();
         let default_locale = self.languages(tenant).await?.default;
+        // Một câu đọc định nghĩa cho cả trang; không có trường công khai thì không giải JSON.
+        let public_keys = if rows.iter().any(|row| row.custom_fields.is_some()) {
+            self.custom_fields.public_keys(tenant, crate::resource::ENTRY).await?
+        } else {
+            BTreeSet::new()
+        };
         let mut authors =
             crate::taxonomy::authors::authors_of(tenant.database().read(), tenant, &ids).await?;
         // Ảnh đại diện của tác giả cũng tra qua `media`: ảnh riêng tư thì không lộ cả ID.
@@ -149,6 +157,10 @@ impl ContentService {
                     .collect();
                 let image = |id: Uuid| media.get(&(row.locale.clone(), id)).cloned();
                 PublicView {
+                    custom_fields: autoxide_kernel::custom_fields::CustomFields::pick_public(
+                        row.custom_fields.as_deref(),
+                        &public_keys,
+                    ),
                     featured: row.featured_media_id.and_then(image),
                     og: row.og_media_id.and_then(image),
                     body_media: images.iter().filter_map(|id| image(*id)).collect(),

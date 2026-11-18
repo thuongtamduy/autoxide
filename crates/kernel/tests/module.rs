@@ -329,6 +329,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/summary".to_owned(),
                     "/tags".to_owned(),
                     "/tags/{id}".to_owned(),
+                    "/tags/{id}/apply".to_owned(),
                     "/tags/{id}/merge".to_owned(),
                     "/tenant".to_owned(),
                     "/tenants".to_owned(),

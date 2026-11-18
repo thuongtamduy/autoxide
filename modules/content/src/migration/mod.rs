@@ -13,6 +13,7 @@ mod m0015_review_index;
 mod m0016_ai_assisted;
 mod m0017_restriction;
 mod m0018_custom_fields;
+mod m0020_published_custom_fields;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -153,5 +154,6 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         // Trường tự định nghĩa của khách (bước 51 P19): giá trị trên bài, index để lọc `cf.<key>`.
         Box::new(m0018_custom_fields::Migration),
         autoxide_kernel::custom_fields::index_migration("m0019_custom_index", "content"),
+        Box::new(m0020_published_custom_fields::Migration),
     ]
 }

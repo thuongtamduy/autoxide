@@ -9151,3 +9151,19 @@ liệu cá nhân.
 4. Hoàn tác lưu trữ: `POST /api/v1/content/entries/{id}/unarchive` đưa bài về nháp nguyên nội dung (event
    `content.entry_unarchived`); bài đã đăng trước khi lưu trữ thì đăng lại thẳng từ lưu trữ như trước (đường dẫn cũ trả 410 tới lúc
    đó). Media đã có `restore`; bình luận, người đăng ký bản tin có thao tác ngược (`approve`, `unblock`).
+
+## D-373 · Phần còn lại của trường tự định nghĩa và gắn nhãn hàng loạt (bước 51 P19, P20) — 2026-11-18 — agent quyết
+
+1. **Xuất:** `ExportInfo::with_custom_fields(target)` cho danh sách biết bản ghi mang trường tự định nghĩa; kernel thêm cột
+   `cf.<khoá>` của các trường đang bật (mặc định xuất hết), giá trị lấy từ `custom_fields` của JSON bản ghi
+   (`ExportPage::from_json` tự gom). Nguồn xuất không phải biết khách có trường nào.
+2. **Công khai:** `content` cho mức `public`; giá trị chép vào `content_published.custom_fields` khi đăng (không lộ giá trị
+   nháp chưa đăng), đọc công khai lọc theo định nghĩa **hiện tại** (`CustomFields::public_keys` + `pick_public`) — chuyển
+   trường về `internal` là thôi lộ ngay, không cần đăng lại.
+3. **Hạn mức theo gói:** `kernel.custom_fields` (kiểu đếm): tạo trường giữ một suất (giữ → lưu → xác nhận, lưu hỏng thì trả),
+   xoá (tắt) trường thì trả suất. Không có module gói thì không giới hạn (vẫn còn trần 100 trường mỗi loại bản ghi).
+4. `personal_data` chưa áp: bản ghi hiện có (bài viết) không gắn với một người; làm cùng loại bản ghi đầu tiên gắn với người
+   (khách hàng, đơn hàng ở bước 41–49). Cột `cf.` khi nhập thuộc `imports` (bước 56).
+5. **Gắn nhãn hàng loạt:** endpoint riêng `POST /kernel/tags/{id}/apply {kind, add, remove}` (tối đa 500, một transaction, một
+   event mỗi bản ghi đổi) thay vì thêm tham số cho `BulkAction`: gắn nhãn dùng chung mọi loại bản ghi, không phải việc của từng
+   module; chọn theo bộ lọc thì lấy ID bằng `dry_run` của thao tác hàng loạt.

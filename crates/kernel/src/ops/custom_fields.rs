@@ -161,6 +161,34 @@ impl CustomFields {
         self.targets.get().and_then(|targets| targets.get(name)).copied()
     }
 
+    /// Khoá các trường đang bật ở mức `public` của loại `target`: phần được đọc công khai.
+    pub async fn public_keys(
+        &self,
+        tenant: &TenantContext,
+        target: &str,
+    ) -> Result<std::collections::BTreeSet<String>, Error> {
+        Ok(self
+            .definitions(tenant, target)
+            .await?
+            .into_iter()
+            .filter(|field| field.visibility == "public")
+            .map(|field| field.key)
+            .collect())
+    }
+
+    /// Phần công khai của giá trị đã lưu (`stored`, JSON trong `text`): chỉ khoá trong `keys`.
+    pub fn pick_public(
+        stored: Option<&str>,
+        keys: &std::collections::BTreeSet<String>,
+    ) -> Map<String, Value> {
+        stored
+            .and_then(|text| serde_json::from_str::<Map<String, Value>>(text).ok())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(key, _)| keys.contains(key))
+            .collect()
+    }
+
     /// Định nghĩa đang bật của loại `target`, theo thứ tự.
     pub async fn definitions(
         &self,
@@ -771,6 +799,17 @@ pub(crate) struct FieldsQuery {
 #[derive(Clone)]
 pub(crate) struct CustomFieldsState {
     pub fields: CustomFields,
+    pub entitlements: crate::entitlement::EntitlementsHandle,
+}
+
+/// Hạn mức theo gói (bước 35): số trường tự định nghĩa đang bật của khách, mọi loại bản ghi.
+pub const CUSTOM_FIELDS_LIMIT: crate::entitlement::Limit = crate::entitlement::Limit::count(
+    "kernel.custom_fields",
+    "Custom fields a tenant can have on at once, across every record type.",
+);
+
+fn limit_reference(id: Uuid) -> String {
+    format!("kernel.custom_field:{id}")
 }
 
 fn not_found(id: Uuid) -> Error {
@@ -1082,7 +1121,14 @@ async fn create_custom_field(
         )
         .with_param("max", MAX_PER_TARGET));
     }
-    save(&tenant, &field, true).await?;
+    // Giữ một suất của hạn mức trước khi lưu; lưu hỏng thì trả lại.
+    let reference = limit_reference(field.id);
+    state.entitlements.reserve(tenant.id(), &CUSTOM_FIELDS_LIMIT, 1, &reference).await?;
+    if let Err(error) = save(&tenant, &field, true).await {
+        state.entitlements.release(tenant.id(), &CUSTOM_FIELDS_LIMIT, &reference).await?;
+        return Err(error);
+    }
+    state.entitlements.confirm(tenant.id(), &CUSTOM_FIELDS_LIMIT, &reference).await?;
     Ok(Created::new(format!("/api/v1/kernel/custom-fields/{}", field.id), field))
 }
 
@@ -1191,16 +1237,63 @@ async fn update_custom_field(
     )
 )]
 async fn delete_custom_field(
+    State(state): State<Arc<CustomFieldsState>>,
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     principal.require(&CUSTOM_FIELDS_MANAGE)?;
     let mut field = find(&tenant, id).await?;
+    let was_active = field.active;
     field.active = false;
     field.updated_at = Utc::now().trunc_subsecs(6);
     save(&tenant, &field, false).await?;
+    if was_active {
+        state.entitlements.release(tenant.id(), &CUSTOM_FIELDS_LIMIT, &limit_reference(id)).await?;
+    }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Which custom fields to list.
+#[derive(Debug, Default, Deserialize, validator::Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListFieldsInput {
+    /// Only the fields of this record type, e.g. `content.entry`.
+    target: Option<String>,
+}
+
+pub(crate) fn tools(fields: CustomFields) -> Vec<crate::mcp::Tool> {
+    vec![
+        crate::mcp::Tool::new(
+            "list_custom_fields",
+            "List the custom fields this tenant added to record types you may read (key, type, \
+             labels, options, whether lists filter on it with `cf.<key>=`). Write their values in \
+             a record's `custom_fields`.",
+            move |tenant: TenantContext, principal: Principal, input: ListFieldsInput| {
+                let state = CustomFieldsState {
+                    fields: fields.clone(),
+                    entitlements: crate::entitlement::EntitlementsHandle::default(),
+                };
+                async move {
+                    if let Some(target) = &input.target {
+                        state.require_read(&principal, target)?;
+                    }
+                    Ok::<Vec<CustomFieldView>, Error>(
+                        list(&tenant, input.target.as_deref())
+                            .await?
+                            .into_iter()
+                            .filter(|field| {
+                                field.active
+                                    && state.require_read(&principal, &field.target).is_ok()
+                            })
+                            .collect(),
+                    )
+                }
+            },
+        )
+        .for_any_signed_in()
+        .read_only(),
+    ]
 }
 
 pub(crate) fn routes(state: CustomFieldsState) -> OpenApiRouter {
