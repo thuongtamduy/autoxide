@@ -83,6 +83,8 @@ endpoints are marked deprecated with a sunset date first.
   replies with variables (`/macros`, `/tickets/{id}/macros/{macro_id}/render`), hand-over as a consumer complaint or to the
   platform (`/tickets/{id}/escalate`; never two complaint cases), customer ratings (`…/satisfaction`).
 - `compliance`: new trait `ComplaintIntake` opens a consumer complaint from another module's record (one case per record).
+- `support::api`: attach point `SupportFacts` where later modules (`shipping`, `orders`) attach a `FactSource` that
+  answers simple questions from exact data (used by automatic answers, D-230).
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
