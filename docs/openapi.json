@@ -62,6 +62,40 @@
         ],
         "type": "string"
       },
+      "ActionInfo": {
+        "description": "An MCP tool that a rule can run as an action.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "input_schema": {
+            "description": "JSON Schema of `arguments`.",
+            "type": "object"
+          },
+          "needs_approval": {
+            "description": "The tool deletes or overwrites data, or needs a person's approval when an agent calls it:\nin a rule, the step waits for a person to approve each run.",
+            "type": "boolean"
+          },
+          "permission": {
+            "description": "The permission the tool needs.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tool": {
+            "description": "Full tool name `<module>.<tool>`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "description",
+          "input_schema",
+          "needs_approval"
+        ],
+        "type": "object"
+      },
       "ActivityItem": {
         "description": "One line of a record's activity: a note, or an event recorded about it.",
         "properties": {
@@ -2067,6 +2101,35 @@
             "type": "boolean"
           }
         },
+        "type": "object"
+      },
+      "Catalog": {
+        "description": "The triggers and actions you may use in rules.",
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventTriggerInfo"
+            },
+            "type": "array"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricTriggerInfo"
+            },
+            "type": "array"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ActionInfo"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "events",
+          "metrics",
+          "tools"
+        ],
         "type": "object"
       },
       "CeremonyResponse": {
@@ -8217,6 +8280,60 @@
         ],
         "type": "object"
       },
+      "CreateRuleRequest": {
+        "additionalProperties": false,
+        "description": "A new automation rule. Every problem (unknown event or tool, a tool you lack the permission\nfor, arguments that do not fit the tool) is reported at once.",
+        "properties": {
+          "actions": {
+            "description": "See `actions` of the rule.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "conditions": {
+            "description": "See `conditions` of the rule; omit for \"always\".",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "Up to 2000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "description": "`false` to save the rule disabled. Rules made by an AI agent always wait for a person to\nenable them.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "1 to 200 characters.",
+            "example": "Tag big orders",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The organization unit of the rule; you need `automations.manage` there. Omit when you\nmanage rules in one unit only (or for the whole tenant); otherwise\n`automations.org_required`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trigger": {
+            "description": "See `trigger` of the rule.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "trigger",
+          "actions"
+        ],
+        "type": "object"
+      },
       "CreateSiteMenuRequest": {
         "additionalProperties": false,
         "description": "A new menu.",
@@ -9933,6 +10050,44 @@
               "progress",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Catalog": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The triggers and actions you may use in rules.",
+            "properties": {
+              "events": {
+                "items": {
+                  "$ref": "#/components/schemas/EventTriggerInfo"
+                },
+                "type": "array"
+              },
+              "metrics": {
+                "items": {
+                  "$ref": "#/components/schemas/MetricTriggerInfo"
+                },
+                "type": "array"
+              },
+              "tools": {
+                "items": {
+                  "$ref": "#/components/schemas/ActionInfo"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "events",
+              "metrics",
+              "tools"
             ],
             "type": "object"
           }
@@ -13591,6 +13746,45 @@
               "status",
               "attempts",
               "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_DryRun": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What a run would do, without calling any tool.",
+            "properties": {
+              "context": {
+                "description": "What the templates see.",
+                "type": "object"
+              },
+              "matched": {
+                "description": "The conditions hold for the sample: a real run would run the actions.",
+                "type": "boolean"
+              },
+              "ok": {
+                "description": "No problem anywhere: the rule would run as written.",
+                "type": "boolean"
+              },
+              "steps": {
+                "items": {
+                  "$ref": "#/components/schemas/DryStep"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "matched",
+              "context",
+              "steps",
+              "ok"
             ],
             "type": "object"
           }
@@ -20700,6 +20894,251 @@
               "requires_mfa",
               "permissions",
               "grants",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_RuleResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An automation rule: \"when the trigger happens and the conditions hold, run the actions\".",
+            "properties": {
+              "actions": {
+                "description": "Steps in order: `{\"tool\": \"<module>.<tool>\", \"arguments\": {…}}` (values may use `{{\nevent.… }}`), `{\"wait\": {\"minutes\": N}}`, `{\"stop_if\": <condition>}`, `{\"notify\": {\"title\",\n\"body\"}}`.",
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "conditions": {
+                "description": "A tree of `all` / `any` / `not` over comparisons `{\"field\": \"event.total\", \"op\": \"gt\",\n\"value\": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "example": "Tag big orders",
+                "type": "string"
+              },
+              "next_run_at": {
+                "description": "When the schedule or metric check runs next.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "org_id": {
+                "description": "The organization unit the rule belongs to; the root unit has the id of the tenant.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "run_as": {
+                "description": "The actions run with the current permissions of this user: the author, or whoever enabled\nthe rule last.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "status": {
+                "description": "`active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or\n`paused` (stopped by itself; see `status_reason`).",
+                "example": "active",
+                "type": "string"
+              },
+              "status_reason": {
+                "description": "Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "timezone": {
+                "description": "IANA time zone of the schedule.",
+                "example": "Asia/Ho_Chi_Minh",
+                "type": "string"
+              },
+              "trigger": {
+                "description": "What starts a run: `{\"type\": \"event\", \"event\": \"<module>.<event>\"}`, `{\"type\":\n\"schedule\", \"every\": \"hour\" | \"day\" | \"week\", \"weekday\", \"hour\", \"minute\", \"timezone\"}`,\n`{\"type\": \"manual\"}` or `{\"type\": \"metric\", \"metric\", \"operator\", \"value\", \"currency\",\n\"hour\", \"minute\", \"timezone\"}`. See `GET /api/v1/automations/catalog`.",
+                "type": "object"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "version": {
+                "description": "Raised by one on every change of the rule; each run records the version it used.",
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "name",
+              "trigger",
+              "actions",
+              "status",
+              "timezone",
+              "run_as",
+              "created_by",
+              "version",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_RunResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "One run of an automation rule, with the log of each step.",
+            "properties": {
+              "approval_step": {
+                "description": "The step waiting for approval.",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "context": {
+                "description": "The data of the trigger, as the templates see it: `event`, `trigger`.",
+                "type": "object"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "cursor": {
+                "description": "The next step to run, from 0.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "depth": {
+                "description": "1 for a run started by a person, a schedule or an ordinary event; one more for each rule\nin a chain (a rule's action caused the event of the next rule).",
+                "format": "int32",
+                "type": "integer"
+              },
+              "error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "error_message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "event_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "event_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The unit of the rule.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "resume_at": {
+                "description": "When a `wait` step ends.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rule_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "rule_version": {
+                "description": "The version of the rule the run uses (changing the rule does not change runs already\nstarted).",
+                "format": "int32",
+                "type": "integer"
+              },
+              "status": {
+                "description": "`queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for\na person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).",
+                "example": "succeeded",
+                "type": "string"
+              },
+              "steps": {
+                "items": {
+                  "$ref": "#/components/schemas/StepLog"
+                },
+                "type": "array"
+              },
+              "trigger_key": {
+                "description": "What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "rule_id",
+              "rule_version",
+              "org_id",
+              "status",
+              "trigger_key",
+              "depth",
+              "context",
+              "cursor",
+              "steps",
               "created_at",
               "updated_at"
             ],
@@ -27930,6 +28369,44 @@
         ],
         "type": "object"
       },
+      "Data_Vec_TemplateInfo": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A ready-made rule you can save now.",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "description": "`<module>.<name>`.",
+                  "type": "string"
+                },
+                "rule": {
+                  "description": "`{\"trigger\", \"conditions\", \"actions\"}`: send it to `POST /rules` with a name.",
+                  "type": "object"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "description",
+                "rule"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_TenantExport": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28771,6 +29248,101 @@
         ],
         "type": "object"
       },
+      "DryProblem": {
+        "description": "A problem a real run would hit.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "DryRun": {
+        "description": "What a run would do, without calling any tool.",
+        "properties": {
+          "context": {
+            "description": "What the templates see.",
+            "type": "object"
+          },
+          "matched": {
+            "description": "The conditions hold for the sample: a real run would run the actions.",
+            "type": "boolean"
+          },
+          "ok": {
+            "description": "No problem anywhere: the rule would run as written.",
+            "type": "boolean"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/DryStep"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "matched",
+          "context",
+          "steps",
+          "ok"
+        ],
+        "type": "object"
+      },
+      "DryStep": {
+        "description": "What one step would do in a dry run.",
+        "properties": {
+          "action": {
+            "description": "The tool name, or `wait`, `stop_if`, `notify`.",
+            "type": "string"
+          },
+          "arguments": {
+            "description": "The arguments after filling the templates with the sample.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "index": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "needs_approval": {
+            "description": "The step waits for a person's approval in each real run.",
+            "type": "boolean"
+          },
+          "problems": {
+            "description": "What would go wrong: unknown tool, missing permission of the rule's `run_as`, arguments\nthat do not fit the tool after filling.",
+            "items": {
+              "$ref": "#/components/schemas/DryProblem"
+            },
+            "type": "array"
+          },
+          "would_stop": {
+            "description": "For `stop_if`: whether the run would stop here (results of earlier steps are unknown in a\ndry run and read as missing).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "action",
+          "needs_approval",
+          "problems"
+        ],
+        "type": "object"
+      },
       "DuplicateFormRequest": {
         "additionalProperties": false,
         "description": "What to call the copy of a form.",
@@ -29443,6 +30015,24 @@
         },
         "required": [
           "deleted"
+        ],
+        "type": "object"
+      },
+      "EventTriggerInfo": {
+        "description": "An event that can trigger a rule.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "description": "`<module>.<event>`.",
+            "example": "notes.note_created",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description"
         ],
         "type": "object"
       },
@@ -35334,6 +35924,28 @@
         },
         "required": [
           "into"
+        ],
+        "type": "object"
+      },
+      "MetricTriggerInfo": {
+        "description": "A figure that a `metric` trigger can watch.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "description": "`fact:<kind>` (daily total of a report figure) or `summary:<id>` (a dashboard figure read\nat check time).",
+            "type": "string"
+          },
+          "unit": {
+            "description": "`amount` (smallest unit of a currency), `quantity`, or `reading` (a dashboard figure;\nratios in basis points, 1% = 100).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "unit"
         ],
         "type": "object"
       },
@@ -44614,6 +45226,267 @@
         ],
         "type": "object"
       },
+      "Page_RuleResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "An automation rule: \"when the trigger happens and the conditions hold, run the actions\".",
+              "properties": {
+                "actions": {
+                  "description": "Steps in order: `{\"tool\": \"<module>.<tool>\", \"arguments\": {…}}` (values may use `{{\nevent.… }}`), `{\"wait\": {\"minutes\": N}}`, `{\"stop_if\": <condition>}`, `{\"notify\": {\"title\",\n\"body\"}}`.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "conditions": {
+                  "description": "A tree of `all` / `any` / `not` over comparisons `{\"field\": \"event.total\", \"op\": \"gt\",\n\"value\": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.",
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "created_by": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "example": "Tag big orders",
+                  "type": "string"
+                },
+                "next_run_at": {
+                  "description": "When the schedule or metric check runs next.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "org_id": {
+                  "description": "The organization unit the rule belongs to; the root unit has the id of the tenant.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "run_as": {
+                  "description": "The actions run with the current permissions of this user: the author, or whoever enabled\nthe rule last.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or\n`paused` (stopped by itself; see `status_reason`).",
+                  "example": "active",
+                  "type": "string"
+                },
+                "status_reason": {
+                  "description": "Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "timezone": {
+                  "description": "IANA time zone of the schedule.",
+                  "example": "Asia/Ho_Chi_Minh",
+                  "type": "string"
+                },
+                "trigger": {
+                  "description": "What starts a run: `{\"type\": \"event\", \"event\": \"<module>.<event>\"}`, `{\"type\":\n\"schedule\", \"every\": \"hour\" | \"day\" | \"week\", \"weekday\", \"hour\", \"minute\", \"timezone\"}`,\n`{\"type\": \"manual\"}` or `{\"type\": \"metric\", \"metric\", \"operator\", \"value\", \"currency\",\n\"hour\", \"minute\", \"timezone\"}`. See `GET /api/v1/automations/catalog`.",
+                  "type": "object"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "version": {
+                  "description": "Raised by one on every change of the rule; each run records the version it used.",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "name",
+                "trigger",
+                "actions",
+                "status",
+                "timezone",
+                "run_as",
+                "created_by",
+                "version",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_RunResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "One run of an automation rule, with the log of each step.",
+              "properties": {
+                "approval_step": {
+                  "description": "The step waiting for approval.",
+                  "format": "int32",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "context": {
+                  "description": "The data of the trigger, as the templates see it: `event`, `trigger`.",
+                  "type": "object"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "cursor": {
+                  "description": "The next step to run, from 0.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "depth": {
+                  "description": "1 for a run started by a person, a schedule or an ordinary event; one more for each rule\nin a chain (a rule's action caused the event of the next rule).",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "error_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "error_message": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "event_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "event_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "finished_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The unit of the rule.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "resume_at": {
+                  "description": "When a `wait` step ends.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rule_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "rule_version": {
+                  "description": "The version of the rule the run uses (changing the rule does not change runs already\nstarted).",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "status": {
+                  "description": "`queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for\na person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).",
+                  "example": "succeeded",
+                  "type": "string"
+                },
+                "steps": {
+                  "items": {
+                    "$ref": "#/components/schemas/StepLog"
+                  },
+                  "type": "array"
+                },
+                "trigger_key": {
+                  "description": "What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "rule_id",
+                "rule_version",
+                "org_id",
+                "status",
+                "trigger_key",
+                "depth",
+                "context",
+                "cursor",
+                "steps",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_ScheduleResponse": {
         "description": "One page of a list.",
         "properties": {
@@ -50532,6 +51405,247 @@
         ],
         "type": "object"
       },
+      "RuleResponse": {
+        "description": "An automation rule: \"when the trigger happens and the conditions hold, run the actions\".",
+        "properties": {
+          "actions": {
+            "description": "Steps in order: `{\"tool\": \"<module>.<tool>\", \"arguments\": {…}}` (values may use `{{\nevent.… }}`), `{\"wait\": {\"minutes\": N}}`, `{\"stop_if\": <condition>}`, `{\"notify\": {\"title\",\n\"body\"}}`.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "conditions": {
+            "description": "A tree of `all` / `any` / `not` over comparisons `{\"field\": \"event.total\", \"op\": \"gt\",\n\"value\": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "example": "Tag big orders",
+            "type": "string"
+          },
+          "next_run_at": {
+            "description": "When the schedule or metric check runs next.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The organization unit the rule belongs to; the root unit has the id of the tenant.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "run_as": {
+            "description": "The actions run with the current permissions of this user: the author, or whoever enabled\nthe rule last.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or\n`paused` (stopped by itself; see `status_reason`).",
+            "example": "active",
+            "type": "string"
+          },
+          "status_reason": {
+            "description": "Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "description": "IANA time zone of the schedule.",
+            "example": "Asia/Ho_Chi_Minh",
+            "type": "string"
+          },
+          "trigger": {
+            "description": "What starts a run: `{\"type\": \"event\", \"event\": \"<module>.<event>\"}`, `{\"type\":\n\"schedule\", \"every\": \"hour\" | \"day\" | \"week\", \"weekday\", \"hour\", \"minute\", \"timezone\"}`,\n`{\"type\": \"manual\"}` or `{\"type\": \"metric\", \"metric\", \"operator\", \"value\", \"currency\",\n\"hour\", \"minute\", \"timezone\"}`. See `GET /api/v1/automations/catalog`.",
+            "type": "object"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "description": "Raised by one on every change of the rule; each run records the version it used.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "name",
+          "trigger",
+          "actions",
+          "status",
+          "timezone",
+          "run_as",
+          "created_by",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "RunResponse": {
+        "description": "One run of an automation rule, with the log of each step.",
+        "properties": {
+          "approval_step": {
+            "description": "The step waiting for approval.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "context": {
+            "description": "The data of the trigger, as the templates see it: `event`, `trigger`.",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "cursor": {
+            "description": "The next step to run, from 0.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "depth": {
+            "description": "1 for a run started by a person, a schedule or an ordinary event; one more for each rule\nin a chain (a rule's action caused the event of the next rule).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit of the rule.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "resume_at": {
+            "description": "When a `wait` step ends.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rule_version": {
+            "description": "The version of the rule the run uses (changing the rule does not change runs already\nstarted).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "status": {
+            "description": "`queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for\na person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).",
+            "example": "succeeded",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepLog"
+            },
+            "type": "array"
+          },
+          "trigger_key": {
+            "description": "What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "rule_id",
+          "rule_version",
+          "org_id",
+          "status",
+          "trigger_key",
+          "depth",
+          "context",
+          "cursor",
+          "steps",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "RunRuleRequest": {
+        "additionalProperties": false,
+        "description": "Data for a manual run.",
+        "properties": {
+          "input": {
+            "description": "What the templates see as `event` (e.g. `{\"order\": {\"id\": \"…\"}}`); default `{}`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "SavedMenuTarget": {
         "description": "The object a saved item links to. With `include=targets`, also how it stands now.",
         "properties": {
@@ -51859,6 +52973,76 @@
           "archived"
         ],
         "type": "string"
+      },
+      "StepLog": {
+        "description": "One step in the log of a run.",
+        "properties": {
+          "action": {
+            "description": "The tool name, or `wait`, `stop_if`, `notify`.",
+            "type": "string"
+          },
+          "approved_by": {
+            "description": "Who approved the step, when it needed approval.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotency_key": {
+            "description": "`automation:<run id>:<step>`: calling again never does the step twice.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "index": {
+            "description": "Position of the action in the rule, from 0.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "result": {
+            "description": "The tool's result (cut down when large).",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "description": "`succeeded`, `failed`, `skipped`, `waiting`, `awaiting_approval`, `stopped` (a `stop_if`\nthat held) or `rejected`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "action",
+          "status",
+          "started_at"
+        ],
+        "type": "object"
       },
       "SubmissionCounts": {
         "description": "Submissions of a form by status.",
@@ -53594,6 +54778,32 @@
         ],
         "type": "string"
       },
+      "TemplateInfo": {
+        "description": "A ready-made rule you can save now.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "description": "`<module>.<name>`.",
+            "type": "string"
+          },
+          "rule": {
+            "description": "`{\"trigger\", \"conditions\", \"actions\"}`: send it to `POST /rules` with a name.",
+            "type": "object"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "rule"
+        ],
+        "type": "object"
+      },
       "Tenant": {
         "description": "A customer (tenant) of the platform.",
         "properties": {
@@ -54455,6 +55665,20 @@
         "required": [
           "email"
         ],
+        "type": "object"
+      },
+      "TestRuleRequest": {
+        "additionalProperties": false,
+        "description": "Data for a dry run.",
+        "properties": {
+          "event_sample": {
+            "description": "What the templates and conditions see as `event` (e.g. a sample payload of the trigger\nevent). Omit to use a sample for the trigger type.",
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "TextInput": {
@@ -55481,6 +56705,49 @@
             "example": "Asia/Ho_Chi_Minh",
             "type": [
               "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateRuleRequest": {
+        "additionalProperties": false,
+        "description": "Changes to an automation rule. Omitted fields stay as they are. Changing the trigger,\nconditions or actions checks the whole rule again with your permissions, and the rule then\nruns as you.",
+        "properties": {
+          "actions": {
+            "items": {
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "conditions": {
+            "description": "New conditions; `{}` removes them (the rule then always runs its actions).",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "Up to 2000 characters; an empty text removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trigger": {
+            "type": [
+              "object",
               "null"
             ]
           }
@@ -67654,6 +68921,1963 @@
         ],
         "x-permissions": [
           "auth.users.manage"
+        ]
+      }
+    },
+    "/api/v1/automations/catalog": {
+      "get": {
+        "description": "Requires `automations.read`. Events of modules in your plan, metrics for `metric` triggers,\nand the MCP tools you have the permission for (with their input schemas).",
+        "operationId": "automations_get_automation_catalog",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Catalog"
+                }
+              }
+            },
+            "description": "Triggers and actions."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the triggers and actions you may use in automation rules.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.read"
+        ]
+      }
+    },
+    "/api/v1/automations/rules": {
+      "get": {
+        "description": "Requires `automations.read`; its scope decides which rules you see. Newest first unless\n`order=asc`.",
+        "operationId": "automations_list_automation_rules",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only rules with this status: `active`, `disabled`, `pending_approval`, `paused`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only rules with this trigger type: `event`, `schedule`, `manual`, `metric`.",
+            "in": "query",
+            "name": "trigger_type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RuleResponse"
+                }
+              }
+            },
+            "description": "One page of the rules in your scope."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the automation rules in your scope.",
+        "tags": [
+          "automations"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          },
+          {
+            "description": "Only rules with this status: `active`, `disabled`, `pending_approval`, `paused`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only rules with this trigger type: `event`, `schedule`, `manual`, `metric`.",
+            "kind": "string",
+            "name": "trigger_type",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "automations.list_automation_rules",
+        "x-permissions": [
+          "automations.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `automations.manage` covering the unit of the rule, and the permission of every tool\nin its actions: the rule runs with your permissions. Made by an AI agent (API key of kind\n`agent`), the rule waits in `pending_approval` until a person enables it. Retry safely with an\n`Idempotency-Key` header.",
+        "operationId": "automations_create_automation_rule",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RuleResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.manage` (`permission_denied`), `org_id` is outside your scope (`org_out_of_scope`), or the unit is not active (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The rule is invalid; `errors` lists every problem, with codes such as `automations.trigger_unknown`, `automations.tool_unknown`, `automations.permission_missing` (a tool you lack the permission for) and the codes of wrong arguments."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an automation rule.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.manage"
+        ]
+      }
+    },
+    "/api/v1/automations/rules/{id}": {
+      "delete": {
+        "description": "Requires `automations.manage` covering the rule. The log of its runs stays until it expires.",
+        "operationId": "automations_delete_automation_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read. When given, the rule is deleted only if nobody changed it since; otherwise `412`.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.manage` (`permission_denied`), it does not cover this rule (`org_out_of_scope`), or the unit is not active (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule with this id in your scope; code `automations.rule_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` does not match: the rule changed since you read it; code `precondition_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an automation rule.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `automations.read` covering the rule; a rule outside your scope answers 404.",
+        "operationId": "automations_get_automation_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RuleResponse"
+                }
+              }
+            },
+            "description": "The rule.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule with this id in your scope; code `automations.rule_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an automation rule.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `automations.manage` covering the rule, the `If-Match` header with the `ETag` you\nread, and — when the trigger, conditions or actions change — the permission of every tool in\nthe rule (it then runs as you). Changed by an AI agent, the rule waits for a person again.",
+        "operationId": "automations_update_automation_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read. The change is made only if nobody changed the rule since; otherwise `412`.",
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RuleResponse"
+                }
+              }
+            },
+            "description": "The rule after the change.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.manage` (`permission_denied`), it does not cover this rule (`org_out_of_scope`), or the unit is not active (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule with this id in your scope; code `automations.rule_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` does not match: the rule changed since you read it. Get it again and retry; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The rule is invalid; `errors` lists every problem."
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` is missing; code `precondition_required`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change an automation rule.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.manage"
+        ]
+      }
+    },
+    "/api/v1/automations/rules/{id}/disable": {
+      "post": {
+        "description": "Requires `automations.manage` covering the rule. Runs already started finish.",
+        "operationId": "automations_disable_automation_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read; when given, the rule must not have changed since.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RuleResponse"
+                }
+              }
+            },
+            "description": "The rule, now `disabled`.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.manage` (`permission_denied`) or it does not cover this rule (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule with this id in your scope; code `automations.rule_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` does not match; code `precondition_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Disable an automation rule.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.manage"
+        ]
+      }
+    },
+    "/api/v1/automations/rules/{id}/enable": {
+      "post": {
+        "description": "Requires `automations.manage` covering the rule and the permission of every tool in it. The\nrule is checked again and from now on runs as you. A person must do this: an AI agent cannot\nenable rules (`automations.human_required`), so rules made by agents need a person's approval.",
+        "operationId": "automations_enable_automation_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read; when given, the rule must not have changed since.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RuleResponse"
+                }
+              }
+            },
+            "description": "The rule, now `active`.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.manage` (`permission_denied`), it does not cover this rule (`org_out_of_scope`), or the caller is an AI agent (`automations.human_required`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule with this id in your scope; code `automations.rule_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` does not match; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The rule is no longer valid for you (e.g. you lack a tool's permission); `errors` lists every problem."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enable an automation rule.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.manage"
+        ]
+      }
+    },
+    "/api/v1/automations/rules/{id}/run": {
+      "post": {
+        "description": "Requires `automations.run` covering the rule. The rule must be `active`; its actions run with\nthe permissions of the rule's `run_as`, in the background — follow the run with `GET\n/runs/{id}`.",
+        "operationId": "automations_run_automation_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RunResponse"
+                }
+              }
+            },
+            "description": "The run was queued."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.run` (`permission_denied`) or it does not cover this rule (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule with this id in your scope; code `automations.rule_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The rule is not `active` (or just paused itself for running too often); code `automations.rule_paused`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run an automation rule now.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.run"
+        ]
+      }
+    },
+    "/api/v1/automations/rules/{id}/test": {
+      "post": {
+        "description": "Requires `automations.read` covering the rule. Evaluates the conditions on the sample, fills\nthe templates and checks the tools and the permissions of the rule's `run_as` — without\ncalling any tool.",
+        "operationId": "automations_test_automation_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_DryRun"
+                }
+              }
+            },
+            "description": "What a run would do."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule with this id in your scope; code `automations.rule_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dry-run an automation rule.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.read"
+        ]
+      }
+    },
+    "/api/v1/automations/runs": {
+      "get": {
+        "description": "Requires `automations.read`. Newest first unless `order=asc`.",
+        "operationId": "automations_list_automation_runs",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only runs of this rule.",
+            "in": "query",
+            "name": "rule_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only runs with this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunResponse"
+                }
+              }
+            },
+            "description": "One page of runs."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the runs of automation rules in your scope.",
+        "tags": [
+          "automations"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          },
+          {
+            "description": "Only runs of this rule.",
+            "kind": "uuid",
+            "name": "rule_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only runs with this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "automations.list_automation_runs",
+        "x-permissions": [
+          "automations.read"
+        ]
+      }
+    },
+    "/api/v1/automations/runs/{id}": {
+      "get": {
+        "description": "Requires `automations.read` covering the rule's unit.",
+        "operationId": "automations_get_automation_run",
+        "parameters": [
+          {
+            "description": "Id of the run.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RunResponse"
+                }
+              }
+            },
+            "description": "The run."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No run with this id in your scope; code `automations.run_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a run of an automation rule, with the log of each step.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.read"
+        ]
+      }
+    },
+    "/api/v1/automations/runs/{id}/approve": {
+      "post": {
+        "description": "Requires `automations.run` covering the rule and the permission of the step's tool. A person\nmust decide: AI agents get `automations.human_required`. The step then runs once.",
+        "operationId": "automations_approve_automation_run",
+        "parameters": [
+          {
+            "description": "Id of the run.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RunResponse"
+                }
+              }
+            },
+            "description": "Approved; the run continues in the background."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.run` or the tool's permission (`permission_denied`), outside your scope (`org_out_of_scope`), or the caller is an AI agent (`automations.human_required`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No run with this id in your scope; code `automations.run_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The run is not `awaiting_approval`; code `automations.run_state`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve the risky step a run waits on.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.run"
+        ]
+      }
+    },
+    "/api/v1/automations/runs/{id}/reject": {
+      "post": {
+        "description": "Requires `automations.run` covering the rule and the permission of the step's tool; a person\nmust decide.",
+        "operationId": "automations_reject_automation_run",
+        "parameters": [
+          {
+            "description": "Id of the run.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RunResponse"
+                }
+              }
+            },
+            "description": "Rejected; the run is `failed` with `automations.approval_rejected`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.run` or the tool's permission (`permission_denied`), outside your scope (`org_out_of_scope`), or the caller is an AI agent (`automations.human_required`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No run with this id in your scope; code `automations.run_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The run is not `awaiting_approval`; code `automations.run_state`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject the risky step a run waits on: the run ends as `failed`.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.run"
+        ]
+      }
+    },
+    "/api/v1/automations/runs/{id}/retry": {
+      "post": {
+        "description": "Requires `automations.run` covering the rule. Steps that already succeeded are not done again\n(each step has its own idempotency key).",
+        "operationId": "automations_retry_automation_run",
+        "parameters": [
+          {
+            "description": "Id of the run.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RunResponse"
+                }
+              }
+            },
+            "description": "The run was queued again."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.run` (`permission_denied`) or it does not cover this rule (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No run with this id in your scope; code `automations.run_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The run is not `failed`; code `automations.run_state`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry a failed run from the step that failed.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.run"
+        ]
+      }
+    },
+    "/api/v1/automations/templates": {
+      "get": {
+        "description": "Requires `automations.read`. Modules declare templates; only those you could save now (their\nevents, metrics and tools are available to you) are listed. Send a template's `rule` with a\n`name` to `POST /rules`.",
+        "operationId": "automations_list_automation_templates",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_TemplateInfo"
+                }
+              }
+            },
+            "description": "Templates."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `automations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the ready-made rule templates you can use.",
+        "tags": [
+          "automations"
+        ],
+        "x-permissions": [
+          "automations.read"
         ]
       }
     },

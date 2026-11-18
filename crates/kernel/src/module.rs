@@ -327,6 +327,12 @@ pub trait Module: Send + Sync {
     fn facts(&self) -> Vec<crate::report::FactSource> {
         Vec::new()
     }
+
+    /// Mẫu luật tự động hoá dựng sẵn của module (bước 58): id `<module>.<tên>`, thân luật theo định
+    /// dạng của module `automations`. Gọi sau `start`. Mặc định: không có.
+    fn automation_templates(&self) -> Vec<crate::automation::AutomationTemplate> {
+        Vec::new()
+    }
 }
 
 /// Những gì một module nhận được lúc khởi động.
@@ -362,6 +368,7 @@ pub struct StartContext<'a> {
     counters:
         &'a mut std::collections::BTreeMap<&'static str, Arc<dyn crate::entitlement::UsageCounter>>,
     facts: &'a crate::report::FactCatalog,
+    automations: &'a crate::automation::AutomationDirectory,
 }
 
 impl StartContext<'_> {
@@ -522,6 +529,12 @@ impl StartContext<'_> {
         self.metrics.register(self.module, metric)
     }
 
+    /// Sổ số liệu tóm tắt của mọi module (bước 51 P4): đọc số liệu của module khác qua hợp đồng
+    /// chung (cảnh báo bất thường của `automations`, bước 58). Sổ có cả số liệu module đăng ký sau.
+    pub fn summary_metrics(&self) -> crate::ops::summary::SummaryMetrics {
+        self.metrics.clone()
+    }
+
     /// Đăng ký danh sách xuất được (bước 51 P16); `resource` phải là id danh sách
     /// `<module>.<operation id>` của P7.
     pub fn export_source(
@@ -678,6 +691,12 @@ impl StartContext<'_> {
     /// event đó.
     pub fn fact_sources(&self) -> Vec<(&'static str, crate::report::FactSource)> {
         self.facts.sources()
+    }
+
+    /// Sổ tool MCP và mẫu luật tự động hoá của mọi module (bước 58), điền sau khi MỌI module đã
+    /// khởi động: giữ tay cầm lúc `start`, chỉ đọc khi phục vụ.
+    pub fn automation_directory(&self) -> crate::automation::AutomationDirectory {
+        self.automations.clone()
     }
 
     /// Bộ phân phối dữ liệu khách cha → khách con của module này (bước 38): ghi bản phân phối
