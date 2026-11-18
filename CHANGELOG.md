@@ -11,6 +11,28 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 40, signing in with Google, Microsoft, GitHub or any OpenID Connect provider (off by default,
+  `AUTOXIDE_AUTH_OIDC`): each tenant adds its providers with `POST /api/v1/auth/oidc-providers` (permissions
+  `auth.oidc.manage`, `auth.oidc.read`; `GET/PATCH/DELETE /api/v1/auth/oidc-providers/{id}`; client secrets stored
+  encrypted and never returned). `GET /api/v1/auth/oidc/providers` lists the buttons; `POST
+  /api/v1/auth/oidc/{slug}/start` answers the provider's address (PKCE S256, one-time `state`, `nonce`) and `POST
+  /api/v1/auth/oidc/{slug}/callback` answers like `POST /api/v1/auth/login` (two-step sign-in still applies). ID tokens
+  are checked against the issuer's JWKS (`RS256`, `ES256` only); GitHub reads the primary verified email. An existing
+  account is linked only when both sides have verified the email (Microsoft: only with `xms_edov`); otherwise `409
+  auth.oidc_link_required`. New accounts only with `allow_signup` and open registration or a default role. People link
+  and unlink providers at `/api/v1/auth/me/identities…` (never the last way to sign in). Providers on private
+  networks are refused unless `AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=true`. Linked identities are in the personal
+  data export and deleted with the account. MCP tools `auth.list_oidc_providers`, `auth.create_oidc_provider`,
+  `auth.update_oidc_provider`, `auth.delete_oidc_provider`, `auth.list_my_identities`. Guide: `docs/guides/oidc.md`.
+  For module authors: the SSRF filter moved from `webhooks` to `autoxide_kernel::net`.
+- Step 40, a replaceable search engine for module authors: `context.search_documents(SearchKind, source)` declares a
+  searchable kind (weighted fields, equality filters, read permission); `SearchIndex::enqueue` in the transaction of a
+  change queues the job `kernel.search_sync`, which indexes current documents and drops deleted ones (safe to repeat);
+  `SearchIndex::search` limits results to the tenant and the caller's units inside the engine. The default engine
+  keeps the index in the tenant's database (`kernel_search_docs`, exact accents ranked before folded matches); another
+  engine is a module calling `context.search_backend(name, …)`, chosen by `AUTOXIDE_SEARCH_BACKEND`.
+  `autoxide task kernel.reindex [kind=…] [tenant=…]` rebuilds the index. Module search boxes and
+  `GET /api/v1/kernel/find` are unchanged.
 - Step 40, uploads straight to storage: when files are on S3, `POST /api/v1/files/uploads {name, content_type, size,
   sha256}` answers a signed `PUT` link (type and SHA-256 signed, 15 minutes by default) and
   `POST /api/v1/files/uploads/{id}/complete` reads the object back, checks its size and SHA-256 (a mismatching file is

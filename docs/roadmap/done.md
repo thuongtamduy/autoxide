@@ -1,4 +1,4 @@
-# Lộ trình — các bước đã xong (0–37)
+# Lộ trình — các bước đã xong (0–37, 40)
 
 Chuyển nguyên văn từ `docs/ROADMAP.md` theo D-228 để lộ trình chỉ còn việc đang mở. Lịch sử từng bước
 xem `CHANGELOG.md` và `docs/DECISIONS.md`.
@@ -825,3 +825,58 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push — D-368:
       `GET|POST /me/device-tokens`, `DELETE /me/device-tokens/{id}`, tool `list_my_devices`, token mất / bị từ chối xoá
       ngay, lỗi 10 lần liên tiếp xoá; chưa có bộ nối FCM / APNs thật (cần khoá của nhà cung cấp)
+
+## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
+
+Đặc tả: [`docs/steps/40-core-capabilities.md`](steps/40-core-capabilities.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+So với những gì một lõi backend hiện đại thường có sẵn, core còn thiếu sáu năng lực chung, không
+gắn với ngành nào. Header bảo mật và MCP đầy đủ hơn không phụ thuộc nền đa khách: làm được ngay.
+Bốn mục còn lại (OIDC, tải thẳng lên S3, SSE, rate limit) bắt đầu SAU bước 34 vì phải theo khách hàng
+và tổ chức. Endpoint mới có OpenAPI và tool MCP
+tương ứng; thêm thư viện thì kiểm đúng phiên bản và ghi `STACK.md`; mọi mục chạy và có test trên
+cả SQLite và Postgres.
+
+- [x] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
+      OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
+      kiểm chữ ký `id_token` qua JWKS; liên kết với tài khoản sẵn có theo email đã xác minh, không
+      tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình —
+      `auth_oidc_provider` theo khách (quản trị `/auth/oidc-providers`, `auth.oidc.manage`), `/auth/oidc/{slug}/start` +
+      `/callback`, `/auth/me/identities…`; `id_token` kiểm bằng `ring` (RS256) + `p256` (ES256), JWKS cache + tải lại khi
+      `kid` lạ tối đa mỗi phút; SSRF qua `autoxide_kernel::net`; `AUTOXIDE_AUTH_OIDC` (D-380)
+- [x] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
+      cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
+      lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
+      chung; file tải lên mà không xác nhận được dọn bằng job — `Storage::{presign_upload, head}`,
+      `autoxide_kernel::upload` (`<module>_uploads`), `POST /files/uploads` + `/complete`, `/media/uploads` + `/complete`,
+      4 tool MCP, job dọn mỗi giờ; ký `content-type` + checksum (không ký được `content-length`), xác nhận luôn đọc lại;
+      loại thật kiểm ở `media`, `files` giữ loại khai như tải qua máy chủ (D-379)
+- [x] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
+      `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
+      HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
+      có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
+- [x] Đẩy event theo thời gian thực bằng Server-Sent Events — stream event do module phát, KHÔNG
+      tự đẩy mọi thay đổi của bảng ("realtime theo bảng" mà `docs/research/frameworks.md` đã không
+      mượn); ghi quyết định nêu khác biệt đó. Một endpoint stream các event mà người
+      gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
+      `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
+      máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình) — `GET /api/v1/kernel/events/stream`, `EventInfo::streamable`, `StreamHub` hỏi bảng
+      event lùi `GRACE` 5 s; quyền hẹp hơn khách chỉ nhận việc của mình (event chưa có `org_id`); không có tool MCP (D-378)
+- [x] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
+      việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
+      mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
+      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch — `Module::{mcp_resources, prompts,
+      description}`, lọc theo permission như tool; resource của kernel / `content` / `comments`, prompt
+      `content.draft_post`, `comments.moderate_queue`; `/llms.txt` + `autoxide://kernel/llms.txt` (D-374)
+- [x] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
+      chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
+      chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
+      quyết định — `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (bảng `kernel_throttle`, `Throttle::take` theo
+      lô burst / 4, khoá theo khách); đo: tới −11% req/s, +22% p95 → `memory` vẫn mặc định; IP vẫn trong
+      bộ nhớ (D-375)
+- [x] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
+      `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
+      module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục —
+      `autoxide_kernel::search::{SearchBackend, SearchIndex, DatabaseSearch}`, `context.search_documents` /
+      `search_backend`, job `kernel.search_sync` xếp cùng transaction, `autoxide task kernel.reindex`,
+      `AUTOXIDE_SEARCH_BACKEND`; tìm xuyên phân hệ bước 51 giữ nguyên (D-381)
