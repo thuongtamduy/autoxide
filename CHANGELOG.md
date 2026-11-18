@@ -17,6 +17,16 @@ endpoints are marked deprecated with a sunset date first.
   products with `PUT /api/v1/catalog/stores/{org_id}/overrides/{product_id}`; prices are kept ready by the job
   `catalog.refresh_storefront`, the per-minute schedule `catalog.apply_scheduled_prices` (event
   `catalog.price_effective`) and the task `catalog.rebuild_storefront`.
+- Module `promotions` (step 43, first part): promotions as rules reaching buyers automatically, by coupon (shared
+  code or batch of codes) or as one-time vouchers in a buyer's wallet; kinds percent / amount off, fixed price, buy X
+  get Y (cheapest free, same item, specified rewards), free shipping, flash sale, tiers, bundle price, add-on deals,
+  gift choice; conditions (customer groups, channels, payment method, carrier, province, tier, client, first order,
+  time windows in the store's time zone); stacking in three classes (`product`, `order`, `shipping`) with
+  `exclusivity`, `combines_with`, `stop_after`, `priority` or `best_for_buyer`; who pays each discount, shared to the
+  cent; hold → confirm → release of every counter (uses, per-buyer keys, day, budget, flash units, gifts, codes,
+  vouchers) in one transaction; legal limits (50% of the price before the promotion, discount days per year) and notice
+  rules as dated data loaded with `autoxide task promotions.load_legal_data`, checked before turning on;
+  `autoxide_promotions::api::Promotions` for `orders`; MCP tools `promotions.*`.
 - Module `inventory` listens to `orders.order_confirmed`, `orders.order_cancelled` and `orders.return_received`
   (optional subscriptions) and confirms, releases or restocks once even when an event arrives again.
 - Module `inventory` (step 42): stock reservations for orders through `autoxide_inventory::api::Inventory`

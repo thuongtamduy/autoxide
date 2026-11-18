@@ -401,6 +401,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   danh mục chính thức
 - [`docs/CATALOG.vi.md`](docs/CATALOG.vi.md) — sản phẩm: biến thể, danh mục, bảng giá có lịch sử,
   sàn giá
+- [`docs/PROMOTIONS.vi.md`](docs/PROMOTIONS.vi.md) — khuyến mại: giảm tự động, coupon, voucher, cộng dồn,
+  giữ lượt cho đơn hàng, hạn mức pháp luật là dữ liệu có ngày hiệu lực
 - [`docs/TAX.vi.md`](docs/TAX.vi.md) — thuế: gói dữ liệu thuế Việt Nam, tính thuế, hồ sơ thuế
 - [`docs/MONEY.vi.md`](docs/MONEY.vi.md) — tiền: sổ cái, thanh toán và chế độ dòng tiền, VietQR, chứng từ kế
   toán, tỉ giá, in chứng từ, xuất dữ liệu kế toán, lưu chứng từ 10 năm
