@@ -191,7 +191,7 @@ pub(crate) async fn create_ticket(
         follow_up_of: None,
         locale: None,
     };
-    let opened = service.open_ticket(&tenant, Actor::from(&principal), None, opening, None).await?;
+    let opened = service.open_by_staff(&tenant, &principal, opening).await?;
     let id = opened.ticket.id;
     Ok(Created::new(
         format!("/support/tickets/{id}"),
