@@ -869,6 +869,52 @@ export type CatalogAddedPrices = {
   warnings: CatalogPriceWarning[];
 };
 
+/** An attribute products can have (origin, material, size of the box…). */
+export type CatalogAttribute = {
+  code: string;
+  /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+  data_type: string;
+  /** Offered as a storefront filter. */
+  filterable: boolean;
+  id: string;
+  /** Law the attribute comes from, for legally required label contents. */
+  legal_basis?: string | null;
+  names: {
+    [key: string]: string;
+  };
+  options: CatalogAttributeOption[];
+  /** Decimal places of a `decimal` attribute. */
+  scale: number;
+  unit?: string | null;
+  updated_at: string;
+};
+
+/** A choosable value of an `option` / `options` attribute. */
+export type CatalogAttributeOption = {
+  /** 1 to 64 lower-case letters, digits, `_` or `-`; unique in the attribute. */
+  code: string;
+  /** Label per language, e.g. `{"en": "Cotton"}`. */
+  labels: {
+    [key: string]: string;
+  };
+};
+
+/** The whole set of options of an attribute. */
+export type CatalogAttributeOptions = {
+  /** Up to 500 options, in display order. Options are matched by `code`. */
+  options: CatalogAttributeOption[];
+};
+
+/** A value of an attribute on a product. */
+export type CatalogAttributeValue = {
+  attribute_id: string;
+  /**
+   * By the attribute's type: text, a whole number, a decimal written as text (`"12.5"`),
+   * `true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes.
+   */
+  value: Record<string, unknown>;
+};
+
 /** A category of the tenant's tree. */
 export type CatalogCategory = {
   /** 0 for a top category. */
@@ -884,6 +930,32 @@ export type CatalogCategory = {
   updated_at: string;
   /** Shown on the storefront. */
   visible: boolean;
+};
+
+/** An attribute of a category. */
+export type CatalogCategoryAttribute = {
+  /** Also for products of the subcategories. */
+  applies_to_descendants?: boolean;
+  attribute_id: string;
+  /** The rule applies from this day (e.g. when a new labelling rule takes effect). */
+  effective_from: string;
+  /** The rule stops applying on this day. */
+  effective_to?: string | null;
+  /** Law the rule comes from. */
+  legal_basis?: string | null;
+  /** Products in the category cannot go on sale without a value. */
+  required?: boolean;
+};
+
+/** The whole set of attributes of a category. */
+export type CatalogCategoryAttributes = {
+  attributes: CatalogCategoryAttribute[];
+};
+
+/** The restricted-goods rules linked to a category. */
+export type CatalogCategoryRestrictions = {
+  /** Rule codes of `GET /restriction-rules`. */
+  rule_codes: string[];
 };
 
 /** Name and slug of a category in one language. */
@@ -906,6 +978,26 @@ export type CatalogComponents = {
   components: CatalogComponent[];
 };
 
+/** A new attribute. */
+export type CatalogCreateAttribute = {
+  /**
+   * 1 to 64 lower-case letters, digits or `_`; unique in the tenant
+   * (`catalog.attribute_code_taken`).
+   */
+  code: string;
+  /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+  data_type: string;
+  filterable?: boolean;
+  legal_basis?: string | null;
+  /** Name per language. */
+  names: {
+    [key: string]: string;
+  };
+  /** Decimal places of a `decimal` attribute, 0 to 6. Default 0. */
+  scale?: number;
+  unit?: string | null;
+};
+
 /** A new category. */
 export type CatalogCreateCategory = {
   /** Omitted: a top category. Categories nest at most 7 levels deep. */
@@ -918,6 +1010,18 @@ export type CatalogCreateCategory = {
   };
   /** Shown on the storefront; default `true`. */
   visible?: boolean;
+};
+
+/** A new document. */
+export type CatalogCreateDocument = {
+  /** A document type a rule requires, e.g. `alcohol_retail_licence`. */
+  document_type: string;
+  expires_on?: string | null;
+  /** Key of a scanned file already stored. */
+  file_key?: string | null;
+  issued_by: string;
+  issued_on: string;
+  number: string;
 };
 
 /** A new price floor. */
@@ -1210,10 +1314,39 @@ export type CatalogProduct = {
   warranty_months?: number | null;
 };
 
+/** The whole set of attribute values of a product. */
+export type CatalogProductAttributes = {
+  attributes: CatalogAttributeValue[];
+};
+
 /** The whole set of categories of a product. */
 export type CatalogProductCategories = {
   /** The first is the main category. */
   category_ids: string[];
+};
+
+/** A count of products. */
+export type CatalogProductCount = {
+  count: number;
+  /**
+   * A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,
+   * `missing_attributes`, `missing_documents`, `restricted`).
+   */
+  key: string;
+};
+
+/** A licence or certificate of a conditional product. */
+export type CatalogProductDocument = {
+  created_at: string;
+  document_type: string;
+  /** The document is valid until the end of this day; `null`: no end. */
+  expires_on?: string | null;
+  /** Key of the scanned file in storage. */
+  file_key?: string | null;
+  id: string;
+  issued_by: string;
+  issued_on: string;
+  number: string;
 };
 
 /** The whole set of images of a product. */
@@ -1255,6 +1388,24 @@ export type CatalogResolvedPrice = {
   variant_id: string;
 };
 
+/** A rule of prohibited or conditional goods (shared data, read only). */
+export type CatalogRestrictionRule = {
+  code: string;
+  effective_from: string;
+  effective_to?: string | null;
+  jurisdiction: string;
+  legal_basis: string;
+  /** `prohibited` or `conditional`. */
+  level: string;
+  names: {
+    [key: string]: string;
+  };
+  pack_version: string;
+  /** Document types a conditional product needs, valid on the day. */
+  required_documents: string[];
+  source_url: string;
+};
+
 /**
  * How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),
  * `preorder` (before it arrives, see `preorder_available_on`).
@@ -1271,6 +1422,16 @@ export type CatalogStatusChange = {
    * `draft`.
    */
   status: CatalogStatus;
+};
+
+/** A stored attribute value (decimals are stored scaled by the attribute's `scale`). */
+export type CatalogStoredAttributeValue = {
+  attribute_id: string;
+  option_id?: string | null;
+  value_boolean?: boolean | null;
+  value_date?: string | null;
+  value_integer?: number | null;
+  value_text?: string | null;
 };
 
 /** Texts of a product in one language. */
@@ -1300,8 +1461,23 @@ export type CatalogTranslation = {
   meta_description?: string | null;
   meta_title?: string | null;
   name: string;
+  /**
+   * Public address of the product in this language, computed by the server:
+   * `/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`, without a language prefix.
+   */
+  path: string;
   short_description: string;
   slug: string;
+};
+
+/** Changes to an attribute; its code and type cannot change. */
+export type CatalogUpdateAttribute = {
+  filterable?: boolean | null;
+  legal_basis?: string | null;
+  names?: {
+    [key: string]: string;
+  } | null;
+  unit?: string | null;
 };
 
 /** Changes to a category. Omitted fields stay as they are. */
@@ -3608,6 +3784,26 @@ export type CreateSiteMenuRequest = {
   org_id?: string | null;
 };
 
+/** A new routing rule. */
+export type CreateSupportRoutingRuleRequest = {
+  /** Only tickets of this category; omitted: any. */
+  category?: string | null;
+  channel?: SupportChannel | null;
+  org_id: string;
+  /** Order among the unit's rules (lower first). */
+  position?: number;
+  /** A team of the unit or of a unit above it. */
+  team_id: string;
+};
+
+/** A new team. */
+export type CreateSupportTeamRequest = {
+  /** 1 to 100 characters; unique in the unit. */
+  name: string;
+  /** Unit of the team. */
+  org_id: string;
+};
+
 /** A ticket staff open for a customer (a phone call, a visit…). */
 export type CreateSupportTicketRequest = {
   /** What the customer asked. */
@@ -4274,6 +4470,29 @@ export type Data_CatalogAddedPrices = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogAttribute = {
+  /** An attribute products can have (origin, material, size of the box…). */
+  data: {
+    code: string;
+    /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+    data_type: string;
+    /** Offered as a storefront filter. */
+    filterable: boolean;
+    id: string;
+    /** Law the attribute comes from, for legally required label contents. */
+    legal_basis?: string | null;
+    names: {
+      [key: string]: string;
+    };
+    options: CatalogAttributeOption[];
+    /** Decimal places of a `decimal` attribute. */
+    scale: number;
+    unit?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogCategory = {
   /** A category of the tenant's tree. */
   data: {
@@ -4290,6 +4509,15 @@ export type Data_CatalogCategory = {
     updated_at: string;
     /** Shown on the storefront. */
     visible: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogCategoryRestrictions = {
+  /** The restricted-goods rules linked to a category. */
+  data: {
+    /** Rule codes of `GET /restriction-rules`. */
+    rule_codes: string[];
   };
 };
 
@@ -4372,6 +4600,23 @@ export type Data_CatalogProduct = {
     updated_at: string;
     variants: CatalogVariant[];
     warranty_months?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogProductDocument = {
+  /** A licence or certificate of a conditional product. */
+  data: {
+    created_at: string;
+    document_type: string;
+    /** The document is valid until the end of this day; `null`: no end. */
+    expires_on?: string | null;
+    /** Key of the scanned file in storage. */
+    file_key?: string | null;
+    id: string;
+    issued_by: string;
+    issued_on: string;
+    number: string;
   };
 };
 
@@ -6053,6 +6298,45 @@ export type Data_Ingested = {
     accepted: number;
     /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
     dropped: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryAdjustment = {
+  /** A stock adjustment with the ledger lines it wrote. */
+  data: {
+    actor_id?: string | null;
+    created_at: string;
+    id: string;
+    movements: InventoryMovement[];
+    org_id: string;
+    reference: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryLevel = {
+  /** The stock of one variant in one warehouse or store. */
+  data: {
+    /**
+     * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+     * may be sold out of stock is oversold.
+     */
+    available: number;
+    average_cost?: Money | null;
+    id: string;
+    /** Units on the way (transfers in transit, purchase orders). */
+    incoming: number;
+    /** Units physically in the warehouse: the sum of the movement ledger. */
+    on_hand: number;
+    /** The warehouse or store (organization unit). */
+    org_id: string;
+    /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+    reorder_point?: number | null;
+    /** Units held for orders not shipped yet. */
+    reserved: number;
+    updated_at: string;
+    variant_id: string;
   };
 };
 
@@ -8649,6 +8933,51 @@ export type Data_SupportOpenedTicket = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportRoutingRule = {
+  /** A routing rule: new tickets of the unit (and the units below) that match go to the team. */
+  data: {
+    /** Only tickets of this category; empty: any. */
+    category?: string | null;
+    channel?: SupportChannel | null;
+    id: string;
+    org_id: string;
+    /** Rules of one unit are tried in this order; rules of nearer units first. */
+    position: number;
+    team_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeam = {
+  /** A support team of an organization unit; it covers tickets of the unit and the units below. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeamDetail = {
+  /** A team with its members. */
+  data: SupportTeam & {
+    members: SupportTeamMember[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeamMember = {
+  /** A member of a support team. */
+  data: {
+    /** Takes new tickets in round-robin assignment. */
+    accepting: boolean;
+    last_assigned_at?: string | null;
+    user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportTicket = {
   /** A support ticket. */
   data: {
@@ -9427,6 +9756,28 @@ export type Data_Vec_CanAnswer = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogAttribute = {
+  data: {
+    code: string;
+    /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+    data_type: string;
+    /** Offered as a storefront filter. */
+    filterable: boolean;
+    id: string;
+    /** Law the attribute comes from, for legally required label contents. */
+    legal_basis?: string | null;
+    names: {
+      [key: string]: string;
+    };
+    options: CatalogAttributeOption[];
+    /** Decimal places of a `decimal` attribute. */
+    scale: number;
+    unit?: string | null;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogCategory = {
   data: {
     /** 0 for a top category. */
@@ -9446,11 +9797,88 @@ export type Data_Vec_CatalogCategory = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogCategoryAttribute = {
+  data: {
+    /** Also for products of the subcategories. */
+    applies_to_descendants?: boolean;
+    attribute_id: string;
+    /** The rule applies from this day (e.g. when a new labelling rule takes effect). */
+    effective_from: string;
+    /** The rule stops applying on this day. */
+    effective_to?: string | null;
+    /** Law the rule comes from. */
+    legal_basis?: string | null;
+    /** Products in the category cannot go on sale without a value. */
+    required?: boolean;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogComponent = {
   data: {
     /** Units of the component in one bundle, 1 to 10000. */
     quantity: number;
     variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogProductCount = {
+  data: {
+    count: number;
+    /**
+     * A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,
+     * `missing_attributes`, `missing_documents`, `restricted`).
+     */
+    key: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogProductDocument = {
+  data: {
+    created_at: string;
+    document_type: string;
+    /** The document is valid until the end of this day; `null`: no end. */
+    expires_on?: string | null;
+    /** Key of the scanned file in storage. */
+    file_key?: string | null;
+    id: string;
+    issued_by: string;
+    issued_on: string;
+    number: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogRestrictionRule = {
+  data: {
+    code: string;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    /** `prohibited` or `conditional`. */
+    level: string;
+    names: {
+      [key: string]: string;
+    };
+    pack_version: string;
+    /** Document types a conditional product needs, valid on the day. */
+    required_documents: string[];
+    source_url: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogStoredAttributeValue = {
+  data: {
+    attribute_id: string;
+    option_id?: string | null;
+    value_boolean?: boolean | null;
+    value_date?: string | null;
+    value_integer?: number | null;
+    value_text?: string | null;
   }[];
 };
 
@@ -10735,6 +11163,20 @@ export type Data_Vec_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_SupportRoutingRule = {
+  data: {
+    /** Only tickets of this category; empty: any. */
+    category?: string | null;
+    channel?: SupportChannel | null;
+    id: string;
+    org_id: string;
+    /** Rules of one unit are tried in this order; rules of nearer units first. */
+    position: number;
+    team_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_TagRef = {
   data: {
     /** One of `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`. */
@@ -11881,6 +12323,98 @@ export type Ingested = {
   accepted: number;
   /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
   dropped: number;
+};
+
+/** A stock adjustment with the ledger lines it wrote. */
+export type InventoryAdjustment = {
+  actor_id?: string | null;
+  created_at: string;
+  id: string;
+  movements: InventoryMovement[];
+  org_id: string;
+  reference: string;
+};
+
+/** One line of a stock adjustment. */
+export type InventoryAdjustmentLine = {
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** Units to add (positive) or remove (negative); not 0. */
+  quantity: number;
+  /**
+   * Code from the reason list `inventory.adjustment` (see
+   * `GET /api/v1/kernel/reasons/inventory.adjustment`), e.g. `damaged`.
+   */
+  reason_code?: string | null;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A stock adjustment to make in one warehouse. */
+export type InventoryAdjustmentRequest = {
+  /** 1 to 500 lines. */
+  lines: InventoryAdjustmentLine[];
+  /** The warehouse or store. */
+  org_id: string;
+  /**
+   * Your id of this adjustment (1 to 100 visible ASCII characters). Sending the same
+   * reference and content again returns the adjustment already made.
+   */
+  reference: string;
+};
+
+/** The stock of one variant in one warehouse or store. */
+export type InventoryLevel = {
+  /**
+   * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+   * may be sold out of stock is oversold.
+   */
+  available: number;
+  average_cost?: Money | null;
+  id: string;
+  /** Units on the way (transfers in transit, purchase orders). */
+  incoming: number;
+  /** Units physically in the warehouse: the sum of the movement ledger. */
+  on_hand: number;
+  /** The warehouse or store (organization unit). */
+  org_id: string;
+  /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+  reorder_point?: number | null;
+  /** Units held for orders not shipped yet. */
+  reserved: number;
+  updated_at: string;
+  variant_id: string;
+};
+
+/** Settings of a stock level. */
+export type InventoryLevelUpdate = {
+  /** Reorder point, 0 to 1 000 000; `null` turns low-stock alerts off. */
+  reorder_point?: number | null;
+};
+
+/** One line of the stock movement ledger. Lines are only ever added. */
+export type InventoryMovement = {
+  actor_id?: string | null;
+  created_at: string;
+  id: string;
+  /**
+   * `receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,
+   * `expiry` or `supplier_return`.
+   */
+  kind: string;
+  level_id: string;
+  lot_id?: string | null;
+  note: string;
+  org_id: string;
+  /** Signed: positive came in, negative went out. */
+  quantity: number;
+  /** Code from the reason list `inventory.adjustment`, for adjustments and counts. */
+  reason_code?: string | null;
+  source_id: string;
+  /** What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`… */
+  source_type: string;
+  unit_cost?: Money | null;
+  variant_id: string;
 };
 
 /** A new invitation. */
@@ -15567,6 +16101,62 @@ export type Page_FormResponse = {
 };
 
 /** One page of a list. */
+export type Page_InventoryLevel = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+     * may be sold out of stock is oversold.
+     */
+    available: number;
+    average_cost?: Money | null;
+    id: string;
+    /** Units on the way (transfers in transit, purchase orders). */
+    incoming: number;
+    /** Units physically in the warehouse: the sum of the movement ledger. */
+    on_hand: number;
+    /** The warehouse or store (organization unit). */
+    org_id: string;
+    /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+    reorder_point?: number | null;
+    /** Units held for orders not shipped yet. */
+    reserved: number;
+    updated_at: string;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryMovement = {
+  /** The items of this page, in the requested order. */
+  data: {
+    actor_id?: string | null;
+    created_at: string;
+    id: string;
+    /**
+     * `receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,
+     * `expiry` or `supplier_return`.
+     */
+    kind: string;
+    level_id: string;
+    lot_id?: string | null;
+    note: string;
+    org_id: string;
+    /** Signed: positive came in, negative went out. */
+    quantity: number;
+    /** Code from the reason list `inventory.adjustment`, for adjustments and counts. */
+    reason_code?: string | null;
+    source_id: string;
+    /** What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`… */
+    source_type: string;
+    unit_cost?: Money | null;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InvitationResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17050,6 +17640,18 @@ export type Page_SubscriberResponse = {
      */
     suppressed?: string | null;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SupportTeam = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    org_id: string;
   }[];
   pagination: Pagination;
 };
@@ -19958,6 +20560,12 @@ export type SetPasswordRequest = {
   password: string;
 };
 
+/** A member's setting. */
+export type SetSupportTeamMemberRequest = {
+  /** Takes new tickets in round-robin assignment. */
+  accepting: boolean;
+};
+
 /** A setting that units can set and the units below them inherit. */
 export type SettingResponse = {
   /** The value when no unit sets it; `null`: none. */
@@ -20639,6 +21247,39 @@ export type SupportRequesterInput = {
 
 /** How a ticket ended. */
 export type SupportResolution = "answered" | "escalated" | "duplicate" | "spam" | "no_reply";
+
+/** A routing rule: new tickets of the unit (and the units below) that match go to the team. */
+export type SupportRoutingRule = {
+  /** Only tickets of this category; empty: any. */
+  category?: string | null;
+  channel?: SupportChannel | null;
+  id: string;
+  org_id: string;
+  /** Rules of one unit are tried in this order; rules of nearer units first. */
+  position: number;
+  team_id: string;
+};
+
+/** A support team of an organization unit; it covers tickets of the unit and the units below. */
+export type SupportTeam = {
+  created_at: string;
+  id: string;
+  name: string;
+  org_id: string;
+};
+
+/** A team with its members. */
+export type SupportTeamDetail = SupportTeam & {
+  members: SupportTeamMember[];
+};
+
+/** A member of a support team. */
+export type SupportTeamMember = {
+  /** Takes new tickets in round-robin assignment. */
+  accepting: boolean;
+  last_assigned_at?: string | null;
+  user_id: string;
+};
 
 /** A support ticket. */
 export type SupportTicket = {
@@ -24079,6 +24720,62 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/attributes": {
+    /** List every attribute of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create an attribute. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateAttribute;
+      responses: {
+        201: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/attributes/{id}": {
+    /** Change an attribute. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdateAttribute;
+      responses: {
+        200: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/attributes/{id}/options": {
+    /** Replace the options of an `option` / `options` attribute. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogAttributeOptions;
+      responses: {
+        200: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/categories": {
     /** List every category of the tenant. */
     get: {
@@ -24133,6 +24830,31 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/categories/{id}/attributes": {
+    /** List the attributes of a category. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogCategoryAttribute;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the attributes of a category. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCategoryAttributes;
+      responses: {
+        200: Data_Vec_CatalogCategoryAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/categories/{id}/move": {
     /** Move a category with everything below it. */
     post: {
@@ -24145,6 +24867,30 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/categories/{id}/restrictions": {
+    /** List the restricted-goods rules of a category. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogCategoryRestrictions;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Link restricted-goods rules to a category. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCategoryRestrictions;
+      responses: {
+        200: Data_CatalogCategoryRestrictions;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -24283,6 +25029,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/products/counts": {
+    /** Count the products in your scope by status or readiness. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { group_by?: string | null }; };
+      responses: {
+        200: Data_Vec_CatalogProductCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/products/{id}": {
     /** Get a product with its texts, options, variants, categories and images. */
     get: {
@@ -24322,6 +25081,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/products/{id}/attributes": {
+    /** List the attribute values of a product. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogStoredAttributeValue;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the attribute values of a product. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogProductAttributes;
+      responses: {
+        200: Data_Vec_CatalogStoredAttributeValue;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/products/{id}/categories": {
     /** Replace the categories of a product. */
     put: {
@@ -24333,6 +25118,45 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/documents": {
+    /** List the documents of a product. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogProductDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a document to a product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCreateDocument;
+      responses: {
+        201: Data_CatalogProductDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/documents/{document_id}": {
+    /** Remove a document from a product. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; document_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -24425,6 +25249,18 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/restriction-rules": {
+    /** List the rules of prohibited and conditional goods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogRestrictionRule;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -27314,6 +28150,88 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/adjustments": {
+    /** Adjust stock in one warehouse, each line with a reason. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryAdjustmentRequest;
+      responses: {
+        200: Data_InventoryAdjustment;
+        201: Data_InventoryAdjustment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/adjustments/{id}": {
+    /** Get a stock adjustment with the ledger lines it wrote. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryAdjustment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/levels": {
+    /** List stock levels (variant × warehouse) in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; below_reorder?: boolean | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/levels/{id}": {
+    /** Get one stock level. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the reorder point of a stock level. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryLevelUpdate;
+      responses: {
+        200: Data_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/movements": {
+    /** List the stock movement ledger in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; kind?: "receipt" | "sale" | "return" | "adjustment" | "count" | "transfer_out" | "transfer_in" | "expiry" | "supplier_return" | null; from?: string | null; to?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryMovement;
+        401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -32420,6 +33338,119 @@ export interface paths {
         422: Problem;
         429: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/routing-rules": {
+    /** List the routing rules of a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      responses: {
+        200: Data_Vec_SupportRoutingRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a routing rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateSupportRoutingRuleRequest;
+      responses: {
+        201: Data_SupportRoutingRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/routing-rules/{id}": {
+    /** Delete a routing rule. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams": {
+    /** List support teams in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SupportTeam;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a support team. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateSupportTeamRequest;
+      responses: {
+        201: Data_SupportTeam;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams/{id}": {
+    /** Get a support team with its members. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportTeamDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a support team. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams/{id}/members/{user_id}": {
+    /** Add a member to a support team, or change whether they take new tickets. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; user_id: string }; };
+      requestBody: SetSupportTeamMemberRequest;
+      responses: {
+        200: Data_SupportTeamMember;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a member from a support team. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; user_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

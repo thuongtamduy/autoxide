@@ -274,18 +274,23 @@ pub(crate) struct TranslationResponse {
     pub locale: String,
     pub name: String,
     pub slug: String,
+    /// Public address of the product in this language, computed by the server:
+    /// `/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`, without a language prefix.
+    #[schema(example = "/products/cotton-t-shirt")]
+    pub path: String,
     pub short_description: String,
     pub description: String,
     pub meta_title: Option<String>,
     pub meta_description: Option<String>,
 }
 
-impl From<&translation::Model> for TranslationResponse {
-    fn from(row: &translation::Model) -> Self {
+impl TranslationResponse {
+    fn new(row: &translation::Model, prefix: &str) -> Self {
         TranslationResponse {
             locale: row.locale.clone(),
             name: row.name.clone(),
             slug: row.slug.clone(),
+            path: format!("/{prefix}/{}", row.slug),
             short_description: row.short_description.clone(),
             description: row.description.clone(),
             meta_title: row.meta_title.clone(),
@@ -457,7 +462,11 @@ impl From<ProductDetail> for ProductResponse {
             default_locale: product.default_locale,
             ai_assisted: product.ai_assisted,
             ever_active: product.ever_active,
-            translations: detail.translations.iter().map(TranslationResponse::from).collect(),
+            translations: detail
+                .translations
+                .iter()
+                .map(|row| TranslationResponse::new(row, &detail.path_prefix))
+                .collect(),
             options: detail.options.iter().map(OptionDto::from).collect(),
             variants: detail.variants.iter().map(VariantResponse::from).collect(),
             media: detail.media.iter().map(ProductMediaDto::from).collect(),

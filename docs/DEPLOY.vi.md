@@ -33,8 +33,11 @@ chmod 600 .env
 ```
 
 - `POSTGRES_PASSWORD` bảo vệ database.
-- `AUTOXIDE_AUTH_TOKEN_SECRET` ký access token. Giữ nguyên giá trị: đổi nó thì mọi người
-  bị đăng xuất.
+- `AUTOXIDE_AUTH_TOKEN_SECRET` ký access token. Muốn đổi mà không đăng xuất ai (định kỳ, vài
+  tháng một lần): đặt giá trị mới vào nó và giá trị cũ vào `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` trên
+  mọi máy chủ, khởi động lại, rồi bỏ `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` sau
+  `AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS` (mặc định 15 phút): token ký bằng khoá cũ vẫn được nhận tới khi
+  hết hạn. Đổi mà không giữ khoá cũ thì mọi access token hết hiệu lực.
 - `AUTOXIDE_SECRET_KEY` ký các token sống ngắn (biểu mẫu, chống spam), làm khoá băm địa chỉ
   IP của người lạ và mã hoá các secret máy chủ giữ (đăng nhập hai bước, secret ký webhook). Để
   ngoài database thì bản sao database (bản backup) không làm lộ các địa chỉ đó, cũng không làm
@@ -321,6 +324,7 @@ database mới.
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
 | `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng mở được các secret đã mã hoá và tính ngược được khối IP từ các bản băm đã lưu |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_SECRET_KEY`, cách nhau dấu phẩy, trong lúc xoay khoá; bỏ đi sau khi chạy `autoxide secrets reseal` |
+| `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_AUTH_TOKEN_SECRET`, cách nhau dấu phẩy, trong lúc xoay khoá; chỉ dùng để kiểm token, bỏ đi sau thời gian sống của access token |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Sau reverse proxy: header chứa địa chỉ client |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | Số proxy của bạn mà một request đi qua (mặc định `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd `10.0.0.0/8, 192.0.2.7` |
@@ -719,6 +723,34 @@ hai giai đoạn:
 Chỉ một máy chủ, không có bộ cân bằng tải thì để khoảng rút là `0`: không có nơi nào khác
 để gửi request, rút chỉ làm việc dừng chậm thêm.
 
+## Backup theo lịch
+
+Ngoài `autoxide backup` chạy tay, mọi tiến trình chạy việc nền backup mọi database nó lo, mỗi
+`AUTOXIDE_BACKUP_INTERVAL_HOURS` giờ (mặc định 24; `0` để tắt), cùng cách với `autoxide backup`, vào
+nơi lưu file của module `files` (thư mục hay bucket S3) dưới `kernel/backups/<database>/<id>/`. Mỗi
+database chỉ giữ `AUTOXIDE_BACKUP_KEEP` bản tốt mới nhất (mặc định 7). Mỗi bản gồm `backup.json`,
+`database.sqlite` và, khi đặt `AUTOXIDE_BACKUP_INCLUDE_FILES=true`, các file đã lưu trong `files/`.
+
+- Bản backup nằm cùng nơi lưu với file tải lên, nên nó bảo vệ khi dữ liệu mất hay hỏng, không bảo vệ
+  khi mất chính nơi lưu đó: chép bucket hay thư mục (cả backup lẫn file tải lên) sang nơi khác, vd
+  bằng tính năng nhân bản của bucket hay một lệnh `rclone sync` hằng đêm. Đó cũng là lý do mặc định
+  không chép file vào từng bản backup.
+- Muốn khôi phục một bản thì chép thư mục của nó ra khỏi nơi lưu (S3:
+  `aws s3 cp --recursive s3://<bucket>/kernel/backups/main/<id>/ ./restore/`; thư mục: `cp -r`), rồi khôi phục
+  thư mục đó như mục "6. Backup và khôi phục" ở trên.
+- Mỗi lượt được ghi vào bảng `kernel_backups` (trạng thái, cỡ, lỗi). `autoxide doctor` cảnh báo khi một
+  database không có bản tốt nào trong hai chu kỳ gần nhất, và `/metrics` có
+  `backup_last_success_timestamp_seconds`, `backup_runs_total`, `backup_duration_seconds` và
+  `backup_size_bytes` (cảnh báo `AutoxideBackupTooOld`, `AutoxideBackupFailed`).
+- Bản backup chứa dữ liệu cá nhân. Dữ liệu đã xoá theo yêu cầu của một người vẫn còn trong các bản
+  backup làm trước đó, tới khi chúng bị xoay vòng (`AUTOXIDE_BACKUP_KEEP` × chu kỳ): ghi điều này vào
+  thông báo xử lý dữ liệu. Giữ nơi lưu ở chế độ riêng tư, ở nước mà dữ liệu của khách phải ở, và giữ
+  `AUTOXIDE_SECRET_KEY` tách khỏi nó. Chứng từ kế toán phải giữ 10 năm nằm ở module `invoices` và
+  `ledger`, không nằm trong bản backup xoay vòng. (Chi tiết pháp lý: cần đối chiếu văn bản gốc / người
+  có chuyên môn pháp lý.)
+- Trong lúc backup một database SQLite, file `-wal` của nó lớn dần tới khi backup xong: chừa chỗ trống
+  trên đĩa cho nó.
+
 ## Theo dõi (monitoring)
 
 Bật `AUTOXIDE_HTTP_METRICS=true` và để Prometheus đọc `/metrics` ngay trên máy (chặn `/metrics` ở
@@ -812,10 +844,23 @@ Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
 - **Sửa:** giải phóng hay thêm dung lượng đĩa trước. Job đã xong và event đã giao tự bị xoá sau 7 ngày;
   trên PostgreSQL chạy `VACUUM` cho bảng lớn sau khi xoá nhiều dòng.
 
+### Backup
+
+- **Dấu hiệu:** cảnh báo `AutoxideBackupTooOld` hay `AutoxideBackupFailed`; `autoxide doctor` cảnh báo
+  `kernel.backup_age`.
+- **Kiểm:** các dòng mới nhất của `kernel_backups` cho database đó (`status`, `error`), dòng log
+  `backup failed`, chỗ trống trên máy chủ (bản backup được dựng trước trong thư mục tạm, cỡ bằng
+  database) và trên nơi lưu file.
+- **Sửa:** theo lỗi (thiếu module `files`, đầy đĩa, thông tin đăng nhập nơi lưu). Dòng kẹt ở `running`
+  do tiến trình đã chết được lượt sau đánh `failed` sau 15 phút. Backup tay bằng
+  `autoxide backup <thư mục>` tới khi backup theo lịch chạy lại.
+
 ### Lộ khoá
 
-- `AUTOXIDE_AUTH_TOKEN_SECRET`: đặt giá trị mới trên mọi máy chủ rồi khởi động lại. Mọi access token
-  hết dùng được; client đăng nhập lại bằng refresh token, vẫn còn hiệu lực.
+- `AUTOXIDE_AUTH_TOKEN_SECRET`: đặt giá trị mới trên mọi máy chủ rồi khởi động lại, KHÔNG đưa khoá bị lộ
+  vào `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS`. Mọi access token hết dùng được; client lấy token mới bằng
+  refresh token, vẫn còn hiệu lực. (Đổi định kỳ thì giữ khoá cũ ở đó một lúc để không ai nhận ra — xem
+  "Lấy mã nguồn và đặt secret".)
 - `AUTOXIDE_SECRET_KEY`: xoay như mục "Lấy mã nguồn và đặt secret" (giá trị mới, giá trị cũ vào
   `AUTOXIDE_SECRET_KEY_PREVIOUS`, `autoxide secrets reseal`). Bản backup lấy trước đó vẫn mở được bằng
   khoá cũ: xoá chúng, hay giữ chúng an toàn như chính khoá. Bộ đếm theo địa chỉ của người xem bắt đầu

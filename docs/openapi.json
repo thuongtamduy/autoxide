@@ -2476,6 +2476,135 @@
         ],
         "type": "object"
       },
+      "CatalogAttribute": {
+        "description": "An attribute products can have (origin, material, size of the box…).",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "data_type": {
+            "description": "`text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`.",
+            "type": "string"
+          },
+          "filterable": {
+            "description": "Offered as a storefront filter.",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legal_basis": {
+            "description": "Law the attribute comes from, for legally required label contents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogAttributeOption"
+            },
+            "type": "array"
+          },
+          "scale": {
+            "description": "Decimal places of a `decimal` attribute.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "data_type",
+          "scale",
+          "names",
+          "filterable",
+          "options",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "CatalogAttributeOption": {
+        "additionalProperties": false,
+        "description": "A choosable value of an `option` / `options` attribute.",
+        "properties": {
+          "code": {
+            "description": "1 to 64 lower-case letters, digits, `_` or `-`; unique in the attribute.",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Label per language, e.g. `{\"en\": \"Cotton\"}`.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "labels"
+        ],
+        "type": "object"
+      },
+      "CatalogAttributeOptions": {
+        "additionalProperties": false,
+        "description": "The whole set of options of an attribute.",
+        "properties": {
+          "options": {
+            "description": "Up to 500 options, in display order. Options are matched by `code`.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogAttributeOption"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "type": "object"
+      },
+      "CatalogAttributeValue": {
+        "additionalProperties": false,
+        "description": "A value of an attribute on a product.",
+        "properties": {
+          "attribute_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "value": {
+            "description": "By the attribute's type: text, a whole number, a decimal written as text (`\"12.5\"`),\n`true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "attribute_id",
+          "value"
+        ],
+        "type": "object"
+      },
       "CatalogCategory": {
         "description": "A category of the tenant's tree.",
         "properties": {
@@ -2526,6 +2655,82 @@
           "visible",
           "texts",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "CatalogCategoryAttribute": {
+        "additionalProperties": false,
+        "description": "An attribute of a category.",
+        "properties": {
+          "applies_to_descendants": {
+            "description": "Also for products of the subcategories.",
+            "type": "boolean"
+          },
+          "attribute_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "effective_from": {
+            "description": "The rule applies from this day (e.g. when a new labelling rule takes effect).",
+            "format": "date",
+            "type": "string"
+          },
+          "effective_to": {
+            "description": "The rule stops applying on this day.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_basis": {
+            "description": "Law the rule comes from.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required": {
+            "description": "Products in the category cannot go on sale without a value.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "attribute_id",
+          "effective_from"
+        ],
+        "type": "object"
+      },
+      "CatalogCategoryAttributes": {
+        "additionalProperties": false,
+        "description": "The whole set of attributes of a category.",
+        "properties": {
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogCategoryAttribute"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "attributes"
+        ],
+        "type": "object"
+      },
+      "CatalogCategoryRestrictions": {
+        "additionalProperties": false,
+        "description": "The restricted-goods rules linked to a category.",
+        "properties": {
+          "rule_codes": {
+            "description": "Rule codes of `GET /restriction-rules`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "rule_codes"
         ],
         "type": "object"
       },
@@ -2586,6 +2791,57 @@
         ],
         "type": "object"
       },
+      "CatalogCreateAttribute": {
+        "additionalProperties": false,
+        "description": "A new attribute.",
+        "properties": {
+          "code": {
+            "description": "1 to 64 lower-case letters, digits or `_`; unique in the tenant\n(`catalog.attribute_code_taken`).",
+            "example": "origin",
+            "type": "string"
+          },
+          "data_type": {
+            "description": "`text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`.",
+            "type": "string"
+          },
+          "filterable": {
+            "type": "boolean"
+          },
+          "legal_basis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Name per language.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "scale": {
+            "description": "Decimal places of a `decimal` attribute, 0 to 6. Default 0.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "data_type",
+          "names"
+        ],
+        "type": "object"
+      },
       "CatalogCreateCategory": {
         "additionalProperties": false,
         "description": "A new category.",
@@ -2623,6 +2879,47 @@
         },
         "required": [
           "texts"
+        ],
+        "type": "object"
+      },
+      "CatalogCreateDocument": {
+        "additionalProperties": false,
+        "description": "A new document.",
+        "properties": {
+          "document_type": {
+            "description": "A document type a rule requires, e.g. `alcohol_retail_licence`.",
+            "type": "string"
+          },
+          "expires_on": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file_key": {
+            "description": "Key of a scanned file already stored.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issued_by": {
+            "type": "string"
+          },
+          "issued_on": {
+            "format": "date",
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_type",
+          "number",
+          "issued_by",
+          "issued_on"
         ],
         "type": "object"
       },
@@ -3559,6 +3856,22 @@
         ],
         "type": "object"
       },
+      "CatalogProductAttributes": {
+        "additionalProperties": false,
+        "description": "The whole set of attribute values of a product.",
+        "properties": {
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogAttributeValue"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "attributes"
+        ],
+        "type": "object"
+      },
       "CatalogProductCategories": {
         "additionalProperties": false,
         "description": "The whole set of categories of a product.",
@@ -3574,6 +3887,76 @@
         },
         "required": [
           "category_ids"
+        ],
+        "type": "object"
+      },
+      "CatalogProductCount": {
+        "description": "A count of products.",
+        "properties": {
+          "count": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "key": {
+            "description": "A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,\n`missing_attributes`, `missing_documents`, `restricted`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "count"
+        ],
+        "type": "object"
+      },
+      "CatalogProductDocument": {
+        "description": "A licence or certificate of a conditional product.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "document_type": {
+            "example": "alcohol_retail_licence",
+            "type": "string"
+          },
+          "expires_on": {
+            "description": "The document is valid until the end of this day; `null`: no end.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file_key": {
+            "description": "Key of the scanned file in storage.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "issued_by": {
+            "type": "string"
+          },
+          "issued_on": {
+            "format": "date",
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "document_type",
+          "number",
+          "issued_by",
+          "issued_on",
+          "created_at"
         ],
         "type": "object"
       },
@@ -3707,6 +4090,71 @@
         ],
         "type": "object"
       },
+      "CatalogRestrictionRule": {
+        "description": "A rule of prohibited or conditional goods (shared data, read only).",
+        "properties": {
+          "code": {
+            "example": "alcohol",
+            "type": "string"
+          },
+          "effective_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "effective_to": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "jurisdiction": {
+            "example": "VN",
+            "type": "string"
+          },
+          "legal_basis": {
+            "type": "string"
+          },
+          "level": {
+            "description": "`prohibited` or `conditional`.",
+            "type": "string"
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "pack_version": {
+            "type": "string"
+          },
+          "required_documents": {
+            "description": "Document types a conditional product needs, valid on the day.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "source_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jurisdiction",
+          "code",
+          "level",
+          "names",
+          "required_documents",
+          "legal_basis",
+          "source_url",
+          "effective_from",
+          "pack_version"
+        ],
+        "type": "object"
+      },
       "CatalogSaleMode": {
         "description": "How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),\n`preorder` (before it arrives, see `preorder_available_on`).",
         "enum": [
@@ -3737,6 +4185,52 @@
         },
         "required": [
           "status"
+        ],
+        "type": "object"
+      },
+      "CatalogStoredAttributeValue": {
+        "description": "A stored attribute value (decimals are stored scaled by the attribute's `scale`).",
+        "properties": {
+          "attribute_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "option_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value_boolean": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "value_date": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value_integer": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "value_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "attribute_id"
         ],
         "type": "object"
       },
@@ -3806,6 +4300,11 @@
           "name": {
             "type": "string"
           },
+          "path": {
+            "description": "Public address of the product in this language, computed by the server:\n`/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`, without a language prefix.",
+            "example": "/products/cotton-t-shirt",
+            "type": "string"
+          },
           "short_description": {
             "type": "string"
           },
@@ -3817,9 +4316,47 @@
           "locale",
           "name",
           "slug",
+          "path",
           "short_description",
           "description"
         ],
+        "type": "object"
+      },
+      "CatalogUpdateAttribute": {
+        "additionalProperties": false,
+        "description": "Changes to an attribute; its code and type cannot change.",
+        "properties": {
+          "filterable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "legal_basis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "CatalogUpdateCategory": {
@@ -10625,6 +11162,70 @@
         ],
         "type": "object"
       },
+      "CreateSupportRoutingRuleRequest": {
+        "additionalProperties": false,
+        "description": "A new routing rule.",
+        "properties": {
+          "category": {
+            "description": "Only tickets of this category; omitted: any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupportChannel",
+                "description": "Only tickets from this channel; omitted: any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "position": {
+            "description": "Order among the unit's rules (lower first).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "team_id": {
+            "description": "A team of the unit or of a unit above it.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "team_id"
+        ],
+        "type": "object"
+      },
+      "CreateSupportTeamRequest": {
+        "additionalProperties": false,
+        "description": "A new team.",
+        "properties": {
+          "name": {
+            "description": "1 to 100 characters; unique in the unit.",
+            "example": "Orders",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Unit of the team.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "name"
+        ],
+        "type": "object"
+      },
       "CreateSupportTicketRequest": {
         "additionalProperties": false,
         "description": "A ticket staff open for a customer (a phone call, a visit…).",
@@ -12639,6 +13240,83 @@
         ],
         "type": "object"
       },
+      "Data_CatalogAttribute": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An attribute products can have (origin, material, size of the box…).",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "data_type": {
+                "description": "`text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`.",
+                "type": "string"
+              },
+              "filterable": {
+                "description": "Offered as a storefront filter.",
+                "type": "boolean"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "legal_basis": {
+                "description": "Law the attribute comes from, for legally required label contents.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "names": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "options": {
+                "items": {
+                  "$ref": "#/components/schemas/CatalogAttributeOption"
+                },
+                "type": "array"
+              },
+              "scale": {
+                "description": "Decimal places of a `decimal` attribute.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "data_type",
+              "scale",
+              "names",
+              "filterable",
+              "options",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CatalogCategory": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -12692,6 +13370,32 @@
               "visible",
               "texts",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogCategoryRestrictions": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "The restricted-goods rules linked to a category.",
+            "properties": {
+              "rule_codes": {
+                "description": "Rule codes of `GET /restriction-rules`.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "rule_codes"
             ],
             "type": "object"
           }
@@ -12992,6 +13696,66 @@
               "media",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogProductDocument": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A licence or certificate of a conditional product.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "document_type": {
+                "example": "alcohol_retail_licence",
+                "type": "string"
+              },
+              "expires_on": {
+                "description": "The document is valid until the end of this day; `null`: no end.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "file_key": {
+                "description": "Key of the scanned file in storage.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "issued_by": {
+                "type": "string"
+              },
+              "issued_on": {
+                "format": "date",
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "document_type",
+              "number",
+              "issued_by",
+              "issued_on",
+              "created_at"
             ],
             "type": "object"
           }
@@ -18089,6 +18853,137 @@
             "required": [
               "accepted",
               "dropped"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventoryAdjustment": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A stock adjustment with the ledger lines it wrote.",
+            "properties": {
+              "actor_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "movements": {
+                "items": {
+                  "$ref": "#/components/schemas/InventoryMovement"
+                },
+                "type": "array"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "reference",
+              "created_at",
+              "movements"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventoryLevel": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The stock of one variant in one warehouse or store.",
+            "properties": {
+              "available": {
+                "description": "Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that\nmay be sold out of stock is oversold.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "average_cost": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money",
+                    "description": "Weighted average unit cost of the stock; `null` until goods with a cost come in."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "incoming": {
+                "description": "Units on the way (transfers in transit, purchase orders).",
+                "format": "int64",
+                "type": "integer"
+              },
+              "on_hand": {
+                "description": "Units physically in the warehouse: the sum of the movement ledger.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "org_id": {
+                "description": "The warehouse or store (organization unit).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "reorder_point": {
+                "description": "`inventory.low_stock` fires when `available` falls to this or below; `null`: never.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "reserved": {
+                "description": "Units held for orders not shipped yet.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "variant_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "variant_id",
+              "on_hand",
+              "available",
+              "reserved",
+              "incoming",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -26060,6 +26955,163 @@
         ],
         "type": "object"
       },
+      "Data_SupportRoutingRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A routing rule: new tickets of the unit (and the units below) that match go to the team.",
+            "properties": {
+              "category": {
+                "description": "Only tickets of this category; empty: any.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "channel": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SupportChannel",
+                    "description": "Only tickets from this channel; empty: any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "position": {
+                "description": "Rules of one unit are tried in this order; rules of nearer units first.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "team_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "team_id",
+              "position"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_SupportTeam": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A support team of an organization unit; it covers tickets of the unit and the units below.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "name",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_SupportTeamDetail": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SupportTeam"
+              },
+              {
+                "properties": {
+                  "members": {
+                    "items": {
+                      "$ref": "#/components/schemas/SupportTeamMember"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "members"
+                ],
+                "type": "object"
+              }
+            ],
+            "description": "A team with its members."
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_SupportTeamMember": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A member of a support team.",
+            "properties": {
+              "accepting": {
+                "description": "Takes new tickets in round-robin assignment.",
+                "type": "boolean"
+              },
+              "last_assigned_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "user_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "user_id",
+              "accepting"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_SupportTicket": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28438,6 +29490,86 @@
         ],
         "type": "object"
       },
+      "Data_Vec_CatalogAttribute": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "An attribute products can have (origin, material, size of the box…).",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "data_type": {
+                  "description": "`text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`.",
+                  "type": "string"
+                },
+                "filterable": {
+                  "description": "Offered as a storefront filter.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "legal_basis": {
+                  "description": "Law the attribute comes from, for legally required label contents.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "names": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "options": {
+                  "items": {
+                    "$ref": "#/components/schemas/CatalogAttributeOption"
+                  },
+                  "type": "array"
+                },
+                "scale": {
+                  "description": "Decimal places of a `decimal` attribute.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "data_type",
+                "scale",
+                "names",
+                "filterable",
+                "options",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_CatalogCategory": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28503,6 +29635,61 @@
         ],
         "type": "object"
       },
+      "Data_Vec_CatalogCategoryAttribute": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "description": "An attribute of a category.",
+              "properties": {
+                "applies_to_descendants": {
+                  "description": "Also for products of the subcategories.",
+                  "type": "boolean"
+                },
+                "attribute_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "effective_from": {
+                  "description": "The rule applies from this day (e.g. when a new labelling rule takes effect).",
+                  "format": "date",
+                  "type": "string"
+                },
+                "effective_to": {
+                  "description": "The rule stops applying on this day.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "legal_basis": {
+                  "description": "Law the rule comes from.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "required": {
+                  "description": "Products in the category cannot go on sale without a value.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "attribute_id",
+                "effective_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_CatalogComponent": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28524,6 +29711,235 @@
               "required": [
                 "variant_id",
                 "quantity"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogProductCount": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A count of products.",
+              "properties": {
+                "count": {
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "key": {
+                  "description": "A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,\n`missing_attributes`, `missing_documents`, `restricted`).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "count"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogProductDocument": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A licence or certificate of a conditional product.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "document_type": {
+                  "example": "alcohol_retail_licence",
+                  "type": "string"
+                },
+                "expires_on": {
+                  "description": "The document is valid until the end of this day; `null`: no end.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "file_key": {
+                  "description": "Key of the scanned file in storage.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "issued_by": {
+                  "type": "string"
+                },
+                "issued_on": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "number": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "document_type",
+                "number",
+                "issued_by",
+                "issued_on",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogRestrictionRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A rule of prohibited or conditional goods (shared data, read only).",
+              "properties": {
+                "code": {
+                  "example": "alcohol",
+                  "type": "string"
+                },
+                "effective_from": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "effective_to": {
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "jurisdiction": {
+                  "example": "VN",
+                  "type": "string"
+                },
+                "legal_basis": {
+                  "type": "string"
+                },
+                "level": {
+                  "description": "`prohibited` or `conditional`.",
+                  "type": "string"
+                },
+                "names": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "pack_version": {
+                  "type": "string"
+                },
+                "required_documents": {
+                  "description": "Document types a conditional product needs, valid on the day.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "source_url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "jurisdiction",
+                "code",
+                "level",
+                "names",
+                "required_documents",
+                "legal_basis",
+                "source_url",
+                "effective_from",
+                "pack_version"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogStoredAttributeValue": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A stored attribute value (decimals are stored scaled by the attribute's `scale`).",
+              "properties": {
+                "attribute_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "option_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value_boolean": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "value_date": {
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value_integer": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "value_text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "attribute_id"
               ],
               "type": "object"
             },
@@ -32671,6 +34087,65 @@
         ],
         "type": "object"
       },
+      "Data_Vec_SupportRoutingRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A routing rule: new tickets of the unit (and the units below) that match go to the team.",
+              "properties": {
+                "category": {
+                  "description": "Only tickets of this category; empty: any.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "channel": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SupportChannel",
+                      "description": "Only tickets from this channel; empty: any."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "position": {
+                  "description": "Rules of one unit are tried in this order; rules of nearer units first.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "team_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "team_id",
+                "position"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_TagRef": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -36088,6 +37563,297 @@
         "required": [
           "accepted",
           "dropped"
+        ],
+        "type": "object"
+      },
+      "InventoryAdjustment": {
+        "description": "A stock adjustment with the ledger lines it wrote.",
+        "properties": {
+          "actor_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "movements": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryMovement"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "reference",
+          "created_at",
+          "movements"
+        ],
+        "type": "object"
+      },
+      "InventoryAdjustmentLine": {
+        "additionalProperties": false,
+        "description": "One line of a stock adjustment.",
+        "properties": {
+          "note": {
+            "description": "Up to 500 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "description": "Units to add (positive) or remove (negative); not 0.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason_code": {
+            "description": "Code from the reason list `inventory.adjustment` (see\n`GET /api/v1/kernel/reasons/inventory.adjustment`), e.g. `damaged`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_cost": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Unit cost of the units added (e.g. opening stock); updates the average cost. Only with a\npositive quantity."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "InventoryAdjustmentRequest": {
+        "additionalProperties": false,
+        "description": "A stock adjustment to make in one warehouse.",
+        "properties": {
+          "lines": {
+            "description": "1 to 500 lines.",
+            "items": {
+              "$ref": "#/components/schemas/InventoryAdjustmentLine"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The warehouse or store.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your id of this adjustment (1 to 100 visible ASCII characters). Sending the same\nreference and content again returns the adjustment already made.",
+            "example": "ADJ-2026-0042",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InventoryLevel": {
+        "description": "The stock of one variant in one warehouse or store.",
+        "properties": {
+          "available": {
+            "description": "Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that\nmay be sold out of stock is oversold.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "average_cost": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Weighted average unit cost of the stock; `null` until goods with a cost come in."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "incoming": {
+            "description": "Units on the way (transfers in transit, purchase orders).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "on_hand": {
+            "description": "Units physically in the warehouse: the sum of the movement ledger.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "org_id": {
+            "description": "The warehouse or store (organization unit).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reorder_point": {
+            "description": "`inventory.low_stock` fires when `available` falls to this or below; `null`: never.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reserved": {
+            "description": "Units held for orders not shipped yet.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "variant_id",
+          "on_hand",
+          "available",
+          "reserved",
+          "incoming",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "InventoryLevelUpdate": {
+        "additionalProperties": false,
+        "description": "Settings of a stock level.",
+        "properties": {
+          "reorder_point": {
+            "description": "Reorder point, 0 to 1 000 000; `null` turns low-stock alerts off.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "InventoryMovement": {
+        "description": "One line of the stock movement ledger. Lines are only ever added.",
+        "properties": {
+          "actor_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,\n`expiry` or `supplier_return`.",
+            "type": "string"
+          },
+          "level_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Signed: positive came in, negative went out.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason_code": {
+            "description": "Code from the reason list `inventory.adjustment`, for adjustments and counts.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "source_type": {
+            "description": "What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`…",
+            "type": "string"
+          },
+          "unit_cost": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "level_id",
+          "org_id",
+          "variant_id",
+          "kind",
+          "quantity",
+          "note",
+          "source_type",
+          "source_id",
+          "created_at"
         ],
         "type": "object"
       },
@@ -47246,6 +49012,201 @@
         ],
         "type": "object"
       },
+      "Page_InventoryLevel": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "The stock of one variant in one warehouse or store.",
+              "properties": {
+                "available": {
+                  "description": "Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that\nmay be sold out of stock is oversold.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "average_cost": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money",
+                      "description": "Weighted average unit cost of the stock; `null` until goods with a cost come in."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "incoming": {
+                  "description": "Units on the way (transfers in transit, purchase orders).",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "on_hand": {
+                  "description": "Units physically in the warehouse: the sum of the movement ledger.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "org_id": {
+                  "description": "The warehouse or store (organization unit).",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "reorder_point": {
+                  "description": "`inventory.low_stock` fires when `available` falls to this or below; `null`: never.",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "reserved": {
+                  "description": "Units held for orders not shipped yet.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "variant_id",
+                "on_hand",
+                "available",
+                "reserved",
+                "incoming",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventoryMovement": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "One line of the stock movement ledger. Lines are only ever added.",
+              "properties": {
+                "actor_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,\n`expiry` or `supplier_return`.",
+                  "type": "string"
+                },
+                "level_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lot_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "quantity": {
+                  "description": "Signed: positive came in, negative went out.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "reason_code": {
+                  "description": "Code from the reason list `inventory.adjustment`, for adjustments and counts.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "source_type": {
+                  "description": "What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`…",
+                  "type": "string"
+                },
+                "unit_cost": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "level_id",
+                "org_id",
+                "variant_id",
+                "kind",
+                "quantity",
+                "note",
+                "source_type",
+                "source_id",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_InvitationResponse": {
         "description": "One page of a list.",
         "properties": {
@@ -52098,6 +54059,50 @@
                 "subscriptions",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_SupportTeam": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A support team of an organization unit; it covers tickets of the unit and the units below.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "name",
+                "created_at"
               ],
               "type": "object"
             },
@@ -60795,6 +62800,20 @@
         ],
         "type": "object"
       },
+      "SetSupportTeamMemberRequest": {
+        "additionalProperties": false,
+        "description": "A member's setting.",
+        "properties": {
+          "accepting": {
+            "description": "Takes new tickets in round-robin assignment.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accepting"
+        ],
+        "type": "object"
+      },
       "SettingResponse": {
         "description": "A setting that units can set and the units below them inherit.",
         "properties": {
@@ -62729,6 +64748,127 @@
           "no_reply"
         ],
         "type": "string"
+      },
+      "SupportRoutingRule": {
+        "description": "A routing rule: new tickets of the unit (and the units below) that match go to the team.",
+        "properties": {
+          "category": {
+            "description": "Only tickets of this category; empty: any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupportChannel",
+                "description": "Only tickets from this channel; empty: any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "position": {
+            "description": "Rules of one unit are tried in this order; rules of nearer units first.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "team_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "team_id",
+          "position"
+        ],
+        "type": "object"
+      },
+      "SupportTeam": {
+        "description": "A support team of an organization unit; it covers tickets of the unit and the units below.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "name",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "SupportTeamDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SupportTeam"
+          },
+          {
+            "properties": {
+              "members": {
+                "items": {
+                  "$ref": "#/components/schemas/SupportTeamMember"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "members"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "A team with its members."
+      },
+      "SupportTeamMember": {
+        "description": "A member of a support team.",
+        "properties": {
+          "accepting": {
+            "description": "Takes new tickets in round-robin assignment.",
+            "type": "boolean"
+          },
+          "last_assigned_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "accepting"
+        ],
+        "type": "object"
       },
       "SupportTicket": {
         "description": "A support ticket.",
@@ -84460,6 +86600,467 @@
         ]
       }
     },
+    "/api/v1/catalog/attributes": {
+      "get": {
+        "description": "Requires `catalog.products.read`.",
+        "operationId": "catalog_list_catalog_attributes",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogAttribute"
+                }
+              }
+            },
+            "description": "Every attribute, by code."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List every attribute of the tenant.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `catalog.categories.manage` for the whole tenant.",
+        "operationId": "catalog_create_catalog_attribute",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCreateAttribute"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogAttribute"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Path of the attribute.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The code is used already; code `catalog.attribute_code_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`) or a language is not configured (`catalog.unsupported_locale`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an attribute.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/attributes/{id}": {
+      "patch": {
+        "description": "Requires `catalog.categories.manage`.",
+        "operationId": "catalog_update_catalog_attribute",
+        "parameters": [
+          {
+            "description": "Id of the attribute.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogUpdateAttribute"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogAttribute"
+                }
+              }
+            },
+            "description": "The attribute after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such attribute; code `catalog.attribute_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change an attribute.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/attributes/{id}/options": {
+      "put": {
+        "description": "Requires `catalog.categories.manage`. Removing an option products still use is refused.",
+        "operationId": "catalog_put_catalog_attribute_options",
+        "parameters": [
+          {
+            "description": "Id of the attribute.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogAttributeOptions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogAttribute"
+                }
+              }
+            },
+            "description": "The attribute after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such attribute; code `catalog.attribute_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Products still use a removed option; code `catalog.attribute_option_in_use`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the options of an `option` / `options` attribute.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
     "/api/v1/catalog/categories": {
       "get": {
         "description": "Requires `catalog.products.read`. Ordered by depth, then display order.",
@@ -84912,6 +87513,215 @@
         ]
       }
     },
+    "/api/v1/catalog/categories/{id}/attributes": {
+      "get": {
+        "description": "Requires `catalog.products.read`.",
+        "operationId": "catalog_get_catalog_category_attributes",
+        "parameters": [
+          {
+            "description": "Id of the category.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogCategoryAttribute"
+                }
+              }
+            },
+            "description": "The attributes of the category."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the attributes of a category.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "put": {
+        "description": "Requires `catalog.categories.manage`. The readiness of every product in the category and its\nsubcategories is computed again.",
+        "operationId": "catalog_put_catalog_category_attributes",
+        "parameters": [
+          {
+            "description": "Id of the category.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCategoryAttributes"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogCategoryAttribute"
+                }
+              }
+            },
+            "description": "The attributes of the category."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such category (`catalog.category_not_found`) or attribute (`catalog.attribute_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the attributes of a category.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
     "/api/v1/catalog/categories/{id}/move": {
       "post": {
         "description": "Requires `catalog.categories.manage`. A category cannot move under itself or its own\nsubcategories.",
@@ -85041,6 +87851,205 @@
           }
         ],
         "summary": "Move a category with everything below it.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/categories/{id}/restrictions": {
+      "get": {
+        "description": "Requires `catalog.products.read`.",
+        "operationId": "catalog_get_catalog_category_restrictions",
+        "parameters": [
+          {
+            "description": "Id of the category.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogCategoryRestrictions"
+                }
+              }
+            },
+            "description": "The rule codes."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the restricted-goods rules of a category.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "put": {
+        "description": "Requires `catalog.categories.manage`. Products of a category with a `prohibited` rule cannot go\non sale; with a `conditional` rule they need valid documents. Readiness of the products in the\ncategory and below is computed again.",
+        "operationId": "catalog_put_catalog_category_restrictions",
+        "parameters": [
+          {
+            "description": "Id of the category.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCategoryRestrictions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogCategoryRestrictions"
+                }
+              }
+            },
+            "description": "The rule codes."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such category (`catalog.category_not_found`) or rule (`catalog.restriction_rule_not_found`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Link restricted-goods rules to a category.",
         "tags": [
           "catalog"
         ],
@@ -86521,6 +89530,102 @@
         ]
       }
     },
+    "/api/v1/catalog/products/counts": {
+      "get": {
+        "description": "Requires `catalog.products.read`. Every key is listed, with 0 when there is no product.",
+        "operationId": "catalog_count_catalog_products",
+        "parameters": [
+          {
+            "description": "`status` (default) or `readiness`.",
+            "in": "query",
+            "name": "group_by",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogProductCount"
+                }
+              }
+            },
+            "description": "One count per key."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`group_by` is not `status` or `readiness`; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Count the products in your scope by status or readiness.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      }
+    },
     "/api/v1/catalog/products/{id}": {
       "delete": {
         "description": "Requires `catalog.products.write` covering the product. A product that was on sale once can\nonly be archived (`POST /products/{id}/status`).",
@@ -86886,6 +89991,225 @@
         ]
       }
     },
+    "/api/v1/catalog/products/{id}/attributes": {
+      "get": {
+        "description": "Requires `catalog.products.read` covering the product.",
+        "operationId": "catalog_get_catalog_product_attributes",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogStoredAttributeValue"
+                }
+              }
+            },
+            "description": "The values."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No product with this id in your scope; code `catalog.product_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the attribute values of a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "put": {
+        "description": "Requires `catalog.products.write` covering the product. The product's readiness is computed\nagain.",
+        "operationId": "catalog_put_catalog_product_attributes",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogProductAttributes"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogStoredAttributeValue"
+                }
+              }
+            },
+            "description": "The values."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.write`, or it does not cover this product; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such product in your scope (`catalog.product_not_found`) or attribute (`catalog.attribute_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value does not fit its attribute; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the attribute values of a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.write"
+        ]
+      }
+    },
     "/api/v1/catalog/products/{id}/categories": {
       "put": {
         "description": "Requires `catalog.products.write` covering the product.",
@@ -87010,6 +90334,343 @@
         ],
         "x-permissions": [
           "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/products/{id}/documents": {
+      "get": {
+        "description": "Requires `catalog.documents.manage` covering the product.",
+        "operationId": "catalog_list_catalog_product_documents",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogProductDocument"
+                }
+              }
+            },
+            "description": "The documents."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.documents.manage`, or it does not cover the product; codes `permission_denied`, `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No product with this id in your scope; code `catalog.product_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the documents of a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.documents.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `catalog.documents.manage` covering the product. The product's readiness is computed\nagain.",
+        "operationId": "catalog_add_catalog_product_document",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCreateDocument"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogProductDocument"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Path of the document.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.documents.manage`, or it does not cover the product; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No product with this id in your scope; code `catalog.product_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a document to a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.documents.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/products/{id}/documents/{document_id}": {
+      "delete": {
+        "description": "Requires `catalog.documents.manage` covering the product.",
+        "operationId": "catalog_delete_catalog_product_document",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the document.",
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.documents.manage`, or it does not cover the product; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such product (`catalog.product_not_found`) or document (`catalog.document_not_found`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a document from a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.documents.manage"
         ]
       }
     },
@@ -87856,6 +91517,80 @@
         ],
         "x-permissions": [
           "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/restriction-rules": {
+      "get": {
+        "description": "Requires `catalog.products.read`. Loaded by the operator with `autoxide task\ncatalog.load_restrictions`; check the legal basis of each rule against the source text.",
+        "operationId": "catalog_list_catalog_restriction_rules",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogRestrictionRule"
+                }
+              }
+            },
+            "description": "Every rule."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the rules of prohibited and conditional goods.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
         ]
       }
     },
@@ -114337,6 +118072,919 @@
         ],
         "x-permissions": [
           "forms.export"
+        ]
+      }
+    },
+    "/api/v1/inventory/adjustments": {
+      "post": {
+        "description": "Requires `inventory.adjust` covering the warehouse. Every line needs a `reason_code` from the\ntenant's reason list `inventory.adjustment`. On hand never goes below 0. Send the same\n`reference` and content again to get the adjustment already made (`200`).",
+        "operationId": "inventory_create_inventory_adjustment",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryAdjustmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryAdjustment"
+                }
+              }
+            },
+            "description": "The adjustment was made before with this `reference` and content."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryAdjustment"
+                }
+              }
+            },
+            "description": "The adjustment.",
+            "headers": {
+              "Location": {
+                "description": "Path of the adjustment.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.adjust` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`), or the plan does not allow another warehouse (`feature_not_enabled`, `limit_exceeded`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A variant does not exist; code `inventory.variant_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "On hand would go below 0; code `inventory.insufficient_stock`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A line has no reason (`inventory.reason_required`) or an unknown one (`kernel.reason_unknown`), the unit holds no stock (`inventory.not_a_warehouse`), the variant tracks no stock (`inventory.not_tracked`), the cost currency differs (`inventory.currency_mismatch`), the reference was used for other content (`reference_reused`), or a value is invalid."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Adjust stock in one warehouse, each line with a reason.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.adjust"
+        ]
+      }
+    },
+    "/api/v1/inventory/adjustments/{id}": {
+      "get": {
+        "description": "Requires `inventory.read` covering the warehouse; an adjustment outside your scope answers\n404.",
+        "operationId": "inventory_get_inventory_adjustment",
+        "parameters": [
+          {
+            "description": "Id of the adjustment.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryAdjustment"
+                }
+              }
+            },
+            "description": "The adjustment."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No adjustment with this id in your scope; code `inventory.adjustment_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a stock adjustment with the ledger lines it wrote.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/levels": {
+      "get": {
+        "description": "Requires `inventory.read`; its scope decides which warehouses you see.",
+        "operationId": "inventory_list_inventory_levels",
+        "parameters": [
+          {
+            "description": "Only this warehouse or store.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only this variant.",
+            "in": "query",
+            "name": "variant_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "`true`: only levels whose available stock is at or below their reorder point.",
+            "in": "query",
+            "name": "below_reorder",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryLevel"
+                }
+              }
+            },
+            "description": "One page of stock levels."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List stock levels (variant × warehouse) in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only this warehouse or store.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this variant.",
+            "kind": "uuid",
+            "name": "variant_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only levels whose available stock is at or below their reorder point.",
+            "kind": "boolean",
+            "name": "below_reorder",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_levels",
+        "x-permissions": [
+          "inventory.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/levels/{id}": {
+      "get": {
+        "description": "Requires `inventory.read` covering the warehouse; a level outside your scope answers 404.",
+        "operationId": "inventory_get_inventory_level",
+        "parameters": [
+          {
+            "description": "Id of the stock level.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryLevel"
+                }
+              }
+            },
+            "description": "The stock level."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No stock level with this id in your scope; code `inventory.level_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one stock level.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `inventory.settings.manage` covering the warehouse. `inventory.low_stock` fires\nwhen the available stock falls from above the reorder point to it or below.",
+        "operationId": "inventory_update_inventory_level",
+        "parameters": [
+          {
+            "description": "Id of the stock level.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryLevelUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryLevel"
+                }
+              }
+            },
+            "description": "The stock level."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No stock level with this id in your scope; code `inventory.level_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The reorder point is out of range; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change the reorder point of a stock level.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/movements": {
+      "get": {
+        "description": "Requires `inventory.read`. Newest first unless `order=asc`. The ledger is append-only: each\nreceipt, sale, return, adjustment, count, transfer or expiry adds lines and never changes\nthem.",
+        "operationId": "inventory_list_inventory_movements",
+        "parameters": [
+          {
+            "description": "Only this warehouse or store.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only this variant.",
+            "in": "query",
+            "name": "variant_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only this kind of line.",
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "description": "Kind of a movement ledger line.",
+                  "enum": [
+                    "receipt",
+                    "sale",
+                    "return",
+                    "adjustment",
+                    "count",
+                    "transfer_out",
+                    "transfer_in",
+                    "expiry",
+                    "supplier_return"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "description": "Lines written at or after this time.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Lines written before this time.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryMovement"
+                }
+              }
+            },
+            "description": "One page of ledger lines."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the stock movement ledger in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only this warehouse or store.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this variant.",
+            "kind": "uuid",
+            "name": "variant_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this kind of line.",
+            "kind": "string",
+            "name": "kind",
+            "operator": "eq",
+            "values": [
+              "receipt",
+              "sale",
+              "return",
+              "adjustment",
+              "count",
+              "transfer_out",
+              "transfer_in",
+              "expiry",
+              "supplier_return"
+            ]
+          },
+          {
+            "description": "Lines written at or after this time.",
+            "kind": "date-time",
+            "name": "from",
+            "operator": "eq"
+          },
+          {
+            "description": "Lines written before this time.",
+            "kind": "date-time",
+            "name": "to",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_movements",
+        "x-permissions": [
+          "inventory.read"
         ]
       }
     },
@@ -159996,6 +164644,1001 @@
           "support"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/support/routing-rules": {
+      "get": {
+        "description": "Requires `support.settings.manage` at the unit. Rules of the units above apply too when none of\nthe unit's own rules match.",
+        "operationId": "support_list_support_routing_rules",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_SupportRoutingRule"
+                }
+              }
+            },
+            "description": "The rules, in order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the unit (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the routing rules of a unit.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `support.settings.manage` at the unit. A new ticket goes to the team of the first\nmatching rule, and round-robin to a team member who takes tickets and can answer them.",
+        "operationId": "support_create_support_routing_rule",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupportRoutingRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportRoutingRule"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or not active (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown category or team; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a routing rule.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/support/routing-rules/{id}": {
+      "delete": {
+        "description": "Requires `support.settings.manage` at the rule's unit.",
+        "operationId": "support_delete_support_routing_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the rule (`org_out_of_scope`, `org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule with this id; code `support.rule_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a routing rule.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/support/teams": {
+      "get": {
+        "description": "Requires `support.settings.manage` or `support.tickets.reply`; you see the teams of the units in\nyour scope.",
+        "operationId": "support_list_support_teams",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SupportTeam"
+                }
+              }
+            },
+            "description": "One page of teams."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.tickets.reply`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List support teams in your scope.",
+        "tags": [
+          "support"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "support.list_support_teams",
+        "x-permissions": [
+          "support.tickets.reply"
+        ]
+      },
+      "post": {
+        "description": "Requires `support.settings.manage` at the unit.",
+        "operationId": "support_create_support_team",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupportTeamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportTeam"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or not active (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit has a team with this name; code `support.team_name_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a support team.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/support/teams/{id}": {
+      "delete": {
+        "description": "Requires `support.settings.manage` at the team's unit. Its members and routing rules go too;\ntickets of the team keep their assignee but lose the team.",
+        "operationId": "support_delete_support_team",
+        "parameters": [
+          {
+            "description": "Id of the team.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the team (`org_out_of_scope`, `org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No team with this id; code `support.team_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a support team.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `support.settings.manage` or `support.tickets.reply` covering the team's unit.",
+        "operationId": "support_get_support_team",
+        "parameters": [
+          {
+            "description": "Id of the team.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportTeamDetail"
+                }
+              }
+            },
+            "description": "The team."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.tickets.reply`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No team with this id in your scope; code `support.team_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a support team with its members.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.tickets.reply"
+        ]
+      }
+    },
+    "/api/v1/support/teams/{id}/members/{user_id}": {
+      "delete": {
+        "description": "Requires `support.settings.manage` at the team's unit.",
+        "operationId": "support_remove_support_team_member",
+        "parameters": [
+          {
+            "description": "Id of the team.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The member.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed (or was not a member)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the team (`org_out_of_scope`, `org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No team with this id in your scope; code `support.team_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a member from a support team.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `support.settings.manage` at the team's unit; a member may also switch `accepting` for\nthemselves. A new member must be able to answer tickets of the unit\n(`support.assignee_out_of_scope` otherwise).",
+        "operationId": "support_set_support_team_member",
+        "parameters": [
+          {
+            "description": "Id of the team.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The member.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSupportTeamMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SupportTeamMember"
+                }
+              }
+            },
+            "description": "The member."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `support.settings.manage` (`permission_denied`), or it does not cover the team (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No team with this id in your scope; code `support.team_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The user cannot answer tickets of this unit; code `support.assignee_out_of_scope`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a member to a support team, or change whether they take new tickets.",
+        "tags": [
+          "support"
+        ],
+        "x-permissions": [
+          "support.settings.manage"
+        ]
       }
     },
     "/api/v1/support/tickets": {

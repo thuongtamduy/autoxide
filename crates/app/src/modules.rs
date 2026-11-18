@@ -83,6 +83,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // người tiêu dùng), nên đứng sau `media` và `tax`; đứng sau `comments` để hỏi đáp sản phẩm
         // (D-202). Module thương mại sau (`inventory`, `promotions`, `shipping`…) đăng ký SAU nó.
         Box::new(autoxide_catalog::module()),
+        // Kho (bước 42): cần `dyn Catalog` (biến thể, combo, chế độ bán) nên đứng sau `catalog`;
+        // dùng `dyn OrgDirectory` (loại nút) và `dyn Ledger` (công nợ nhà cung cấp) nếu có. `orders`
+        // (bước 45) giữ chỗ qua `dyn Inventory`, nên đăng ký SAU nó.
+        Box::new(autoxide_inventory::module()),
         // Khuyến mại (bước 43): cần `dyn Catalog` (biến thể, giá ngay trước khuyến mại, sàn giá),
         // nên đứng sau `catalog`; đọc cài đặt kế thừa qua `dyn OrgDirectory` nếu có. `orders`
         // (bước 45) đăng ký SAU nó để gọi `dyn Promotions`.
@@ -234,7 +238,7 @@ mod tests {
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
-            // Mỗi lịch (của `kernel` — dọn bản xuất, dọn file của job —, `ai`, `auth`, `idempotency`, `webhooks`, hai của `files` (dọn mồ côi, dọn lượt tải thẳng bỏ dở), sáu của `plans`, một
+            // Mỗi lịch (của `kernel` — dọn bản xuất, dọn file của job, backup theo lịch (bước 39) —, `ai`, `auth`, `idempotency`, `webhooks`, hai của `files` (dọn mồ côi, dọn lượt tải thẳng bỏ dở), sáu của `plans`, một
             // của `tax`, sáu của `ledger` (niêm phong, hết hạn thanh toán, đối soát, nhả tạm giữ, kiểm chi trả, đọc biến động ngân hàng), hai của `invoices` (hỏi trạng thái hoá đơn điện tử, dọn chứng từ hết hạn lưu), năm của
             // `compliance` (hết hạn định danh, nhắc hạn sự cố 72 giờ, dọn bằng chứng đồng ý cookie, nhắc vụ việc quá
             // hạn — D-360, D-361, D-363;
@@ -242,10 +246,10 @@ mod tests {
             // của `notifications` (dọn nhật ký gửi), một của `bookings` (trả chỗ giữ tạm quá hạn), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
             // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `analytics` (gộp mỗi giờ,
-            // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58), ba
-            // của `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher — bước 43))
-            // đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 48);
+            // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
+            // một của `catalog` (tính lại readiness theo giấy tờ — bước 41), ba của `promotions` (chuyển
+            // trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher — bước 43)) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 50);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

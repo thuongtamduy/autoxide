@@ -32,6 +32,7 @@ autoxide-analytics.workspace = true
 autoxide-compliance.workspace = true
 autoxide-notifications.workspace = true
 autoxide-catalog.workspace = true
+autoxide-inventory.workspace = true
 autoxide-promotions.workspace = true
 autoxide-support.workspace = true
 autoxide-bookings.workspace = true

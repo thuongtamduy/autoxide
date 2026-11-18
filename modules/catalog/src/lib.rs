@@ -4,6 +4,7 @@
 //! Đặc tả: `docs/steps/41-catalog.md`.
 
 pub mod api;
+mod attributes;
 mod categories;
 mod config;
 mod entity;
@@ -16,6 +17,8 @@ mod permissions;
 mod pricing;
 mod products;
 mod readiness;
+mod restrictions;
+mod rules_pack;
 mod service;
 mod snapshots;
 mod tools;
@@ -32,6 +35,7 @@ use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::entitlement::{Feature, Limit};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{EventInfo, Subscription};
+use autoxide_kernel::job::{JobRegistration, Schedule};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
@@ -103,11 +107,36 @@ impl Module for CatalogModule {
             media,
             tax,
             config,
+            context.tenancy(),
         ));
         context.usage_counter(&service::PRODUCTS_LIMIT, Arc::new(service::ProductCounter))?;
         self.service = Some(service.clone());
         // `Arc<CatalogService>` tự đổi thành `Arc<dyn Catalog>`: module khác chỉ thấy trait.
         context.provide::<dyn api::Catalog>(service)
+    }
+
+    fn control_plane_tables(&self) -> Vec<&'static str> {
+        // Quy tắc hàng cấm / có điều kiện: dữ liệu luật dùng chung mọi khách (D-198).
+        vec!["catalog_restriction_rules"]
+    }
+
+    fn jobs(&self) -> Vec<JobRegistration> {
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![JobRegistration::new(
+                rules_pack::REFRESH_DOCUMENTS,
+                Arc::new(rules_pack::RefreshDocuments(service)),
+            )]
+        })
+    }
+
+    fn schedules(&self) -> Vec<Schedule> {
+        // Giấy tờ hết hạn theo ngày: tính lại `readiness` mỗi ngày.
+        let day = std::time::Duration::from_secs(24 * 3600);
+        vec![Schedule::new(rules_pack::REFRESH_DOCUMENTS, rules_pack::REFRESH_DOCUMENTS, day)]
+    }
+
+    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
+        self.service.clone().map_or_else(Vec::new, |service| vec![rules_pack::task(service)])
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {

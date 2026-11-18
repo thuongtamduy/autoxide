@@ -353,6 +353,8 @@ mod tests {
             for expected in [
                 ("migrations", "ok"),
                 ("secret_key", "warning"),
+                // Bản cài mới chưa có bản backup theo lịch nào (bước 39).
+                ("kernel.backup_age", "warning"),
                 ("auth.administrator", "warning"),
                 // Chưa đặt khoá ký access token: máy chủ tự sinh khoá mỗi lần khởi động.
                 ("auth.token_secret", "warning"),
@@ -376,7 +378,7 @@ mod tests {
             assert!(text.contains("→ Run `autoxide user create"), "{text}");
             assert!(text.contains("→ Set AUTOXIDE_AUTH_TOKEN_SECRET"), "{text}");
             assert!(
-                text.ends_with("No failed checks; 8 warning(s) to look at before going live.\n"),
+                text.ends_with("No failed checks; 9 warning(s) to look at before going live.\n"),
                 "{text}"
             );
             let _ = std::fs::remove_dir_all(dir);
