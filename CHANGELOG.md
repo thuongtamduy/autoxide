@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Custom fields (step 51): modules let tenants add their own fields to a record type
+  (`Module::custom_field_targets`); `/api/v1/kernel/custom-fields` defines them (`kernel.custom_fields.manage`;
+  14 types, labels and help by language, required, options, ranges, default, visibility, filterable). Values live
+  on the record (`custom_fields`), checked by `CustomFields::validate` with every problem at once; filterable
+  fields are indexed in the same transaction and lists filter on `cf.<key>=<eq|in|gte|lte|prefix>:<value>`.
+  Posts and pages take custom fields.
 - Step 37, mobile push (`docs/NOTIFICATIONS.md`): `GET /api/v1/notifications/me/device-tokens` lists your registered
   devices (tokens are stored encrypted and never returned) and the MCP tool `notifications.list_my_devices`; a device token
   the provider rejects is removed at once, one that fails 10 times in a row too, and one failing device no longer blocks the

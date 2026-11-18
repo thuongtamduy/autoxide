@@ -343,6 +343,7 @@ pub(crate) fn fields_of(snapshot: Snapshot) -> EntryFields {
         meta_description: Some(snapshot.meta_description),
         og_media_id: Some(snapshot.og_media_id),
         canonical_url: Some(snapshot.canonical_url),
+        custom_fields: None,
         noindex: Some(snapshot.noindex),
         ai_generated: Some(snapshot.ai_generated),
         // Khôi phục bản cũ không bỏ nhãn AI: nội dung hiện tại có thể đã dùng gợi ý (D-362).

@@ -246,6 +246,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::tags::CreateTags),
             // Câu chữ khách đổi (bước 51 P21).
             Box::new(crate::ops::texts::CreateTextOverrides),
+            // Trường tự định nghĩa (bước 51 P19).
+            Box::new(crate::ops::custom_fields::CreateCustomFields),
         ]
     }
 
@@ -318,6 +320,7 @@ impl Module for KernelModule {
             crate::ops::reasons::REASONS_MANAGE,
             crate::ops::tags::TAGS_MANAGE,
             crate::ops::texts::TEXTS_MANAGE,
+            crate::ops::custom_fields::CUSTOM_FIELDS_MANAGE,
             crate::job::runs::JOBS_MANAGE,
         ]
     }
@@ -372,6 +375,9 @@ impl Module for KernelModule {
                 crate::ops::approvals::ApprovalsState { outbox: outbox.clone() },
             ));
         }
+        routes = routes.merge(crate::ops::custom_fields::routes(
+            crate::ops::custom_fields::CustomFieldsState { fields: self.catalog.custom_fields() },
+        ));
         routes = routes.merge(crate::ops::texts::routes(crate::ops::texts::TextsState {
             overrides: self.catalog.text_overrides(),
             translations: self.translations.clone(),

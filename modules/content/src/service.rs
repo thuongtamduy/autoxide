@@ -45,6 +45,8 @@ pub(crate) struct ContentService {
     /// Sổ đối tượng của kernel: tên người sửa (`auth.user`) mà không phụ thuộc module `auth`
     /// (D-046). Rỗng (test dựng tay, app không có `auth`): không có tên.
     pub(crate) resources: autoxide_kernel::resource::ResourceDirectory,
+    /// Trường tự định nghĩa của khách (bước 51 P19). Không có loại nào khai: không nhận trường nào.
+    pub(crate) custom_fields: autoxide_kernel::custom_fields::CustomFields,
     /// Bộ dựng mẫu của kernel (D-351): điền biến của mẫu trang bắt buộc.
     pub(crate) templates: autoxide_kernel::template::TemplateEngine,
     /// Hồ sơ pháp lý (module `compliance`) làm biến của mẫu trang bắt buộc; `None` khi app không
@@ -94,6 +96,7 @@ impl ContentService {
             orgs: None,
             entitlements: Default::default(),
             resources: Default::default(),
+            custom_fields: Default::default(),
             templates: Default::default(),
             legal: None,
         }
@@ -106,6 +109,14 @@ impl ContentService {
     ) -> Self {
         self.templates = templates;
         self.legal = legal;
+        self
+    }
+
+    pub(crate) fn with_custom_fields(
+        mut self,
+        custom_fields: autoxide_kernel::custom_fields::CustomFields,
+    ) -> Self {
+        self.custom_fields = custom_fields;
         self
     }
 

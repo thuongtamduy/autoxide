@@ -8,6 +8,7 @@ pub mod bulk;
 pub(crate) mod can;
 pub(crate) mod client_config;
 pub mod connections;
+pub mod custom_fields;
 pub mod doctor;
 pub mod find;
 pub mod list_exports;

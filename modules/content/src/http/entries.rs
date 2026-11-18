@@ -105,6 +105,9 @@ pub(crate) struct EntryResponse {
     version: String,
     /// The tenant's internal tags (`PUT /api/v1/kernel/records/content.entry/{id}/tags`).
     tags: Vec<autoxide_kernel::tags::TagRef>,
+    /// Values of the tenant's custom fields, by key.
+    #[schema(value_type = Object)]
+    custom_fields: serde_json::Map<String, Value>,
 }
 
 /// Mục như API trả, kèm term và tác giả (đọc chung một lần cho mọi mục), và bản dịch AI nào đã
@@ -151,6 +154,7 @@ fn entry_response(
     author_ids: Vec<Uuid>,
     translation_outdated: bool,
 ) -> EntryResponse {
+    let custom_fields = crate::entries::stored_custom(&entry);
     EntryResponse {
         translation_outdated,
         translated_from_revision_id: entry.translated_from_revision_id,
@@ -188,6 +192,7 @@ fn entry_response(
         published_at: None,
         path: None,
         tags: Vec::new(),
+        custom_fields: custom_fields.unwrap_or_default(),
         created_at: entry.created_at,
         updated_at: entry.updated_at,
     }
@@ -302,6 +307,7 @@ impl EntriesQuery {
         let tags_any = tags(self.tags_any.as_deref(), "tags_any");
         let tags_all = tags(self.tags_all.as_deref(), "tags_all");
         EntryFilter {
+            custom: Vec::new(),
             tags_any,
             tags_all,
             owner_org: self.owner_org,
@@ -378,6 +384,10 @@ pub(crate) struct EntryFieldsInput {
     /// (`false` while it is `true`) needs `content.publish` (else 403
     /// `content.ai_label_requires_publish`).
     pub ai_assisted: Option<bool>,
+    /// Values of the tenant's custom fields (`GET /api/v1/kernel/custom-fields?target=content.entry`),
+    /// by key; `null` clears one. Every problem is listed at once under `custom_fields.<key>`.
+    #[schema(value_type = Option<Object>)]
+    pub custom_fields: Option<serde_json::Map<String, Value>>,
 }
 
 impl From<EntryFieldsInput> for EntryFields {
@@ -397,6 +407,7 @@ impl From<EntryFieldsInput> for EntryFields {
             ai_generated: input.ai_generated,
             ai_assisted: input.ai_assisted,
             translated_from: None,
+            custom_fields: input.custom_fields,
         }
     }
 }
@@ -429,7 +440,8 @@ pub(crate) struct UpdateEntryRequest {
 
 /// List posts and pages (drafts included).
 ///
-/// Requires `content.read`. Newest first unless `order=asc`.
+/// Requires `content.read`. Newest first unless `order=asc`. Filter on the tenant's filterable
+/// custom fields with `cf.<key>=<eq|in|gte|lte|prefix>:<value>`, e.g. `cf.owner=eq:ada`.
 #[utoipa::path(
     get,
     path = "/entries",
@@ -450,9 +462,15 @@ pub(crate) async fn list_entries(
     principal: Principal,
     Query(query): Query<EntriesQuery>,
     Query(paging): Query<PageQuery>,
+    Query(raw): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Page<EntryResponse>, Error> {
     let mut problems = Vec::new();
-    let filter = query.filter(principal.user_id(), &mut problems);
+    let mut filter = query.filter(principal.user_id(), &mut problems);
+    // Trường tự định nghĩa (bước 51 P19): `cf.<khoá>=<toán tử>:<giá trị>`.
+    filter.custom = raw
+        .into_iter()
+        .filter_map(|(name, value)| name.strip_prefix("cf.").map(|key| (key.to_owned(), value)))
+        .collect();
     let page = page_request(paging, problems)?;
     let page = service.list(&tenant, &principal, &filter, &page).await?;
     let autoxide_kernel::pagination::Page { data, pagination } = page;

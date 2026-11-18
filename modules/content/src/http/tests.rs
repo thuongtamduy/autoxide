@@ -1472,3 +1472,71 @@ async fn nhan_noi_bo_tren_bai_viet() {
     .await
     .unwrap();
 }
+
+/// Trường tự định nghĩa (bước 51 P19): khách định nghĩa trường cho bài viết; lỗi gom một lần; giá
+/// trị mặc định; lọc `cf.<khoá>` qua index ghi cùng transaction; trường không lọc được là 422; đổi
+/// kiểu trường đã dùng là 409.
+#[tokio::test]
+async fn truong_tu_dinh_nghia_tren_bai_viet() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["content.read", "content.write", "kernel.custom_fields.manage"])
+            .user("reader", 2, &["content.read"])
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let define = |body: Value| app.post("/api/v1/kernel/custom-fields").token("admin").json(body).send();
+        let owner = define(json!({"target": "content.entry", "key": "owner", "data_type": "text", "labels": {"en": "Owner"}, "filterable": true})).await.unwrap();
+        assert_eq!(owner.status(), StatusCode::CREATED, "{}", owner.json());
+        let owner_id = owner.json()["data"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(define(json!({"target": "content.entry", "key": "budget", "data_type": "integer", "labels": {"en": "Budget"}, "min": "0", "filterable": true})).await.unwrap().status(), StatusCode::CREATED);
+        assert_eq!(define(json!({"target": "content.entry", "key": "stage", "data_type": "option", "labels": {"en": "Stage"}, "options": ["draft", "review"], "required": true, "default": "draft"})).await.unwrap().status(), StatusCode::CREATED);
+        let bad = define(json!({"target": "content.entry", "key": "Bad Key", "data_type": "colour", "labels": {}})).await.unwrap();
+        assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let fields = app.get("/api/v1/kernel/custom-fields?target=content.entry").token("reader").send().await.unwrap().json();
+        assert_eq!(fields["data"].as_array().unwrap().len(), 3, "người đọc bài đọc được định nghĩa");
+
+        let wrong = send(&app, "POST", "/entries", Some("admin"), &[], Some(json!({"kind": "post", "title": "Sai", "custom_fields": {"budget": -5, "colour": "x"}}))).await;
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", wrong.json());
+        let mut paths: Vec<String> = wrong.json()["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap().to_owned()).collect();
+        paths.sort();
+        assert_eq!(paths, ["custom_fields.budget", "custom_fields.colour"]);
+        let first = send(&app, "POST", "/entries", Some("admin"), &[], Some(json!({"kind": "post", "title": "Một", "custom_fields": {"owner": "Ada Lovelace", "budget": 100}}))).await;
+        assert_eq!(first.status(), StatusCode::CREATED, "{}", first.json());
+        assert_eq!(first.json()["data"]["custom_fields"]["stage"], "draft", "giá trị mặc định");
+        let id = first.json()["data"]["id"].as_str().unwrap().to_owned();
+        let second = send(&app, "POST", "/entries", Some("admin"), &[], Some(json!({"kind": "post", "title": "Hai", "custom_fields": {"owner": "Bob", "budget": 50}}))).await;
+        assert_eq!(second.status(), StatusCode::CREATED);
+
+        let count = |query: &'static str| {
+            let app = &app;
+            async move {
+                let answer = send(app, "GET", &format!("/entries?{query}"), Some("reader"), &[], None).await;
+                (answer.status(), answer.json()["data"].as_array().map_or(0, Vec::len))
+            }
+        };
+        assert_eq!(count("cf.owner=prefix:ada").await, (StatusCode::OK, 1));
+        assert_eq!(count("cf.budget=gte:60").await, (StatusCode::OK, 1));
+        assert_eq!(count("cf.budget=in:50,100").await, (StatusCode::OK, 2));
+        assert_eq!(count("cf.stage=eq:draft").await.0, StatusCode::UNPROCESSABLE_ENTITY, "không lọc được");
+
+        let read = send(&app, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let cleared = send(&app, "PATCH", &format!("/entries/{id}"), Some("admin"), &[("if-match", &etag)], Some(json!({"custom_fields": {"budget": null}}))).await;
+        assert_eq!(cleared.status(), StatusCode::OK, "{}", cleared.json());
+        assert!(cleared.json()["data"]["custom_fields"].get("budget").is_none());
+        assert_eq!(count("cf.budget=gte:60").await, (StatusCode::OK, 0), "index ghi lại cùng lúc");
+
+        let locked = app.patch(&format!("/api/v1/kernel/custom-fields/{owner_id}")).token("admin").json(json!({"data_type": "integer"})).send().await.unwrap();
+        assert_eq!((locked.status(), locked.json()["code"].as_str()), (StatusCode::CONFLICT, Some("kernel.custom_field_type_locked")));
+    })
+    .await
+    .unwrap();
+}
