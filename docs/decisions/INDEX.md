@@ -4,7 +4,7 @@
 
 Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
 
-394 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+395 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
 
 ## Phạm vi và mục tiêu (12)
 
@@ -82,7 +82,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **[D-20261118-file-length](D-20261118-file-length.md)** Độ dài file `.rs`: cảnh báo trên 800 dòng, chặn trên 1200, danh sách miễn không được dài thêm — 2026-11-18
 - **[D-20261118-public-ci-openapi-dup](D-20261118-public-ci-openapi-dup.md)** Repo công khai: CI tự chạy; pull request chỉ gate trên PostgreSQL 16; bắt tham số OpenAPI khai trùng bằng `lint` thay vì thêm `tsc` vào gate (D-197, D-243, D-300) — 2026-11-18 · **chủ dự án quyết**
 
-## Kiến trúc module và kernel (10)
+## Kiến trúc module và kernel (11)
 
 - **D-005** Một binary, ranh giới module chặt — 2026-11-11 · **chủ dự án quyết**
 - **D-025** Không foreign key xuyên module, không ngoại lệ — 2026-11-11 · **chủ dự án quyết**
@@ -94,6 +94,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-170** Hàm tạo cho các kiểu module dựng bằng literal, rồi `#[non_exhaustive]` — 2026-11-13
 - **D-351** Bộ dựng mẫu của kernel `autoxide_kernel::template` dùng `minijinja` (bước 37 mục 2, phần kernel) — 2026-11-17
 - **D-365** Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17
+- **[D-20261118-step41-kernel-prep](D-20261118-step41-kernel-prep.md)** Ba API kernel cho module thương mại: `Subscription::optional`, `csv::read`, `slug` — 2026-11-18
 
 ## Database, dữ liệu, job, event (25)
 
