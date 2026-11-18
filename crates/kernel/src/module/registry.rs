@@ -635,6 +635,7 @@ impl Modules {
     pub fn worker(&self, concurrency: u64) -> Result<Worker, ModuleError> {
         let databases = self.started()?;
         let mut handlers: HashMap<&'static str, Arc<dyn JobHandler>> = HashMap::new();
+        let mut timeouts: HashMap<&'static str, std::time::Duration> = HashMap::new();
         let mut modules = Vec::new();
         let mut schedules = Vec::new();
         let mut problems = Vec::new();
@@ -651,6 +652,9 @@ impl Modules {
                         "module `{name}` registers job kind `{kind}`; its job kinds must start \
                          with `{name}.`"
                     ));
+                }
+                if let Some(limit) = registration.time_limit() {
+                    timeouts.insert(kind, limit);
                 }
                 if handlers.insert(kind, registration.handler()).is_some() {
                     problems.push(format!("job kind `{kind}` has two handlers"));
@@ -685,6 +689,7 @@ impl Modules {
             return Err(ModuleError(problems.join("; ")));
         }
         Ok(Worker::new(databases, modules, handlers, schedules, concurrency)
+            .with_timeouts(timeouts)
             .with_entitlements(self.entitlements.clone()))
     }
 

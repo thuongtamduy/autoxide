@@ -3,6 +3,7 @@
 //!
 //! Bước 33+ thêm vào đây: `tenancy`; bước 36: `numbering` (đánh số tuần tự không nhảy số).
 
+pub mod backup;
 pub mod database;
 pub mod migration;
 pub mod numbering;
