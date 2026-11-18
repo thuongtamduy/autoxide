@@ -307,6 +307,13 @@ fn serve_phuc_vu_roi_dung_em_khi_nhan_sigterm() {
         }
     }
     let address = address.unwrap();
+    // Đọc tiếp log ở thread riêng: máy chủ ghi nhiều log sau khi khởi động (vd backup theo lịch
+    // đầu tiên, bước 39); không ai đọc thì ống dẫn đầy và tiến trình đứng chờ khi ghi log.
+    let rest = std::thread::spawn(move || {
+        let mut rest = String::new();
+        log.read_to_string(&mut rest).unwrap();
+        rest
+    });
 
     let http = |method: &str, path: &str, authorization: &str, body: &str| {
         let mut stream = std::net::TcpStream::connect(&address).unwrap();
@@ -331,8 +338,7 @@ fn serve_phuc_vu_roi_dung_em_khi_nhan_sigterm() {
 
     let sent = Command::new("kill").args(["-TERM", &child.id().to_string()]).status().unwrap();
     let status = child.wait().unwrap();
-    let mut rest = String::new();
-    log.read_to_string(&mut rest).unwrap();
+    let rest = rest.join().unwrap();
 
     assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
     assert!(login.starts_with("HTTP/1.1 200 OK\r\n"), "{login}");

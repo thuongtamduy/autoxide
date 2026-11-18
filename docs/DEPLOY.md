@@ -746,6 +746,35 @@ For a rolling update behind a load balancer:
 With a single server and no load balancer, keep the drain at `0`: there is nowhere else to
 send requests, and the drain would only delay the stop.
 
+## Scheduled backups
+
+Besides `autoxide backup` run by hand, every process that runs background work backs up every
+database it handles each `AUTOXIDE_BACKUP_INTERVAL_HOURS` hours (default 24; `0` turns this off),
+the same way `autoxide backup` does, into the file storage of the `files` module (the directory or
+the S3 bucket) under `kernel/backups/<database>/<id>/`. Only the newest `AUTOXIDE_BACKUP_KEEP` good
+backups of each database are kept (default 7). Each backup is a `backup.json`, a `database.sqlite`
+and, with `AUTOXIDE_BACKUP_INCLUDE_FILES=true`, the stored files under `files/`.
+
+- The backups sit on the same storage as the uploads, so they protect against lost or broken data,
+  not against losing that storage: copy the bucket or directory (backups and uploads) to another
+  place, for example with the bucket's replication or a nightly `rclone sync`. That is also why the
+  files are not copied into each backup by default.
+- To restore one, copy its directory out of the storage (for S3:
+  `aws s3 cp --recursive s3://<bucket>/kernel/backups/main/<id>/ ./restore/`; for a directory,
+  `cp -r`), then restore that directory as in "6. Back up and restore" above.
+- Each run is recorded in the table `kernel_backups` (status, size, error). `autoxide doctor` warns
+  when a database has no good backup from the last two intervals, and `/metrics` has
+  `backup_last_success_timestamp_seconds`, `backup_runs_total`, `backup_duration_seconds` and
+  `backup_size_bytes` (alerts `AutoxideBackupTooOld`, `AutoxideBackupFailed`).
+- A backup holds personal data. Data erased on someone's request stays in the backups made before,
+  until they are rotated out (`AUTOXIDE_BACKUP_KEEP` × interval): say so in your privacy notice.
+  Keep the storage private, in the country where the tenants' data must stay, and keep
+  `AUTOXIDE_SECRET_KEY` apart from it. Accounting records that must be kept for 10 years live in the
+  `invoices` and `ledger` modules, not in rotated backups. (Legal details: check the original texts
+  or someone qualified.)
+- While a backup of a SQLite database runs, its `-wal` file grows until the backup ends: plan disk
+  space for it.
+
 ## Monitoring
 
 Turn on `AUTOXIDE_HTTP_METRICS=true` and let Prometheus scrape `/metrics` from the machine itself
@@ -840,6 +869,17 @@ Each case: what you see, how to check, how to fix it.
   pg_total_relation_size(relid) DESC LIMIT 10;`.
 - **Fix:** free or add disk space first. Finished jobs and delivered events are removed after 7 days
   on their own; on PostgreSQL run `VACUUM` on a large table after deleting much from it.
+
+### Backups
+
+- **Sign:** alert `AutoxideBackupTooOld` or `AutoxideBackupFailed`; `autoxide doctor` warns about
+  `kernel.backup_age`.
+- **Check:** the newest rows of `kernel_backups` for that database (`status`, `error`), the log line
+  `backup failed`, free space on the server (a backup is first built in the temporary directory, as
+  large as the database) and on the file storage.
+- **Fix:** what the error says (no `files` module, a full disk, storage credentials). A row stuck
+  in `running` whose process died is marked `failed` by the next run after 15 minutes. Take a backup
+  by hand with `autoxide backup <directory>` until the scheduled ones work again.
 
 ### A key leaked
 
