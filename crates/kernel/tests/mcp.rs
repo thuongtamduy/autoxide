@@ -173,10 +173,19 @@ async fn chi_liet_ke_va_goi_duoc_tool_co_permission() {
             add.description.as_deref().unwrap().ends_with("Requires permission `notes.write`.")
         );
         assert_eq!(add.input_schema["properties"]["a"]["type"], "integer");
-        assert_eq!(names(tools), ["notes.whoami", "notes.add", "notes.issue_key", "notes.who"]);
+        assert_eq!(
+            names(tools),
+            [
+                "kernel.list_custom_fields",
+                "notes.whoami",
+                "notes.add",
+                "notes.issue_key",
+                "notes.who"
+            ]
+        );
         assert_eq!(
             names(reader.list_all_tools().await.unwrap()),
-            ["notes.whoami", "notes.issue_key", "notes.who"]
+            ["kernel.list_custom_fields", "notes.whoami", "notes.issue_key", "notes.who"]
         );
 
         let call = CallToolRequestParams::new("notes.add")

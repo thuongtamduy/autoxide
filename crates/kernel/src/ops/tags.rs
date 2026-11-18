@@ -847,7 +847,6 @@ async fn apply_tag(
             .with_param("kind", kind.clone())
             .with_param("id", "*")
     })?;
-    principal.require(&write)?;
     let total = input.add.len() + input.remove.len();
     if total == 0 || total > MAX_APPLY {
         return Err(Error::validation(vec![
@@ -856,6 +855,7 @@ async fn apply_tag(
         ]));
     }
     find_view(&tenant, tag).await?;
+    principal.require(&write)?;
     // Tra bản ghi NGOÀI transaction ghi (có thể gọi module khác).
     let found = state.resources.resolve_many(&tenant, &kind, &input.add, None).await?;
     let tenant_id = tenant.id().as_uuid();
