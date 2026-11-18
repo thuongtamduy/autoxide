@@ -9,7 +9,8 @@
 //!
 //! Đếm trong bộ nhớ của từng tiến trình: chạy nhiều máy chủ thì mỗi máy đếm riêng.
 //! Đủ để chặn một client gửi dồn; chặn đoán mật khẩu thì nằm ở login throttling
-//! (đếm trong database, dùng chung mọi máy chủ).
+//! (đếm trong database, dùng chung mọi máy chủ). Giới hạn theo API key đếm chung qua database
+//! được khi `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (bước 40 P6, `rate_limit_store`).
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr};
@@ -131,14 +132,39 @@ fn group(address: IpAddr) -> IpAddr {
 /// Request bằng phiên đăng nhập không bị đếm ở đây (đã có giới hạn theo địa chỉ).
 pub(super) struct ApiKeyLimited {
     inner: Arc<dyn Authenticator>,
-    cells: Gcra<Uuid>,
+    counter: KeyCounter,
+}
+
+/// Nơi đếm của giới hạn theo API key.
+enum KeyCounter {
+    /// Mỗi tiến trình đếm riêng.
+    Memory(Gcra<Uuid>),
+    /// Đếm chung qua database, theo lô (D-373).
+    Database(super::rate_limit_store::SharedCounter),
 }
 
 impl ApiKeyLimited {
-    /// `inner` bọc thêm giới hạn `limit`; tắt (`per_minute = 0`) thì trả nguyên `inner`.
-    pub(super) fn wrap(inner: Arc<dyn Authenticator>, limit: RateLimit) -> Arc<dyn Authenticator> {
-        match Gcra::new(limit) {
-            Some(cells) => Arc::new(ApiKeyLimited { inner, cells }),
+    /// `inner` bọc thêm giới hạn `limit`, đếm trong bộ nhớ; tắt (`per_minute = 0`) thì trả nguyên
+    /// `inner`.
+    #[cfg(test)]
+    fn wrap(inner: Arc<dyn Authenticator>, limit: RateLimit) -> Arc<dyn Authenticator> {
+        Self::wrap_in(inner, limit, None)
+    }
+
+    /// Bọc `inner` thêm giới hạn `limit`; có `registry` thì đếm chung qua database của khách mặc
+    /// định, không thì trong bộ nhớ. Tắt (`per_minute = 0`) thì trả nguyên `inner`.
+    pub(super) fn wrap_in(
+        inner: Arc<dyn Authenticator>,
+        limit: RateLimit,
+        registry: Option<crate::tenancy::DatabaseRegistry>,
+    ) -> Arc<dyn Authenticator> {
+        let counter = match registry {
+            Some(registry) => super::rate_limit_store::SharedCounter::new(limit, registry)
+                .map(KeyCounter::Database),
+            None => Gcra::new(limit).map(KeyCounter::Memory),
+        };
+        match counter {
+            Some(counter) => Arc::new(ApiKeyLimited { inner, counter }),
             None => inner,
         }
     }
@@ -152,9 +178,12 @@ impl Authenticator for ApiKeyLimited {
         hint: &crate::tenancy::TenantHint,
     ) -> Result<Principal, Error> {
         let principal = self.inner.authenticate(authorization, hint).await?;
-        if let Some(key) = principal.api_key_id()
-            && let Decision::Deny(wait) = self.cells.check(key, Instant::now())
-        {
+        let Some(key) = principal.api_key_id() else { return Ok(principal) };
+        let decision = match &self.counter {
+            KeyCounter::Memory(cells) => cells.check(key, Instant::now()),
+            KeyCounter::Database(shared) => shared.check(principal.tenant_id(), key).await,
+        };
+        if let Decision::Deny(wait) = decision {
             metrics::counter!("http_api_key_rate_limited_total").increment(1);
             let seconds = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
             return Err(Error::too_many_requests(

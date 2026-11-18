@@ -260,6 +260,12 @@ impl Module for KernelModule {
             Box::new(crate::ops::pins::CreatePins),
             // Nhật ký request theo khách (bước 52 mục 1).
             Box::new(crate::ops::request_log::CreateRequestLog),
+            // Bảng đếm rate limit theo API key dùng chung mọi máy chủ (bước 40 P6, D-373).
+            crate::throttle::throttle_migration("m0032_create_throttle", NAME),
+            crate::tenancy::migration::adopt(
+                "m0033_tenancy_throttle",
+                vec![crate::throttle::tenant_table(NAME)],
+            ),
         ]
     }
 

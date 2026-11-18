@@ -44,6 +44,7 @@ mod metrics;
 mod openapi;
 mod problem;
 mod rate_limit;
+mod rate_limit_store;
 mod request_id;
 mod security_headers;
 mod server;
@@ -299,10 +300,14 @@ pub fn build(
 
     // REST và MCP xác thực qua bộ có giới hạn theo API key; lớp idempotency giữ bộ gốc (nó chỉ
     // xác thực để biết khoá thuộc về ai, không được đếm thêm một lần).
-    let limited = extras
-        .authenticator
-        .clone()
-        .map(|inner| rate_limit::ApiKeyLimited::wrap(inner, config.api_key_rate_limit));
+    let limited = extras.authenticator.clone().map(|inner| {
+        // Đếm chung qua database (bước 40 P6) cần sổ database; không có thì đếm trong bộ nhớ.
+        let shared = match config.rate_limit_store {
+            crate::config::RateLimitStore::Database => extras.tenancy.clone(),
+            _ => None,
+        };
+        rate_limit::ApiKeyLimited::wrap_in(inner, config.api_key_rate_limit, shared)
+    });
     let translations = Arc::new(extras.translations);
     // Nhật ký request theo khách (bước 52): chỉ khi có sổ database và hạn lưu > 0.
     let request_log = extras.tenancy.as_ref().and_then(|registry| {

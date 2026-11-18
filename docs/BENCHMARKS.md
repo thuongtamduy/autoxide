@@ -469,3 +469,24 @@ bao (không có gói mặc định); bản cũ không có module `plans` nên ha
 Mọi bài trong ±5% (dao động ±20%, D-179). Lớp chặn theo gói ở mỗi request của module (đếm request, đọc quyền dùng từ
 bộ nhớ đệm) không đo được trên đường nóng; khách có gói và khách không gói chạy ngang nhau. Bảng đầu là người dùng
 của khách nền tảng (luôn không giới hạn: tay cầm không hỏi `plans`).
+
+## Rate limit theo API key đếm chung qua database (bước 40 P6) — 18/11/2026
+
+Cùng một binary release, máy 4 CPU, máy tạo tải chạy chung, chế độ `single`, 6 giây mỗi bài, 64 kết nối, 3 lượt xen kẽ,
+lấy trung vị. `LOADTEST_ONLY=api_key scripts/loadtest.sh` với `LOADTEST_RATE_LIMIT_STORE` = (không đặt: tắt giới hạn
+theo API key) / `memory` / `database`; khi bật: 1 000 000 request/phút (không có 429), burst 30 như mặc định → lô của
+`database` là 7 lượt, tức một câu `INSERT … ON CONFLICT DO UPDATE … RETURNING` mỗi 7 request. Cả 64 kết nối dùng
+**một** API key — trường hợp xấu nhất: mọi request xếp hàng trên một lô và một dòng đếm.
+
+| Database | Bài đo | Tắt (req/s) | `memory` | `database` | `database` so `memory` | p95 `memory` → `database` (ms) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| SQLite | GET /auth/me | 3045 | 3075 | 3038 | -1% | 23.66 → 24.72 (+4%) |
+| SQLite | MCP auth.whoami | 3033 | 2973 | 2659 | -11% | 24.79 → 30.36 (+22%) |
+| PostgreSQL 16 | GET /auth/me | 2305 | 2295 | 2109 | -8% | 32.53 → 35.56 (+9%) |
+| PostgreSQL 16 | MCP auth.whoami | 2058 | 2101 | 2013 | -4% | 35.23 → 36.31 (+3%) |
+
+Đọc số: `memory` không đo được so với tắt (GCRA trong bộ nhớ, một lock ngắn). `database` tốn 1–11% request/s và tới
++22% p95 khi một key bắn dồn: lần lấy lô là một lệnh ghi — trên SQLite xếp hàng ở kết nối ghi duy nhất cùng mọi lệnh
+ghi khác, và các request cùng key chờ lần lấy lô đó. Vượt ngưỡng 10% của đặc tả ở một bài, nên **`memory` vẫn là mặc
+định** và `database` là lựa chọn cho nhiều máy chủ PostgreSQL (D-373). Nhiều key khác nhau không chờ nhau (mỗi key một
+lô); lô lớn hơn (tăng burst) thì ít câu ghi hơn, đổi lại sai số `lô × số máy chủ` lớn hơn.

@@ -9169,3 +9169,29 @@ liệu cá nhân.
    `/llms-full.txt` (theo khuyến nghị của đặc tả) — hướng dẫn cho agent đã là resource MCP.
 6. `docs/mcp-tools.json` thêm `resources` và `prompts` (khoá mới, `api-diff` chỉ so `tools`); `docs/guides/mcp.md` có bảng
    resource / prompt, test giữ khớp code như bảng tool.
+
+## D-373 · Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18 — agent quyết
+
+1. **`AUTOXIDE_HTTP_RATE_LIMIT_STORE` = `memory` (mặc định) | `database`.** `memory` giữ GCRA hiện có, mỗi tiến trình đếm
+   riêng — đúng hoàn toàn với SQLite (một tiến trình máy chủ). `database` đếm chung qua bảng `kernel_throttle`
+   (`throttle_migration` + nâng theo khách, migration `m0032` / `m0033` của kernel), trên database của khách mặc định để mọi
+   máy chủ thấy cùng số đếm; khoá `api_key:<tenant_id>:<api_key_id>` — khách A dùng hết lượt không chặn khách B.
+2. **Theo lô:** `Throttle::take(tenant, key, n)` — một câu `INSERT … ON CONFLICT DO UPDATE … RETURNING` cộng thẳng `n` vào số
+   đếm của cửa sổ (cửa sổ cũ đã qua thì bắt đầu lại), lượt được cấp = `min(n, limit − (count − n))`; database xếp hàng các
+   lượt đồng thời nên tổng lượt cấp trong một cửa sổ không vượt `limit` (test đồng thời trên cả hai database). Mỗi tiến
+   trình lấy lô `k = max(1, burst / 4)` cho một key rồi tiêu dần trong bộ nhớ (mỗi key một `tokio::Mutex`: request cùng key
+   chờ một lần hỏi thay vì cùng hỏi); cấp 0 thì chặn tới hết cửa sổ mà không hỏi lại. Cửa sổ cố định 60 giây, giới hạn
+   `max(per_minute, burst)`; sai số tối đa `k × số máy chủ` mỗi cửa sổ (ghi trong mô tả biến). Cửa sổ cố định cho phép dồn ở
+   ranh giới hai cửa sổ — chấp nhận, đây là chống lạm dụng chứ không phải tính tiền.
+3. **Database lỗi thì cho qua** (log `warn`, số đo `http_rate_limit_store_errors_total`): bộ giới hạn không làm sự cố
+   database nặng thêm. Dọn dòng cũ: mỗi tiến trình tối đa mỗi giờ một lần, chạy nền ngay trong bộ đếm (`Throttle::purge`),
+   không thêm job theo lịch — như nhật ký request (D-370); kernel chưa có job dọn chung như đặc tả giả định.
+4. **Giới hạn theo địa chỉ IP vẫn đếm trong bộ nhớ** (lệch đặc tả "tuỳ chọn theo IP"): nó chạy trước xác thực cho mọi request
+   kể cả ẩn danh — đếm trong database thì kẻ lạ gửi từ nhiều địa chỉ là ép máy chủ ghi database, đúng thứ bộ giới hạn phải chặn.
+   Chặn đoán mật khẩu đã đếm chung qua `throttle` (D-116). Giá trị theo khách / theo gói cho giới hạn API key: chưa làm — cần
+   một nơi khai cấu hình theo khách cho lớp HTTP (lớp chạy trước khi biết khách); để khi gói (bước 35) cần bán theo hạn mức
+   request.
+5. **Số đo** (`docs/BENCHMARKS.md`, 18/11/2026, một key, 64 kết nối, lô 7): `database` so `memory` — SQLite `GET /auth/me`
+   −1% req/s, p95 +4%; SQLite MCP −11%, p95 +22%; PostgreSQL `GET /auth/me` −8%, p95 +9%; PostgreSQL MCP −4%, p95 +3%. Một bài
+   vượt ngưỡng 10% của đặc tả → **giữ `memory` làm mặc định**. `autoxide doctor` cảnh báo khi `database` + SQLite.
+6. `scripts/loadtest.sh` thêm `LOADTEST_RATE_LIMIT_STORE` / `LOADTEST_RATE_LIMIT_BURST` / `LOADTEST_ONLY=api_key` để đo lại.
