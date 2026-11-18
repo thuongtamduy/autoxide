@@ -2476,6 +2476,135 @@
         ],
         "type": "object"
       },
+      "CatalogAttribute": {
+        "description": "An attribute products can have (origin, material, size of the box…).",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "data_type": {
+            "description": "`text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`.",
+            "type": "string"
+          },
+          "filterable": {
+            "description": "Offered as a storefront filter.",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legal_basis": {
+            "description": "Law the attribute comes from, for legally required label contents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogAttributeOption"
+            },
+            "type": "array"
+          },
+          "scale": {
+            "description": "Decimal places of a `decimal` attribute.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "data_type",
+          "scale",
+          "names",
+          "filterable",
+          "options",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "CatalogAttributeOption": {
+        "additionalProperties": false,
+        "description": "A choosable value of an `option` / `options` attribute.",
+        "properties": {
+          "code": {
+            "description": "1 to 64 lower-case letters, digits, `_` or `-`; unique in the attribute.",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Label per language, e.g. `{\"en\": \"Cotton\"}`.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "labels"
+        ],
+        "type": "object"
+      },
+      "CatalogAttributeOptions": {
+        "additionalProperties": false,
+        "description": "The whole set of options of an attribute.",
+        "properties": {
+          "options": {
+            "description": "Up to 500 options, in display order. Options are matched by `code`.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogAttributeOption"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "type": "object"
+      },
+      "CatalogAttributeValue": {
+        "additionalProperties": false,
+        "description": "A value of an attribute on a product.",
+        "properties": {
+          "attribute_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "value": {
+            "description": "By the attribute's type: text, a whole number, a decimal written as text (`\"12.5\"`),\n`true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "attribute_id",
+          "value"
+        ],
+        "type": "object"
+      },
       "CatalogCategory": {
         "description": "A category of the tenant's tree.",
         "properties": {
@@ -2526,6 +2655,82 @@
           "visible",
           "texts",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "CatalogCategoryAttribute": {
+        "additionalProperties": false,
+        "description": "An attribute of a category.",
+        "properties": {
+          "applies_to_descendants": {
+            "description": "Also for products of the subcategories.",
+            "type": "boolean"
+          },
+          "attribute_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "effective_from": {
+            "description": "The rule applies from this day (e.g. when a new labelling rule takes effect).",
+            "format": "date",
+            "type": "string"
+          },
+          "effective_to": {
+            "description": "The rule stops applying on this day.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_basis": {
+            "description": "Law the rule comes from.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required": {
+            "description": "Products in the category cannot go on sale without a value.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "attribute_id",
+          "effective_from"
+        ],
+        "type": "object"
+      },
+      "CatalogCategoryAttributes": {
+        "additionalProperties": false,
+        "description": "The whole set of attributes of a category.",
+        "properties": {
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogCategoryAttribute"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "attributes"
+        ],
+        "type": "object"
+      },
+      "CatalogCategoryRestrictions": {
+        "additionalProperties": false,
+        "description": "The restricted-goods rules linked to a category.",
+        "properties": {
+          "rule_codes": {
+            "description": "Rule codes of `GET /restriction-rules`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "rule_codes"
         ],
         "type": "object"
       },
@@ -2586,6 +2791,57 @@
         ],
         "type": "object"
       },
+      "CatalogCreateAttribute": {
+        "additionalProperties": false,
+        "description": "A new attribute.",
+        "properties": {
+          "code": {
+            "description": "1 to 64 lower-case letters, digits or `_`; unique in the tenant\n(`catalog.attribute_code_taken`).",
+            "example": "origin",
+            "type": "string"
+          },
+          "data_type": {
+            "description": "`text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`.",
+            "type": "string"
+          },
+          "filterable": {
+            "type": "boolean"
+          },
+          "legal_basis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Name per language.",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "scale": {
+            "description": "Decimal places of a `decimal` attribute, 0 to 6. Default 0.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "data_type",
+          "names"
+        ],
+        "type": "object"
+      },
       "CatalogCreateCategory": {
         "additionalProperties": false,
         "description": "A new category.",
@@ -2623,6 +2879,47 @@
         },
         "required": [
           "texts"
+        ],
+        "type": "object"
+      },
+      "CatalogCreateDocument": {
+        "additionalProperties": false,
+        "description": "A new document.",
+        "properties": {
+          "document_type": {
+            "description": "A document type a rule requires, e.g. `alcohol_retail_licence`.",
+            "type": "string"
+          },
+          "expires_on": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file_key": {
+            "description": "Key of a scanned file already stored.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issued_by": {
+            "type": "string"
+          },
+          "issued_on": {
+            "format": "date",
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_type",
+          "number",
+          "issued_by",
+          "issued_on"
         ],
         "type": "object"
       },
@@ -3559,6 +3856,22 @@
         ],
         "type": "object"
       },
+      "CatalogProductAttributes": {
+        "additionalProperties": false,
+        "description": "The whole set of attribute values of a product.",
+        "properties": {
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogAttributeValue"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "attributes"
+        ],
+        "type": "object"
+      },
       "CatalogProductCategories": {
         "additionalProperties": false,
         "description": "The whole set of categories of a product.",
@@ -3574,6 +3887,76 @@
         },
         "required": [
           "category_ids"
+        ],
+        "type": "object"
+      },
+      "CatalogProductCount": {
+        "description": "A count of products.",
+        "properties": {
+          "count": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "key": {
+            "description": "A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,\n`missing_attributes`, `missing_documents`, `restricted`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "count"
+        ],
+        "type": "object"
+      },
+      "CatalogProductDocument": {
+        "description": "A licence or certificate of a conditional product.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "document_type": {
+            "example": "alcohol_retail_licence",
+            "type": "string"
+          },
+          "expires_on": {
+            "description": "The document is valid until the end of this day; `null`: no end.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file_key": {
+            "description": "Key of the scanned file in storage.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "issued_by": {
+            "type": "string"
+          },
+          "issued_on": {
+            "format": "date",
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "document_type",
+          "number",
+          "issued_by",
+          "issued_on",
+          "created_at"
         ],
         "type": "object"
       },
@@ -3707,6 +4090,71 @@
         ],
         "type": "object"
       },
+      "CatalogRestrictionRule": {
+        "description": "A rule of prohibited or conditional goods (shared data, read only).",
+        "properties": {
+          "code": {
+            "example": "alcohol",
+            "type": "string"
+          },
+          "effective_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "effective_to": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "jurisdiction": {
+            "example": "VN",
+            "type": "string"
+          },
+          "legal_basis": {
+            "type": "string"
+          },
+          "level": {
+            "description": "`prohibited` or `conditional`.",
+            "type": "string"
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "pack_version": {
+            "type": "string"
+          },
+          "required_documents": {
+            "description": "Document types a conditional product needs, valid on the day.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "source_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jurisdiction",
+          "code",
+          "level",
+          "names",
+          "required_documents",
+          "legal_basis",
+          "source_url",
+          "effective_from",
+          "pack_version"
+        ],
+        "type": "object"
+      },
       "CatalogSaleMode": {
         "description": "How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),\n`preorder` (before it arrives, see `preorder_available_on`).",
         "enum": [
@@ -3737,6 +4185,52 @@
         },
         "required": [
           "status"
+        ],
+        "type": "object"
+      },
+      "CatalogStoredAttributeValue": {
+        "description": "A stored attribute value (decimals are stored scaled by the attribute's `scale`).",
+        "properties": {
+          "attribute_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "option_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value_boolean": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "value_date": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value_integer": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "value_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "attribute_id"
         ],
         "type": "object"
       },
@@ -3806,6 +4300,11 @@
           "name": {
             "type": "string"
           },
+          "path": {
+            "description": "Public address of the product in this language, computed by the server:\n`/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`, without a language prefix.",
+            "example": "/products/cotton-t-shirt",
+            "type": "string"
+          },
           "short_description": {
             "type": "string"
           },
@@ -3817,9 +4316,47 @@
           "locale",
           "name",
           "slug",
+          "path",
           "short_description",
           "description"
         ],
+        "type": "object"
+      },
+      "CatalogUpdateAttribute": {
+        "additionalProperties": false,
+        "description": "Changes to an attribute; its code and type cannot change.",
+        "properties": {
+          "filterable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "legal_basis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "CatalogUpdateCategory": {
@@ -12639,6 +13176,83 @@
         ],
         "type": "object"
       },
+      "Data_CatalogAttribute": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An attribute products can have (origin, material, size of the box…).",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "data_type": {
+                "description": "`text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`.",
+                "type": "string"
+              },
+              "filterable": {
+                "description": "Offered as a storefront filter.",
+                "type": "boolean"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "legal_basis": {
+                "description": "Law the attribute comes from, for legally required label contents.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "names": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "options": {
+                "items": {
+                  "$ref": "#/components/schemas/CatalogAttributeOption"
+                },
+                "type": "array"
+              },
+              "scale": {
+                "description": "Decimal places of a `decimal` attribute.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "data_type",
+              "scale",
+              "names",
+              "filterable",
+              "options",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CatalogCategory": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -12692,6 +13306,32 @@
               "visible",
               "texts",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogCategoryRestrictions": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "The restricted-goods rules linked to a category.",
+            "properties": {
+              "rule_codes": {
+                "description": "Rule codes of `GET /restriction-rules`.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "rule_codes"
             ],
             "type": "object"
           }
@@ -12992,6 +13632,66 @@
               "media",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogProductDocument": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A licence or certificate of a conditional product.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "document_type": {
+                "example": "alcohol_retail_licence",
+                "type": "string"
+              },
+              "expires_on": {
+                "description": "The document is valid until the end of this day; `null`: no end.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "file_key": {
+                "description": "Key of the scanned file in storage.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "issued_by": {
+                "type": "string"
+              },
+              "issued_on": {
+                "format": "date",
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "document_type",
+              "number",
+              "issued_by",
+              "issued_on",
+              "created_at"
             ],
             "type": "object"
           }
@@ -28014,6 +28714,86 @@
         ],
         "type": "object"
       },
+      "Data_Vec_CatalogAttribute": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "An attribute products can have (origin, material, size of the box…).",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "data_type": {
+                  "description": "`text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`.",
+                  "type": "string"
+                },
+                "filterable": {
+                  "description": "Offered as a storefront filter.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "legal_basis": {
+                  "description": "Law the attribute comes from, for legally required label contents.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "names": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "options": {
+                  "items": {
+                    "$ref": "#/components/schemas/CatalogAttributeOption"
+                  },
+                  "type": "array"
+                },
+                "scale": {
+                  "description": "Decimal places of a `decimal` attribute.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "data_type",
+                "scale",
+                "names",
+                "filterable",
+                "options",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_CatalogCategory": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28079,6 +28859,61 @@
         ],
         "type": "object"
       },
+      "Data_Vec_CatalogCategoryAttribute": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "description": "An attribute of a category.",
+              "properties": {
+                "applies_to_descendants": {
+                  "description": "Also for products of the subcategories.",
+                  "type": "boolean"
+                },
+                "attribute_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "effective_from": {
+                  "description": "The rule applies from this day (e.g. when a new labelling rule takes effect).",
+                  "format": "date",
+                  "type": "string"
+                },
+                "effective_to": {
+                  "description": "The rule stops applying on this day.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "legal_basis": {
+                  "description": "Law the rule comes from.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "required": {
+                  "description": "Products in the category cannot go on sale without a value.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "attribute_id",
+                "effective_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_CatalogComponent": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28100,6 +28935,235 @@
               "required": [
                 "variant_id",
                 "quantity"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogProductCount": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A count of products.",
+              "properties": {
+                "count": {
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "key": {
+                  "description": "A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,\n`missing_attributes`, `missing_documents`, `restricted`).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "count"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogProductDocument": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A licence or certificate of a conditional product.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "document_type": {
+                  "example": "alcohol_retail_licence",
+                  "type": "string"
+                },
+                "expires_on": {
+                  "description": "The document is valid until the end of this day; `null`: no end.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "file_key": {
+                  "description": "Key of the scanned file in storage.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "issued_by": {
+                  "type": "string"
+                },
+                "issued_on": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "number": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "document_type",
+                "number",
+                "issued_by",
+                "issued_on",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogRestrictionRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A rule of prohibited or conditional goods (shared data, read only).",
+              "properties": {
+                "code": {
+                  "example": "alcohol",
+                  "type": "string"
+                },
+                "effective_from": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "effective_to": {
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "jurisdiction": {
+                  "example": "VN",
+                  "type": "string"
+                },
+                "legal_basis": {
+                  "type": "string"
+                },
+                "level": {
+                  "description": "`prohibited` or `conditional`.",
+                  "type": "string"
+                },
+                "names": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "pack_version": {
+                  "type": "string"
+                },
+                "required_documents": {
+                  "description": "Document types a conditional product needs, valid on the day.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "source_url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "jurisdiction",
+                "code",
+                "level",
+                "names",
+                "required_documents",
+                "legal_basis",
+                "source_url",
+                "effective_from",
+                "pack_version"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogStoredAttributeValue": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A stored attribute value (decimals are stored scaled by the attribute's `scale`).",
+              "properties": {
+                "attribute_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "option_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value_boolean": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "value_date": {
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value_integer": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "value_text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "attribute_id"
               ],
               "type": "object"
             },
@@ -81410,6 +82474,467 @@
         ]
       }
     },
+    "/api/v1/catalog/attributes": {
+      "get": {
+        "description": "Requires `catalog.products.read`.",
+        "operationId": "catalog_list_catalog_attributes",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogAttribute"
+                }
+              }
+            },
+            "description": "Every attribute, by code."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List every attribute of the tenant.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `catalog.categories.manage` for the whole tenant.",
+        "operationId": "catalog_create_catalog_attribute",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCreateAttribute"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogAttribute"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Path of the attribute.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The code is used already; code `catalog.attribute_code_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`) or a language is not configured (`catalog.unsupported_locale`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an attribute.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/attributes/{id}": {
+      "patch": {
+        "description": "Requires `catalog.categories.manage`.",
+        "operationId": "catalog_update_catalog_attribute",
+        "parameters": [
+          {
+            "description": "Id of the attribute.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogUpdateAttribute"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogAttribute"
+                }
+              }
+            },
+            "description": "The attribute after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such attribute; code `catalog.attribute_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change an attribute.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/attributes/{id}/options": {
+      "put": {
+        "description": "Requires `catalog.categories.manage`. Removing an option products still use is refused.",
+        "operationId": "catalog_put_catalog_attribute_options",
+        "parameters": [
+          {
+            "description": "Id of the attribute.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogAttributeOptions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogAttribute"
+                }
+              }
+            },
+            "description": "The attribute after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such attribute; code `catalog.attribute_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Products still use a removed option; code `catalog.attribute_option_in_use`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the options of an `option` / `options` attribute.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
     "/api/v1/catalog/categories": {
       "get": {
         "description": "Requires `catalog.products.read`. Ordered by depth, then display order.",
@@ -81862,6 +83387,215 @@
         ]
       }
     },
+    "/api/v1/catalog/categories/{id}/attributes": {
+      "get": {
+        "description": "Requires `catalog.products.read`.",
+        "operationId": "catalog_get_catalog_category_attributes",
+        "parameters": [
+          {
+            "description": "Id of the category.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogCategoryAttribute"
+                }
+              }
+            },
+            "description": "The attributes of the category."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the attributes of a category.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "put": {
+        "description": "Requires `catalog.categories.manage`. The readiness of every product in the category and its\nsubcategories is computed again.",
+        "operationId": "catalog_put_catalog_category_attributes",
+        "parameters": [
+          {
+            "description": "Id of the category.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCategoryAttributes"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogCategoryAttribute"
+                }
+              }
+            },
+            "description": "The attributes of the category."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such category (`catalog.category_not_found`) or attribute (`catalog.attribute_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the attributes of a category.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
     "/api/v1/catalog/categories/{id}/move": {
       "post": {
         "description": "Requires `catalog.categories.manage`. A category cannot move under itself or its own\nsubcategories.",
@@ -81991,6 +83725,205 @@
           }
         ],
         "summary": "Move a category with everything below it.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/categories/{id}/restrictions": {
+      "get": {
+        "description": "Requires `catalog.products.read`.",
+        "operationId": "catalog_get_catalog_category_restrictions",
+        "parameters": [
+          {
+            "description": "Id of the category.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogCategoryRestrictions"
+                }
+              }
+            },
+            "description": "The rule codes."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the restricted-goods rules of a category.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "put": {
+        "description": "Requires `catalog.categories.manage`. Products of a category with a `prohibited` rule cannot go\non sale; with a `conditional` rule they need valid documents. Readiness of the products in the\ncategory and below is computed again.",
+        "operationId": "catalog_put_catalog_category_restrictions",
+        "parameters": [
+          {
+            "description": "Id of the category.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCategoryRestrictions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogCategoryRestrictions"
+                }
+              }
+            },
+            "description": "The rule codes."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such category (`catalog.category_not_found`) or rule (`catalog.restriction_rule_not_found`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Link restricted-goods rules to a category.",
         "tags": [
           "catalog"
         ],
@@ -83471,6 +85404,102 @@
         ]
       }
     },
+    "/api/v1/catalog/products/counts": {
+      "get": {
+        "description": "Requires `catalog.products.read`. Every key is listed, with 0 when there is no product.",
+        "operationId": "catalog_count_catalog_products",
+        "parameters": [
+          {
+            "description": "`status` (default) or `readiness`.",
+            "in": "query",
+            "name": "group_by",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogProductCount"
+                }
+              }
+            },
+            "description": "One count per key."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`group_by` is not `status` or `readiness`; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Count the products in your scope by status or readiness.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      }
+    },
     "/api/v1/catalog/products/{id}": {
       "delete": {
         "description": "Requires `catalog.products.write` covering the product. A product that was on sale once can\nonly be archived (`POST /products/{id}/status`).",
@@ -83836,6 +85865,225 @@
         ]
       }
     },
+    "/api/v1/catalog/products/{id}/attributes": {
+      "get": {
+        "description": "Requires `catalog.products.read` covering the product.",
+        "operationId": "catalog_get_catalog_product_attributes",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogStoredAttributeValue"
+                }
+              }
+            },
+            "description": "The values."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No product with this id in your scope; code `catalog.product_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the attribute values of a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "put": {
+        "description": "Requires `catalog.products.write` covering the product. The product's readiness is computed\nagain.",
+        "operationId": "catalog_put_catalog_product_attributes",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogProductAttributes"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogStoredAttributeValue"
+                }
+              }
+            },
+            "description": "The values."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.write`, or it does not cover this product; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such product in your scope (`catalog.product_not_found`) or attribute (`catalog.attribute_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value does not fit its attribute; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the attribute values of a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.write"
+        ]
+      }
+    },
     "/api/v1/catalog/products/{id}/categories": {
       "put": {
         "description": "Requires `catalog.products.write` covering the product.",
@@ -83960,6 +86208,343 @@
         ],
         "x-permissions": [
           "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/products/{id}/documents": {
+      "get": {
+        "description": "Requires `catalog.documents.manage` covering the product.",
+        "operationId": "catalog_list_catalog_product_documents",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogProductDocument"
+                }
+              }
+            },
+            "description": "The documents."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.documents.manage`, or it does not cover the product; codes `permission_denied`, `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No product with this id in your scope; code `catalog.product_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the documents of a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.documents.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `catalog.documents.manage` covering the product. The product's readiness is computed\nagain.",
+        "operationId": "catalog_add_catalog_product_document",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCreateDocument"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogProductDocument"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Path of the document.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.documents.manage`, or it does not cover the product; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No product with this id in your scope; code `catalog.product_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a document to a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.documents.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/products/{id}/documents/{document_id}": {
+      "delete": {
+        "description": "Requires `catalog.documents.manage` covering the product.",
+        "operationId": "catalog_delete_catalog_product_document",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the document.",
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.documents.manage`, or it does not cover the product; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such product (`catalog.product_not_found`) or document (`catalog.document_not_found`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a document from a product.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.documents.manage"
         ]
       }
     },
@@ -84806,6 +87391,80 @@
         ],
         "x-permissions": [
           "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/restriction-rules": {
+      "get": {
+        "description": "Requires `catalog.products.read`. Loaded by the operator with `autoxide task\ncatalog.load_restrictions`; check the legal basis of each rule against the source text.",
+        "operationId": "catalog_list_catalog_restriction_rules",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogRestrictionRule"
+                }
+              }
+            },
+            "description": "Every rule."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the rules of prohibited and conditional goods.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
         ]
       }
     },

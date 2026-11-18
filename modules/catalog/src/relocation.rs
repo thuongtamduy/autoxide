@@ -1,6 +1,7 @@
 //! Chính sách tách / gộp khách của các bảng của `catalog` (bước 38, D-20261118-step38-relocation):
 //! sản phẩm, bảng giá, rào giá, giá vốn và tuỳ biến cửa hàng theo nút; bảng con đi theo dòng cha;
-//! danh mục và quy tắc làm tròn là cấu hình cả khách, chép sang khách mới khi tách.
+//! danh mục, thuộc tính và quy tắc làm tròn là cấu hình cả khách, chép sang khách mới khi tách
+//! (cùng thuộc tính, quy tắc hàng cấm của danh mục).
 
 use autoxide_kernel::tenancy::Relocation;
 
@@ -21,7 +22,12 @@ pub(crate) fn relocation() -> Relocation {
         .follow("catalog_product_categories", "product_id", "catalog_products")
         .follow("catalog_bundle_components", "bundle_variant_id", "catalog_variants")
         .follow("catalog_prices", "price_list_id", "catalog_price_lists")
-        .copy_on_split(&["catalog_categories", "catalog_rounding_rules"])
+        .follow("catalog_product_attributes", "product_id", "catalog_products")
+        .follow("catalog_product_documents", "product_id", "catalog_products")
+        .copy_on_split(&["catalog_categories", "catalog_rounding_rules", "catalog_attributes"])
+        .follow("catalog_attribute_options", "attribute_id", "catalog_attributes")
+        .follow("catalog_category_attributes", "category_id", "catalog_categories")
+        .follow("catalog_category_restrictions", "category_id", "catalog_categories")
         .follow("catalog_category_paths", "descendant_id", "catalog_categories")
         .follow("catalog_category_translations", "category_id", "catalog_categories")
 }

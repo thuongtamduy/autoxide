@@ -53,6 +53,8 @@ pub(crate) struct CatalogService {
     /// `dyn TaxEngine` của module `tax` khi đã cài: luật giá bán cho người tiêu dùng Việt Nam.
     pub(crate) tax: Option<Arc<dyn autoxide_tax::api::TaxEngine>>,
     pub(crate) config: CatalogConfig,
+    /// Sổ database: database điều khiển (dữ liệu luật dùng chung) và ngữ cảnh khách cho job.
+    pub(crate) databases: autoxide_kernel::tenancy::DatabaseRegistry,
 }
 
 impl CatalogService {
@@ -62,8 +64,9 @@ impl CatalogService {
         media: Option<Arc<dyn autoxide_media::api::Media>>,
         tax: Option<Arc<dyn autoxide_tax::api::TaxEngine>>,
         config: CatalogConfig,
+        databases: autoxide_kernel::tenancy::DatabaseRegistry,
     ) -> Self {
-        CatalogService { outbox, entitlements, media, tax, config }
+        CatalogService { outbox, entitlements, media, tax, config, databases }
     }
 
     /// Bật tính năng `feature` của gói cho khách, hay lỗi `feature_not_enabled`.
