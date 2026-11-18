@@ -69,15 +69,20 @@ A browser can only send the file if the bucket allows it (CORS): allow `PUT` fro
 ## With the SDK
 
 ```ts
+import { createClient } from "@autoxide/sdk";
+
+const api = createClient({ baseUrl: "https://api.example.com", token: "axk1_…" /* read it from your secret store */ });
+declare const file: File; // e.g. from <input type="file">
+
 const bytes = new Uint8Array(await file.arrayBuffer());
 const digest = await crypto.subtle.digest("SHA-256", bytes);
 const sha256 = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-const { data: link } = await api.post("/api/v1/files/uploads", {
-  name: file.name, content_type: file.type, size: file.size, sha256,
+const link = await api.post("/api/v1/files/uploads", {
+  body: { name: file.name, content_type: file.type, size: file.size, sha256 },
 });
 const headers = { ...link.headers };
 delete headers["content-length"]; // the browser sets it
 await fetch(link.url, { method: link.method, headers, body: bytes });
-const { data: saved } = await api.post(`/api/v1/files/uploads/${link.id}/complete`, {});
+const saved = await api.post("/api/v1/files/uploads/{id}/complete", { path: { id: link.id } });
 ```

@@ -1,6 +1,6 @@
 //! Migration thật của mọi module chạy được vòng up → down → up, trên database trống và trên database
 //! có dữ liệu, trên cả hai database (đặc tả 31 B2). Trước đây chỉ có test cơ chế bằng bảng mẫu
-//! (`crates/kernel/tests/migration.rs`) và một vòng không so schema.
+//! (`crates/kernel/tests/integration/migration.rs`) và một vòng không so schema.
 
 use autoxide_kernel::config::ConfigSource;
 use autoxide_kernel::database::Database;

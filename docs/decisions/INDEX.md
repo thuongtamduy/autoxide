@@ -4,7 +4,7 @@
 
 Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
 
-386 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+391 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
 
 ## Phạm vi và mục tiêu (12)
 
@@ -21,7 +21,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-185** Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 · **chủ dự án quyết**
 - **D-199** Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 · **chủ dự án quyết**
 
-## Quy trình, gate, lộ trình (55)
+## Quy trình, gate, lộ trình (58)
 
 - **D-004** GraphQL để sau, OpenAPI từ đầu — 2026-11-11 · **chủ dự án quyết**
 - **D-012** Rust edition 2024, toolchain ghim — 2026-11-11
@@ -76,8 +76,11 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-316** Mục "tạo tài khoản từ số điện thoại" chuyển sang bước 45 — 2026-11-16
 - **D-340** Giỏ ở quầy bán (yêu cầu W-053 của giao diện) vào đặc tả bước 45 — 2026-11-17
 - **D-346** Chấp nhận tạm `chrono` / `chrono-tz` / `humantime` "không còn bảo trì" — 2026-11-17
+- **[D-20261118-build-size](D-20261118-build-size.md)** Build gọn: test tích hợp mỗi crate một chương trình, bỏ debug info của thư viện ngoài, gate không incremental và tự dọn `target/` (D-299, D-20261118-ci-pr-affected-tests) — 2026-11-18 · **chủ dự án quyết**
+- **[D-20261118-ci-pr-affected-tests](D-20261118-ci-pr-affected-tests.md)** CI của pull request chỉ test crate bị sửa, trên cả SQLite và Postgres, không doc-test (`./gate.sh --pr`; D-299, D-300, D-20261118-public-ci-openapi-dup) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261118-decision-ids](D-20261118-decision-ids.md)** Quyết định mới mỗi mục một file, ID theo ngày và tên; mục lục tự sinh — 2026-11-18
 - **[D-20261118-file-length](D-20261118-file-length.md)** Độ dài file `.rs`: cảnh báo trên 800 dòng, chặn trên 1200, danh sách miễn không được dài thêm — 2026-11-18
+- **[D-20261118-public-ci-openapi-dup](D-20261118-public-ci-openapi-dup.md)** Repo công khai: CI tự chạy; pull request chỉ gate trên PostgreSQL 16; bắt tham số OpenAPI khai trùng bằng `lint` thay vì thêm `tsc` vào gate (D-197, D-243, D-300) — 2026-11-18 · **chủ dự án quyết**
 
 ## Kiến trúc module và kernel (10)
 
@@ -213,7 +216,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-376** Giải thích quyền theo gói và "đang dùng ở đâu" (bước 51 P11, D-267) — 2026-11-18
 - **D-380** Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18
 
-## Đa khách, tổ chức, gói (35)
+## Đa khách, tổ chức, gói (37)
 
 - **D-210** Tách nhánh thành khách riêng, chuyển database: chỉ nhân sự nền tảng (H3) — 2026-11-14
 - **D-211** Khách tự thu hồi quyền vào hỗ trợ (H4) — 2026-11-14
@@ -250,6 +253,8 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-338** Cấp phát khách theo gói (phần nhân sự vận hành) — 2026-11-17
 - **D-358** "Bán trước khi thông báo website" (A-3.5): nhãn "bắt buộc theo luật", không chặn — 2026-11-17
 - **D-370** Nhật ký request theo khách và nhật ký lệnh của agent (bước 52 mục 1, D-202) — 2026-11-18
+- **[D-20261118-step38-distribution](D-20261118-step38-distribution.md)** Phân phối cha → con và vào ngữ cảnh con xuyên database — 2026-11-18
+- **[D-20261118-step38-report-facts](D-20261118-step38-report-facts.md)** Báo cáo gộp: `Module::facts`, kho ở database của khách gốc, hai chặng cục bộ → gốc — 2026-11-18
 
 ## Hợp đồng cho giao diện (31)
 

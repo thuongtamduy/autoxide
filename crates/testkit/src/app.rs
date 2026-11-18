@@ -108,8 +108,8 @@ pub struct TestAppBuilder<'a> {
     provided: Vec<Provision>,
     users: HashMap<String, Principal>,
     multi: bool,
-    /// Khách khai thêm: (slug, có database riêng không).
-    tenants: Vec<(String, bool)>,
+    /// Khách khai thêm: (slug, có database riêng không, slug của khách cha).
+    tenants: Vec<(String, bool, Option<String>)>,
     /// Placement riêng chưa có khách nào (đích để dời khách tới).
     placements: Vec<String>,
     /// Người của khách: (slug, token, bên gọi).
@@ -364,7 +364,7 @@ impl<'a> TestAppBuilder<'a> {
     /// Thêm khách `slug` trên database của app (placement chung `main`). Bật chế độ nhiều khách.
     pub fn tenant(mut self, slug: &str) -> Self {
         self.multi = true;
-        self.tenants.push((slug.to_owned(), false));
+        self.tenants.push((slug.to_owned(), false, None));
         self
     }
 
@@ -372,7 +372,16 @@ impl<'a> TestAppBuilder<'a> {
     /// cùng loại, dọn cùng bài test). Bật chế độ nhiều khách.
     pub fn tenant_dedicated(mut self, slug: &str) -> Self {
         self.multi = true;
-        self.tenants.push((slug.to_owned(), true));
+        self.tenants.push((slug.to_owned(), true, None));
+        self
+    }
+
+    /// Thêm khách `slug` là con của khách `parent` (khai trước nó, hay `default`) — cây khách hàng
+    /// của bước 34; `dedicated`: trên database riêng như [`tenant_dedicated`](Self::tenant_dedicated).
+    /// Bật chế độ nhiều khách.
+    pub fn child_tenant(mut self, slug: &str, parent: &str, dedicated: bool) -> Self {
+        self.multi = true;
+        self.tenants.push((slug.to_owned(), dedicated, Some(parent.to_owned())));
         self
     }
 
@@ -389,6 +398,13 @@ impl<'a> TestAppBuilder<'a> {
     pub fn user_in(mut self, slug: &str, token: &str, user_id: u128, permissions: &[&str]) -> Self {
         let permissions = permissions.iter().map(|p| (*p).to_owned());
         let principal = Principal::new(Uuid::from_u128(user_id), permissions);
+        self.tenant_users.push((slug.to_owned(), token.to_owned(), principal));
+        self
+    }
+
+    /// Như [`principal`](Self::principal), cho người của khách `slug` (vd quyền theo nút của khách
+    /// đó: `Principal::with_grants(…)`).
+    pub fn principal_in(mut self, slug: &str, token: &str, principal: Principal) -> Self {
         self.tenant_users.push((slug.to_owned(), token.to_owned(), principal));
         self
     }
@@ -441,8 +457,8 @@ impl<'a> TestAppBuilder<'a> {
         let mut users = self.users;
         if !self.tenants.is_empty() || !self.placements.is_empty() {
             let placements = modules.placements(&registry).map_err(|e| fail("placements", e))?;
-            let dedicated = self.tenants.iter().filter(|(_, dedicated)| *dedicated);
-            let names = dedicated.map(|(slug, _)| slug).chain(&self.placements);
+            let dedicated = self.tenants.iter().filter(|(_, dedicated, _)| *dedicated);
+            let names = dedicated.map(|(slug, ..)| slug).chain(&self.placements);
             for name in names {
                 let url = self.test.extra_database().await.map_err(|e| fail("placement", e))?;
                 let url = url.parse().map_err(|e| fail("placement", e))?;
@@ -453,11 +469,22 @@ impl<'a> TestAppBuilder<'a> {
             let admin = modules
                 .api::<TenantAdmin>()
                 .ok_or_else(|| fail("tenants", "the kernel did not start its tenant service"))?;
-            for (slug, dedicated) in &self.tenants {
+            for (slug, dedicated, parent) in &self.tenants {
+                let parent_id = match parent {
+                    None => None,
+                    Some(parent) => Some(
+                        registry
+                            .tenant_by_slug(parent)
+                            .await
+                            .map_err(|e| fail("child tenant", e))?
+                            .id()
+                            .as_uuid(),
+                    ),
+                };
                 let input = NewTenant {
                     slug: slug.clone(),
                     name: slug.clone(),
-                    parent_id: None,
+                    parent_id,
                     placement: dedicated.then(|| slug.clone()),
                 };
                 let actor = autoxide_kernel::event::Actor::system();

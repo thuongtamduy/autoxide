@@ -260,6 +260,9 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `plans.retire_plan` | `plans.plans.manage` | writes |
 | `plans.set_override` | `plans.subscriptions.manage` | writes |
 | `plans.update_plan` | `plans.plans.manage` | writes |
+| `reporting.facts` | `reporting.read` | read-only |
+| `reporting.kinds` | `reporting.read` | read-only |
+| `reporting.summary` | `reporting.read` | read-only |
 | `tax.quote` | `tax.read` | read-only |
 | `tax.rates` | `tax.read` | read-only |
 | `webhooks.list_deliveries` | `webhooks.manage` | read-only |

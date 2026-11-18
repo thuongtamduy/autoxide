@@ -1,0 +1,18 @@
+{
+  "field:Give the fact kind to sum, e.g. `invoices.issued_total`.": "Cho biết loại số liệu cần cộng, vd `invoices.issued_total`.",
+  "field:must be `day`, `week`, `month`, `tenant` or `org`": "phải là `day`, `week`, `month`, `tenant` hoặc `org`",
+  "field:must be a date `YYYY-MM-DD`": "phải là ngày dạng `YYYY-MM-DD`",
+  "field:must be an ISO 4217 code": "phải là mã tiền tệ ISO 4217",
+  "field:must be comma-separated `name:value` pairs": "phải là các cặp `tên:giá trị` cách nhau bằng dấu phẩy",
+  "field:must be comma-separated ids": "phải là các ID cách nhau bằng dấu phẩy",
+  "field:must name at most 200 ids": "chỉ được nêu tối đa 200 ID",
+  "reporting.dimension_unknown": "Loại số liệu `{kind}` không có chiều lọc `{dimension}`.",
+  "reporting.kind_unknown": "Không có loại số liệu `{kind}`. Xem danh sách ở `GET /api/v1/reporting/kinds`.",
+  "reporting.range_invalid": "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.",
+  "reporting.range_too_large": "Khoảng thời gian quá dài cho cách nhóm `{group_by}` (tối đa {max} ngày).",
+  "reporting.store_unavailable": "Kho báo cáo của cây khách hàng đang bảo trì. Hãy thử lại sau ít phút.",
+  "reporting.tenant_not_found": "Không tìm thấy khách hàng này trong phạm vi bạn được xem.",
+  "text:A sale (`org_id`, `amount`, `channel`).": "Một lần bán (`org_id`, `amount`, `channel`).",
+  "text:See how far behind the report store is and push the facts of a tenant again.": "Xem kho báo cáo đang chậm bao nhiêu và đẩy lại số liệu của một khách.",
+  "text:See report figures: with scope `tenant`, of this tenant and every tenant below it; with a narrower scope, only of your units.": "Xem số liệu báo cáo: độ sâu `tenant` thấy của khách này và mọi khách cấp dưới; độ sâu hẹp hơn chỉ thấy của các nút của mình."
+}

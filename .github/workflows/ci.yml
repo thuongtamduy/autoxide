@@ -29,8 +29,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Thấp nhất được hỗ trợ (STACK.md) và mới nhất.
-        postgres: ["16", "18"]
+        # Thấp nhất được hỗ trợ (STACK.md) và mới nhất. Pull request chỉ chạy bản thấp nhất (dễ
+        # hỏng nhất) để có kết quả sớm; push lên main và chạy tay thì chạy cả hai (D-20261118-public-ci-openapi-dup).
+        postgres: ${{ github.event_name == 'pull_request' && fromJSON('["16"]') || fromJSON('["16", "18"]') }}
     services:
       postgres:
         image: postgres:${{ matrix.postgres }}-alpine
@@ -68,7 +69,9 @@ jobs:
             sleep 1
           done
           exit 1
-      - run: ./gate.sh
+      # Pull request: chỉ test crate bị sửa (so với main) và crate phụ thuộc, không doc-test; push lên
+      # main và chạy tay: gate đầy đủ (D-20261118-ci-pr-affected-tests).
+      - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
 
   sdk:
     name: TypeScript SDK and guide examples (tsc)

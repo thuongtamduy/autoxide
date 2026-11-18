@@ -241,7 +241,8 @@ Cột như bước 36: UUIDv7, UTC, tiền = `<tên>_minor` + `<tên>_currency`,
 |---|---|---|
 | `reporting_local_facts` | `id`, `tenant_id` (khách **nguồn**), `source_event_id`, `fact_index` (thứ tự trong event), `kind`, `org_id`, `occurred_at`, `local_day` (ngày theo múi giờ của nút nguồn), `amount_minor`, `amount_currency`, `quantity`, `dimensions` (JSON), `created_at`, `forwarded_at` (null = chưa đẩy) | unique (`tenant_id`, `source_event_id`, `fact_index`); index (`tenant_id`, `forwarded_at`, `id`) |
 | `reporting_facts` | kho của cây — chỉ ở database của **khách gốc** của cây: `id` (= id fact cục bộ), `tenant_id` (khách gốc), `source_tenant_id`, `kind`, `org_id`, `occurred_at`, `local_day`, `amount_*`, `quantity`, `dimensions`, `received_at` | unique (`tenant_id`, `source_tenant_id`, `id`); index (`tenant_id`, `kind`, `local_day`); index (`tenant_id`, `source_tenant_id`, `kind`, `local_day`) |
-| `reporting_daily` | cộng dồn theo ngày: `tenant_id` (gốc), `source_tenant_id`, `org_id` (UUID nil khi không có), `kind`, `local_day`, `currency` (chuỗi rỗng khi không có tiền), `amount_minor`, `quantity`, `fact_count` | PK (`tenant_id`, `source_tenant_id`, `org_id`, `kind`, `local_day`, `currency`) |
+| `reporting_daily` | cộng dồn theo ngày: `tenant_id` (gốc), `source_tenant_id`, `org_id` (nút gốc = ID khách khi số liệu không nêu nút — D-20261118-step38-report-facts), `kind`, `local_day`, `currency` (chuỗi rỗng khi không có tiền), `amount_minor`, `quantity`, `fact_count` | PK (`tenant_id`, `source_tenant_id`, `org_id`, `kind`, `local_day`, `currency`) |
+| `reporting_fact_dimensions` | chiều của số liệu trong kho (D-20261118-step38-report-facts): `tenant_id` (gốc), `fact_id`, `name`, `value` | PK (`tenant_id`, `fact_id`, `name`); index (`tenant_id`, `name`, `value`, `fact_id`) |
 | `reporting_rehomes` | nhật ký dời kho khi cây đổi (tách, gộp, đổi khách cha): `id`, `tenant_id` (khách bị dời), `from_root`, `to_root`, `status`, `moved_facts`, `started_at`, `finished_at` | index (`tenant_id`, `started_at`) |
 
 Không có `user_id` hay dữ liệu cá nhân trong fact → kho gộp không phải xoá gì khi có `USER_DELETED`, và
@@ -472,7 +473,7 @@ bị tạm khoá → sandbox của nó cũng bị chặn; khách gốc bị xoá
 |---|---|---|
 | `GET /kinds` | `reporting.read` | các loại fact đã khai (kind, mô tả, đơn vị: tiền / số, dimension được phép) |
 | `GET /summary?kind=&from=&to=&group_by=day\|week\|month\|tenant\|org\|group&tenant_ids=&org_ids=&group_ids=&currency=` | `reporting.read` | tổng theo nhóm: `by_currency[]` (`amount`, `quantity`, `count`), `converted` (khi có `currency`), `missing_rates[]`, `excluded_org_count` (khi có `group_ids` / `group_by=group`, D-232); đọc `reporting_daily`; khoảng tối đa 366 ngày khi nhóm theo ngày (`reporting.range_too_large`) |
-| `GET /facts?kind=&from=&to=&tenant_ids=&org_ids=&group_ids=&dimension.<tên>=` | `reporting.read` | `Page` fact thô để xem chi tiết (`fetch_page`, `limit`/`cursor`/`order`) |
+| `GET /facts?kind=&from=&to=&tenant_ids=&org_ids=&group_ids=&dimensions=<tên>:<giá trị>,…` | `reporting.read` | `Page` fact thô để xem chi tiết (`fetch_page`, `limit`/`cursor`/`order`) |
 | `GET /lag` | `reporting.manage` | với từng khách trong cây: số fact chưa đẩy, fact cũ nhất chưa đẩy, lần đẩy cuối |
 | `POST /rebuild` | `reporting.manage` | đặt lại `forwarded_at` của fact cục bộ còn giữ cho một khách (đẩy lại; unique chặn trùng); trả số dòng |
 

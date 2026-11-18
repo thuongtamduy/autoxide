@@ -5,10 +5,14 @@
 #                       nhưng chỉ chạy test của crate bị sửa (kể từ lần gate nhanh xanh gần
 #                       nhất, chưa có thì so với origin/main) và crate phụ thuộc vào chúng, chỉ
 #                       trên SQLite, không cần Docker.
-#   ./gate.sh           gate đầy đủ (cả SQLite và Postgres): bắt buộc trước khi phát hành (D-300).
+#   ./gate.sh           gate đầy đủ: bắt buộc trước khi merge vào main và trước khi phát hành.
+#   ./gate.sh --pr      gate của pull request trên CI (D-20261118-ci-pr-affected-tests): như gate đầy đủ nhưng chỉ chạy test
+#                       của crate bị sửa so với GATE_BASE (mặc định origin/main) và crate phụ thuộc
+#                       vào chúng, trên cả SQLite và Postgres, không chạy doc-test. Push lên main
+#                       vẫn chạy gate đầy đủ.
 #
-# CI trên GitHub (.github/workflows/ci.yml) chạy gate đầy đủ trên mỗi pull request và mỗi lần
-# push lên main (D-175, D-197); gate trên máy vẫn là định nghĩa "xong", CI là lưới thứ hai.
+# CI trên GitHub (.github/workflows/ci.yml): pull request chạy `--pr`, push lên main chạy gate đầy
+# đủ (D-175, D-197); gate trên máy vẫn là định nghĩa "xong", CI là lưới thứ hai.
 #
 # Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
 #
@@ -44,6 +48,12 @@
 #                        TEST_S3_SECRET_ACCESS_KEY (mặc định `test` / `test`).
 #   GATE_S3_IMAGE        image cho container S3 giả lập (mặc định motoserver/moto).
 #   GATE_GITLEAKS_IMAGE  image gitleaks khi máy không cài gitleaks.
+#   GATE_BASE            với --pr: so với ref này để biết crate nào bị sửa (mặc định origin/main).
+#   GATE_TARGET_MAX_GB   trần dung lượng của target/ (mặc định 40): vượt thì gate dọn trước khi build
+#                        (cache incremental trước, vẫn vượt thì `cargo clean`). 0: không dọn.
+#
+# Gate build không incremental (CARGO_INCREMENTAL=0, như CI): cache incremental chỉ giúp sửa rồi
+# build lại một crate trong lúc làm, còn gate build lại nhiều crate và cache đó phình theo mỗi nhánh.
 #
 # Gate đỏ thì sửa code. Không nới gate, không tắt lint, không bỏ qua test
 # (CLAUDE.md, mục "Gate").
@@ -52,11 +62,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 QUICK=0
+PR=0
 case "${1:-}" in
   "") ;;
   --quick) QUICK=1 ;;
+  --pr) PR=1 ;;
   *)
-    echo "usage: ./gate.sh [--quick]" >&2
+    echo "usage: ./gate.sh [--quick | --pr]" >&2
     exit 2
     ;;
 esac
@@ -94,6 +106,21 @@ require() {
 
 require cargo "Install Rust from https://rustup.rs"
 require cargo-deny "Install it with: cargo install cargo-deny --locked"
+
+export CARGO_INCREMENTAL=0
+
+# --- dọn target/ khi quá trần (D-20261118-build-size) ---------------------------------------------
+# Cargo không bao giờ tự xoá bản build cũ: mỗi nhánh, mỗi Cargo.lock khác nhau để lại một bộ file.
+target_gb() { du -s --block-size=1G target 2>/dev/null | cut -f1 || echo 0; }
+TARGET_MAX_GB="${GATE_TARGET_MAX_GB:-40}"
+if [ "$TARGET_MAX_GB" != 0 ] && [ -d target ] && [ "$(target_gb)" -gt "$TARGET_MAX_GB" ]; then
+  step "target/ is over ${TARGET_MAX_GB} GB: removing the incremental cache"
+  rm -rf target/*/incremental
+  if [ "$(target_gb)" -gt "$TARGET_MAX_GB" ]; then
+    step "target/ is still over ${TARGET_MAX_GB} GB: cargo clean (the next build starts from scratch)"
+    cargo clean
+  fi
+fi
 
 # --- 1-5: kiểm tĩnh, nhanh, không cần database ---------------------------------
 
@@ -182,9 +209,16 @@ export TEST_S3_ENDPOINT="$S3_ENDPOINT"
 
 # --- 7: SQLite ------------------------------------------------------------------
 
-step "tests on SQLite"
+BASE="${GATE_BASE:-origin/main}"
+
 # `env -u`: bỏ biến nếu người chạy lỡ đặt sẵn, để bước này chắc chắn là SQLite.
-env -u TEST_DATABASE_URL cargo xtask test-all --doc
+if [ "$PR" = 1 ]; then
+  step "tests on SQLite, crates changed since $BASE only (cargo xtask test-affected)"
+  env -u TEST_DATABASE_URL cargo xtask test-affected --base "$BASE" --keep-env
+else
+  step "tests on SQLite"
+  env -u TEST_DATABASE_URL cargo xtask test-all --doc
+fi
 
 # --- 8: Postgres ----------------------------------------------------------------
 
@@ -229,6 +263,12 @@ if [ -n "$POSTGRES_URL" ]; then
 else
   step "tests on Postgres ($POSTGRES_IMAGE in Docker)"
   start_postgres
+fi
+if [ "$PR" = 1 ]; then
+  TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-affected --base "$BASE" --keep-env
+  printf '\n\033[32mgate --pr: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests of crates changed since %s on SQLite and Postgres\033[0m\n' "$BASE"
+  printf 'Not checked: doc tests, crates the change does not reach. The push to main runs the full gate.\n'
+  exit 0
 fi
 TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-all
 
