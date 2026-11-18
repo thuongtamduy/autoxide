@@ -68,6 +68,11 @@ impl Module for TaxModule {
         "tax"
     }
 
+    fn description(&self) -> &'static str {
+        "Tax engine: tax groups and rates as dated data, tax profiles per organization unit, \
+         withholding and invoice requirements."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true

@@ -507,6 +507,79 @@ impl Modules {
         if problems.is_empty() { Ok(tools) } else { Err(ModuleError(problems.join("; "))) }
     }
 
+    /// Resource MCP của mọi module, URI đầy đủ `autoxide://<module>/<path>` (bước 40 P2). Gọi sau
+    /// [`start`](Self::start). Khai báo sai (path sai dạng hay trùng, thiếu khai quyền, permission
+    /// không ai khai) là lỗi khởi động.
+    pub fn mcp_resources(&self) -> Result<Vec<crate::mcp::McpResource>, ModuleError> {
+        let mut resources = Vec::new();
+        let mut problems = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for module in &self.modules {
+            let name = module.name();
+            for resource in module.mcp_resources() {
+                let resource = resource.qualify(name);
+                problems.extend(resource.problems(name));
+                if let Some(permission) = resource.permission()
+                    && !self.permissions.contains(permission.name())
+                {
+                    problems.push(format!(
+                        "resource `{}` requires permission `{}`, which no module declares",
+                        resource.uri(),
+                        permission.name()
+                    ));
+                }
+                if !seen.insert(resource.uri().to_owned()) {
+                    problems.push(format!("resource `{}` is declared twice", resource.uri()));
+                }
+                resources.push(resource);
+            }
+        }
+        if problems.is_empty() { Ok(resources) } else { Err(ModuleError(problems.join("; "))) }
+    }
+
+    /// Prompt MCP của mọi module, tên đầy đủ `<module>.<tên>` (bước 40 P2). Gọi sau
+    /// [`start`](Self::start). Khai báo sai (tên sai dạng hay trùng, `uses` trỏ tới tool không có
+    /// trong `Module::tools` của cùng module) là lỗi khởi động.
+    pub fn prompts(&self) -> Result<Vec<crate::mcp::Prompt>, ModuleError> {
+        let mut prompts = Vec::new();
+        let mut problems = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for module in &self.modules {
+            let name = module.name();
+            let declared = module.prompts();
+            if declared.is_empty() {
+                continue;
+            }
+            let tools = module.tools();
+            for prompt in declared {
+                let mut used = Vec::new();
+                for short in prompt.uses_short() {
+                    match tools.iter().find(|tool| tool.name() == *short) {
+                        Some(tool) => used.push(tool.clone().qualify(name)),
+                        None => problems.push(format!(
+                            "prompt `{name}.{}` uses tool `{short}`, but module `{name}` has no \
+                             such tool in Module::tools",
+                            prompt.name()
+                        )),
+                    }
+                }
+                let prompt = prompt.qualify(name, used);
+                problems.extend(prompt.problems(name));
+                if !seen.insert(prompt.name().to_owned()) {
+                    problems.push(format!("prompt `{}` is declared twice", prompt.name()));
+                }
+                prompts.push(prompt);
+            }
+        }
+        if problems.is_empty() { Ok(prompts) } else { Err(ModuleError(problems.join("; "))) }
+    }
+
+    /// Tên và mô tả một câu (`Module::description`) của mọi module, theo thứ tự đăng ký — cho
+    /// `/llms.txt`.
+    pub fn descriptions(&self) -> Vec<(&'static str, &'static str)> {
+        self.modules.iter().map(|module| (module.name(), module.description())).collect()
+    }
+
     /// Bảng mặt điều khiển của mọi module (kể cả `kernel`), theo thứ tự đăng ký.
     pub fn control_plane_tables(&self) -> Vec<&'static str> {
         self.modules.iter().flat_map(|module| module.control_plane_tables()).collect()

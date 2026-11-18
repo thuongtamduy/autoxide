@@ -87,6 +87,11 @@ impl Module for NotificationsModule {
         "notifications"
     }
 
+    fn description(&self) -> &'static str {
+        "Notifications to users by email, SMS, Zalo ZNS, web push, mobile push and an in-app \
+         inbox, with templates and preferences."
+    }
+
     // Tin bảo mật và giao dịch là nền của mọi module khác, không bán theo gói.
     fn always_enabled(&self) -> bool {
         true

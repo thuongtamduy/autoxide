@@ -106,6 +106,9 @@ async fn diagnose(settings: Settings) -> Vec<Line> {
     if let Some(finding) = probe_hsts(&values, &config.http) {
         lines.push(line("hsts", Some(finding)));
     }
+    if let Some(finding) = probe_rate_limit_store(&config) {
+        lines.push(line("rate_limit_store", Some(finding)));
+    }
     let database = match Database::connect(&config.database).await {
         Ok(database) => database,
         Err(error) => {
@@ -218,6 +221,20 @@ fn probe_hsts(
     })
 }
 
+/// Đếm rate limit trong database mà dùng SQLite (bước 40 P6): vẫn đúng nhưng vô ích — SQLite chỉ
+/// cho một tiến trình máy chủ — và thêm lệnh ghi lên kết nối ghi duy nhất. Gợi ý, không lỗi.
+fn probe_rate_limit_store(config: &autoxide_kernel::config::Config) -> Option<Finding> {
+    let shared = config.http.rate_limit_store == autoxide_kernel::config::RateLimitStore::Database;
+    let sqlite = config.database.url.backend() == autoxide_kernel::config::DatabaseBackend::Sqlite;
+    (shared && sqlite).then(|| {
+        Finding::warning(
+            "AUTOXIDE_HTTP_RATE_LIMIT_STORE=database with SQLite: SQLite runs one server process, \
+             so counting in memory is just as exact and adds no writes.",
+        )
+        .with_hint("Use `memory` with SQLite; keep `database` for several servers on PostgreSQL.")
+    })
+}
+
 fn probe_secret_key(modules: &Modules) -> Finding {
     match modules.api::<SecretKey>() {
         Some(key) if !key.is_configured() => Finding::warning(
@@ -284,6 +301,21 @@ mod tests {
         let https = ("AUTOXIDE_HTTP_PUBLIC_URL", "https://api.example.com");
         assert_eq!(probe(&[https]), Some(Status::Warning));
         assert_eq!(probe(&[https, ("AUTOXIDE_HTTP_HSTS_SECONDS", "31536000")]), Some(Status::Ok));
+    }
+
+    /// `database` + SQLite: nhắc dùng `memory` (bước 40 P6).
+    #[test]
+    fn nhac_khi_dem_rate_limit_trong_sqlite() {
+        let probe = |pairs: &[(&str, &str)]| {
+            let source = ConfigSource::from_pairs(pairs.iter().copied());
+            let settings = crate::settings::read(&source).unwrap();
+            probe_rate_limit_store(&settings.config).map(|finding| finding.status)
+        };
+        let sqlite = ("DATABASE_URL", "sqlite://data/autoxide.sqlite");
+        let shared = ("AUTOXIDE_HTTP_RATE_LIMIT_STORE", "database");
+        assert_eq!(probe(&[sqlite]), None);
+        assert_eq!(probe(&[sqlite, shared]), Some(Status::Warning));
+        assert_eq!(probe(&[("DATABASE_URL", "postgres://u:p@localhost/db"), shared]), None);
     }
 
     fn statuses(lines: &[Line]) -> Vec<(&str, &str)> {

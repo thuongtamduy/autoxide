@@ -54,6 +54,10 @@ impl Module for AiModule {
         "ai"
     }
 
+    fn description(&self) -> &'static str {
+        "Connection to AI models (text generation and embeddings) for every module; off by default."
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }

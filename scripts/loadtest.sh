@@ -21,6 +21,11 @@
 # Thêm LOADTEST_PLAN=1 (bước 35): khách s1 có thuê bao gói bật mọi module, khách s2 không — đo cả
 # GET /forms (module bị gói chi phối) của hai khách để so lớp chặn theo gói.
 #
+# Rate limit theo API key (bước 40 P6): LOADTEST_RATE_LIMIT_STORE=memory|database bật giới hạn theo
+# API key (1 000 000 request/phút để không có 429, burst LOADTEST_RATE_LIMIT_BURST, mặc định 30 như
+# cấu hình mặc định — lô của `database` là burst / 4) để đo chi phí đếm mỗi request.
+# LOADTEST_ONLY=api_key chỉ chạy bài GET /auth/me bằng API key (so nhanh trước / sau).
+#
 # Máy tạo tải và máy chủ chạy chung một máy nên tranh CPU: số đo là cận dưới, dùng để so
 # trước / sau một thay đổi trên cùng máy.
 
@@ -62,6 +67,11 @@ export AUTOXIDE_HTTP_ADDRESS="127.0.0.1:${PORT}"
 export AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE=0
 # Cả giới hạn theo API key (D-109): không thì bài đo API key chỉ đo câu trả lời 429.
 export AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE=0
+if [ -n "${LOADTEST_RATE_LIMIT_STORE:-}" ]; then
+  export AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE=1000000
+  export AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST="${LOADTEST_RATE_LIMIT_BURST:-30}"
+  export AUTOXIDE_HTTP_RATE_LIMIT_STORE="$LOADTEST_RATE_LIMIT_STORE"
+fi
 export AUTOXIDE_LOG_LEVEL=warn
 export AUTOXIDE_AUTH_TOKEN_SECRET="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
 export AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS=86400
@@ -211,6 +221,11 @@ echo "## $backend ($TENANCY) — $(nproc) CPU, ${DURATION} mỗi bài"
 echo
 echo "| Bài đo                             | Kết nối |  Request/s |   p50 ms |   p95 ms |   p99 ms |  Thành công |"
 echo "| ---------------------------------- | ----: | --------: | -------: | -------: | -------: | ------: |"
+if [ "${LOADTEST_ONLY:-}" = api_key ]; then
+  run "GET /auth/me (API key, ${LOADTEST_RATE_LIMIT_STORE:-off})" "$CONNECTIONS" -H "authorization: Bearer $API_KEY" "$BASE/api/v1/auth/me"
+  run "MCP auth.whoami (API key, ${LOADTEST_RATE_LIMIT_STORE:-off})" "$CONNECTIONS" -m POST -H "authorization: Bearer $API_KEY" -H 'accept: application/json, text/event-stream' -T application/json -d "$MCP_BODY" "$BASE/mcp"
+  exit 0
+fi
 run "GET /health/ready"                   "$CONNECTIONS" "$BASE/health/ready"
 run "GET /auth/me (access token)"         "$CONNECTIONS" -H "$AUTH" "$BASE/api/v1/auth/me"
 run "GET /auth/me (API key)"              "$CONNECTIONS" -H "authorization: Bearer $API_KEY" "$BASE/api/v1/auth/me"

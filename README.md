@@ -46,7 +46,8 @@ result holding a one-time secret, such as a new API key, which is never stored: 
 gets `409 idempotency_result_not_kept`). Mail
 goes out through SMTP from the job queue (password reset, email verification). Files
 are stored on local disk or in S3. AI agents call the system as tools over MCP at
-`/mcp`.
+`/mcp`, read its resources (module guides, JSON Schemas) and prompts, and find their way from
+`/llms.txt`, a page generated from the code.
 
 What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

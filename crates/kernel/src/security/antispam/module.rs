@@ -35,6 +35,11 @@ impl Module for AntispamModule {
         NAME
     }
 
+    fn description(&self) -> &'static str {
+        "Spam protection shared by public forms: form tokens, proof-of-work challenges and \
+         rate limits."
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(AntispamConfig::read(reader)?);
         Ok(())

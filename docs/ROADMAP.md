@@ -93,14 +93,18 @@ cả SQLite và Postgres.
       gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
       `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
       máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình)
-- [ ] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
+- [x] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
       việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
       mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
-      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch
-- [ ] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
+      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch — `Module::{mcp_resources, prompts,
+      description}`, lọc theo permission như tool; resource của kernel / `content` / `comments`, prompt
+      `content.draft_post`, `comments.moderate_queue`; `/llms.txt` + `autoxide://kernel/llms.txt` (D-374)
+- [x] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
       chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
       chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
-      quyết định
+      quyết định — `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (bảng `kernel_throttle`, `Throttle::take` theo
+      lô burst / 4, khoá theo khách); đo: tới −11% req/s, +22% p95 → `memory` vẫn mặc định; IP vẫn trong
+      bộ nhớ (D-375)
 - [ ] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
       `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
       module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục
@@ -122,7 +126,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       công khai (`Resource.image` và `resolve_many` đã có, D-238). `content` không biết khái niệm sản phẩm
 - [x] Tham chiếu ngược "đang dùng ở đâu" (D-267): module khai tham chiếu tới đối tượng khác qua sổ đối tượng
       (bài, trang, menu, sản phẩm trỏ tới tệp media…); `GET /media/{id}/usages` và tương tự cho loại khác — xong (18/11,
-      D-374): `GET /kernel/records/{kind}/{id}/usages`, nguồn của `content` và `menus`; module thương mại khai khi làm
+      D-376): `GET /kernel/records/{kind}/{id}/usages`, nguồn của `content` và `menus`; module thương mại khai khi làm
 - [x] Sổ điều hướng (P1): `Module::navigation` (nhóm, mục, permission, tính năng, nguồn số đếm, thứ tự); nhóm
       trùng phải khai giống nhau; menu ẩn khi module chưa bật hay thiếu permission, **khoá (vẫn hiện) khi
       thiếu tính năng của gói**; nhãn theo i18n; ETag; tool MCP
@@ -148,7 +152,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       `module_not_enabled` / `feature_not_in_plan` / `quota_exceeded` — giao diện hiện vì sao bị khoá, ai cấp
       được, nâng gói mở gì — **một phần** (17/11): `POST /me/can` với `unknown_permission`, `module_not_enabled`
       (`required_module`), `missing_permission`, cùng hàm kiểm với request thật. Còn: `feature_not_in_plan` /
-      `quota_exceeded`, `upgrade_to` — xong (18/11, D-374) với `feature` / `limit` trong câu hỏi. `grantors` (ai cấp được)
+      `quota_exceeded`, `upgrade_to` — xong (18/11, D-376) với `feature` / `limit` trong câu hỏi. `grantors` (ai cấp được)
       làm cùng mục "giải thích và mô phỏng" của bước 54
 - [x] Agent là người dùng thật (P12): API key `agent`; `ActorKind` chung cho audit, nhật ký, event (D-224);
       lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) agent gọi trả `202 approval_required`, yêu cầu

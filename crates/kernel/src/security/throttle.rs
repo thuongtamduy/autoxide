@@ -180,6 +180,55 @@ impl Throttle {
         })
     }
 
+    /// Lấy tối đa `n` lượt của khoá `key` trong cửa sổ hiện tại, bằng MỘT câu (D-375): dùng cho
+    /// rate limit theo lô — mỗi máy chủ lấy một lô rồi tiêu dần trong bộ nhớ, hết mới hỏi lại. Số
+    /// đếm cộng thẳng `n` (vượt `limit` cũng không sao: lượt sau trong cửa sổ nhận 0), nên số lượt
+    /// được cấp tính được từ số đếm trả về: `min(n, limit − (count − n))`. Các lượt đồng thời được
+    /// database xếp hàng trên dòng, tổng số lượt cấp trong một cửa sổ không vượt `limit`. Không đụng
+    /// tới `locked_until` (của [`hit`](Self::hit)).
+    pub async fn take(&self, tenant: &TenantContext, key: &str, n: u32) -> Result<Taken, Error> {
+        let wanted = <i32 as TryFrom<u32>>::try_from(n).map_err(Error::internal)?;
+        let now = now();
+        let table = Alias::new(&self.table);
+        let column = |name: &str| Expr::col((table.clone(), Alias::new(name)));
+        let fresh = column("window_started_at").gt(now - self.window);
+        let upsert = Query::insert()
+            .into_table(table.clone())
+            .columns(["tenant_id", "key", "count", "window_started_at"].map(Alias::new))
+            .values_panic([
+                tenant.id().as_uuid().into(),
+                sha256(key).into(),
+                wanted.into(),
+                now.into(),
+            ])
+            .on_conflict(
+                OnConflict::columns([Alias::new("tenant_id"), Alias::new("key")])
+                    .value(
+                        Alias::new("count"),
+                        Expr::case(fresh.clone(), column("count").add(wanted)).finally(wanted),
+                    )
+                    .value(
+                        Alias::new("window_started_at"),
+                        Expr::case(fresh, column("window_started_at")).finally(now),
+                    )
+                    .to_owned(),
+            )
+            .returning(Query::returning().columns(["count", "window_started_at"].map(Alias::new)))
+            .to_owned();
+        let row = tenant.database().write().query_one(&upsert).await?.ok_or_else(|| {
+            Error::internal(format!("taking from `{}` returned no row", self.table))
+        })?;
+        let count = i64::from(row.try_get::<i32>("", "count")?);
+        let started = row.try_get::<DateTime<Utc>>("", "window_started_at")?;
+        let before = count - i64::from(wanted);
+        let granted = (i64::from(self.limit) - before).clamp(0, i64::from(wanted));
+        let ends = started + self.window;
+        Ok(Taken {
+            granted: <u32 as TryFrom<i64>>::try_from(granted).unwrap_or(0),
+            window_left: (ends - now).to_std().unwrap_or_default(),
+        })
+    }
+
     /// Trả lại một lần đã đếm (vd lần thử hoá ra không sai): người dùng thật không bị tính oan.
     pub async fn refund(&self, tenant: &TenantContext, key: &str) -> Result<(), Error> {
         let update = Query::update()
@@ -246,6 +295,17 @@ impl Throttle {
         }
         Ok(())
     }
+}
+
+/// Kết quả của [`Throttle::take`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Taken {
+    /// Số lượt được cấp, từ 0 tới số đã xin.
+    pub granted: u32,
+    /// Thời gian còn lại của cửa sổ: lượt được cấp chỉ dùng trong khoảng này; cấp 0 thì thử lại sau
+    /// chừng này.
+    pub window_left: Duration,
 }
 
 /// Kết quả của câu "chèn hoặc cộng": số đếm của chính lượt này và hạn khoá của dòng (nếu có).

@@ -103,19 +103,26 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     }
     // Tiến trình chỉ làm việc nền (`worker`) không phục vụ API của module, chỉ health
     // check (và số đo) để hệ thống vận hành theo dõi.
-    let (routes, authenticator, tools) = if config.process.role.serves_api() {
+    let (routes, authenticator, mcp) = if config.process.role.serves_api() {
         // Bộ xác thực (nếu một module công bố) được gắn vào mọi request.
-        let tools = match modules.tools() {
-            Ok(tools) => tools,
+        let mcp = modules
+            .tools()
+            .and_then(|tools| Ok((tools, modules.mcp_resources()?, modules.prompts()?)));
+        let mcp = match mcp {
+            Ok(mcp) => mcp,
             Err(error) => {
                 let _ = database.close().await;
                 return Err(error.to_string());
             }
         };
-        (modules.routes(), modules.api::<dyn Authenticator>(), tools)
+        (modules.routes(), modules.api::<dyn Authenticator>(), mcp)
     } else {
-        (Vec::new(), None, Vec::new())
+        (Vec::new(), None, (Vec::new(), Vec::new(), Vec::new()))
     };
+    let (tools, resources, prompts) = mcp;
+    let public_url = modules
+        .api::<autoxide_kernel::public_url::PublicUrl>()
+        .and_then(|url| url.base().ok().map(str::to_owned));
     let mut extras = http::Extras::default()
         .authenticator(authenticator)
         .idempotency(modules.api::<dyn IdempotencyStore>())
@@ -123,7 +130,11 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         .deprecations(modules.deprecations())
         .body_limits(modules.body_limits())
         .entitlements(modules.entitlements())
-        .tools(tools);
+        .tools(tools)
+        .resources(resources)
+        .prompts(prompts)
+        .modules(modules.descriptions())
+        .public_url(public_url);
     if let Some(registry) = modules.tenancy() {
         extras = extras.tenancy(registry);
     }

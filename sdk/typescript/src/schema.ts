@@ -5535,6 +5535,8 @@ export type Data_ModuleInfo = {
     always_enabled: boolean;
     /** Endpoints of the module that are deprecated. */
     deprecations: ModuleDeprecation[];
+    /** One sentence about what the module does; empty when the module gives none. */
+    description: string;
     /** Events the module emits. */
     events: ModuleEvent[];
     /** Features of the module that a plan turns on or off (`<module>.<name>`). */
@@ -5558,8 +5560,12 @@ export type Data_ModuleInfo = {
     permissions: ModulePermission[];
     /** Place in the start order, from 0. A module starts after the modules it depends on. */
     position: number;
+    /** MCP prompts (templates for common jobs) the module offers at `/mcp`. */
+    prompts: ModulePrompt[];
     /** Modules this module uses; a plan that turns this module on must turn them on too. */
     requires: string[];
+    /** MCP resources (read-only documents) the module offers at `/mcp`. */
+    resources: ModuleResource[];
     /** Recurring jobs the module schedules. */
     schedules: ModuleSchedule[];
     /** Events the module listens to; `*` means every event. */
@@ -7907,6 +7913,8 @@ export type Data_Vec_ModuleInfo = {
     always_enabled: boolean;
     /** Endpoints of the module that are deprecated. */
     deprecations: ModuleDeprecation[];
+    /** One sentence about what the module does; empty when the module gives none. */
+    description: string;
     /** Events the module emits. */
     events: ModuleEvent[];
     /** Features of the module that a plan turns on or off (`<module>.<name>`). */
@@ -7930,8 +7938,12 @@ export type Data_Vec_ModuleInfo = {
     permissions: ModulePermission[];
     /** Place in the start order, from 0. A module starts after the modules it depends on. */
     position: number;
+    /** MCP prompts (templates for common jobs) the module offers at `/mcp`. */
+    prompts: ModulePrompt[];
     /** Modules this module uses; a plan that turns this module on must turn them on too. */
     requires: string[];
+    /** MCP resources (read-only documents) the module offers at `/mcp`. */
+    resources: ModuleResource[];
     /** Recurring jobs the module schedules. */
     schedules: ModuleSchedule[];
     /** Events the module listens to; `*` means every event. */
@@ -11070,6 +11082,8 @@ export type ModuleInfo = {
   always_enabled: boolean;
   /** Endpoints of the module that are deprecated. */
   deprecations: ModuleDeprecation[];
+  /** One sentence about what the module does; empty when the module gives none. */
+  description: string;
   /** Events the module emits. */
   events: ModuleEvent[];
   /** Features of the module that a plan turns on or off (`<module>.<name>`). */
@@ -11093,8 +11107,12 @@ export type ModuleInfo = {
   permissions: ModulePermission[];
   /** Place in the start order, from 0. A module starts after the modules it depends on. */
   position: number;
+  /** MCP prompts (templates for common jobs) the module offers at `/mcp`. */
+  prompts: ModulePrompt[];
   /** Modules this module uses; a plan that turns this module on must turn them on too. */
   requires: string[];
+  /** MCP resources (read-only documents) the module offers at `/mcp`. */
+  resources: ModuleResource[];
   /** Recurring jobs the module schedules. */
   schedules: ModuleSchedule[];
   /** Events the module listens to; `*` means every event. */
@@ -11139,6 +11157,40 @@ export type ModulePermission = {
   name: string;
   /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
   risk: string;
+};
+
+/** An MCP prompt: a template for a common job, fetched with `prompts/get`. */
+export type ModulePrompt = {
+  arguments: ModulePromptArgument[];
+  description: string;
+  /** Full prompt name, `<module>.<prompt>`. */
+  name: string;
+  /**
+   * Full names of the tools the prompt leads to; only callers who may call all of them see
+   * the prompt.
+   */
+  tools: string[];
+};
+
+/** An argument of an MCP prompt. */
+export type ModulePromptArgument = {
+  description: string;
+  name: string;
+  required: boolean;
+};
+
+/** An MCP resource: a read-only document an agent reads with `resources/read`. */
+export type ModuleResource = {
+  description: string;
+  mime_type: string;
+  name: string;
+  /**
+   * The caller needs this permission to see and read the resource; empty means any
+   * signed-in caller.
+   */
+  permissions: string[];
+  /** Full URI, `autoxide://<module>/<path>`. */
+  uri: string;
 };
 
 /** A recurring job. */
@@ -26139,6 +26191,16 @@ export interface paths {
       responses: {
         200: Data_Health;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/llms.txt": {
+    /** Overview of this server for AI agents. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: string;
         default: Problem;
       };
     };

@@ -619,6 +619,12 @@ lần. Đặt cùng `AUTOXIDE_AUTH_TOKEN_SECRET` ở mọi nơi. Muốn tăng AP
 rẽ, chạy vài tiến trình với `AUTOXIDE_PROCESS_ROLE=api` và ít nhất một tiến trình
 `worker`. SQLite chỉ cho một tiến trình máy chủ.
 
+Mặc định giới hạn request đếm theo từng tiến trình: với N máy chủ, một địa chỉ hay một API key
+được tới N lần giới hạn. Muốn các máy chủ chia chung giới hạn theo API key, đặt
+`AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`: mọi máy chủ đếm trong database, lấy lượt theo lô nhỏ
+(một phần tư `AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST`), nên mỗi phút một key được vượt giới hạn
+nhiều nhất một lô cho mỗi máy chủ. Giới hạn theo địa chỉ vẫn đếm theo từng tiến trình.
+
 ### Cập nhật không làm rơi request
 
 Khi được bảo dừng (`SIGTERM`, tín hiệu Docker, systemd và Kubernetes gửi), máy chủ đi qua

@@ -62,6 +62,11 @@ impl Module for OrganizationsModule {
         "organizations"
     }
 
+    fn description(&self) -> &'static str {
+        "The organization tree inside each tenant (head office, regions, stores, sellers…), its \
+         unit types, life cycle and settings."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true

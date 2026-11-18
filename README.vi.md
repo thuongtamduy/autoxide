@@ -42,7 +42,8 @@ tiếng Việt, chọn bằng header `Accept-Language`. Lệnh ghi gửi kèm he
 secret chỉ trả một lần, như API key mới, vốn không bao giờ được lưu: lần gửi lại nhận
 `409 idempotency_result_not_kept`). Mail gửi qua
 SMTP từ job queue (đặt lại mật khẩu, xác minh email). File lưu trên ổ đĩa hoặc S3. AI
-agent gọi hệ thống như công cụ qua MCP ở `/mcp`.
+agent gọi hệ thống như công cụ qua MCP ở `/mcp`, đọc resource (hướng dẫn của module, JSON
+Schema) và prompt của nó, và tự tìm đường từ `/llms.txt`, trang sinh từ code.
 
 Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

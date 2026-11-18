@@ -3,6 +3,7 @@
 //! phần bên trong của binary, như danh sách module ở `modules.rs`.
 
 pub(crate) mod access;
+pub(crate) mod agents;
 pub(crate) mod billing;
 pub(crate) mod cases;
 pub(crate) mod guides;

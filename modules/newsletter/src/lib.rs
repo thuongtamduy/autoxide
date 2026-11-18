@@ -83,6 +83,11 @@ impl Module for NewsletterModule {
         "newsletter"
     }
 
+    fn description(&self) -> &'static str {
+        "Newsletter lists, double opt-in subscribers, one-click unsubscribe and campaigns sent \
+         in rate-limited batches."
+    }
+
     fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
         use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
         let Some(config) = &self.config else {

@@ -84,7 +84,8 @@ pub const API_KEY_RATE_LIMIT_PER_MINUTE: Setting = Setting::new(
     "Requests one API key may make per minute, on average (REST and MCP), on top of the limit \
      per client address; more are answered with 429 and a `Retry-After` header. AI agents often \
      retry in loops: this keeps one key from crowding out the others. `0` turns it off. \
-     Counted per server process.",
+     Counted per server process, or shared by every server with \
+     `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`.",
 )
 .with_default("120");
 
@@ -93,6 +94,17 @@ pub const API_KEY_RATE_LIMIT_BURST: Setting = Setting::new(
     "Requests one API key may make at once before the per-minute rate applies.",
 )
 .with_default("30");
+
+pub const RATE_LIMIT_STORE: Setting = Setting::new(
+    "AUTOXIDE_HTTP_RATE_LIMIT_STORE",
+    "Where the limit per API key is counted: `memory` (each server process counts on its own; \
+     exact with SQLite, which runs one server) or `database` (shared by every server through the \
+     database, for several servers on PostgreSQL). `database` counts in fixed one-minute windows \
+     of at most max(per minute, burst) requests and takes them in lots of max(1, burst / 4), so \
+     with N servers a key may get up to N lots more per minute. The limit per client address is \
+     always counted in memory.",
+)
+.with_default("memory");
 
 pub const CLIENT_IP_HEADER: Setting = Setting::new(
     "AUTOXIDE_HTTP_CLIENT_IP_HEADER",
@@ -341,12 +353,25 @@ pub struct HttpConfig {
     pub trusted_proxies: Vec<IpRange>,
     /// Giới hạn số request của một API key (D-109).
     pub api_key_rate_limit: RateLimit,
+    /// Nơi đếm giới hạn theo API key (bước 40 P6, D-375).
+    pub rate_limit_store: RateLimitStore,
     /// Header chứa địa chỉ client do reverse proxy đặt; `None`: dùng địa chỉ kết nối.
     pub client_ip_header: Option<HeaderName>,
     /// Header bảo mật cho mọi response.
     pub security_headers: SecurityHeaders,
     /// Số ngày giữ nhật ký request theo khách (bước 52); `0`: không ghi.
     pub request_log_days: u16,
+}
+
+/// Nơi đếm giới hạn theo API key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub enum RateLimitStore {
+    /// Mỗi tiến trình đếm riêng (GCRA trong bộ nhớ).
+    #[default]
+    Memory,
+    /// Đếm chung qua bảng `kernel_throttle`, lấy theo lô.
+    Database,
 }
 
 /// Giới hạn số request của một địa chỉ client.
@@ -384,6 +409,11 @@ impl HttpConfig {
             .get_with(&API_KEY_RATE_LIMIT_PER_MINUTE, |raw| parse_in_range(raw, 0u32, 1_000_000));
         let key_burst =
             reader.get_with(&API_KEY_RATE_LIMIT_BURST, |raw| parse_in_range(raw, 1u32, 1_000_000));
+        let rate_limit_store = reader.get_with(&RATE_LIMIT_STORE, |raw| match raw.trim() {
+            "memory" => Ok(RateLimitStore::Memory),
+            "database" => Ok(RateLimitStore::Database),
+            _ => Err("must be `memory` or `database`".to_owned()),
+        });
         let client_ip_header = reader.optional_with(&CLIENT_IP_HEADER, |raw| {
             HeaderName::try_from(raw.trim())
                 .map_err(|_| "must be an HTTP header name, like `X-Forwarded-For`".to_owned())
@@ -424,6 +454,7 @@ impl HttpConfig {
             trusted_proxy_count: trusted_proxy_count?,
             trusted_proxies: trusted_proxies?.unwrap_or_default(),
             api_key_rate_limit: RateLimit { per_minute: key_per_minute?, burst: key_burst? },
+            rate_limit_store: rate_limit_store?,
             client_ip_header: client_ip_header?,
             security_headers: SecurityHeaders {
                 enabled: security_enabled?,
@@ -461,6 +492,12 @@ mod tests {
         assert!(!config.metrics);
         assert_eq!(config.rate_limit, RateLimit { per_minute: 600, burst: 60 });
         assert_eq!(config.api_key_rate_limit, RateLimit { per_minute: 120, burst: 30 });
+        // Bước 40 P6: đếm trong bộ nhớ vẫn là mặc định (`memory_van_la_mac_dinh`).
+        assert_eq!(config.rate_limit_store, RateLimitStore::Memory);
+        let shared = read(&[("AUTOXIDE_HTTP_RATE_LIMIT_STORE", "database")]).unwrap();
+        assert_eq!(shared.rate_limit_store, RateLimitStore::Database);
+        let wrong = read(&[("AUTOXIDE_HTTP_RATE_LIMIT_STORE", "redis")]).unwrap_err();
+        assert!(wrong.contains("must be `memory` or `database`"), "{wrong}");
         assert_eq!(config.client_ip_header, None);
         let header = read(&[("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "X-Forwarded-For")]).unwrap();
         assert_eq!(header.client_ip_header.unwrap().as_str(), "x-forwarded-for");
