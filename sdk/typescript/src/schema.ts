@@ -8781,6 +8781,40 @@ export type Data_SupportOpenedTicket = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportPolicyInForce = {
+  /** The policy in force at a unit, and where it comes from. */
+  data: SupportPolicy & {
+    /** The unit whose own policy applies; empty: the defaults. */
+    defined_at?: string | null;
+    /** The unit asked about. */
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportReport = {
+  /** Support figures for tickets created in a period. */
+  data: {
+    /** `breached` per 10000 tickets. */
+    breach_rate_bp: number;
+    /** Of those, that missed a response-time target. */
+    breached: number;
+    /** Median minutes from opening to the first answer (wall clock), of answered tickets. */
+    median_first_response_minutes?: number | null;
+    /** Median minutes from opening to solved (wall clock), of solved tickets. */
+    median_resolve_minutes?: number | null;
+    /** Average rating × 100 (e.g. 450 = 4.5). */
+    satisfaction_avg_x100?: number | null;
+    /** Ratings given (1 to 5). */
+    satisfaction_count: number;
+    /** Of those, solved or closed. */
+    solved: number;
+    /** Tickets created in the period. */
+    tickets: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportRoutingRule = {
   /** A routing rule: new tickets of the unit (and the units below) that match go to the team. */
   data: {
@@ -19552,6 +19586,9 @@ export type SetPasswordRequest = {
   password: string;
 };
 
+/** A policy to set on a unit (every field; units below without their own policy inherit it). */
+export type SetSupportPolicyRequest = SupportPolicy;
+
 /** A member's setting. */
 export type SetSupportTeamMemberRequest = {
   /** Takes new tickets in round-robin assignment. */
@@ -20213,8 +20250,72 @@ export type SupportOpenedTicket = SupportTicket & {
   access_token?: string | null;
 };
 
+/**
+ * Support policy of an organization unit. Units without their own policy use the nearest unit
+ * above that has one, else the defaults.
+ */
+export type SupportPolicy = {
+  /** A solved ticket closes after this many days without a new message (1 to 90). */
+  auto_close_days: number;
+  /** Automatic answers to simple questions (off by default). */
+  auto_reply: boolean;
+  /** Words that always stop an automatic answer. */
+  auto_reply_blocked_terms: string[];
+  /** At most this many automatic answers in a row on one ticket, then a person takes over. */
+  auto_reply_max_per_thread: number;
+  /** Lowest confidence (basis points, 0 to 10000) of the classification to answer automatically. */
+  auto_reply_min_confidence_bp: number;
+  /** When staff work. */
+  business_hours: SupportWorkingHours[];
+  /** Ticket categories customers choose from (codes; labels are translated by the website). */
+  categories: string[];
+  /** Business minutes to the first answer, per priority (`low`, `normal`, `high`, `urgent`). */
+  first_response_minutes: Record<string, unknown>;
+  /** Guests (no account) may open tickets. */
+  guest_tickets: boolean;
+  /** Days off (`YYYY-MM-DD`, local date). */
+  holidays: string[];
+  /** Email replies to ticket notifications go back into the ticket (needs an inbound mail module). */
+  inbound_email: boolean;
+  /**
+   * Business minutes to solve the ticket, per priority; time waiting for the customer does not
+   * count.
+   */
+  resolve_minutes: Record<string, unknown>;
+  /** Offset of the unit's local time from UTC, in minutes (Vietnam: 420). */
+  utc_offset_minutes: number;
+};
+
+/** The policy in force at a unit, and where it comes from. */
+export type SupportPolicyInForce = SupportPolicy & {
+  /** The unit whose own policy applies; empty: the defaults. */
+  defined_at?: string | null;
+  /** The unit asked about. */
+  org_id: string;
+};
+
 /** How urgent a ticket is. */
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
+
+/** Support figures for tickets created in a period. */
+export type SupportReport = {
+  /** `breached` per 10000 tickets. */
+  breach_rate_bp: number;
+  /** Of those, that missed a response-time target. */
+  breached: number;
+  /** Median minutes from opening to the first answer (wall clock), of answered tickets. */
+  median_first_response_minutes?: number | null;
+  /** Median minutes from opening to solved (wall clock), of solved tickets. */
+  median_resolve_minutes?: number | null;
+  /** Average rating × 100 (e.g. 450 = 4.5). */
+  satisfaction_avg_x100?: number | null;
+  /** Ratings given (1 to 5). */
+  satisfaction_count: number;
+  /** Of those, solved or closed. */
+  solved: number;
+  /** Tickets created in the period. */
+  tickets: number;
+};
 
 /** Who asked. Customers and guests see their own email or phone number masked. */
 export type SupportRequester = {
@@ -20318,6 +20419,16 @@ export type SupportTicketDetail = SupportTicket & {
 
 /** Where a ticket stands. */
 export type SupportTicketStatus = "open" | "pending_agent" | "pending_customer" | "solved" | "closed";
+
+/** One range of working time on a day of the week. */
+export type SupportWorkingHours = {
+  /** Local time `HH:MM`, after `opens`. */
+  closes: string;
+  /** 1 = Monday … 7 = Sunday. */
+  day: number;
+  /** Local time `HH:MM`. */
+  opens: string;
+};
 
 /** An address that gets no campaign mail. */
 export type SuppressionResponse = {
@@ -31804,6 +31915,40 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/policies/{org_id}": {
+    /** Get the support policy in force at a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Set the support policy of a unit. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: SetSupportPolicyRequest;
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove the own support policy of a unit. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/public/tickets": {
     /** Open a support ticket from the website. */
     post: {
@@ -31858,6 +32003,19 @@ export interface paths {
         422: Problem;
         429: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/reports/summary": {
+    /** Support figures for a period. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { from: string; to: string; org_id?: string }; };
+      responses: {
+        200: Data_SupportReport;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
