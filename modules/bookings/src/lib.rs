@@ -9,12 +9,18 @@
 //! qua `dyn Ledger`) và `notifications` (nhắc lịch qua `dyn Notifier`); cả ba là tuỳ chọn.
 //! Không cần module bán hàng (41–49).
 
+mod actions;
 pub mod api;
 mod availability;
+mod booking;
 mod entity;
 mod events;
+mod http_bookings;
+mod http_customer;
 mod http_public;
 mod http_setup;
+mod jobs;
+mod listing;
 mod migration;
 mod openings;
 mod permissions;
@@ -62,10 +68,17 @@ impl Module for BookingsModule {
 
     fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
         use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
-        Navigation::default().group(NavGroup::new("bookings", "Bookings", "calendar", 45)).item(
-            NavItem::new("bookings.services", "bookings", "Services and staff", 20)
-                .permissions(&[permissions::SERVICES_MANAGE]),
-        )
+        Navigation::default()
+            .group(NavGroup::new("bookings", "Bookings", "calendar", 45))
+            .item(NavItem::new("bookings.calendar", "bookings", "Appointments", 10).permissions(&[
+                permissions::BOOKINGS_MANAGE,
+                permissions::BOOKINGS_READ,
+                permissions::BOOKINGS_STAFF,
+            ]))
+            .item(
+                NavItem::new("bookings.services", "bookings", "Services and staff", 20)
+                    .permissions(&[permissions::SERVICES_MANAGE]),
+            )
     }
 
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
@@ -94,14 +107,38 @@ impl Module for BookingsModule {
             settings: Settings {
                 orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             },
+            jobs: context.jobs(),
+            databases: context.tenancy(),
+            ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
         });
         self.service = Some(service);
         Ok(())
     }
 
+    fn jobs(&self) -> Vec<autoxide_kernel::job::JobRegistration> {
+        self.service.as_ref().map_or_else(Vec::new, jobs::registrations)
+    }
+
+    fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
+        jobs::schedules()
+    }
+
+    fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
+        // Cọc đã thu; `ledger` có thể không được cài (`optional`).
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![autoxide_kernel::event::Subscription::optional(
+                "ledger.payment_succeeded",
+                Arc::new(jobs::PaymentListener(service)),
+            )]
+        })
+    }
+
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
-            http_setup::routes(service.clone()).merge(http_public::routes(service))
+            http_setup::routes(service.clone())
+                .merge(http_bookings::routes(service.clone()))
+                .merge(http_customer::routes(service.clone()))
+                .merge(http_public::routes(service))
         })
     }
 }
