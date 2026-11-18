@@ -392,6 +392,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   luận của website, kiểm duyệt, báo cáo và cấm, mail báo trả lời, lưu ý pháp lý
 - [`docs/MENUS.vi.md`](docs/MENUS.vi.md) — dùng module menu: mục, đối tượng của module khác, nhãn,
   endpoint công khai và cache, chuyển từ menu của module nội dung
+- [`docs/ANALYTICS.vi.md`](docs/ANALYTICS.vi.md) — phân tích truy cập không cookie: gửi sự kiện từ
+  website, báo cáo, phễu, đồng ý cho theo dõi theo người, ghi chú pháp lý
 - [`docs/ADDRESS.vi.md`](docs/ADDRESS.vi.md) — đơn vị hành chính và địa chỉ: đọc danh mục, nhập
   danh mục chính thức
 - [`docs/CATALOG.vi.md`](docs/CATALOG.vi.md) — sản phẩm: biến thể, danh mục, bảng giá có lịch sử,
