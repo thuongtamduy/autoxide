@@ -92,6 +92,8 @@ pub(crate) mod kyc_profile {
         pub reviewed_by: Option<Uuid>,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
+        /// Ghi chú của người duyệt khi từ chối / thu hồi (cho người được duyệt đọc).
+        pub review_note: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

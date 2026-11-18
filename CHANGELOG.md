@@ -11,6 +11,15 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `ledger`: `POST /api/v1/ledger/bank-accounts/{id}/vietqr-preview` makes a sample VietQR code to scan before taking
+  real payments (nothing is stored); `GET /api/v1/ledger/books/{id}/integrity` checks a book's hash chain on demand.
+- `invoices`: `POST /api/v1/invoices/documents/{id}/refresh` asks the e-invoice provider about a document now;
+  `GET /api/v1/invoices/vat-summary?from=&to=` adds up output VAT by kind of document and VAT rate.
+- `compliance`: `GET /api/v1/compliance/overview` counts the work waiting in each area (identity checks, websites,
+  incidents, cases, data subject requests), filled per permission. Identity profiles carry `subject_name`,
+  `missing_documents` and the reviewer's `review_note` (reject and revoke take `note`).
+- `GET /api/v1/kernel/records/types` lists the record types (with `has_children`); `organizations` registers
+  `organizations.unit` so other modules can show a unit's name.
 - Every list endpoint takes `count=true` and answers `pagination.total`, the number of items matching the filters, on
   the first page (one extra query, only when asked). MCP list tools take `count` too.
 - `ledger`: `PATCH /api/v1/ledger/bank-accounts/{id}` (account name, bank feed, `active` / `disabled`); accounting
@@ -881,6 +890,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- The fake e-invoice provider of `autoxide-testkit` gives the same answer to every status check of one submission, so
+  tests no longer fail when two checks run at once.
 - `Throttle::hit` no longer lets extra attempts through under concurrent load: an attempt that passed the "is it
   locked?" read just before another attempt locked the key (and reset its counter) now sees the lock returned by
   its own counting statement and is refused. Seen on PostgreSQL under parallel load; SQLite and PostgreSQL alike.

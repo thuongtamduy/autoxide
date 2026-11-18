@@ -125,6 +125,7 @@
   "field:must be an email address": "phải là địa chỉ email",
   "field:must be at least 1": "phải từ 1 trở lên",
   "field:must be at most 100 characters": "dài tối đa 100 ký tự",
+  "field:must be at most 1000 characters": "tối đa 1000 ký tự",
   "field:must be at most 20 file ids": "tối đa 20 id file",
   "field:must be at most 200 characters": "phải dài tối đa 200 ký tự",
   "field:must be at most 20000 characters": "dài tối đa 20000 ký tự",

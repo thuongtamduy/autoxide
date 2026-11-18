@@ -70,12 +70,34 @@ pub(crate) struct ProfileResponse {
     verified_at: Option<DateTime<Utc>>,
     expires_at: Option<DateTime<Utc>>,
     reason_code: Option<String>,
+    /// What the reviewer wrote to the person when refusing or revoking.
+    review_note: Option<String>,
+    /// `true` when the profile waits for the person (`draft` or `needs_info`) and no document has
+    /// been sent for a manual review.
+    missing_documents: bool,
+    /// Name of the subject as known before verification: the account name for `user`, the unit
+    /// name for `org`; `null` for other kinds, or when unknown. Compare with `verified_name`.
+    subject_name: Option<String>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
 
+impl ProfileResponse {
+    fn named(mut self, names: &std::collections::HashMap<(String, String), String>) -> Self {
+        self.subject_name =
+            names.get(&(self.subject_kind.clone(), self.subject_id.clone())).cloned();
+        self
+    }
+}
+
 impl From<kyc_profile::Model> for ProfileResponse {
     fn from(row: kyc_profile::Model) -> Self {
+        let document_file_ids: Vec<Uuid> =
+            serde_json::from_str(&row.document_files).unwrap_or_default();
+        // Tính trước khi `row.status` bị chuyển vào struct (ownership: sau khi chuyển thì không mượn
+        // lại được).
+        let missing_documents =
+            matches!(row.status.as_str(), "draft" | "needs_info") && document_file_ids.is_empty();
         ProfileResponse {
             id: row.id,
             subject_kind: row.subject_kind,
@@ -88,11 +110,14 @@ impl From<kyc_profile::Model> for ProfileResponse {
             document_kind: row.document_kind,
             document_last4: row.document_last4,
             assurance: row.assurance,
-            document_file_ids: serde_json::from_str(&row.document_files).unwrap_or_default(),
+            document_file_ids,
             info_request: row.info_request.and_then(|text| serde_json::from_str(&text).ok()),
             verified_at: row.verified_at,
             expires_at: row.expires_at,
+            missing_documents,
             reason_code: row.reason_code,
+            review_note: row.review_note,
+            subject_name: None,
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
@@ -316,7 +341,8 @@ async fn list_profiles(
     let page = service
         .list_profiles(&tenant, &principal, query.status, &PageRequest::try_from(page)?)
         .await?;
-    Ok(page.map(ProfileResponse::from))
+    let names = service.subject_names(&tenant, &page.data).await;
+    Ok(page.map(|row| ProfileResponse::from(row).named(&names)))
 }
 
 /// Open the identity verification profile of a unit (a seller).
@@ -370,7 +396,9 @@ async fn get_profile(
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<ProfileResponse>, Error> {
-    Ok(Data { data: service.profile_for(&tenant, &principal, id).await?.into() })
+    let row = service.profile_for(&tenant, &principal, id).await?;
+    let names = service.subject_names(&tenant, std::slice::from_ref(&row)).await;
+    Ok(Data { data: ProfileResponse::from(row).named(&names) })
 }
 
 /// Start a verification of a unit's profile with the provider.
@@ -466,6 +494,8 @@ async fn submit_documents(
 pub(crate) struct ReasonRequest {
     /// Short code, e.g. `document_unreadable`, `name_mismatch`, `fraud_suspected`.
     reason_code: String,
+    /// Note for the person, up to 1000 characters: what was wrong and what to do.
+    note: Option<String>,
 }
 
 /// What more is needed.
@@ -479,17 +509,18 @@ pub(crate) struct InfoRequest {
     message: String,
 }
 
-fn reason(raw: String) -> Result<String, Error> {
-    let code = raw.trim().to_owned();
-    if (1..=64).contains(&code.len()) {
-        Ok(code)
-    } else {
-        Err(Error::validation(vec![FieldError::new(
-            "reason_code",
-            "length",
-            "must be 1 to 64 characters",
-        )]))
+/// Mã lý do và ghi chú, kiểm cả hai rồi báo một lần.
+fn reason(input: ReasonRequest) -> Result<(String, Option<String>), Error> {
+    let mut problems = Vec::new();
+    let code = input.reason_code.trim().to_owned();
+    if !(1..=64).contains(&code.len()) {
+        problems.push(FieldError::new("reason_code", "length", "must be 1 to 64 characters"));
     }
+    let note = input.note.map(|note| note.trim().to_owned()).filter(|note| !note.is_empty());
+    if note.as_ref().is_some_and(|note| note.chars().count() > 1000) {
+        problems.push(FieldError::new("note", "length", "must be at most 1000 characters"));
+    }
+    if problems.is_empty() { Ok((code, note)) } else { Err(Error::validation(problems)) }
 }
 
 /// Approve a profile.
@@ -547,7 +578,8 @@ async fn reject(
     ValidJson(input): ValidJson<ReasonRequest>,
 ) -> Result<Data<ProfileResponse>, Error> {
     principal.require(&crate::permissions::KYC_REVIEW)?;
-    let decision = Decision::Reject(reason(input.reason_code)?);
+    let (code, note) = reason(input)?;
+    let decision = Decision::Reject(code, note);
     Ok(Data { data: service.review(&tenant, &principal, id, decision).await?.into() })
 }
 
@@ -579,7 +611,8 @@ async fn revoke(
     ValidJson(input): ValidJson<ReasonRequest>,
 ) -> Result<Data<ProfileResponse>, Error> {
     principal.require(&crate::permissions::KYC_REVIEW)?;
-    let decision = Decision::Revoke(reason(input.reason_code)?);
+    let (code, note) = reason(input)?;
+    let decision = Decision::Revoke(code, note);
     Ok(Data { data: service.review(&tenant, &principal, id, decision).await?.into() })
 }
 

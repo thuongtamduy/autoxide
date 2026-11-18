@@ -400,3 +400,86 @@ async fn chinh_sach_cua_khach() {
     .await
     .unwrap();
 }
+
+/// Module `auth` giả cho test: chỉ đăng ký bộ tra tên tài khoản `auth.user`.
+struct FakeAuth;
+
+struct FakeNames;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::resource::ResourceResolver for FakeNames {
+    async fn resolve(
+        &self,
+        _tenant: &autoxide_kernel::tenancy::TenantContext,
+        id: &str,
+    ) -> Result<Option<autoxide_kernel::resource::Resource>, autoxide_kernel::error::Error> {
+        Ok((id == Uuid::from_u128(2).to_string())
+            .then(|| autoxide_kernel::resource::Resource::new("Alice Nguyen")))
+    }
+}
+
+impl autoxide_kernel::module::Module for FakeAuth {
+    fn name(&self) -> &'static str {
+        "auth"
+    }
+
+    fn start(
+        &mut self,
+        context: &mut autoxide_kernel::module::StartContext<'_>,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        context.resource_type("auth.user", Arc::new(FakeNames))
+    }
+}
+
+#[tokio::test]
+async fn ho_so_kyc_kem_ten_chu_the_co_thieu_giay_to_va_ghi_chu_duyet() {
+    TestDatabase::run(async |test| {
+        let verifier = Arc::new(FakeIdentityVerifier::new());
+        let app = TestApp::builder(test)
+            .user("admin", 1, ALL)
+            .user("alice", 2, &[])
+            .provide::<dyn IdentityVerifier>(verifier)
+            .module(FakeAuth)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let (status, opened) = call(&app, "POST", "/me/kyc", "alice", Some(json!({}))).await;
+        assert!(status.is_success(), "{opened}");
+
+        let (status, page) = call(&app, "GET", "/kyc/profiles?status=draft", "admin", None).await;
+        assert_eq!(status, StatusCode::OK, "{page}");
+        let profile = &page["data"][0];
+        assert_eq!(profile["subject_kind"], "user");
+        assert_eq!(profile["subject_name"], "Alice Nguyen");
+        assert_eq!(profile["missing_documents"], true);
+        assert_eq!(profile["review_note"], Value::Null);
+        let id = profile["id"].as_str().unwrap().to_owned();
+        let (_, one) = call(&app, "GET", &format!("/kyc/profiles/{id}"), "admin", None).await;
+        assert_eq!(one["data"]["subject_name"], "Alice Nguyen");
+
+        // Sai cả mã lẫn ghi chú: báo một lần.
+        let long = "x".repeat(1001);
+        let body = json!({"reason_code": "", "note": long});
+        let uri = format!("/kyc/profiles/{id}/reject");
+        let (status, problem) = call(&app, "POST", &uri, "admin", Some(body)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["errors"].as_array().unwrap().len(), 2);
+
+        let body = json!({"reason_code": "document_unreadable",
+                          "note": "The photo of the ID card is blurred; send a sharper one."});
+        let (status, rejected) = call(&app, "POST", &uri, "admin", Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{rejected}");
+        assert_eq!(rejected["data"]["status"], "rejected");
+        assert_eq!(rejected["data"]["missing_documents"], false);
+        assert_eq!(
+            rejected["data"]["review_note"],
+            "The photo of the ID card is blurred; send a sharper one."
+        );
+        // Người được duyệt đọc được ghi chú.
+        let (_, mine) = call(&app, "GET", "/me/kyc", "alice", None).await;
+        assert_eq!(mine["data"]["profile"]["review_note"], rejected["data"]["review_note"]);
+    })
+    .await
+    .unwrap();
+}

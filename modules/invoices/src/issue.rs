@@ -518,6 +518,19 @@ impl InvoicesService {
         self.check_status(tenant, id).await
     }
 
+    /// Hỏi nhà cung cấp ngay (REST, `invoices.issue`) thay vì chờ lịch hỏi định kỳ. Chứng từ không ở
+    /// `submitting` thì trả nguyên — không có gì để hỏi.
+    pub(crate) async fn refresh_manual(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<Document, Error> {
+        self.document_for(tenant, principal, &ISSUE, id).await?;
+        self.check_status(tenant, id).await?;
+        self.document_detail(tenant, principal, id).await
+    }
+
     /// Hỏi nhà cung cấp trạng thái của chứng từ `submitting` `id`.
     pub(crate) async fn check_status(&self, tenant: &TenantContext, id: Uuid) -> Result<(), Error> {
         let database = tenant.database();

@@ -17,6 +17,7 @@ mod profile;
 mod service;
 mod settings;
 mod tools;
+mod unit_resource;
 
 #[cfg(test)]
 mod tests;
@@ -112,6 +113,7 @@ impl Module for OrganizationsModule {
         context.usage_counter(&service::UNITS_LIMIT, Arc::new(service::UnitCounter))?;
         let service = Arc::new(service);
         context.resource_type(profile::STORE, Arc::new(profile::StoreResolver))?;
+        context.resource_type(unit_resource::UNIT, Arc::new(unit_resource::UnitResolver))?;
         self.service = Some(service.clone());
         // Kernel hỏi "nút này có thuộc khách không" (gắn tên miền với một cửa hàng…).
         context.provide::<dyn autoxide_kernel::tenancy::OrgNodes>(service.clone())?;

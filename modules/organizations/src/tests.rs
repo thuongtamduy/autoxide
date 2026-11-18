@@ -598,3 +598,24 @@ async fn khong_ro_ri_giua_khach() {
 
 mod profile;
 mod settings;
+
+#[tokio::test]
+async fn so_doi_tuong_tra_ten_nut_theo_lo() {
+    TestDatabase::run(async |test| {
+        let app = build(test, |builder| builder).await;
+        let tree = tree(&app).await;
+        let resources = app.modules().resources();
+        let tenant = app.default_tenant();
+        let ids =
+            vec![tree.r1.clone(), tree.s1.clone(), Uuid::now_v7().to_string(), "x".to_owned()];
+        let found =
+            resources.resolve_many(&tenant, "organizations.unit", &ids, None).await.unwrap();
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[&tree.r1].title, "Region North");
+        assert_eq!(found[&tree.s1].title, "Store Hà Nội");
+        // Tên nội bộ, không công khai.
+        assert!(!found[&tree.s1].public);
+    })
+    .await
+    .unwrap();
+}

@@ -1681,15 +1681,27 @@ export type ComplianceKycProfile = {
   /** What the reviewer asked for (`needs_info`): `fields` and `message`. */
   info_request?: Record<string, unknown> | null;
   method?: string | null;
+  /**
+   * `true` when the profile waits for the person (`draft` or `needs_info`) and no document has
+   * been sent for a manual review.
+   */
+  missing_documents: boolean;
   /** `individual`, `household_business` or `organization`. */
   party_type: string;
   provider?: string | null;
   reason_code?: string | null;
+  /** What the reviewer wrote to the person when refusing or revoking. */
+  review_note?: string | null;
   /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
   status: string;
   subject_id: string;
   /** `user`, `org`, `email` or `reference`. */
   subject_kind: string;
+  /**
+   * Name of the subject as known before verification: the account name for `user`, the unit
+   * name for `org`; `null` for other kinds, or when unknown. Compare with `verified_name`.
+   */
+  subject_name?: string | null;
   updated_at: string;
   verified_at?: string | null;
   verified_name?: string | null;
@@ -1705,6 +1717,8 @@ export type ComplianceKycProfileRequest = {
 
 /** Why a profile is refused or revoked. */
 export type ComplianceKycReasonRequest = {
+  /** Note for the person, up to 1000 characters: what was wrong and what to do. */
+  note?: string | null;
   /** Short code, e.g. `document_unreadable`, `name_mismatch`, `fraud_suspected`. */
   reason_code: string;
 };
@@ -1817,6 +1831,57 @@ export type ComplianceMyKyc = {
   profile?: ComplianceKycProfile | null;
   /** `none` when you have no profile yet. */
   status: string;
+};
+
+/** Work waiting in each compliance area. An area is `null` when you may not read it. */
+export type ComplianceOverview = {
+  cases?: ComplianceOverviewCases | null;
+  incidents?: ComplianceOverviewIncidents | null;
+  kyc?: ComplianceOverviewKyc | null;
+  subject_requests?: ComplianceOverviewSubjectRequests | null;
+  websites?: ComplianceOverviewWebsites | null;
+};
+
+/** Complaints and infringement reports. */
+export type ComplianceOverviewCases = {
+  /** Held by the anti-spam checks, waiting for a look. */
+  held: number;
+  /** Not yet decided, closed or withdrawn (spam held aside not counted). */
+  open: number;
+  /** Open and past the time to decide. */
+  overdue: number;
+};
+
+/** Personal data incidents. */
+export type ComplianceOverviewIncidents = {
+  /** Not `closed`. */
+  open: number;
+  /** `open` or `contained` and past the time to report to the authority. */
+  report_overdue: number;
+};
+
+/** Identity verification waiting for someone. */
+export type ComplianceOverviewKyc = {
+  /** Profiles `needs_info`: waiting for the person to send more. */
+  needs_info: number;
+  /** Profiles `pending`: waiting for the provider or for a review. */
+  pending: number;
+};
+
+/** Requests of data subjects (access, erasure…). */
+export type ComplianceOverviewSubjectRequests = {
+  /** `received` or `in_progress`. */
+  open: number;
+  /** Open and past the legal deadline. */
+  overdue: number;
+};
+
+/** Websites and apps to declare to the Ministry of Industry and Trade. */
+export type ComplianceOverviewWebsites = {
+  /** `submitted`: waiting for the ministry. */
+  awaiting_authority: number;
+  /** `not_submitted` or `needs_supplement`: you have something to send. */
+  to_submit: number;
 };
 
 /** A document you still have to accept. */
@@ -3792,15 +3857,27 @@ export type Data_ComplianceKycProfile = {
     /** What the reviewer asked for (`needs_info`): `fields` and `message`. */
     info_request?: Record<string, unknown> | null;
     method?: string | null;
+    /**
+     * `true` when the profile waits for the person (`draft` or `needs_info`) and no document has
+     * been sent for a manual review.
+     */
+    missing_documents: boolean;
     /** `individual`, `household_business` or `organization`. */
     party_type: string;
     provider?: string | null;
     reason_code?: string | null;
+    /** What the reviewer wrote to the person when refusing or revoking. */
+    review_note?: string | null;
     /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
     status: string;
     subject_id: string;
     /** `user`, `org`, `email` or `reference`. */
     subject_kind: string;
+    /**
+     * Name of the subject as known before verification: the account name for `user`, the unit
+     * name for `org`; `null` for other kinds, or when unknown. Compare with `verified_name`.
+     */
+    subject_name?: string | null;
     updated_at: string;
     verified_at?: string | null;
     verified_name?: string | null;
@@ -3876,6 +3953,18 @@ export type Data_ComplianceMyKyc = {
     profile?: ComplianceKycProfile | null;
     /** `none` when you have no profile yet. */
     status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ComplianceOverview = {
+  /** Work waiting in each compliance area. An area is `null` when you may not read it. */
+  data: {
+    cases?: ComplianceOverviewCases | null;
+    incidents?: ComplianceOverviewIncidents | null;
+    kyc?: ComplianceOverviewKyc | null;
+    subject_requests?: ComplianceOverviewSubjectRequests | null;
+    websites?: ComplianceOverviewWebsites | null;
   };
 };
 
@@ -4907,6 +4996,19 @@ export type Data_InvoicesTemplatePreview = {
 };
 
 /** Envelope of a single result. */
+export type Data_InvoicesVatSummary = {
+  /** Output VAT of a period. */
+  data: {
+    from: string;
+    /** The unit, or `null` for every unit in your scope. */
+    org_id?: string | null;
+    /** One row per kind of document, currency and VAT rate. */
+    rows: InvoicesVatSummaryRow[];
+    to: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_JobRunView = {
   /** A tracked background job. */
   data: {
@@ -5011,6 +5113,20 @@ export type Data_LedgerBookResponse = {
     id: string;
     /** The unit that keeps the book. */
     org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerChainCheck = {
+  /** The result of checking a book's hash chain. */
+  data: {
+    book_id: string;
+    broken?: LedgerChainBreak | null;
+    /** Number of sealed entries checked (when intact). */
+    checked: number;
+    checked_at: string;
+    /** `true` when every sealed entry and seal is as it was sealed. */
+    intact: boolean;
   };
 };
 
@@ -5298,6 +5414,20 @@ export type Data_LedgerTrialBalanceResponse = {
     org_id: string;
     to: string;
     totals: LedgerTrialBalanceTotal[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_LedgerVietqrPreview = {
+  /** A sample VietQR code for a bank account. */
+  data: {
+    amount: Money;
+    /** The account the code pays into. */
+    bank_account: LedgerBankAccount;
+    /** The transfer note inside the code. */
+    memo: string;
+    /** The VietQR (EMVCo) text to draw as a QR code. */
+    qr_payload: string;
   };
 };
 
@@ -8545,6 +8675,21 @@ export type Data_Vec_RecordNote = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_RecordType = {
+  data: {
+    /**
+     * `true` when records of this type form a tree (e.g. categories): a menu item can list a
+     * record's children automatically.
+     */
+    has_children: boolean;
+    /** `<module>.<type>`, e.g. `content.entry`. */
+    kind: string;
+    /** The module that owns the type. */
+    module: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_Referrer = {
   data: {
     /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
@@ -10074,6 +10219,33 @@ export type InvoicesTemplateVariable = {
   required: boolean;
 };
 
+/** Output VAT of a period. */
+export type InvoicesVatSummary = {
+  from: string;
+  /** The unit, or `null` for every unit in your scope. */
+  org_id?: string | null;
+  /** One row per kind of document, currency and VAT rate. */
+  rows: InvoicesVatSummaryRow[];
+  to: string;
+};
+
+/** One row of the VAT summary. */
+export type InvoicesVatSummaryRow = {
+  /** Number of documents with lines in this row. */
+  documents: number;
+  /** Kind of document, e.g. `vat_invoice`. */
+  kind: string;
+  /** Amount before tax: increases minus decrease adjustments. */
+  net: Money;
+  /**
+   * VAT rate in percent as written on the lines, e.g. `"10"`; `null` for lines without a rate
+   * (not subject to VAT).
+   */
+  rate_percent?: string | null;
+  /** VAT: increases minus decrease adjustments. */
+  tax: Money;
+};
+
 /** A file written by a job. */
 export type JobFile = {
   /** When it is deleted. */
@@ -10277,6 +10449,27 @@ export type LedgerBookResponse = {
   id: string;
   /** The unit that keeps the book. */
   org_id: string;
+};
+
+/** The first place a hash chain breaks. */
+export type LedgerChainBreak = {
+  /** The entry there, when it still exists. */
+  entry_id?: string | null;
+  /** What was found, in English, e.g. `the entry or its lines were changed`. */
+  reason: string;
+  /** Sequence number in the chain where the check failed. */
+  sequence: number;
+};
+
+/** The result of checking a book's hash chain. */
+export type LedgerChainCheck = {
+  book_id: string;
+  broken?: LedgerChainBreak | null;
+  /** Number of sealed entries checked (when intact). */
+  checked: number;
+  checked_at: string;
+  /** `true` when every sealed entry and seal is as it was sealed. */
+  intact: boolean;
 };
 
 /** Where cash on delivery goes (D-216): never to the marketplace operator's own account. */
@@ -10736,6 +10929,28 @@ export type LedgerVietqrPaymentRequest = {
   reference: string;
   /** Id of your document (order, invoice…). */
   source_id?: string | null;
+};
+
+/** A sample VietQR code for a bank account. */
+export type LedgerVietqrPreview = {
+  amount: Money;
+  /** The account the code pays into. */
+  bank_account: LedgerBankAccount;
+  /** The transfer note inside the code. */
+  memo: string;
+  /** The VietQR (EMVCo) text to draw as a QR code. */
+  qr_payload: string;
+};
+
+/** What to put in a sample VietQR code. */
+export type LedgerVietqrPreviewRequest = {
+  /** Amount in VND, e.g. `{"amount": "10000", "currency": "VND"}`. */
+  amount: Money;
+  /**
+   * Transfer note, 1 to 25 letters, digits or spaces without accents; default a sample transfer
+   * code like the ones real payments get.
+   */
+  memo?: string | null;
 };
 
 /** Receipt of a partner notification. */
@@ -12582,15 +12797,27 @@ export type Page_ComplianceKycProfile = {
     /** What the reviewer asked for (`needs_info`): `fields` and `message`. */
     info_request?: Record<string, unknown> | null;
     method?: string | null;
+    /**
+     * `true` when the profile waits for the person (`draft` or `needs_info`) and no document has
+     * been sent for a manual review.
+     */
+    missing_documents: boolean;
     /** `individual`, `household_business` or `organization`. */
     party_type: string;
     provider?: string | null;
     reason_code?: string | null;
+    /** What the reviewer wrote to the person when refusing or revoking. */
+    review_note?: string | null;
     /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
     status: string;
     subject_id: string;
     /** `user`, `org`, `email` or `reference`. */
     subject_kind: string;
+    /**
+     * Name of the subject as known before verification: the account name for `user`, the unit
+     * name for `org`; `null` for other kinds, or when unknown. Compare with `verified_name`.
+     */
+    subject_name?: string | null;
     updated_at: string;
     verified_at?: string | null;
     verified_name?: string | null;
@@ -15811,6 +16038,19 @@ export type RecordTagsInput = {
   new_tags?: string[];
   /** The tags the record has after the call (replaces the current ones). */
   tag_ids?: string[];
+};
+
+/** A type of record in the resource directory. */
+export type RecordType = {
+  /**
+   * `true` when records of this type form a tree (e.g. categories): a menu item can list a
+   * record's children automatically.
+   */
+  has_children: boolean;
+  /** `<module>.<type>`, e.g. `content.entry`. */
+  kind: string;
+  /** The module that owns the type. */
+  module: string;
 };
 
 /** One-time recovery codes. Shown only once. */
@@ -20496,6 +20736,17 @@ export interface paths {
       };
     };
   };
+  "/api/v1/compliance/overview": {
+    /** Work waiting in each compliance area. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_ComplianceOverview;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/compliance/policies": {
     /** List the compliance policies set by the tenant. */
     get: {
@@ -22359,6 +22610,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/invoices/documents/{id}/refresh": {
+    /** Ask the e-invoice provider about a document now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InvoicesDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/invoices/documents/{id}/render": {
     /** Print a document as HTML or PDF. */
     get: {
@@ -22636,6 +22901,19 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/invoices/vat-summary": {
+    /** Output VAT of a period by kind of document and VAT rate. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { from: string; to: string; org_id?: string }; };
+      responses: {
+        200: Data_InvoicesVatSummary;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -23150,6 +23428,17 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/records/types": {
+    /** List the types of record that menus, embeds and notes can point to. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_RecordType;
+        401: Problem;
         default: Problem;
       };
     };
@@ -23810,6 +24099,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/ledger/bank-accounts/{id}/vietqr-preview": {
+    /** Make a sample VietQR code for a bank account, without creating a payment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: LedgerVietqrPreviewRequest;
+      responses: {
+        200: Data_LedgerVietqrPreview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ledger/bank-feeds/{provider}": {
     /** Receive bank account transactions from a bank feed. */
     post: {
@@ -23856,6 +24160,19 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_LedgerBookResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/books/{id}/integrity": {
+    /** Check a book's hash chain now. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_LedgerChainCheck;
         401: Problem;
         403: Problem;
         404: Problem;

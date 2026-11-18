@@ -18,6 +18,7 @@
   "field:must be 1 to 200 characters long": "phải dài 1 đến 200 ký tự",
   "field:must be 1 to 200 characters long (fixed text, no personal data)": "phải dài 1 đến 200 ký tự (chữ cố định, không chứa dữ liệu cá nhân)",
   "field:must be 1 to 200 characters long (no personal data)": "phải dài 1 đến 200 ký tự (không chứa dữ liệu cá nhân)",
+  "field:must be 1 to 25 letters, digits or spaces, without accents": "phải có 1 đến 25 chữ cái, chữ số hoặc khoảng trắng, không dấu",
   "field:must be 1 to 32 characters": "phải dài 1 đến 32 ký tự",
   "field:must be 1 to 50 characters long": "phải dài 1 đến 50 ký tự",
   "field:must be `active` or `closed`": "phải là `active` hay `closed`",

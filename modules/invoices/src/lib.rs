@@ -21,6 +21,7 @@ mod retention;
 mod service;
 mod templates;
 mod tools;
+mod vat;
 
 #[cfg(test)]
 mod tests;
@@ -116,7 +117,8 @@ impl Module for InvoicesModule {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
             http::routes(service.clone())
                 .merge(http_documents::routes(service.clone()))
-                .merge(http_print::routes(service))
+                .merge(http_print::routes(service.clone()))
+                .merge(vat::routes(service))
         })
     }
 

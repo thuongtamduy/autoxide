@@ -419,3 +419,107 @@ async fn tool_mcp_lap_nhap_va_phat_hanh() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn hoi_lai_nha_cung_cap_hoa_don_ngay() {
+    use sea_orm::ConnectionTrait as _;
+    TestDatabase::run(async |test| {
+        let Setup { app, provider, .. } = setup(test).await;
+        series(&app, "vat_invoice", "1C26TAA", Some("fake")).await;
+        let found = draft(&app, "R-1", 200_000).await;
+        let refresh = format!("/documents/{}/refresh", found.id);
+        // Nháp: không có gì để hỏi, trả nguyên.
+        let (status, same) = call(&app, "POST", &refresh, None).await;
+        assert_eq!(status, StatusCode::OK, "{same}");
+        assert_eq!(same["data"]["status"], "draft");
+
+        let (status, _) = call(&app, "POST", &format!("/documents/{}/issue", found.id), None).await;
+        assert_eq!(status, StatusCode::OK);
+        drain(&app).await;
+        // Giả như lần hỏi định kỳ chưa tới: chứng từ còn chờ cơ quan thuế.
+        let write = app.database().write();
+        let backend = write.get_database_backend();
+        write
+            .execute_raw(sea_orm::Statement::from_sql_and_values(
+                backend,
+                "UPDATE invoices_documents SET status = 'submitting', authority_code = NULL \
+                 WHERE id = $1",
+                [found.id.into()],
+            ))
+            .await
+            .unwrap();
+
+        provider.fail_next(1);
+        let (status, problem) = call(&app, "POST", &refresh, None).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{problem}");
+        assert_eq!(problem["code"], "einvoice.provider_unavailable");
+        let (status, accepted) = call(&app, "POST", &refresh, None).await;
+        assert_eq!(status, StatusCode::OK, "{accepted}");
+        assert_eq!(accepted["data"]["status"], "accepted");
+        assert!(accepted["data"]["authority_code"].as_str().is_some());
+
+        let missing = format!("/documents/{}/refresh", Uuid::now_v7());
+        let (status, _) = call(&app, "POST", &missing, None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn tong_hop_gtgt_dau_ra_theo_ky() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        let tenant = app.default_tenant();
+        series(&app, "vat_invoice", "1C26TAA", Some("fake")).await;
+        let kept = draft(&app, "V-1", 200_000).await;
+        let kept = invoices(&app).issue(&tenant, Actor::system(), kept.id).await.unwrap();
+        let dropped = draft(&app, "V-2", 100_000).await;
+        invoices(&app).issue(&tenant, Actor::system(), dropped.id).await.unwrap();
+        drain(&app).await;
+        let (status, _) = call(
+            &app,
+            "POST",
+            &format!("/documents/{}/cancel", dropped.id),
+            Some(json!({"reason": "Wrong buyer"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        // Điều chỉnh giảm 50.000 đ trước thuế cho chứng từ còn lại.
+        let (status, adjustment) = call(
+            &app,
+            "POST",
+            &format!("/documents/{}/adjust", kept.id),
+            Some(json!({"reference": "ADJ-V", "direction": "decrease", "lines": [{"description": "Discount",
+                "kind": "service", "unit_price": {"amount": "50000", "currency": "VND"}, "tax_category": "vat.standard"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{adjustment}");
+        let adjustment_id = adjustment["data"]["id"].as_str().unwrap().parse().unwrap();
+        let adjusted = invoices(&app).issue(&tenant, Actor::system(), adjustment_id).await.unwrap();
+        drain(&app).await;
+
+        let today = Utc::now().date_naive();
+        let uri = format!("/vat-summary?from={}&to={today}", today.with_day(1).unwrap());
+        let (status, summary) = call(&app, "GET", &uri, None).await;
+        assert_eq!(status, StatusCode::OK, "{summary}");
+        let rows = summary["data"]["rows"].as_array().unwrap();
+        assert_eq!(rows.len(), 1, "{summary}");
+        let row = &rows[0];
+        assert_eq!(row["kind"], "vat_invoice");
+        assert_eq!(row["rate_percent"], "10");
+        let net = kept.subtotal.minor() - adjusted.subtotal.minor();
+        let tax = kept.tax.minor() - adjusted.tax.minor();
+        assert_eq!(row["net"], json!({"amount": net.to_string(), "currency": "VND"}));
+        assert_eq!(row["tax"], json!({"amount": tax.to_string(), "currency": "VND"}));
+        assert_eq!(row["documents"], 2);
+
+        let (status, problem) =
+            call(&app, "GET", "/vat-summary?from=2026-01-01&to=2025-01-01", None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        let (status, _) = call(&app, "GET", "/vat-summary", None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    })
+    .await
+    .unwrap();
+}

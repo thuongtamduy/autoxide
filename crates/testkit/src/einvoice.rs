@@ -23,7 +23,7 @@ pub struct FakeEInvoiceProvider {
     pub issued: Mutex<Vec<EInvoice>>,
     /// Hoá đơn đã huỷ (mã ở nhà cung cấp).
     pub cancelled: Mutex<Vec<String>>,
-    /// Lý do từ chối cho lần kiểm trạng thái kế tiếp của từng hoá đơn.
+    /// Lý do từ chối của lần gửi gần nhất của từng hoá đơn.
     rejections: Mutex<HashMap<String, String>>,
     reject_next: Mutex<Option<String>>,
     unavailable: AtomicUsize,
@@ -77,10 +77,14 @@ impl EInvoiceProvider for FakeEInvoiceProvider {
         if let Ok(mut issued) = self.issued.lock() {
             issued.push(invoice.clone());
         }
-        if let Some(reason) = self.reject_next.lock().ok().and_then(|mut slot| slot.take())
-            && let Ok(mut rejections) = self.rejections.lock()
-        {
-            rejections.insert(reference.clone(), reason);
+        // Kết quả gắn với lần gửi này: gửi lại (sau khi sửa) thì thay kết quả cũ. Hỏi trạng thái không
+        // "tiêu" kết quả — hai lần hỏi đồng thời (job gửi và lịch hỏi định kỳ) thấy cùng một câu trả lời.
+        let rejection = self.reject_next.lock().ok().and_then(|mut slot| slot.take());
+        if let Ok(mut rejections) = self.rejections.lock() {
+            match rejection {
+                Some(reason) => rejections.insert(reference.clone(), reason),
+                None => rejections.remove(&reference),
+            };
         }
         Ok(IssuedEInvoice::new(reference.clone())
             .lookup_code(format!("LOOKUP-{}", &reference[9..17])))
@@ -88,7 +92,8 @@ impl EInvoiceProvider for FakeEInvoiceProvider {
 
     async fn status(&self, _tenant: TenantId, provider_ref: &str) -> Result<EInvoiceStatus, Error> {
         self.take_failure()?;
-        let rejected = self.rejections.lock().ok().and_then(|mut found| found.remove(provider_ref));
+        let rejected =
+            self.rejections.lock().ok().and_then(|found| found.get(provider_ref).cloned());
         Ok(match rejected {
             Some(reason) => EInvoiceStatus::Rejected { reason },
             None => EInvoiceStatus::Accepted {

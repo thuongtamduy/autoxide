@@ -639,9 +639,65 @@ async fn get_record_usages(
     Ok(Data { data: found })
 }
 
+/// A type of record in the resource directory.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct RecordType {
+    /// `<module>.<type>`, e.g. `content.entry`.
+    #[schema(example = "content.term")]
+    kind: String,
+    /// The module that owns the type.
+    module: String,
+    /// `true` when records of this type form a tree (e.g. categories): a menu item can list a
+    /// record's children automatically.
+    has_children: bool,
+}
+
+/// List the types of record that menus, embeds and notes can point to.
+///
+/// Any signed-in user; only the types of modules whose `<module>.read` you hold. To find records of
+/// a type, use `GET /api/v1/kernel/find?q=…` with the operator `is:<type>`.
+#[utoipa::path(
+    get,
+    path = "/records/types",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "list_record_types",
+    security(("bearer" = [])),
+    responses(
+        (status = 200, description = "The types, sorted by name.", body = Data<Vec<RecordType>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+    )
+)]
+async fn list_record_types(
+    State(state): State<Arc<RecordsState>>,
+    principal: Principal,
+) -> Result<Data<Vec<RecordType>>, Error> {
+    let mut types: Vec<RecordType> = state
+        .resources
+        .types()
+        .into_iter()
+        .filter_map(|kind| {
+            let module = kind.split_once('.').map_or(kind, |(module, _)| module);
+            let reader = format!("{module}.read");
+            let readable = state
+                .permissions
+                .iter()
+                .find(|permission| permission.name() == reader)
+                .is_some_and(|permission| principal.require(permission).is_ok());
+            readable.then(|| RecordType {
+                kind: kind.to_owned(),
+                module: module.to_owned(),
+                has_children: state.resources.has_children(kind),
+            })
+        })
+        .collect();
+    types.sort_by(|a, b| a.kind.cmp(&b.kind));
+    Ok(Data { data: types })
+}
+
 pub(crate) fn routes(state: RecordsState) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(get_record_usages))
+        .routes(routes!(list_record_types))
         .routes(routes!(list_record_events))
         .routes(routes!(list_record_notes, create_record_note))
         .routes(routes!(delete_record_note))

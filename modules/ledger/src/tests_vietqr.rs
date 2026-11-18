@@ -421,3 +421,53 @@ async fn loc_thanh_toan_theo_so_tien_tien_te_va_nut() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn xem_truoc_vietqr_khong_tao_thanh_toan() {
+    TestDatabase::run(async |test| {
+        let (app, _feed, account) = setup(test).await;
+        let uri = format!("/bank-accounts/{account}/vietqr-preview");
+        let (status, preview) = call(
+            &app,
+            "POST",
+            &uri,
+            Some(json!({"amount": {"amount": "10000", "currency": "VND"}, "memo": "THU 1"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{preview}");
+        let payload = preview["data"]["qr_payload"].as_str().unwrap();
+        assert!(payload.contains(ACCOUNT) && payload.contains("970436"), "{payload}");
+        assert!(payload.contains("THU 1"));
+        assert_eq!(preview["data"]["bank_account"]["id"], account.as_str());
+        // Không nêu nội dung: mã chuyển khoản mẫu.
+        let (_, sample) = call(
+            &app,
+            "POST",
+            &uri,
+            Some(json!({"amount": {"amount": "5000", "currency": "VND"}})),
+        )
+        .await;
+        assert!(sample["data"]["memo"].as_str().unwrap().starts_with("AX"), "{sample}");
+        // Không có thanh toán nào được tạo.
+        let (_, listed) = call(&app, "GET", "/payments", None).await;
+        assert!(listed["data"].as_array().unwrap().is_empty());
+
+        let (status, problem) = call(
+            &app,
+            "POST",
+            &uri,
+            Some(json!({"amount": {"amount": "5", "currency": "USD"}, "memo": "có dấu"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        let fields: Vec<&str> = problem["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["field"].as_str().unwrap())
+            .collect();
+        assert_eq!(fields, ["amount", "memo"]);
+    })
+    .await
+    .unwrap();
+}

@@ -32,6 +32,7 @@ pub(crate) fn routes(service: Arc<InvoicesService>) -> OpenApiRouter {
         .routes(routes!(list_documents, create_document))
         .routes(routes!(get_document, update_document, delete_document))
         .routes(routes!(issue_document))
+        .routes(routes!(refresh_document))
         .routes(routes!(cancel_document))
         .routes(routes!(adjust_document))
         .routes(routes!(replace_document))
@@ -317,6 +318,37 @@ async fn issue_document(
     Path(id): Path<Uuid>,
 ) -> Result<Data<Document>, Error> {
     Ok(Data { data: service.issue_manual(&tenant, &principal, id).await? })
+}
+
+/// Ask the e-invoice provider about a document now.
+///
+/// Requires `invoices.issue` on the unit. A document sent to the tax authority (`submitting`) is
+/// checked with the provider at once instead of waiting for the next periodic check, and becomes
+/// `accepted` (with the authority code) or `rejected` (with the reason) when the provider has an
+/// answer; still waiting leaves it `submitting`. A document in any other status is returned as it
+/// is. Safe to call again.
+#[utoipa::path(
+    post,
+    path = "/documents/{id}/refresh",
+    extensions(("x-permissions" = json!(["invoices.issue"]))),
+    operation_id = "refresh_invoice_document",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the document.")),
+    responses(
+        (status = 200, description = "The document after asking.", body = Data<Document>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `invoices.issue`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No such document; code `invoices.document_not_found`.", body = Problem),
+        (status = 503, description = "The provider did not answer; try again later (`einvoice.provider_unavailable`).", body = Problem),
+    )
+)]
+async fn refresh_document(
+    State(service): State<Arc<InvoicesService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Data<Document>, Error> {
+    Ok(Data { data: service.refresh_manual(&tenant, &principal, id).await? })
 }
 
 /// Why the document is cancelled.
