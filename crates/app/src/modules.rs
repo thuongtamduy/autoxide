@@ -75,6 +75,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.
         Box::new(autoxide_reporting::module()),
+        // Tự động hoá quy trình (bước 58): nghe event của mọi module và gọi tool MCP của mọi module
+        // qua sổ tool của kernel, nên đứng CUỐI CÙNG (sau cả `reporting`).
+        Box::new(autoxide_automations::module()),
     ]
 }
 

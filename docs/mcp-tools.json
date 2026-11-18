@@ -1643,6 +1643,263 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Create a \"when … then …\" automation rule. `trigger`: `{\"type\": \"event\", \"event\": \"<module>.<event>\"}`, `{\"type\": \"schedule\", \"every\": \"day\", \"hour\": 9}`, `{\"type\": \"manual\"}` or `{\"type\": \"metric\", …}`; `conditions`: a tree of `all` / `any` / `not` over `{\"field\": \"event.total\", \"op\": \"gt\", \"value\": 5000000}`; `actions`: `[{\"tool\": \"<module>.<tool>\", \"arguments\": {…}}]`, values may use `{{ event.… }}`; see `GET /api/v1/automations/catalog` for the triggers and tools. Rules you create as an agent wait until a person enables them; try a rule with `automations.test_rule`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new automation rule. Every problem (unknown event or tool, a tool you lack the permission\nfor, arguments that do not fit the tool) is reported at once.",
+        "properties": {
+          "actions": {
+            "description": "See `actions` of the rule.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "conditions": {
+            "description": "See `conditions` of the rule; omit for \"always\".",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "Up to 2000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "description": "`false` to save the rule disabled. Rules made by an AI agent always wait for a person to\nenable them.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "1 to 200 characters.",
+            "example": "Tag big orders",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The organization unit of the rule; you need `automations.manage` there. Omit when you\nmanage rules in one unit only (or for the whole tenant); otherwise\n`automations.org_required`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trigger": {
+            "description": "See `trigger` of the rule.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "trigger",
+          "actions"
+        ],
+        "type": "object"
+      },
+      "name": "automations.create_rule",
+      "output_schema": null,
+      "permissions": [
+        "automations.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get an automation rule in your scope: trigger, conditions, actions and status.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A rule to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the rule.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "automations.get_rule",
+      "output_schema": null,
+      "permissions": [
+        "automations.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the automation rules in your scope, newest first; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
+        "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "automations.list_rules",
+      "output_schema": null,
+      "permissions": [
+        "automations.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Dry-run an automation rule on a sample: whether the conditions hold, the arguments after filling the templates, and what would fail (unknown tool, missing permission of the person the rule runs as, wrong arguments). Calls no tool.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A dry run of a rule.",
+        "properties": {
+          "event_sample": {
+            "description": "What the conditions and templates see as `event`; omit for a sample of the trigger type.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the rule.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "automations.test_rule",
+      "output_schema": null,
+      "permissions": [
+        "automations.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Change an automation rule in your scope. Changing the trigger, conditions or actions checks the whole rule again with your permissions; changed by an agent, the rule waits until a person enables it again.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to a rule; omitted fields stay as they are.",
+        "properties": {
+          "actions": {
+            "description": "New actions (see `create_rule`).",
+            "items": {
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "conditions": {
+            "description": "New conditions; `{}` removes them.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "Up to 2000 characters; an empty text removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the rule.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "description": "1 to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trigger": {
+            "description": "New trigger (see `create_rule`).",
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "automations.update_rule",
+      "output_schema": null,
+      "permissions": [
+        "automations.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Answer a shown question (a top-level comment) as yourself, like a signed-in user on the website: the answer carries your badges on the target (e.g. `seller`), follows the same moderation and may wait for approval. Needs a display name (`PUT /api/v1/comments/profile`) and, on some kinds, a verified account.",
       "input_schema": {
         "additionalProperties": false,
