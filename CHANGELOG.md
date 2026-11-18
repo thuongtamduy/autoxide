@@ -17,9 +17,19 @@ endpoints are marked deprecated with a sunset date first.
   products with `PUT /api/v1/catalog/stores/{org_id}/overrides/{product_id}`; prices are kept ready by the job
   `catalog.refresh_storefront`, the per-minute schedule `catalog.apply_scheduled_prices` (event
   `catalog.price_effective`) and the task `catalog.rebuild_storefront`.
+- Module `inventory` listens to `orders.order_confirmed`, `orders.order_cancelled` and `orders.return_received`
+  (optional subscriptions) and confirms, releases or restocks once even when an event arrives again.
+- Module `inventory` (step 42): stock reservations for orders through `autoxide_inventory::api::Inventory`
+  (`reserve` / `confirm` / `fulfil` / `release` / `restock`, `availability`, `in_stock_at`) that never oversell under
+  concurrent requests; bundles take stock from components; warehouse choice per store (`PUT /sources/{store}`,
+  `PUT /settings/{store}`: nearby first, split); the minute job `inventory.expire_reservations`;
+  `GET /reservations`, `POST /reservations/{id}/release`, MCP tool `inventory.release_reservation`.
 - `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
   (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
   temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).
+- `GET /api/v1/kernel/ops/backlog` and MCP tool `kernel.ops_backlog` (permission `kernel.ops.read`, platform staff
+  only): job and event backlogs by module, the dead-letter queue, database connections and the newest backup of every
+  database (step 39).
 - Restore drill (step 39): an end-to-end test backs up data made over the API, restores it into an empty database
   (across PostgreSQL and SQLite when the gate runs on PostgreSQL) and checks the server starts, the old administrator
   signs in and the data and files match; `docs/DEPLOY.md` has "Restoring, step by step".
@@ -28,6 +38,16 @@ endpoints are marked deprecated with a sunset date first.
   `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
   `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
   tools `inventory.*`.
+- `shipping`: cash on delivery recorded as obligations in the ledger (never held), carrier statements imported
+  from CSV or the carrier's API and matched by tracking number, discrepancies (amount, unknown, overdue) resolved
+  with a reason code; `shipping.cod_settled` carries `seller_org_id`.
+- `shipping`: carrier accounts (encrypted credentials, connection test), carrier quotes with a timeout, shipments
+  from `orders.fulfillment_requested` or by hand (parcels, partial delivery, booking between two transactions,
+  cancel, labels), one status table for every carrier, signed carrier webhooks stored as received and applied by
+  a job, events `shipping.shipment_*` for orders.
+- `shipping`: shipping rates set by each shop (zones by province, weight tiers with volumetric weight, free
+  shipping from an order value, store pickup, methods inherited down the organization tree) and `POST /quote`,
+  the same computation as `ShippingRates::quote` / `confirm_option` for orders.
 - New module `shipping` (step 44, first part; `docs/SHIPPING.md`): buyer address books (Vietnamese addresses checked
   against the administrative units of `address`, generic foreign addresses, exactly one default, export and erasure
   with the account) and the contract for `orders` and carrier connectors in `autoxide_shipping::api`
@@ -65,6 +85,10 @@ endpoints are marked deprecated with a sunset date first.
   response-time targets per priority in business minutes, business hours, days off, auto-close days, guest tickets).
   Deadlines count business time and stop while waiting for the customer; jobs `support.sla_check` (marks late tickets,
   event `support.ticket_breached`) and `support.auto_close`; work source `support.tickets`; `GET /reports/summary`.
+- `support`: link tickets to records of any module (`/tickets/{id}/links`, checked in the record registry), saved
+  replies with variables (`/macros`, `/tickets/{id}/macros/{macro_id}/render`), hand-over as a consumer complaint or to the
+  platform (`/tickets/{id}/escalate`; never two complaint cases), customer ratings (`…/satisfaction`).
+- `compliance`: new trait `ComplaintIntake` opens a consumer complaint from another module's record (one case per record).
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions

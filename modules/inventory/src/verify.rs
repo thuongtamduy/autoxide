@@ -17,7 +17,7 @@ use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
-use crate::entity::{level, movement};
+use crate::entity::{level, movement, reservation, reservation_line};
 use crate::service::InventoryService;
 
 /// Số dòng tối đa mỗi khách của bước kiểm mẫu.
@@ -99,13 +99,43 @@ async fn ledger_sums<C: ConnectionTrait>(
     Ok(rows.into_iter().collect())
 }
 
-/// Số đang giữ (chưa xuất, chưa trả) theo dòng tồn.
+/// Số đang giữ (chưa xuất, chưa trả) theo dòng tồn: dòng của chỗ giữ `held` / `confirmed`.
 pub(crate) async fn held_sums<C: ConnectionTrait>(
-    _connection: &C,
-    _tenant: &TenantContext,
-    _ids: &[Uuid],
+    connection: &C,
+    tenant: &TenantContext,
+    ids: &[Uuid],
 ) -> Result<HashMap<Uuid, i64>, Error> {
-    Ok(HashMap::new())
+    let open: Vec<Uuid> = reservation::Entity::find()
+        .select_only()
+        .column(reservation::Column::Id)
+        .filter(reservation::Column::Status.is_in(["held", "confirmed"]))
+        .scoped(tenant)
+        .into_tuple()
+        .all(connection)
+        .await?;
+    let mut held = HashMap::new();
+    for chunk in open.chunks(500) {
+        let rows: Vec<(Uuid, i64)> = reservation_line::Entity::find()
+            .select_only()
+            .column(reservation_line::Column::LevelId)
+            .column_as(
+                Expr::cust(
+                    "CAST(COALESCE(SUM(quantity - fulfilled_quantity - released_quantity), 0) AS BIGINT)",
+                ),
+                "total",
+            )
+            .filter(reservation_line::Column::ReservationId.is_in(chunk.iter().copied()))
+            .filter(reservation_line::Column::LevelId.is_in(ids.iter().copied()))
+            .scoped(tenant)
+            .group_by(reservation_line::Column::LevelId)
+            .into_tuple()
+            .all(connection)
+            .await?;
+        for (level, total) in rows {
+            *held.entry(level).or_insert(0) += total;
+        }
+    }
+    Ok(held)
 }
 
 fn describe(tenant: &TenantContext, mismatches: &[Mismatch]) -> Vec<String> {

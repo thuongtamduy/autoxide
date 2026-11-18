@@ -5,15 +5,19 @@
 
 pub mod api;
 mod config;
+mod contract;
 mod entity;
 mod errors;
 mod events;
 mod http;
 mod levels;
 mod migration;
+mod orders_events;
 mod permissions;
 mod relocation;
+mod reservations;
 mod service;
+mod settings;
 mod stock;
 mod tools;
 mod verify;
@@ -28,7 +32,8 @@ use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::doctor::Check;
 use autoxide_kernel::entitlement::{Feature, Limit};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::EventInfo;
+use autoxide_kernel::event::{EventInfo, Subscription};
+use autoxide_kernel::job::{JobRegistration, Schedule};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
@@ -114,9 +119,25 @@ impl Module for InventoryModule {
             reasons: context.reason_codes(),
         };
         let service = Arc::new(InventoryService::new(parts, config));
-        self.service = Some(service);
+        self.service = Some(service.clone());
         self.databases = Some(databases);
-        Ok(())
+        // `Arc<InventoryService>` tự đổi thành `Arc<dyn Inventory>`: module khác chỉ thấy trait.
+        context.provide::<dyn api::Inventory>(service)
+    }
+
+    fn subscriptions(&self) -> Vec<Subscription> {
+        let Some(service) = &self.service else { return Vec::new() };
+        let mut subscriptions = contract::subscriptions(service);
+        subscriptions.extend(orders_events::subscriptions(service));
+        subscriptions
+    }
+
+    fn jobs(&self) -> Vec<JobRegistration> {
+        self.service.as_ref().map_or_else(Vec::new, contract::registrations)
+    }
+
+    fn schedules(&self) -> Vec<Schedule> {
+        contract::schedules()
     }
 
     fn routes(&self) -> OpenApiRouter {

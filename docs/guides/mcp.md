@@ -193,6 +193,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |
 | `inventory.list_movements` | `inventory.read` | read-only |
+| `inventory.release_reservation` | `inventory.adjust` | destructive |
 | `invoices.create_draft` | `invoices.write` | writes |
 | `invoices.create_export` | `invoices.export` | writes |
 | `invoices.document` | `invoices.read` | read-only |
@@ -218,6 +219,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.migrate_placements` | `kernel.tenants.operate` | writes |
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
 | `kernel.navigation` | — | read-only |
+| `kernel.ops_backlog` | `kernel.ops.read` | read-only |
 | `kernel.request_log` | `kernel.devtools.read` | read-only |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |

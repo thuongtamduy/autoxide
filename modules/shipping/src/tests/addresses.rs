@@ -137,7 +137,7 @@ async fn mot_dia_chi_mac_dinh() {
         let (status, _) =
             call(&app, "DELETE", &format!("/me/addresses/{current}"), "x", None).await;
         assert_eq!(status, StatusCode::NO_CONTENT);
-        let book = service();
+        let book = service_of(&app);
         let default = book
             .default_for(&app.default_tenant(), Uuid::from_u128(BUYER_X))
             .await
@@ -227,7 +227,7 @@ async fn xuat_va_xoa_du_lieu_ca_nhan() {
         create(&app, "x", hanoi("1 A")).await;
         create(&app, "y", hanoi("9 Z")).await;
         let tenant = app.default_tenant();
-        let service = service();
+        let service = service_of(&app);
         let exported = service.export(&tenant, Uuid::from_u128(BUYER_X)).await.unwrap();
         assert_eq!(exported["addresses"].as_array().unwrap().len(), 1);
         assert_eq!(exported["addresses"][0]["address"]["line"], "1 A");
