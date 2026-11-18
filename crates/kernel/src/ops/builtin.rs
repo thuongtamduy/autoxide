@@ -260,7 +260,7 @@ impl Module for KernelModule {
             Box::new(crate::ops::pins::CreatePins),
             // Nhật ký request theo khách (bước 52 mục 1).
             Box::new(crate::ops::request_log::CreateRequestLog),
-            // Bảng đếm rate limit theo API key dùng chung mọi máy chủ (bước 40 P6, D-373).
+            // Bảng đếm rate limit theo API key dùng chung mọi máy chủ (bước 40 P6, D-375).
             crate::throttle::throttle_migration("m0032_create_throttle", NAME),
             crate::tenancy::migration::adopt(
                 "m0033_tenancy_throttle",
@@ -365,7 +365,7 @@ impl Module for KernelModule {
     }
 
     fn limits(&self) -> Vec<crate::entitlement::Limit> {
-        vec![crate::entitlement::API_REQUESTS]
+        vec![crate::entitlement::API_REQUESTS, crate::ops::custom_fields::CUSTOM_FIELDS_LIMIT]
     }
 
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
@@ -396,8 +396,17 @@ impl Module for KernelModule {
             ));
         }
         routes = routes.merge(crate::ops::request_log::routes());
+        routes = routes.merge(crate::ops::filter_parse::routes(
+            crate::ops::filter_parse::FilterParseState {
+                lists: self.catalog.lists(),
+                model: self.catalog.text_model(),
+            },
+        ));
         routes = routes.merge(crate::ops::custom_fields::routes(
-            crate::ops::custom_fields::CustomFieldsState { fields: self.catalog.custom_fields() },
+            crate::ops::custom_fields::CustomFieldsState {
+                fields: self.catalog.custom_fields(),
+                entitlements: self.entitlements.clone().unwrap_or_default(),
+            },
         ));
         routes = routes.merge(crate::ops::texts::routes(crate::ops::texts::TextsState {
             overrides: self.catalog.text_overrides(),
@@ -442,6 +451,7 @@ impl Module for KernelModule {
                     jobs: jobs.clone(),
                     entitlements: entitlements.clone(),
                     registry: registry.clone(),
+                    fields: self.catalog.custom_fields(),
                 },
             ));
             routes = routes.merge(crate::ops::bulk::routes(crate::ops::bulk::BulkState {
@@ -554,6 +564,12 @@ impl Module for KernelModule {
             tools.extend(crate::tenancy::migration_runs::tools(runs.clone()));
         }
         tools.extend(crate::ops::request_log::tools());
+        tools.extend(crate::ops::custom_fields::tools(self.catalog.custom_fields()));
+        if let Some(outbox) = &self.outbox {
+            tools.extend(crate::ops::approvals::tools(crate::ops::approvals::ApprovalsState {
+                outbox: outbox.clone(),
+            }));
+        }
         tools
     }
 
@@ -630,6 +646,8 @@ impl Module for KernelModule {
         self.translations = context.translations().clone();
         self.entitlements = Some(context.entitlements());
         self.outbox = Some(context.outbox()?);
+        // Yêu cầu duyệt của agent vào hộp việc của người quyết được (bước 51 P12).
+        context.work_source(Arc::new(crate::ops::approvals::ApprovalsWork))?;
         let flags = Arc::new(UserFlags::new(self.max_flags));
         context.personal_data(flags.clone())?;
         self.flags.fill(flags);

@@ -44,6 +44,7 @@ events! {
     (EntryPublished, "content.entry_published", "A post or page was published, or its published version replaced."),
     (EntryUnpublished, "content.entry_unpublished", "A post or page was taken down; it is a draft again."),
     (EntryArchived, "content.entry_archived", "A post or page was taken down for good; its address answers 410."),
+    (EntryUnarchived, "content.entry_unarchived", "An archived post or page was brought back as a draft."),
     (EntryDeleted, "content.entry_deleted", "A post or page was deleted."),
     (EntryMoved, "content.entry_moved", "A page moved under another parent; its address and those of its subpages may have changed."),
     (EntryRestored, "content.entry_restored", "A revision was copied back into the draft of a post or page."),

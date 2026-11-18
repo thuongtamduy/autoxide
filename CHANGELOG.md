@@ -26,6 +26,20 @@ endpoints are marked deprecated with a sunset date first.
   The module catalog gains `description`, `resources` and `prompts`; `docs/mcp-tools.json` lists resources and prompts.
   For module authors: `Module::{mcp_resources, prompts, description}` (empty by default), `McpResource`
   (`text`, `schema::<T>`, `new`), `Prompt`, `PromptArgument`, `PromptArguments::fenced`.
+- Step 51 P19: list exports take `cf.<key>` columns for the tenant's active custom fields (by default every one is
+  exported); custom fields of visibility `public` on posts and pages are copied into the published version and returned
+  by the public reads (`custom_fields`); the plan limit `kernel.custom_fields` counts active fields (deleting one gives its
+  slot back); MCP tool `kernel.list_custom_fields`.
+- Step 51 P20: `POST /api/v1/kernel/tags/{id}/apply {kind, add, remove}` tags or untags up to 500 records at once, one
+  `kernel.record_tags_changed` event per changed record; records already in the wanted state are `skipped`.
+- Step 51 P12: pending approval requests show in the work inbox of the people who may decide them (source
+  `kernel.approvals`); MCP tools `kernel.list_approvals` and `kernel.decide_approval` (a person decides, an agent cannot).
+  `WorkSource::for_any_signed_in` lets a source filter its own items instead of requiring one permission.
+- Step 52, AI in the admin: `POST /api/v1/kernel/filters/parse {resource, text}` turns a sentence into the query parameters of
+  a list, each checked against the list's filter schema (invalid ones come back in `ignored`); nothing is run. Needs the `ai`
+  module.
+- Step 52, safe undo: `POST /api/v1/content/entries/{id}/unarchive` brings an archived post or page back as a draft
+  (event `content.entry_unarchived`).
 - Step 52, developer tools: `GET /api/v1/webhooks/deliveries` lists the deliveries of every endpoint (filter `status`,
   `endpoint_id`); `POST /api/v1/webhooks/deliveries/{id}/redeliver` sends a finished delivery again with the same body and
   `webhook-id` (event `webhooks.delivery_redelivered`); MCP tools `webhooks.list_deliveries` and `webhooks.redeliver`.

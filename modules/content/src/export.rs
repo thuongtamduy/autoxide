@@ -35,6 +35,7 @@ pub(crate) struct Entries(pub(crate) Arc<ContentService>);
 impl ExportSource for Entries {
     fn info(&self) -> ExportInfo {
         ExportInfo::new("content.list_content_entries", "content-entries", COLUMNS.to_vec())
+            .with_custom_fields(crate::resource::ENTRY)
     }
 
     fn permission(&self) -> Permission {

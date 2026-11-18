@@ -180,7 +180,7 @@ impl Throttle {
         })
     }
 
-    /// Lấy tối đa `n` lượt của khoá `key` trong cửa sổ hiện tại, bằng MỘT câu (D-373): dùng cho
+    /// Lấy tối đa `n` lượt của khoá `key` trong cửa sổ hiện tại, bằng MỘT câu (D-375): dùng cho
     /// rate limit theo lô — mỗi máy chủ lấy một lô rồi tiêu dần trong bộ nhớ, hết mới hỏi lại. Số
     /// đếm cộng thẳng `n` (vượt `limit` cũng không sao: lượt sau trong cửa sổ nhận 0), nên số lượt
     /// được cấp tính được từ số đếm trả về: `min(n, limit − (count − n))`. Các lượt đồng thời được

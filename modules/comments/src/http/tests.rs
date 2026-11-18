@@ -322,6 +322,9 @@ async fn tool_mcp() {
                 "comments.queue",
                 "comments.unanswered",
                 "kernel.current_tenant",
+                "kernel.decide_approval",
+                "kernel.list_approvals",
+                "kernel.list_custom_fields",
                 "kernel.navigation"
             ]
         );
@@ -329,7 +332,7 @@ async fn tool_mcp() {
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 8, "with `kernel.current_tenant` and `kernel.navigation`");
+        assert_eq!(tools.len(), 11, "with `kernel.current_tenant` and `kernel.navigation`");
         for tool in &tools {
             assert!(
                 !serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"),

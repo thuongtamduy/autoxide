@@ -139,7 +139,7 @@ pub(super) struct ApiKeyLimited {
 enum KeyCounter {
     /// Mỗi tiến trình đếm riêng.
     Memory(Gcra<Uuid>),
-    /// Đếm chung qua database, theo lô (D-373).
+    /// Đếm chung qua database, theo lô (D-375).
     Database(super::rate_limit_store::SharedCounter),
 }
 

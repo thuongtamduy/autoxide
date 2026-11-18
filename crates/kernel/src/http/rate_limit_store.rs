@@ -1,4 +1,4 @@
-//! Đếm giới hạn theo API key CHUNG giữa mọi máy chủ, qua bảng `kernel_throttle` (bước 40 P6, D-373).
+//! Đếm giới hạn theo API key CHUNG giữa mọi máy chủ, qua bảng `kernel_throttle` (bước 40 P6, D-375).
 //!
 //! Bật bằng `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`. Để không thêm một câu ghi cho mỗi request,
 //! đếm **theo lô**: mỗi tiến trình lấy một lô `k = max(1, burst / 4)` lượt của một key bằng

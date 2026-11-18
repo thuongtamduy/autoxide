@@ -488,5 +488,5 @@ theo API key) / `memory` / `database`; khi bật: 1 000 000 request/phút (khôn
 Đọc số: `memory` không đo được so với tắt (GCRA trong bộ nhớ, một lock ngắn). `database` tốn 1–11% request/s và tới
 +22% p95 khi một key bắn dồn: lần lấy lô là một lệnh ghi — trên SQLite xếp hàng ở kết nối ghi duy nhất cùng mọi lệnh
 ghi khác, và các request cùng key chờ lần lấy lô đó. Vượt ngưỡng 10% của đặc tả ở một bài, nên **`memory` vẫn là mặc
-định** và `database` là lựa chọn cho nhiều máy chủ PostgreSQL (D-373). Nhiều key khác nhau không chờ nhau (mỗi key một
+định** và `database` là lựa chọn cho nhiều máy chủ PostgreSQL (D-375). Nhiều key khác nhau không chờ nhau (mỗi key một
 lô); lô lớn hơn (tăng burst) thì ít câu ghi hơn, đổi lại sai số `lô × số máy chủ` lớn hơn.

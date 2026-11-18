@@ -1,4 +1,4 @@
-//! Rate limit theo API key đếm chung qua database (bước 40 P6, D-373): hai máy chủ dùng chung một
+//! Rate limit theo API key đếm chung qua database (bước 40 P6, D-375): hai máy chủ dùng chung một
 //! database chia nhau một hạn mức, mỗi khách đếm riêng. Chạy trên cả SQLite và Postgres.
 
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.

@@ -9139,7 +9139,36 @@ liệu cá nhân.
    cài audit thì trả rỗng. Chạy lại job trong dead-letter queue đã có từ bước 51 P15 (`POST /kernel/jobs/{id}/retry`, event
    `kernel.job_retried`).
 
-## D-372 · MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18 — agent quyết
+## D-372 · Lời thường thành bộ lọc ở kernel, `POST /api/v1/kernel/filters/parse`; khôi phục bài đã lưu trữ (bước 52 mục 2, 3) — 2026-11-18 — agent quyết
+
+1. Đặc tả ghi `POST /api/v1/ai/filters/parse`. Endpoint đặt ở kernel (`/api/v1/kernel/filters/parse`) vì schema bộ lọc (P7) là của
+   kernel và module `ai` chỉ công bố mô hình (`dyn TextModel`); để ở `ai` thì module `ai` phải đọc phần bên trong kernel. Mô hình
+   nối vào sau khi mọi module khởi động (như `RecordHistory`); không có module `ai` thì 503 `kernel.filters_need_ai`.
+2. Mô hình chỉ đề xuất; kernel kiểm **từng** tham số bằng `check_params` (sai tên, sai kiểu, ngoài tập giá trị → `ignored`), bỏ
+   `cursor` / `limit`. Không chạy lệnh nào, không đọc dữ liệu: người gọi gọi danh sách với `params`, permission áp như thường —
+   nên endpoint chỉ cần đăng nhập. Câu của người dùng ở `input`, luật ở `instructions` (D-109); hạn mức token của `ai` áp dụng.
+3. Trợ lý (`/ai/assistant/messages`) chưa làm: cần thiết kế vòng gọi tool có giới hạn và duyệt; để lại trong lộ trình.
+4. Hoàn tác lưu trữ: `POST /api/v1/content/entries/{id}/unarchive` đưa bài về nháp nguyên nội dung (event
+   `content.entry_unarchived`); bài đã đăng trước khi lưu trữ thì đăng lại thẳng từ lưu trữ như trước (đường dẫn cũ trả 410 tới lúc
+   đó). Media đã có `restore`; bình luận, người đăng ký bản tin có thao tác ngược (`approve`, `unblock`).
+
+## D-373 · Phần còn lại của trường tự định nghĩa và gắn nhãn hàng loạt (bước 51 P19, P20) — 2026-11-18 — agent quyết
+
+1. **Xuất:** `ExportInfo::with_custom_fields(target)` cho danh sách biết bản ghi mang trường tự định nghĩa; kernel thêm cột
+   `cf.<khoá>` của các trường đang bật (mặc định xuất hết), giá trị lấy từ `custom_fields` của JSON bản ghi
+   (`ExportPage::from_json` tự gom). Nguồn xuất không phải biết khách có trường nào.
+2. **Công khai:** `content` cho mức `public`; giá trị chép vào `content_published.custom_fields` khi đăng (không lộ giá trị
+   nháp chưa đăng), đọc công khai lọc theo định nghĩa **hiện tại** (`CustomFields::public_keys` + `pick_public`) — chuyển
+   trường về `internal` là thôi lộ ngay, không cần đăng lại.
+3. **Hạn mức theo gói:** `kernel.custom_fields` (kiểu đếm): tạo trường giữ một suất (giữ → lưu → xác nhận, lưu hỏng thì trả),
+   xoá (tắt) trường thì trả suất. Không có module gói thì không giới hạn (vẫn còn trần 100 trường mỗi loại bản ghi).
+4. `personal_data` chưa áp: bản ghi hiện có (bài viết) không gắn với một người; làm cùng loại bản ghi đầu tiên gắn với người
+   (khách hàng, đơn hàng ở bước 41–49). Cột `cf.` khi nhập thuộc `imports` (bước 56).
+5. **Gắn nhãn hàng loạt:** endpoint riêng `POST /kernel/tags/{id}/apply {kind, add, remove}` (tối đa 500, một transaction, một
+   event mỗi bản ghi đổi) thay vì thêm tham số cho `BulkAction`: gắn nhãn dùng chung mọi loại bản ghi, không phải việc của từng
+   module; chọn theo bộ lọc thì lấy ID bằng `dry_run` của thao tác hàng loạt.
+
+## D-374 · MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18 — agent quyết
 
 1. **Hai hàm mới của `Module`, mặc định rỗng (D-038):** `mcp_resources()` → `McpResource`, `prompts()` → `Prompt`, cùng
    `description()` (một câu tiếng Anh, mặc định `""`). Tên `McpResource` để không lẫn với `autoxide_kernel::resource` (sổ loại
@@ -9170,7 +9199,7 @@ liệu cá nhân.
 6. `docs/mcp-tools.json` thêm `resources` và `prompts` (khoá mới, `api-diff` chỉ so `tools`); `docs/guides/mcp.md` có bảng
    resource / prompt, test giữ khớp code như bảng tool.
 
-## D-373 · Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18 — agent quyết
+## D-375 · Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18 — agent quyết
 
 1. **`AUTOXIDE_HTTP_RATE_LIMIT_STORE` = `memory` (mặc định) | `database`.** `memory` giữ GCRA hiện có, mỗi tiến trình đếm
    riêng — đúng hoàn toàn với SQLite (một tiến trình máy chủ). `database` đếm chung qua bảng `kernel_throttle`

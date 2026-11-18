@@ -59,6 +59,9 @@ pub struct ExportInfo {
     pub file_name: &'static str,
     /// Mọi cột theo thứ tự mặc định; [`ExportPage::rows`] theo đúng thứ tự này.
     pub columns: Vec<&'static str>,
+    /// Loại bản ghi có trường tự định nghĩa (P19): xuất thêm được cột `cf.<khoá>` của các trường
+    /// đang bật, giá trị lấy từ [`ExportPage::custom`].
+    pub custom_fields: Option<&'static str>,
 }
 
 impl ExportInfo {
@@ -67,7 +70,13 @@ impl ExportInfo {
         file_name: &'static str,
         columns: Vec<&'static str>,
     ) -> Self {
-        ExportInfo { resource, file_name, columns }
+        ExportInfo { resource, file_name, columns, custom_fields: None }
+    }
+
+    /// Bản ghi của danh sách mang trường tự định nghĩa của loại `target` (vd `content.entry`).
+    pub fn with_custom_fields(mut self, target: &'static str) -> Self {
+        self.custom_fields = Some(target);
+        self
     }
 }
 
@@ -131,6 +140,8 @@ fn encode(text: &str) -> String {
 pub struct ExportPage {
     /// Mỗi dòng đủ mọi cột của [`ExportInfo::columns`], đúng thứ tự.
     pub rows: Vec<Vec<String>>,
+    /// Trường tự định nghĩa của từng dòng (cùng thứ tự với `rows`), khi danh sách có.
+    pub custom: Vec<serde_json::Map<String, Value>>,
     /// Con trỏ trang sau; `None`: hết.
     pub next: Option<String>,
 }
@@ -138,26 +149,31 @@ pub struct ExportPage {
 impl ExportPage {
     /// Trang từ các bản ghi đã đổi thành JSON như endpoint danh sách trả: mỗi cột là một trường cấp
     /// trên cùng cùng tên (chuỗi giữ nguyên, `null` / thiếu thành ô trống, còn lại viết JSON).
+    /// Trường `custom_fields` (object) của bản ghi, nếu có, thành [`custom`](Self::custom).
     pub fn from_json<T: Serialize>(
         items: &[T],
         columns: &[&str],
         next: Option<String>,
     ) -> Result<Self, Error> {
-        let rows = items
-            .iter()
-            .map(|item| {
-                let value = serde_json::to_value(item).map_err(Error::internal)?;
-                Ok(columns
-                    .iter()
-                    .map(|column| match value.get(column) {
-                        None | Some(Value::Null) => String::new(),
-                        Some(Value::String(text)) => text.clone(),
-                        Some(other) => other.to_string(),
-                    })
-                    .collect())
-            })
-            .collect::<Result<_, Error>>()?;
-        Ok(ExportPage { rows, next })
+        let mut rows = Vec::with_capacity(items.len());
+        let mut custom = Vec::with_capacity(items.len());
+        for item in items {
+            let value = serde_json::to_value(item).map_err(Error::internal)?;
+            rows.push(columns.iter().map(|column| cell(value.get(column))).collect());
+            custom.push(
+                value.get("custom_fields").and_then(Value::as_object).cloned().unwrap_or_default(),
+            );
+        }
+        Ok(ExportPage { rows, custom, next })
+    }
+}
+
+/// Ô CSV của một giá trị JSON: chuỗi giữ nguyên, `null` / thiếu thành ô trống, còn lại viết JSON.
+fn cell(value: Option<&Value>) -> String {
+    match value {
+        None | Some(Value::Null) => String::new(),
+        Some(Value::String(text)) => text.clone(),
+        Some(other) => other.to_string(),
     }
 }
 
@@ -273,6 +289,7 @@ pub(crate) struct ExportsState {
     pub jobs: JobQueue,
     pub entitlements: EntitlementsHandle,
     pub registry: DatabaseRegistry,
+    pub fields: crate::ops::custom_fields::CustomFields,
 }
 
 fn storage(registry: &DatabaseRegistry, tenant: &TenantContext) -> Result<TenantStorage, Error> {
@@ -346,16 +363,18 @@ async fn export_list(
         None if input.params.is_empty() => {}
         None => problems.push(FieldError::new("params", "invalid", "this list takes no filter")),
     }
-    let columns = if input.columns.is_empty() {
-        info.columns.iter().map(|column| (*column).to_owned()).collect()
-    } else {
-        input.columns.clone()
-    };
-    if columns.len() > 100 || !columns.iter().all(|column| info.columns.contains(&column.as_str()))
-    {
+    // Cột của danh sách và cột `cf.<khoá>` của các trường tự định nghĩa đang bật (P19).
+    let mut known: Vec<String> = info.columns.iter().map(|column| (*column).to_owned()).collect();
+    if let Some(target) = info.custom_fields {
+        for field in state.fields.definitions(&tenant, target).await? {
+            known.push(format!("cf.{}", field.key));
+        }
+    }
+    let columns = if input.columns.is_empty() { known.clone() } else { input.columns.clone() };
+    if columns.len() > 100 || !columns.iter().all(|column| known.contains(column)) {
         problems.push(
             FieldError::new("columns", "invalid", "may only name columns of the export: {columns}")
-                .with_param("columns", info.columns.join(", ")),
+                .with_param("columns", known.join(", ")),
         );
     }
     if !problems.is_empty() {
@@ -462,10 +481,14 @@ impl JobHandler for ExportRunner {
             .find(&payload.resource)
             .ok_or_else(|| Error::internal(format!("no export `{}`", payload.resource)))?;
         let info = source.info();
-        let positions: Vec<usize> = payload
+        // Mỗi cột: vị trí trong dòng của nguồn, hay khoá của trường tự định nghĩa (`cf.<khoá>`).
+        let picks: Vec<Result<usize, String>> = payload
             .columns
             .iter()
-            .filter_map(|column| info.columns.iter().position(|known| known == column))
+            .filter_map(|column| match column.strip_prefix("cf.") {
+                Some(key) if info.custom_fields.is_some() => Some(Err(key.to_owned())),
+                _ => info.columns.iter().position(|known| known == column).map(Ok),
+            })
             .collect();
         let principal = payload.principal.restore();
         let query = ExportQuery::new(payload.params);
@@ -488,14 +511,18 @@ impl JobHandler for ExportRunner {
             loop {
                 let page = source.page(&tenant, &principal, &query, cursor).await?;
                 let mut chunk = String::new();
-                for row in &page.rows {
+                for (index, row) in page.rows.iter().enumerate() {
                     if written >= MAX_ROWS {
                         truncated = true;
                         break;
                     }
-                    let picked: Vec<String> = positions
+                    let custom = page.custom.get(index);
+                    let picked: Vec<String> = picks
                         .iter()
-                        .map(|&position| row.get(position).cloned().unwrap_or_default())
+                        .map(|pick| match pick {
+                            Ok(position) => row.get(*position).cloned().unwrap_or_default(),
+                            Err(key) => cell(custom.and_then(|custom| custom.get(key))),
+                        })
                         .collect();
                     chunk.push_str(&crate::csv::line(&picked));
                     written += 1;

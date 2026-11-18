@@ -4390,6 +4390,47 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Approve or reject a command an AI agent asked to run. Only a person holding one of the command's permissions decides; an agent cannot.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A decision on an approval request.",
+        "properties": {
+          "decision": {
+            "description": "`approve` or `reject`.",
+            "example": "approve",
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the request.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Required to reject (1 to 500 characters, shown to the agent).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "decision"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.decide_approval",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Start an export of all the data of a tenant (yours by default) into one JSON Lines file, in the background; follow it with `kernel.get_tenant_export` until it is `ready`, then download it over REST.",
       "input_schema": {
         "additionalProperties": false,
@@ -4568,6 +4609,60 @@
       "permissions": [
         "kernel.tenants.read"
       ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List approval requests: those of your own AI agents, and those you may decide. An agent sees here whether a person approved its command yet.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which approval requests to list.",
+        "properties": {
+          "status": {
+            "description": "Only `pending`, `approved`, `rejected`, `expired` or `used` requests.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_approvals",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the custom fields this tenant added to record types you may read (key, type, labels, options, whether lists filter on it with `cf.<key>=`). Write their values in a record's `custom_fields`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which custom fields to list.",
+        "properties": {
+          "target": {
+            "description": "Only the fields of this record type, e.g. `content.entry`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_custom_fields",
+      "output_schema": null,
+      "permissions": []
     },
     {
       "annotations": {

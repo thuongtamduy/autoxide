@@ -82,6 +82,8 @@ pub(crate) struct ModuleCatalog {
     custom_fields: crate::ops::custom_fields::CustomFields,
     /// Lịch sử theo bản ghi (bước 51 P13), module nhật ký công bố; điền sau khi mọi module khởi động.
     history: crate::ops::records::HistorySlot,
+    /// Mô hình AI (module `ai` công bố), điền sau khi mọi module khởi động (bước 52).
+    model: crate::ops::filter_parse::TextModelSlot,
     /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
     lists: crate::ops::list_exports::ListsHandle,
     /// Sổ điều hướng đã gom (bước 51 P1).
@@ -158,6 +160,10 @@ impl ModuleCatalog {
 
     pub(crate) fn setup_steps(&self) -> crate::ops::setup::SetupSteps {
         self.setup.clone()
+    }
+
+    pub(crate) fn text_model(&self) -> crate::ops::filter_parse::TextModelSlot {
+        self.model.clone()
     }
 
     pub(crate) fn history(&self) -> crate::ops::records::HistorySlot {

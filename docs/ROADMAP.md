@@ -98,13 +98,13 @@ cả SQLite và Postgres.
       mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
       OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch — `Module::{mcp_resources, prompts,
       description}`, lọc theo permission như tool; resource của kernel / `content` / `comments`, prompt
-      `content.draft_post`, `comments.moderate_queue`; `/llms.txt` + `autoxide://kernel/llms.txt` (D-372)
+      `content.draft_post`, `comments.moderate_queue`; `/llms.txt` + `autoxide://kernel/llms.txt` (D-374)
 - [x] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
       chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
       chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
       quyết định — `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (bảng `kernel_throttle`, `Throttle::take` theo
       lô burst / 4, khoá theo khách); đo: tới −11% req/s, +22% p95 → `memory` vẫn mặc định; IP vẫn trong
-      bộ nhớ (D-373)
+      bộ nhớ (D-375)
 - [ ] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
       `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
       module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục
@@ -157,7 +157,8 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) agent gọi trả `202 approval_required`, yêu cầu
       duyệt có hạn, đủ duyệt / từ chối / event / tool MCP, như nhau REST và MCP; việc chờ vào hộp việc — xong
       (17/11, D-365): `x-approval: "agent"`, `/kernel/approvals`, gửi lại kèm `Autoxide-Approval`; MCP từ chối agent
-      và chỉ sang REST. Còn: yêu cầu chờ vào hộp việc, tool MCP `list_approvals` / `decide_approval`
+      và chỉ sang REST; (18/11) yêu cầu chờ vào hộp việc của người quyết được (nguồn `kernel.approvals`), tool MCP
+      `kernel.list_approvals` / `kernel.decide_approval`
 - [x] Cờ theo người dùng cho trợ giúp trong giao diện (P14, D-207): `/api/v1/me/flags` (`kernel_user_flags`),
       chỉ cờ của mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản xuất dữ liệu, xoá khi xoá tài khoản;
       `tenant_id` thêm ở bước 33 cùng mọi bảng
@@ -166,11 +167,12 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       mức hiện `internal` / `public` / `buyer_input`), giá trị nằm trên bản ghi, lọc qua bảng index của module ghi
       cùng transaction, dùng chung cho xuất / nhập / tự động hoá; hạn mức theo gói; test trên cả hai database
       — xong phần lõi (17/11): `kernel_custom_fields`, `/kernel/custom-fields`, `CustomFields::validate` / `write_index` /
-      `condition`, `content.entry` (giá trị, lọc `cf.<khoá>`). Còn: cột `cf.<khoá>` trong xuất (P16) / nhập (56),
-      đọc công khai mức `public`, đưa trường `personal_data` vào xuất / xoá dữ liệu cá nhân, hạn mức theo gói, tool MCP
+      `condition`, `content.entry` (giá trị, lọc `cf.<khoá>`); (18/11, D-373) cột `cf.<khoá>` trong xuất, mức `public` chép vào
+      bản công khai của bài, hạn mức `kernel.custom_fields` theo gói, tool `kernel.list_custom_fields`. Cột `cf.` khi nhập
+      thuộc bước 56; trường `personal_data` áp khi có loại bản ghi gắn với một người (khách hàng, đơn — bước 41–49)
 - [x] Nhãn gắn bản ghi (P20, D-235): nhãn nội bộ dùng chung mọi loại bản ghi, lọc `tags_any` / `tags_all`, gắn
-      hàng loạt, gộp nhãn, event cho tự động hoá — xong (17/11) trừ gắn hàng loạt: thao tác hàng loạt (P8) chưa nhận
-      tham số (nhãn nào), làm khi thêm tham số cho `BulkAction`
+      hàng loạt, gộp nhãn, event cho tự động hoá — xong (17/11); gắn / gỡ hàng loạt (18/11): `POST /kernel/tags/{id}/apply`
+      (tối đa 500 bản ghi, chọn theo bộ lọc thì lấy id bằng `dry_run` của thao tác hàng loạt)
 - [x] Đổi câu chữ hiển thị theo khách (P21, D-235): chỉ câu module cho đổi và không gian `ui.*`, giữ chỗ điền, không
       đổi mã lỗi và câu pháp lý, đọc qua cache không query
 - [ ] Nhập dữ liệu (P17, D-220): không làm ở kernel — `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
@@ -246,9 +248,13 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       `actor_kind` (đủ `ActorKind`, D-224) và theo key; dòng của lệnh `202 approval_required` giữ `approval_id`
       - [x] Bảng `kernel_request_log`, ghi bất đồng bộ, `GET /kernel/devtools/requests`, tool `kernel.request_log`,
             lệnh MCP `mcp:<tool>`, `approval_id`, hạn lưu `AUTOXIDE_REQUEST_LOG_DAYS` (D-370)
-- [ ] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
+- [x] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
+      - `POST /content/entries/{id}/unarchive`; media đã có `restore`, bình luận và người đăng ký bản tin có thao tác ngược
+        (`approve` / `unblock`); `dry_run` ở thao tác hàng loạt (P8), nhập menu cũ. Nhập CSV (bước 56) và đổi giá hàng loạt
+        (thương mại) thêm `dry_run` khi làm tới.
 - [ ] AI trong quản trị (D-109): lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`); trợ lý chạy
       tool MCP với quyền người gọi, mọi lệnh ghi là bản nháp hay yêu cầu duyệt, trả kèm tool đã gọi
+      - [x] `POST /kernel/filters/parse`: lời thường thành bộ lọc đã kiểm theo schema (D-372). Còn: trợ lý.
 - [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình hay
       dùng (`/me/pins`)
       - [x] `/api/v1/me/pins`: ghim màn hình hay bản ghi, tối đa 20, xếp lại, dữ liệu cá nhân

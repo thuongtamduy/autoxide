@@ -353,7 +353,7 @@ pub struct HttpConfig {
     pub trusted_proxies: Vec<IpRange>,
     /// Giới hạn số request của một API key (D-109).
     pub api_key_rate_limit: RateLimit,
-    /// Nơi đếm giới hạn theo API key (bước 40 P6, D-373).
+    /// Nơi đếm giới hạn theo API key (bước 40 P6, D-375).
     pub rate_limit_store: RateLimitStore,
     /// Header chứa địa chỉ client do reverse proxy đặt; `None`: dùng địa chỉ kết nối.
     pub client_ip_header: Option<HeaderName>,
