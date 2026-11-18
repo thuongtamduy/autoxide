@@ -84,6 +84,11 @@ export type AddPasskeyRequest = {
   name: string;
 };
 
+/** A record to link, as `<module>.<type>:<id>`. */
+export type AddSupportLinkRequest = {
+  target: string;
+};
+
 /** A message to add. */
 export type AddSupportMessageRequest = {
   /** The text comes from an AI suggestion (shown with a label). */
@@ -8476,6 +8481,18 @@ export type Data_RelocationPlan = {
 };
 
 /** Envelope of a single result. */
+export type Data_RenderedSupportMacro = {
+  /** A saved reply filled in for one ticket. */
+  data: {
+    /**
+     * Text in the customer's language with the variables filled in; edit it, then send it as a
+     * message.
+     */
+    body: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Resolution = {
   /** What lives at an address. */
   data: {
@@ -9168,6 +9185,28 @@ export type Data_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportMacro = {
+  /** A saved reply staff insert into answers. */
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    /** Approved for automatic answers. */
+    auto_reply: boolean;
+    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+    bodies: Record<string, unknown>;
+    id: string;
+    name: string;
+    /** The unit it belongs to; units below use it too. */
+    org_id: string;
+    /** Ways customers ask the question, per language (automatic answers). */
+    questions: Record<string, unknown>;
+    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+    review_due_on?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportMessage = {
   /**
    * One message of a ticket. Messages are never edited; a hidden message keeps its place with
@@ -9331,6 +9370,8 @@ export type Data_SupportTicket = {
 export type Data_SupportTicketDetail = {
   /** A ticket with its messages, oldest first. */
   data: SupportTicket & {
+    /** Linked records, as `<module>.<type>:<id>` (staff only; empty for customers). */
+    links: string[];
     messages: SupportMessage[];
   };
 };
@@ -11400,6 +11441,11 @@ export type Data_Vec_SettingResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_String = {
+  data: string[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_SupportGrantResponse = {
   data: {
     /**
@@ -11431,6 +11477,27 @@ export type Data_Vec_SupportGrantResponse = {
     starts_at: string;
     /** The tenant the staff may enter. */
     tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportMacro = {
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    /** Approved for automatic answers. */
+    auto_reply: boolean;
+    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+    bodies: Record<string, unknown>;
+    id: string;
+    name: string;
+    /** The unit it belongs to; units below use it too. */
+    org_id: string;
+    /** Ways customers ask the question, per language (automatic answers). */
+    questions: Record<string, unknown>;
+    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+    review_due_on?: string | null;
+    updated_at: string;
   }[];
 };
 
@@ -12156,6 +12223,13 @@ export type EraseRequest = {
 export type ErasedResponse = {
   /** Submissions deleted. */
   deleted: number;
+};
+
+/** Where to hand the ticket over. */
+export type EscalateSupportTicketRequest = {
+  /** The complaint in the customer's words (10 to 5000 characters); omitted: their first message. */
+  note?: string | null;
+  to: SupportEscalation;
 };
 
 /** A batch of events from a page. */
@@ -19720,6 +19794,16 @@ export type Ranked = {
   visitors: number;
 };
 
+/** A rating of the support. */
+export type RateSupportTicketRequest = {
+  /** Up to 1000 characters. */
+  note?: string | null;
+  /** 1 (bad) to 5 (very good). */
+  rating: number;
+  /** Guests: the ticket token. Signed-in customers omit it. */
+  token?: string | null;
+};
+
 /**
  * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
  * one tenant's shop, without permissions).
@@ -20095,6 +20179,15 @@ export type RenameTagRequest = {
   name: string;
 };
 
+/** A saved reply filled in for one ticket. */
+export type RenderedSupportMacro = {
+  /**
+   * Text in the customer's language with the variables filled in; edit it, then send it as a
+   * message.
+   */
+  body: string;
+};
+
 /** The whole weekly schedule of a resource. */
 export type ReplaceBookingScheduleRequest = {
   /** At most 70 ranges; ranges of the same day must not overlap. Empty: never available (staff). */
@@ -20365,6 +20458,15 @@ export type RunResponse = {
 export type RunRuleRequest = {
   /** What the templates see as `event` (e.g. `{"order": {"id": "…"}}`); default `{}`. */
   input?: Record<string, unknown> | null;
+};
+
+/** A saved reply to write. */
+export type SaveSupportMacroRequest = {
+  /** Text per language; variables `{customer_name}`, `{ticket_number}`, `{subject}`. */
+  bodies: Record<string, unknown>;
+  /** 1 to 100 characters. */
+  name: string;
+  org_id: string;
 };
 
 /** The object a saved item links to. With `include=targets`, also how it stands now. */
@@ -21621,6 +21723,9 @@ export type SupportAuthorKind = "customer" | "agent" | "system";
 /** Where a ticket came from. */
 export type SupportChannel = "web" | "guest" | "order_lookup" | "staff" | "email";
 
+/** Where to hand a ticket over. */
+export type SupportEscalation = "consumer_complaint" | "platform";
+
 /** A new support access grant. */
 export type SupportGrantRequest = {
   /**
@@ -21673,6 +21778,25 @@ export type SupportGrantResponse = {
   starts_at: string;
   /** The tenant the staff may enter. */
   tenant_id: string;
+};
+
+/** A saved reply staff insert into answers. */
+export type SupportMacro = {
+  approved_at?: string | null;
+  approved_by?: string | null;
+  /** Approved for automatic answers. */
+  auto_reply: boolean;
+  /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+  bodies: Record<string, unknown>;
+  id: string;
+  name: string;
+  /** The unit it belongs to; units below use it too. */
+  org_id: string;
+  /** Ways customers ask the question, per language (automatic answers). */
+  questions: Record<string, unknown>;
+  /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+  review_due_on?: string | null;
+  updated_at: string;
 };
 
 /**
@@ -21876,6 +22000,8 @@ export type SupportTicket = {
 
 /** A ticket with its messages, oldest first. */
 export type SupportTicketDetail = SupportTicket & {
+  /** Linked records, as `<module>.<type>:<id>` (staff only; empty for customers). */
+  links: string[];
   messages: SupportMessage[];
 };
 
@@ -34188,6 +34314,56 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/macros": {
+    /** List the saved replies usable at a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      responses: {
+        200: Data_Vec_SupportMacro;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a saved reply. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SaveSupportMacroRequest;
+      responses: {
+        201: Data_SupportMacro;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/macros/{id}": {
+    /** Replace a saved reply. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SaveSupportMacroRequest;
+      responses: {
+        200: Data_SupportMacro;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a saved reply. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/me/claim": {
     /** Attach your guest tickets to your account. */
     post: {
@@ -34235,6 +34411,22 @@ export interface paths {
       requestBody: MySupportMessageRequest;
       responses: {
         201: Data_SupportMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets/{id}/satisfaction": {
+    /** Rate the support of your ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -34312,6 +34504,21 @@ export interface paths {
       requestBody: PublicSupportMessageRequest;
       responses: {
         201: Data_SupportMessage;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}/satisfaction": {
+    /** Rate the support of a guest ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
         403: Problem;
         404: Problem;
         409: Problem;
@@ -34511,6 +34718,64 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/escalate": {
+    /** Hand a ticket over as a consumer complaint or to the marketplace. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: EscalateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/links": {
+    /** Link a ticket to a record (an order, a product…). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AddSupportLinkRequest;
+      responses: {
+        200: Data_Vec_String;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/links/{target}": {
+    /** Remove a link from a ticket. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; target: string }; };
+      responses: {
+        200: Data_Vec_String;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/macros/{macro_id}/render": {
+    /** Fill a saved reply in for a ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; macro_id: string }; };
+      responses: {
+        200: Data_RenderedSupportMacro;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
