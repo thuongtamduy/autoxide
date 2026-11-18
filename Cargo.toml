@@ -61,6 +61,7 @@ autoxide-invoices = { path = "modules/invoices" }
 autoxide-compliance = { path = "modules/compliance" }
 autoxide-notifications = { path = "modules/notifications" }
 autoxide-analytics = { path = "modules/analytics" }
+autoxide-bookings = { path = "modules/bookings" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

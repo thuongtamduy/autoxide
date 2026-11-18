@@ -401,3 +401,60 @@ async fn ben_nhan_panic_hay_dong_hong_khong_chan_event_sau() {
     .await
     .unwrap();
 }
+
+/// Module nghe event của module có thể chưa cài (`Subscription::optional`, bước 41).
+struct OptionalListener {
+    recorder: Arc<Recorder>,
+}
+
+impl Module for OptionalListener {
+    fn name(&self) -> &'static str {
+        "listener"
+    }
+
+    fn subscriptions(&self) -> Vec<Subscription> {
+        vec![
+            Subscription::optional("orders.order_confirmed", self.recorder.clone()),
+            Subscription::optional("notes.note_created", self.recorder.clone()),
+        ]
+    }
+}
+
+/// `Subscription::optional` cho event chưa module nào khai: khởi động không lỗi, và event của
+/// module ĐÃ cài vẫn tới như `Subscription::new`.
+#[tokio::test]
+async fn subscription_optional_khong_loi_khoi_dong() {
+    TestDatabase::run(async |test| {
+        let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+        let mut reader = ConfigReader::new(&source);
+        let config = DatabaseConfig::read(&mut reader);
+        let database = Database::connect(&reader.finish(config).unwrap().0).await.unwrap();
+        let slot = Arc::new(Mutex::new(None));
+        let recorder = Arc::new(Recorder::default());
+        let mut modules = Modules::new(vec![
+            Box::new(Notes(slot.clone())),
+            Box::new(OptionalListener { recorder: recorder.clone() }),
+        ])
+        .unwrap();
+        modules.migrator().unwrap().up(&database).await.unwrap();
+        modules.start(&database).unwrap();
+        let outbox = slot.lock().unwrap().clone().unwrap();
+
+        let dispatcher = modules.dispatcher().unwrap();
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+        outbox
+            .record(
+                database.write(),
+                &tenant,
+                Actor::system(),
+                None,
+                &NoteCreated { title: "optional".into() },
+            )
+            .await
+            .unwrap();
+        assert_eq!(dispatcher.run_once().await.unwrap(), 1);
+        assert_eq!(recorder.seen.lock().unwrap().len(), 1);
+    })
+    .await
+    .unwrap();
+}

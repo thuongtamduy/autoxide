@@ -461,7 +461,7 @@ Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng
 Bắt đầu SAU bước 35 và 36. Khai hạn mức (số sản phẩm) và tính năng (nhiều biến thể, bảng giá) theo
 bước 35.
 
-- [ ] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
+- [x] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
       chưa cài), bộ CSV của `forms` thành `autoxide_kernel::csv`, slug của `content` thành
       `autoxide_kernel::slug` — để ba bước song song 42–44 không cùng sửa kernel
 - [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái (nháp, đang
@@ -835,7 +835,7 @@ Bắt đầu SAU bước 45 và 47. Bán cho doanh nghiệp trên cùng hệ th�
 
 Bắt đầu SAU bước 34 và 36; không cần phần bán hàng. Spa, salon, phòng khám, lớp học, sân thể thao.
 
-- [ ] Dịch vụ (thời lượng, đệm, sức chứa, cọc), nhân viên và phòng / thiết bị, lịch làm việc lặp và ngày nghỉ
+- [x] Dịch vụ (thời lượng, đệm, sức chứa, cọc), nhân viên và phòng / thiết bị, lịch làm việc lặp và ngày nghỉ
       theo múi giờ của nút; tính giờ trống công khai
 - [ ] Đặt chỗ không bao giờ chồng giờ khi nhiều người đặt cùng lúc (ô giờ có khoá duy nhất, chạy trên cả hai
       database); giữ tạm khi trả cọc qua đối tác; huỷ, đổi giờ, vắng mặt theo chính sách

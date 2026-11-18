@@ -889,7 +889,7 @@ impl ContentService {
         }
         match input.slug.as_deref().map(str::trim) {
             Some(slug) if !slug.is_empty() => {
-                if !crate::entries::slug::is_valid(slug) {
+                if !autoxide_kernel::slug::is_valid(slug) {
                     problems.push(FieldError::new(
                         "slug",
                         "invalid",
@@ -899,7 +899,7 @@ impl ContentService {
                 text.slug = slug.to_owned();
             }
             _ if text.slug.is_empty() => {
-                text.slug = crate::entries::slug::from_title(&text.name, id)
+                text.slug = autoxide_kernel::slug::from_title(&text.name, id)
             }
             _ => {}
         }

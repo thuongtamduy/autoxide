@@ -21,6 +21,13 @@ endpoints are marked deprecated with a sunset date first.
   `analytics.read`. Events are linked to a signed-in user only with consent `analytics.personal`; withdrawing
   unlinks them. MCP tools `analytics.overview`, `analytics.top_pages`, `analytics.top_objects`, `analytics.funnel`
   (read only); summary metric `analytics.visitors`; settings `AUTOXIDE_ANALYTICS_*`. Guide: `docs/ANALYTICS.md`.
+- Module `bookings` (step 60): bookable services (duration, buffers, capacity, deposit), staff, rooms and
+  equipment with weekly schedules in the unit's time zone, time off and extra hours, and public free times
+  (`GET /api/v1/bookings/public/availability`, cached 15 seconds). Guide: `docs/BOOKINGS.md`.
+- Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
+  that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
+  with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and
+  `catalog`).
 - `deploy/prometheus/autoxide-alerts.yml` (alerting rules, each with an `action` saying what to do) and
   `deploy/grafana/autoxide-dashboard.json`; `docs/DEPLOY.md` gains "Monitoring" and a "Runbook" (server errors, slow
   requests, stuck queue, dead-letter queue, connections, full database, leaked keys, lost last administrator,

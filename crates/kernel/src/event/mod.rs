@@ -271,6 +271,7 @@ pub trait EventHandler: Send + Sync {
 pub struct Subscription {
     event: &'static str,
     handler: Arc<dyn EventHandler>,
+    optional: bool,
 }
 
 impl Subscription {
@@ -278,11 +279,23 @@ impl Subscription {
     pub const ALL: &'static str = "*";
 
     pub fn new(event: &'static str, handler: Arc<dyn EventHandler>) -> Self {
-        Subscription { event, handler }
+        Subscription { event, handler, optional: false }
+    }
+
+    /// Như [`new`](Self::new), nhưng nhận event của module CÓ THỂ chưa cài (D-20261118-step41-kernel-prep):
+    /// chưa module nào khai `event` thì registry chỉ ghi log `info` thay vì báo lỗi khởi động. Dùng
+    /// khi module đăng ký trước nghe module đăng ký sau (vd `catalog` nghe `inventory.cost_changed`).
+    pub fn optional(event: &'static str, handler: Arc<dyn EventHandler>) -> Self {
+        Subscription { event, handler, optional: true }
     }
 
     pub fn event(&self) -> &'static str {
         self.event
+    }
+
+    /// `true` khi tạo bằng [`optional`](Self::optional).
+    pub fn is_optional(&self) -> bool {
+        self.optional
     }
 
     fn matches(&self, name: &str) -> bool {
@@ -292,7 +305,10 @@ impl Subscription {
 
 impl std::fmt::Debug for Subscription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Subscription").field("event", &self.event).finish_non_exhaustive()
+        f.debug_struct("Subscription")
+            .field("event", &self.event)
+            .field("optional", &self.optional)
+            .finish_non_exhaustive()
     }
 }
 
