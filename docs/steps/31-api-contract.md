@@ -363,7 +363,7 @@ Khuyến nghị cấu trúc:
 - `cargo xtask upgrade-test [--from vX.Y.Z]`: chọn tag trước (như A1), lấy image
   `ghcr.io/<owner>/autoxide:X.Y.Z` (`docker pull`); không có thì build từ tag
   (`git worktree add <tạm> vX.Y.Z` → `docker build -t autoxide:vX.Y.Z`); rồi chạy
-  `cargo test -p autoxide --test upgrade` hai lần: không `TEST_DATABASE_URL` (SQLite), và với Postgres
+  `cargo test -p autoxide --test integration upgrade::` hai lần: không `TEST_DATABASE_URL` (SQLite), và với Postgres
   (dựng container như `gate.sh`, hay `GATE_POSTGRES_URL`).
 
 Kịch bản trong test:

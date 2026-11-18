@@ -7,7 +7,7 @@
 //! 2. Image cũ: `--image`; không có thì `docker pull ghcr.io/<chủ>/<repo>:X.Y.Z` (image mà
 //!    quy trình phát hành đẩy lên); không tải được thì dùng `autoxide:vX.Y.Z` đã build trên máy, hay
 //!    build nó từ tag (`git worktree add` → `docker build`).
-//! 3. `cargo test -p autoxide --test upgrade` với `TEST_UPGRADE_IMAGE`: trên SQLite, rồi trên
+//! 3. `cargo test -p autoxide --test integration upgrade::` với `TEST_UPGRADE_IMAGE`: trên SQLite, rồi trên
 //!    Postgres (`GATE_POSTGRES_URL`, không có thì dựng container như `gate.sh`).
 //!
 //! Cần Docker, build bản release của tag cũ, lâu: chạy trong job `upgrade` của CI và lúc phát
@@ -265,13 +265,25 @@ fn cargo_test(root: &Path, image: &str, database_url: Option<&str>) -> Result<()
     let mut command = Command::new(cargo);
     command
         .current_dir(root)
-        .args(["test", "--locked", "-p", "autoxide", "--test", "upgrade", "--", "--nocapture"])
+        // Test tích hợp của `autoxide` là một chương trình (`tests/integration/`, D-20261118-build-size):
+        // lọc đúng module `upgrade` của nó.
+        .args([
+            "test",
+            "--locked",
+            "-p",
+            "autoxide",
+            "--test",
+            "integration",
+            "upgrade::",
+            "--",
+            "--nocapture",
+        ])
         .env("TEST_UPGRADE_IMAGE", image)
         .env_remove("TEST_DATABASE_URL");
     if let Some(url) = database_url {
         command.env("TEST_DATABASE_URL", url);
     }
-    run_command(&mut command, "cargo test --test upgrade")
+    run_command(&mut command, "cargo test --test integration upgrade::")
 }
 
 /// Chạy lệnh. `Ok(())` khi test xanh trên mọi database đã chọn.
