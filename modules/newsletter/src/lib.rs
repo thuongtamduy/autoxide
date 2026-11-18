@@ -83,6 +83,29 @@ impl Module for NewsletterModule {
         "newsletter"
     }
 
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        let Some(config) = &self.config else {
+            return Vec::new();
+        };
+        vec![
+            RetentionPolicy::new(
+                "newsletter.subscribers",
+                "Subscribers (email address, name) and their subscriptions, kept until they \
+                 unsubscribe from every list or are erased on request.",
+                DataCategory::Basic,
+                Keep::UntilDeleted,
+            ),
+            RetentionPolicy::new(
+                "newsletter.unconfirmed",
+                "Sign-ups whose email address was never confirmed.",
+                DataCategory::Basic,
+                Keep::Days(config.unconfirmed_days),
+            )
+            .setting(config::UNCONFIRMED_DAYS.name),
+        ]
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }
