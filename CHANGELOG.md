@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
+  `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
+  `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
+  `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
+  tools `inventory.*`.
 - `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
   conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
   product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category

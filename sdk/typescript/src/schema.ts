@@ -6302,6 +6302,45 @@ export type Data_Ingested = {
 };
 
 /** Envelope of a single result. */
+export type Data_InventoryAdjustment = {
+  /** A stock adjustment with the ledger lines it wrote. */
+  data: {
+    actor_id?: string | null;
+    created_at: string;
+    id: string;
+    movements: InventoryMovement[];
+    org_id: string;
+    reference: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryLevel = {
+  /** The stock of one variant in one warehouse or store. */
+  data: {
+    /**
+     * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+     * may be sold out of stock is oversold.
+     */
+    available: number;
+    average_cost?: Money | null;
+    id: string;
+    /** Units on the way (transfers in transit, purchase orders). */
+    incoming: number;
+    /** Units physically in the warehouse: the sum of the movement ledger. */
+    on_hand: number;
+    /** The warehouse or store (organization unit). */
+    org_id: string;
+    /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+    reorder_point?: number | null;
+    /** Units held for orders not shipped yet. */
+    reserved: number;
+    updated_at: string;
+    variant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_InvitationResponse = {
   /** An invitation to work in this tenant. */
   data: {
@@ -12123,6 +12162,98 @@ export type Ingested = {
   dropped: number;
 };
 
+/** A stock adjustment with the ledger lines it wrote. */
+export type InventoryAdjustment = {
+  actor_id?: string | null;
+  created_at: string;
+  id: string;
+  movements: InventoryMovement[];
+  org_id: string;
+  reference: string;
+};
+
+/** One line of a stock adjustment. */
+export type InventoryAdjustmentLine = {
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** Units to add (positive) or remove (negative); not 0. */
+  quantity: number;
+  /**
+   * Code from the reason list `inventory.adjustment` (see
+   * `GET /api/v1/kernel/reasons/inventory.adjustment`), e.g. `damaged`.
+   */
+  reason_code?: string | null;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A stock adjustment to make in one warehouse. */
+export type InventoryAdjustmentRequest = {
+  /** 1 to 500 lines. */
+  lines: InventoryAdjustmentLine[];
+  /** The warehouse or store. */
+  org_id: string;
+  /**
+   * Your id of this adjustment (1 to 100 visible ASCII characters). Sending the same
+   * reference and content again returns the adjustment already made.
+   */
+  reference: string;
+};
+
+/** The stock of one variant in one warehouse or store. */
+export type InventoryLevel = {
+  /**
+   * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+   * may be sold out of stock is oversold.
+   */
+  available: number;
+  average_cost?: Money | null;
+  id: string;
+  /** Units on the way (transfers in transit, purchase orders). */
+  incoming: number;
+  /** Units physically in the warehouse: the sum of the movement ledger. */
+  on_hand: number;
+  /** The warehouse or store (organization unit). */
+  org_id: string;
+  /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+  reorder_point?: number | null;
+  /** Units held for orders not shipped yet. */
+  reserved: number;
+  updated_at: string;
+  variant_id: string;
+};
+
+/** Settings of a stock level. */
+export type InventoryLevelUpdate = {
+  /** Reorder point, 0 to 1 000 000; `null` turns low-stock alerts off. */
+  reorder_point?: number | null;
+};
+
+/** One line of the stock movement ledger. Lines are only ever added. */
+export type InventoryMovement = {
+  actor_id?: string | null;
+  created_at: string;
+  id: string;
+  /**
+   * `receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,
+   * `expiry` or `supplier_return`.
+   */
+  kind: string;
+  level_id: string;
+  lot_id?: string | null;
+  note: string;
+  org_id: string;
+  /** Signed: positive came in, negative went out. */
+  quantity: number;
+  /** Code from the reason list `inventory.adjustment`, for adjustments and counts. */
+  reason_code?: string | null;
+  source_id: string;
+  /** What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`… */
+  source_type: string;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
 /** A new invitation. */
 export type InvitationRequest = {
   email: string;
@@ -15802,6 +15933,62 @@ export type Page_FormResponse = {
      * the version it was sent with, and is shown with that version's labels.
      */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryLevel = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+     * may be sold out of stock is oversold.
+     */
+    available: number;
+    average_cost?: Money | null;
+    id: string;
+    /** Units on the way (transfers in transit, purchase orders). */
+    incoming: number;
+    /** Units physically in the warehouse: the sum of the movement ledger. */
+    on_hand: number;
+    /** The warehouse or store (organization unit). */
+    org_id: string;
+    /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+    reorder_point?: number | null;
+    /** Units held for orders not shipped yet. */
+    reserved: number;
+    updated_at: string;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryMovement = {
+  /** The items of this page, in the requested order. */
+  data: {
+    actor_id?: string | null;
+    created_at: string;
+    id: string;
+    /**
+     * `receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,
+     * `expiry` or `supplier_return`.
+     */
+    kind: string;
+    level_id: string;
+    lot_id?: string | null;
+    note: string;
+    org_id: string;
+    /** Signed: positive came in, negative went out. */
+    quantity: number;
+    /** Code from the reason list `inventory.adjustment`, for adjustments and counts. */
+    reason_code?: string | null;
+    source_id: string;
+    /** What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`… */
+    source_type: string;
+    unit_cost?: Money | null;
+    variant_id: string;
   }[];
   pagination: Pagination;
 };
@@ -27142,6 +27329,88 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/adjustments": {
+    /** Adjust stock in one warehouse, each line with a reason. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryAdjustmentRequest;
+      responses: {
+        200: Data_InventoryAdjustment;
+        201: Data_InventoryAdjustment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/adjustments/{id}": {
+    /** Get a stock adjustment with the ledger lines it wrote. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryAdjustment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/levels": {
+    /** List stock levels (variant × warehouse) in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; below_reorder?: boolean | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/levels/{id}": {
+    /** Get one stock level. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the reorder point of a stock level. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryLevelUpdate;
+      responses: {
+        200: Data_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/movements": {
+    /** List the stock movement ledger in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; kind?: "receipt" | "sale" | "return" | "adjustment" | "count" | "transfer_out" | "transfer_in" | "expiry" | "supplier_return" | null; from?: string | null; to?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryMovement;
+        401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
