@@ -11,10 +11,10 @@ use utoipa::ToSchema;
 use crate::error::Error;
 use crate::tenancy::TenantContext;
 
-/// Một bản ghi đang trỏ tới bản ghi được hỏi.
+/// A record that points to the record asked about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Referrer {
-    /// Loại của bản ghi trỏ tới, vd `content.entry`.
+    /// Type of the pointing record, e.g. `content.entry`.
     #[schema(example = "content.entry")]
     pub kind: String,
     pub id: String,
