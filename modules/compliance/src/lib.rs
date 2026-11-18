@@ -32,6 +32,7 @@ mod incidents;
 mod kyc;
 mod legal;
 mod migration;
+mod overview;
 mod permissions;
 mod privacy;
 mod provider;
@@ -207,7 +208,8 @@ impl Module for ComplianceModule {
                 .merge(http_moit::routes(service.clone()))
                 .merge(http_privacy::routes(service.clone()))
                 .merge(http_tracking::routes(service.clone()))
-                .merge(http_verification::routes(service))
+                .merge(http_verification::routes(service.clone()))
+                .merge(overview::routes(service))
         })
     }
 

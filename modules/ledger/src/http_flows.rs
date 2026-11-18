@@ -40,9 +40,11 @@ pub(crate) fn routes(service: Arc<LedgerService>) -> OpenApiRouter {
         .routes(routes!(get_payout))
         .routes(routes!(list_bank_accounts, create_bank_account))
         .routes(routes!(update_bank_account))
+        .routes(routes!(preview_vietqr))
         .routes(routes!(create_vietqr_payment))
         .routes(routes!(receive_bank_feed))
         .routes(routes!(seal_status))
+        .routes(routes!(verify_book))
         .with_state(service)
 }
 
@@ -524,6 +526,70 @@ async fn update_bank_account(
     Ok(Data { data: row.into() })
 }
 
+/// What to put in a sample VietQR code.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = LedgerVietqrPreviewRequest)]
+pub(crate) struct VietqrPreviewRequest {
+    /// Amount in VND, e.g. `{"amount": "10000", "currency": "VND"}`.
+    amount: Money,
+    /// Transfer note, 1 to 25 letters, digits or spaces without accents; default a sample transfer
+    /// code like the ones real payments get.
+    memo: Option<String>,
+}
+
+/// A sample VietQR code for a bank account.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerVietqrPreview)]
+pub(crate) struct VietqrPreviewResponse {
+    /// The VietQR (EMVCo) text to draw as a QR code.
+    qr_payload: String,
+    /// The transfer note inside the code.
+    memo: String,
+    amount: Money,
+    /// The account the code pays into.
+    bank_account: BankAccountResponse,
+}
+
+/// Make a sample VietQR code for a bank account, without creating a payment.
+///
+/// Requires `ledger.read` on the account's unit. Nothing is stored: scan the code with a banking app
+/// to check that it shows the right bank, account number and name before taking real payments —
+/// do not complete the transfer, it would not be matched to any payment.
+#[utoipa::path(
+    post,
+    path = "/bank-accounts/{id}/vietqr-preview",
+    extensions(("x-permissions" = json!(["ledger.read"]))),
+    operation_id = "preview_ledger_vietqr",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the bank account.")),
+    request_body = VietqrPreviewRequest,
+    responses(
+        (status = 200, description = "The sample code.", body = Data<VietqrPreviewResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `ledger.read`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No such bank account in your scope; code `ledger.bank_account_not_found`.", body = Problem),
+        (status = 422, description = "A value is invalid (amount not positive VND, note too long…); every problem in `errors`.", body = Problem),
+    )
+)]
+async fn preview_vietqr(
+    State(service): State<Arc<LedgerService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<VietqrPreviewRequest>,
+) -> Result<Data<VietqrPreviewResponse>, Error> {
+    let preview = service.preview_vietqr(&tenant, &principal, id, input.amount, input.memo).await?;
+    Ok(Data {
+        data: VietqrPreviewResponse {
+            qr_payload: preview.qr_payload,
+            memo: preview.memo,
+            amount: preview.amount,
+            bank_account: preview.account.into(),
+        },
+    })
+}
+
 /// A VietQR payment to create.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -632,6 +698,71 @@ pub(crate) struct SealStatusResponse {
     sealed: u64,
     /// When the oldest entry not yet sealed was posted; entries are sealed within seconds.
     oldest_unsealed_at: Option<DateTime<Utc>>,
+}
+
+/// The result of checking a book's hash chain.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerChainCheck)]
+pub(crate) struct ChainCheckResponse {
+    book_id: Uuid,
+    /// `true` when every sealed entry and seal is as it was sealed.
+    intact: bool,
+    /// Number of sealed entries checked (when intact).
+    checked: u64,
+    /// Where the chain first breaks, when it is not intact.
+    broken: Option<ChainBreak>,
+    checked_at: DateTime<Utc>,
+}
+
+/// The first place a hash chain breaks.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[schema(as = LedgerChainBreak)]
+pub(crate) struct ChainBreak {
+    /// Sequence number in the chain where the check failed.
+    sequence: i64,
+    /// The entry there, when it still exists.
+    entry_id: Option<Uuid>,
+    /// What was found, in English, e.g. `the entry or its lines were changed`.
+    reason: String,
+}
+
+/// Check a book's hash chain now.
+///
+/// Requires `ledger.read` on the book's unit. Reads every sealed entry of the book again and
+/// compares it with its seal, the way the daily check does (`autoxide doctor`): `intact: false`
+/// means someone changed or deleted entries outside the API — keep the database as it is and
+/// investigate. Only reads; takes longer the more entries the book has. Entries not yet sealed are
+/// not checked (see `seal-status`).
+#[utoipa::path(
+    get,
+    path = "/books/{id}/integrity",
+    extensions(("x-permissions" = json!(["ledger.read"]))),
+    operation_id = "check_ledger_integrity",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the book.")),
+    responses(
+        (status = 200, description = "The result of the check.", body = Data<ChainCheckResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `ledger.read`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No such book in your scope; code `ledger.book_not_found`.", body = Problem),
+    )
+)]
+async fn verify_book(
+    State(service): State<Arc<LedgerService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Data<ChainCheckResponse>, Error> {
+    let verdict = service.verify_book(&tenant, &principal, id).await?;
+    let (intact, checked, broken) = match verdict {
+        crate::chain::Verdict::Intact(checked) => (true, checked, None),
+        crate::chain::Verdict::Broken { sequence, entry, reason } => {
+            (false, 0, Some(ChainBreak { sequence, entry_id: entry, reason: reason.to_owned() }))
+        }
+    };
+    Ok(Data {
+        data: ChainCheckResponse { book_id: id, intact, checked, broken, checked_at: Utc::now() },
+    })
 }
 
 /// Which period.

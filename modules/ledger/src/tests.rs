@@ -886,3 +886,50 @@ async fn danh_sach_ky_kem_so_but_toan_va_so_da_niem_phong() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn kiem_chuoi_bam_cua_so_theo_yeu_cau() {
+    TestDatabase::run(async |test| {
+        let (app, _) = app(test).await;
+        let tenant = app.default_tenant();
+        let ledger = ledger(&app);
+        let mut ids = Vec::new();
+        for index in 0..2 {
+            let posted = ledger
+                .post(
+                    &tenant,
+                    Actor::system(),
+                    transfer("cash.bank", "revenue.sales", 10, &format!("I-{index}")),
+                )
+                .await
+                .unwrap()
+                .into_inner();
+            ids.push((posted.id, posted.book_id));
+        }
+        LedgerService::seal_entries(app.database()).await.unwrap();
+        let uri = format!("/books/{}/integrity", ids[0].1);
+        let (status, check) = call(&app, "GET", &uri, "acct", None).await;
+        assert_eq!(status, StatusCode::OK, "{check}");
+        assert_eq!(check["data"]["intact"], true);
+        assert_eq!(check["data"]["checked"], 2);
+        assert_eq!(check["data"]["broken"], Value::Null);
+
+        // Sửa một dòng ngoài API: phát hiện đúng bút toán.
+        line::Entity::update_many()
+            .col_expr(line::Column::AmountMinor, Expr::col(line::Column::AmountMinor).add(1))
+            .filter(line::Column::EntryId.eq(ids[1].0))
+            .exec(app.database().write())
+            .await
+            .unwrap();
+        let (_, check) = call(&app, "GET", &uri, "acct", None).await;
+        assert_eq!(check["data"]["intact"], false, "{check}");
+        assert_eq!(check["data"]["broken"]["entry_id"], ids[1].0.to_string());
+        assert_eq!(check["data"]["broken"]["sequence"], 2);
+
+        let (status, _) =
+            call(&app, "GET", &format!("/books/{}/integrity", Uuid::now_v7()), "acct", None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    })
+    .await
+    .unwrap();
+}

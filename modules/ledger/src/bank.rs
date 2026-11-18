@@ -83,6 +83,15 @@ pub(crate) struct BankAccountChange {
     pub status: Option<String>,
 }
 
+/// Chuỗi VietQR mẫu và tài khoản nó trỏ tới.
+#[derive(Debug, Clone)]
+pub(crate) struct VietqrPreview {
+    pub qr_payload: String,
+    pub memo: String,
+    pub amount: Money,
+    pub account: bank_account::Model,
+}
+
 impl LedgerService {
     pub(crate) fn bank_feed(&self, provider: &str) -> Result<Arc<dyn BankFeed>, Error> {
         self.bank_feeds
@@ -261,6 +270,53 @@ impl LedgerService {
             .ok_or_else(bank_account_not_found)?;
         transaction.commit().await?;
         Ok(saved)
+    }
+
+    /// Chuỗi VietQR mẫu cho tài khoản `id` (không tạo thanh toán, không ghi gì): để kiểm số tài khoản
+    /// đã đúng bằng cách quét thử bằng ứng dụng ngân hàng trước khi nhận tiền thật. Nội dung mặc định
+    /// là một mã chuyển khoản mẫu cùng dạng mã thật.
+    pub(crate) async fn preview_vietqr(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        amount: Money,
+        memo: Option<String>,
+    ) -> Result<VietqrPreview, Error> {
+        principal.require(&READ)?;
+        let condition = principal.scope_condition(&READ, bank_account::Column::OrgId, None)?;
+        let account = bank_account::Entity::find_by_id(id)
+            .scoped(tenant)
+            .filter(condition)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(bank_account_not_found)?;
+        let mut problems = Vec::new();
+        if !amount.is_positive() || amount.currency() != Currency::VND {
+            problems.push(FieldError::new(
+                "amount",
+                "range",
+                "must be a positive amount in VND (VietQR transfers are in VND)",
+            ));
+        }
+        let memo = memo.map(|memo| memo.trim().to_owned());
+        if let Some(memo) = &memo
+            && (!(1..=25).contains(&memo.len())
+                || !memo.bytes().all(|b| b.is_ascii_alphanumeric() || b == b' '))
+        {
+            problems.push(FieldError::new(
+                "memo",
+                "format",
+                "must be 1 to 25 letters, digits or spaces, without accents",
+            ));
+        }
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
+        }
+        let memo = memo.unwrap_or_else(|| vietqr::transfer_code(Uuid::now_v7()));
+        let qr_payload = vietqr::payload(&account.bank_bin, &account.account_number, amount, &memo)
+            .ok_or_else(|| Error::internal("a checked VietQR transfer did not fit the QR"))?;
+        Ok(VietqrPreview { qr_payload, memo, amount, account })
     }
 
     pub(crate) async fn list_bank_accounts(

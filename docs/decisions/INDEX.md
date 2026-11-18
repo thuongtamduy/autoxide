@@ -4,7 +4,7 @@
 
 Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
 
-385 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+386 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
 
 ## Phạm vi và mục tiêu (12)
 
@@ -251,7 +251,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-358** "Bán trước khi thông báo website" (A-3.5): nhãn "bắt buộc theo luật", không chặn — 2026-11-17
 - **D-370** Nhật ký request theo khách và nhật ký lệnh của agent (bước 52 mục 1, D-202) — 2026-11-18
 
-## Hợp đồng cho giao diện (30)
+## Hợp đồng cho giao diện (31)
 
 - **D-096** Module đầu tiên là `cms` (nội dung); giao diện là dự án riêng, công khai; chưa làm app — 2026-11-12 · **chủ dự án quyết** · *thay một phần bởi D-098, D-099, D-238*
 - **D-097** Stack của dự án giao diện — 2026-11-12
@@ -283,6 +283,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-369** Sổ điều hướng cho điện thoại: gợi ý `mobile` trên `NavItem`, thanh đáy tối đa 5 mục (bước 52 mục 6, D-232) — 2026-11-18
 - **D-373** Phần còn lại của trường tự định nghĩa và gắn nhãn hàng loạt (bước 51 P19, P20) — 2026-11-18
 - **D-382** Trả nợ giao diện đợt 2: tổng số của danh sách và các chỗ thiếu trên module đã xong — 2026-11-18
+- **[D-20261118-ui-debt-batch-3](D-20261118-ui-debt-batch-3.md)** Trả nợ giao diện đợt 3: công cụ kế toán, tổng quan tuân thủ, hồ sơ định danh, sổ loại đối tượng — 2026-11-18
 
 ## Module nội dung, file, liên lạc (89)
 

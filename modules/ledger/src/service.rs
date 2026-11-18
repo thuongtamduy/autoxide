@@ -986,6 +986,25 @@ impl LedgerService {
 
     /// Bút toán của sổ `book_id` (hay kỳ `period_id`) đã vào chuỗi băm chưa: tổng, đã niêm phong,
     /// bút toán chưa niêm phong lâu nhất. Đếm theo index (sổ, ngày) và (bút toán) — không quét bảng.
+    /// Kiểm lại cả chuỗi băm của sổ `book_id` theo yêu cầu: đọc lại mọi bút toán đã niêm phong trên
+    /// một bức ảnh nhất quán, so dấu băm. Chỉ đọc; tốn tỉ lệ với số bút toán của sổ.
+    pub(crate) async fn verify_book(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        book_id: uuid::Uuid,
+    ) -> Result<crate::chain::Verdict, Error> {
+        let book = self.book_for(tenant, principal, &READ, book_id).await?;
+        let snapshot = tenant.database().begin_snapshot().await?;
+        let verdict = crate::chain::verify(&snapshot, tenant.id().as_uuid(), book.id).await;
+        snapshot.rollback().await?;
+        let verdict = verdict?;
+        if let crate::chain::Verdict::Broken { sequence, reason, .. } = &verdict {
+            tracing::warn!(tenant_id = %tenant.id(), book_id = %book.id, sequence, reason, "ledger hash chain is broken");
+        }
+        Ok(verdict)
+    }
+
     pub(crate) async fn seal_status(
         &self,
         tenant: &TenantContext,

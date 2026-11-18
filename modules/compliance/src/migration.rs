@@ -40,6 +40,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![autoxide_kernel::antispam::tenant_table("compliance")],
         ),
         Box::new(ConsentStatsIndex),
+        Box::new(KycReviewNote),
     ]
 }
 
@@ -1093,6 +1094,40 @@ impl MigrationTrait for ConsentStatsIndex {
                 Index::drop()
                     .name("compliance_consents_stats_idx")
                     .table(Alias::new("compliance_consents"))
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+/// Ghi chú của người duyệt khi từ chối / thu hồi hồ sơ định danh (D-20261118-ui-debt-batch-3).
+struct KycReviewNote;
+
+impl MigrationName for KycReviewNote {
+    fn name(&self) -> &str {
+        "m0019_kyc_review_note"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for KycReviewNote {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("compliance_kyc_profiles")
+                    .add_column(schema::text_null("review_note"))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("compliance_kyc_profiles")
+                    .drop_column("review_note")
                     .to_owned(),
             )
             .await

@@ -408,3 +408,34 @@ async fn muc_dich_kem_so_nguoi_dong_y_va_da_rut() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn tong_quan_chi_dem_khu_vuc_duoc_doc() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let received = Utc::now() - Duration::days(5);
+        let input = json!({"kind": "access", "channel": "email", "subject": "ada@example.com",
+                           "received_at": received.to_rfc3339()});
+        let (status, created) = call(&app, "POST", "/subject-requests", "admin", Some(input)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let input = json!({"kind": "erasure", "channel": "email", "subject": "bob@example.com"});
+        let (status, _) = call(&app, "POST", "/subject-requests", "admin", Some(input)).await;
+        assert_eq!(status, StatusCode::CREATED);
+
+        let (status, overview) = call(&app, "GET", "/overview", "admin", None).await;
+        assert_eq!(status, StatusCode::OK, "{overview}");
+        let data = &overview["data"];
+        assert_eq!(data["subject_requests"], json!({"open": 2, "overdue": 1}));
+        assert_eq!(data["incidents"], json!({"open": 0, "report_overdue": 0}));
+        // Không có quyền đọc khu vực: `null`.
+        assert_eq!(data["kyc"], serde_json::Value::Null);
+        assert_eq!(data["cases"], serde_json::Value::Null);
+        assert_eq!(data["websites"], serde_json::Value::Null);
+
+        let (status, nothing) = call(&app, "GET", "/overview", "alice", None).await;
+        assert_eq!(status, StatusCode::OK, "{nothing}");
+        assert_eq!(nothing["data"]["subject_requests"], serde_json::Value::Null);
+    })
+    .await
+    .unwrap();
+}

@@ -136,6 +136,7 @@ impl ComplianceService {
             expires_at: Set(None),
             reason_code: Set(None),
             reviewed_by: Set(None),
+            review_note: Set(None),
             created_at: Set(at),
             updated_at: Set(at),
         })
@@ -531,10 +532,10 @@ impl ComplianceService {
                     Decision::Approve => {
                         matches!(row.status.as_str(), "pending" | "needs_info" | "draft")
                     }
-                    Decision::Reject(_) => {
+                    Decision::Reject(..) => {
                         matches!(row.status.as_str(), "pending" | "needs_info" | "draft")
                     }
-                    Decision::Revoke(_) => row.status == "verified",
+                    Decision::Revoke(..) => row.status == "verified",
                     Decision::RequestInfo { .. } => {
                         matches!(row.status.as_str(), "pending" | "draft")
                     }
@@ -546,19 +547,22 @@ impl ComplianceService {
                     Decision::Approve => {
                         active.status = Set("verified".to_owned());
                         active.reason_code = Set(None);
+                        active.review_note = Set(None);
                         active.verified_at = Set(Some(at));
                         active.expires_at = Set(Some(at + Duration::days(valid_days)));
                         if row.method.is_none() {
                             active.method = Set(Some("manual".to_owned()));
                         }
                     }
-                    Decision::Reject(reason) => {
+                    Decision::Reject(reason, note) => {
                         active.status = Set("rejected".to_owned());
                         active.reason_code = Set(Some(reason.clone()));
+                        active.review_note = Set(note.clone());
                     }
-                    Decision::Revoke(reason) => {
+                    Decision::Revoke(reason, note) => {
                         active.status = Set("revoked".to_owned());
                         active.reason_code = Set(Some(reason.clone()));
+                        active.review_note = Set(note.clone());
                     }
                     Decision::RequestInfo { fields, message } => {
                         active.status = Set("needs_info".to_owned());
@@ -582,7 +586,7 @@ impl ComplianceService {
                             )
                             .await?
                     }
-                    Decision::Reject(_) => {
+                    Decision::Reject(..) => {
                         outbox
                             .record(
                                 &transaction,
@@ -593,7 +597,7 @@ impl ComplianceService {
                             )
                             .await?
                     }
-                    Decision::Revoke(_) => {
+                    Decision::Revoke(..) => {
                         outbox
                             .record(
                                 &transaction,
@@ -636,6 +640,39 @@ impl ComplianceService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(kyc_not_found)
+    }
+
+    /// Tên chủ thể trước khi xác minh, theo lô qua sổ đối tượng của kernel: tài khoản (`auth.user`)
+    /// và nút tổ chức (`organizations.unit`). Loại chưa có bộ tra hay lỗi thì bỏ qua — tên chỉ để
+    /// hiển thị, không chặn danh sách.
+    pub(crate) async fn subject_names(
+        &self,
+        tenant: &TenantContext,
+        rows: &[kyc_profile::Model],
+    ) -> std::collections::HashMap<(String, String), String> {
+        let mut names = std::collections::HashMap::new();
+        for (subject_kind, resource_kind) in [("user", "auth.user"), ("org", "organizations.unit")]
+        {
+            let ids: Vec<String> = rows
+                .iter()
+                .filter(|row| row.subject_kind == subject_kind)
+                .map(|row| row.subject_id.clone())
+                .collect();
+            if ids.is_empty() || !self.resources.knows(resource_kind) {
+                continue;
+            }
+            match self.resources.resolve_many(tenant, resource_kind, &ids, None).await {
+                Ok(found) => {
+                    for (id, resource) in found {
+                        names.insert((subject_kind.to_owned(), id), resource.title);
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(kind = resource_kind, error = %error, "cannot read subject names");
+                }
+            }
+        }
+        names
     }
 
     pub(crate) async fn list_profiles(
@@ -828,9 +865,13 @@ impl ComplianceService {
 #[derive(Debug, Clone)]
 pub(crate) enum Decision {
     Approve,
-    Reject(String),
-    Revoke(String),
-    RequestInfo { fields: Vec<String>, message: String },
+    /// Mã lý do, ghi chú cho người được duyệt.
+    Reject(String, Option<String>),
+    Revoke(String, Option<String>),
+    RequestInfo {
+        fields: Vec<String>,
+        message: String,
+    },
 }
 
 /// Job `compliance.kyc_process`.
