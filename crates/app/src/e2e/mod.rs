@@ -7,6 +7,7 @@ pub(crate) mod agents;
 pub(crate) mod automations;
 pub(crate) mod billing;
 pub(crate) mod cases;
+pub(crate) mod catalog;
 pub(crate) mod child_context;
 pub(crate) mod guides;
 pub(crate) mod invoices;
