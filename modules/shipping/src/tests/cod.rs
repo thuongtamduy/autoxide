@@ -303,6 +303,8 @@ fn service_with_ledger(app: &TestApp) -> Arc<crate::service::ShippingService> {
         carriers: base.carriers.clone(),
         ledger: None,
         reasons: base.reasons.clone(),
+        catalog: None,
+        orgs: None,
         units: base.units.clone(),
     };
     parts.ledger = app.api::<dyn Ledger>();

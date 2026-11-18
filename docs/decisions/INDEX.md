@@ -443,6 +443,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step44-shipping-api](D-20261118-step44-shipping-api.md)** Module `shipping`: hợp đồng `api` cho bước 45, sổ hãng `CarrierRegistry`, sổ địa chỉ không cần permission, địa chỉ nước ngoài trong `Address` — 2026-11-18
 - **[D-20261118-step44-shipping-carriers](D-20261118-step44-shipping-carriers.md)** `shipping`: tài khoản hãng mã hoá trong bảng, bảng chuyển trạng thái chung, đặt hãng giữa hai transaction, webhook ghi nguyên văn rồi xử lý bằng job — 2026-11-18
 - **[D-20261118-step44-shipping-cod](D-20261118-step44-shipping-cod.md)** `shipping`: tiền thu hộ (COD) chỉ ghi nghĩa vụ trong sổ cái, đối soát bảng kê CSV chung, chênh lệch giải quyết bằng danh sách lý do — 2026-11-18
+- **[D-20261118-step44-shipping-dates](D-20261118-step44-shipping-dates.md)** `shipping`: ngày giao dự kiến theo lịch giao, giờ sẵn sàng nhận tại cửa hàng, ước tính công khai đọc biến thể qua `Catalog` — 2026-11-18
 - **[D-20261118-step44-shipping-rates](D-20261118-step44-shipping-rates.md)** `shipping`: cân quy đổi số nguyên, bậc phí theo vùng tỉnh, phương thức kế thừa theo cây, thuế của phí giao do `orders` tính theo `tax_category` — 2026-11-18
 - **[D-20261118-step53-sla](D-20261118-step53-sla.md)** `support`: chính sách hỗ trợ là một văn bản JSON theo nút, giờ làm nằm trong chính sách, mặc định SLA — 2026-11-18
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18

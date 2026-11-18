@@ -3,6 +3,7 @@
 
 mod addresses;
 mod cod;
+mod dates;
 mod fake_ledger;
 pub(crate) mod rates;
 mod shipments;
@@ -109,6 +110,8 @@ pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::ShippingService> 
         carriers,
         ledger: None,
         reasons: Default::default(),
+        catalog: None,
+        orgs: None,
         units: Some(Arc::new(FakeUnits)),
     };
     Arc::new(crate::service::ShippingService::new(parts, Default::default()))

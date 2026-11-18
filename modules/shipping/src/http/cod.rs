@@ -257,7 +257,7 @@ pub(crate) struct DiscrepancyBody {
     created_at: DateTime<Utc>,
 }
 
-fn discrepancy(row: cod_discrepancy::Model) -> DiscrepancyBody {
+pub(crate) fn discrepancy(row: cod_discrepancy::Model) -> DiscrepancyBody {
     DiscrepancyBody {
         expected: money(row.expected_minor, &row.currency),
         reported: money(row.reported_minor, &row.currency),

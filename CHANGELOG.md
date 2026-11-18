@@ -27,6 +27,10 @@ endpoints are marked deprecated with a sunset date first.
   `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
   `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
   tools `inventory.*`.
+- `shipping`: delivery calendars (working days, holidays, special cut-offs as data), expected delivery dates
+  (`eta`) and store pickup `ready_at` / `hold_days` on every quote option, a public shipping estimate for product
+  pages (`GET /api/v1/shipping/public/estimate`), MCP tools `shipping.*`. `OrgDirectory::opening_hours` reads the
+  opening hours of a unit's public profile.
 - `shipping`: cash on delivery recorded as obligations in the ledger (never held), carrier statements imported
   from CSV or the carrier's API and matched by tracking number, discrepancies (amount, unknown, overdue) resolved
   with a reason code; `shipping.cod_settled` carries `seller_org_id`.

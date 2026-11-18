@@ -6,8 +6,6 @@ Module `shipping` giữ sổ địa chỉ của người mua, tính phí vận c
 chuyển dưới dạng module bộ nối, theo dõi vận đơn và đối soát tiền thu hộ (COD). Module không phụ thuộc
 `orders` hay `catalog`: `orders` báo giá qua `autoxide_shipping::api` và gửi yêu cầu giao bằng event.
 
-Hướng dẫn này lớn dần theo module. Mục ghi *(đang làm)* là phần còn đang dựng.
-
 ## Sổ địa chỉ
 
 Người mua đã đăng nhập lưu tối đa `AUTOXIDE_SHIPPING_MAX_ADDRESSES_PER_BUYER` (mặc định 20) địa chỉ:
@@ -160,9 +158,30 @@ Luật mọi bộ nối phải theo (ví dụ đầy đủ: `autoxide_shipping::
 `AUTOXIDE_SHIPPING_FAKE_CARRIER=true` đăng ký hãng giả `fake` để thử mọi thứ trên máy phát triển. `autoxide
 doctor` cảnh báo khi bật; không bao giờ bật trên production.
 
-## Ngày giao *(đang làm)*
+## Ngày giao dự kiến
 
-Lịch giao và ước tính công khai sẽ được ghi ở đây khi xong.
+Lịch giao ở `/api/v1/shipping/calendars` (`shipping.settings.manage`): múi giờ (mặc định `Asia/Ho_Chi_Minh`), ngày làm
+việc trong tuần, và ngày riêng đặt bằng `PUT /calendars/{id}/days/{YYYY-MM-DD}` — `closed` (nghỉ lễ, nhập khi có thông
+báo; không viết cứng ngày nào) hay `special_hours` với giờ chốt riêng. Phương thức gắn lịch (`calendar_id`), giờ chốt
+trong ngày (`cutoff_minute`, 660 = 11:00) và `same_day`.
+
+Mỗi lựa chọn của báo giá có `eta`: `earliest_date` và `latest_date` là ngày theo múi giờ của lịch (ngày làm việc sau
+ngày rời kho), và `order_by` — giờ chốt hôm nay khi còn kịp. Phương thức không gắn lịch dùng thứ Hai – thứ Bảy, giờ
+Việt Nam. Lựa chọn nhận tại cửa hàng có `ready_at` (giờ đặt + `prep_hours` của điểm nhận, lùi tới giờ mở cửa kế tiếp
+theo hồ sơ công khai của cửa hàng, 08:00–21:00 khi cửa hàng chưa khai) và `hold_days`.
+
+## Ước tính công khai cho trang sản phẩm
+
+`GET /api/v1/shipping/public/estimate?variant_id=…&quantity=1&province_code=79` không cần đăng nhập. Chạy đúng báo giá
+lúc thanh toán cho giỏ một dòng tới một tỉnh (phí, ngưỡng miễn phí, `eta` kèm giờ chốt hôm nay) và trả
+`estimate: true` — phí thật luôn tính lại cho giỏ. Cân nặng, kích thước, nút bán và giá của biến thể lấy từ module
+`catalog`. Response cache được 60 giây.
+
+## Tool MCP
+
+`shipping.quote` (chỉ đọc), `shipping.list_shipments`, `shipping.get_shipment`, `shipping.book_shipment`,
+`shipping.cancel_shipment` (phá huỷ), `shipping.update_status`, `shipping.list_cod_discrepancies` — cùng permission với
+endpoint REST tương ứng.
 
 ## Cấu hình
 

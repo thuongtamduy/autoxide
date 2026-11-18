@@ -2,11 +2,12 @@
 //! gọi service → trả envelope.
 
 pub(crate) mod addresses;
+mod calendars;
 mod carriers;
-mod cod;
-mod quote;
+pub(crate) mod cod;
+pub(crate) mod quote;
 mod settings;
-mod shipments;
+pub(crate) mod shipments;
 
 use std::sync::Arc;
 
@@ -50,5 +51,9 @@ pub(crate) fn routes(service: Arc<ShippingService>) -> OpenApiRouter {
         .routes(routes!(cod::list_discrepancies))
         .routes(routes!(cod::resolve_discrepancy))
         .routes(routes!(cod::refresh_tracking))
+        .routes(routes!(calendars::list_calendars, calendars::create_calendar))
+        .routes(routes!(calendars::get_calendar, calendars::update_calendar))
+        .routes(routes!(calendars::set_day, calendars::delete_day))
+        .routes(routes!(calendars::estimate))
         .with_state(service)
 }

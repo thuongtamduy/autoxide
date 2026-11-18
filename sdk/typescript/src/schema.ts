@@ -8771,6 +8771,22 @@ export type Data_ShippingAddress = {
 };
 
 /** Envelope of a single result. */
+export type Data_ShippingCalendar = {
+  /** A delivery calendar. */
+  data: {
+    /** Holidays and special days (only in single-calendar answers). */
+    days: ShippingCalendarDayEntry[];
+    id: string;
+    name: string;
+    org_id: string;
+    time_zone: string;
+    updated_at: string;
+    /** 1 = Monday … 7 = Sunday. */
+    working_days: number[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ShippingCarrierAccount = {
   /** A carrier account. Credentials are never returned: only the names of the fields set. */
   data: {
@@ -8844,6 +8860,15 @@ export type Data_ShippingCodStatementDetail = {
   /** A carrier statement with its lines. */
   data: ShippingCodStatement & {
     lines: ShippingCodStatementLine[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingEstimate = {
+  /** A public shipping estimate. */
+  data: ShippingQuote & {
+    /** Always `true`: the fee is computed again when the order is placed. */
+    estimate: boolean;
   };
 };
 
@@ -17897,6 +17922,23 @@ export type Page_ShippingAddress = {
 };
 
 /** One page of a list. */
+export type Page_ShippingCalendar = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Holidays and special days (only in single-calendar answers). */
+    days: ShippingCalendarDayEntry[];
+    id: string;
+    name: string;
+    org_id: string;
+    time_zone: string;
+    updated_at: string;
+    /** 1 = Monday … 7 = Sunday. */
+    working_days: number[];
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ShippingCarrierAccount = {
   /** The items of this page, in the requested order. */
   data: {
@@ -20629,6 +20671,48 @@ export type ShippingAddressChanges = {
   recipient_name?: string | null;
 };
 
+/** A delivery calendar. */
+export type ShippingCalendar = {
+  /** Holidays and special days (only in single-calendar answers). */
+  days: ShippingCalendarDayEntry[];
+  id: string;
+  name: string;
+  org_id: string;
+  time_zone: string;
+  updated_at: string;
+  /** 1 = Monday … 7 = Sunday. */
+  working_days: number[];
+};
+
+/** A day with other rules than usual. */
+export type ShippingCalendarDay = {
+  /** `special_hours`: orders before this minute of the day leave that day. */
+  cutoff_minute?: number | null;
+  /** `closed` (no dispatch: holiday) or `special_hours` (dispatch with its own cut-off). */
+  kind: string;
+  /** E.g. the name of the holiday. */
+  note?: string;
+};
+
+/** A special day of a calendar. */
+export type ShippingCalendarDayEntry = {
+  cutoff_minute?: number | null;
+  day: string;
+  kind: string;
+  note: string;
+};
+
+/** Fields of a delivery calendar; on create `name` is required. */
+export type ShippingCalendarFields = {
+  name?: string | null;
+  /** Organization unit owning the calendar (create only). */
+  org_id?: string | null;
+  /** IANA time zone; default `Asia/Ho_Chi_Minh`. */
+  time_zone?: string | null;
+  /** Working days of the week, 1 = Monday … 7 = Sunday; default Monday to Friday. */
+  working_days?: number[] | null;
+};
+
 /** A carrier account. Credentials are never returned: only the names of the fields set. */
 export type ShippingCarrierAccount = {
   active: boolean;
@@ -20723,6 +20807,12 @@ export type ShippingDays = {
 
 /** Direction of a shipment: `outbound` (to the buyer) or `return` (picked up from the buyer). */
 export type ShippingDirection = "outbound" | "return";
+
+/** A public shipping estimate. */
+export type ShippingEstimate = ShippingQuote & {
+  /** Always `true`: the fee is computed again when the order is placed. */
+  estimate: boolean;
+};
 
 /** Expected delivery dates. */
 export type ShippingEta = {
@@ -20925,26 +21015,37 @@ export type ShippingQuote = {
   unavailable: ShippingUnavailableMethod[];
 };
 
-/** One line of the cart, with the figures of the variant (from the catalog). */
-export type ShippingQuoteItem = {
-  height_mm?: number | null;
-  length_mm?: number | null;
-  quantity: number;
-  /** `false` for digital goods and services: not weighed, not shipped. */
-  requires_shipping?: boolean;
-  sku?: string;
-  variant_id: string;
-  /** Weight of one item, grams. */
-  weight_grams?: number | null;
-  width_mm?: number | null;
-};
-
 /** A cart to quote. */
 export type ShippingQuoteRequest = {
   /** Time of the order (default: now). */
   at?: string | null;
-  destination?: ShippingPostalAddress | null;
-  items: ShippingQuoteItem[];
+  /** Where to deliver; leave out for store pickup only. */
+  destination?: {
+    /** Outside Vietnam: the city (required). */
+    city?: string | null;
+    /** Vietnam: code of the commune, ward or special zone (required). */
+    commune_code?: string | null;
+    /** ISO 3166-1 alpha-2 country code. */
+    country: string;
+    /** House number, street, village… (1 to 300 characters). */
+    line: string;
+    /** Postal code, mostly for addresses outside Vietnam. */
+    postal_code?: string | null;
+    /** Vietnam: code of the province. Elsewhere: the region. */
+    province_code: string;
+  } | null;
+  items: {
+    height_mm?: number | null;
+    length_mm?: number | null;
+    quantity: number;
+    /** `false` for digital goods and services: not weighed, not shipped. */
+    requires_shipping?: boolean;
+    sku?: string;
+    variant_id: string;
+    /** Weight of one item, grams. */
+    weight_grams?: number | null;
+    width_mm?: number | null;
+  }[];
   /** Language of method names (default `en`). */
   locale?: string | null;
   /** Order value after discounts, for free shipping. */
@@ -33639,6 +33740,83 @@ export interface paths {
       };
     };
   };
+  "/api/v1/shipping/calendars": {
+    /** List delivery calendars. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a delivery calendar. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ShippingCalendarFields;
+      responses: {
+        201: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/calendars/{id}": {
+    /** Get a delivery calendar with its special days. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a delivery calendar. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingCalendarFields;
+      responses: {
+        200: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/calendars/{id}/days/{day}": {
+    /** Set a special day of a delivery calendar (holiday, other cut-off). */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; day: string }; };
+      requestBody: ShippingCalendarDay;
+      responses: {
+        200: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a special day of a delivery calendar. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; day: string }; };
+      responses: {
+        200: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/shipping/carrier-accounts": {
     /** List carrier accounts. */
     get: {
@@ -33941,6 +34119,19 @@ export interface paths {
       responses: {
         200: Data_ShippingMethod;
         401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/public/estimate": {
+    /** Estimate shipping for a product page. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { variant_id: string; product_id?: string; quantity?: number; province_code: string; country?: string; org_id?: string; currency?: string; locale?: string }; };
+      responses: {
+        200: Data_ShippingEstimate;
         403: Problem;
         404: Problem;
         422: Problem;

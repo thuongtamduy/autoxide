@@ -96,5 +96,13 @@
   "text:Delivery confirmed with the carrier": "Đã xác nhận giao hàng với hãng",
   "text:Return confirmed with the carrier": "Đã xác nhận hoàn hàng với hãng",
   "text:The carrier corrected its statement": "Hãng đã sửa bảng kê",
-  "text:Written off: will not be collected": "Xoá sổ: không thu được"
+  "text:Written off: will not be collected": "Xoá sổ: không thu được",
+  "shipping.calendar_not_found": "Không tìm thấy lịch giao `{id}` trong phạm vi của bạn.",
+  "shipping.estimate_quantity": "Số lượng phải từ 1 đến 1000.",
+  "shipping.estimate_unavailable": "Ước tính phí giao cần module catalog, hiện chưa cài.",
+  "shipping.variant_not_for_sale": "Không có biến thể `{id}` đang bán.",
+  "field:cannot be changed; create another calendar": "không đổi được; hãy tạo lịch khác",
+  "field:must be `closed` or `special_hours`": "phải là `closed` hay `special_hours`",
+  "field:must be an IANA time zone like `Asia/Ho_Chi_Minh`": "phải là múi giờ IANA, vd `Asia/Ho_Chi_Minh`",
+  "field:must list days 1 (Monday) to 7 (Sunday)": "phải liệt kê ngày từ 1 (thứ Hai) đến 7 (Chủ nhật)"
 }
