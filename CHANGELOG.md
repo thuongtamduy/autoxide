@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 51 P12: pending approval requests show in the work inbox of the people who may decide them (source
+  `kernel.approvals`); MCP tools `kernel.list_approvals` and `kernel.decide_approval` (a person decides, an agent cannot).
+  `WorkSource::for_any_signed_in` lets a source filter its own items instead of requiring one permission.
 - Step 52, AI in the admin: `POST /api/v1/kernel/filters/parse {resource, text}` turns a sentence into the query parameters of
   a list, each checked against the list's filter schema (invalid ones come back in `ignored`); nothing is run. Needs the `ai`
   module.

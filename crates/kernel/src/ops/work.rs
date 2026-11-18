@@ -102,6 +102,11 @@ pub trait WorkSource: Send + Sync {
     fn id(&self) -> &'static str;
     /// Người gọi cần permission này (ở nút đang chọn) mới thấy nguồn.
     fn permission(&self) -> Permission;
+    /// Mọi người đã đăng nhập đều thấy nguồn (bỏ qua [`permission`](Self::permission)); nguồn tự
+    /// chỉ trả việc của người gọi — vd yêu cầu duyệt mà người gọi quyết được.
+    fn for_any_signed_in(&self) -> bool {
+        false
+    }
     async fn count(
         &self,
         tenant: &TenantContext,
@@ -250,7 +255,9 @@ impl WorkState {
             if !self.entitlements.module_enabled(tenant.id(), module).await? {
                 continue;
             }
-            if principal.require_at(read, &source.permission(), target).await.is_ok() {
+            if source.for_any_signed_in()
+                || principal.require_at(read, &source.permission(), target).await.is_ok()
+            {
                 allowed.push((module, source));
             }
         }

@@ -545,6 +545,11 @@ impl Module for KernelModule {
             tools.extend(crate::tenancy::migration_runs::tools(runs.clone()));
         }
         tools.extend(crate::ops::request_log::tools());
+        if let Some(outbox) = &self.outbox {
+            tools.extend(crate::ops::approvals::tools(crate::ops::approvals::ApprovalsState {
+                outbox: outbox.clone(),
+            }));
+        }
         tools
     }
 
@@ -621,6 +626,8 @@ impl Module for KernelModule {
         self.translations = context.translations().clone();
         self.entitlements = Some(context.entitlements());
         self.outbox = Some(context.outbox()?);
+        // Yêu cầu duyệt của agent vào hộp việc của người quyết được (bước 51 P12).
+        context.work_source(Arc::new(crate::ops::approvals::ApprovalsWork))?;
         let flags = Arc::new(UserFlags::new(self.max_flags));
         context.personal_data(flags.clone())?;
         self.flags.fill(flags);
