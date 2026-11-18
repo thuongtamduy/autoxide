@@ -15,6 +15,8 @@
 //! File dưới [`BACKUP_PREFIX`] (chính các bản backup theo lịch) không bao giờ được chép: không thì
 //! bản sau chứa bản trước, phình theo cấp số.
 
+pub mod scheduled;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 

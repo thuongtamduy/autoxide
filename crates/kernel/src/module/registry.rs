@@ -1170,6 +1170,7 @@ mod tests {
             .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
                 || name.starts_with("AUTOXIDE_EVENTS_STREAM")
+                || name.starts_with("AUTOXIDE_BACKUP_")
         };
         assert!(names.iter().all(internal), "{names:?}");
         assert!(modules.migrator().is_ok());
