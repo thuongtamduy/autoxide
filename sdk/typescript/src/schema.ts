@@ -539,6 +539,14 @@ export type BookingCheckout = {
   qr_payload?: string | null;
 };
 
+/** A code was sent. */
+export type BookingCodeSent = {
+  /** Send it back with the code. */
+  challenge_id: string;
+  /** The code works until this moment, once. */
+  expires_at: string;
+};
+
 /** A booking just made, with the deposit checkout when one is due. */
 export type BookingCreated = {
   booking: BookingRecord;
@@ -607,6 +615,14 @@ export type BookingOpening = {
   /** Places left (always 1 for one-to-one services). */
   seats_left: number;
   starts_at: string;
+};
+
+/** A one-time code sent by SMS, to prove a guest owns the phone number. */
+export type BookingPhoneCode = {
+  /** The `challenge_id` from `POST /api/v1/bookings/public/phone-codes`. */
+  challenge_id: string;
+  /** The 6 digits received by SMS. */
+  code: string;
 };
 
 /** A booking. */
@@ -3206,6 +3222,7 @@ export type CustomerBookingRequest = {
   note?: string;
   /** How to pay the deposit, e.g. `card`, `wallet` or `vietqr`; default `card`. */
   payment_method?: string | null;
+  phone_code?: BookingPhoneCode | null;
   /** A staff member (or court, room…) from the availability; omitted: the first one free. */
   resource_id?: string | null;
   /** Page of the shop to open after paying the deposit. */
@@ -3501,6 +3518,17 @@ export type Data_BookingAvailability = {
     terms: PublicBookingTerms;
     /** IANA time zone of the unit, e.g. `Asia/Ho_Chi_Minh`. */
     timezone: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingCodeSent = {
+  /** A code was sent. */
+  data: {
+    /** Send it back with the code. */
+    challenge_id: string;
+    /** The code works until this moment, once. */
+    expires_at: string;
   };
 };
 
@@ -10612,6 +10640,14 @@ export type FoundView = {
   screen: string;
   subtitle?: string | null;
   title: string;
+};
+
+/** A guest cancels a booking. */
+export type GuestCancelRequest = {
+  /** A fresh code sent to the phone number of the booking. */
+  phone_code: BookingPhoneCode;
+  /** Up to 200 characters. */
+  reason?: string | null;
 };
 
 /** Health of the service. */
@@ -17773,6 +17809,12 @@ export type SecretResponse = {
   secret: string;
 };
 
+/** The phone number to send a code to. */
+export type SendBookingCodeRequest = {
+  /** E.g. `0912345678` or `+84912345678`. */
+  phone: string;
+};
+
 /** Something to fix or review. */
 export type SeoFinding = {
   /**
@@ -21497,6 +21539,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/bookings/{id}/calendar.ics": {
+    /** Download a booking as a calendar file. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/bookings/{id}/cancel": {
     /** Cancel a booking. */
     post: {
@@ -21624,6 +21679,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/me/bookings": {
+    /** List my bookings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; resource_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingRecord;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/me/bookings/{id}/calendar.ics": {
+    /** Download one of my bookings as a calendar file. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/public/availability": {
     /** Find free times (public). */
     get: {
@@ -21644,11 +21725,40 @@ export interface paths {
       requestBody: CustomerBookingRequest;
       responses: {
         201: Data_BookingCreated;
-        401: Problem;
         403: Problem;
         404: Problem;
         409: Problem;
         422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/bookings/{id}/cancel": {
+    /** Cancel a guest booking (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: GuestCancelRequest;
+      responses: {
+        200: Data_BookingRecord;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/phone-codes": {
+    /** Send a booking code by SMS (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SendBookingCodeRequest;
+      responses: {
+        200: Data_BookingCodeSent;
+        403: Problem;
+        422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };

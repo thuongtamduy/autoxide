@@ -6,6 +6,7 @@ pub(crate) mod access;
 pub(crate) mod agents;
 pub(crate) mod automations;
 pub(crate) mod billing;
+pub(crate) mod bookings;
 pub(crate) mod cases;
 pub(crate) mod child_context;
 pub(crate) mod guides;
