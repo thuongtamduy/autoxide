@@ -30,19 +30,25 @@ gửi dữ liệu cho mạng quảng cáo. Thử nghiệm A/B là bước 67 (D-
 ### Thu sự kiện
 
 - `POST /api/v1/analytics/public/events` (công khai, theo website suy từ tên miền; gom tối đa 20 sự kiện mỗi
-  lần; `sendBeacon` được): `{type, path, referrer, utm: {source, medium, campaign, term, content}, object:
-  "<kind>:<id>"?, props?}`. Kiểu sự kiện do module khai (`Module::analytics_events` → `{key, props_schema}`,
-  mặc định rỗng — D-038); sự kiện lạ hay `props` sai schema bị bỏ, không lỗi (chống rác, không làm hỏng trang).
-- Sự kiện phía máy chủ (đơn đặt, thanh toán xong, đăng ký) lấy từ event sẵn có của module qua đăng ký nhận —
-  không tin số đơn do trình duyệt gửi.
-- Chống bot: bỏ user agent bot đã biết, giới hạn tần suất theo IP băm (`throttle`), bỏ sự kiện không có tên
-  miền khớp website.
+  lần; `application/json` — website gửi bằng `fetch(…, {keepalive: true})`, cùng tác dụng với `sendBeacon`,
+  D-20261118-step57-analytics): `{type, path, referrer, utm: {source, medium, campaign, term, content}, object:
+  "<kind>:<id>"?, props?}`. Kiểu sự kiện do module khai (`Module::analytics_events` → `AnalyticsEvent {key,
+  object_kind, props}` với thuộc tính có kiểu `text` / `number` / `boolean`; `Module::funnels` → `Funnel`; mặc định
+  rỗng — D-038; kernel gom thành `AnalyticsCatalog`); tên loại có tiền tố module (`catalog.product_viewed`; của
+  chính module: `analytics.page_view`). Sự kiện lạ hay `props` sai khai báo bị bỏ, không lỗi (chống rác, không làm
+  hỏng trang).
+- Sự kiện phía máy chủ (đơn đặt, thanh toán xong, đăng ký) lấy từ event sẵn có của module qua đăng ký nhận
+  (`AnalyticsEvent::server(key, mô tả, event của chính module, hàm rút)`) — không tin số đơn do trình duyệt gửi.
+- Chống bot: bỏ user agent bot đã biết (và không có user agent), giới hạn tần suất theo IP băm (`throttle`), bỏ
+  lô mà trang gửi (`Origin`, không có thì `Referer`) không phải tên miền của request, tên miền đã xác minh của
+  khách hay tên miền trong `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS`.
 
 ### Phiên ẩn danh không cookie (mặc định)
 
-- Khoá phiên = HMAC(khoá ngày xoay mỗi 24 giờ, `website_id` + IP băm theo khối mạng + user agent rút gọn).
-  Khoá ngày sinh từ `SecretKey::derive("analytics.day.<ngày>")` và **bị xoá sau ngày đó** → không nối được hai
-  ngày, không truy ngược ra IP. Không lưu IP, không lưu user agent đầy đủ.
+- Khoá phiên = HMAC(khoá ngày xoay mỗi 24 giờ, `website_id` + khối mạng của IP + user agent rút gọn
+  `trình duyệt|hệ điều hành|loại máy`). Khoá ngày là chuỗi ngẫu nhiên lưu ở `analytics_day_keys` và **bị xoá sau
+  ngày đó** (D-20261118-step57-analytics) → không nối được hai ngày, không truy ngược ra IP. Không lưu IP, không
+  lưu user agent đầy đủ.
 - Đếm khách duy nhất theo ngày; không có "khách quay lại" khi không có đồng ý.
 
 ### Theo dõi theo người (chỉ khi đồng ý)
@@ -58,9 +64,11 @@ gửi dữ liệu cho mạng quảng cáo. Thử nghiệm A/B là bước 67 (D-
   Báo cáo **chỉ đọc bảng gộp** (nhanh trên bảng lớn, D-190), giữ `AUTOXIDE_ANALYTICS_RETENTION_DAYS` (mặc định 790
   — 2 năm + 2 tháng để so cùng kỳ).
 - `GET /api/v1/analytics/overview?site&from&to` (khách, lượt xem, tỉ lệ thoát, nguồn hàng đầu),
-  `/pages`, `/sources`, `/campaigns`, `/objects?kind=catalog.product` (xem nhiều nhất), `/funnels/{key}`
-  (module khai phễu: `Module::funnels`, vd `orders.checkout`).
-- Số liệu tóm tắt cho trang tổng quan (P4 bước 51) và cột "thịnh hành" cho `catalog` (bước 41) qua `api`.
+  `/pages`, `/sources`, `/campaigns`, `/objects?kind=catalog.product` (xem nhiều nhất), `/types`, `/funnels` và
+  `/funnels/{key}` (module khai phễu: `Module::funnels`, vd `orders.checkout`; các bước đếm độc lập); công khai:
+  `/event-types`. Danh sách xếp hạng trả `Data<[…]>` với `limit` 1–100.
+- Số liệu tóm tắt `analytics.visitors` cho trang tổng quan (P4 bước 51); "thịnh hành" cho `catalog` (bước 41) và
+  "vừa xem" cho `customers` (bước 47) qua trait `api::Analytics` (`top_objects`, `recently_viewed`).
 - Mọi API theo phạm vi nút (website của nút, bước 34); permission `analytics.read`.
 
 ### Bảng dữ liệu (mọi bảng có `tenant_id`)
@@ -68,17 +76,21 @@ gửi dữ liệu cho mạng quảng cáo. Thử nghiệm A/B là bước 67 (D-
 | Bảng | Cột chính |
 |---|---|
 | `analytics_events` | `id`, `tenant_id`, `site_org_id`, `occurred_at`, `type`, `session_key`, `user_id` NULL (chỉ khi đồng ý), `path`, `referrer_host`, `utm_*`, `object`, `props` JSON — index (`tenant_id`, `occurred_at`) |
-| `analytics_daily` | `tenant_id`, `site_org_id`, `day`, `dimension` (`page`/`source`/`campaign`/`object`/`type`), `value`, `views`, `visitors`, `events` — khoá (`tenant_id`, `site_org_id`, `day`, `dimension`, `value`) |
-| `analytics_funnel_daily` | `tenant_id`, `site_org_id`, `day`, `funnel`, `step`, `sessions` |
+| `analytics_daily` | `tenant_id`, `site_org_id`, `day`, `dimension` (`total`/`page`/`source`/`campaign`/`object`/`type`), `value`, `views`, `visitors`, `events`, `bounces` — khoá (`tenant_id`, `site_org_id`, `dimension`, `day`, `value`) |
+| `analytics_funnel_daily` | `tenant_id`, `site_org_id`, `day`, `funnel`, `step`, `step_key`, `sessions` |
+| `analytics_day_keys` | `tenant_id`, `day`, `key` (ngẫu nhiên), xoá khi ngày qua |
+| `analytics_rollups` | `tenant_id`, `day`, `rolled_at`: ngày đã gộp |
 
 ### Tool MCP, event, cấu hình, permission, lỗi
 
 - MCP: `analytics.overview`, `analytics.top_pages`, `analytics.top_objects`, `analytics.funnel` (`read_only`).
-- Không phát event cho từng lượt xem. Event `analytics.daily_rolled_up` cho `reporting` (bước 38) nếu cần.
+- Không phát event cho từng lượt xem, không phát event gộp (chưa module nào cần).
 - Cấu hình: hai hạn lưu ở trên, `AUTOXIDE_ANALYTICS_ENABLED` (mặc định `true`), `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE`
-  (theo IP băm, mặc định 120).
-- Permission `analytics.read`, `analytics.manage` (phễu, loại trừ IP nội bộ). Tính năng gói `analytics`.
-- Mã lỗi: `analytics.site_unknown` (404), `analytics.range_too_long` (422, quá 400 ngày một lần).
+  (theo IP băm, mặc định 120), `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` (mặc định rỗng).
+- Permission `analytics.read` (theo nút). Không có `analytics.manage`: phễu do module khai bằng code, tên miền nhận
+  do cấu hình (D-20261118-step57-analytics). Module `analytics` là module của gói.
+- Mã lỗi: `analytics.site_unknown` (404), `analytics.funnel_unknown` (404), `analytics.range_too_long` (422, quá 400
+  ngày một lần), `analytics.range_reversed` (422), `analytics.kind_invalid` (422).
 
 ## Test bắt buộc (cả hai database)
 
@@ -96,4 +108,4 @@ gửi dữ liệu cho mạng quảng cáo. Thử nghiệm A/B là bước 67 (D-
 ## Agent làm bước này tự quyết
 
 Danh sách bot; cách cắt user agent rút gọn; mặc định tỉ lệ thoát tính thế nào; có dùng `reporting` (38) để gộp
-xuyên database không. Ghi vào `docs/DECISIONS.md`.
+xuyên database không. Đã ghi ở D-20261118-step57-analytics.

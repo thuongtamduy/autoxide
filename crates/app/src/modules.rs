@@ -71,6 +71,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // event lưu trữ / xoá của `content` (sau `content`).
         Box::new(autoxide_comments::module()),
         Box::new(autoxide_support::module()),
+        // Phân tích truy cập (bước 57): đọc sổ đồng ý `dyn ConsentLedger` của `compliance` (sau
+        // `compliance`); loại sự kiện và phễu của mọi module đọc từ kernel, nên module đăng ký sau
+        // vẫn khai được.
+        Box::new(autoxide_analytics::module()),
         // Menu của website (D-238): cần `dyn Media` (ảnh của ô gợi ý) và đọc menu cũ của
         // `content` để nhập sang, nên đứng sau cả hai. Đối tượng đích tra qua sổ đối tượng của
         // kernel, nên module đăng ký sau vẫn được menu trỏ tới.
@@ -236,9 +240,10 @@ mod tests {
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), một của `bookings` (trả chỗ giữ tạm quá hạn), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
-            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `automations` (luật tới hạn,
-            // dọn nhật ký — bước 58)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 43);
+            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `analytics` (gộp mỗi giờ,
+            // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58))
+            // đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 45);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

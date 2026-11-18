@@ -13,7 +13,7 @@
   "field:is required for an address in Vietnam": "bắt buộc với địa chỉ ở Việt Nam",
   "field:must be a phone number: digits, optionally starting with `+`": "phải là số điện thoại: chữ số, có thể bắt đầu bằng `+`",
   "field:must be a two-letter ISO 3166-1 country code like `VN`": "phải là mã quốc gia ISO 3166-1 hai chữ cái, vd `VN`",
-  "field:must be {min} to {max} characters long": "phải dài {min} tới {max} ký tự",
+  "field:must be {min} to {max} characters long": "phải dài {min} đến {max} ký tự",
   "field:addresses in Vietnam cannot be checked: the `address` module is not installed": "không kiểm được địa chỉ ở Việt Nam: chưa cài module `address`",
   "text:Quote shipping options for a cart in your scope (agents, staff placing orders).": "Báo giá các cách giao cho giỏ hàng trong phạm vi của bạn (agent, nhân viên đặt hàng).",
   "text:See the address books of buyers (customer care).": "Xem sổ địa chỉ của người mua (chăm sóc khách hàng).",
