@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `support` (step 53): customer support tickets. Customers open tickets from the website (signed in, or
+  as guests with an email or phone number confirmed by a one-time code; guests keep a ticket token), staff open
+  tickets for customers, other modules through `SupportIntake`. Messages are only added (hidden with a reason, never
+  edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
+  machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
+  tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
 - New module `reporting` (step 38): reports across a customer tree. Modules declare the figures their events
   produce (`Module::facts`; first ones: `invoices.issued_total`, `invoices.issued_count`, `ledger.revenue`,
   `ledger.tax_output`); facts of every tenant — also tenants on other databases — reach a store at the root tenant

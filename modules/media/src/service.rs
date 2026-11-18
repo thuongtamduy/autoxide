@@ -897,6 +897,30 @@ pub(crate) fn too_large(max: u64) -> Error {
 
 #[async_trait::async_trait]
 impl crate::api::Media for MediaService {
+    async fn uploaders(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<Vec<(Uuid, Option<Uuid>)>, Error> {
+        if ids.len() > crate::api::MAX_IDS {
+            return Err(Error::internal(format!(
+                "Media::uploaders takes at most {} ids, got {}",
+                crate::api::MAX_IDS,
+                ids.len()
+            )));
+        }
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = Entity::find()
+            .scoped(tenant)
+            .filter(Column::Id.is_in(ids.to_vec()))
+            .filter(Column::TrashedAt.is_null())
+            .all(tenant.database().read())
+            .await?;
+        Ok(rows.into_iter().map(|item| (item.id, item.uploaded_by)).collect())
+    }
+
     async fn find_many_in(
         &self,
         tenant: &TenantContext,

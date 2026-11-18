@@ -67,6 +67,7 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Bình luận: cần `dyn Mailer` (sau `mail`), kiểm đích qua sổ đối tượng của kernel và nghe
         // event lưu trữ / xoá của `content` (sau `content`).
         Box::new(autoxide_comments::module()),
+        Box::new(autoxide_support::module()),
         // Menu của website (D-238): cần `dyn Media` (ảnh của ô gợi ý) và đọc menu cũ của
         // `content` để nhập sang, nên đứng sau cả hai. Đối tượng đích tra qua sổ đối tượng của
         // kernel, nên module đăng ký sau vẫn được menu trỏ tới.
