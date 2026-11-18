@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `support` (step 53): customer support tickets. Customers open tickets from the website (signed in, or
+  as guests with an email or phone number confirmed by a one-time code; guests keep a ticket token), staff open
+  tickets for customers, other modules through `SupportIntake`. Messages are only added (hidden with a reason, never
+  edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
+  machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
+  tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
