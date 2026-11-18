@@ -76,6 +76,10 @@ tồn bằng một câu `UPDATE` có điều kiện, theo thứ tự cố địn
 Quản trị xem chỗ giữ bằng `GET /reservations` (`inventory.reservations.read`) và gỡ chỗ bị kẹt bằng
 `POST /reservations/{id}/release` (`inventory.adjust`; ghi lại người gỡ).
 
+Module `inventory` cũng nghe `orders.order_confirmed`, `orders.order_cancelled` và `orders.return_received` (khi
+đã cài module `orders`) và chạy đúng các hàm đó, nên event đến trước hay sau lời gọi trực tiếp, hay đến hai lần, chỉ
+đổi tồn một lần.
+
 ## Chọn kho
 
 `PUT /sources/{cửa hàng}` khai các kho phục vụ một cửa hàng hay kênh, theo `priority`; không khai thì cửa hàng bán tồn

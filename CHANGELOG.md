@@ -11,6 +11,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` listens to `orders.order_confirmed`, `orders.order_cancelled` and `orders.return_received`
+  (optional subscriptions) and confirms, releases or restocks once even when an event arrives again.
 - Module `inventory` (step 42): stock reservations for orders through `autoxide_inventory::api::Inventory`
   (`reserve` / `confirm` / `fulfil` / `release` / `restock`, `availability`, `in_stock_at`) that never oversell under
   concurrent requests; bundles take stock from components; warehouse choice per store (`PUT /sources/{store}`,
