@@ -85,5 +85,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "media"),
         // `alt` viết từ gợi ý của AI, để giao diện gắn nhãn (Luật 134/2025/QH15, D-362).
         Box::new(m0014_alt_ai_assisted::Migration),
+        // Bảng `media_uploads`: lượt tải thẳng lên S3 (bước 40 P4).
+        autoxide_kernel::upload::uploads_migration("m0015_create_uploads", "media"),
     ]
 }

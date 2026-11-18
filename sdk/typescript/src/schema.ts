@@ -7286,6 +7286,28 @@ export type Data_UnsubscribeResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_UploadLink = {
+  /**
+   * Where and how to send a file straight to storage: send it with exactly this method, URL and
+   * headers before `expires_at`, then complete the upload with its `id`.
+   */
+  data: {
+    /** The URL stops working at this time. */
+    expires_at: string;
+    /** Headers to send with the file, exactly as given (the signature covers them). */
+    headers: {
+      [key: string]: string;
+    };
+    /** Id of the upload; also the id of the record it becomes. */
+    id: string;
+    /** HTTP method to send the file with. */
+    method: string;
+    /** Signed URL of the storage to send the file to (not this server). */
+    url: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_UploadedResponse = {
   /** The uploaded item, plus the items already in the library with exactly the same content. */
   data: MediaItemResponse & {
@@ -11065,6 +11087,11 @@ export type ModuleDeprecation = {
 export type ModuleEvent = {
   description: string;
   name: string;
+  /**
+   * Permission needed to receive this event on `GET /api/v1/kernel/events/stream`; absent when
+   * the event is not streamed.
+   */
+  stream_permission?: string | null;
 };
 
 /** A feature a plan can turn on or off. */
@@ -16128,6 +16155,30 @@ export type SitemapItem = {
   translations: PublicTranslation[];
 };
 
+/** A media item to upload straight to storage. */
+export type StartMediaUploadRequest = {
+  /**
+   * The real media type of the file; the upload link only accepts this `Content-Type`, and the
+   * content is checked against it when you complete the upload.
+   */
+  content_type: string;
+  /** Folder to put the item in. Omit for the root. */
+  folder_id?: string | null;
+  /** File name, 1 to 255 characters, without `/` or `\`. */
+  name: string;
+  /**
+   * The organization unit that owns the item; you need `media.write` there. Omit when you work
+   * in one unit only (or for the whole tenant).
+   */
+  org_id?: string | null;
+  /** SHA-256 of the content, as 64 hex digits. */
+  sha256: string;
+  /** Exact size in bytes. */
+  size: number;
+  /** Tags for the item (each 1 to 50 characters, at most 20). */
+  tags?: string[];
+};
+
 /** Proof that you are the account owner. */
 export type StartPasskeyRegistrationRequest = {
   /** Your current password: a stolen access token alone must not add a passkey. */
@@ -16148,6 +16199,18 @@ export type StartTotpRequest = {
    * (accounts without a password use this). Exactly one of the two.
    */
   reauth_token?: string | null;
+};
+
+/** A file to upload straight to storage. */
+export type StartUploadRequest = {
+  /** Media type of the file; the upload link only accepts this `Content-Type`. */
+  content_type: string;
+  /** File name, 1 to 255 characters, without `/` or `\`. */
+  name: string;
+  /** SHA-256 of the content, as 64 hex digits; checked when you complete the upload. */
+  sha256: string;
+  /** Exact size in bytes; the link only accepts this size. */
+  size: number;
 };
 
 /** Where an entry is in its life. */
@@ -17370,6 +17433,25 @@ export type UpdateUserRequest = {
   disabled?: boolean | null;
   /** New display name, 1 to 200 characters. */
   name?: string | null;
+};
+
+/**
+ * Where and how to send a file straight to storage: send it with exactly this method, URL and
+ * headers before `expires_at`, then complete the upload with its `id`.
+ */
+export type UploadLink = {
+  /** The URL stops working at this time. */
+  expires_at: string;
+  /** Headers to send with the file, exactly as given (the signature covers them). */
+  headers: {
+    [key: string]: string;
+  };
+  /** Id of the upload; also the id of the record it becomes. */
+  id: string;
+  /** HTTP method to send the file with. */
+  method: string;
+  /** Signed URL of the storage to send the file to (not this server). */
+  url: string;
 };
 
 /** The uploaded item, plus the items already in the library with exactly the same content. */
@@ -21285,6 +21367,37 @@ export interface paths {
       };
     };
   };
+  "/api/v1/files/uploads": {
+    /** Start an upload straight to storage. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: StartUploadRequest;
+      responses: {
+        201: Data_UploadLink;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/files/uploads/{id}/complete": {
+    /** Complete an upload straight to storage. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_FileResponse;
+        201: Data_FileResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/files/{id}": {
     /** Get the details of a file. */
     get: {
@@ -22239,6 +22352,22 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/events/stream": {
+    /** Stream events in real time (Server-Sent Events). */
+    get: {
+      parameters: { header: { "Last-Event-ID"?: string | null; "Accept-Language"?: string }; query: { names: string; last_event_id?: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
         default: Problem;
       };
     };
@@ -23938,6 +24067,39 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/media/uploads": {
+    /** Start uploading a media item straight to storage. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: StartMediaUploadRequest;
+      responses: {
+        201: Data_UploadLink;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/media/uploads/{id}/complete": {
+    /** Complete an upload of a media item straight to storage. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_UploadedResponse;
+        201: Data_UploadedResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        413: Problem;
+        415: Problem;
+        422: Problem;
         default: Problem;
       };
     };

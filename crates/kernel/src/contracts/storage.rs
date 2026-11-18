@@ -36,6 +36,61 @@ impl StoredFile {
     }
 }
 
+/// Ràng buộc của một lần tải thẳng lên nơi lưu (bước 40 P4): nơi lưu ký chúng vào link, nên client
+/// không gửi được file khác cỡ, khác loại khai hay (với S3) khác hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct UploadConstraints {
+    /// Số byte chính xác.
+    pub size: u64,
+    /// Loại nội dung (`Content-Type`) client phải gửi.
+    pub content_type: String,
+    /// SHA-256 của nội dung.
+    pub sha256: [u8; 32],
+}
+
+impl UploadConstraints {
+    pub fn new(size: u64, content_type: impl Into<String>, sha256: [u8; 32]) -> Self {
+        UploadConstraints { size, content_type: content_type.into(), sha256 }
+    }
+}
+
+/// Link tải thẳng lên nơi lưu: client gửi `method` tới `url` kèm ĐÚNG các `headers` (đã ký), thân
+/// là nội dung file, trước `expires_at`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PresignedUpload {
+    pub method: String,
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl PresignedUpload {
+    pub fn new(
+        method: impl Into<String>,
+        url: impl Into<String>,
+        headers: Vec<(String, String)>,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        PresignedUpload { method: method.into(), url: url.into(), headers, expires_at }
+    }
+}
+
+/// Thông tin một file đang lưu, không đọc nội dung.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ObjectInfo {
+    /// Số byte.
+    pub size: u64,
+}
+
+impl ObjectInfo {
+    pub const fn new(size: u64) -> Self {
+        ObjectInfo { size }
+    }
+}
+
 /// Nơi lưu file của chương trình. Khoá (`key`) là đường dẫn tương đối gồm chữ, số,
 /// `-`, `_`, `.` và `/` (vd `notes/0193…`); module nên đặt tên module của mình ở đầu.
 #[async_trait::async_trait]
@@ -76,6 +131,28 @@ pub trait Storage: Send + Sync {
         let mut keys = self.keys().await?;
         keys.retain(|key| key.starts_with(prefix));
         Ok(keys)
+    }
+
+    /// Link để client tải file thẳng lên `key` (bước 40 P4), hết hạn sau `ttl`, ký kèm
+    /// `constraints`. `None`: nơi lưu không cấp được link (ổ đĩa) — client tải qua máy chủ như cũ.
+    ///
+    /// Cài đặt mặc định trả `None`; nơi lưu như S3 cài lại.
+    async fn presign_upload(
+        &self,
+        key: &str,
+        constraints: &UploadConstraints,
+        ttl: std::time::Duration,
+    ) -> Result<Option<PresignedUpload>, Error> {
+        let _ = (key, constraints, ttl);
+        Ok(None)
+    }
+
+    /// Thông tin file ở `key` (không đọc nội dung), hoặc `None` nếu không có.
+    ///
+    /// Cài đặt mặc định mở file qua [`get`](Self::get) rồi bỏ luồng; nơi lưu hỏi được thông tin
+    /// riêng (S3 `HEAD`) nên cài lại.
+    async fn head(&self, key: &str) -> Result<Option<ObjectInfo>, Error> {
+        Ok(self.get(key).await?.map(|file| ObjectInfo::new(file.size)))
     }
 }
 
@@ -184,6 +261,19 @@ impl Storage for TenantStorage {
     async fn keys_with_prefix(&self, prefix: &str) -> Result<Vec<String>, Error> {
         let keys = self.inner.keys_with_prefix(&format!("{}{prefix}", self.prefix)).await?;
         Ok(self.strip(keys))
+    }
+
+    async fn presign_upload(
+        &self,
+        key: &str,
+        constraints: &UploadConstraints,
+        ttl: std::time::Duration,
+    ) -> Result<Option<PresignedUpload>, Error> {
+        self.inner.presign_upload(&self.key(key)?, constraints, ttl).await
+    }
+
+    async fn head(&self, key: &str) -> Result<Option<ObjectInfo>, Error> {
+        self.inner.head(&self.key(key)?).await
     }
 }
 

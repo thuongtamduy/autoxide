@@ -625,6 +625,21 @@ Mặc định giới hạn request đếm theo từng tiến trình: với N má
 (một phần tư `AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST`), nên mỗi phút một key được vượt giới hạn
 nhiều nhất một lô cho mỗi máy chủ. Giới hạn theo địa chỉ vẫn đếm theo từng tiến trình.
 
+## Tải thẳng lên S3
+
+Khi file nằm trên S3, client tải được file lớn thẳng lên bucket (`POST /api/v1/files/uploads`,
+hướng dẫn: [`docs/guides/direct-uploads.vi.md`](guides/direct-uploads.vi.md)). Trình duyệt cần
+bucket cho phép (CORS). Ví dụ với Amazon S3:
+
+```json
+[{"AllowedOrigins": ["https://admin.example.com"], "AllowedMethods": ["PUT"],
+  "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"], "MaxAgeSeconds": 3600}]
+```
+
+Máy chủ kiểm mọi lượt được xác nhận bằng cách đọc lại file (cỡ và SHA-256), vì không phải dịch
+vụ tương thích S3 nào cũng kiểm checksum đã ký; tăng `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` nếu
+cho phép file rất lớn. Lượt bỏ dở bị một job chạy mỗi giờ xoá.
+
 ### Cập nhật không làm rơi request
 
 Khi được bảo dừng (`SIGTERM`, tín hiệu Docker, systemd và Kubernetes gửi), máy chủ đi qua

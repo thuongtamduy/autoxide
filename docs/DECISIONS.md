@@ -9249,3 +9249,69 @@ liệu cá nhân.
 2. `notifications` đăng ký `kernel.job_finished` và `kernel.record_note_added` (có sẵn từ P13 nhưng chưa ai gửi tin): tin **chỉ
    trong ứng dụng** (`notifications.job_finished`, `notifications.mentioned`, giao dịch), vì là việc vận hành hằng ngày — email
    cho mỗi bản xuất là thừa. `dedupe_key` theo ID event (và người được nhắc), nên event giao lại không tạo tin thứ hai.
+
+## D-378 · Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18 — agent quyết
+
+1. **Khác "realtime theo bảng"** (TrailBase, PocketBase — `docs/research/frameworks.md` đã không mượn): realtime theo bảng đẩy
+   mọi thay đổi dòng, nên lộ cấu trúc bảng (hợp đồng mới không ai thiết kế), bỏ qua luật service layer (quyền đọc tính lại ở
+   tầng dòng, khác REST) và phá luật "module sở hữu bảng". Ở đây chỉ stream **event module chủ động khai**
+   (`EventInfo::streamable(permission)`, mặc định không) — payload là hợp đồng event đã có (audit, webhook dùng chung), quyền là
+   permission đọc bản ghi như REST. Ban đầu: `content.entry_published` (`content.read`), `comments.comment_created`
+   (`comments.moderate`, payload không có chữ / tên / email), `media.item_uploaded` (`media.read`). `Modules` từ chối event
+   stream với permission không ai khai; sổ module ghi `stream_permission`.
+2. **Đọc từ bảng outbox, đúng khi nhiều máy chủ:** mỗi tiến trình một `StreamHub` (kernel công bố, `serve` đóng khi tắt), một
+   vòng hỏi chung mỗi `AUTOXIDE_EVENTS_STREAM_POLL_MS` (1000) cho mọi kết nối, chỉ hỏi database (placement) đang có người nghe,
+   phát qua `tokio::sync::broadcast`. Mỗi lượt hỏi theo khoá chính `id >= UUIDv7 nhỏ nhất của (lượt trước − GRACE)` — UUIDv7 xếp
+   theo thời điểm trên cả hai database và có index sẵn, không cần migration thêm index cho mọi module — **lùi `GRACE` = 5 s**
+   rồi khử trùng theo ID đã phát: ID gán lúc ghi, transaction commit muộn mang thời điểm sớm hơn event đã phát (test
+   `event_commit_muon_van_toi`). Không dùng LISTEN/NOTIFY: chỉ Postgres có, hỏi vòng đủ rẻ (một câu theo khoá chính mỗi
+   database, module) và chạy giống nhau trên hai database; nếu sau này đo thấy cần thì thêm sau một trait với nhánh hỏi vòng
+   làm mặc định. Hỏi qua kết nối ghi (dòng vừa commit chưa tới read replica vẫn thấy).
+3. **Nối lại:** `Last-Event-ID` (header, hay `last_event_id`) → đọc bù thẳng từ database của khách từ `thời điểm(id) − GRACE`,
+   bỏ chính `id` đó; giao **ít nhất một lần**, client khử trùng theo `id` (ghi trong OpenAPI). Kết nối tụt hậu (`Lagged`) đọc bù
+   cùng cách. ID cũ hơn 7 ngày (bộ phát dọn event đã giao sau 7 ngày) hay bù quá 10 000 event → `event: reset`.
+4. **Quyền:** cùng khách; permission của event; độ sâu: `tenant` không hàng rào nút → mọi event của khách, hẹp hơn → **chỉ event
+   do chính người gọi gây ra** (lệch đặc tả "lọc theo nhánh"): bảng `<module>_events` chưa có `org_id`, thêm cột cần migration
+   ở mọi module có event và `Outbox::record` nhận nút — việc lớn hơn bước này; cách hiện tại không bao giờ lộ bản ghi của nhánh
+   khác. Khi event mang nút thì thêm nhánh `Unit` / `Subtree` vào `Reach`. Quyền xét lúc mở; kết nối sống tối đa 30 phút rồi
+   đóng để quyền bị thu hồi có hiệu lực.
+5. **Giới hạn mỗi tiến trình:** `…_MAX_PER_USER` (5), `…_MAX_PER_TENANT` (200), `…_MAX_CONNECTIONS` (1000) → 429
+   `kernel.stream_too_many`. Tắt mặc định (`AUTOXIDE_EVENTS_STREAM=false` → 404 `kernel.stream_disabled`). Lớp timeout chung
+   không cắt stream (chỉ chờ header); graceful shutdown gọi `StreamHub::close` ngay khi bắt đầu rút. `X-Accel-Buffering: no`,
+   `: ping` mỗi 15 s, `retry: 3000`.
+6. **Không có tool MCP tương ứng** (lệch đặc tả `kernel.list_events`): MCP không giữ stream; agent cần "có gì mới" dùng webhook
+   hay đọc danh sách của module. Thêm khi có agent cần thật.
+
+## D-379 · Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18 — agent quyết
+
+1. **Một trait, hai hàm mới có mặc định (D-038):** `Storage::presign_upload(key, UploadConstraints, ttl) ->
+   Option<PresignedUpload>` (mặc định `None`: ổ đĩa, client tải qua máy chủ như cũ) và `Storage::head(key)` (mặc định qua
+   `get`). `TenantStorage` thêm tiền tố khách như mọi thao tác khác (D-259); `ObjectStorage` của `files` cài cho S3 bằng
+   `object_store::signer::Signer::signed_url_opts` (0.14.2). Không thêm thư viện.
+2. **Ký `content-type` và `x-amz-checksum-sha256`, không ký `content-length`** (lệch đặc tả): `object_store` giữ
+   `content-length` cho bộ ký và từ chối ký nó qua `SignedUrlOptions` (tra `validate_signed_url_extras`). Checksum đã ký mạnh
+   hơn: Amazon S3 từ chối nội dung khác hash, tức khác cả cỡ. Dịch vụ tương thích S3 có thể không kiểm checksum (moto của gate
+   không kiểm) — nên **lệnh xác nhận luôn đọc lại cả object, đo cỡ và băm SHA-256** (`upload::inspect`), không tin nơi lưu;
+   sai thì xoá object, giữ lượt (client PUT lại đúng file trước hạn). Đọc lại tốn một lượt GET; file rất lớn cần tăng
+   `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (ghi trong mô tả biến, như tải qua máy chủ).
+3. **Khung chung `autoxide_kernel::upload`:** bảng `<module>_uploads` (`uploads_migration`, như `jobs_migration`; khoá chính
+   `(tenant_id, id)`, index `(status, expires_at)`), `DirectUploads::{insert, find, lock, complete, delete, expired,
+   forget_completed}` viết bằng sea-query (tên bảng theo module), `UploadLink` (schema OpenAPI dùng chung). ID của lượt là ID
+   của bản ghi sẽ tạo: khoá lưu đặt sẵn ở chỗ cuối cùng (`files/<id>`, `media/<id>/<version>`), không chép. Xác nhận: kiểm
+   NGOÀI transaction; trong transaction `lock` (FOR UPDATE trên Postgres, SQLite một bên ghi) → lượt còn `pending` thì tạo bản
+   ghi + event + `complete`, không thì trả bản ghi đã có — hai lệnh xác nhận đồng thời chỉ tạo một bản ghi (test cả hai
+   database). Gọi lại sau khi xong: `200` cùng bản ghi.
+4. **Loại thật:** `media` đọc lại qua đúng bộ kiểm của tải qua máy chủ (magic bytes, SVG chạy được, kích thước ảnh), tách
+   `receive` thành `checked` + `finished` dùng chung. `files` giữ loại đã khai như khi tải qua máy chủ (S3 lưu đúng loại đã ký,
+   tải xuống có `nosniff` + CSP `sandbox`) — lệch đặc tả "kiểm loại thật" cho `files`: nhận loại bằng magic bytes đang là phần
+   của `media`; đưa bộ nhận loại vào kernel để `files` dùng thì phải đổi cả đường tải qua máy chủ của `files` cho nhất quán —
+   để khi có nhu cầu.
+5. **Mã lỗi:** `…direct_upload_unavailable` (409), `…upload_not_found` (404), `…upload_expired` (**409**, lệch đặc tả 410:
+   `ErrorKind` không có 410, thêm loại lỗi mới cho một mã là quá tay), `…upload_incomplete` (409), `…upload_mismatch` (422).
+6. **Hạn mức:** `files` giữ chỗ `files.storage_bytes` theo cỡ khai lúc cấp link, xác nhận khi xong, trả khi lượt bị dọn.
+   `media` chưa có hạn mức dung lượng nên không giữ chỗ.
+7. **Dọn:** job `files.purge_expired_uploads`, `media.purge_expired_uploads` mỗi giờ trên mọi database (bảng ở database của
+   khách): lượt `pending` quá hạn 1 giờ → xoá object, dòng (trả hạn mức); dòng lượt đã xong giữ 7 ngày. Cấu hình
+   `AUTOXIDE_FILES_DIRECT_MAX_BYTES` (5 GiB), `AUTOXIDE_FILES_DIRECT_UPLOAD_SECONDS` (900), `AUTOXIDE_MEDIA_DIRECT_MAX_BYTES`
+   (1 GiB — xác nhận đọc lại cả item), `AUTOXIDE_MEDIA_DIRECT_UPLOAD_SECONDS` (900). Test: link giả của `MemoryStorage::presign`
+   (testkit) trên hai database; S3 thật (moto) ở `files` và e2e `media`.

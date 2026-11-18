@@ -12,3 +12,5 @@ Tiếng Anh: [`README.md`](README.md).
 - [Đọc danh sách dài](pagination.vi.md): `limit`, `cursor`, `order`
 - [Đọc lỗi](errors.vi.md): `code`, `errors`, `Retry-After`
 - [Nối AI agent qua MCP](mcp.vi.md): key cho agent, cấu hình client, các tool
+- [Nhận event theo thời gian thực](realtime-events.vi.md): Server-Sent Events, `Last-Event-ID`, giới hạn
+- [Tải file lớn thẳng lên nơi lưu](direct-uploads.vi.md): link đã ký tới S3, xác nhận, kiểm file

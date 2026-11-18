@@ -16,6 +16,7 @@
 mod dispatcher;
 mod migration;
 mod outbox;
+pub(crate) mod stream;
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -33,6 +34,7 @@ pub use migration::{
     outbox_access_migration, outbox_actor_migration, outbox_migration, tenant_table,
 };
 pub use outbox::Outbox;
+pub use stream::StreamHub;
 
 /// Một loại event, khai bởi module phát nó.
 ///
@@ -47,12 +49,14 @@ pub struct EventInfo {
     description: &'static str,
     /// Câu hoạt động (bước 51 P5) và permission cần để thấy nó.
     activity: Option<(&'static str, crate::access::Permission)>,
+    /// Permission cần để nhận event này qua stream SSE (bước 40 P5); `None`: không stream.
+    stream: Option<crate::access::Permission>,
 }
 
 impl EventInfo {
     /// `name`: `<module>.<việc>` (chữ thường, số, `_`). `description`: câu tiếng Anh.
     pub const fn new(name: &'static str, description: &'static str) -> Self {
-        EventInfo { name, description, activity: None }
+        EventInfo { name, description, activity: None, stream: None }
     }
 
     /// Event này hiện trong "hoạt động gần đây" (bước 51 P5, `GET /api/v1/audit/activity`) với câu
@@ -66,6 +70,20 @@ impl EventInfo {
     ) -> Self {
         self.activity = Some((sentence, reader));
         self
+    }
+
+    /// Event này được đẩy qua stream thời gian thực (`GET /api/v1/kernel/events/stream`, bước 40
+    /// P5) tới người có `reader` — cùng permission đọc bản ghi qua REST, vì payload chứa dữ liệu của
+    /// bản ghi. Mặc định không stream: chỉ event module chủ động khai mới ra ngoài (không có
+    /// "realtime theo bảng", D-378).
+    pub const fn streamable(mut self, reader: crate::access::Permission) -> Self {
+        self.stream = Some(reader);
+        self
+    }
+
+    /// Permission để nhận event qua stream, khi event khai [`streamable`](Self::streamable).
+    pub fn stream_permission(&self) -> Option<crate::access::Permission> {
+        self.stream
     }
 
     /// Câu hoạt động và permission để thấy nó, khi event khai.
@@ -322,6 +340,11 @@ impl EventCatalog {
     /// Mọi loại event, theo thứ tự tên.
     pub fn iter(&self) -> impl Iterator<Item = &EventInfo> {
         self.events.iter().map(|(_, event)| event)
+    }
+
+    /// Event stream được (bước 40 P5): (module phát, event), theo thứ tự tên.
+    pub fn streamable(&self) -> Vec<(&'static str, EventInfo)> {
+        self.events.iter().filter(|(_, event)| event.stream.is_some()).copied().collect()
     }
 
     /// Các module có phát ít nhất một event (tức có bảng `<module>_events`).

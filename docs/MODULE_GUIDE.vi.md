@@ -294,6 +294,11 @@ Khai event trong `src/events.rs` và trả từ `Module::events`. Dữ liệu d�
 `audit` ghi mọi event; module khác đăng ký nhận qua `Module::subscriptions` và phải chịu
 được việc nhận lại cùng một event.
 
+Event mà màn hình của client cần thấy ngay thì đẩy qua stream thời gian thực
+(`GET /api/v1/kernel/events/stream`): khai bằng `EventInfo::new(…).streamable(NOTES_READ)`,
+nêu permission đọc bản ghi qua REST — payload tới mọi người có permission đó trong khách.
+Event không khai thì không được stream.
+
 ### 7. Tool MCP
 
 `Module::tools` trả các `autoxide_kernel::mcp::Tool`. Mỗi tool nhận một kiểu đầu vào

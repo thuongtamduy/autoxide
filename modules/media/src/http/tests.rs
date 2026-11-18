@@ -451,6 +451,8 @@ async fn tool_mcp_theo_permission() {
             names("writer").await,
             [
                 "kernel.current_tenant", "kernel.decide_approval", "kernel.list_approvals", "kernel.list_custom_fields", "kernel.navigation",
+                "media.confirm_upload",
+                "media.create_upload",
                 "media.get",
                 "media.list",
                 "media.list_tags",

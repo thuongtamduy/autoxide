@@ -162,6 +162,8 @@ pub(crate) struct MediaService {
     /// Cấu hình theo khách của kernel (`media.alt_locales`); `None` (test dựng tay): chỉ dùng
     /// cấu hình của máy chủ.
     pub(crate) settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
+    /// Lượt tải thẳng lên S3 (bước 40 P4), bảng `media_uploads`.
+    pub(crate) uploads: autoxide_kernel::upload::DirectUploads,
 }
 
 impl MediaService {
@@ -173,7 +175,8 @@ impl MediaService {
         config: MediaConfig,
     ) -> Self {
         let resources = autoxide_kernel::resource::ResourceDirectory::default();
-        MediaService { storage, outbox, jobs, ai, config, resources, settings: None }
+        let uploads = autoxide_kernel::upload::DirectUploads::new("media");
+        MediaService { storage, outbox, jobs, ai, config, resources, settings: None, uploads }
     }
 
     /// Đọc cấu hình theo khách từ `settings` của kernel.

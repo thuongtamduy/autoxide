@@ -3338,6 +3338,86 @@
     },
     {
       "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Complete an upload started with `files.create_upload` after sending the file: the server checks its size and SHA-256 and creates the file (a mismatching file is removed). Calling it again returns the same file.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An upload straight to storage to complete.",
+        "properties": {
+          "id": {
+            "description": "Id of the upload, from `files.create_upload`.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "files.confirm_upload",
+      "output_schema": null,
+      "permissions": [
+        "files.upload",
+        "files.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Start uploading a large file straight to storage (S3): give its name, type, exact size and SHA-256 (hex); you get a signed link. Send the file there yourself with the given method and headers, then call `files.confirm_upload`. On disk storage this answers `files.direct_upload_unavailable`: use `files.upload_file` instead.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A file to upload straight to storage.",
+        "properties": {
+          "content_type": {
+            "description": "Media type of the file; the upload link only accepts this `Content-Type`.",
+            "example": "video/mp4",
+            "type": "string"
+          },
+          "name": {
+            "description": "File name, 1 to 255 characters, without `/` or `\\`.",
+            "example": "video.mp4",
+            "type": "string"
+          },
+          "sha256": {
+            "description": "SHA-256 of the content, as 64 hex digits; checked when you complete the upload.",
+            "type": "string"
+          },
+          "size": {
+            "description": "Exact size in bytes; the link only accepts this size.",
+            "example": 734003200,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "content_type",
+          "size",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "name": "files.create_upload",
+      "output_schema": null,
+      "permissions": [
+        "files.upload"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": true,
         "read_only": false,
         "requires_approval_for_agent": false,
@@ -5814,6 +5894,108 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Complete an upload started with `media.create_upload` after sending the file: the server checks its real type, size and SHA-256 and creates the item (a failing file is removed). Calling it again returns the same item.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A media item to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the media item.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "media.confirm_upload",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Start uploading a large media item straight to storage (S3): give its name, real type, exact size and SHA-256 (hex), and optionally folder, tags and unit; you get a signed link. Send the file there yourself with the given method and headers, then call `media.confirm_upload`. On disk storage this answers `media.direct_upload_unavailable`: use `media.upload` instead.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A media item to upload straight to storage.",
+        "properties": {
+          "content_type": {
+            "description": "The real media type of the file; the upload link only accepts this `Content-Type`, and the\ncontent is checked against it when you complete the upload.",
+            "example": "video/mp4",
+            "type": "string"
+          },
+          "folder_id": {
+            "description": "Folder to put the item in. Omit for the root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "File name, 1 to 255 characters, without `/` or `\\`.",
+            "example": "launch-video.mp4",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The organization unit that owns the item; you need `media.write` there. Omit when you work\nin one unit only (or for the whole tenant).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "description": "SHA-256 of the content, as 64 hex digits.",
+            "type": "string"
+          },
+          "size": {
+            "description": "Exact size in bytes.",
+            "example": 734003200,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "tags": {
+            "description": "Tags for the item (each 1 to 50 characters, at most 20).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "content_type",
+          "size",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "name": "media.create_upload",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
       ]
     },
     {

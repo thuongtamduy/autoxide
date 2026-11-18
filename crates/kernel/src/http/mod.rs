@@ -48,6 +48,7 @@ mod rate_limit_store;
 mod request_id;
 mod security_headers;
 mod server;
+pub(crate) mod stream;
 
 use std::time::Duration;
 
