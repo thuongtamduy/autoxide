@@ -24,6 +24,11 @@ endpoints are marked deprecated with a sunset date first.
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and
   `catalog`).
+- Jobs: `JobRegistration::timeout` lets a job kind run longer than 4.5 minutes; the worker extends its claim while
+  the job runs and stops the job if it loses the claim.
+- `autoxide_kernel::backup` (`write_backup`, `BackupSink`, `DirectorySink`, `StorageSink`): the core of `autoxide
+  backup`, shared with the scheduled backups of step 39. A backup never copies files under `kernel/backups/` (the
+  scheduled backups themselves).
 - `deploy/prometheus/autoxide-alerts.yml` (alerting rules, each with an `action` saying what to do) and
   `deploy/grafana/autoxide-dashboard.json`; `docs/DEPLOY.md` gains "Monitoring" and a "Runbook" (server errors, slow
   requests, stuck queue, dead-letter queue, connections, full database, leaked keys, lost last administrator,
