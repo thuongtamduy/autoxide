@@ -237,6 +237,8 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       từ audit; chạy lại job trong dead-letter queue; `kernel.devtools.read` / `kernel.devtools.manage`
 - [ ] Nhật ký lệnh của agent (D-202): lệnh MCP ghi `mcp:<tên tool>`, không ghi tham số; lọc theo
       `actor_kind` (đủ `ActorKind`, D-224) và theo key; dòng của lệnh `202 approval_required` giữ `approval_id`
+      - [x] Bảng `kernel_request_log`, ghi bất đồng bộ, `GET /kernel/devtools/requests`, tool `kernel.request_log`,
+            lệnh MCP `mcp:<tool>`, `approval_id`, hạn lưu `AUTOXIDE_REQUEST_LOG_DAYS` (D-370)
 - [ ] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
 - [ ] AI trong quản trị (D-109): lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`); trợ lý chạy
       tool MCP với quyền người gọi, mọi lệnh ghi là bản nháp hay yêu cầu duyệt, trả kèm tool đã gọi

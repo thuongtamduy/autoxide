@@ -258,6 +258,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::custom_fields::CreateCustomFields),
             // Ghim của người dùng (bước 52 mục 4).
             Box::new(crate::ops::pins::CreatePins),
+            // Nhật ký request theo khách (bước 52 mục 1).
+            Box::new(crate::ops::request_log::CreateRequestLog),
         ]
     }
 
@@ -332,6 +334,8 @@ impl Module for KernelModule {
             crate::ops::texts::TEXTS_MANAGE,
             crate::ops::custom_fields::CUSTOM_FIELDS_MANAGE,
             crate::job::runs::JOBS_MANAGE,
+            crate::ops::request_log::DEVTOOLS_READ,
+            crate::ops::request_log::DEVTOOLS_MANAGE,
         ]
     }
 
@@ -385,6 +389,7 @@ impl Module for KernelModule {
                 crate::ops::approvals::ApprovalsState { outbox: outbox.clone() },
             ));
         }
+        routes = routes.merge(crate::ops::request_log::routes());
         routes = routes.merge(crate::ops::custom_fields::routes(
             crate::ops::custom_fields::CustomFieldsState { fields: self.catalog.custom_fields() },
         ));
@@ -533,6 +538,7 @@ impl Module for KernelModule {
         if let Some(runs) = &self.migration_runs {
             tools.extend(crate::tenancy::migration_runs::tools(runs.clone()));
         }
+        tools.extend(crate::ops::request_log::tools());
         tools
     }
 

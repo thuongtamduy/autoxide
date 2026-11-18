@@ -17,9 +17,26 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::request_id::REQUEST_ID_HEADER;
 use crate::error::Error;
+use crate::ops::request_log::{CallerSlot, Finished, RequestLog, header_text};
+use opentelemetry::trace::TraceContextExt;
 
-pub(super) async fn log_requests(request: Request, next: Next) -> Response {
+pub(super) async fn log_requests(
+    request_log: Option<RequestLog>,
+    mut request: Request,
+    next: Next,
+) -> Response {
     let method = request.method().clone();
+    // Ô người gọi: extractor `Principal` / `TenantContext` điền khi giải ra (bước 52).
+    let caller = CallerSlot::default();
+    if request_log.is_some() {
+        request.extensions_mut().insert(caller.clone());
+    }
+    let idempotency_key = header_text(request.headers().get("idempotency-key"), 255);
+    let approval_header = request
+        .headers()
+        .get(&crate::ops::approvals::APPROVAL_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.trim().parse::<uuid::Uuid>().ok());
     let path = request.uri().path().to_owned();
     // Mẫu route đã khớp (vd `/api/v1/notes/{id}`); không có khi request không khớp
     // route nào.
@@ -55,6 +72,33 @@ pub(super) async fn log_requests(request: Request, next: Next) -> Response {
     let elapsed_ms = elapsed.as_millis() as u64;
     let route = route.as_deref().unwrap_or("unmatched");
     super::metrics::record_request(method.as_str(), route, status, elapsed.as_secs_f64());
+    // Lệnh MCP ghi một dòng mỗi tool ở lớp MCP; request bao ngoài không ghi thêm.
+    if let Some(request_log) = &request_log
+        && route != super::MCP_PATH
+    {
+        let span_context = span.context().span().span_context().clone();
+        request_log.record(
+            &caller,
+            Finished {
+                method: method.as_str().to_owned(),
+                path: route.to_owned(),
+                status,
+                code: response
+                    .extensions()
+                    .get::<Arc<Error>>()
+                    .map(|error| error.code().to_owned()),
+                duration: elapsed,
+                idempotency_key,
+                approval_id: response
+                    .extensions()
+                    .get::<crate::ops::approvals::Pending>()
+                    .map(|pending| pending.0)
+                    .or(approval_header),
+                request_id: (!request_id.is_empty()).then(|| request_id.clone()),
+                trace_id: span_context.is_valid().then(|| span_context.trace_id().to_string()),
+            },
+        );
+    }
     span.record("http.route", route);
     span.record("http.response.status_code", status);
     span.in_scope(|| match response.extensions().get::<Arc<Error>>() {

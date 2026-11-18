@@ -51,6 +51,8 @@ struct McpServer {
     translations: Arc<Translations>,
     /// Quyền dùng theo khách (bước 35): tool của module gói không có bị ẩn và bị chặn.
     entitlements: crate::entitlement::EntitlementsHandle,
+    /// Nhật ký request theo khách (bước 52); `None` khi tắt.
+    request_log: Option<crate::ops::request_log::RequestLog>,
 }
 
 /// Router của endpoint MCP; `None` khi chưa module nào xác thực (không biết ai gọi thì
@@ -61,9 +63,10 @@ pub(super) fn router(
     authenticator: Option<Arc<dyn Authenticator>>,
     origins: &CorsOrigins,
     entitlements: crate::entitlement::EntitlementsHandle,
+    request_log: Option<crate::ops::request_log::RequestLog>,
 ) -> Option<Router> {
     let authenticator = authenticator?;
-    let server = McpServer { tools: Arc::new(tools), translations, entitlements };
+    let server = McpServer { tools: Arc::new(tools), translations, entitlements, request_log };
     let mut config = StreamableHttpServerConfig::default()
         .with_legacy_session_mode(false)
         .with_json_response(true)
@@ -188,6 +191,29 @@ fn describe(tool: &Tool) -> rmcp::model::Tool {
 }
 
 impl McpServer {
+    /// Chạy tool sau khi kiểm gói và trạng thái chỉ đọc của khách; lỗi nào cũng là `Error`.
+    async fn run(
+        &self,
+        tool: &Tool,
+        tenant: TenantContext,
+        principal: Principal,
+        arguments: Value,
+    ) -> Result<Value, Error> {
+        // Gói của khách không có module của tool: cùng lỗi như REST.
+        let (enabled, plan_read_only) = self.plan_allows(tool, tenant.id()).await?;
+        if !enabled {
+            let module = tool.name().split('.').next().unwrap_or_default();
+            metrics::counter!("entitlement_denials_total", "kind" => "module").increment(1);
+            return Err(crate::entitlement::module_not_enabled(module));
+        }
+        // Khách chỉ đọc (trạng thái khách hay thuê bao): tool đọc vẫn chạy, tool ghi nhận cùng lỗi
+        // như REST.
+        if (tenant.read_only() || plan_read_only) && !tool.is_read_only() {
+            return Err(crate::tenancy::errors::tenant_read_only());
+        }
+        tool.call(tenant, principal, arguments).await
+    }
+
     /// Module của tool (`<module>.<tên>`) có được dùng ở khách `tenant` không, và khách có chỉ
     /// đọc vì thuê bao không (bước 35). `(true, false)` khi không có gói nào áp dụng.
     async fn plan_allows(
@@ -320,24 +346,27 @@ impl ServerHandler for McpServer {
         metrics::counter!("mcp_tool_calls_total").increment(1);
         // Đếm cho hạn mức `kernel.api_requests` (REST và MCP), như lớp HTTP.
         self.entitlements.count_request(tenant.id());
-        // Gói của khách không có module của tool: cùng lỗi như REST.
-        let (enabled, plan_read_only) = match self.plan_allows(tool, tenant.id()).await {
-            Ok(found) => found,
-            Err(error) => return Ok(self.failure(tool.name(), &error, language).into()),
-        };
-        if !enabled {
-            let module = tool.name().split('.').next().unwrap_or_default();
-            metrics::counter!("entitlement_denials_total", "kind" => "module").increment(1);
-            let error = crate::entitlement::module_not_enabled(module);
-            return Ok(self.failure(tool.name(), &error, language).into());
+        let started = std::time::Instant::now();
+        let outcome = self.run(tool, tenant.clone(), principal.clone(), arguments).await;
+        // Nhật ký lệnh của agent (D-202): tên tool và mã lỗi, không bao giờ tham số.
+        if let Some(request_log) = &self.request_log {
+            let request_id =
+                context.extensions.get::<axum::http::request::Parts>().and_then(|parts| {
+                    crate::ops::request_log::header_text(
+                        parts.headers.get(&super::request_id::REQUEST_ID_HEADER),
+                        128,
+                    )
+                });
+            request_log.record_tool(
+                &tenant,
+                &principal,
+                tool.name(),
+                outcome.as_ref().err().map(|error| error.code().to_owned()),
+                started.elapsed(),
+                request_id,
+            );
         }
-        // Khách chỉ đọc (trạng thái khách hay thuê bao): tool đọc vẫn chạy, tool ghi nhận cùng lỗi
-        // như REST.
-        if (tenant.read_only() || plan_read_only) && !tool.is_read_only() {
-            let error = crate::tenancy::errors::tenant_read_only();
-            return Ok(self.failure(tool.name(), &error, language).into());
-        }
-        let mut result = match tool.call(tenant, principal, arguments).await {
+        let mut result = match outcome {
             Ok(value) => CallToolResult::structured(envelope(value)),
             Err(error) => self.failure(tool.name(), &error, language),
         };

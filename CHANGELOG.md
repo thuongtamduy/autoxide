@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 52, developer tools: a per-tenant log of signed-in REST calls and MCP tool calls (`mcp:<tool>`), with the route template,
+  status, error `code`, duration, `Idempotency-Key`, approval id, request id and trace id — never bodies, tokens, query strings
+  or tool arguments. `GET /api/v1/kernel/devtools/requests` and the MCP tool `kernel.request_log` (`kernel.devtools.read`) filter
+  it by `actor_kind`, `api_key_id`, `path`, `status` and time. Written in the background; kept `AUTOXIDE_REQUEST_LOG_DAYS`
+  days (14 by default, `0` turns it off).
 - Step 52, phone admin: navigation items carry a `mobile` hint (`NavItem::mobile`, bottom bar / "More" / hidden);
   `GET /api/v1/kernel/navigation?device=mobile` (and the MCP tool with `device`) returns at most 5 bottom-bar items,
   leaves out items hidden on phones and orders by placement. `device=desktop` (the default) is unchanged.

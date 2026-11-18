@@ -9099,3 +9099,30 @@ tự khai cùng chỗ khai mục.
    việc hằng ngày làm được trên điện thoại (xem số liệu, xử lý việc, duyệt bài, duyệt bình luận, tải ảnh). `Hidden`: khoá API,
    webhook, cơ sở dữ liệu của nền tảng — việc của nhà phát triển / vận hành, cần màn hình lớn. Module thương mại sau này tự khai
    (vd đơn hàng) và đẩy mục kém hơn xuống `secondary` theo `order`.
+
+## D-370 · Nhật ký request theo khách và nhật ký lệnh của agent (bước 52 mục 1, D-202) — 2026-11-18 — agent quyết
+
+Bối cảnh: bàn kỹ thuật cần biết ai (người, API key, agent) đã gọi gì, kết quả ra sao, mà không làm chậm request và không lưu dữ
+liệu cá nhân.
+
+1. Bảng `kernel_request_log` (cấp khách hàng): thời điểm, `actor_kind` (đủ bảy giá trị của `ActorKind`), người dùng, API key,
+   phương thức, **đường dẫn mẫu** (`MatchedPath`, không có ID thật), status, `code` lỗi, thời gian xử lý, `Idempotency-Key`,
+   `approval_id`, `request_id`, `trace_id` (khi xuất trace OTLP). Không lưu thân, header xác thực, query. Index (`tenant_id`,
+   `id`), (`tenant_id`, `actor_kind`, `id`), (`tenant_id`, `api_key_id`, `id`), sweep (`expires_at`).
+2. **Chỉ ghi request đã xác thực.** Request công khai (trang bán hàng, form) không phải việc của bàn kỹ thuật; ghi thì bảng phình
+   theo lượt xem.
+3. **Ghi bất đồng bộ bằng hàng đợi trong bộ nhớ có giới hạn** (10 000 dòng), không qua outbox: outbox ghi trong transaction của
+   request, tức thêm một lệnh ghi vào đường nóng. Một tác vụ nền gom tối đa 200 dòng, mỗi khách một câu `INSERT` nhiều dòng.
+   Hàng đợi đầy thì bỏ dòng và đếm `kernel_request_log_dropped_total`; dừng máy chủ có thể mất dòng chưa ghi — chấp nhận vì đây
+   là nhật ký, không phải dữ liệu nghiệp vụ.
+4. Người gọi lấy từ extractor: lớp log đặt một ô (`CallerSlot`) vào request, extractor `Principal` / `TenantContext` điền khi giải
+   ra — không xác thực lần hai.
+5. Lệnh MCP ghi ở lớp MCP, một dòng mỗi lần gọi tool (kể cả lỗi), `mcp:<tool>`, phương thức `MCP`, status 200 / 400 (lỗi), không
+   ghi tham số; request `POST /mcp` bao ngoài không ghi riêng. `approval_id`: dòng `202` của lệnh chờ duyệt và dòng gửi lại với
+   `Autoxide-Approval` cùng giữ ID của yêu cầu duyệt.
+6. Hạn lưu `AUTOXIDE_REQUEST_LOG_DAYS` (mặc định 14, `0` tắt), lưu thành `expires_at` của từng dòng. **Dọn bởi tác vụ ghi**, mỗi
+   database tối đa mỗi giờ một lần, thay cho job theo lịch: một lịch hằng ngày ở mọi database sẽ thêm job vào mọi database dù
+   không có nhật ký (đã gặp ở D-365 với việc dọn hoãn việc). Database không có request nào thì cũng không có dòng nào để dọn.
+7. `GET /api/v1/kernel/devtools/requests` và tool MCP `kernel.request_log` (`kernel.devtools.read`, chỉ đọc), lọc `actor_kind`
+   (nhiều giá trị), `api_key_id`, `path` (chính xác), `status`, `from` / `to`. Khai luôn `kernel.devtools.manage` cho các thao tác
+   ghi của bàn kỹ thuật (gửi lại webhook, chạy lại job).

@@ -20,6 +20,7 @@ pub(crate) mod navigation;
 pub(crate) mod pins;
 pub mod reasons;
 pub(crate) mod records;
+pub(crate) mod request_log;
 pub mod resolve;
 pub mod setup;
 pub mod summary;

@@ -65,7 +65,7 @@ impl crate::event::Event for ApprovalDecided {
 /// Đánh dấu trên câu trả lời 202: lớp idempotency không giữ nó, để agent gửi lại cùng key sau khi
 /// được duyệt.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Pending;
+pub(crate) struct Pending(pub(crate) Uuid);
 
 /// Lệnh của một module cần duyệt khi agent gọi: (method, đường dẫn mẫu đầy đủ) → permission.
 #[derive(Debug, Clone, Default)]
@@ -235,7 +235,7 @@ async fn checked(
     tracing::info!(approval_id = %id, "command of an agent waits for approval");
     let view = find_view(&tenant, id).await?;
     let mut response = (StatusCode::ACCEPTED, axum::Json(Data { data: view })).into_response();
-    response.extensions_mut().insert(Pending);
+    response.extensions_mut().insert(Pending(id));
     Ok(response)
 }
 

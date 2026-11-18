@@ -294,6 +294,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/client-config".to_owned(),
                     "/custom-fields".to_owned(),
                     "/custom-fields/{id}".to_owned(),
+                    "/devtools/requests".to_owned(),
                     "/domains".to_owned(),
                     "/domains/allowed".to_owned(),
                     "/domains/{id}".to_owned(),
@@ -408,6 +409,8 @@ async fn module_thay_danh_muc_permission_cua_moi_module() {
             [
                 "kernel.custom_fields.manage",
                 "kernel.data.export",
+                "kernel.devtools.manage",
+                "kernel.devtools.read",
                 "kernel.domains.manage",
                 "kernel.jobs.manage",
                 "kernel.jobs.read",

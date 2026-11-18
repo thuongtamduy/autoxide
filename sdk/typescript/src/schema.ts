@@ -10445,6 +10445,36 @@ export type Localized = {
   vi?: string | null;
 };
 
+/** One call in the log of the tenant. */
+export type LoggedRequest = {
+  /** `user`, `agent`, `service`, `system`, `support`, `app` or `scim`. */
+  actor_kind: string;
+  /** The API key used, when the call came with one. */
+  api_key_id?: string | null;
+  /** The approval request the call created (`202`) or used (`Autoxide-Approval`). */
+  approval_id?: string | null;
+  at: string;
+  /** The error `code`, when the call failed. */
+  code?: string | null;
+  duration_ms: number;
+  id: string;
+  idempotency_key?: string | null;
+  /** HTTP method, or `MCP` for a tool call. */
+  method: string;
+  /**
+   * The route template (no real ids), e.g. `/api/v1/content/entries/{id}`, or
+   * `mcp:<tool>` for a tool call, e.g. `mcp:content.publish_entry`.
+   */
+  path: string;
+  /** `x-request-id` of the call. */
+  request_id?: string | null;
+  /** HTTP status; for a tool call `200`, or `400` when the tool returned an error. */
+  status: number;
+  /** OpenTelemetry trace id, when traces are exported. */
+  trace_id?: string | null;
+  user_id?: string | null;
+};
+
 /** Finish signing in with the token from the mail. */
 export type LoginLinkConfirmation = {
   /** The `device_secret` from `POST /api/v1/auth/login/link`, when it asked to bind the device. */
@@ -13027,6 +13057,40 @@ export type Page_ListResponse = {
     /** Subscriptions by status. */
     subscriptions: SubscriptionCounts;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_LoggedRequest = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `user`, `agent`, `service`, `system`, `support`, `app` or `scim`. */
+    actor_kind: string;
+    /** The API key used, when the call came with one. */
+    api_key_id?: string | null;
+    /** The approval request the call created (`202`) or used (`Autoxide-Approval`). */
+    approval_id?: string | null;
+    at: string;
+    /** The error `code`, when the call failed. */
+    code?: string | null;
+    duration_ms: number;
+    id: string;
+    idempotency_key?: string | null;
+    /** HTTP method, or `MCP` for a tool call. */
+    method: string;
+    /**
+     * The route template (no real ids), e.g. `/api/v1/content/entries/{id}`, or
+     * `mcp:<tool>` for a tool call, e.g. `mcp:content.publish_entry`.
+     */
+    path: string;
+    /** `x-request-id` of the call. */
+    request_id?: string | null;
+    /** HTTP status; for a tool call `200`, or `400` when the tool returned an error. */
+    status: number;
+    /** OpenTelemetry trace id, when traces are exported. */
+    trace_id?: string | null;
+    user_id?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -21813,6 +21877,19 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/devtools/requests": {
+    /** List the calls made in this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; actor_kind?: string; api_key_id?: string; path?: string; status?: number; from?: string; to?: string }; };
+      responses: {
+        200: Page_LoggedRequest;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
