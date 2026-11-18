@@ -193,7 +193,7 @@ fn migrate_down_module_khong_ton_tai_thoat_ma_1() {
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(
         stderr(&output),
-        "autoxide: migration: unknown module `nope`; registered modules: kernel, antispam, mail, ai, files, address, organizations, auth, audit, idempotency, webhooks, tax, ledger, invoices, compliance, notifications, bookings, plans, media, content, forms, newsletter, comments, support, analytics, menus, reporting, automations\n"
+        "autoxide: migration: unknown module `nope`; registered modules: kernel, antispam, mail, ai, files, address, organizations, auth, audit, idempotency, webhooks, tax, ledger, invoices, compliance, notifications, bookings, plans, media, content, forms, newsletter, comments, support, analytics, menus, catalog, reporting, automations\n"
     );
 }
 
