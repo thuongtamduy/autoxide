@@ -1,4 +1,4 @@
-//! Loại đối tượng `organizations.unit` trong sổ đối tượng của kernel (D-123, D-383): module khác lấy
+//! Loại đối tượng `organizations.unit` trong sổ đối tượng của kernel (D-123, D-20261118-ui-debt-batch-3): module khác lấy
 //! tên của nút tổ chức theo lô — vd `compliance` hiện tên người bán trên hồ sơ định danh trước khi
 //! xác minh — mà không phụ thuộc module `organizations`. Nút luôn riêng tư (`public = false`): hồ sơ
 //! công khai của cửa hàng là loại khác (`organizations.store`).

@@ -1,4 +1,4 @@
-//! Tổng quan tuân thủ (đề bài giao diện, D-383): số việc đang chờ theo từng khu vực, cho màn đầu của
+//! Tổng quan tuân thủ (đề bài giao diện, D-20261118-ui-debt-batch-3): số việc đang chờ theo từng khu vực, cho màn đầu của
 //! mục Tuân thủ. Mỗi khu vực chỉ có khi người gọi có quyền đọc khu vực đó; khu vực khác là `null`.
 //! Mỗi số là một câu `COUNT` theo index của bảng.
 

@@ -1,4 +1,4 @@
-//! Sổ đối tượng trên chương trình thật (D-383), cả SQLite và Postgres: danh sách loại đối tượng kèm
+//! Sổ đối tượng trên chương trình thật (D-20261118-ui-debt-batch-3), cả SQLite và Postgres: danh sách loại đối tượng kèm
 //! cờ "có cây", lọc theo quyền đọc của module.
 
 use autoxide_testkit::{TestApp, TestDatabase};

@@ -1100,7 +1100,7 @@ impl MigrationTrait for ConsentStatsIndex {
     }
 }
 
-/// Ghi chú của người duyệt khi từ chối / thu hồi hồ sơ định danh (D-383).
+/// Ghi chú của người duyệt khi từ chối / thu hồi hồ sơ định danh (D-20261118-ui-debt-batch-3).
 struct KycReviewNote;
 
 impl MigrationName for KycReviewNote {

@@ -899,6 +899,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- `lettre` 0.11.24 (mail over SMTP): fixes RUSTSEC-2026-0560 … 0565 (STARTTLS reply injection, SMTP command
+  injection, panics on malformed replies, wrong recipient for quoted local parts).
 - The fake e-invoice provider of `autoxide-testkit` gives the same answer to every status check of one submission, so
   tests no longer fail when two checks run at once.
 - `Throttle::hit` no longer lets extra attempts through under concurrent load: an attempt that passed the "is it

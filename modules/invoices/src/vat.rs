@@ -1,4 +1,4 @@
-//! Bảng tổng hợp thuế GTGT đầu ra theo kỳ và thuế suất (đề bài giao diện, D-383): cộng từ các dòng
+//! Bảng tổng hợp thuế GTGT đầu ra theo kỳ và thuế suất (đề bài giao diện, D-20261118-ui-debt-batch-3): cộng từ các dòng
 //! của chứng từ bán đã có số trong kỳ. Đây là số tham khảo để đối chiếu khi lập tờ khai — cách tính
 //! (chứng từ nào vào, điều chỉnh giảm trừ thế nào) **cần người có chuyên môn kế toán / thuế đối chiếu**.
 //! Thuế GTGT đầu vào cần chứng từ mua, chưa có (bước 42).
