@@ -128,7 +128,8 @@ async fn bam_ip_theo_ngay_va_co_dinh() {
         let fixed = fingerprint(&key, "forms", address).await.unwrap();
         assert_ne!(fixed, a);
         assert_eq!(fixed, fingerprint(&key, "forms", address).await.unwrap());
-        assert!(!fixed.contains("203"));
+        // Bản băm là chuỗi hex nên có thể tình cờ chứa "203"; điều cần kiểm là không lộ nguyên địa chỉ.
+        assert!(!fixed.contains(&address.to_string()));
     })
     .await
     .unwrap();
