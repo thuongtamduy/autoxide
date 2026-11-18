@@ -28,6 +28,10 @@ pub(crate) const SETTINGS_CHANGED: EventInfo = EventInfo::new(
     "support.settings_changed",
     "Support teams, team members or routing rules changed.",
 );
+pub(crate) const TICKET_BREACHED: EventInfo = EventInfo::new(
+    "support.ticket_breached",
+    "A support ticket missed its first-response or resolution deadline.",
+);
 pub(crate) const TICKETS_CLAIMED: EventInfo = EventInfo::new(
     "support.tickets_claimed",
     "Guest tickets were attached to the account that verified the same email or phone number.",
@@ -61,6 +65,7 @@ event!(TicketAssigned, "support.ticket_assigned");
 event!(MessageAdded, "support.message_added");
 event!(MessageHidden, "support.message_hidden");
 event!(TicketsClaimed, "support.tickets_claimed");
+event!(TicketBreached, "support.ticket_breached");
 event!(SettingsChanged, "support.settings_changed");
 
 pub(crate) fn all() -> Vec<EventInfo> {
@@ -72,6 +77,7 @@ pub(crate) fn all() -> Vec<EventInfo> {
         MESSAGE_ADDED,
         MESSAGE_HIDDEN,
         TICKETS_CLAIMED,
+        TICKET_BREACHED,
         SETTINGS_CHANGED,
     ]
 }

@@ -61,6 +61,10 @@ endpoints are marked deprecated with a sunset date first.
   tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
 - `support`: support teams of an organization unit (`/teams`, members who take tickets), routing rules by category and
   channel (`/routing-rules`, inherited down the tree) and round-robin assignment to members who can answer the ticket.
+- `support`: support policies per organization unit (`/policies/{org_id}`, inherited down the tree: categories,
+  response-time targets per priority in business minutes, business hours, days off, auto-close days, guest tickets).
+  Deadlines count business time and stop while waiting for the customer; jobs `support.sla_check` (marks late tickets,
+  event `support.ticket_breached`) and `support.auto_close`; work source `support.tickets`; `GET /reports/summary`.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions

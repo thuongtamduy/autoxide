@@ -305,7 +305,7 @@ async fn xoa_tai_khoan_an_danh_hoa_giu_thong_ke() {
             autoxide_kernel::privacy::USER_DELETED,
             json!({"before": {"id": Uuid::from_u128(BUYER)}}),
         );
-        let handler = support_service(app);
+        let handler = super::service_of(app);
         handler.handle(&event).await.unwrap();
         handler.handle(&event).await.unwrap();
 
@@ -322,18 +322,4 @@ async fn xoa_tai_khoan_an_danh_hoa_giu_thong_ke() {
     })
     .await
     .unwrap();
-}
-
-/// Service của module trên database của `app` (để gọi handler event trực tiếp, không cần `auth`).
-fn support_service(app: &autoxide_testkit::TestApp) -> std::sync::Arc<dyn EventHandler> {
-    let parts = crate::service::Parts {
-        outbox: autoxide_kernel::event::Outbox::standalone("support"),
-        guard: app.api::<autoxide_kernel::antispam::SpamGuard>().unwrap(),
-        secret: (*app.api::<autoxide_kernel::secret::SecretKey>().unwrap()).clone(),
-        notifier: None,
-        media: None,
-        accounts: None,
-        authenticator: None,
-    };
-    std::sync::Arc::new(crate::service::SupportService::new(parts, Default::default()))
 }
