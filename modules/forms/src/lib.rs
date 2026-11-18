@@ -75,6 +75,17 @@ impl Module for FormsModule {
         "forms"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            .by_org(&["forms_forms"])
+            .follow("forms_form_versions", "form_id", "forms_forms")
+            .follow("forms_submissions", "form_id", "forms_forms")
+            .follow("forms_exports", "form_id", "forms_forms")
+            .ephemeral(&["forms_throttle", "forms_antispam_nonces"])
+    }
+
     fn description(&self) -> &'static str {
         "Forms with typed fields, public submissions behind spam protection, an inbox, CSV \
          export and retention."

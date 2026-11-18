@@ -19,6 +19,7 @@ mod legacy;
 mod migration;
 mod permissions;
 mod public;
+mod relocation;
 mod service;
 mod tools;
 
@@ -136,5 +137,10 @@ impl Module for MenusModule {
             (Some(service), Some(databases)) => vec![legacy::task(service, databases)],
             _ => Vec::new(),
         }
+    }
+
+    // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 }

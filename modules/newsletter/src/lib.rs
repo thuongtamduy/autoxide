@@ -83,6 +83,22 @@ impl Module for NewsletterModule {
         "newsletter"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            // Người đăng ký là dữ liệu cá nhân của khách nguồn: ở lại khi tách, chuyển khi gộp.
+            .stay(&[
+                "newsletter_lists",
+                "newsletter_subscribers",
+                "newsletter_subscriptions",
+                "newsletter_campaigns",
+                "newsletter_deliveries",
+                "newsletter_suppressions",
+            ])
+            .ephemeral(&["newsletter_throttle", "newsletter_antispam_nonces", "newsletter_tokens"])
+    }
+
     fn description(&self) -> &'static str {
         "Newsletter lists, double opt-in subscribers, one-click unsubscribe and campaigns sent \
          in rate-limited batches."

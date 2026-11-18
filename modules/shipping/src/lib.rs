@@ -13,6 +13,7 @@ mod migration;
 mod permissions;
 mod privacy;
 mod registry;
+mod relocation;
 mod service;
 
 #[cfg(test)]
@@ -105,6 +106,10 @@ impl Module for ShippingModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 
     fn checks(&self) -> Vec<Check> {

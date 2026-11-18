@@ -34,6 +34,7 @@ pub(crate) mod org_settings;
 pub(crate) mod org_tree;
 mod placements;
 mod registry;
+pub mod relocate;
 pub(crate) mod request;
 pub(crate) mod residency;
 pub(crate) mod schema;
@@ -71,6 +72,12 @@ pub use org_tree::{OrgTree, nearest, root_immutable, root_of};
 pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
 pub use registry::{
     ChildTenant, DatabaseRegistry, FileStore, PLACEMENT_READ_URL, PLACEMENT_STORAGE, PLACEMENT_URL,
+};
+pub use relocate::{
+    Merge, RELOCATIONS_REQUEST, RelocateTable, Relocation, RelocationBlocker, RelocationConflict,
+    RelocationContext, RelocationInput, RelocationKind, RelocationPlan, RelocationTable,
+    RelocationWarning, SealedColumn, Split, TENANTS_RELOCATE, TablePolicy, TableReport,
+    TenantRelocation, TenantRelocations,
 };
 pub use request::{TENANT_HEADER, TenantHint};
 pub use residency::{Residency, parse_country};
@@ -221,6 +228,9 @@ pub enum TenantStatus {
     Moving,
     /// Đã xoá hẳn (dữ liệu đã xoá, chỉ còn dòng trong sổ khách): request nhận `tenant_not_found`.
     Deleted,
+    /// Đã gộp vào khách khác (bước 38): dữ liệu đã chuyển sang khách nhận; request nhận
+    /// `tenant_not_found`.
+    Merged,
 }
 
 impl TenantStatus {
@@ -232,6 +242,7 @@ impl TenantStatus {
             TenantStatus::Maintenance => "maintenance",
             TenantStatus::Moving => "moving",
             TenantStatus::Deleted => "deleted",
+            TenantStatus::Merged => "merged",
         }
     }
 
@@ -244,6 +255,7 @@ impl TenantStatus {
             "maintenance" => Some(TenantStatus::Maintenance),
             "moving" => Some(TenantStatus::Moving),
             "deleted" => Some(TenantStatus::Deleted),
+            "merged" => Some(TenantStatus::Merged),
             _ => None,
         }
     }
@@ -754,7 +766,9 @@ pub fn ensure_serving(tenant: &TenantContext) -> Result<(), Error> {
         TenantStatus::Maintenance | TenantStatus::Moving | TenantStatus::Provisioning => {
             Err(errors::tenant_maintenance(30))
         }
-        TenantStatus::Deleted => Err(errors::tenant_not_found(&tenant.id().to_string())),
+        TenantStatus::Deleted | TenantStatus::Merged => {
+            Err(errors::tenant_not_found(&tenant.id().to_string()))
+        }
     }
 }
 

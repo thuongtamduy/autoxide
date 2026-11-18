@@ -61,6 +61,24 @@ impl Module for InvoicesModule {
         "invoices"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            .by_org(&[
+                "invoices_series",
+                "invoices_documents",
+                "invoices_templates",
+                "invoices_exports",
+            ])
+            .follow("invoices_lines", "document_id", "invoices_documents")
+            .table(
+                "invoices_mandates",
+                autoxide_kernel::tenancy::TablePolicy::ByOrg { column: "principal_org_id" },
+            )
+            .stay(&["invoices_archives"])
+    }
+
     fn description(&self) -> &'static str {
         "Accounting documents and e-invoices: drafts, numbered issue, adjustment, replacement \
          and cancellation."
