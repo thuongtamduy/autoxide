@@ -8,7 +8,9 @@
 
 use autoxide_kernel::access::Permission;
 use autoxide_kernel::ai::TextModel;
+use autoxide_kernel::analytics::AnalyticsCatalog;
 use autoxide_kernel::antispam::AntispamConfig;
+use autoxide_kernel::automation::AutomationDirectory;
 use autoxide_kernel::bulk::BulkAction;
 use autoxide_kernel::config::Config;
 use autoxide_kernel::connections::ConnectionProbe;

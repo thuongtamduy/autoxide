@@ -4,7 +4,7 @@
 
 Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
 
-397 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+402 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
 
 ## Phạm vi và mục tiêu (12)
 
@@ -142,7 +142,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-336** Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
 
-## MCP, AI, agent dùng API (20)
+## MCP, AI, agent dùng API (21)
 
 - **D-020** "Phù hợp với AI agent" nghĩa là gì — 2026-11-11
 - **D-022** MCP endpoint nằm trong core — 2026-11-11 · **chủ dự án quyết**
@@ -164,6 +164,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-372** Lời thường thành bộ lọc ở kernel, `POST /api/v1/kernel/filters/parse`; khôi phục bài đã lưu trữ (bước 52 mục 2, 3) — 2026-11-18
 - **D-374** MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18
 - **[D-20261118-module-contracts](D-20261118-module-contracts.md)** OpenAPI và MCP theo từng module, trỏ từ `/llms.txt` — 2026-11-18
+- **[D-20261118-step58-automations](D-20261118-step58-automations.md)** Tự động hoá quy trình: luật, bộ chạy, duyệt, cảnh báo số liệu — 2026-11-18
 
 ## Xác thực, phân quyền, bảo mật (50)
 
@@ -218,7 +219,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-376** Giải thích quyền theo gói và "đang dùng ở đâu" (bước 51 P11, D-267) — 2026-11-18
 - **D-380** Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18
 
-## Đa khách, tổ chức, gói (37)
+## Đa khách, tổ chức, gói (38)
 
 - **D-210** Tách nhánh thành khách riêng, chuyển database: chỉ nhân sự nền tảng (H3) — 2026-11-14
 - **D-211** Khách tự thu hồi quyền vào hỗ trợ (H4) — 2026-11-14
@@ -256,6 +257,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-358** "Bán trước khi thông báo website" (A-3.5): nhãn "bắt buộc theo luật", không chặn — 2026-11-17
 - **D-370** Nhật ký request theo khách và nhật ký lệnh của agent (bước 52 mục 1, D-202) — 2026-11-18
 - **[D-20261118-step38-distribution](D-20261118-step38-distribution.md)** Phân phối cha → con và vào ngữ cảnh con xuyên database — 2026-11-18
+- **[D-20261118-step38-relocation](D-20261118-step38-relocation.md)** Tách / gộp khách: chính sách theo bảng, giữ khoá chính, audit ghi lại ở đích, chỉ nhân sự nền tảng chạy — 2026-11-18
 - **[D-20261118-step38-report-facts](D-20261118-step38-report-facts.md)** Báo cáo gộp: `Module::facts`, kho ở database của khách gốc, hai chặng cục bộ → gốc — 2026-11-18
 
 ## Hợp đồng cho giao diện (31)
@@ -292,7 +294,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-382** Trả nợ giao diện đợt 2: tổng số của danh sách và các chỗ thiếu trên module đã xong — 2026-11-18
 - **[D-20261118-ui-debt-batch-3](D-20261118-ui-debt-batch-3.md)** Trả nợ giao diện đợt 3: công cụ kế toán, tổng quan tuân thủ, hồ sơ định danh, sổ loại đối tượng — 2026-11-18
 
-## Module nội dung, file, liên lạc (89)
+## Module nội dung, file, liên lạc (90)
 
 - **D-027** Thông báo mặc định bằng tiếng Anh — 2026-11-11 · **chủ dự án quyết**
 - **D-060** Không dịch thông báo của từng trường ở máy chủ — 2026-11-11
@@ -383,6 +385,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-366** Mẫu thông báo khách tự soạn: nháp / xuất bản / quay lại, khung mail MJML (`mrml`), thương hiệu (bước 37, D-206) — 2026-11-17
 - **D-367** `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17
 - **D-368** Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17
+- **[D-20261118-step57-analytics](D-20261118-step57-analytics.md)** Phân tích truy cập không cookie: hợp đồng khai báo, khoá phiên, gộp, đồng ý — 2026-11-18
 
 ## Tiền, thuế, chứng từ (18)
 
@@ -419,7 +422,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-363** Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17
 - **D-364** Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17
 
-## Thương mại (10)
+## Thương mại (12)
 
 - **D-191** Module thương mại: sáu module, bước 41–46 — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-193*
 - **D-203** Nút "Đánh giá này hữu ích" cho đánh giá sản phẩm (bước 45) — 2026-11-13 · **chủ dự án quyết**
@@ -430,6 +433,8 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-225** Khuyến mại: thời hạn bắt buộc, thông báo theo nơi nhận, kiểm trước khi bật, "Lưu mã", nhắc flash sale — 2026-11-14
 - **D-226** Che số điện thoại, email của khách; cơ sở tính điểm thưởng — 2026-11-14
 - **D-236** Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 · **chủ dự án quyết**
+- **[D-20261118-step41-catalog-design](D-20261118-step41-catalog-design.md)** `catalog`: giá chỉ thêm, thứ tự chọn bảng giá, hợp đồng `api` cho bước 42–44 — 2026-11-18
+- **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
 
 ## Vận hành và hiệu năng (10)

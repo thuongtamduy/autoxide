@@ -66,6 +66,8 @@ pub(crate) struct KernelModule {
     move_setup: crate::tenancy::moves::MoveSetup,
     /// Service dời khách giữa các placement; có sau `start`.
     moves: Option<Arc<crate::tenancy::TenantMoves>>,
+    /// Tách / gộp khách (bước 38): cấu hình, service, route, job.
+    relocations: crate::tenancy::relocate::Wiring,
     /// Xuất dữ liệu khách (bước 35, D-328); có sau `start`.
     exports: Option<Arc<crate::tenancy::TenantExports>>,
     /// Migrate placement bằng API (D-334); có sau `start`.
@@ -112,6 +114,7 @@ impl KernelModule {
             domains: None,
             move_setup,
             moves: None,
+            relocations: Default::default(),
             exports: None,
             migration_runs: None,
             export_days: 30,
@@ -285,9 +288,15 @@ impl Module for KernelModule {
             ),
             // Chỉ mục tìm kiếm mặc định (bước 40 P7): cấp khách hàng, mọi database dữ liệu.
             Box::new(crate::search::database::CreateSearchDocs),
+            // Lượt tách / gộp khách (bước 38, mặt điều khiển).
+            Box::new(crate::tenancy::relocate::CreateRelocations),
             // Sổ các lượt backup theo lịch (bước 39, mặt điều khiển).
             Box::new(crate::backup::scheduled::CreateBackups),
         ]
+    }
+
+    fn relocation(&self) -> crate::tenancy::Relocation {
+        crate::tenancy::relocate::kernel_relocation()
     }
 
     fn control_plane_tables(&self) -> Vec<&'static str> {
@@ -300,6 +309,7 @@ impl Module for KernelModule {
             "kernel_tenant_moves",
             "kernel_tenant_exports",
             "kernel_migration_runs",
+            "kernel_relocations",
             "kernel_backups",
         ]
     }
@@ -327,6 +337,7 @@ impl Module for KernelModule {
             crate::config::parse_in_range(raw, 1u64, 100_000)
         });
         let stream_config = crate::event::stream::StreamConfig::read(reader);
+        let relocation_drain = crate::tenancy::relocate::Wiring::read(reader);
         let search_backend = reader.get_with(&crate::search::SEARCH_BACKEND, |raw| {
             let name = raw.trim();
             let valid = !name.is_empty()
@@ -357,6 +368,7 @@ impl Module for KernelModule {
         self.job_file_days = job_file_days?;
         self.stream_config = stream_config?;
         self.search_backend = search_backend?;
+        self.relocations.set(relocation_drain?);
         self.catalog.text_overrides().set_ui_max(ui_texts?);
         Ok(())
     }
@@ -371,6 +383,8 @@ impl Module for KernelModule {
             crate::tenancy::PLACEMENTS_READ,
             crate::tenancy::DOMAINS_MANAGE,
             crate::tenancy::TENANTS_MOVE,
+            crate::tenancy::TENANTS_RELOCATE,
+            crate::tenancy::RELOCATIONS_REQUEST,
             crate::tenancy::DATA_EXPORT,
             crate::tenancy::TENANTS_DELETE,
             crate::job::runs::JOBS_READ,
@@ -401,6 +415,9 @@ impl Module for KernelModule {
             crate::tenancy::domains::DOMAIN_FAILED,
             crate::tenancy::domains::DOMAIN_UPDATED,
             crate::tenancy::moves::TENANT_MOVED,
+            crate::tenancy::relocate::RELOCATION_STARTED,
+            crate::tenancy::relocate::RELOCATION_FINISHED,
+            crate::tenancy::relocate::RELOCATION_FAILED,
             crate::tenancy::erasure::TENANT_DELETED,
         ]
     }
@@ -558,6 +575,7 @@ impl Module for KernelModule {
         if let Some(runs) = &self.migration_runs {
             routes = routes.merge(crate::tenancy::migration_runs::routes(runs.clone()));
         }
+        routes = routes.merge(self.relocations.routes());
         routes
     }
 
@@ -672,6 +690,7 @@ impl Module for KernelModule {
                 Arc::new(crate::tenancy::migration_runs::MigrateRunner(runs.clone())),
             ));
         }
+        jobs.extend(self.relocations.jobs());
         if let Some(backups) = &self.backups {
             jobs.push(
                 crate::job::JobRegistration::new(
@@ -791,6 +810,13 @@ impl Module for KernelModule {
         ));
         self.moves = Some(moves.clone());
         context.provide::<crate::tenancy::TenantMoves>(moves)?;
+        self.relocations.start(
+            context,
+            self.move_setup.clone(),
+            key.clone(),
+            self.seeds.clone(),
+            self.request_timeout,
+        )?;
         let exports = Arc::new(crate::tenancy::TenantExports::new(
             context.tenancy().clone(),
             self.move_setup.clone(),

@@ -70,14 +70,26 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Bình luận: cần `dyn Mailer` (sau `mail`), kiểm đích qua sổ đối tượng của kernel và nghe
         // event lưu trữ / xoá của `content` (sau `content`).
         Box::new(autoxide_comments::module()),
+        Box::new(autoxide_support::module()),
+        // Phân tích truy cập (bước 57): đọc sổ đồng ý `dyn ConsentLedger` của `compliance` (sau
+        // `compliance`); loại sự kiện và phễu của mọi module đọc từ kernel, nên module đăng ký sau
+        // vẫn khai được.
+        Box::new(autoxide_analytics::module()),
         // Menu của website (D-238): cần `dyn Media` (ảnh của ô gợi ý) và đọc menu cũ của
         // `content` để nhập sang, nên đứng sau cả hai. Đối tượng đích tra qua sổ đối tượng của
         // kernel, nên module đăng ký sau vẫn được menu trỏ tới.
         Box::new(autoxide_menus::module()),
+        // Sản phẩm (bước 41): cần `dyn Media` (ảnh sản phẩm) và `dyn TaxEngine` (luật giá bán cho
+        // người tiêu dùng), nên đứng sau `media` và `tax`; đứng sau `comments` để hỏi đáp sản phẩm
+        // (D-202). Module thương mại sau (`inventory`, `promotions`, `shipping`…) đăng ký SAU nó.
+        Box::new(autoxide_catalog::module()),
         // Báo cáo gộp của cây khách hàng (bước 38): nghe event mà mọi module khai số liệu
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.
         Box::new(autoxide_reporting::module()),
+        // Tự động hoá quy trình (bước 58): nghe event của mọi module và gọi tool MCP của mọi module
+        // qua sổ tool của kernel, nên đứng CUỐI CÙNG (sau cả `reporting`).
+        Box::new(autoxide_automations::module()),
     ]
 }
 
@@ -223,10 +235,12 @@ mod tests {
             // `compliance` (hết hạn định danh, nhắc hạn sự cố 72 giờ, dọn bằng chứng đồng ý cookie, nhắc vụ việc quá
             // hạn — D-360, D-361, D-363;
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
-            // của `notifications` (dọn nhật ký gửi), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
+            // của `notifications` (dọn nhật ký gửi), một của `bookings` (trả chỗ giữ tạm quá hạn), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
-            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 41);
+            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `analytics` (gộp mỗi giờ,
+            // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58))
+            // đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 46);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

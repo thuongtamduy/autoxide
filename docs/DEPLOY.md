@@ -628,6 +628,56 @@ one country (set by platform staff with `PUT /api/v1/compliance/residency`) cann
 in another country or of unknown country: the move answers `tenant_residency_violation`. See
 [COMPLIANCE.md](COMPLIANCE.md#data-residency).
 
+## Splitting a branch into its own tenant, and merging tenants
+
+A tenant's organization tree can outgrow it: a region becomes a company of its own, or a shop that
+had its own tenant joins a chain. Platform staff split a branch into a new tenant on another
+database, or merge a tenant into another one under one of its units. Every row keeps its id, so
+splitting and merging back gives the original data again.
+
+```bash
+# Split unit <north> of `acme` into the tenant `acme-north` on placement `acme-north-db`.
+autoxide tenant split acme --org <north> --slug acme-north --name "Acme North" \
+  --placement acme-north-db --reason "Contract 2026-11: the region becomes its own company" --dry-run
+# Merge `acme-north` back into `acme` under unit <root-or-other-unit>.
+autoxide tenant merge acme-north --into acme --under-org <unit> --reason "…" --dry-run
+```
+
+- **Dry run first.** It lists, for every table, the rows that move, are copied, stay, or must run
+  first (queued events and due jobs), what blocks (a tenant that is not active, another split, merge
+  or move in progress, migrations missing, a target that is the same database), and the
+  **conflicts**: rows that point across the boundary (a row that goes refers to a row that stays,
+  or the other way) and unique values the receiving tenant already has (two pages with the same
+  slug). Fix them, then run the same command without `--dry-run`.
+- **Two databases.** The target placement must be another database than the source tenant's. To
+  split into the shared database, or to merge two tenants of the same database, move one of them
+  first (`autoxide tenant move`).
+- **What happens.** The tenant (both tenants when merging) answers `503 tenant_maintenance`; its
+  queued events and due jobs run first (`AUTOXIDE_RELOCATION_DRAIN_SECONDS`, default 300). Then the
+  rows are copied in one transaction on the target, keeping their ids; the new tenant gets the id
+  of the branch's root unit, which becomes its root. Rows are checked, the tenants switch in one
+  transaction (domains attached to units of the branch go with it; a merged tenant becomes
+  `merged`), and the rows that left are deleted from the source. Files of what moved are copied
+  under the new tenant's prefix. The audit log of what moved is written again into the target's
+  hash chain; the source keeps its own chain untouched. Ledger books move with their unit, and their
+  seal chain still verifies. The report store of the tree follows (`reporting.rehome`).
+- **What stays.** Each module declares how its tables move (`Module::relocation`): personal data of
+  the tenant (subscribers, consents, identity checks, comments) stays with the source when
+  splitting and moves when merging; staff accounts with a role in the branch are copied (they sign in
+  again); roles and similar settings are copied; subscriptions, sessions and counters stay.
+- **Legal basis.** Moving data between two tenants can transfer personal data between two
+  controllers; `--reason` is required and kept with the run and in the audit log.
+- **Resume.** If it stops half-way, run `autoxide tenant split --resume <id>` (or `merge`); every
+  step can run again. `autoxide tenant relocation-status <id>` shows the state and the error.
+
+Over the API, platform staff with `kernel.tenants.relocate` call `POST /api/v1/kernel/relocations`
+(`{"kind": "split", "tenant": "acme", "org_id": "…", "slug": "…", "name": "…", "placement": "…",
+"reason": "…"}`): that is a dry run; add `"dry_run": false` to run it as a background job and follow
+it at `GET /api/v1/kernel/relocations/{id}`. A tenant cannot split or merge itself: its
+administrators (`kernel.relocations.request`) send a request with
+`POST /api/v1/kernel/tenant/relocation-requests`, which lands in the work inbox of the platform staff,
+who run it with `"request_id"`.
+
 ## Personal data breaches
 
 When personal data may have leaked (a stolen backup, an exposed database, a wrong mail sent), the report

@@ -115,6 +115,17 @@ impl SummaryMetrics {
     fn all(&self) -> Vec<Entry> {
         self.entries.read().unwrap_or_else(PoisonError::into_inner).clone()
     }
+
+    /// Số liệu `id` (`<module>.<số liệu>`), nếu có module khai — cho module đọc số liệu của module
+    /// khác qua hợp đồng chung (vd cảnh báo bất thường của `automations`, bước 58).
+    pub fn find(&self, id: &str) -> Option<Arc<dyn SummaryMetric>> {
+        self.all().into_iter().map(|(_, metric)| metric).find(|metric| metric.info().id == id)
+    }
+
+    /// Phần khai của mọi số liệu, theo thứ tự đăng ký.
+    pub fn infos(&self) -> Vec<MetricInfo> {
+        self.all().iter().map(|(_, metric)| metric.info()).collect()
+    }
 }
 
 /// A figure for a dashboard.

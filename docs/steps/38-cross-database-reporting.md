@@ -262,9 +262,10 @@ của con nằm ở database của gốc).
 **Kernel `tenancy::relocate`** — mặt điều khiển: `kernel_relocations` (`id`, `kind` `split`/`merge`,
 `source_tenant_id`, `target_tenant_id`, `org_id` (gốc nhánh tách / nút nhận khi gộp), `placement`
 (`shared`/`dedicated` + database), `state` (`planned` → `frozen` → `copied` → `verified` → `switched` →
-`cleaned` → `done`; hoặc `failed`), `plan` (JSON: bảng, số dòng, cảnh báo, xung đột), `error`, `created_by`,
-`created_at`, `updated_at`). Khách hàng có thêm trạng thái `merged` + `merged_into` (cột mới trên
-`kernel_tenants` — migration mới, không sửa migration của bước 33).
+`cleaned` → `done`; hoặc `failed`; `requested` cho yêu cầu của khách), `plan` (JSON: bảng, số dòng, cảnh báo, xung
+đột), `options` (slug, tên, lý do, khách gốc trước / sau), `error`, `runner`, `created_by`, `created_at`, `updated_at`)
+— migration kernel `m0035_create_relocations`. Khách hàng có thêm trạng thái `merged` (không thêm cột `merged_into`:
+khách nhận đọc từ lượt gộp — D-20261118-step38-relocation).
 
 **Kernel `tenancy::sandbox`** (D-232):
 
@@ -337,6 +338,10 @@ của con nằm ở database của gốc).
   `TestApp::builder(…).module(…)`); `catalog` (41) dùng thật.
 
 ### Luồng 3 — tách và gộp
+
+Nguồn và đích luôn là **hai database khác nhau** (`tenancy.relocation_same_database`): muốn tách vào database chung
+hay gộp hai khách cùng database thì dời một khách trước bằng `autoxide tenant move` (D-20261118-step38-relocation). Khách
+mới có ID = ID nút gốc N.
 
 **Tách** nhánh gốc N của khách T thành khách T' (`autoxide tenant split --tenant T --org N --name … --placement
 dedicated|shared [--database-url …] [--dry-run]`):
@@ -484,8 +489,10 @@ Phân phối không có route chung ở kernel: module dùng nó tự mở `POST
 
 Tách / gộp: CLI (`autoxide tenant split|merge|relocation-status`) là cách chính cho người vận hành. Mặt điều
 khiển thêm `POST /api/v1/kernel/relocations` (`dry_run` mặc định `true`) và `GET /api/v1/kernel/relocations/{id}`
-— chỉ nhân sự nền tảng (`kernel.platform.manage`, D-210), chạy bằng job, tiến độ qua job API chung (D-213).
-Khách không tự tách / gộp: khách chỉ gửi yêu cầu, yêu cầu vào hộp việc của nhân sự nền tảng (D-210).
+— chỉ nhân sự nền tảng (`kernel.tenants.relocate` + tài khoản khách nền tảng, D-210, D-20261118-step38-relocation),
+chạy bằng job `kernel.relocate`. Khách không tự tách / gộp: khách chỉ gửi yêu cầu
+(`POST /api/v1/kernel/tenant/relocation-requests`, `GET …/{id}`, permission `kernel.relocations.request`), yêu cầu vào
+hộp việc của nhân sự nền tảng (nguồn việc `kernel.relocation_requests`), nhân sự chạy nó bằng `request_id`.
 
 **`/api/v1/kernel`** — sandbox (D-232):
 
@@ -524,8 +531,9 @@ không có tool xoá sandbox (chỉ REST có người). `organizations.list_grou
 
 ### Event
 
-`reporting` không phát event nghiệp vụ. Kernel: `tenancy.relocation_started`, `tenancy.relocation_finished`,
-`tenancy.relocation_failed` (ghi ở mặt điều khiển, vào audit), `tenancy.delegated_access` (nếu bước 34 chưa có).
+`reporting` không phát event nghiệp vụ. Kernel: `kernel.relocation_started`, `kernel.relocation_failed` (ghi ở khách
+nguồn), `kernel.relocation_finished` (ghi ở khách nhận, kèm khách gốc trước / sau — `reporting` nghe để dời kho), vào
+audit (D-20261118-step38-relocation), `tenancy.delegated_access` (nếu bước 34 chưa có).
 
 D-232: kernel `kernel.sandbox_created`, `kernel.sandbox_extended`, `kernel.sandbox_deleted` (ghi ở khách gốc;
 payload: id sandbox, hạn — `auth` nghe `created` / `deleted` để tạo / thu hồi uỷ quyền), `kernel.sandbox_promoted`
@@ -535,7 +543,7 @@ payload: id sandbox, hạn — `auth` nghe `created` / `deleted` để tạo / t
 ### Job / lịch
 
 `reporting.forward` (lịch, `AUTOXIDE_REPORTING_FORWARD_SECONDS`), `reporting.prune_local` (24 giờ),
-`reporting.rehome` (job, khi `kernel_relocations` hay đổi khách cha); `<module>.distribute` (job của module
+`reporting.rehome` (job, khi nghe `kernel.relocation_finished`); `<module>.distribute` (job của module
 dùng `Distributor`, `unique_key` theo đích). Mọi bộ chạy chịu được chạy lại.
 
 D-232: `kernel.sandbox_copy` (job, `unique_key = "sandbox_copy:{sandbox}"`, chạy lại tiếp từ module / con trỏ
@@ -579,6 +587,7 @@ D-232: `kernel.sandboxes.read`, `kernel.sandboxes.manage` (chỉ cấp ở độ
 | `tenancy.distribution_target_invalid` (kernel) | 422 | Khách `{tenant}` không phải khách con của khách gửi. |
 | `tenancy.relocation_conflict` (kernel) | 409 | Không tách / gộp được: {count} xung đột, xem báo cáo của lần chạy `{id}`. |
 | `tenancy.relocation_in_progress` (kernel) | 409 | Khách này đang có một lần tách / gộp chưa xong (`{id}`). Chạy tiếp bằng `--resume` hoặc chờ nó xong. |
+| `tenancy.relocation_not_found`, `…_org_invalid`, `…_same_database`, `…_tenant_exists`, `…_not_active`, `…_platform`, `…_cycle`, `…_schema_differs`, `…_drain_timeout`, `…_count_mismatch` (kernel, D-20261118-step38-relocation) | 404 / 409 | Xem `crates/kernel/locales/vi.json`. |
 | `tenancy.sandbox_not_found` (kernel, D-232) | 404 | Không có bản thử `{id}` của khách hàng này. |
 | `tenancy.sandbox_nested` (kernel, D-232) | 422 | Không tạo được bản thử từ một bản thử; tạo từ khách hàng thật. |
 | `tenancy.sandbox_forbidden` (kernel, D-232) | 403 | Bản thử không làm được việc `{action}`; làm việc này ở khách hàng thật. |

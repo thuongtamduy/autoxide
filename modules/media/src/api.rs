@@ -79,4 +79,15 @@ pub trait Media: Send + Sync {
     async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<MediaRef>, Error> {
         Ok(self.find_many(tenant, &[id]).await?.into_iter().next())
     }
+
+    /// Người tải lên của các item có ID trong `ids` và không trong thùng rác (`None`: hệ thống tải
+    /// lên); ID không có thì không có mặt. Để module khác kiểm tệp đính kèm thuộc người gửi (vd
+    /// phiếu hỗ trợ, D-202). Bộ cài đặt cũ không biết người tải lên: mọi item là `None`.
+    async fn uploaders(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<Vec<(Uuid, Option<Uuid>)>, Error> {
+        Ok(self.find_many(tenant, ids).await?.into_iter().map(|item| (item.id, None)).collect())
+    }
 }

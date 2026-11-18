@@ -18,18 +18,18 @@ mod security;
 mod values;
 
 pub use contracts::{
-    ai, einvoice, identity, mail, moderation, payment, privacy, push, report, resource, sms,
-    storage, zns,
+    ai, analytics, einvoice, identity, mail, moderation, payment, privacy, push, report, resource,
+    sms, storage, zns,
 };
 pub use data::{
     backup, database, migration, numbering, pagination, reference, rows, search, tenancy, transfer,
     upload, version,
 };
-pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use ops::{
-    bulk, connections, custom_fields, doctor, find, list_exports, logging, metrics, reasons,
-    resolve, setup, summary, tags, task, telemetry, texts, usages, work,
+    automation, bulk, connections, custom_fields, doctor, find, list_exports, logging, metrics,
+    reasons, resolve, setup, summary, tags, task, telemetry, texts, usages, work,
 };
+pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use security::{
     access, antispam, entitlement, idempotency, ip_hash, net, secret, throttle, tls, tokens,
 };

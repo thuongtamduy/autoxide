@@ -3,6 +3,7 @@
 
 pub(crate) mod alerts;
 pub(crate) mod approvals;
+pub mod automation;
 pub(crate) mod builtin;
 pub mod bulk;
 pub(crate) mod can;

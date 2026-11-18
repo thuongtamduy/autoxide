@@ -190,7 +190,7 @@ pub(crate) fn host_of_url(url: &str) -> Option<String> {
     normalize_domain(host)
 }
 
-mod entity {
+pub(super) mod entity {
     //! Bảng `kernel_tenant_domains` (mặt điều khiển).
     use sea_orm::entity::prelude::*;
 

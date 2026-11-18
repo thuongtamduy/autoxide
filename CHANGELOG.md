@@ -11,6 +11,41 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
+  `POST /api/v1/analytics/public/events` (up to 20, unknown or malformed ones dropped, bots and foreign pages
+  dropped, `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` per network block); anonymous sessions use a random key per day
+  that is deleted once the day is over, and neither addresses nor user agents are stored. Modules declare event
+  types (`Module::analytics_events`, from the browser or taken from their own events) and funnels
+  (`Module::funnels`). An hourly job adds events up per day; reports read only those totals: `/overview`, `/pages`,
+  `/sources`, `/campaigns`, `/objects`, `/types`, `/funnels/{key}`, per website (organization unit) with
+  `analytics.read`. Events are linked to a signed-in user only with consent `analytics.personal`; withdrawing
+  unlinks them. MCP tools `analytics.overview`, `analytics.top_pages`, `analytics.top_objects`, `analytics.funnel`
+  (read only); summary metric `analytics.visitors`; settings `AUTOXIDE_ANALYTICS_*`. Guide: `docs/ANALYTICS.md`.
+- Module `catalog` (step 41, first part; `docs/CATALOG.md`): products with variants, options, SKU and barcode
+  unique per tenant, sale modes (in stock, backorder, pre-order), bundles, images from `media`; a category tree;
+  price lists per store, chain and customer group with append-only price history, scheduled and temporary prices,
+  price floors; `autoxide_catalog::api::Catalog` for inventory, promotions, shipping and orders; MCP tools
+  `catalog.*`.
+- New module `support` (step 53): customer support tickets. Customers open tickets from the website (signed in, or
+  as guests with an email or phone number confirmed by a one-time code; guests keep a ticket token), staff open
+  tickets for customers, other modules through `SupportIntake`. Messages are only added (hidden with a reason, never
+  edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
+  machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
+  tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
+- New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
+  schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
+  (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
+  are a fixed tree of operators; actions are existing MCP tools (arguments filled from the trigger with templates)
+  plus `wait`, `stop_if` and `notify`. Rules run in jobs with the current permissions of their owner, once per
+  trigger, with an `Idempotency-Key` per step; risky steps wait for a person's approval; rules made by AI agents wait
+  until a person enables them; loops and too many runs pause the rule. REST under `/api/v1/automations` (rules,
+  runs, dry runs, catalog, templates), MCP tools `automations.list_rules`, `get_rule`, `test_rule`, `create_rule`,
+  `update_rule`; permissions `automations.read`, `automations.manage`, `automations.run`; settings
+  `AUTOXIDE_AUTOMATIONS_RUN_RETENTION_DAYS`, `AUTOXIDE_AUTOMATIONS_MAX_RUNS_PER_HOUR`,
+  `AUTOXIDE_AUTOMATIONS_TICK_SECONDS`. Guide: `docs/guides/automations.md`.
+- Kernel: `automation::AutomationDirectory` (every module's MCP tools, called with the same checks as `/mcp`),
+  `Module::automation_templates`, `AccessPath::Automation` (changes made by a rule's run carry it in the audit log),
+  `StartContext::summary_metrics()`.
 - Scheduled backups (step 39): every `AUTOXIDE_BACKUP_INTERVAL_HOURS` (default 24, `0` off) a background process backs up
   each database into the file storage under `kernel/backups/<database>/<id>/`, keeping the newest
   `AUTOXIDE_BACKUP_KEEP` (default 7); files are copied too only with `AUTOXIDE_BACKUP_INCLUDE_FILES=true`. Runs are
@@ -19,6 +54,12 @@ endpoints are marked deprecated with a sunset date first.
 - Module `bookings` (step 60): bookable services (duration, buffers, capacity, deposit), staff, rooms and
   equipment with weekly schedules in the unit's time zone, time off and extra hours, and public free times
   (`GET /api/v1/bookings/public/availability`, cached 15 seconds). Guide: `docs/BOOKINGS.md`.
+- Bookings that never overlap (step 60): customers book at `POST /api/v1/bookings/public/bookings`, the shop at
+  `POST /api/v1/bookings/bookings`; a unique key on 5-minute cells stops double booking on SQLite and PostgreSQL, a
+  conditional update keeps classes within capacity (`bookings.slot_taken`, `bookings.capacity_full`). Deposits hold
+  the booking while the customer pays through `ledger`; unpaid holds are released. Confirm, check in, complete,
+  no-show, cancel and reschedule follow the unit's policy, with refunds through the payment partner. New permission
+  `bookings.read`.
 - Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and
@@ -46,6 +87,16 @@ endpoints are marked deprecated with a sunset date first.
   `reporting.read` (scoped) and `reporting.manage`. `ledger.entry_posted` / `ledger.entry_reversed` carry `lines`.
 - Kernel: `tenancy::distribution` lets a module send records from a parent tenant to its child tenants (also on
   other databases) through a job that can run again without making copies.
+- Split a branch of a tenant into a tenant of its own on another database, and merge tenants back, keeping every id
+  and the history (step 38): `autoxide tenant split|merge|relocation-status` (`--dry-run`, `--resume`), and for
+  platform staff `POST /api/v1/kernel/relocations` (dry run by default, runs as a job) and
+  `GET /api/v1/kernel/relocations/{id}` (permission `kernel.tenants.relocate`). Tenants send a request with
+  `POST /api/v1/kernel/tenant/relocation-requests` (permission `kernel.relocations.request`); it lands in the work
+  inbox of the platform staff. Modules declare how their tables move (`Module::relocation`); the plan lists rows,
+  references across the boundary and unique conflicts before anything changes. The audit log of what moves is
+  written again into the target's hash chain; the report store follows (`reporting.rehome`). New setting
+  `AUTOXIDE_RELOCATION_DRAIN_SECONDS`; new tenant status `merged`; events `kernel.relocation_started`,
+  `kernel.relocation_finished`, `kernel.relocation_failed`.
 - `autoxide doctor` warns when `AUTOXIDE_AUTH_TOKEN_SECRET` is not set (check `auth.token_secret`), as the
   deployment guide already said; the README's installation steps now include importing the reference data
   (`autoxide task address.import`, `autoxide task tax.import_pack`).
