@@ -489,6 +489,96 @@ export type BodyNode = {
   type: string;
 };
 
+/** Free times of a service, with what the customer must know before booking. */
+export type BookingAvailability = {
+  openings: BookingOpening[];
+  service_id: string;
+  terms: PublicBookingTerms;
+  /** IANA time zone of the unit, e.g. `Asia/Ho_Chi_Minh`. */
+  timezone: string;
+};
+
+/** How much deposit a booking asks for, paid through the shop's payment partner. */
+export type BookingDeposit = {
+  /** `none`, `percent` (of the price) or `amount` (fixed, in the price's currency). */
+  kind: string;
+  /** Percent 1–100, or the amount in minor units; `0` for `none`. */
+  value?: number;
+};
+
+/** Time off or extra working hours. */
+export type BookingException = {
+  created_at: string;
+  ends_at: string;
+  id: string;
+  kind: string;
+  reason: string;
+  resource_id: string;
+  starts_at: string;
+};
+
+/** A free time. */
+export type BookingOpening = {
+  ends_at: string;
+  /** `starts_at` in the local time of the unit, with its offset, e.g. `2026-11-23T09:00:00+07:00`. */
+  local_start: string;
+  /** The staff member (or court, room…) free at this time. */
+  resource_id: string;
+  /** Places left (always 1 for one-to-one services). */
+  seats_left: number;
+  starts_at: string;
+};
+
+/** A staff member, room or equipment. */
+export type BookingResource = {
+  active: boolean;
+  created_at: string;
+  id: string;
+  kind: string;
+  name: string;
+  org_id: string;
+  updated_at: string;
+  user_id?: string | null;
+};
+
+/** The weekly schedule of a resource. */
+export type BookingSchedule = {
+  ranges: BookingWeeklyRange[];
+  resource_id: string;
+};
+
+/** A bookable service. */
+export type BookingService = {
+  active: boolean;
+  buffer_after_minutes: number;
+  buffer_before_minutes: number;
+  capacity: number;
+  created_at: string;
+  deposit: BookingDeposit;
+  description: string;
+  duration_minutes: number;
+  id: string;
+  name: string;
+  names: {
+    [key: string]: string;
+  };
+  org_id: string;
+  performers: string[];
+  price: Money;
+  required: string[];
+  updated_at: string;
+};
+
+/** A weekly working range, in the local time of the unit (setting `organizations.timezone`). */
+export type BookingWeeklyRange = {
+  /** Minutes after local midnight, up to 1440: 1020 is 17:00. */
+  end_minute: number;
+  /** Minutes after local midnight, in steps of 5: 540 is 09:00. */
+  start_minute: number;
+  /** 1 (Monday) to 7 (Sunday). */
+  weekday: number;
+};
+
 /** Kind of a bounce report. */
 export type BounceKind = "hard" | "soft" | "complaint";
 
@@ -2546,6 +2636,67 @@ export type CreateApiKeyRequest = {
   totp_code?: string | null;
 };
 
+/** Time off or extra working hours of a resource. */
+export type CreateBookingExceptionRequest = {
+  /** After `starts_at`, at most 366 days later. */
+  ends_at: string;
+  /** `closed` (time off, a holiday) or `open` (an extra shift). */
+  kind: string;
+  /** Up to 200 characters, e.g. "Lunar New Year holiday". */
+  reason?: string;
+  resource_id: string;
+  starts_at: string;
+};
+
+/** A new staff member, room or equipment. */
+export type CreateBookingResourceRequest = {
+  /**
+   * `staff`, `room` or `equipment`. Staff need a weekly schedule to be bookable; rooms and
+   * equipment without one are always open.
+   */
+  kind: string;
+  /** 1 to 200 characters, shown to customers. */
+  name: string;
+  /** The unit it belongs to; you need `bookings.services.manage` there. */
+  org_id?: string | null;
+  /**
+   * Staff only: the user account of this person, so they see their own appointments with
+   * `bookings.staff`.
+   */
+  user_id?: string | null;
+};
+
+/** A new bookable service. */
+export type CreateBookingServiceRequest = {
+  /** Time the resource needs after (cleaning), 0 to 240 in steps of 5. */
+  buffer_after_minutes?: number;
+  /** Time the resource needs before the customer arrives (setup), 0 to 240 in steps of 5. */
+  buffer_before_minutes?: number;
+  /** People per time slot: 1 for a haircut, more for a class. Default 1. */
+  capacity?: number;
+  deposit?: BookingDeposit | null;
+  /** Up to 2000 characters. Never put health information here. */
+  description?: string;
+  /** 5 to 1440, in steps of 5. */
+  duration_minutes: number;
+  /** 1 to 200 characters. */
+  name: string;
+  /** The name in other languages, e.g. `{"fr": "Coupe"}`. */
+  names?: {
+    [key: string]: string;
+  };
+  /**
+   * The unit that offers it; you need `bookings.services.manage` there. Omitted: your only unit,
+   * or the tenant's root.
+   */
+  org_id?: string | null;
+  /** Staff (or courts, rooms…) that can give the service; one of them is booked. */
+  performers: string[];
+  price: Money;
+  /** Rooms or equipment every booking also needs. */
+  required?: string[];
+};
+
 /** A new draft campaign. */
 export type CreateCampaignRequest = {
   /** Omitted: `false`. */
@@ -3123,6 +3274,81 @@ export type Data_BillingProfileResponse = {
     updated_at: string;
     /** User who last changed it. */
     updated_by?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingAvailability = {
+  /** Free times of a service, with what the customer must know before booking. */
+  data: {
+    openings: BookingOpening[];
+    service_id: string;
+    terms: PublicBookingTerms;
+    /** IANA time zone of the unit, e.g. `Asia/Ho_Chi_Minh`. */
+    timezone: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingException = {
+  /** Time off or extra working hours. */
+  data: {
+    created_at: string;
+    ends_at: string;
+    id: string;
+    kind: string;
+    reason: string;
+    resource_id: string;
+    starts_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingResource = {
+  /** A staff member, room or equipment. */
+  data: {
+    active: boolean;
+    created_at: string;
+    id: string;
+    kind: string;
+    name: string;
+    org_id: string;
+    updated_at: string;
+    user_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingSchedule = {
+  /** The weekly schedule of a resource. */
+  data: {
+    ranges: BookingWeeklyRange[];
+    resource_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingService = {
+  /** A bookable service. */
+  data: {
+    active: boolean;
+    buffer_after_minutes: number;
+    buffer_before_minutes: number;
+    capacity: number;
+    created_at: string;
+    deposit: BookingDeposit;
+    description: string;
+    duration_minutes: number;
+    id: string;
+    name: string;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    performers: string[];
+    price: Money;
+    required: string[];
+    updated_at: string;
   };
 };
 
@@ -7751,6 +7977,19 @@ export type Data_Vec_BillingPeriodResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_BookingException = {
+  data: {
+    created_at: string;
+    ends_at: string;
+    id: string;
+    kind: string;
+    reason: string;
+    resource_id: string;
+    starts_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CanAnswer = {
   data: {
     allowed: boolean;
@@ -8563,6 +8802,24 @@ export type Data_Vec_ProviderResponse = {
     scopes: string;
     slug: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PublicBookingService = {
+  data: {
+    capacity: number;
+    description: string;
+    duration_minutes: number;
+    id: string;
+    name: string;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    /** Staff (or courts, rooms…) that can give it; give one as `resource_id` to book that one. */
+    performers: string[];
+    price: Money;
   }[];
 };
 
@@ -12593,6 +12850,48 @@ export type Page_AuthorResponse = {
 };
 
 /** One page of a list. */
+export type Page_BookingResource = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    created_at: string;
+    id: string;
+    kind: string;
+    name: string;
+    org_id: string;
+    updated_at: string;
+    user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BookingService = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    buffer_after_minutes: number;
+    buffer_before_minutes: number;
+    capacity: number;
+    created_at: string;
+    deposit: BookingDeposit;
+    description: string;
+    duration_minutes: number;
+    id: string;
+    name: string;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    performers: string[];
+    price: Money;
+    required: string[];
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CampaignResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -15632,6 +15931,36 @@ export type PublicAuthorPage = {
   website_url: string;
 };
 
+/** A service customers can book. */
+export type PublicBookingService = {
+  capacity: number;
+  description: string;
+  duration_minutes: number;
+  id: string;
+  name: string;
+  names: {
+    [key: string]: string;
+  };
+  org_id: string;
+  /** Staff (or courts, rooms…) that can give it; give one as `resource_id` to book that one. */
+  performers: string[];
+  price: Money;
+};
+
+/** The deposit a booking of this service asks for, and what happens to it. */
+export type PublicBookingTerms = {
+  /** Deposit paid when booking, through the shop's licensed payment partner; zero: none. */
+  deposit: Money;
+  /** Cancel at least this many hours before the start to get the whole deposit back. */
+  free_cancel_hours: number;
+  /** Percent of the deposit kept on a later cancellation. */
+  late_cancel_retain_percent: number;
+  /** Percent of the deposit kept when the customer does not come. */
+  no_show_retain_percent: number;
+  /** Bookings without a deposit wait for the shop to confirm them. */
+  requires_approval: boolean;
+};
+
 /** A comment, as shown to everyone. */
 export type PublicComment = {
   author: CommentAuthor;
@@ -16308,6 +16637,12 @@ export type ReleaseSection = {
 export type RenameTagRequest = {
   /** 1 to 50 characters, without `,`; unique, ignoring case. */
   name: string;
+};
+
+/** The whole weekly schedule of a resource. */
+export type ReplaceBookingScheduleRequest = {
+  /** At most 70 ranges; ranges of the same day must not overlap. Empty: never available (staff). */
+  ranges: BookingWeeklyRange[];
 };
 
 /** The whole item tree of a menu. */
@@ -18025,6 +18360,34 @@ export type UnsubscribeRequest = {
 export type UnsubscribeResponse = {
   /** Always `true`. */
   unsubscribed: boolean;
+};
+
+/** Changes to a resource. */
+export type UpdateBookingResourceRequest = {
+  /** `false`: not offered for new bookings. */
+  active?: boolean | null;
+  name?: string | null;
+  /** Staff only; `null` unlinks the account. */
+  user_id?: string | null;
+};
+
+/** Changes to a service; omitted fields stay as they are. */
+export type UpdateBookingServiceRequest = {
+  /** `false` stops new bookings; existing bookings stay. */
+  active?: boolean | null;
+  buffer_after_minutes?: number | null;
+  buffer_before_minutes?: number | null;
+  capacity?: number | null;
+  deposit?: BookingDeposit | null;
+  description?: string | null;
+  duration_minutes?: number | null;
+  name?: string | null;
+  names?: {
+    [key: string]: string;
+  } | null;
+  performers?: string[] | null;
+  price?: Money | null;
+  required?: string[] | null;
 };
 
 /** Changes to a draft or scheduled campaign. Omitted fields stay as they are. */
@@ -19805,6 +20168,197 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/exceptions": {
+    /** List time off and extra hours of a resource. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { resource_id: string; from?: string; to?: string }; };
+      responses: {
+        200: Data_Vec_BookingException;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Add time off or extra hours. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBookingExceptionRequest;
+      responses: {
+        201: Data_BookingException;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/exceptions/{id}": {
+    /** Remove time off or extra hours. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/availability": {
+    /** Find free times (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { service_id: string; org_id?: string; resource_id?: string; from: string; to: string }; };
+      responses: {
+        200: Data_BookingAvailability;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/services": {
+    /** List bookable services (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string }; };
+      responses: {
+        200: Data_Vec_PublicBookingService;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/resources": {
+    /** List staff, rooms and equipment. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingResource;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a staff member, room or equipment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBookingResourceRequest;
+      responses: {
+        201: Data_BookingResource;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/resources/{id}": {
+    /** Get a staff member, room or equipment. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingResource;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a staff member, room or equipment. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateBookingResourceRequest;
+      responses: {
+        200: Data_BookingResource;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/resources/{id}/schedule": {
+    /** Get the weekly schedule of a resource. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingSchedule;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the weekly schedule of a resource. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ReplaceBookingScheduleRequest;
+      responses: {
+        200: Data_BookingSchedule;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/services": {
+    /** List bookable services. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingService;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a bookable service. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBookingServiceRequest;
+      responses: {
+        201: Data_BookingService;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/services/{id}": {
+    /** Get a bookable service. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingService;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a bookable service. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateBookingServiceRequest;
+      responses: {
+        200: Data_BookingService;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

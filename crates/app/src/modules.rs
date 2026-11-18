@@ -48,6 +48,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // đứng trước); `plans` (thông báo thuê bao tới quản trị khách) và module sau khai loại thông
         // báo và gửi qua `dyn Notifier`.
         Box::new(autoxide_notifications::module()),
+        // Đặt lịch dịch vụ (bước 60): múi giờ và chính sách theo nút qua `dyn OrgDirectory`, cọc qua
+        // `dyn Ledger`, nhắc lịch qua `dyn Notifier` — đều đứng trước; không module nào cần nó.
+        Box::new(autoxide_bookings::module()),
         // Gói, thuê bao, quyền dùng (bước 35): sau mọi module nền nó cần — `invoices` (hoá đơn thuê
         // bao), `ledger` (thu tiền) — và (bước 37) `compliance`. Module đăng ký trước vẫn hỏi quyền
         // dùng được qua tay cầm của kernel, gắn sau khi mọi module khởi động (D-323).
