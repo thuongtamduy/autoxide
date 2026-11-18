@@ -1,5 +1,6 @@
 //! Entity SeaORM của module `bookings`: mỗi bảng một file.
 
+pub(crate) mod booking;
 pub(crate) mod exception;
 pub(crate) mod resource;
 pub(crate) mod schedule;

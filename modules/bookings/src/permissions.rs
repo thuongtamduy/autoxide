@@ -11,6 +11,11 @@ pub(crate) const BOOKINGS_MANAGE: Permission = Permission::new(
 )
 .scoped();
 
+/// Chỉ xem mọi lịch đặt của nút (lễ tân, báo cáo).
+pub(crate) const BOOKINGS_READ: Permission =
+    Permission::new("bookings.read", "See every booking of the unit, without changing them.")
+        .scoped();
+
 /// Nhân viên: xem lịch của chính mình (tài nguyên gắn với tài khoản), check-in, xong, vắng mặt.
 pub(crate) const BOOKINGS_STAFF: Permission = Permission::new(
     "bookings.staff",
@@ -27,5 +32,5 @@ pub(crate) const SERVICES_MANAGE: Permission = Permission::new(
 .scoped();
 
 pub(crate) fn all() -> Vec<Permission> {
-    vec![BOOKINGS_MANAGE, BOOKINGS_STAFF, SERVICES_MANAGE]
+    vec![BOOKINGS_MANAGE, BOOKINGS_READ, BOOKINGS_STAFF, SERVICES_MANAGE]
 }
