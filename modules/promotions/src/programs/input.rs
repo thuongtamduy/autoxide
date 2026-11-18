@@ -197,10 +197,6 @@ impl PromotionInput {
     }
 }
 
-fn problem(field: &str, code: &str, message: &'static str) -> FieldError {
-    FieldError::new(field, code, message)
-}
-
 /// Bitmask ngày trong tuần (bit 0 = thứ Hai).
 pub(crate) fn weekday_mask(days: &[u8]) -> i32 {
     days.iter().filter(|day| (1..=7).contains(*day)).fold(0, |mask, day| mask | (1 << (day - 1)))
@@ -211,15 +207,19 @@ pub(crate) fn check(input: &PromotionInput) -> Result<Currency, Error> {
     let mut problems = Vec::new();
     let currency = Currency::parse(&input.currency).ok();
     if currency.is_none() {
-        problems.push(problem("currency", "invalid", "must be an ISO 4217 code like VND"));
+        problems.push(FieldError::new("currency", "invalid", "must be an ISO 4217 code like VND"));
     }
     let money = |field: &str, value: &Option<Money>, problems: &mut Vec<FieldError>| {
         if let Some(value) = value {
             if Some(value.currency()) != currency {
-                problems.push(problem(field, "currency", "must be in the promotion's currency"));
+                problems.push(FieldError::new(
+                    field,
+                    "currency",
+                    "must be in the promotion's currency",
+                ));
             }
             if !value.is_positive() {
-                problems.push(problem(field, "range", "must be more than 0"));
+                problems.push(FieldError::new(field, "range", "must be more than 0"));
             }
         }
     };
@@ -230,7 +230,7 @@ pub(crate) fn check(input: &PromotionInput) -> Result<Currency, Error> {
     money("bundle_price", &input.bundle_price, &mut problems);
     let bp = |field: &str, value: Option<i32>, problems: &mut Vec<FieldError>| {
         if value.is_some_and(|value| !(1..=10_000).contains(&value)) {
-            problems.push(problem(
+            problems.push(FieldError::new(
                 field,
                 "range",
                 "must be 1 to 10000 basis points (0.01% to 100%)",
@@ -241,7 +241,7 @@ pub(crate) fn check(input: &PromotionInput) -> Result<Currency, Error> {
     bp("reward_value_bp", input.reward_value_bp, &mut problems);
     let positive = |field: &str, value: Option<i64>, problems: &mut Vec<FieldError>| {
         if value.is_some_and(|value| value < 1) {
-            problems.push(problem(field, "range", "must be at least 1"));
+            problems.push(FieldError::new(field, "range", "must be at least 1"));
         }
     };
     for (field, value) in [
@@ -266,16 +266,20 @@ pub(crate) fn check(input: &PromotionInput) -> Result<Currency, Error> {
         positive(field, value, &mut problems);
     }
     if input.ends_at <= input.starts_at {
-        problems.push(problem("ends_at", "invalid_window", "must be after `starts_at`"));
+        problems.push(FieldError::new("ends_at", "invalid_window", "must be after `starts_at`"));
     }
     if input.title.trim().is_empty() || input.title.chars().count() > 200 {
-        problems.push(problem("title", "length", "must be 1 to 200 characters long"));
+        problems.push(FieldError::new("title", "length", "must be 1 to 200 characters long"));
     }
     if input.terms.chars().count() > 5000 {
-        problems.push(problem("terms", "length", "must be at most 5000 characters long"));
+        problems.push(FieldError::new("terms", "length", "must be at most 5000 characters long"));
     }
     if autoxide_kernel::i18n::canonical_locale(&input.locale).is_none() {
-        problems.push(problem("locale", "invalid", "must be a language code like `vi` or `en`"));
+        problems.push(FieldError::new(
+            "locale",
+            "invalid",
+            "must be a language code like `vi` or `en`",
+        ));
     }
     check_kind(input, &mut problems);
     check_lists(input, &mut problems);
@@ -291,30 +295,34 @@ fn check_kind(input: &PromotionInput, problems: &mut Vec<FieldError>) {
     let scope = input.scope();
     let needs_value = |problems: &mut Vec<FieldError>| {
         if input.value_bp.is_none() && input.value.is_none() {
-            problems.push(problem("value_bp", "required", "give `value_bp` or `value`"));
+            problems.push(FieldError::new("value_bp", "required", "give `value_bp` or `value`"));
         }
     };
     match input.kind {
         crate::model::Kind::PercentOff if input.value_bp.is_none() => {
-            problems.push(problem("value_bp", "required", "a percent discount needs `value_bp`"));
+            problems.push(FieldError::new(
+                "value_bp",
+                "required",
+                "a percent discount needs `value_bp`",
+            ));
         }
         crate::model::Kind::AmountOff | crate::model::Kind::FixedPrice if input.value.is_none() => {
-            problems.push(problem("value", "required", "this kind needs `value`"));
+            problems.push(FieldError::new("value", "required", "this kind needs `value`"));
         }
         crate::model::Kind::FixedPrice if scope != Scope::Items => {
-            problems.push(problem("scope", "invalid", "a fixed price applies to `items`"));
+            problems.push(FieldError::new("scope", "invalid", "a fixed price applies to `items`"));
         }
         crate::model::Kind::BuyXGetY
             if input.buy_quantity.is_none() || input.get_quantity.is_none() =>
         {
-            problems.push(problem(
+            problems.push(FieldError::new(
                 "buy_quantity",
                 "required",
                 "give `buy_quantity` and `get_quantity`",
             ));
         }
         crate::model::Kind::Tiered if input.tiers.is_empty() => {
-            problems.push(problem(
+            problems.push(FieldError::new(
                 "tiers",
                 "required",
                 "a tiered promotion needs at least one tier",
@@ -323,17 +331,25 @@ fn check_kind(input: &PromotionInput, problems: &mut Vec<FieldError>) {
         crate::model::Kind::BundlePrice
             if input.bundle_quantity.is_none() || input.bundle_price.is_none() =>
         {
-            problems.push(problem(
+            problems.push(FieldError::new(
                 "bundle_quantity",
                 "required",
                 "give `bundle_quantity` and `bundle_price`",
             ));
         }
         crate::model::Kind::GiftChoice if input.gift_options.is_empty() => {
-            problems.push(problem("gift_options", "required", "a gift choice needs gift options"));
+            problems.push(FieldError::new(
+                "gift_options",
+                "required",
+                "a gift choice needs gift options",
+            ));
         }
         crate::model::Kind::FreeShipping if scope != Scope::Shipping => {
-            problems.push(problem("scope", "invalid", "free shipping has scope `shipping`"));
+            problems.push(FieldError::new(
+                "scope",
+                "invalid",
+                "free shipping has scope `shipping`",
+            ));
         }
         crate::model::Kind::FlashSale
         | crate::model::Kind::BuyXGetY
@@ -342,7 +358,7 @@ fn check_kind(input: &PromotionInput, problems: &mut Vec<FieldError>) {
         | crate::model::Kind::GiftChoice
             if scope != Scope::Items =>
         {
-            problems.push(problem("scope", "invalid", "this kind has scope `items`"));
+            problems.push(FieldError::new("scope", "invalid", "this kind has scope `items`"));
         }
         _ => {}
     }
@@ -354,7 +370,7 @@ fn check_kind(input: &PromotionInput, problems: &mut Vec<FieldError>) {
             || input.voucher_quota.is_some()
             || input.per_user_claim_limit.is_some())
     {
-        problems.push(problem(
+        problems.push(FieldError::new(
             "trigger",
             "invalid",
             "claims and voucher quotas need trigger `voucher`",
@@ -363,17 +379,21 @@ fn check_kind(input: &PromotionInput, problems: &mut Vec<FieldError>) {
     if input.reward_selection == Some(RewardSelection::Specified)
         && input.kind != crate::model::Kind::BuyXGetY
     {
-        problems.push(problem("reward_selection", "invalid", "only for `buy_x_get_y`"));
+        problems.push(FieldError::new("reward_selection", "invalid", "only for `buy_x_get_y`"));
     }
 }
 
 fn check_lists(input: &PromotionInput, problems: &mut Vec<FieldError>) {
     if input.customer_groups.len() > 100 || input.channels.len() > 50 || input.conditions.len() > 20
     {
-        problems.push(problem("conditions", "length", "too many groups, channels or conditions"));
+        problems.push(FieldError::new(
+            "conditions",
+            "length",
+            "too many groups, channels or conditions",
+        ));
     }
     if input.channels.iter().any(|channel| channel.is_empty() || channel.len() > 64) {
-        problems.push(problem("channels", "length", "each channel is 1 to 64 characters"));
+        problems.push(FieldError::new("channels", "length", "each channel is 1 to 64 characters"));
     }
     for (index, condition) in input.conditions.iter().enumerate() {
         let field = format!("conditions[{index}]");
@@ -386,7 +406,7 @@ fn check_lists(input: &PromotionInput, problems: &mut Vec<FieldError>) {
             matches!(condition.operator, Operator::In | Operator::NotIn)
         };
         if !operator_ok || condition.values.len() > 200 {
-            problems.push(problem(
+            problems.push(FieldError::new(
                 &field,
                 "invalid",
                 "`min_items` takes `gte` / `lte` and one number; other kinds take `in` / `not_in`",
@@ -400,8 +420,8 @@ fn check_lists(input: &PromotionInput, problems: &mut Vec<FieldError>) {
             || !(1..=1440).contains(&window.end_minute)
             || window.end_minute <= window.start_minute
         {
-            problems.push(problem(
-                &format!("schedules[{index}]"),
+            problems.push(FieldError::new(
+                format!("schedules[{index}]"),
                 "invalid",
                 "weekdays 1 to 7, minutes 0 to 1440, end after start",
             ));
@@ -414,8 +434,8 @@ fn check_lists(input: &PromotionInput, problems: &mut Vec<FieldError>) {
             || tier.value_bp.is_some_and(|bp| !(1..=10_000).contains(&bp))
             || tier.value.is_some_and(|value| !value.is_positive())
         {
-            problems.push(problem(
-                &format!("tiers[{index}]"),
+            problems.push(FieldError::new(
+                format!("tiers[{index}]"),
                 "invalid",
                 "a positive threshold and exactly one of `value_bp` / `value`",
             ));
@@ -424,7 +444,7 @@ fn check_lists(input: &PromotionInput, problems: &mut Vec<FieldError>) {
     if !input.funding.is_empty() {
         let total: i64 = input.funding.iter().map(|share| i64::from(share.share_bp)).sum();
         if total != 10_000 || input.funding.iter().any(|share| share.share_bp <= 0) {
-            problems.push(problem(
+            problems.push(FieldError::new(
                 "funding",
                 "promotions.invalid_funding",
                 "shares must add up to 10000",
@@ -435,7 +455,7 @@ fn check_lists(input: &PromotionInput, problems: &mut Vec<FieldError>) {
     if gifts.len() != input.gift_options.len()
         || input.gift_options.iter().any(|gift| gift.stock_limit.is_some_and(|limit| limit < 0))
     {
-        problems.push(problem(
+        problems.push(FieldError::new(
             "gift_options",
             "invalid",
             "each gift once, stock limit not negative",

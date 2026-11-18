@@ -68,10 +68,6 @@ pub(crate) struct Outcome {
     pub cart: Cart,
 }
 
-fn invalid_cart(field: &str, message: &'static str) -> Error {
-    Error::validation(vec![FieldError::new(field, "invalid", message)])
-}
-
 /// Khoá so mã: chữ hoa, bỏ khoảng trắng.
 pub(crate) fn code_key(code: &str) -> String {
     code.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_uppercase()
@@ -89,16 +85,21 @@ impl PromotionsService {
             .with_param("max", self.config.max_codes_per_cart));
         }
         if cart.lines.len() > MAX_CART_LINES {
-            return Err(invalid_cart("lines", "a cart has at most 500 lines"));
+            return Err(Error::validation(vec![FieldError::new(
+                "lines",
+                "invalid",
+                "a cart has at most 500 lines",
+            )]));
         }
         if cart.voucher_ids.len() > 20
             || cart.gift_selections.len() > 50
             || cart.buyer_keys.len() > 10
         {
-            return Err(invalid_cart(
+            return Err(Error::validation(vec![FieldError::new(
                 "voucher_ids",
+                "invalid",
                 "too many vouchers, gift selections or buyer keys",
-            ));
+            )]));
         }
         let mut keys = BTreeSet::new();
         for line in &cart.lines {
@@ -106,27 +107,41 @@ impl PromotionsService {
                 || line.line_key.is_empty()
                 || line.line_key.len() > 100
             {
-                return Err(invalid_cart(
+                return Err(Error::validation(vec![FieldError::new(
                     "lines",
+                    "invalid",
                     "each `line_key` is 1 to 100 characters and unique",
-                ));
+                )]));
             }
             if !(1..=1_000_000).contains(&line.quantity) {
-                return Err(invalid_cart("lines", "each quantity is 1 to 1000000"));
+                return Err(Error::validation(vec![FieldError::new(
+                    "lines",
+                    "invalid",
+                    "each quantity is 1 to 1000000",
+                )]));
             }
             if line.unit_price.currency() != cart.currency || line.unit_price.is_negative() {
-                return Err(invalid_cart(
+                return Err(Error::validation(vec![FieldError::new(
                     "lines",
+                    "invalid",
                     "each unit price is in the cart's currency, not negative",
-                ));
+                )]));
             }
         }
         if cart.shipping_fee.is_some_and(|fee| fee.currency() != cart.currency || fee.is_negative())
         {
-            return Err(invalid_cart("shipping_fee", "the shipping fee is in the cart's currency"));
+            return Err(Error::validation(vec![FieldError::new(
+                "shipping_fee",
+                "invalid",
+                "the shipping fee is in the cart's currency",
+            )]));
         }
         if cart.buyer_keys.iter().any(|key| key.is_empty() || key.len() > 128) {
-            return Err(invalid_cart("buyer_keys", "each buyer key is 1 to 128 characters"));
+            return Err(Error::validation(vec![FieldError::new(
+                "buyer_keys",
+                "invalid",
+                "each buyer key is 1 to 128 characters",
+            )]));
         }
         Ok(())
     }

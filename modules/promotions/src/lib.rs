@@ -72,7 +72,8 @@ impl Module for PromotionsModule {
     }
 
     fn control_plane_tables(&self) -> Vec<&'static str> {
-        migration::CONTROL_PLANE_TABLES.to_vec()
+        // Dữ liệu luật dùng chung mọi khách (D-198); khai bằng chữ để `cargo xtask check` đọc được.
+        vec!["promotions_legal_packs", "promotions_legal_limits", "promotions_notice_rules"]
     }
 
     fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {

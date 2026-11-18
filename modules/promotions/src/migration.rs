@@ -35,10 +35,6 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     ]
 }
 
-/// Bảng mặt điều khiển của module (khai qua `Module::control_plane_tables`).
-pub(crate) const CONTROL_PLANE_TABLES: [&str; 3] =
-    ["promotions_legal_packs", "promotions_legal_limits", "promotions_notice_rules"];
-
 async fn index(
     manager: &SchemaManager<'_>,
     table: &str,

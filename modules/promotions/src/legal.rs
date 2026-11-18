@@ -639,6 +639,47 @@ impl autoxide_kernel::doctor::Probe for LegalCheck {
     }
 }
 
+impl PromotionsService {
+    /// Hạn mức hiệu lực ngày `day` (mặc định hôm nay theo giờ Việt Nam).
+    pub(crate) async fn legal_limits_at(
+        &self,
+        day: Option<NaiveDate>,
+    ) -> Result<Vec<legal_limit::Model>, Error> {
+        let day =
+            day.unwrap_or_else(|| crate::compliance::legal_day(chrono::Utc::now())).to_string();
+        Ok(legal_limit::Entity::find()
+            .filter(legal_limit::Column::EffectiveFrom.lte(day.clone()))
+            .filter(
+                sea_orm::Condition::any()
+                    .add(legal_limit::Column::EffectiveTo.is_null())
+                    .add(legal_limit::Column::EffectiveTo.gt(day)),
+            )
+            .order_by_asc(legal_limit::Column::PromotionKind)
+            .order_by_asc(legal_limit::Column::ProgramKind)
+            .all(self.databases.control().read())
+            .await?)
+    }
+
+    /// Quy tắc thông báo hiệu lực ngày `day`.
+    pub(crate) async fn notice_rules_at(
+        &self,
+        day: Option<NaiveDate>,
+    ) -> Result<Vec<notice_rule::Model>, Error> {
+        let day =
+            day.unwrap_or_else(|| crate::compliance::legal_day(chrono::Utc::now())).to_string();
+        Ok(notice_rule::Entity::find()
+            .filter(notice_rule::Column::EffectiveFrom.lte(day.clone()))
+            .filter(
+                sea_orm::Condition::any()
+                    .add(notice_rule::Column::EffectiveTo.is_null())
+                    .add(notice_rule::Column::EffectiveTo.gt(day)),
+            )
+            .order_by_asc(notice_rule::Column::PromotionKind)
+            .all(self.databases.control().read())
+            .await?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

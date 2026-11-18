@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
@@ -21,7 +20,7 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::api::{Voucher, VoucherSource};
+use crate::api::Voucher;
 use crate::codes::{Generated, NewCodes};
 use crate::compliance::Check;
 use crate::http::dto::{CodeDto, CodesAdded, PromotionListItem, PromotionResponse, VersionDto};
@@ -782,49 +781,6 @@ async fn record_notice(
             submitted_by: row.submitted_by,
         },
     })
-}
-
-impl PromotionsService {
-    /// Cấp tay một voucher (lý do bắt buộc, có trong event → audit).
-    pub(crate) async fn grant_by_hand(
-        &self,
-        tenant: &TenantContext,
-        principal: &Principal,
-        id: Uuid,
-        reason: &str,
-        user_id: Uuid,
-        reference: Option<String>,
-    ) -> Result<autoxide_kernel::reference::Submitted<Voucher>, Error> {
-        if !(3..=500).contains(&reason.trim().chars().count()) {
-            return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
-                "reason",
-                "length",
-                "must be 3 to 500 characters long",
-            )]));
-        }
-        let program = self.promotion(tenant, principal, id).await?;
-        crate::service::readable(
-            principal,
-            tenant.database().read(),
-            &VOUCHERS_GRANT,
-            program.row.org_id,
-            || crate::programs::not_found(id),
-        )
-        .await?;
-        let source_ref = reference.unwrap_or_else(|| format!("grant:{}", Uuid::now_v7()));
-        tracing::info!(promotion_id = %id, user_id = %user_id, "voucher granted by hand");
-        let source_ref: String = source_ref.chars().take(200).collect();
-        self.issue(
-            tenant,
-            id,
-            user_id,
-            VoucherSource::Grant,
-            &source_ref,
-            Actor::from(principal),
-            Some(reason.trim()),
-        )
-        .await
-    }
 }
 
 impl Validate for Patch {

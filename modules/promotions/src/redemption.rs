@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use autoxide_kernel::error::{Error, ErrorKind};
+use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::rows::{self, Bounds};
@@ -62,26 +62,31 @@ fn redemption_expired() -> Error {
 }
 
 fn exhausted(counter: &Counter) -> Error {
-    let (code, message): (&'static str, &'static str) = match counter.counter {
-        "budget" => ("promotions.budget_exhausted", "Promotion `{title}` has used up its budget."),
-        "daily" => {
-            ("promotions.daily_limit_reached", "Promotion `{title}` has no uses left today.")
-        }
-        "customer" => (
+    let error = match counter.counter {
+        "budget" => Error::conflict(
+            "promotions.budget_exhausted",
+            "Promotion `{title}` has used up its budget.",
+        ),
+        "daily" => Error::conflict(
+            "promotions.daily_limit_reached",
+            "Promotion `{title}` has no uses left today.",
+        ),
+        "customer" => Error::conflict(
             "promotions.customer_limit_reached",
             "You have used all your uses of promotion `{title}`.",
         ),
-        "flash" => {
-            ("promotions.flash_sold_out", "The flash-sale units of `{variant}` are sold out.")
+        "flash" => Error::conflict(
+            "promotions.flash_sold_out",
+            "The flash-sale units of `{variant}` are sold out.",
+        ),
+        "gift" => {
+            Error::conflict("promotions.gift_out_of_stock", "Gift `{variant}` is out of stock.")
         }
-        "gift" => ("promotions.gift_out_of_stock", "Gift `{variant}` is out of stock."),
-        "voucher" => ("promotions.voucher_used", "The voucher has been used."),
-        _ => ("promotions.usage_exhausted", "Promotion `{title}` has no uses left."),
+        "voucher" => Error::conflict("promotions.voucher_used", "The voucher has been used."),
+        _ => Error::conflict("promotions.usage_exhausted", "Promotion `{title}` has no uses left."),
     };
     let variant = counter.counter_id.split('|').nth(1).unwrap_or_default().to_owned();
-    Error::new(ErrorKind::Conflict, code, message)
-        .with_param("title", &counter.title)
-        .with_param("variant", variant)
+    error.with_param("title", &counter.title).with_param("variant", variant)
 }
 
 /// Khoá kỳ của hạn mức mỗi người theo giờ địa phương.
@@ -523,7 +528,7 @@ fn replay(
         Ok(Submitted::Replayed(present(existing)?))
     } else {
         Err(Error::conflict(
-            "reference_reused",
+            "promotions.reference_reused",
             "Order `{order_id}` already holds promotion usage for a different cart.",
         )
         .with_param("order_id", order_id))
@@ -974,6 +979,64 @@ async fn record_stats<C: ConnectionTrait>(
             .await?;
     }
     Ok(())
+}
+
+impl PromotionsService {
+    /// Một trang lượt giữ trong phạm vi `promotions.read` của người gọi.
+    pub(crate) async fn redemptions(
+        &self,
+        tenant: &TenantContext,
+        principal: &autoxide_kernel::access::Principal,
+        order_id: Option<Uuid>,
+        status: Option<String>,
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<redemption::Model>, Error> {
+        let mut condition = sea_orm::Condition::all().add(principal.scope_condition(
+            &crate::permissions::READ,
+            redemption::Column::OrgId,
+            None,
+        )?);
+        if let Some(order) = order_id {
+            condition = condition.add(redemption::Column::OrderId.eq(order));
+        }
+        if let Some(status) = status {
+            condition = condition.add(redemption::Column::Status.eq(status));
+        }
+        let select = redemption::Entity::find().filter(condition).scoped(tenant);
+        let read = tenant.database().read();
+        autoxide_kernel::pagination::fetch_page(
+            select,
+            redemption::Column::Id,
+            |row| row.id,
+            page,
+            read,
+        )
+        .await
+    }
+
+    /// Gỡ kẹt bằng tay: trả lượt giữ `id` như khi huỷ đơn (`promotions.publish` ở cửa hàng).
+    pub(crate) async fn release_by_id(
+        &self,
+        tenant: &TenantContext,
+        principal: &autoxide_kernel::access::Principal,
+        id: Uuid,
+    ) -> Result<Redemption, Error> {
+        let read = tenant.database().read();
+        let row = redemption::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(read)
+            .await?
+            .ok_or_else(redemption_not_found)?;
+        crate::service::writable(
+            principal,
+            read,
+            &crate::permissions::PUBLISH,
+            row.org_id,
+            redemption_not_found,
+        )
+        .await?;
+        self.release(tenant, row.order_id, false).await?.ok_or_else(redemption_not_found)
+    }
 }
 
 #[cfg(test)]

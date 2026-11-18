@@ -597,29 +597,32 @@ fn shares_targets(a: &Program, b: &Program) -> bool {
 pub(crate) fn activation_error(failed: &[&Check]) -> Error {
     let first: &str =
         failed.first().map(|found| found.code.as_str()).unwrap_or("promotions.invalid_transition");
-    let (kind, message) = match first {
-        "promotions.no_legal_data" => (
-            ErrorKind::Conflict,
+    let mut error = match first {
+        "promotions.no_legal_data" => Error::conflict(
+            "promotions.no_legal_data",
             "No promotion law limit is in force; run `autoxide task promotions.load_legal_data`.",
         ),
-        "promotions.notice_required" => (
-            ErrorKind::Conflict,
+        "promotions.notice_required" => Error::conflict(
+            "promotions.notice_required",
             "The promotion must be notified to {authority} before it starts; record the notice as \
              submitted.",
         ),
-        "promotions.exceeds_duration_limit" => (
+        "promotions.exceeds_duration_limit" => Error::new(
             ErrorKind::Validation,
+            "promotions.exceeds_duration_limit",
             "The discount days exceed the limit of {max} days under {legal_basis} in force.",
         ),
-        "promotions.exceeds_legal_limit" => (
+        "promotions.exceeds_legal_limit" => Error::new(
             ErrorKind::Validation,
+            "promotions.exceeds_legal_limit",
             "The discount {value} exceeds the limit {max} under {legal_basis} in force.",
         ),
-        _ => (ErrorKind::Validation, "The promotion cannot be turned on: see `errors`."),
+        _ => Error::new(
+            ErrorKind::Validation,
+            "promotions.activation_failed",
+            "The promotion cannot be turned on: see `errors`.",
+        ),
     };
-    let code =
-        if first.starts_with("promotions.") { first } else { "promotions.activation_failed" };
-    let mut error = Error::new(kind, code.to_owned(), message);
     if let Some(found) = failed.first() {
         for (name, value) in &found.params {
             error = error.with_param(name.clone(), value);

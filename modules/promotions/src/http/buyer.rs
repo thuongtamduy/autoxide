@@ -5,14 +5,13 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::pagination::{Page, PageQuery, PageRequest, fetch_page};
+use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::response::{Created, Data, Problem};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -21,7 +20,6 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::api::{Cart, Evaluation, Redemption, Voucher, VoucherStatus};
-use crate::entity::{legal_limit, notice_rule, redemption};
 use crate::evaluate::Options;
 use crate::http::dto::{LegalLimitDto, NoticeRuleDto};
 use crate::permissions::{PUBLISH, READ, USE};
@@ -106,18 +104,7 @@ async fn legal_limits(
     Query(query): Query<AtQuery>,
 ) -> Result<Data<Vec<LegalLimitDto>>, Error> {
     principal.require(&READ)?;
-    let day = query.at.unwrap_or_else(|| crate::compliance::legal_day(Utc::now())).to_string();
-    let rows = legal_limit::Entity::find()
-        .filter(legal_limit::Column::EffectiveFrom.lte(day.clone()))
-        .filter(
-            Condition::any()
-                .add(legal_limit::Column::EffectiveTo.is_null())
-                .add(legal_limit::Column::EffectiveTo.gt(day)),
-        )
-        .order_by_asc(legal_limit::Column::PromotionKind)
-        .order_by_asc(legal_limit::Column::ProgramKind)
-        .all(service.databases.control().read())
-        .await?;
+    let rows = service.legal_limits_at(query.at).await?;
     Ok(Data { data: rows.iter().map(LegalLimitDto::from).collect() })
 }
 
@@ -144,17 +131,7 @@ async fn notice_rules(
     Query(query): Query<AtQuery>,
 ) -> Result<Data<Vec<NoticeRuleDto>>, Error> {
     principal.require(&READ)?;
-    let day = query.at.unwrap_or_else(|| crate::compliance::legal_day(Utc::now())).to_string();
-    let rows = notice_rule::Entity::find()
-        .filter(notice_rule::Column::EffectiveFrom.lte(day.clone()))
-        .filter(
-            Condition::any()
-                .add(notice_rule::Column::EffectiveTo.is_null())
-                .add(notice_rule::Column::EffectiveTo.gt(day)),
-        )
-        .order_by_asc(notice_rule::Column::PromotionKind)
-        .all(service.databases.control().read())
-        .await?;
+    let rows = service.notice_rules_at(query.at).await?;
     Ok(Data { data: rows.iter().map(NoticeRuleDto::from).collect() })
 }
 
@@ -206,19 +183,8 @@ async fn list_redemptions(
 ) -> Result<Page<RedemptionItem>, Error> {
     principal.require(&READ)?;
     let page = PageRequest::try_from(page)?;
-    let _ = &service;
-    let mut condition =
-        Condition::all().add(principal.scope_condition(&READ, redemption::Column::OrgId, None)?);
-    if let Some(order) = query.order_id {
-        condition = condition.add(redemption::Column::OrderId.eq(order));
-    }
-    if let Some(status) = query.status {
-        condition = condition.add(redemption::Column::Status.eq(status));
-    }
-    let select = redemption::Entity::find().filter(condition).scoped(&tenant);
     let found =
-        fetch_page(select, redemption::Column::Id, |row| row.id, &page, tenant.database().read())
-            .await?;
+        service.redemptions(&tenant, &principal, query.order_id, query.status, &page).await?;
     Ok(found.map(|row| RedemptionItem {
         id: row.id,
         order_id: row.order_id,
@@ -257,20 +223,7 @@ async fn release_redemption(
     Path(id): Path<Uuid>,
 ) -> Result<Data<Redemption>, Error> {
     principal.require(&PUBLISH)?;
-    let not_found = || {
-        Error::not_found(
-            "promotions.redemption_not_found",
-            "No promotion usage is held for this order.",
-        )
-    };
-    let row = redemption::Entity::find_by_id(id)
-        .scoped(&tenant)
-        .one(tenant.database().read())
-        .await?
-        .ok_or_else(not_found)?;
-    crate::service::writable(&principal, tenant.database().read(), &PUBLISH, row.org_id, not_found)
-        .await?;
-    let released = service.release(&tenant, row.order_id, false).await?.ok_or_else(not_found)?;
+    let released = service.release_by_id(&tenant, &principal, id).await?;
     Ok(Data { data: released })
 }
 
