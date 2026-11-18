@@ -11,6 +11,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `auth`: `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` — while changing `AUTOXIDE_AUTH_TOKEN_SECRET`, access tokens signed with
+  an old key are still accepted, so nobody is signed out (step 39). `docs/DEPLOY.md` has the steps.
 - New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
   `POST /api/v1/analytics/public/events` (up to 20, unknown or malformed ones dropped, bots and foreign pages
   dropped, `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` per network block); anonymous sessions use a random key per day
