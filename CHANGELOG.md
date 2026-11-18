@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Restore drill (step 39): an end-to-end test backs up data made over the API, restores it into an empty database
+  (across PostgreSQL and SQLite when the gate runs on PostgreSQL) and checks the server starts, the old administrator
+  signs in and the data and files match; `docs/DEPLOY.md` has "Restoring, step by step".
 - Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
   `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
   `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
