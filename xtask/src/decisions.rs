@@ -479,11 +479,13 @@ pub fn render(entries: &[Entry]) -> String {
     );
     let _ = writeln!(
         text,
-        "{} mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: \
+        // Không ghi số mục (tổng hay theo chủ đề): hai nhánh song song cùng thêm mục thì git gộp
+        // sạch mà số đếm sai, gate báo lệch dù không ai sửa tay. Không có số đếm thì hai mục thêm ở
+        // hai chỗ gộp vẫn đúng; thêm sát nhau thì git báo xung đột, sinh lại là xong.
+        "Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: \
          số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. \"Thay bởi\" \
          nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n \
-         '^## D-123 ' {LOG_FILE}`; mục mới có link tới file của nó.\n",
-        entries.len()
+         '^## D-123 ' {LOG_FILE}`; mục mới có link tới file của nó.\n"
     );
     for (name, _) in TOPICS {
         let members: Vec<&Entry> =
@@ -491,7 +493,7 @@ pub fn render(entries: &[Entry]) -> String {
         if members.is_empty() {
             continue;
         }
-        let _ = writeln!(text, "## {name} ({})\n", members.len());
+        let _ = writeln!(text, "## {name}\n");
         for entry in members {
             let who = if entry.who.starts_with("chủ dự án") {
                 " · **chủ dự án quyết**"
