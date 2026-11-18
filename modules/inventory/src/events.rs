@@ -41,6 +41,10 @@ event!(LowStock, names::LOW_STOCK);
 event!(OutOfStock, names::OUT_OF_STOCK);
 event!(MovementRecorded, names::MOVEMENT_RECORDED);
 event!(CostChanged, names::COST_CHANGED);
+event!(ReservationHeld, names::RESERVATION_HELD);
+event!(ReservationConfirmed, names::RESERVATION_CONFIRMED);
+event!(ReservationReleased, names::RESERVATION_RELEASED);
+event!(ReservationExpired, names::RESERVATION_EXPIRED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -63,6 +67,19 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             names::COST_CHANGED,
             "The weighted average unit cost of a variant in a warehouse changed.",
+        ),
+        EventInfo::new(names::RESERVATION_HELD, "Stock was reserved for an order."),
+        EventInfo::new(
+            names::RESERVATION_CONFIRMED,
+            "A stock reservation was confirmed: the order was placed.",
+        ),
+        EventInfo::new(
+            names::RESERVATION_RELEASED,
+            "A stock reservation was released (order cancelled, payment failed, released by hand).",
+        ),
+        EventInfo::new(
+            names::RESERVATION_EXPIRED,
+            "A stock reservation expired before the order was confirmed.",
         ),
     ]
 }

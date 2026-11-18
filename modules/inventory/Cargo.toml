@@ -25,6 +25,7 @@ validator.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
+futures-util.workspace = true
 rmcp = { workspace = true, features = [
   "client",
   "transport-streamable-http-client-reqwest",

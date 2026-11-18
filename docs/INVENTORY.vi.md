@@ -57,6 +57,36 @@ phát `inventory.cost_changed` (`catalog` dùng cho sàn giá).
 `available` đi từ trên điểm đặt hàng lại xuống bằng hay dưới nó; `inventory.out_of_stock` khi đi từ trên 0 xuống 0
 hay dưới. `GET /levels?below_reorder=true` và tool MCP `inventory.list_low_stock` liệt kê các dòng đó.
 
+## Giữ chỗ (cho đơn hàng)
+
+Module `orders` giữ hàng qua `autoxide_inventory::api::Inventory`:
+
+1. `reserve` — giữ mọi dòng của đơn hoặc không gì, tới `expires_at` (tối đa `AUTOXIDE_INVENTORY_MAX_HOLD_HOURS`). Gọi
+   lại cùng `order_id` và cùng nội dung trả lại chỗ giữ cũ; khác nội dung là `reference_reused`. Combo trừ từng thành
+   phần; hàng số và dịch vụ được bỏ qua. Biến thể bán `backorder` hay `preorder` được giữ làm `available` âm
+   (`backordered`).
+2. `confirm` — đơn đã đặt: chỗ giữ không còn hạn.
+3. `fulfil` — xuất một phần hay hết số đã giữ (`fulfilment_key` để gọi lại an toàn); ghi dòng sổ `sale`.
+4. `release` — trả phần chưa xuất (huỷ đơn, thanh toán lỗi…). Trả hai lần chỉ cộng lại một lần.
+5. `restock` — nhập lại hàng trả về (`reference` như `return:<id>`); dòng không bán lại được chỉ được ghi nhận.
+
+Chỗ giữ chưa xác nhận quá `expires_at` được job `inventory.expire_reservations` (mỗi phút) trả lại. Mỗi phần giữ trừ
+tồn bằng một câu `UPDATE` có điều kiện, theo thứ tự cố định, nên 100 người cùng mua cái cuối chỉ đúng một người được.
+
+Quản trị xem chỗ giữ bằng `GET /reservations` (`inventory.reservations.read`) và gỡ chỗ bị kẹt bằng
+`POST /reservations/{id}/release` (`inventory.adjust`; ghi lại người gỡ).
+
+## Chọn kho
+
+`PUT /sources/{cửa hàng}` khai các kho phục vụ một cửa hàng hay kênh, theo `priority`; không khai thì cửa hàng bán tồn
+của chính nó. `PUT /settings/{cửa hàng}`:
+
+- `prefer_nearby` — kho cùng tỉnh với người mua trước (tỉnh lấy từ hồ sơ công khai của nút ở module `organizations`);
+- `allow_split` — chia đơn cho nhiều kho khi không kho nào đủ mọi dòng (mặc định tắt: một đơn một kho).
+
+Giữ chỗ thử trước một kho đủ mọi dòng; không có kho ứng viên nào thì trả `inventory.no_source`, không đủ hàng thì
+`inventory.insufficient_stock` nêu từng dòng.
+
 ## Kiểm số liệu
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<nút>]` so mọi dòng tồn với sổ và chỗ giữ của nó,

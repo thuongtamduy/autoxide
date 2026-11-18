@@ -3,6 +3,7 @@
 //! chỉ dùng qua `api`).
 
 mod levels;
+mod reservations;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -12,6 +13,9 @@ use autoxide_catalog::api::{
 };
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::{Actor, EventInfo, Outbox};
+use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext, root_of};
 use autoxide_organizations::api::{EffectiveSetting, OrgDirectory, Unit};
@@ -285,6 +289,88 @@ pub(crate) async fn level(app: &TestApp, org: OrgId, variant: Uuid) -> Value {
     let (status, found) = call(app, "GET", &uri, "boss", None).await;
     assert_eq!(status, StatusCode::OK, "{found}");
     found["data"][0].clone()
+}
+
+/// Module giả phát event thay một module khác (`organizations`, `orders`…): khai tên event, giữ
+/// `Outbox` sau `start` để test ghi event như module thật.
+pub(crate) struct Emitter {
+    name: &'static str,
+    events: Vec<&'static str>,
+    outbox: Arc<Mutex<Option<Outbox>>>,
+}
+
+impl Emitter {
+    pub(crate) fn new(
+        name: &'static str,
+        events: &[&'static str],
+    ) -> (Self, Arc<Mutex<Option<Outbox>>>) {
+        let outbox = Arc::new(Mutex::new(None));
+        (Emitter { name, events: events.to_vec(), outbox: outbox.clone() }, outbox)
+    }
+}
+
+impl Module for Emitter {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        vec![
+            autoxide_kernel::event::outbox_migration("m0001_events", self.name),
+            autoxide_kernel::event::outbox_actor_migration("m0002_event_actor", self.name),
+            autoxide_kernel::tenancy::migration::adopt(
+                "m0003_tenancy_events",
+                vec![autoxide_kernel::event::tenant_table(self.name)],
+            ),
+            autoxide_kernel::event::outbox_access_migration("k0001_event_access", self.name),
+        ]
+    }
+    fn events(&self) -> Vec<EventInfo> {
+        self.events.iter().map(|name| EventInfo::new(name, "Test event.")).collect()
+    }
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        *self.outbox.lock().unwrap() = Some(context.outbox()?);
+        Ok(())
+    }
+}
+
+/// Event của module giả: tên đặt lúc chạy qua `Raw::NAME` không được (hằng), nên mỗi tên một kiểu.
+macro_rules! raw_event {
+    ($kind:ident, $name:expr) => {
+        #[derive(Debug, serde::Serialize)]
+        #[serde(transparent)]
+        pub(crate) struct $kind(pub serde_json::Value);
+
+        impl autoxide_kernel::event::Event for $kind {
+            const NAME: &'static str = $name;
+        }
+    };
+}
+pub(crate) use raw_event;
+
+/// Ghi `event` vào outbox của module giả (một transaction riêng).
+pub(crate) async fn emit<E: autoxide_kernel::event::Event>(
+    app: &TestApp,
+    outbox: &Arc<Mutex<Option<Outbox>>>,
+    subject: Option<String>,
+    event: &E,
+) {
+    let outbox = outbox.lock().unwrap().clone().unwrap();
+    let tenant = app.default_tenant();
+    let transaction = app.database().begin_write().await.unwrap();
+    outbox.record(&transaction, &tenant, Actor::system(), subject, event).await.unwrap();
+    transaction.commit().await.unwrap();
+}
+
+/// Chạy hết event và job đang chờ.
+pub(crate) async fn drain(app: &TestApp) {
+    let worker = app.modules().worker(4).unwrap().blocked_delay(std::time::Duration::ZERO);
+    let dispatcher = app.modules().dispatcher().unwrap();
+    for _ in 0..10 {
+        let events = dispatcher.run_once().await.unwrap();
+        if worker.run_once().await.unwrap() + events == 0 {
+            break;
+        }
+    }
 }
 
 /// Kiểm mọi dòng tồn khớp sổ, qua lệnh `inventory.verify_levels` như người vận hành chạy.

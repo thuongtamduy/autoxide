@@ -19551,6 +19551,110 @@
         ],
         "type": "object"
       },
+      "Data_InventoryReservation": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Stock held for one order.",
+            "properties": {
+              "expires_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lines": {
+                "items": {
+                  "$ref": "#/components/schemas/InventoryReservedLine"
+                },
+                "type": "array"
+              },
+              "order_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "selling_org_id": {
+                "description": "The store or channel that sold.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "status": {
+                "description": "`held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "order_id",
+              "selling_org_id",
+              "status",
+              "lines"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventorySources": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Warehouses serving a store.",
+            "properties": {
+              "sources": {
+                "items": {
+                  "$ref": "#/components/schemas/InventorySource"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "sources"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventoryStoreSettings": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "How a store picks warehouses.",
+            "properties": {
+              "allow_split": {
+                "description": "Split an order over several warehouses when no single one has every line. Default\n`false`: one order, one warehouse.",
+                "type": "boolean"
+              },
+              "prefer_nearby": {
+                "description": "Try warehouses in the buyer's province first (province from the units' public profile).",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "prefer_nearby",
+              "allow_split"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_InvitationResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -38671,6 +38775,183 @@
         ],
         "type": "object"
       },
+      "InventoryReservation": {
+        "description": "Stock held for one order.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryReservedLine"
+            },
+            "type": "array"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "selling_org_id": {
+            "description": "The store or channel that sold.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order_id",
+          "selling_org_id",
+          "status",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InventoryReservedLine": {
+        "description": "Part of an order line reserved in one warehouse.",
+        "properties": {
+          "backordered": {
+            "description": "Reserved beyond the available stock (the product may be sold out of stock).",
+            "type": "boolean"
+          },
+          "bundle_variant_id": {
+            "description": "The bundle variant of the order line, when it is a bundle.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fulfilled_quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "line_key": {
+            "description": "The order's line key.",
+            "type": "string"
+          },
+          "preordered": {
+            "description": "Pre-order line.",
+            "type": "boolean"
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "released_quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "variant_id": {
+            "description": "The variant taken from stock (a component when the line is a bundle).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "warehouse_org_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_key",
+          "variant_id",
+          "warehouse_org_id",
+          "quantity",
+          "fulfilled_quantity",
+          "released_quantity",
+          "backordered",
+          "preordered"
+        ],
+        "type": "object"
+      },
+      "InventorySource": {
+        "additionalProperties": false,
+        "description": "One warehouse serving a store or channel.",
+        "properties": {
+          "active": {
+            "description": "`false` keeps the row but stops using the warehouse.",
+            "type": "boolean"
+          },
+          "priority": {
+            "description": "Lower is tried first.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "warehouse_org_id": {
+            "description": "The warehouse or store whose stock is sold.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "warehouse_org_id",
+          "priority",
+          "active"
+        ],
+        "type": "object"
+      },
+      "InventorySources": {
+        "description": "Warehouses serving a store.",
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/InventorySource"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources"
+        ],
+        "type": "object"
+      },
+      "InventorySourcesRequest": {
+        "additionalProperties": false,
+        "description": "The warehouses serving a store, replacing the current list.",
+        "properties": {
+          "sources": {
+            "description": "Up to 100 warehouses; empty: the store sells only its own stock.",
+            "items": {
+              "$ref": "#/components/schemas/InventorySource"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources"
+        ],
+        "type": "object"
+      },
+      "InventoryStoreSettings": {
+        "additionalProperties": false,
+        "description": "How a store picks warehouses.",
+        "properties": {
+          "allow_split": {
+            "description": "Split an order over several warehouses when no single one has every line. Default\n`false`: one order, one warehouse.",
+            "type": "boolean"
+          },
+          "prefer_nearby": {
+            "description": "Try warehouses in the buyer's province first (province from the units' public profile).",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "prefer_nearby",
+          "allow_split"
+        ],
+        "type": "object"
+      },
       "InvitationRequest": {
         "additionalProperties": false,
         "description": "A new invitation.",
@@ -50229,6 +50510,66 @@
                 "source_type",
                 "source_id",
                 "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventoryReservation": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "Stock held for one order.",
+              "properties": {
+                "expires_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "$ref": "#/components/schemas/InventoryReservedLine"
+                  },
+                  "type": "array"
+                },
+                "order_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "selling_org_id": {
+                  "description": "The store or channel that sold.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "order_id",
+                "selling_org_id",
+                "status",
+                "lines"
               ],
               "type": "object"
             },
@@ -121641,6 +121982,696 @@
         "x-autoxide-list": "inventory.list_inventory_movements",
         "x-permissions": [
           "inventory.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/reservations": {
+      "get": {
+        "description": "Requires `inventory.reservations.read`; its scope applies to the selling unit. Newest first\nunless `order=asc`.",
+        "operationId": "inventory_list_inventory_reservations",
+        "parameters": [
+          {
+            "description": "Only the reservation of this order.",
+            "in": "query",
+            "name": "order_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only reservations in this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "description": "Status of a stock reservation.",
+                  "enum": [
+                    "held",
+                    "confirmed",
+                    "fulfilled",
+                    "released",
+                    "expired"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryReservation"
+                }
+              }
+            },
+            "description": "One page of reservations."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.reservations.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List stock reservations of orders sold by units in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only the reservation of this order.",
+            "kind": "uuid",
+            "name": "order_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only reservations in this status.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq",
+            "values": [
+              "held",
+              "confirmed",
+              "fulfilled",
+              "released",
+              "expired"
+            ]
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_reservations",
+        "x-permissions": [
+          "inventory.reservations.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/reservations/{id}/release": {
+      "post": {
+        "description": "Requires `inventory.adjust` covering the selling unit. Units not shipped yet go back to the\navailable stock; the release is recorded (`inventory.reservation_released` with your user\nid, reason `manual`). Releasing again returns the reservation as it is.",
+        "operationId": "inventory_release_inventory_reservation",
+        "parameters": [
+          {
+            "description": "Id of the reservation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryReservation"
+                }
+              }
+            },
+            "description": "The reservation after the release."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.adjust` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No reservation with this id in your scope; code `inventory.reservation_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Release a stuck reservation by hand.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.adjust"
+        ]
+      }
+    },
+    "/api/v1/inventory/settings/{org_id}": {
+      "get": {
+        "description": "Requires `inventory.settings.manage` covering the unit.",
+        "operationId": "inventory_get_inventory_settings",
+        "parameters": [
+          {
+            "description": "The selling unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryStoreSettings"
+                }
+              }
+            },
+            "description": "The settings (defaults when never set)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`) or the unit is outside your scope (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get how a store picks warehouses.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `inventory.settings.manage` covering the unit.",
+        "operationId": "inventory_put_inventory_settings",
+        "parameters": [
+          {
+            "description": "The selling unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryStoreSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryStoreSettings"
+                }
+              }
+            },
+            "description": "The settings."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change how a store picks warehouses.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/sources/{selling_org_id}": {
+      "get": {
+        "description": "Requires `inventory.settings.manage` covering the selling unit. Without rows the store sells\nits own stock (when it is a warehouse or store).",
+        "operationId": "inventory_get_inventory_sources",
+        "parameters": [
+          {
+            "description": "The selling unit.",
+            "in": "path",
+            "name": "selling_org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySources"
+                }
+              }
+            },
+            "description": "The warehouses."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`) or the unit is outside your scope (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the warehouses serving a store or channel, in the order they are tried.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `inventory.settings.manage` covering the selling unit. Every warehouse must be a\nwarehouse or store.",
+        "operationId": "inventory_put_inventory_sources",
+        "parameters": [
+          {
+            "description": "The selling unit.",
+            "in": "path",
+            "name": "selling_org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventorySourcesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySources"
+                }
+              }
+            },
+            "description": "The warehouses now serving the unit."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A unit holds no stock (`inventory.not_a_warehouse`), a warehouse is listed twice, or the list is too long; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the warehouses serving a store or channel.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
         ]
       }
     },
