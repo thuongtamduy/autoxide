@@ -131,7 +131,7 @@ fn parse_baseline(text: &str) -> Result<BTreeMap<String, usize>, String> {
 }
 
 /// File `.rs` git theo dõi hay mới thêm (chưa bị `.gitignore` loại).
-fn rust_files(root: &Path) -> Result<Vec<String>, String> {
+pub(crate) fn rust_files(root: &Path) -> Result<Vec<String>, String> {
     let output = Command::new("git")
         .args(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.rs"])
         .current_dir(root)

@@ -1,0 +1,68 @@
+# Alerting rules for Autoxide (Prometheus 2.x / 3.x rule file). Load it from prometheus.yml:
+#
+#   rule_files:
+#     - /etc/prometheus/autoxide-alerts.yml
+#
+# Every rule has `summary` (what is wrong) and `action` (what to do); the action points at the
+# runbook in docs/DEPLOY.md ("Runbook"). Several worker processes each publish the same backlog
+# gauges, so the rules take `max without(instance)` instead of `sum`.
+# `cargo xtask check` keeps every metric name here in line with the code.
+groups:
+  - name: autoxide
+    rules:
+      - alert: AutoxideHigh5xxRate
+        expr: |
+          sum without(instance, method, route, status) (rate(http_requests_total{status=~"5.."}[10m]))
+            / sum without(instance, method, route, status) (rate(http_requests_total[10m]))
+            > 0.02
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "More than 2% of API requests fail with a server error (5xx)."
+          action: "Read the error logs for those requests (search by `request_id`), then see docs/DEPLOY.md, Runbook: server errors."
+      - alert: AutoxideSlowP95
+        expr: |
+          histogram_quantile(0.95,
+            sum without(instance, method) (rate(http_request_duration_seconds_bucket[10m]))) > 0.5
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: "The slowest 5% of requests on route {{ $labels.route }} take more than 0.5 s."
+          action: "Find the slow queries of that route (EXPLAIN), check database_connections for an exhausted pool; see docs/DEPLOY.md, Runbook: slow requests."
+      - alert: AutoxideJobsStuck
+        expr: max without(instance) (jobs_oldest_pending_seconds) > 600
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "A job of module {{ $labels.module }} on database {{ $labels.database }} has waited more than 10 minutes."
+          action: "Check that a process with AUTOXIDE_PROCESS_ROLE=all or worker is running and its logs; look at the dead-letter queue with `autoxide jobs failed`; see docs/DEPLOY.md, Runbook: stuck queue."
+      - alert: AutoxideDeadLetterGrowing
+        expr: |
+          increase(jobs_failed_total[1h]) > 0
+            or max without(instance) (delta(jobs_dead[1h])) > 0
+        labels:
+          severity: warn
+        annotations:
+          summary: "Jobs gave up after their last retry and went to the dead-letter queue."
+          action: "Run `autoxide jobs failed`, fix the cause shown in its error, then `autoxide jobs retry <module> <id>`; see docs/DEPLOY.md, Runbook: dead-letter queue."
+      - alert: AutoxideEventsBacklog
+        expr: max without(instance) (events_oldest_pending_seconds) > 300
+        for: 5m
+        labels:
+          severity: warn
+        annotations:
+          summary: "An event of module {{ $labels.module }} on database {{ $labels.database }} has not been delivered for more than 5 minutes."
+          action: "A subscriber keeps failing or no background process runs: read the logs for `event delivery failed`; see docs/DEPLOY.md, Runbook: stuck queue."
+      - alert: AutoxideDbPoolExhausted
+        expr: |
+          max without(instance, state) (database_connections{state="in_use"})
+            / max without(instance) (database_connections_max) >= 0.9
+        for: 5m
+        labels:
+          severity: warn
+        annotations:
+          summary: "The {{ $labels.pool }} connection pool of database {{ $labels.database }} is at least 90% in use."
+          action: "Look for slow queries holding connections, then raise AUTOXIDE_DATABASE_READ_CONNECTIONS / AUTOXIDE_DATABASE_WRITE_CONNECTIONS within what the database server allows; see docs/DEPLOY.md, Runbook: database connections."
