@@ -9256,3 +9256,37 @@ liệu cá nhân.
    `: ping` mỗi 15 s, `retry: 3000`.
 6. **Không có tool MCP tương ứng** (lệch đặc tả `kernel.list_events`): MCP không giữ stream; agent cần "có gì mới" dùng webhook
    hay đọc danh sách của module. Thêm khi có agent cần thật.
+
+## D-378 · Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18 — agent quyết
+
+1. **Một trait, hai hàm mới có mặc định (D-038):** `Storage::presign_upload(key, UploadConstraints, ttl) ->
+   Option<PresignedUpload>` (mặc định `None`: ổ đĩa, client tải qua máy chủ như cũ) và `Storage::head(key)` (mặc định qua
+   `get`). `TenantStorage` thêm tiền tố khách như mọi thao tác khác (D-259); `ObjectStorage` của `files` cài cho S3 bằng
+   `object_store::signer::Signer::signed_url_opts` (0.14.2). Không thêm thư viện.
+2. **Ký `content-type` và `x-amz-checksum-sha256`, không ký `content-length`** (lệch đặc tả): `object_store` giữ
+   `content-length` cho bộ ký và từ chối ký nó qua `SignedUrlOptions` (tra `validate_signed_url_extras`). Checksum đã ký mạnh
+   hơn: Amazon S3 từ chối nội dung khác hash, tức khác cả cỡ. Dịch vụ tương thích S3 có thể không kiểm checksum (moto của gate
+   không kiểm) — nên **lệnh xác nhận luôn đọc lại cả object, đo cỡ và băm SHA-256** (`upload::inspect`), không tin nơi lưu;
+   sai thì xoá object, giữ lượt (client PUT lại đúng file trước hạn). Đọc lại tốn một lượt GET; file rất lớn cần tăng
+   `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (ghi trong mô tả biến, như tải qua máy chủ).
+3. **Khung chung `autoxide_kernel::upload`:** bảng `<module>_uploads` (`uploads_migration`, như `jobs_migration`; khoá chính
+   `(tenant_id, id)`, index `(status, expires_at)`), `DirectUploads::{insert, find, lock, complete, delete, expired,
+   forget_completed}` viết bằng sea-query (tên bảng theo module), `UploadLink` (schema OpenAPI dùng chung). ID của lượt là ID
+   của bản ghi sẽ tạo: khoá lưu đặt sẵn ở chỗ cuối cùng (`files/<id>`, `media/<id>/<version>`), không chép. Xác nhận: kiểm
+   NGOÀI transaction; trong transaction `lock` (FOR UPDATE trên Postgres, SQLite một bên ghi) → lượt còn `pending` thì tạo bản
+   ghi + event + `complete`, không thì trả bản ghi đã có — hai lệnh xác nhận đồng thời chỉ tạo một bản ghi (test cả hai
+   database). Gọi lại sau khi xong: `200` cùng bản ghi.
+4. **Loại thật:** `media` đọc lại qua đúng bộ kiểm của tải qua máy chủ (magic bytes, SVG chạy được, kích thước ảnh), tách
+   `receive` thành `checked` + `finished` dùng chung. `files` giữ loại đã khai như khi tải qua máy chủ (S3 lưu đúng loại đã ký,
+   tải xuống có `nosniff` + CSP `sandbox`) — lệch đặc tả "kiểm loại thật" cho `files`: nhận loại bằng magic bytes đang là phần
+   của `media`; đưa bộ nhận loại vào kernel để `files` dùng thì phải đổi cả đường tải qua máy chủ của `files` cho nhất quán —
+   để khi có nhu cầu.
+5. **Mã lỗi:** `…direct_upload_unavailable` (409), `…upload_not_found` (404), `…upload_expired` (**409**, lệch đặc tả 410:
+   `ErrorKind` không có 410, thêm loại lỗi mới cho một mã là quá tay), `…upload_incomplete` (409), `…upload_mismatch` (422).
+6. **Hạn mức:** `files` giữ chỗ `files.storage_bytes` theo cỡ khai lúc cấp link, xác nhận khi xong, trả khi lượt bị dọn.
+   `media` chưa có hạn mức dung lượng nên không giữ chỗ.
+7. **Dọn:** job `files.purge_expired_uploads`, `media.purge_expired_uploads` mỗi giờ trên mọi database (bảng ở database của
+   khách): lượt `pending` quá hạn 1 giờ → xoá object, dòng (trả hạn mức); dòng lượt đã xong giữ 7 ngày. Cấu hình
+   `AUTOXIDE_FILES_DIRECT_MAX_BYTES` (5 GiB), `AUTOXIDE_FILES_DIRECT_UPLOAD_SECONDS` (900), `AUTOXIDE_MEDIA_DIRECT_MAX_BYTES`
+   (1 GiB — xác nhận đọc lại cả item), `AUTOXIDE_MEDIA_DIRECT_UPLOAD_SECONDS` (900). Test: link giả của `MemoryStorage::presign`
+   (testkit) trên hai database; S3 thật (moto) ở `files` và e2e `media`.

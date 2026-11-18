@@ -197,3 +197,46 @@ async fn media_tren_o_dia_va_s3() {
     .await
     .unwrap();
 }
+
+/// Tải thẳng lên S3 (bước 40 P4) trên chương trình thật: link ký sẵn, `PUT` bằng HTTP thẳng tới
+/// S3 (không qua máy chủ), xác nhận tạo item; gọi lại trả cùng item. Chỉ chạy khi có S3.
+#[tokio::test]
+async fn tai_thang_media_len_s3() {
+    use sha2::{Digest as _, Sha256};
+    let Some(s3) = autoxide_testkit::s3_settings() else {
+        return;
+    };
+    TestDatabase::run(async |test| {
+        let runtime = start(test.url(), &s3).await;
+        let token = admin_token(&runtime, "direct@example.com").await;
+        let auth = format!("Bearer {token}");
+        let image = png(64, 32);
+        let sha256: String = Sha256::digest(&image).iter().map(|b| format!("{b:02x}")).collect();
+        let request = json!({"name": "logo.png", "content_type": "image/png", "size": image.len(), "sha256": sha256});
+        let headers = [("authorization", auth.as_str()), ("content-type", "application/json")];
+        let (status, _, link) =
+            call(&runtime, "POST", "/api/v1/media/uploads", &headers, request.to_string().into_bytes())
+                .await;
+        assert_eq!(status, StatusCode::CREATED, "{link}");
+        let link = &link["data"];
+
+        autoxide_kernel::tls::install_crypto_provider();
+        let mut put = reqwest::Client::new().put(link["url"].as_str().unwrap()).body(image.clone());
+        for (name, value) in link["headers"].as_object().unwrap() {
+            put = put.header(name.as_str(), value.as_str().unwrap());
+        }
+        assert!(put.send().await.unwrap().status().is_success());
+
+        let complete = format!("/api/v1/media/uploads/{}/complete", link["id"].as_str().unwrap());
+        let headers = [("authorization", auth.as_str())];
+        let (status, _, item) = call(&runtime, "POST", &complete, &headers, Vec::new()).await;
+        assert_eq!(status, StatusCode::CREATED, "{item}");
+        assert_eq!((item["data"]["width"].as_i64(), item["data"]["height"].as_i64()), (Some(64), Some(32)));
+        assert_eq!(item["data"]["id"], link["id"]);
+        let (status, _, again) = call(&runtime, "POST", &complete, &headers, Vec::new()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(again["data"]["id"], link["id"]);
+    })
+    .await
+    .unwrap();
+}

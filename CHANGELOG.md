@@ -11,6 +11,19 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 40, uploads straight to storage: when files are on S3, `POST /api/v1/files/uploads {name, content_type, size,
+  sha256}` answers a signed `PUT` link (type and SHA-256 signed, 15 minutes by default) and
+  `POST /api/v1/files/uploads/{id}/complete` reads the object back, checks its size and SHA-256 (a mismatching file is
+  removed, `422 files.upload_mismatch`) and creates the file with the upload's id; calling it again returns the same
+  file. The media library gets the same pair (`/api/v1/media/uploads`, plus `folder_id`, `tags`, `org_id`), checking the
+  content like an upload through the server (real type, SVG, image size). On disk storage the answer is `409
+  …direct_upload_unavailable`. Concurrent completions create one record; uploads never completed are removed by the
+  hourly jobs `files.purge_expired_uploads` / `media.purge_expired_uploads`; plain files reserve the storage quota from
+  the start. MCP tools `files.create_upload`, `files.confirm_upload`, `media.create_upload`, `media.confirm_upload`.
+  Settings `AUTOXIDE_FILES_DIRECT_MAX_BYTES`, `AUTOXIDE_FILES_DIRECT_UPLOAD_SECONDS`, `AUTOXIDE_MEDIA_DIRECT_MAX_BYTES`,
+  `AUTOXIDE_MEDIA_DIRECT_UPLOAD_SECONDS`. Guide: `docs/guides/direct-uploads.md`; bucket CORS in `docs/DEPLOY.md`. For
+  module authors: `Storage::{presign_upload, head}` (defaults: no link, `head` through `get`), `autoxide_kernel::upload`
+  (`DirectUploads`, `uploads_migration`, `inspect`, `UploadLink`).
 - Step 40, real-time events: `GET /api/v1/kernel/events/stream?names=…` streams, as Server-Sent Events, the events modules
   declare streamable — `content.entry_published` (`content.read`), `comments.comment_created` (`comments.moderate`),
   `media.item_uploaded` (`media.read`) — to signed-in callers with that permission, in their tenant only (a permission

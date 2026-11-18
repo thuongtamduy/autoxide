@@ -79,10 +79,13 @@ cả SQLite và Postgres.
       OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
       kiểm chữ ký `id_token` qua JWKS; liên kết với tài khoản sẵn có theo email đã xác minh, không
       tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình
-- [ ] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
+- [x] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
       cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
       lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
-      chung; file tải lên mà không xác nhận được dọn bằng job
+      chung; file tải lên mà không xác nhận được dọn bằng job — `Storage::{presign_upload, head}`,
+      `autoxide_kernel::upload` (`<module>_uploads`), `POST /files/uploads` + `/complete`, `/media/uploads` + `/complete`,
+      4 tool MCP, job dọn mỗi giờ; ký `content-type` + checksum (không ký được `content-length`), xác nhận luôn đọc lại;
+      loại thật kiểm ở `media`, `files` giữ loại khai như tải qua máy chủ (D-378)
 - [x] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
       `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
       HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,

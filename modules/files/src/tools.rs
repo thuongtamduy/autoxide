@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::http::FileResponse;
+use crate::http::{FileResponse, StartUploadRequest};
 use crate::permissions::{FILES_MANAGE, FILES_UPLOAD};
 use crate::service::FileService;
 
@@ -54,10 +54,53 @@ pub(crate) struct FileContent {
     content_base64: String,
 }
 
+/// An upload straight to storage to complete.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UploadId {
+    /// Id of the upload, from `files.create_upload`.
+    id: Uuid,
+}
+
 pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
     let (list, get, read, upload, delete) =
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
+    let (start, complete) = (service.clone(), service.clone());
     vec![
+        Tool::new(
+            "create_upload",
+            "Start uploading a large file straight to storage (S3): give its name, type, exact \
+             size and SHA-256 (hex); you get a signed link. Send the file there yourself with the \
+             given method and headers, then call `files.confirm_upload`. On disk storage this \
+             answers `files.direct_upload_unavailable`: use `files.upload_file` instead.",
+            move |tenant: TenantContext, principal: Principal, input: StartUploadRequest| {
+                let service = start.clone();
+                async move {
+                    let started = service.start_upload(&tenant, &principal, input.into()).await?;
+                    let id = started.upload.id;
+                    Ok::<_, Error>(autoxide_kernel::upload::UploadLink::new(id, started.link))
+                }
+            },
+        )
+        .requires(FILES_UPLOAD),
+        Tool::new(
+            "confirm_upload",
+            "Complete an upload started with `files.create_upload` after sending the file: the \
+             server checks its size and SHA-256 and creates the file (a mismatching file is \
+             removed). Calling it again returns the same file.",
+            move |tenant: TenantContext, principal: Principal, input: UploadId| {
+                let service = complete.clone();
+                async move {
+                    let file = match service.complete_upload(&tenant, &principal, input.id).await? {
+                        crate::uploads::Completed::Created(file)
+                        | crate::uploads::Completed::Existing(file) => file,
+                    };
+                    Ok::<_, Error>(FileResponse::from(file))
+                }
+            },
+        )
+        .requires(FILES_UPLOAD)
+        .or_requires(FILES_MANAGE),
         Tool::new(
             "list_files",
             "List the files you uploaded, newest first; follow `pagination.next_cursor` for more.",
@@ -227,6 +270,38 @@ mod tests {
             let error = read.call(tenant, ada, json!({"id": file.id})).await.unwrap_err();
             assert_eq!(error.code(), "files.too_large_for_tool");
             assert!(error.to_string().contains(&format!("/api/v1/files/{}/content", file.id)));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Tool tải thẳng: cùng service với REST (link giả của nơi lưu trong bộ nhớ).
+    #[tokio::test]
+    async fn tai_thang_qua_tool() {
+        TestDatabase::run(async |test| {
+            let storage = std::sync::Arc::new(autoxide_testkit::MemoryStorage::new());
+            storage.presign(true);
+            let (files, database) =
+                crate::testing::service_on(test, no_limits(), storage.clone()).await;
+            let tools = all(&files);
+            let tool = |name: &str| tools.iter().find(|tool| tool.name() == name).unwrap();
+            let tenant = TenantContext::default_on(database);
+            let ada = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
+            let sha = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+            let input =
+                json!({"name": "a.txt", "content_type": "text/plain", "size": 5, "sha256": sha});
+            let link =
+                tool("create_upload").call(tenant.clone(), ada.clone(), input).await.unwrap();
+            assert_eq!(link["method"], "PUT");
+            storage.put_presigned(link["url"].as_str().unwrap(), &b"hello"[..]);
+            let confirm = json!({"id": link["id"]});
+            let file = tool("confirm_upload")
+                .call(tenant.clone(), ada.clone(), confirm.clone())
+                .await
+                .unwrap();
+            assert_eq!((file["id"].clone(), file["size"].as_u64()), (link["id"].clone(), Some(5)));
+            let again = tool("confirm_upload").call(tenant, ada, confirm).await.unwrap();
+            assert_eq!(again, file);
         })
         .await
         .unwrap();

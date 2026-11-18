@@ -5,10 +5,12 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::storage::ByteStream;
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::upload::UploadLink;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -20,6 +22,7 @@ use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::service::{FileRecord, FileService, too_large};
 
@@ -28,6 +31,8 @@ pub(crate) fn routes(service: Arc<FileService>) -> OpenApiRouter {
         .routes(routes!(list_files, upload_file))
         .routes(routes!(get_file, delete_file))
         .routes(routes!(download_file))
+        .routes(routes!(start_upload))
+        .routes(routes!(complete_upload))
         .with_state(service)
 }
 
@@ -258,6 +263,107 @@ async fn delete_file(
 ) -> Result<StatusCode, Error> {
     service.delete(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// A file to upload straight to storage.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct StartUploadRequest {
+    /// File name, 1 to 255 characters, without `/` or `\`.
+    #[schema(example = "video.mp4")]
+    pub(crate) name: String,
+    /// Media type of the file; the upload link only accepts this `Content-Type`.
+    #[schema(example = "video/mp4")]
+    pub(crate) content_type: String,
+    /// Exact size in bytes; the link only accepts this size.
+    #[schema(example = 734003200)]
+    pub(crate) size: u64,
+    /// SHA-256 of the content, as 64 hex digits; checked when you complete the upload.
+    pub(crate) sha256: String,
+}
+
+impl From<StartUploadRequest> for crate::uploads::StartUpload {
+    fn from(request: StartUploadRequest) -> Self {
+        crate::uploads::StartUpload {
+            name: request.name,
+            content_type: request.content_type,
+            size: request.size,
+            sha256: request.sha256,
+        }
+    }
+}
+
+/// Start an upload straight to storage.
+///
+/// Requires `files.upload`. For large files when files are stored on S3: the answer is a signed
+/// link; send the file there (not to this server) with the given method and headers before
+/// `expires_at`, then call `POST /api/v1/files/uploads/{id}/complete`. The link only accepts the
+/// declared size and type. When files are stored on the server's disk the answer is `409
+/// files.direct_upload_unavailable`: upload through `POST /api/v1/files`. Retry safely with an
+/// `Idempotency-Key` header.
+#[utoipa::path(
+    post,
+    path = "/uploads",
+    extensions(("x-permissions" = json!(["files.upload"]))),
+    operation_id = "start_file_upload",
+    security(("bearer" = [])),
+    request_body = StartUploadRequest,
+    responses(
+        (status = 201, description = "The upload link. `Location` is the file it will become once completed.", body = Data<autoxide_kernel::upload::UploadLink>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `files.upload`; code `permission_denied`.", body = Problem),
+        (status = 409, description = "Files are stored where they cannot be uploaded straight to; code `files.direct_upload_unavailable`. Use `POST /api/v1/files`.", body = Problem),
+        (status = 422, description = "The name, type, size or SHA-256 is invalid; see `errors` (all problems at once).", body = Problem),
+    )
+)]
+async fn start_upload(
+    State(service): State<Arc<FileService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    ValidJson(request): ValidJson<StartUploadRequest>,
+) -> Result<Created<autoxide_kernel::upload::UploadLink>, Error> {
+    let started = service.start_upload(&tenant, &principal, request.into()).await?;
+    let id = started.upload.id;
+    Ok(Created::new(format!("/files/{id}"), UploadLink::new(id, started.link)))
+}
+
+/// Complete an upload straight to storage.
+///
+/// Requires `files.upload` (your own uploads; `files.manage` for anyone's). The server reads the
+/// file back and checks its size and SHA-256 against what you declared; a file that does not match
+/// is removed (`422 files.upload_mismatch`) — send the right file to the same link and complete
+/// again. Calling it again after it succeeded returns the same file with `200`.
+#[utoipa::path(
+    post,
+    path = "/uploads/{id}/complete",
+    extensions(("x-permissions" = json!(["files.upload", "files.manage"]))),
+    operation_id = "complete_file_upload",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the upload.")),
+    responses(
+        (status = 200, description = "Already completed: the same file.", body = Data<FileResponse>),
+        (status = 201, description = "The file was created.", body = Data<FileResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `files.upload`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No upload of yours has this id (code `files.upload_not_found`), or its file was deleted since (code `files.file_not_found`).", body = Problem),
+        (status = 409, description = "The file is not in storage yet (code `files.upload_incomplete`), or the upload expired (code `files.upload_expired`).", body = Problem),
+        (status = 422, description = "The file does not match the declared size or SHA-256 and was removed; code `files.upload_mismatch`.", body = Problem),
+    )
+)]
+async fn complete_upload(
+    State(service): State<Arc<FileService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Response, Error> {
+    Ok(match service.complete_upload(&tenant, &principal, id).await? {
+        crate::uploads::Completed::Created(file) => {
+            Created::new(format!("/files/{}", file.id), FileResponse::from(file)).into_response()
+        }
+        crate::uploads::Completed::Existing(file) => {
+            Data { data: FileResponse::from(file) }.into_response()
+        }
+    })
 }
 
 /// `attachment` kèm tên file (RFC 6266): không bao giờ mở ngay trong trình duyệt.
@@ -516,6 +622,34 @@ mod tests {
             assert!(own.get(&key).await.unwrap().is_some());
             assert!(shared.get(&orphan_shared).await.unwrap().is_none());
             assert!(shared.get(&stray).await.unwrap().is_some());
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Tải thẳng qua REST: ổ đĩa → 409 nói rõ dùng `POST /api/v1/files`; đầu vào sai → 422 với mọi
+    /// trường; xác nhận lượt không có → 404.
+    #[tokio::test]
+    async fn tai_thang_qua_api_tren_o_dia() {
+        TestDatabase::run(async |test| {
+            let app = app(test).await;
+            let sha = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+            let body = serde_json::json!({"name": "a.txt", "content_type": "text/plain", "size": 5, "sha256": sha});
+            let answer = app.post("/api/v1/files/uploads").token("ada").json(body).send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::CONFLICT);
+            assert_eq!(answer.json()["code"], "files.direct_upload_unavailable");
+
+            let bad = serde_json::json!({"name": "", "content_type": "x", "size": 0, "sha256": "1"});
+            let answer = app.post("/api/v1/files/uploads").token("ada").json(bad).send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(answer.json()["errors"].as_array().unwrap().len(), 4);
+            let answer = app.post("/api/v1/files/uploads").token("nobody").json(serde_json::json!({"name": "a", "content_type": "text/plain", "size": 1, "sha256": sha})).send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::FORBIDDEN);
+
+            let path = format!("/api/v1/files/uploads/{}/complete", Uuid::now_v7());
+            let answer = app.post(&path).token("ada").send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::NOT_FOUND);
+            assert_eq!(answer.json()["code"], "files.upload_not_found");
         })
         .await
         .unwrap();

@@ -157,7 +157,38 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
         (service.clone(), service.clone(), service.clone(), service.clone());
     let (upload, list_tags, alt) = (service.clone(), service.clone(), service.clone());
     let set_alt = service.clone();
+    let (start, complete) = (service.clone(), service.clone());
     vec![
+        Tool::new(
+            "create_upload",
+            "Start uploading a large media item straight to storage (S3): give its name, real \
+             type, exact size and SHA-256 (hex), and optionally folder, tags and unit; you get a \
+             signed link. Send the file there yourself with the given method and headers, then \
+             call `media.confirm_upload`. On disk storage this answers \
+             `media.direct_upload_unavailable`: use `media.upload` instead.",
+            move |tenant: TenantContext, principal: Principal, input: crate::http::StartMediaUploadRequest| {
+                let service = start.clone();
+                async move {
+                    let (upload, link) = service.start_upload(&tenant, &principal, input.into()).await?;
+                    Ok::<_, Error>(autoxide_kernel::upload::UploadLink::new(upload.id, link))
+                }
+            },
+        )
+        .requires(MEDIA_WRITE),
+        Tool::new(
+            "confirm_upload",
+            "Complete an upload started with `media.create_upload` after sending the file: the \
+             server checks its real type, size and SHA-256 and creates the item (a failing file is \
+             removed). Calling it again returns the same item.",
+            move |tenant: TenantContext, principal: Principal, input: MediaId| {
+                let service = complete.clone();
+                async move {
+                    let confirmed = service.complete_upload(&tenant, &principal, input.id).await?;
+                    crate::http::present_uploaded(&service, &tenant, confirmed.uploaded).await
+                }
+            },
+        )
+        .requires(MEDIA_WRITE),
         Tool::new(
             "list",
             "List media items (images, video, audio, documents), newest first. Filter by \

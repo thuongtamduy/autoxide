@@ -144,6 +144,8 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `content.translate` | `content.write` or `content.write_own` | writes |
 | `content.unpublish` | `content.publish` or `content.publish_own` | destructive |
 | `content.update` | `content.write` or `content.write_own` | writes |
+| `files.confirm_upload` | `files.upload` or `files.manage` | writes |
+| `files.create_upload` | `files.upload` | writes |
 | `files.delete_file` | `files.upload` or `files.manage` | destructive |
 | `files.get_file` | `files.upload` or `files.manage` | read-only |
 | `files.list_files` | `files.upload` | read-only |
@@ -199,6 +201,8 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `ledger.release_hold` | `ledger.holds_release` | writes |
 | `ledger.resolve_exception` | `ledger.reconcile` | writes |
 | `ledger.trial_balance` | `ledger.read` | read-only |
+| `media.confirm_upload` | `media.write` | writes |
+| `media.create_upload` | `media.write` | writes |
 | `media.get` | `media.read` | read-only |
 | `media.list` | `media.read` | read-only |
 | `media.list_tags` | `media.read` | read-only |

@@ -21440,6 +21440,61 @@
         ],
         "type": "object"
       },
+      "Data_UploadLink": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Where and how to send a file straight to storage: send it with exactly this method, URL and\nheaders before `expires_at`, then complete the upload with its `id`.",
+            "properties": {
+              "expires_at": {
+                "description": "The URL stops working at this time.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "headers": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Headers to send with the file, exactly as given (the signature covers them).",
+                "example": {
+                  "content-length": "734003200",
+                  "content-type": "video/mp4"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "id": {
+                "description": "Id of the upload; also the id of the record it becomes.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "method": {
+                "description": "HTTP method to send the file with.",
+                "example": "PUT",
+                "type": "string"
+              },
+              "url": {
+                "description": "Signed URL of the storage to send the file to (not this server).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "method",
+              "url",
+              "headers",
+              "expires_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_UploadedResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -48131,6 +48186,63 @@
         ],
         "type": "object"
       },
+      "StartMediaUploadRequest": {
+        "additionalProperties": false,
+        "description": "A media item to upload straight to storage.",
+        "properties": {
+          "content_type": {
+            "description": "The real media type of the file; the upload link only accepts this `Content-Type`, and the\ncontent is checked against it when you complete the upload.",
+            "example": "video/mp4",
+            "type": "string"
+          },
+          "folder_id": {
+            "description": "Folder to put the item in. Omit for the root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "File name, 1 to 255 characters, without `/` or `\\`.",
+            "example": "launch-video.mp4",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The organization unit that owns the item; you need `media.write` there. Omit when you work\nin one unit only (or for the whole tenant).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "description": "SHA-256 of the content, as 64 hex digits.",
+            "type": "string"
+          },
+          "size": {
+            "description": "Exact size in bytes.",
+            "example": 734003200,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "tags": {
+            "description": "Tags for the item (each 1 to 50 characters, at most 20).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "content_type",
+          "size",
+          "sha256"
+        ],
+        "type": "object"
+      },
       "StartPasskeyRegistrationRequest": {
         "description": "Proof that you are the account owner.",
         "properties": {
@@ -48163,6 +48275,40 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "StartUploadRequest": {
+        "additionalProperties": false,
+        "description": "A file to upload straight to storage.",
+        "properties": {
+          "content_type": {
+            "description": "Media type of the file; the upload link only accepts this `Content-Type`.",
+            "example": "video/mp4",
+            "type": "string"
+          },
+          "name": {
+            "description": "File name, 1 to 255 characters, without `/` or `\\`.",
+            "example": "video.mp4",
+            "type": "string"
+          },
+          "sha256": {
+            "description": "SHA-256 of the content, as 64 hex digits; checked when you complete the upload.",
+            "type": "string"
+          },
+          "size": {
+            "description": "Exact size in bytes; the link only accepts this size.",
+            "example": 734003200,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "content_type",
+          "size",
+          "sha256"
+        ],
         "type": "object"
       },
       "Status": {
@@ -51717,6 +51863,52 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "UploadLink": {
+        "description": "Where and how to send a file straight to storage: send it with exactly this method, URL and\nheaders before `expires_at`, then complete the upload with its `id`.",
+        "properties": {
+          "expires_at": {
+            "description": "The URL stops working at this time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Headers to send with the file, exactly as given (the signature covers them).",
+            "example": {
+              "content-length": "734003200",
+              "content-type": "video/mp4"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "id": {
+            "description": "Id of the upload; also the id of the record it becomes.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "method": {
+            "description": "HTTP method to send the file with.",
+            "example": "PUT",
+            "type": "string"
+          },
+          "url": {
+            "description": "Signed URL of the storage to send the file to (not this server).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "method",
+          "url",
+          "headers",
+          "expires_at"
+        ],
         "type": "object"
       },
       "UploadedResponse": {
@@ -84556,6 +84748,277 @@
         ]
       }
     },
+    "/api/v1/files/uploads": {
+      "post": {
+        "description": "Requires `files.upload`. For large files when files are stored on S3: the answer is a signed\nlink; send the file there (not to this server) with the given method and headers before\n`expires_at`, then call `POST /api/v1/files/uploads/{id}/complete`. The link only accepts the\ndeclared size and type. When files are stored on the server's disk the answer is `409\nfiles.direct_upload_unavailable`: upload through `POST /api/v1/files`. Retry safely with an\n`Idempotency-Key` header.",
+        "operationId": "files_start_file_upload",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UploadLink"
+                }
+              }
+            },
+            "description": "The upload link. `Location` is the file it will become once completed.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `files.upload`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Files are stored where they cannot be uploaded straight to; code `files.direct_upload_unavailable`. Use `POST /api/v1/files`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The name, type, size or SHA-256 is invalid; see `errors` (all problems at once)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start an upload straight to storage.",
+        "tags": [
+          "files"
+        ],
+        "x-permissions": [
+          "files.upload"
+        ]
+      }
+    },
+    "/api/v1/files/uploads/{id}/complete": {
+      "post": {
+        "description": "Requires `files.upload` (your own uploads; `files.manage` for anyone's). The server reads the\nfile back and checks its size and SHA-256 against what you declared; a file that does not match\nis removed (`422 files.upload_mismatch`) — send the right file to the same link and complete\nagain. Calling it again after it succeeded returns the same file with `200`.",
+        "operationId": "files_complete_file_upload",
+        "parameters": [
+          {
+            "description": "Id of the upload.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FileResponse"
+                }
+              }
+            },
+            "description": "Already completed: the same file."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FileResponse"
+                }
+              }
+            },
+            "description": "The file was created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `files.upload`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No upload of yours has this id (code `files.upload_not_found`), or its file was deleted since (code `files.file_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The file is not in storage yet (code `files.upload_incomplete`), or the upload expired (code `files.upload_expired`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The file does not match the declared size or SHA-256 and was removed; code `files.upload_mismatch`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete an upload straight to storage.",
+        "tags": [
+          "files"
+        ],
+        "x-permissions": [
+          "files.upload",
+          "files.manage"
+        ]
+      }
+    },
     "/api/v1/files/{id}": {
       "delete": {
         "description": "Requires `files.upload` for your own files, `files.manage` for anyone's.",
@@ -108212,6 +108675,296 @@
           }
         ],
         "summary": "Rename a media tag.",
+        "tags": [
+          "media"
+        ],
+        "x-permissions": [
+          "media.write"
+        ]
+      }
+    },
+    "/api/v1/media/uploads": {
+      "post": {
+        "description": "Requires `media.write`. For large items when files are stored on S3: the answer is a signed\nlink; send the file there (not to this server) with the given method and headers before\n`expires_at`, then call `POST /api/v1/media/uploads/{id}/complete`. When files are stored on the\nserver's disk the answer is `409 media.direct_upload_unavailable`: upload through\n`POST /api/v1/media`. Retry safely with an `Idempotency-Key` header.",
+        "operationId": "media_start_media_upload",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartMediaUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UploadLink"
+                }
+              }
+            },
+            "description": "The upload link. `Location` is the item it will become once completed.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `media.write` (code `permission_denied`), or not in the chosen unit (code `org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Files are stored where they cannot be uploaded straight to; code `media.direct_upload_unavailable`. Use `POST /api/v1/media`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The name, type, size, SHA-256, folder, tags or unit is invalid; see `errors` (all problems at once)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start uploading a media item straight to storage.",
+        "tags": [
+          "media"
+        ],
+        "x-permissions": [
+          "media.write"
+        ]
+      }
+    },
+    "/api/v1/media/uploads/{id}/complete": {
+      "post": {
+        "description": "Requires `media.write` (your own uploads). The server reads the item back and checks it like\nan upload through the server — its real type from its first bytes, no active SVG content, image\nsize — and its size and SHA-256 against what you declared. A file that fails is removed; send\nthe right file to the same link and complete again. Calling it again after it succeeded returns\nthe same item with `200`.",
+        "operationId": "media_complete_media_upload",
+        "parameters": [
+          {
+            "description": "Id of the upload.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UploadedResponse"
+                }
+              }
+            },
+            "description": "Already completed: the same item."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UploadedResponse"
+                }
+              }
+            },
+            "description": "The item was created. `duplicates` lists items that already had this content.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `media.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No upload of yours has this id (code `media.upload_not_found`), or its item was deleted since (code `media.item_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The file is not in storage yet (code `media.upload_incomplete`), or the upload expired (code `media.upload_expired`)."
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The file is larger than the server accepts; code `media.too_large`. It was removed."
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The content is not of the declared type (code `media.content_mismatch`), the SVG has active content (code `media.svg_active_content`) or the image is damaged (code `media.invalid_image`). It was removed."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The file does not match the declared size or SHA-256 (code `media.upload_mismatch`; it was removed), or its folder was deleted since (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete an upload of a media item straight to storage.",
         "tags": [
           "media"
         ],

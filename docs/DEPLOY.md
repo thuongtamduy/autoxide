@@ -645,6 +645,21 @@ up to N times its limit. To share the limit per API key between servers, set
 in small lots (a quarter of `AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST`), so a key gets at most one
 lot per server more than its limit each minute. The limit per address stays per process.
 
+## Uploads straight to S3
+
+With files on S3, clients can upload large files straight to the bucket
+(`POST /api/v1/files/uploads`, guide: [`docs/guides/direct-uploads.md`](guides/direct-uploads.md)).
+Browsers need the bucket to allow it (CORS). On Amazon S3, for example:
+
+```json
+[{"AllowedOrigins": ["https://admin.example.com"], "AllowedMethods": ["PUT"],
+  "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"], "MaxAgeSeconds": 3600}]
+```
+
+The server checks every completed upload by reading it back (size and SHA-256), because not every
+S3-compatible service checks the signed checksum; raise `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`
+if you allow very large files. Abandoned uploads are removed by an hourly job.
+
 ### Updating without dropping requests
 
 When a server is told to stop (`SIGTERM`, as Docker, systemd and Kubernetes send), it

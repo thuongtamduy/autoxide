@@ -25,6 +25,22 @@ pub(crate) const ALLOWED_TYPES: Setting = Setting::new(
 )
 .with_default(DEFAULT_TYPES);
 
+pub(crate) const DIRECT_MAX_BYTES: Setting = Setting::new(
+    "AUTOXIDE_MEDIA_DIRECT_MAX_BYTES",
+    "Largest media item that can be uploaded straight to S3 with `POST /api/v1/media/uploads`, in \
+     bytes (1 to 5368709120). Completing such an upload reads the whole item back to check it: \
+     raise AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS for big items. Only used when files are stored \
+     on S3.",
+)
+.with_default("1073741824");
+
+pub(crate) const DIRECT_UPLOAD_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_MEDIA_DIRECT_UPLOAD_SECONDS",
+    "How long a link to upload a media item straight to S3 stays valid, in seconds (60 to 3600). \
+     Uploads not completed within an hour after that are removed.",
+)
+.with_default("900");
+
 pub(crate) const TRASH_DAYS: Setting = Setting::new(
     "AUTOXIDE_MEDIA_TRASH_DAYS",
     "Days an item stays in the trash before it is deleted for good (1 to 3650).",
@@ -64,6 +80,21 @@ pub(crate) struct MediaConfig {
     pub ai_send_private: bool,
     /// Ngôn ngữ được dịch `alt` (D-202), đúng dạng đã khai.
     pub alt_locales: Vec<String>,
+    /// Tải thẳng lên S3 (bước 40 P4).
+    pub direct: Direct,
+}
+
+/// Tải thẳng lên S3 (bước 40 P4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Direct {
+    pub max_bytes: u64,
+    pub ttl: std::time::Duration,
+}
+
+impl Default for Direct {
+    fn default() -> Self {
+        Direct { max_bytes: 1024 * 1024 * 1024, ttl: std::time::Duration::from_secs(900) }
+    }
 }
 
 /// Giới hạn của nội dung tải lên.
@@ -163,7 +194,16 @@ impl MediaConfig {
                 Ok(locales)
             }
         });
+        let direct_max = reader.get_with(&DIRECT_MAX_BYTES, |raw| {
+            parse_in_range(raw, 1u64, autoxide_kernel::upload::MAX_SINGLE_PUT_BYTES)
+        });
+        let direct_seconds =
+            reader.get_with(&DIRECT_UPLOAD_SECONDS, |raw| parse_in_range(raw, 60u64, 3600));
         Ok(MediaConfig {
+            direct: Direct {
+                max_bytes: direct_max?,
+                ttl: std::time::Duration::from_secs(direct_seconds?),
+            },
             limits: Limits { max_bytes: max_bytes?, allowed_types: allowed_types? },
             trash_days: trash_days?,
             image_widths: image_widths?,

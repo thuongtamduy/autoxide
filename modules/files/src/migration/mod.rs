@@ -33,5 +33,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "files"),
+        // Bảng `files_uploads`: lượt tải thẳng lên S3 (bước 40 P4).
+        autoxide_kernel::upload::uploads_migration("m0007_create_uploads", "files"),
     ]
 }

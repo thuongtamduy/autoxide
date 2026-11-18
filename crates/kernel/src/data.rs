@@ -12,4 +12,5 @@ pub mod rows;
 pub mod search;
 pub mod tenancy;
 pub mod transfer;
+pub mod upload;
 pub mod version;

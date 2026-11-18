@@ -42,12 +42,12 @@ const NAME_MAX_LENGTH: usize = 255;
 pub(crate) type FileRecord = entity::Model;
 
 /// Thông tin của một file vừa ghi nội dung, chờ lưu dòng.
-struct NewFile {
-    id: Uuid,
-    name: String,
-    content_type: String,
-    size: u64,
-    sha256: String,
+pub(crate) struct NewFile {
+    pub id: Uuid,
+    pub name: String,
+    pub content_type: String,
+    pub size: u64,
+    pub sha256: String,
 }
 
 /// Một file đang được tải xuống.
@@ -59,10 +59,13 @@ pub(crate) struct Download {
 // Service không giữ database: database và nơi lưu là của khách, đi theo `TenantContext`.
 pub(crate) struct FileService {
     storage: Arc<dyn Storage>,
-    outbox: Outbox,
+    pub(crate) outbox: Outbox,
     limits: Limits,
     /// Hạn mức dung lượng theo gói (bước 35).
     pub(crate) entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+    /// Tải thẳng lên S3 (bước 40 P4): giới hạn và bảng `files_uploads`.
+    pub(crate) direct: crate::config::Direct,
+    pub(crate) uploads: autoxide_kernel::upload::DirectUploads,
 }
 
 /// Hạn mức dung lượng lưu file của một khách (bước 35), theo byte.
@@ -74,13 +77,20 @@ pub(crate) const STORAGE_LIMIT: autoxide_kernel::entitlement::Limit =
     );
 
 /// Mã giữ chỗ hạn mức của file `id`.
-fn storage_reference(id: Uuid) -> String {
+pub(crate) fn storage_reference(id: Uuid) -> String {
     format!("files.file:{id}")
 }
 
 impl FileService {
     pub(crate) fn new(storage: Arc<dyn Storage>, outbox: Outbox, limits: Limits) -> Self {
-        FileService { storage, outbox, limits, entitlements: Default::default() }
+        FileService {
+            storage,
+            outbox,
+            limits,
+            entitlements: Default::default(),
+            direct: crate::config::Direct::default(),
+            uploads: autoxide_kernel::upload::DirectUploads::new("files"),
+        }
     }
 
     pub(crate) fn limits(&self) -> &Limits {
@@ -307,7 +317,7 @@ fn visible(principal: &Principal, file: Option<FileRecord>, id: Uuid) -> Result<
 /// Tên file: bỏ khoảng trắng hai đầu; 1 tới 255 ký tự; không có `/`, `\`, ký tự điều khiển
 /// hay ký tự định dạng vô hình (tên chỉ để hiển thị và đặt khi tải về, không bao giờ thành
 /// đường dẫn).
-fn check_name(name: &str) -> Result<String, Error> {
+pub(crate) fn check_name(name: &str) -> Result<String, Error> {
     let name = name.trim();
     let length = name.chars().count();
     let valid = (1..=NAME_MAX_LENGTH).contains(&length)
@@ -417,7 +427,7 @@ impl EventHandler for FileService {
     }
 }
 
-fn details(file: &FileRecord) -> serde_json::Value {
+pub(crate) fn details(file: &FileRecord) -> serde_json::Value {
     json!({
         "name": file.name,
         "content_type": file.content_type,
@@ -436,7 +446,7 @@ pub(crate) fn too_large(max: u64) -> Error {
     .with_param("max", max)
 }
 
-fn file_not_found(id: Uuid) -> Error {
+pub(crate) fn file_not_found(id: Uuid) -> Error {
     Error::not_found("files.file_not_found", "File `{id}` does not exist.").with_param("id", id)
 }
 
@@ -445,7 +455,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// Bây giờ, cắt tới micro giây để hai database trả cùng giá trị.
-fn now() -> DateTime<Utc> {
+pub(crate) fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
 

@@ -4,7 +4,10 @@
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::storage::{ByteStream, Storage, StorageLocation, StorageOpener, StoredFile};
+use autoxide_kernel::storage::{
+    ByteStream, ObjectInfo, PresignedUpload, Storage, StorageLocation, StorageOpener, StoredFile,
+    UploadConstraints,
+};
 use futures_util::{StreamExt as _, TryStreamExt as _};
 use object_store::aws::AmazonS3Builder;
 use object_store::buffered::BufWriter;
@@ -20,6 +23,8 @@ const PART_SIZE: usize = 8 * 1024 * 1024;
 
 pub(crate) struct ObjectStorage {
     store: Arc<dyn ObjectStore>,
+    /// Bộ ký link của S3 (cùng client với `store`); `None` với ổ đĩa: không tải thẳng được.
+    signer: Option<Arc<object_store::aws::AmazonS3>>,
     /// Thêm vào đầu mọi khoá: thư mục lưu file (ổ đĩa), hay thư mục con trong bucket (S3).
     prefix: Option<String>,
 }
@@ -37,10 +42,19 @@ impl ObjectStorage {
                 // `fsync`: ghi xong là nằm trên đĩa thật, như S3 bảo đảm — mất điện
                 // không mất file đã báo là lưu xong.
                 let store = LocalFileSystem::new().with_fsync(true).with_automatic_cleanup(true);
-                Ok(ObjectStorage { store: Arc::new(store), prefix: Some(base.to_string()) })
+                Ok(ObjectStorage {
+                    store: Arc::new(store),
+                    signer: None,
+                    prefix: Some(base.to_string()),
+                })
             }
             Backend::S3(s3) => {
-                Ok(ObjectStorage { store: Arc::new(s3_store(s3)?), prefix: s3.prefix.clone() })
+                let store = Arc::new(s3_store(s3)?);
+                Ok(ObjectStorage {
+                    store: store.clone(),
+                    signer: Some(store),
+                    prefix: s3.prefix.clone(),
+                })
             }
         }
     }
@@ -176,6 +190,56 @@ impl Storage for ObjectStorage {
             Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
             Err(error) => Err(storage_error(error)),
         }
+    }
+
+    async fn head(&self, key: &str) -> Result<Option<ObjectInfo>, Error> {
+        let path = self.path(key)?;
+        match self.store.head(&path).await {
+            Ok(meta) => Ok(Some(ObjectInfo::new(meta.size))),
+            Err(object_store::Error::NotFound { .. }) => Ok(None),
+            Err(error) => Err(storage_error(error)),
+        }
+    }
+
+    /// Link `PUT` ký SigV4 (bước 40 P4), ký kèm `content-type` và `x-amz-checksum-sha256`: S3
+    /// từ chối request thiếu hay sai một trong hai, và từ chối nội dung khác hash — tức khác cả cỡ.
+    /// `content-length` không ký được qua `object_store` (header do bộ ký giữ); nó vẫn được trả để
+    /// client gửi. Dịch vụ tương thích S3 có thể không kiểm hash: lệnh xác nhận luôn đọc lại, đo cỡ
+    /// và băm (D-378).
+    async fn presign_upload(
+        &self,
+        key: &str,
+        constraints: &UploadConstraints,
+        ttl: std::time::Duration,
+    ) -> Result<Option<PresignedUpload>, Error> {
+        use base64::Engine as _;
+        use object_store::signer::{
+            HeaderName, HeaderValue, Method, SignedUrlOptions, Signer as _,
+        };
+        let Some(signer) = &self.signer else {
+            return Ok(None);
+        };
+        let path = self.path(key)?;
+        let checksum = base64::engine::general_purpose::STANDARD.encode(constraints.sha256);
+        let signed = [
+            ("content-type", constraints.content_type.clone()),
+            ("x-amz-checksum-sha256", checksum),
+        ];
+        let mut options = SignedUrlOptions::new();
+        for (name, value) in &signed {
+            let name = HeaderName::from_bytes(name.as_bytes()).map_err(Error::internal)?;
+            let value = HeaderValue::from_str(value).map_err(Error::internal)?;
+            options = options.with_signed_header(name, value);
+        }
+        let mut headers = vec![("content-length".to_owned(), constraints.size.to_string())];
+        headers.extend(signed.into_iter().map(|(name, value)| (name.to_owned(), value)));
+        let issued = chrono::Utc::now();
+        let url = signer
+            .signed_url_opts(Method::PUT, &path, ttl, &options)
+            .await
+            .map_err(storage_error)?;
+        let expires_at = issued + chrono::Duration::from_std(ttl).map_err(Error::internal)?;
+        Ok(Some(PresignedUpload::new("PUT", url.to_string(), headers, expires_at)))
     }
 }
 
