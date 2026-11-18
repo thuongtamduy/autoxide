@@ -880,8 +880,12 @@ async fn job_xong_va_nhac_ten_thanh_tin_trong_ung_dung() {
 
         let (status, inbox) = call(&fx.app, "GET", "/me/inbox", "alice", None).await;
         assert_eq!(status, StatusCode::OK, "{inbox}");
-        let titles: Vec<&str> =
-            inbox["data"].as_array().unwrap().iter().map(|m| m["title"].as_str().unwrap()).collect();
+        let titles: Vec<&str> = inbox["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["title"].as_str().unwrap())
+            .collect();
         assert_eq!(titles.len(), 2, "{inbox}");
         assert!(titles.contains(&"CSV export of content-entries: succeeded"), "{titles:?}");
         assert!(titles.contains(&"You were mentioned in a note"), "{titles:?}");
