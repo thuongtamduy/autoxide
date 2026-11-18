@@ -516,6 +516,38 @@ at once. `modules/notes` is the worked example (`notes.notes`).
   `TaskArgument`s and a `TaskRun`, run with `autoxide task <module>.<task> name=value`. It
   calls the service, like REST does. See `modules/media/src/images/refresh.rs`.
 
+### 9a. What the module shows in interfaces
+
+Interfaces and agents learn from the kernel what a module offers; a module declares its part
+once, next to its code (step 51). Every one of these is optional (default: nothing).
+
+- **Menu**: `Module::navigation` — groups and items with permissions, plan features and a
+  work counter. Labels are English, translated through the module's `text:` keys.
+- **Work inbox**: `context.work_source(…)` — a `WorkSource` computes the work from data (no "done"
+  flag), with a count for the menu. Items have a stable key `<source>:<record id>`, so people
+  snooze and assign them.
+- **Search and codes**: `context.finder_source(…)` (a `FinderSource`; `fields` and `scoped` when
+  it understands `field:value` and `scope=`) and `context.code_resolver(…)` (order numbers, page
+  addresses… for `GET /api/v1/kernel/resolve`).
+- **Figures and setup**: `context.summary_metric(…)` (a `MetricInfo` always carries its
+  definition) and `context.setup_step(…)` (done is computed from data).
+- **Activity**: `EventInfo::activity(…)` gives an event a readable sentence; notes and history of
+  any record of the resource directory come from the kernel.
+- **Lists**: every list endpoint (a `GET` with `cursor`) gets `x-autoxide-filters` from its own
+  query parameters — keep them in one `IntoParams` struct. Exports: `context.export_source(…)` with
+  the list's id. Bulk actions: `context.bulk_action(…)`; the action must be safe to repeat.
+- **Risky commands**: add `("x-approval" = json!("agent"))` to the route's `extensions`; an MCP
+  tool doing the same calls `.requires_approval_for_agent()`.
+- **Tenant choices**: `Module::reason_lists` (codes with English labels; legal ones stay on),
+  `Module::overridable_texts` (terms a tenant may reword; never error texts),
+  `context.taggable(kind, write_permission)` for internal tags, and
+  `Module::custom_field_targets` for custom fields. A module taking custom fields stores
+  `custom_fields` on its records, checks them with `CustomFields::validate`, adds
+  `custom_fields::index_migration` and writes the index with `CustomFields::write_index` in the
+  same transaction as the record.
+- **Connections to partners**: settings named `<module>.connection.<kind>.<field>`;
+  `context.connection_probe(…)` to test one, `ConnectionStatus::record` after each use.
+
 ### 10. Translations
 
 Every error `code` and mail template key has a Vietnamese text in `locales/vi.json`,
