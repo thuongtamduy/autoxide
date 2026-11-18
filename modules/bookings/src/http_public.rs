@@ -17,6 +17,7 @@ use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::openings::{Availability, AvailabilityQuery};
 use crate::service::BookingsService;
@@ -143,7 +144,7 @@ impl BookingAvailability {
 }
 
 /// Which free times to find.
-#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema)]
+#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema, Validate)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct AvailabilityParams {
     /// The service.
