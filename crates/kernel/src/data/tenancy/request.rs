@@ -129,6 +129,9 @@ pub(crate) async fn authenticate(
         _ => principal,
     };
     parts.extensions.insert(Authenticated(principal.clone()));
+    if let Some(slot) = parts.extensions.get::<crate::ops::request_log::CallerSlot>() {
+        slot.note_principal(&principal);
+    }
     Ok(principal)
 }
 
@@ -187,6 +190,14 @@ pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
     if let Some(tenant) = parts.extensions.get::<TenantContext>() {
         return Ok(tenant.clone());
     }
+    let tenant = resolve_tenant(parts).await?;
+    if let Some(slot) = parts.extensions.get::<crate::ops::request_log::CallerSlot>() {
+        slot.note_tenant(&tenant);
+    }
+    Ok(tenant)
+}
+
+async fn resolve_tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
     let registry = parts.extensions.get::<DatabaseRegistry>().cloned().ok_or_else(|| {
         Error::internal(
             "an endpoint needs the tenant of the request, but no tenancy registry is set",

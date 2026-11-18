@@ -5866,6 +5866,29 @@ export type Data_PersonalDataResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Pin = {
+  /** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
+  data: {
+    created_at: string;
+    id: string;
+    /** `navigation` (a screen) or `record`. */
+    kind: string;
+    /**
+     * The screen's label in the language of `Accept-Language`, or the label sent when pinning
+     * a record.
+     */
+    label: string;
+    /** Display order, smallest first. */
+    position: number;
+    /**
+     * The screen id from `GET /api/v1/kernel/navigation` (e.g. `content.entries`), or
+     * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
+     */
+    target: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PlanResponse = {
   /** A plan: the modules, features and limits a tenant gets, and its prices. */
   data: {
@@ -7963,6 +7986,28 @@ export type Data_Vec_PermissionResponse = {
      * a person owns (`own`). `false`: it can only be granted for the whole tenant.
      */
     scoped: boolean;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_Pin = {
+  data: {
+    created_at: string;
+    id: string;
+    /** `navigation` (a screen) or `record`. */
+    kind: string;
+    /**
+     * The screen's label in the language of `Accept-Language`, or the label sent when pinning
+     * a record.
+     */
+    label: string;
+    /** Display order, smallest first. */
+    position: number;
+    /**
+     * The screen id from `GET /api/v1/kernel/navigation` (e.g. `content.entries`), or
+     * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
+     */
+    target: string;
   }[];
 };
 
@@ -10400,6 +10445,36 @@ export type Localized = {
   vi?: string | null;
 };
 
+/** One call in the log of the tenant. */
+export type LoggedRequest = {
+  /** `user`, `agent`, `service`, `system`, `support`, `app` or `scim`. */
+  actor_kind: string;
+  /** The API key used, when the call came with one. */
+  api_key_id?: string | null;
+  /** The approval request the call created (`202`) or used (`Autoxide-Approval`). */
+  approval_id?: string | null;
+  at: string;
+  /** The error `code`, when the call failed. */
+  code?: string | null;
+  duration_ms: number;
+  id: string;
+  idempotency_key?: string | null;
+  /** HTTP method, or `MCP` for a tool call. */
+  method: string;
+  /**
+   * The route template (no real ids), e.g. `/api/v1/content/entries/{id}`, or
+   * `mcp:<tool>` for a tool call, e.g. `mcp:content.publish_entry`.
+   */
+  path: string;
+  /** `x-request-id` of the call. */
+  request_id?: string | null;
+  /** HTTP status; for a tool call `200`, or `400` when the tool returned an error. */
+  status: number;
+  /** OpenTelemetry trace id, when traces are exported. */
+  trace_id?: string | null;
+  user_id?: string | null;
+};
+
 /** Finish signing in with the token from the mail. */
 export type LoginLinkConfirmation = {
   /** The `device_secret` from `POST /api/v1/auth/login/link`, when it asked to bind the device. */
@@ -10820,6 +10895,17 @@ export type MigrationRunRequest = {
   placement?: string | null;
 };
 
+/** Where an item goes on a phone. */
+export type MobileView = {
+  /** Order within the placement, smallest first. */
+  order: number;
+  /**
+   * `primary` (bottom bar, at most 5 in the answer) or `secondary` (the "More" menu). Items a
+   * module hides on phones are left out of the answer.
+   */
+  placement: string;
+};
+
 /** A deprecated endpoint. */
 export type ModuleDeprecation = {
   method: string;
@@ -11031,6 +11117,7 @@ export type NavItemView = {
   /** Stable key of the screen, e.g. `content.entries`. */
   id: string;
   label: string;
+  mobile?: MobileView | null;
   required_feature?: string | null;
   /** Label of the sub-group in the row of tabs, when there is one. */
   section?: string | null;
@@ -12975,6 +13062,40 @@ export type Page_ListResponse = {
 };
 
 /** One page of a list. */
+export type Page_LoggedRequest = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `user`, `agent`, `service`, `system`, `support`, `app` or `scim`. */
+    actor_kind: string;
+    /** The API key used, when the call came with one. */
+    api_key_id?: string | null;
+    /** The approval request the call created (`202`) or used (`Autoxide-Approval`). */
+    approval_id?: string | null;
+    at: string;
+    /** The error `code`, when the call failed. */
+    code?: string | null;
+    duration_ms: number;
+    id: string;
+    idempotency_key?: string | null;
+    /** HTTP method, or `MCP` for a tool call. */
+    method: string;
+    /**
+     * The route template (no real ids), e.g. `/api/v1/content/entries/{id}`, or
+     * `mcp:<tool>` for a tool call, e.g. `mcp:content.publish_entry`.
+     */
+    path: string;
+    /** `x-request-id` of the call. */
+    request_id?: string | null;
+    /** HTTP status; for a tool call `200`, or `400` when the tool returned an error. */
+    status: number;
+    /** OpenTelemetry trace id, when traces are exported. */
+    trace_id?: string | null;
+    user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ManagedApiKeyResponse = {
   /** The items of this page, in the requested order. */
   data: (ApiKeyResponse & {
@@ -14077,6 +14198,48 @@ export type PermissionResponse = {
 export type PersonalDataResponse = Record<string, unknown> & {
   /** Your profile, roles, sessions, API keys, passkeys and two-step sign-in status. */
   auth: Record<string, unknown>;
+};
+
+/** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
+export type Pin = {
+  created_at: string;
+  id: string;
+  /** `navigation` (a screen) or `record`. */
+  kind: string;
+  /**
+   * The screen's label in the language of `Accept-Language`, or the label sent when pinning
+   * a record.
+   */
+  label: string;
+  /** Display order, smallest first. */
+  position: number;
+  /**
+   * The screen id from `GET /api/v1/kernel/navigation` (e.g. `content.entries`), or
+   * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
+   */
+  target: string;
+};
+
+/** What to pin. */
+export type PinInput = {
+  /** `navigation` or `record`. */
+  kind: string;
+  /**
+   * Required for `record` (1 to 200 characters, e.g. the record's title); ignored for
+   * `navigation`, whose label comes from the navigation.
+   */
+  label?: string | null;
+  /**
+   * For `navigation`, a screen id from `GET /api/v1/kernel/navigation`; for `record`,
+   * `<record kind>:<id>`.
+   */
+  target: string;
+};
+
+/** The new order of all my pins. */
+export type PinOrder = {
+  /** Ids of every pin of the caller, in the wanted order. */
+  ids: string[];
 };
 
 /** Where tenants' data is kept: one database. Connection URLs are never shown. */
@@ -21718,6 +21881,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/devtools/requests": {
+    /** List the calls made in this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; actor_kind?: string; api_key_id?: string; path?: string; status?: number; from?: string; to?: string }; };
+      responses: {
+        200: Page_LoggedRequest;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/domains": {
     /** List this tenant's domains. */
     get: {
@@ -21914,11 +22090,12 @@ export interface paths {
   "/api/v1/kernel/navigation": {
     /** Get the navigation of the admin interface. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; device?: string }; };
       responses: {
         200: Data_NavigationView;
         304: void;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -23151,6 +23328,55 @@ export interface paths {
       responses: {
         200: Data_Vec_MyPermission;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/pins": {
+    /** List my pins. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_Pin;
+        401: Problem;
+        default: Problem;
+      };
+    };
+    /** Pin a screen or a record. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PinInput;
+      responses: {
+        200: Data_Pin;
+        201: Data_Pin;
+        401: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/pins/order": {
+    /** Reorder my pins. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PinOrder;
+      responses: {
+        200: Data_Vec_Pin;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/pins/{id}": {
+    /** Unpin. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
         default: Problem;
       };
     };

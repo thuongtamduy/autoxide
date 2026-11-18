@@ -9082,3 +9082,47 @@ push.
    hỏi khi cần secret thật"); là module riêng cài `MobilePushSender`, làm khi chủ dự án cấp khoá.
 4. Đóng bước 37: mọi mục `[x]`, chuyển sang `docs/roadmap/done.md` như bước 35 / 36. Còn lại có ghi: báo cáo đã lưu (A-b10) dời sang
    bước 51 / 38 (D-367); bộ nối thật (SMS brandname, Zalo ZNS, web push VAPID, FCM / APNs, VNeID / eKYC) chờ khoá của nhà cung cấp.
+
+## D-369 · Sổ điều hướng cho điện thoại: gợi ý `mobile` trên `NavItem`, thanh đáy tối đa 5 mục (bước 52 mục 6, D-232) — 2026-11-18 — agent quyết
+
+Bối cảnh: giao diện cần biết màn nào đặt ở thanh đáy của điện thoại. Kernel không có danh sách màn viết cứng (D-200), nên module
+tự khai cùng chỗ khai mục.
+
+1. `NavItem` thêm `mobile: MobileHint { placement, order }` (`Primary` / `Secondary` / `Hidden`), đặt bằng `.mobile(…)`. Hàm dựng
+   cho mặc định `Secondary` với `order` của mục — module cũ không phải sửa (như D-038).
+2. `GET /api/v1/kernel/navigation?device=mobile` (và tool `kernel.navigation` với `device`): lọc như desktop, bỏ mục `Hidden`, mỗi
+   mục thêm `mobile`, mục trong nhóm sắp theo chỗ rồi thứ tự. Giữ 5 mục `primary` có `order` nhỏ nhất trong số mục hiện và
+   `available`; phần dư và mục `locked` thành `secondary`. Không kiểm số mục lúc khởi động: tập module bật khác nhau theo khách.
+   `device` khác `desktop` / `mobile` → 422. `device=desktop` (mặc định) trả đúng như trước, không có trường `mobile`. `ETag` tính
+   cả `device`.
+3. Màn `primary` đầu tiên: Tổng quan (10), Việc và hoạt động (20), Bài viết và trang (30), Bình luận (40), Thư viện media (50) —
+   việc hằng ngày làm được trên điện thoại (xem số liệu, xử lý việc, duyệt bài, duyệt bình luận, tải ảnh). `Hidden`: khoá API,
+   webhook, cơ sở dữ liệu của nền tảng — việc của nhà phát triển / vận hành, cần màn hình lớn. Module thương mại sau này tự khai
+   (vd đơn hàng) và đẩy mục kém hơn xuống `secondary` theo `order`.
+
+## D-370 · Nhật ký request theo khách và nhật ký lệnh của agent (bước 52 mục 1, D-202) — 2026-11-18 — agent quyết
+
+Bối cảnh: bàn kỹ thuật cần biết ai (người, API key, agent) đã gọi gì, kết quả ra sao, mà không làm chậm request và không lưu dữ
+liệu cá nhân.
+
+1. Bảng `kernel_request_log` (cấp khách hàng): thời điểm, `actor_kind` (đủ bảy giá trị của `ActorKind`), người dùng, API key,
+   phương thức, **đường dẫn mẫu** (`MatchedPath`, không có ID thật), status, `code` lỗi, thời gian xử lý, `Idempotency-Key`,
+   `approval_id`, `request_id`, `trace_id` (khi xuất trace OTLP). Không lưu thân, header xác thực, query. Index (`tenant_id`,
+   `id`), (`tenant_id`, `actor_kind`, `id`), (`tenant_id`, `api_key_id`, `id`), sweep (`expires_at`).
+2. **Chỉ ghi request đã xác thực.** Request công khai (trang bán hàng, form) không phải việc của bàn kỹ thuật; ghi thì bảng phình
+   theo lượt xem.
+3. **Ghi bất đồng bộ bằng hàng đợi trong bộ nhớ có giới hạn** (10 000 dòng), không qua outbox: outbox ghi trong transaction của
+   request, tức thêm một lệnh ghi vào đường nóng. Một tác vụ nền gom tối đa 200 dòng, mỗi khách một câu `INSERT` nhiều dòng.
+   Hàng đợi đầy thì bỏ dòng và đếm `kernel_request_log_dropped_total`; dừng máy chủ có thể mất dòng chưa ghi — chấp nhận vì đây
+   là nhật ký, không phải dữ liệu nghiệp vụ.
+4. Người gọi lấy từ extractor: lớp log đặt một ô (`CallerSlot`) vào request, extractor `Principal` / `TenantContext` điền khi giải
+   ra — không xác thực lần hai.
+5. Lệnh MCP ghi ở lớp MCP, một dòng mỗi lần gọi tool (kể cả lỗi), `mcp:<tool>`, phương thức `MCP`, status 200 / 400 (lỗi), không
+   ghi tham số; request `POST /mcp` bao ngoài không ghi riêng. `approval_id`: dòng `202` của lệnh chờ duyệt và dòng gửi lại với
+   `Autoxide-Approval` cùng giữ ID của yêu cầu duyệt.
+6. Hạn lưu `AUTOXIDE_REQUEST_LOG_DAYS` (mặc định 14, `0` tắt), lưu thành `expires_at` của từng dòng. **Dọn bởi tác vụ ghi**, mỗi
+   database tối đa mỗi giờ một lần, thay cho job theo lịch: một lịch hằng ngày ở mọi database sẽ thêm job vào mọi database dù
+   không có nhật ký (đã gặp ở D-365 với việc dọn hoãn việc). Database không có request nào thì cũng không có dòng nào để dọn.
+7. `GET /api/v1/kernel/devtools/requests` và tool MCP `kernel.request_log` (`kernel.devtools.read`, chỉ đọc), lọc `actor_kind`
+   (nhiều giá trị), `api_key_id`, `path` (chính xác), `status`, `from` / `to`. Khai luôn `kernel.devtools.manage` cho các thao tác
+   ghi của bàn kỹ thuật (gửi lại webhook, chạy lại job).

@@ -246,12 +246,17 @@ pub fn build(
         .clone()
         .map(|inner| rate_limit::ApiKeyLimited::wrap(inner, config.api_key_rate_limit));
     let translations = Arc::new(extras.translations);
+    // Nhật ký request theo khách (bước 52): chỉ khi có sổ database và hạn lưu > 0.
+    let request_log = extras.tenancy.as_ref().and_then(|registry| {
+        crate::ops::request_log::RequestLog::start(registry.clone(), config.request_log_days)
+    });
     if let Some(mcp) = mcp::router(
         extras.tools,
         translations.clone(),
         limited.clone(),
         &config.cors_origins,
         extras.entitlements.clone(),
+        request_log.clone(),
     ) {
         router = router.merge(mcp);
     }
@@ -327,7 +332,9 @@ pub fn build(
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             deprecation::mark(deprecated.clone(), request, next)
         }))
-        .layer(middleware::from_fn(log::log_requests))
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            log::log_requests(request_log.clone(), request, next)
+        }))
         // NGOÀI lớp log, trong lớp request id: mọi response (404, 429, preflight…) đều có header.
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             security_headers::add(security.clone(), request, next)

@@ -149,6 +149,13 @@ pub const HSTS_SECONDS: Setting = Setting::new(
 )
 .with_default("0");
 
+pub const REQUEST_LOG_DAYS: Setting = Setting::new(
+    "AUTOXIDE_REQUEST_LOG_DAYS",
+    "Days the per-tenant log of signed-in API and MCP calls is kept (0 to 365); `0` turns the \
+     log off. No bodies, tokens or query strings are logged.",
+)
+.with_default("14");
+
 pub const HSTS_INCLUDE_SUBDOMAINS: Setting = Setting::new(
     "AUTOXIDE_HTTP_HSTS_INCLUDE_SUBDOMAINS",
     "Add `includeSubDomains` to the `Strict-Transport-Security` header (`true` or `false`): \
@@ -338,6 +345,8 @@ pub struct HttpConfig {
     pub client_ip_header: Option<HeaderName>,
     /// Header bảo mật cho mọi response.
     pub security_headers: SecurityHeaders,
+    /// Số ngày giữ nhật ký request theo khách (bước 52); `0`: không ghi.
+    pub request_log_days: u16,
 }
 
 /// Giới hạn số request của một địa chỉ client.
@@ -391,6 +400,8 @@ impl HttpConfig {
         let hsts_seconds =
             reader.get_with(&HSTS_SECONDS, |raw| parse_in_range(raw, 0u64, 63_072_000));
         let hsts_include_subdomains = reader.get_with(&HSTS_INCLUDE_SUBDOMAINS, parse_bool);
+        let request_log_days =
+            reader.get_with(&REQUEST_LOG_DAYS, |raw| parse_in_range(raw, 0u16, 365));
         let mut trusted_proxies = reader.optional_with(&TRUSTED_PROXIES, parse_ranges);
         // Dải proxy mà không có header thì không có tác dụng gì: báo sai thay vì lặng lẽ bỏ qua.
         if matches!(&trusted_proxies, Ok(Some(_))) && matches!(&client_ip_header, Ok(None)) {
@@ -420,6 +431,7 @@ impl HttpConfig {
                 hsts_seconds: hsts_seconds?,
                 hsts_include_subdomains: hsts_include_subdomains?,
             },
+            request_log_days: request_log_days?,
         })
     }
 }

@@ -4717,11 +4717,18 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Get the screens of the admin interface you may use in this tenant, grouped as in the side bar: `locked` screens need a feature the plan lacks. Use it to tell a person where to go.",
+      "description": "Get the screens of the admin interface you may use in this tenant, grouped as in the side bar: `locked` screens need a feature the plan lacks. Use it to tell a person where to go; pass `device: \"mobile\"` for the phone layout.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Where the caller works.",
         "properties": {
+          "device": {
+            "description": "`desktop` (default) or `mobile`: with `mobile` each item says where it goes on a phone.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "org_id": {
             "description": "The organization unit chosen; omitted: the whole tenant.",
             "format": "uuid",
@@ -4736,6 +4743,91 @@
       "name": "kernel.navigation",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the recent API and MCP calls made in this tenant (who, which route or tool, status, error code), newest first. Filter by `actor_kind` (e.g. `agent`), `api_key_id`, exact `path` (e.g. `mcp:content.publish_entry`) or `status`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which calls to list (the same filters as the REST endpoint).",
+        "properties": {
+          "actor_kind": {
+            "description": "Kinds of actor, comma-separated, e.g. `agent`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "api_key_id": {
+            "description": "Only calls made with this API key.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "`next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "At or after this time (RFC 3339).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "1 to 200; 50 by default.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "path": {
+            "description": "Exactly this route template or `mcp:<tool>`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "Only calls that ended with this HTTP status.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Before this time (RFC 3339).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.request_log",
+      "output_schema": null,
+      "permissions": [
+        "kernel.devtools.read"
+      ]
     },
     {
       "annotations": {

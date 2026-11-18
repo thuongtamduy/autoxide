@@ -1256,7 +1256,11 @@ async fn agent_goi_lenh_rui_ro_nhan_202_approval_required() {
             .via_api_key(Uuid::from_u128(9))
             .with_actor_kind(autoxide_kernel::access::ActorKind::Agent);
         let app = TestApp::builder(test)
-            .user("editor", 2, &["content.read", "content.write", "content.delete"])
+            .user(
+                "editor",
+                2,
+                &["content.read", "content.write", "content.delete", "kernel.devtools.read"],
+            )
             .principal("robot", robot)
             .provide::<dyn Media>(media)
             .provide::<dyn TextModel>(text)
@@ -1337,6 +1341,32 @@ async fn agent_goi_lenh_rui_ro_nhan_202_approval_required() {
         assert_eq!(
             send(&app, "GET", &format!("/entries/{id}"), Some("editor"), &[], None).await.status(),
             StatusCode::NOT_FOUND
+        );
+        // Nhật ký lệnh của agent (D-202): dòng 202 và dòng chạy thật cùng giữ `approval_id`.
+        let mut rows = Vec::new();
+        for _ in 0..100 {
+            let page = app
+                .get("/api/v1/kernel/devtools/requests?actor_kind=agent&path=/api/v1/content/entries/{id}")
+                .token("editor")
+                .send()
+                .await
+                .unwrap()
+                .json();
+            rows = page["data"].as_array().unwrap().clone();
+            if rows.iter().filter(|row| row["method"] == "DELETE").count() >= 3 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        }
+        let statuses: Vec<(u64, &str)> = rows
+            .iter()
+            .filter(|row| row["method"] == "DELETE")
+            .map(|row| (row["status"].as_u64().unwrap(), row["approval_id"].as_str().unwrap_or("")))
+            .collect();
+        assert_eq!(
+            statuses,
+            [(204, approval.as_str()), (409, approval.as_str()), (202, approval.as_str())],
+            "lenh_cho_duyet_giu_approval_id"
         );
         let used = app
             .get(&format!("/api/v1/kernel/approvals/{approval}"))

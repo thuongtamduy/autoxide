@@ -18,10 +18,10 @@ use uuid::Uuid;
 
 use crate::access::{OrgTarget, Principal};
 use crate::entitlement::EntitlementsHandle;
-use crate::error::Error;
+use crate::error::{Error, FieldError};
 use crate::i18n::{Language, Translations};
 use crate::mcp::Tool;
-use crate::module::navigation::{NavigationCatalog, Space};
+use crate::module::navigation::{MobilePlacement, NavigationCatalog, Space};
 use crate::ops::module_catalog::ModuleCatalog;
 use crate::response::{Data, Problem};
 use crate::tenancy::{OrgId, TenantContext, root_of};
@@ -66,6 +66,20 @@ pub(crate) struct NavItemView {
     pub required_feature: Option<String>,
     /// Work source of the inbox that counts pending work for this screen, when there is one.
     pub counter: Option<String>,
+    /// Only with `device=mobile`: where the item goes on a phone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mobile: Option<MobileView>,
+}
+
+/// Where an item goes on a phone.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct MobileView {
+    /// `primary` (bottom bar, at most 5 in the answer) or `secondary` (the "More" menu). Items a
+    /// module hides on phones are left out of the answer.
+    #[schema(example = "primary")]
+    pub placement: String,
+    /// Order within the placement, smallest first.
+    pub order: u16,
 }
 
 /// Where the caller works.
@@ -75,6 +89,26 @@ pub(crate) struct NavigationQuery {
     /// The organization unit chosen in the interface; omitted: the whole tenant. Items show when
     /// the caller has one of their permissions at this unit.
     org_id: Option<Uuid>,
+    /// `desktop` (default) or `mobile`: with `mobile` each item carries `mobile`, items hidden on
+    /// phones are left out, and items are ordered by placement then order.
+    #[param(example = "mobile")]
+    device: Option<String>,
+}
+
+/// Số mục tối đa trên thanh đáy của điện thoại (D-232).
+const MOBILE_PRIMARY_MAX: usize = 5;
+
+/// `device` của query hay tool: `true` khi là điện thoại.
+fn is_mobile(device: Option<&str>) -> Result<bool, Error> {
+    match device {
+        None | Some("desktop") => Ok(false),
+        Some("mobile") => Ok(true),
+        Some(_) => Err(Error::validation(vec![FieldError::new(
+            "device",
+            "invalid",
+            "must be `desktop` or `mobile`",
+        )])),
+    }
 }
 
 #[derive(Clone)]
@@ -92,6 +126,7 @@ impl NavigationState {
         principal: &Principal,
         org_id: Option<Uuid>,
         language: Language,
+        mobile: bool,
     ) -> Result<NavigationView, Error> {
         let Some(catalog) = self.catalog.navigation() else {
             return Ok(NavigationView { groups: Vec::new() });
@@ -118,6 +153,9 @@ impl NavigationState {
                     continue;
                 }
                 let locked = item.feature.filter(|feature| !entitlements.has_feature(feature));
+                if mobile && item.mobile.placement == MobilePlacement::Hidden {
+                    continue;
+                }
                 items.push(NavItemView {
                     id: item.id.to_owned(),
                     label: self.translations.describe(item.label, language),
@@ -127,6 +165,10 @@ impl NavigationState {
                     state: if locked.is_some() { "locked" } else { "available" }.to_owned(),
                     required_feature: locked.map(str::to_owned),
                     counter: item.counter.map(str::to_owned),
+                    mobile: mobile.then(|| MobileView {
+                        placement: item.mobile.placement.as_str().to_owned(),
+                        order: item.mobile.order,
+                    }),
                 });
             }
             if !items.is_empty() {
@@ -139,7 +181,45 @@ impl NavigationState {
                 });
             }
         }
+        if mobile {
+            limit_primary(&mut groups);
+        }
         Ok(NavigationView { groups })
+    }
+}
+
+/// Giữ tối đa 5 mục `primary` (thứ tự nhỏ nhất, chỉ mục `available`), phần còn lại thành
+/// `secondary`; rồi sắp mục trong nhóm theo chỗ, thứ tự. Không lỗi lúc khởi động vì tập module bật
+/// khác nhau theo khách.
+fn limit_primary(groups: &mut [NavGroupView]) {
+    let mut primary: Vec<(u16, String)> = groups
+        .iter()
+        .flat_map(|group| group.items.iter())
+        .filter_map(|item| {
+            let hint = item.mobile.as_ref()?;
+            (hint.placement == "primary" && item.state == "available")
+                .then(|| (hint.order, item.id.clone()))
+        })
+        .collect();
+    primary.sort();
+    primary.truncate(MOBILE_PRIMARY_MAX);
+    for group in groups.iter_mut() {
+        for item in &mut group.items {
+            if let Some(hint) = item.mobile.as_mut()
+                && hint.placement == "primary"
+                && !primary.iter().any(|(_, id)| *id == item.id)
+            {
+                hint.placement = "secondary".to_owned();
+            }
+        }
+        group.items.sort_by_key(|item| {
+            let hint = item.mobile.as_ref();
+            (
+                hint.map_or(1, |hint| u8::from(hint.placement != "primary")),
+                hint.map_or(0, |hint| hint.order),
+                item.id.clone(),
+            )
+        });
     }
 }
 
@@ -159,7 +239,8 @@ pub(crate) fn routes(state: NavigationState) -> OpenApiRouter {
 /// Any signed-in user. The groups and screens modules declare, for the caller in this tenant at
 /// `org_id`: a screen shows when its module is on for the tenant and the caller has one of its
 /// permissions there; it is `locked` (shown, not hidden) when the plan lacks a feature it needs.
-/// Labels follow `Accept-Language`. Send the `ETag` back in `If-None-Match` to get `304` while
+/// Labels follow `Accept-Language`. With `device=mobile` each item also says whether it belongs in
+/// the bottom bar (`primary`, at most 5) or the "More" menu (`secondary`). Send the `ETag` back in `If-None-Match` to get `304` while
 /// nothing changed for you.
 #[utoipa::path(
     get,
@@ -172,6 +253,7 @@ pub(crate) fn routes(state: NavigationState) -> OpenApiRouter {
         (status = 200, description = "The navigation.", body = Data<NavigationView>, headers(("ETag" = String, description = "Fingerprint of this answer."))),
         (status = 304, description = "Unchanged since the `ETag` sent in `If-None-Match`."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 422, description = "`device` is neither `desktop` nor `mobile`; see `errors`.", body = Problem),
     )
 )]
 async fn get_navigation(
@@ -182,11 +264,13 @@ async fn get_navigation(
     Query(query): Query<NavigationQuery>,
     headers: HeaderMap,
 ) -> Result<Response, Error> {
-    let view = state.view(&tenant, &principal, query.org_id, language).await?;
+    let mobile = is_mobile(query.device.as_deref())?;
+    let view = state.view(&tenant, &principal, query.org_id, language, mobile).await?;
     let data = Data { data: view };
     let body = serde_json::to_vec(&data).map_err(Error::internal)?;
     // Vân tay của chính câu trả lời: gồm bản dựng (nhãn, mục), quyền của người gọi ở nút và gói.
-    let digest = Sha256::digest(&body);
+    // Gồm cả `device`: hai thiết bị không bao giờ dùng chung một ETag.
+    let digest = Sha256::new().chain_update(&body).chain_update([u8::from(mobile)]).finalize();
     let etag = format!(
         "\"{}\"",
         digest.iter().take(16).map(|byte| format!("{byte:02x}")).collect::<String>()
@@ -215,11 +299,13 @@ pub(crate) fn tools(state: NavigationState) -> Vec<Tool> {
             "navigation",
             "Get the screens of the admin interface you may use in this tenant, grouped as in the \
              side bar: `locked` screens need a feature the plan lacks. Use it to tell a person \
-             where to go.",
+             where to go; pass `device: \"mobile\"` for the phone layout.",
             move |tenant: TenantContext, principal: Principal, input: NavigationInput| {
                 let state = state.clone();
                 async move {
-                    let view = state.view(&tenant, &principal, input.org_id, Language::En).await?;
+                    let mobile = is_mobile(input.device.as_deref())?;
+                    let view =
+                        state.view(&tenant, &principal, input.org_id, Language::En, mobile).await?;
                     Ok::<Data<NavigationView>, Error>(Data { data: view })
                 }
             },
@@ -235,4 +321,6 @@ pub(crate) fn tools(state: NavigationState) -> Vec<Tool> {
 pub(crate) struct NavigationInput {
     /// The organization unit chosen; omitted: the whole tenant.
     org_id: Option<Uuid>,
+    /// `desktop` (default) or `mobile`: with `mobile` each item says where it goes on a phone.
+    device: Option<String>,
 }
