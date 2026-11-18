@@ -193,6 +193,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |
 | `inventory.list_movements` | `inventory.read` | read-only |
+| `inventory.release_reservation` | `inventory.adjust` | destructive |
 | `invoices.create_draft` | `invoices.write` | writes |
 | `invoices.create_export` | `invoices.export` | writes |
 | `invoices.document` | `invoices.read` | read-only |

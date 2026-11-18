@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` (step 42): stock reservations for orders through `autoxide_inventory::api::Inventory`
+  (`reserve` / `confirm` / `fulfil` / `release` / `restock`, `availability`, `in_stock_at`) that never oversell under
+  concurrent requests; bundles take stock from components; warehouse choice per store (`PUT /sources/{store}`,
+  `PUT /settings/{store}`: nearby first, split); the minute job `inventory.expire_reservations`;
+  `GET /reservations`, `POST /reservations/{id}/release`, MCP tool `inventory.release_reservation`.
 - `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
   (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
   temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).
