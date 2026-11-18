@@ -238,6 +238,7 @@ mod tests {
                     &tenant,
                     Actor::system(),
                     crate::role::RoleInput {
+                        denies: Vec::new(),
                         requires_mfa: true,
                         name: "writer".to_owned(),
                         description: String::new(),

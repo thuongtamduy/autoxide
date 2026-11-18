@@ -695,6 +695,7 @@ mod tests {
             let bob =
                 Accounts::create(services.users.as_ref(), &services.tenant, bob).await.unwrap();
             let helpdesk = crate::role::RoleInput {
+                denies: Vec::new(),
                 requires_mfa: false,
                 grants: Vec::new(),
                 name: "helpdesk".to_owned(),

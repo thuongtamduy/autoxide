@@ -705,6 +705,7 @@ mod tests {
                 &tenant,
                 Actor::system(),
                 RoleInput {
+                    denies: Vec::new(),
                     requires_mfa: false,
                     grants: Vec::new(),
                     name: "reader".to_owned(),

@@ -101,6 +101,9 @@ pub(crate) struct RoleResponse {
     /// The same permissions with their scope in the organization tree. Empty when
     /// `all_permissions`.
     grants: Vec<RoleGrant>,
+    /// Permissions the role denies, sorted by name; they win over every grant of the user's
+    /// other roles.
+    denies: Vec<String>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -119,6 +122,7 @@ impl From<Role> for RoleResponse {
                 .into_iter()
                 .map(|(permission, scope)| RoleGrant { permission, scope })
                 .collect(),
+            denies: role.denies,
             created_at: role.created_at,
             updated_at: role.updated_at,
         }
@@ -144,6 +148,12 @@ pub(crate) struct RoleRequest {
     #[serde(default)]
     #[schema(inline)]
     grants: Vec<RoleGrant>,
+    /// Permissions the role denies. A denied permission wins over every grant: no other role of
+    /// the user, not even the built-in `admin` role, gives it back. A role either grants or
+    /// denies a permission, not both.
+    #[serde(default)]
+    #[schema(example = json!([]))]
+    denies: Vec<String>,
     /// When `true`, the role's permissions work only for accounts with two-step sign-in
     /// (an authenticator app or a passkey); others see `mfa_required` in `GET /api/v1/auth/me`
     /// until they turn it on. The only change the built-in `admin` role accepts.
@@ -163,6 +173,7 @@ impl From<RoleRequest> for RoleInput {
                 .into_iter()
                 .map(|grant| (grant.permission, grant.scope))
                 .collect(),
+            denies: request.denies,
         }
     }
 }
@@ -551,6 +562,7 @@ mod tests {
                     &tenant,
                     Actor::system(),
                     crate::role::RoleInput {
+                        denies: Vec::new(),
                         requires_mfa: false,
                         grants: Vec::new(),
                         name: "reader".to_owned(),
@@ -595,6 +607,7 @@ mod tests {
             let (app, services) = app(test).await;
             let tenant = services.tenant.clone();
             let input = |permissions: &[&str]| crate::role::RoleInput {
+                denies: Vec::new(),
                 requires_mfa: false,
                 grants: Vec::new(),
                 name: "reader".to_owned(),

@@ -89,6 +89,8 @@ pub(crate) struct SupportService {
     pub orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
     /// `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS`.
     pub max_hours: u32,
+    /// Mọi permission của chương trình: mở role toàn quyền khi có role cấm (bước 54).
+    pub catalog: autoxide_kernel::access::PermissionCatalog,
 }
 
 fn now() -> DateTime<Utc> {
@@ -421,17 +423,22 @@ impl SupportService {
         }
         let access = AccessPath::Support(grant.id);
         let granted = crate::role::role_grants(&platform, &[grant.role_id]).await?;
-        let Some((all, permissions)) = granted.get(&grant.role_id) else { return Ok(None) };
+        let Some((all, rules)) = granted.get(&grant.role_id) else { return Ok(None) };
         let entered = if *all {
             Principal::with_all_permissions(principal.user_id())
         } else {
             let root = root_of(target.id());
-            let grants = permissions
+            let grants = rules
+                .grants
                 .iter()
                 .map(|(permission, scope)| (permission.clone(), Grant::new(root, *scope)));
             Principal::with_grants(principal.user_id(), grants)
         };
-        Ok(Some(entered.in_tenant(platform.id()).operating(target.id()).with_access(access)))
+        let entered = entered
+            .in_tenant(platform.id())
+            .operating(target.id())
+            .without(rules.denies.iter().cloned(), &self.catalog);
+        Ok(Some(entered.with_access(access)))
     }
 }
 

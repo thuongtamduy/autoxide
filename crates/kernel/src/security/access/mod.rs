@@ -393,6 +393,9 @@ pub struct Principal {
     access: AccessPath,
     /// Loại bên làm theo credential (API key `agent`, `service`…).
     kind: ActorKind,
+    /// Permission bị role cấm (bước 54, deny thắng allow): đã bỏ khỏi `grants`; giữ tên để lỗi
+    /// nói rõ lý do (`denied_by_role`) thay vì "thiếu".
+    denied: Arc<BTreeSet<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -420,6 +423,8 @@ pub struct PrincipalSnapshot {
     access: AccessPath,
     #[serde(default)]
     kind: ActorKind,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    denied: Vec<String>,
 }
 
 impl PrincipalSnapshot {
@@ -447,6 +452,7 @@ impl PrincipalSnapshot {
             fence: self.fence.map(OrgId::from_uuid),
             access: self.access,
             kind: self.kind,
+            denied: Arc::new(self.denied.iter().cloned().collect()),
         }
     }
 
@@ -481,6 +487,7 @@ impl Principal {
             fence: self.fence.map(|fence| fence.as_uuid()),
             access: self.access,
             kind: self.kind,
+            denied: self.denied.iter().cloned().collect(),
         }
     }
 }
@@ -538,6 +545,7 @@ impl Principal {
             fence: None,
             access: AccessPath::Direct,
             kind: ActorKind::Human,
+            denied: Arc::default(),
         }
     }
 
@@ -593,6 +601,49 @@ impl Principal {
         }
         self.grants = Grants::Only(Arc::new(kept));
         self
+    }
+
+    /// Bỏ các permission `denied` (bước 54: deny thắng allow — một role cấm thì không role nào
+    /// khác, kể cả role toàn quyền, cấp lại được). Người có mọi permission thành người có mọi
+    /// permission của `catalog` (độ sâu `tenant`) trừ phần bị cấm; quyền nạp lại mỗi request nên
+    /// permission thêm sau vẫn có ở request kế.
+    #[must_use]
+    pub fn without(
+        mut self,
+        denied: impl IntoIterator<Item = String>,
+        catalog: &PermissionCatalog,
+    ) -> Self {
+        let denied: BTreeSet<String> = denied.into_iter().collect();
+        if denied.is_empty() {
+            return self;
+        }
+        let root = root_of(self.tenant);
+        let mut kept: BTreeMap<String, Vec<Grant>> = match &self.grants {
+            Grants::All => catalog
+                .iter()
+                .map(|permission| {
+                    (permission.name.to_owned(), vec![Grant::new(root, Scope::Tenant)])
+                })
+                .collect(),
+            Grants::Only(map) => (**map).clone(),
+        };
+        kept.retain(|name, _| !denied.contains(name));
+        self.grants = Grants::Only(Arc::new(kept));
+        let mut all = (*self.denied).clone();
+        all.extend(denied);
+        self.denied = Arc::new(all);
+        self
+    }
+
+    /// Permission `name` bị một role cấm.
+    pub fn is_denied(&self, name: &str) -> bool {
+        self.denied.contains(name)
+    }
+
+    /// Lỗi 403 `permission_denied` cho `permission`, với `reason` `denied_by_role` hay `missing`.
+    fn refuse(&self, permission: &Permission) -> Error {
+        let reason = if self.is_denied(permission.name) { "denied_by_role" } else { "missing" };
+        permission_denied(permission).with_reason(reason)
     }
 
     /// Nút mặc định cho bản ghi mới khi người tạo không chọn (bước 34): nút gốc nếu họ có
@@ -724,7 +775,7 @@ impl Principal {
         if self.has(permission) {
             return Ok(());
         }
-        Err(permission_denied(permission))
+        Err(self.refuse(permission))
     }
 }
 

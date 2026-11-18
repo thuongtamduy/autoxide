@@ -705,6 +705,14 @@
       "input_schema": {
         "description": "The full content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "example": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for. Optional.",
             "type": "string"
@@ -1242,6 +1250,13 @@
         "additionalProperties": false,
         "description": "The full new content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for.",
             "type": "string"

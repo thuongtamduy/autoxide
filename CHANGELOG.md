@@ -11,6 +11,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `auth`: roles take `denies`, permissions the role forbids. A denied permission wins over every grant of the user's
+  other roles, even the built-in `admin` role; `permission_denied` answers `reason: denied_by_role` (or `missing`).
 - Kernel: `Principal::check` decides one record (`Decision::Allow` / `Missing` / `OutOfScope`) from the same rule
   that builds the list filter (`scope_condition`); a randomized test proves both agree on SQLite and Postgres.
 - `ledger`: `POST /api/v1/ledger/bank-accounts/{id}/vietqr-preview` makes a sample VietQR code to scan before taking

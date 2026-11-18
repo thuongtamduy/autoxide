@@ -19841,6 +19841,13 @@
                 "format": "date-time",
                 "type": "string"
               },
+              "denies": {
+                "description": "Permissions the role denies, sorted by name; they win over every grant of the user's\nother roles.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "description": {
                 "type": "string"
               },
@@ -19886,6 +19893,7 @@
               "requires_mfa",
               "permissions",
               "grants",
+              "denies",
               "created_at",
               "updated_at"
             ],
@@ -26019,6 +26027,13 @@
                   "format": "date-time",
                   "type": "string"
                 },
+                "denies": {
+                  "description": "Permissions the role denies, sorted by name; they win over every grant of the user's\nother roles.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
                 "description": {
                   "type": "string"
                 },
@@ -26064,6 +26079,7 @@
                 "requires_mfa",
                 "permissions",
                 "grants",
+                "denies",
                 "created_at",
                 "updated_at"
               ],
@@ -43038,6 +43054,13 @@
                   "format": "date-time",
                   "type": "string"
                 },
+                "denies": {
+                  "description": "Permissions the role denies, sorted by name; they win over every grant of the user's\nother roles.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
                 "description": {
                   "type": "string"
                 },
@@ -43083,6 +43106,7 @@
                 "requires_mfa",
                 "permissions",
                 "grants",
+                "denies",
                 "created_at",
                 "updated_at"
               ],
@@ -48758,6 +48782,14 @@
       "RoleRequest": {
         "description": "The full content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "example": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for. Optional.",
             "type": "string"
@@ -48827,6 +48859,13 @@
             "format": "date-time",
             "type": "string"
           },
+          "denies": {
+            "description": "Permissions the role denies, sorted by name; they win over every grant of the user's\nother roles.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "type": "string"
           },
@@ -48872,6 +48911,7 @@
           "requires_mfa",
           "permissions",
           "grants",
+          "denies",
           "created_at",
           "updated_at"
         ],

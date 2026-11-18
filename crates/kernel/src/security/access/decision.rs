@@ -11,7 +11,7 @@ use sea_orm::sea_query::Condition;
 use sea_orm::{ColumnTrait, ConnectionTrait};
 use uuid::Uuid;
 
-use super::{OrgTarget, Permission, Principal, Scope, org_out_of_scope, permission_denied};
+use super::{OrgTarget, Permission, Principal, Scope, org_out_of_scope};
 use crate::error::Error;
 use crate::tenancy::{OrgId, OrgTree, TenantId};
 
@@ -136,7 +136,7 @@ impl Principal {
         org: C,
         owner: Option<C>,
     ) -> Result<Condition, Error> {
-        let reach = self.reach(permission).ok_or_else(|| permission_denied(permission))?;
+        let reach = self.reach(permission).ok_or_else(|| self.refuse(permission))?;
         Ok(reach.condition(org, owner))
     }
 
@@ -151,7 +151,7 @@ impl Principal {
     ) -> Result<(), Error> {
         match self.check(db, permission, target).await? {
             Decision::Allow => Ok(()),
-            Decision::Missing => Err(permission_denied(permission)),
+            Decision::Missing => Err(self.refuse(permission)),
             Decision::OutOfScope => Err(org_out_of_scope(target.org, permission)),
         }
     }

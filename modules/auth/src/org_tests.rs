@@ -58,6 +58,7 @@ async fn role(
     grants: &[(&str, Scope)],
 ) -> Role {
     let input = RoleInput {
+        denies: Vec::new(),
         requires_mfa: false,
         name: name.to_owned(),
         description: String::new(),
@@ -91,6 +92,7 @@ async fn role_cap_permission_kem_do_sau() {
         );
         // Permission không theo nút chỉ cấp cho cả khách; nêu một permission hai lần là sai.
         let input = RoleInput {
+            denies: Vec::new(),
             requires_mfa: false,
             name: "bad".to_owned(),
             description: String::new(),

@@ -6707,6 +6707,11 @@ export type Data_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -8739,6 +8744,11 @@ export type Data_Vec_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -14284,6 +14294,11 @@ export type Page_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -16260,6 +16275,12 @@ export type RoleGrant = {
 
 /** The full content of a role. */
 export type RoleRequest = {
+  /**
+   * Permissions the role denies. A denied permission wins over every grant: no other role of
+   * the user, not even the built-in `admin` role, gives it back. A role either grants or
+   * denies a permission, not both.
+   */
+  denies?: string[];
   /** What the role is for. Optional. */
   description?: string;
   /**
@@ -16299,6 +16320,11 @@ export type RoleResponse = {
    */
   all_permissions: boolean;
   created_at: string;
+  /**
+   * Permissions the role denies, sorted by name; they win over every grant of the user's
+   * other roles.
+   */
+  denies: string[];
   description: string;
   /**
    * The same permissions with their scope in the organization tree. Empty when

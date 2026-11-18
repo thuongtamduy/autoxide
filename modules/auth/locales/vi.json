@@ -95,6 +95,7 @@
   "auth.user_not_found": "Không có người dùng `{id}`.",
   "auth.wrong_password": "Mật khẩu hiện tại không đúng. Nếu bạn quên, có thể đặt lại qua email.",
   "field:`{permission}` can only be granted for the whole tenant (`tenant`)": "`{permission}` chỉ cấp được cho toàn khách hàng (`tenant`)",
+  "field:`{permission}` is also granted by this role; a role either grants or denies a permission": "`{permission}` cũng được role này cấp; một role chỉ cấp hoặc cấm một permission",
   "field:`{permission}` is listed more than once; give each permission one scope": "`{permission}` được nêu hơn một lần; mỗi permission chỉ có một độ sâu",
   "field:a role with every permission can only be delegated at the root unit": "role có mọi permission chỉ uỷ quyền được ở nút gốc",
   "field:customer accounts have no roles; leave it out for `realm` `customer`": "tài khoản người mua không có role; bỏ trống khi `realm` là `customer`",

@@ -278,12 +278,14 @@ impl Module for AuthModule {
         let delegations = Arc::new(delegation::DelegationService {
             databases: databases.clone(),
             outbox: outbox.clone(),
+            catalog: context.permissions().clone(),
         });
         let support = Arc::new(support::SupportService {
             databases: databases.clone(),
             outbox: outbox.clone(),
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             max_hours: config.support_max_hours,
+            catalog: context.permissions().clone(),
         });
         let authenticator = RequestAuthenticator {
             support: support.clone(),
