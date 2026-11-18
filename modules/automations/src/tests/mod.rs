@@ -35,6 +35,122 @@ use crate::service::Automations;
 use crate::service::rules::{NewRule, Rule};
 use crate::service::validate::RawBody;
 
+pub(crate) use fixtures::*;
+
+/// Người dùng `id` với các permission `permissions` cho cả khách.
+pub(crate) fn person(id: u128, permissions: &[&str]) -> Principal {
+    let root = root_of(autoxide_kernel::tenancy::DEFAULT_TENANT);
+    Principal::with_grants(
+        Uuid::from_u128(id),
+        permissions
+            .iter()
+            .map(|permission| ((*permission).to_owned(), Grant::new(root, Scope::Tenant))),
+    )
+}
+
+/// App của test: `shop`, `idempotency`, `automations`; người 1 có đủ quyền (token `1`).
+pub(crate) struct Harness {
+    pub app: TestApp,
+    pub shop: Shop,
+    pub people: People,
+    pub service: Arc<Automations>,
+    pub tenant: TenantContext,
+    pub owner: Principal,
+}
+
+impl Harness {
+    pub(crate) async fn new(test: &TestDatabase) -> Harness {
+        Harness::with(test, &[]).await
+    }
+
+    pub(crate) async fn with(test: &TestDatabase, settings: &[(&str, &str)]) -> Harness {
+        let shop = Shop::default();
+        let people = People::default();
+        let owner = person(1, &OWNER);
+        people.set(owner.clone());
+        let (module, shared) = crate::module_with_service();
+        let mut builder = TestApp::builder(test)
+            .provide::<dyn Authenticator>(Arc::new(people.clone()))
+            .provide::<dyn IdempotencyStore>(Arc::new(MemoryStore::default()))
+            .module(shop.clone())
+            .module(module);
+        for (name, value) in settings {
+            builder = builder.setting(name, value);
+        }
+        let app = builder.build().await.unwrap();
+        let service = shared.get().unwrap().clone();
+        let tenant = app.default_tenant();
+        Harness { app, shop, people, service, tenant, owner }
+    }
+
+    /// Tạo luật (người 1) và trả nó; lỗi thì panic kèm lỗi.
+    pub(crate) async fn rule(&self, trigger: Value, conditions: Value, actions: Value) -> Rule {
+        self.rule_by(&self.owner, trigger, conditions, actions).await.unwrap()
+    }
+
+    pub(crate) async fn rule_by(
+        &self,
+        principal: &Principal,
+        trigger: Value,
+        conditions: Value,
+        actions: Value,
+    ) -> Result<Rule, Error> {
+        let input = NewRule {
+            name: "Test rule".to_owned(),
+            description: None,
+            org_id: None,
+            body: RawBody { trigger, conditions, actions },
+            enabled: true,
+        };
+        self.service.create_rule(&self.tenant, principal, input).await
+    }
+
+    /// Giao mọi event rồi chạy mọi job tới khi hết việc.
+    pub(crate) async fn settle(&self) {
+        let dispatcher = self.app.modules().dispatcher().unwrap();
+        let worker = self.app.modules().worker(4).unwrap();
+        for _ in 0..10 {
+            let delivered = dispatcher.run_once().await.unwrap();
+            let ran = worker.run_once().await.unwrap();
+            if delivered == 0 && ran == 0 {
+                break;
+            }
+        }
+    }
+
+    pub(crate) async fn runs(&self, rule_id: Uuid) -> Vec<run::Model> {
+        use autoxide_kernel::tenancy::ScopeExt;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+        run::Entity::find()
+            .filter(run::Column::RuleId.eq(rule_id))
+            .scoped(&self.tenant)
+            .order_by_asc(run::Column::Id)
+            .all(self.tenant.database().read())
+            .await
+            .unwrap()
+    }
+
+    pub(crate) async fn reload(&self, rule_id: Uuid) -> Rule {
+        use autoxide_kernel::tenancy::ScopeExt;
+        use sea_orm::EntityTrait;
+        rule::Entity::find_by_id(rule_id)
+            .scoped(&self.tenant)
+            .one(self.tenant.database().read())
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    pub(crate) fn count(&self, pick: impl Fn(&Counters) -> &AtomicU64) -> u64 {
+        pick(&self.shop.counters).load(Ordering::SeqCst)
+    }
+}
+
+/// Kích hoạt theo event `shop.order_placed`.
+pub(crate) fn on_order() -> Value {
+    json!({"type": "event", "event": "shop.order_placed"})
+}
+
 // Module mẫu và bộ xác thực của test nằm trong `#[cfg(test)] mod fixtures` để `cargo xtask check`
 // bỏ qua mã lỗi của chúng (`shop.busy`, `auth.invalid_token` — không phải mã của module này).
 #[cfg(test)]
@@ -317,120 +433,4 @@ mod fixtures {
             Ok(())
         }
     }
-}
-
-pub(crate) use fixtures::*;
-
-/// Người dùng `id` với các permission `permissions` cho cả khách.
-pub(crate) fn person(id: u128, permissions: &[&str]) -> Principal {
-    let root = root_of(autoxide_kernel::tenancy::DEFAULT_TENANT);
-    Principal::with_grants(
-        Uuid::from_u128(id),
-        permissions
-            .iter()
-            .map(|permission| ((*permission).to_owned(), Grant::new(root, Scope::Tenant))),
-    )
-}
-
-/// App của test: `shop`, `idempotency`, `automations`; người 1 có đủ quyền (token `1`).
-pub(crate) struct Harness {
-    pub app: TestApp,
-    pub shop: Shop,
-    pub people: People,
-    pub service: Arc<Automations>,
-    pub tenant: TenantContext,
-    pub owner: Principal,
-}
-
-impl Harness {
-    pub(crate) async fn new(test: &TestDatabase) -> Harness {
-        Harness::with(test, &[]).await
-    }
-
-    pub(crate) async fn with(test: &TestDatabase, settings: &[(&str, &str)]) -> Harness {
-        let shop = Shop::default();
-        let people = People::default();
-        let owner = person(1, &OWNER);
-        people.set(owner.clone());
-        let (module, shared) = crate::module_with_service();
-        let mut builder = TestApp::builder(test)
-            .provide::<dyn Authenticator>(Arc::new(people.clone()))
-            .provide::<dyn IdempotencyStore>(Arc::new(MemoryStore::default()))
-            .module(shop.clone())
-            .module(module);
-        for (name, value) in settings {
-            builder = builder.setting(name, value);
-        }
-        let app = builder.build().await.unwrap();
-        let service = shared.get().unwrap().clone();
-        let tenant = app.default_tenant();
-        Harness { app, shop, people, service, tenant, owner }
-    }
-
-    /// Tạo luật (người 1) và trả nó; lỗi thì panic kèm lỗi.
-    pub(crate) async fn rule(&self, trigger: Value, conditions: Value, actions: Value) -> Rule {
-        self.rule_by(&self.owner, trigger, conditions, actions).await.unwrap()
-    }
-
-    pub(crate) async fn rule_by(
-        &self,
-        principal: &Principal,
-        trigger: Value,
-        conditions: Value,
-        actions: Value,
-    ) -> Result<Rule, Error> {
-        let input = NewRule {
-            name: "Test rule".to_owned(),
-            description: None,
-            org_id: None,
-            body: RawBody { trigger, conditions, actions },
-            enabled: true,
-        };
-        self.service.create_rule(&self.tenant, principal, input).await
-    }
-
-    /// Giao mọi event rồi chạy mọi job tới khi hết việc.
-    pub(crate) async fn settle(&self) {
-        let dispatcher = self.app.modules().dispatcher().unwrap();
-        let worker = self.app.modules().worker(4).unwrap();
-        for _ in 0..10 {
-            let delivered = dispatcher.run_once().await.unwrap();
-            let ran = worker.run_once().await.unwrap();
-            if delivered == 0 && ran == 0 {
-                break;
-            }
-        }
-    }
-
-    pub(crate) async fn runs(&self, rule_id: Uuid) -> Vec<run::Model> {
-        use autoxide_kernel::tenancy::ScopeExt;
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
-        run::Entity::find()
-            .filter(run::Column::RuleId.eq(rule_id))
-            .scoped(&self.tenant)
-            .order_by_asc(run::Column::Id)
-            .all(self.tenant.database().read())
-            .await
-            .unwrap()
-    }
-
-    pub(crate) async fn reload(&self, rule_id: Uuid) -> Rule {
-        use autoxide_kernel::tenancy::ScopeExt;
-        use sea_orm::EntityTrait;
-        rule::Entity::find_by_id(rule_id)
-            .scoped(&self.tenant)
-            .one(self.tenant.database().read())
-            .await
-            .unwrap()
-            .unwrap()
-    }
-
-    pub(crate) fn count(&self, pick: impl Fn(&Counters) -> &AtomicU64) -> u64 {
-        pick(&self.shop.counters).load(Ordering::SeqCst)
-    }
-}
-
-/// Kích hoạt theo event `shop.order_placed`.
-pub(crate) fn on_order() -> Value {
-    json!({"type": "event", "event": "shop.order_placed"})
 }
