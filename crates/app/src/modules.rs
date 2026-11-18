@@ -75,6 +75,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // `content` để nhập sang, nên đứng sau cả hai. Đối tượng đích tra qua sổ đối tượng của
         // kernel, nên module đăng ký sau vẫn được menu trỏ tới.
         Box::new(autoxide_menus::module()),
+        // Sản phẩm (bước 41): cần `dyn Media` (ảnh sản phẩm) và `dyn TaxEngine` (luật giá bán cho
+        // người tiêu dùng), nên đứng sau `media` và `tax`; đứng sau `comments` để hỏi đáp sản phẩm
+        // (D-202). Module thương mại sau (`inventory`, `promotions`, `shipping`…) đăng ký SAU nó.
+        Box::new(autoxide_catalog::module()),
         // Báo cáo gộp của cây khách hàng (bước 38): nghe event mà mọi module khai số liệu
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.

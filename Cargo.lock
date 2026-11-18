@@ -378,6 +378,7 @@ dependencies = [
  "autoxide-auth",
  "autoxide-automations",
  "autoxide-bookings",
+ "autoxide-catalog",
  "autoxide-comments",
  "autoxide-compliance",
  "autoxide-content",
@@ -552,6 +553,29 @@ dependencies = [
  "axum",
  "chrono",
  "chrono-tz",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-catalog"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-media",
+ "autoxide-tax",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
  "rmcp",
  "sea-orm",
  "serde",

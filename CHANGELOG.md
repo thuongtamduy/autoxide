@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `catalog` (step 41, first part; `docs/CATALOG.md`): products with variants, options, SKU and barcode
+  unique per tenant, sale modes (in stock, backorder, pre-order), bundles, images from `media`; a category tree;
+  price lists per store, chain and customer group with append-only price history, scheduled and temporary prices,
+  price floors; `autoxide_catalog::api::Catalog` for inventory, promotions, shipping and orders; MCP tools
+  `catalog.*`.
 - New module `support` (step 53): customer support tickets. Customers open tickets from the website (signed in, or
   as guests with an email or phone number confirmed by a one-time code; guests keep a ticket token), staff open
   tickets for customers, other modules through `SupportIntake`. Messages are only added (hidden with a reason, never
