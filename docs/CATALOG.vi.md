@@ -83,6 +83,19 @@ hơn, rồi id. Mỗi biến thể lấy giá từ bảng đầu tiên theo th�
 **Giá bán cho người tiêu dùng ở Việt Nam** phải bằng VND và gồm thuế khi nút có hồ sơ thuế Việt Nam
 (Luật Giá 16/2023/QH15 — cần đối chiếu văn bản gốc với người có chuyên môn pháp lý).
 
+**Bảng giá suy ra** lấy giá từ một bảng gốc (`derived_from`; chỉ một tầng, `catalog.derived_chain`),
+điều chỉnh theo `adjust_bp` (phần vạn, có dấu: `-1000` = giảm 10%) và `adjust_minor`, rồi làm tròn theo
+**quy tắc làm tròn** (`/rounding-rules`: bội số của `step_minor`, hay dạng `k × step_minor +
+ending_minor`, vd bước 10.000 và đuôi 9.000 cho 129.000, 199.000). Một job ghi dòng giá thật vào bảng suy
+ra mỗi khi bảng gốc có giá mới, nên đọc giá không bao giờ tính công thức. Dòng tay trong bảng suy ra ghim
+giá biến thể đó khi còn hiệu lực.
+
+**Đổi giá hàng loạt** (`/price-lists/{id}/changes`): tạo (`set`, `percent` hay `amount`, cho danh mục,
+sản phẩm hay biến thể, có thể tạm thời với `valid_to`) → xem trước (số biến thể, 20 dòng mẫu, vi phạm sàn
+giá; không ghi gì) → duyệt (`catalog.prices.approve`; cài đặt nút
+`catalog.price_change_requires_second_person` bật thì người duyệt phải khác người tạo) → job ghi dòng giá
+(`source = bulk`). Hoàn tác bằng một lần đổi mới về giá cũ.
+
 **Sàn giá** (`/price-guards`): giá tối thiểu và / hoặc biên lợi nhuận tối thiểu trên giá vốn, theo nút
 và (nếu muốn) theo danh mục, tác dụng `warn` (giá vẫn ghi, kèm cảnh báo) hay `block`
 (`catalog.price_below_floor`). Quy tắc của nút gần nhất thắng; trong một nút, quy tắc của danh mục gần

@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
+  (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
+  temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).
 - Restore drill (step 39): an end-to-end test backs up data made over the API, restores it into an empty database
   (across PostgreSQL and SQLite when the gate runs on PostgreSQL) and checks the server starts, the old administrator
   signs in and the data and files match; `docs/DEPLOY.md` has "Restoring, step by step".
