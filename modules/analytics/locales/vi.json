@@ -1,0 +1,11 @@
+{
+  "analytics.funnel_unknown": "Không có phễu `{key}`; xem các phễu đã khai ở `GET /api/v1/analytics/funnels`.",
+  "analytics.kind_invalid": "`kind` phải là một loại đối tượng như `catalog.product`: chữ thường, số và `_`, có đúng một dấu chấm.",
+  "analytics.range_reversed": "`from` không được sau `to`.",
+  "analytics.range_too_long": "Mỗi lần chỉ hỏi tối đa {max} ngày: hãy dời `from` hoặc `to` lại gần nhau.",
+  "analytics.site_unknown": "Khách không có website (nút tổ chức) `{site}`. Bỏ `site` để xem website của cả khách.",
+  "text:An order was paid.": "Một đơn hàng đã được trả tiền.",
+  "text:See the visit reports (pages, sources, campaigns, objects, funnels) of the websites in your scope.": "Xem báo cáo truy cập (trang, nguồn, chiến dịch, đối tượng, phễu) của các website trong phạm vi của bạn.",
+  "text:Sum of the daily unique visitors of the website of the chosen unit over the last 7 days (today included, UTC), from the hourly totals; no cookies, so one person on two days counts twice.": "Tổng khách duy nhất từng ngày của website của nút đang chọn trong 7 ngày qua (gồm hôm nay, giờ UTC), từ số gộp mỗi giờ; không dùng cookie nên một người ghé hai ngày được đếm hai lần.",
+  "text:Visitors, last 7 days": "Khách 7 ngày qua"
+}

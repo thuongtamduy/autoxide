@@ -11,6 +11,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
+  `POST /api/v1/analytics/public/events` (up to 20, unknown or malformed ones dropped, bots and foreign pages
+  dropped, `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` per network block); anonymous sessions use a random key per day
+  that is deleted once the day is over, and neither addresses nor user agents are stored. Modules declare event
+  types (`Module::analytics_events`, from the browser or taken from their own events) and funnels
+  (`Module::funnels`). An hourly job adds events up per day; reports read only those totals: `/overview`, `/pages`,
+  `/sources`, `/campaigns`, `/objects`, `/types`, `/funnels/{key}`, per website (organization unit) with
+  `analytics.read`. Events are linked to a signed-in user only with consent `analytics.personal`; withdrawing
+  unlinks them. MCP tools `analytics.overview`, `analytics.top_pages`, `analytics.top_objects`, `analytics.funnel`
+  (read only); summary metric `analytics.visitors`; settings `AUTOXIDE_ANALYTICS_*`. Guide: `docs/ANALYTICS.md`.
+- Module `catalog` (step 41, first part; `docs/CATALOG.md`): products with variants, options, SKU and barcode
+  unique per tenant, sale modes (in stock, backorder, pre-order), bundles, images from `media`; a category tree;
+  price lists per store, chain and customer group with append-only price history, scheduled and temporary prices,
+  price floors; `autoxide_catalog::api::Catalog` for inventory, promotions, shipping and orders; MCP tools
+  `catalog.*`.
 - New module `support` (step 53): customer support tickets. Customers open tickets from the website (signed in, or
   as guests with an email or phone number confirmed by a one-time code; guests keep a ticket token), staff open
   tickets for customers, other modules through `SupportIntake`. Messages are only added (hidden with a reason, never

@@ -61,6 +61,8 @@ autoxide-ledger = { path = "modules/ledger" }
 autoxide-invoices = { path = "modules/invoices" }
 autoxide-compliance = { path = "modules/compliance" }
 autoxide-notifications = { path = "modules/notifications" }
+autoxide-analytics = { path = "modules/analytics" }
+autoxide-catalog = { path = "modules/catalog" }
 autoxide-support = { path = "modules/support" }
 autoxide-bookings = { path = "modules/bookings" }
 

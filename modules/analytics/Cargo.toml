@@ -1,0 +1,38 @@
+[package]
+name = "autoxide-analytics"
+description = "Autoxide module: cookieless website analytics kept in your own database — pages, sources, UTM campaigns, most viewed objects and funnels, per-person tracking only with consent."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+autoxide-compliance.workspace = true
+autoxide-kernel.workspace = true
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+hmac.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+rmcp = { workspace = true, features = [
+  "client",
+  "transport-streamable-http-client-reqwest",
+  "reqwest-tls-no-provider",
+] }
+tokio.workspace = true
+
+[lints]
+workspace = true
