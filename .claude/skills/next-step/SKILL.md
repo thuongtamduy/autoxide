@@ -30,8 +30,9 @@ hứng, đừng nhảy cóc.
   quyết định nào đã chốt cho mảng này, rồi đọc đúng mục đó.
 - Mục cần một thư viện chưa từng dùng trong repo: chạy skill `check-library-api`
   **trước** khi viết code dùng nó.
-- Repo đã có code: dùng CodeGraph (`codegraph explore "<tên hoặc câu hỏi>"`) để
-  xem phần liên quan thay vì đọc mò từng file.
+- Repo đã có code: tìm bằng `grep` / `rg` theo tên kiểu, hàm, mã lỗi hay tên bảng (tên trong repo đặt
+  rõ, file ngắn nên tìm theo tên trúng ngay), rồi đọc đúng đoạn đó thay vì đọc mò từng file.
+  Không dùng CodeGraph (D-20261118-no-codegraph).
 
 ## 3. Làm
 

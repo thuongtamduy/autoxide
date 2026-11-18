@@ -23,6 +23,7 @@ mod programs;
 mod provider;
 mod reasons;
 mod redemption;
+mod relocation;
 mod service;
 mod settings;
 mod tools;
@@ -80,6 +81,10 @@ impl Module for PromotionsModule {
 
     fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
         vec![programs::transitions::ACTIVE_PROMOTIONS]
+    }
+
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 
     fn permissions(&self) -> Vec<Permission> {

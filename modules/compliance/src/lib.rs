@@ -113,6 +113,55 @@ impl Module for ComplianceModule {
         "compliance"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            .copy_on_split(&["compliance_policies", "compliance_documents", "compliance_purposes"])
+            .follow("compliance_document_versions", "document_id", "compliance_documents")
+            .by_org(&[
+                "compliance_legal_profiles",
+                "compliance_websites",
+                "compliance_tracking_tags",
+                "compliance_cookie_settings",
+                "compliance_cookie_consents",
+            ])
+            .table(
+                "compliance_website_pages",
+                autoxide_kernel::tenancy::TablePolicy::FollowParent {
+                    parent_table: "compliance_websites",
+                    column: "website_id",
+                    parent_column: "id",
+                },
+            )
+            .table(
+                "compliance_cases",
+                autoxide_kernel::tenancy::TablePolicy::ByOrg { column: "respondent_org_id" },
+            )
+            .follow("compliance_case_respondents", "case_id", "compliance_cases")
+            .follow("compliance_case_entries", "case_id", "compliance_cases")
+            .follow("compliance_disclosures", "case_id", "compliance_cases")
+            // Dữ liệu cá nhân theo khách (định danh, đồng ý, yêu cầu của chủ thể): ở lại khách nguồn
+            // khi tách (D-20261118-step38-relocation), chuyển khi gộp.
+            .stay(&[
+                "compliance_kyc_profiles",
+                "compliance_acceptances",
+                "compliance_consents",
+                "compliance_account_verifications",
+                "compliance_incidents",
+                "compliance_subject_requests",
+            ])
+            .follow("compliance_kyc_attempts", "profile_id", "compliance_kyc_profiles")
+            .follow("compliance_consent_records", "consent_id", "compliance_consents")
+            .follow("compliance_incident_entries", "incident_id", "compliance_incidents")
+            .ephemeral(&[
+                "compliance_kyc_callbacks",
+                "compliance_phone_challenges",
+                "compliance_throttle",
+                "compliance_antispam_nonces",
+            ])
+    }
+
     fn description(&self) -> &'static str {
         "Vietnamese compliance basics: identity checks, legal documents and acceptances, \
          website registration, personal data requests and incidents."

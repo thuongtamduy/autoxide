@@ -18,8 +18,8 @@ mod security;
 mod values;
 
 pub use contracts::{
-    ai, einvoice, identity, mail, moderation, payment, privacy, push, report, resource, sms,
-    storage, zns,
+    ai, analytics, einvoice, identity, mail, moderation, payment, privacy, push, report, resource,
+    sms, storage, zns,
 };
 pub use data::{
     backup, database, migration, numbering, pagination, reference, rows, search, tenancy, transfer,

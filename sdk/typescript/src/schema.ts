@@ -5977,6 +5977,18 @@ export type Data_FormTokenResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_FunnelReport = {
+  /** A funnel over a range of days. */
+  data: {
+    description: string;
+    from: string;
+    key: string;
+    steps: FunnelStep[];
+    to: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Health = {
   /** Health of the service. */
   data: {
@@ -6030,6 +6042,17 @@ export type Data_ImportReport = {
     subscribed: number;
     /** Subscriptions already confirmed. */
     unchanged: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Ingested = {
+  /** What was done with a batch. */
+  data: {
+    /** Events stored. */
+    accepted: number;
+    /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
+    dropped: number;
   };
 };
 
@@ -7312,6 +7335,31 @@ export type Data_OverrideResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Overview = {
+  /** Visits of a website over a range of days. */
+  data: {
+    /** `bounces / visitors`, 0 to 1 (0 when there are no visitors). */
+    bounce_rate: number;
+    /** Visits that saw exactly one page. */
+    bounces: number;
+    /** One entry per day that had visits. */
+    days: DayCount[];
+    /** All events. */
+    events: number;
+    from: string;
+    /** The website (organization unit). */
+    site: string;
+    to: string;
+    /** The sources bringing the most page views from outside the website. */
+    top_sources: Ranked[];
+    /** Page views. */
+    views: number;
+    /** Sum of the daily unique visitors (no cookies: one person on two days counts twice). */
+    visitors: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ParsedFilters = {
   /** Filters understood from the sentence. */
   data: {
@@ -7895,6 +7943,36 @@ export type Data_RedirectResponse = {
     /** Target address (a path in the site, or a full URL). */
     to_url?: string | null;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_RelocationPlan = {
+  /** What a split or merge would do (dry run). Nothing is changed. */
+  data: {
+    blocking: RelocationBlocker[];
+    conflicts: RelocationConflict[];
+    kind: RelocationKind;
+    /**
+     * Split: the root unit of the branch. Merge: the unit of the receiving tenant the merged
+     * tenant goes under.
+     */
+    org_id: string;
+    /** Placement (database) of the target. */
+    placement: string;
+    /** `true` when nothing blocks and there is no conflict. */
+    ready: boolean;
+    /** Rows that move or are copied. */
+    rows: number;
+    source: string;
+    /** Tenant whose rows go. */
+    source_tenant_id: string;
+    /** Every tenant-level table, in copy order. */
+    tables: RelocationTable[];
+    target: string;
+    /** Tenant that receives them (split: the new tenant, its id is the id of the branch unit). */
+    target_tenant_id: string;
+    warnings: RelocationWarning[];
   };
 };
 
@@ -8776,6 +8854,33 @@ export type Data_TenantMovePlan = {
 };
 
 /** Envelope of a single result. */
+export type Data_TenantRelocation = {
+  /** A split or merge of tenants. */
+  data: {
+    created_at: string;
+    /** Why the last run stopped; running it again resumes it. */
+    error?: string | null;
+    finished_at?: string | null;
+    id: string;
+    kind: RelocationKind;
+    org_id?: string | null;
+    placement?: string | null;
+    plan?: RelocationPlan | null;
+    reason: string;
+    source_tenant_id: string;
+    /**
+     * `requested` (asked by the tenant, waiting for the platform staff), `planned`, `frozen`
+     * (the tenants answer 503), `copied`, `verified`, `switched`, `cleaned`, `done` or `failed`.
+     */
+    state: string;
+    /** Rows written to the target per table (after `copied`). */
+    tables: TenantTableRows[];
+    target_tenant_id?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TenantSettingState = {
   /** A setting the installed modules take per tenant, and its state in the current tenant. */
   data: {
@@ -9536,10 +9641,37 @@ export type Data_Vec_DelegationResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_EventTypeInfo = {
+  data: {
+    description: string;
+    /** The `type` to send, e.g. `catalog.product_viewed`. */
+    key: string;
+    /** When set, events must carry `object` = `<object_kind>:<id>`. */
+    object_kind?: string | null;
+    props: PropInfo[];
+    /**
+     * `browser` (pages send it) or `server` (recorded by the server from what happened; pages
+     * cannot send it).
+     */
+    source: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_EventTypeResponse = {
   data: {
     description: string;
     name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_FunnelInfo = {
+  data: {
+    description: string;
+    key: string;
+    /** Event types of the steps, in order. */
+    steps: string[];
   }[];
 };
 
@@ -10196,6 +10328,20 @@ export type Data_Vec_PublicProviderResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_Ranked = {
+  data: {
+    /** Events (for event types and objects). */
+    events: number;
+    /** The page path, source, campaign, object (`<kind>:<id>`) or event type. */
+    value: string;
+    /** Page views (for objects: events about the object). */
+    views: number;
+    /** Sum of the daily unique visitors. */
+    visitors: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ReasonView = {
   data: {
     active: boolean;
@@ -10736,6 +10882,13 @@ export type Data_WorkView = {
   };
 };
 
+/** One day of the overview. */
+export type DayCount = {
+  day: string;
+  views: number;
+  visitors: number;
+};
+
 /** A decimal number written as a string, like "12.5" or "-0.08": a dot before the fraction, no thousands separators, no exponent, at most 28 digits. */
 export type DecimalString = string;
 
@@ -11128,11 +11281,35 @@ export type ErasedResponse = {
   deleted: number;
 };
 
+/** A batch of events from a page. */
+export type EventBatch = {
+  /**
+   * 1 to 20 events. Events of unknown types, with undeclared or wrongly typed `props`, or
+   * otherwise malformed are dropped one by one; the batch is never refused for them.
+   */
+  events: IncomingEvent[];
+};
+
 /** An event that can trigger a rule. */
 export type EventTriggerInfo = {
   description: string;
   /** `<module>.<event>`. */
   name: string;
+};
+
+/** An event type. */
+export type EventTypeInfo = {
+  description: string;
+  /** The `type` to send, e.g. `catalog.product_viewed`. */
+  key: string;
+  /** When set, events must carry `object` = `<object_kind>:<id>`. */
+  object_kind?: string | null;
+  props: PropInfo[];
+  /**
+   * `browser` (pages send it) or `server` (recorded by the server from what happened; pages
+   * cannot send it).
+   */
+  source: string;
 };
 
 /** A kind of event that endpoints can subscribe to. */
@@ -11390,6 +11567,40 @@ export type FoundView = {
   title: string;
 };
 
+/** A funnel a module declares. */
+export type FunnelInfo = {
+  description: string;
+  key: string;
+  /** Event types of the steps, in order. */
+  steps: string[];
+};
+
+/** A funnel over a range of days. */
+export type FunnelReport = {
+  description: string;
+  from: string;
+  key: string;
+  steps: FunnelStep[];
+  to: string;
+};
+
+/** One step of a funnel. */
+export type FunnelStep = {
+  /** `sessions` of this step divided by the previous step's. */
+  from_previous: number;
+  /**
+   * `sessions` of this step divided by the first step's, 0 to 1 and more (steps are counted
+   * independently, see the funnel endpoint).
+   */
+  from_start: number;
+  /** The event type of the step. */
+  key: string;
+  /** Sessions with the event, summed over the days. */
+  sessions: number;
+  /** Position, from 0. */
+  step: number;
+};
+
 /** Health of the service. */
 export type Health = {
   /** Always `ok`; a service that is not healthy answers with an error instead. */
@@ -11475,6 +11686,38 @@ export type ImportRequest = {
 export type ImportedMenu = {
   key: string;
   locale: string;
+};
+
+/** One event sent by a page. */
+export type IncomingEvent = {
+  /**
+   * What the event is about, `<kind>:<id>`, e.g. `catalog.product:0190…`. Required when the
+   * event type names an object kind.
+   */
+  object?: string | null;
+  /**
+   * Path of the page, starting with `/` (query and fragment are cut off; up to 512
+   * characters).
+   */
+  path: string;
+  /** Extra values the event type declares; anything else drops the event. */
+  props?: Record<string, unknown> | null;
+  /** `document.referrer`: only its host is kept. */
+  referrer?: string | null;
+  /**
+   * A declared event type, e.g. `analytics.page_view` or `catalog.product_viewed`; see
+   * `GET /api/v1/analytics/event-types`. Unknown types are dropped.
+   */
+  type: string;
+  utm?: Utm | null;
+};
+
+/** What was done with a batch. */
+export type Ingested = {
+  /** Events stored. */
+  accepted: number;
+  /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
+  dropped: number;
 };
 
 /** A new invitation. */
@@ -14091,6 +14334,28 @@ export type OverrideResponse = {
   reason: string;
   /** The tenant it applies to. */
   tenant_id: string;
+};
+
+/** Visits of a website over a range of days. */
+export type Overview = {
+  /** `bounces / visitors`, 0 to 1 (0 when there are no visitors). */
+  bounce_rate: number;
+  /** Visits that saw exactly one page. */
+  bounces: number;
+  /** One entry per day that had visits. */
+  days: DayCount[];
+  /** All events. */
+  events: number;
+  from: string;
+  /** The website (organization unit). */
+  site: string;
+  to: string;
+  /** The sources bringing the most page views from outside the website. */
+  top_sources: Ranked[];
+  /** Page views. */
+  views: number;
+  /** Sum of the daily unique visitors (no cookies: one person on two days counts twice). */
+  visitors: number;
 };
 
 /** One page of a list. */
@@ -17386,6 +17651,13 @@ export type ProfileRequest = {
   display_name: string;
 };
 
+/** A prop an event type takes. */
+export type PropInfo = {
+  /** `text` (up to 100 characters), `number` or `boolean`. */
+  kind: string;
+  name: string;
+};
+
 /** Changes to a sign-in provider; fields left out stay as they are, `null` clears. */
 export type ProviderPatch = {
   allow_signup?: boolean | null;
@@ -18045,6 +18317,18 @@ export type PutMenuRequest = {
   items: MenuItemInput[];
 };
 
+/** One row of a ranking. */
+export type Ranked = {
+  /** Events (for event types and objects). */
+  events: number;
+  /** The page path, source, campaign, object (`<kind>:<id>`) or event type. */
+  value: string;
+  /** Page views (for objects: events about the object). */
+  views: number;
+  /** Sum of the daily unique visitors. */
+  visitors: number;
+};
+
 /**
  * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
  * one tenant's shop, without permissions).
@@ -18265,6 +18549,153 @@ export type ReleaseSection = {
   items: string[];
   /** `added`, `changed`, `deprecated`, `removed`, `fixed` or `security`. */
   kind: string;
+};
+
+/** What a tenant asks the platform staff to do. */
+export type RelocationAsk = {
+  /** Merge: id or slug of the tenant to join. */
+  into?: string | null;
+  /**
+   * `split`: a branch of your tenant becomes a tenant of its own. `merge`: your tenant joins
+   * `into`.
+   */
+  kind: RelocationKind;
+  /** Split: wished name of the new tenant. */
+  name?: string | null;
+  /** Split: the root unit of the branch. */
+  org_id?: string | null;
+  /** Split: wished placement (database), if the platform offers a choice. */
+  placement?: string | null;
+  /** Why (contract, consent of the people whose data moves). */
+  reason: string;
+  /** Split: wished slug of the new tenant. */
+  slug?: string | null;
+  /** Merge: the unit of `into` to go under. */
+  under_org?: string | null;
+};
+
+/** Something that blocks a split or merge. */
+export type RelocationBlocker = {
+  /** Stable code, the same as the error a real run would answer. */
+  code: string;
+  message: string;
+};
+
+/**
+ * Rows that cannot move as they are: a reference across the boundary or a unique value taken in
+ * the target.
+ */
+export type RelocationConflict = {
+  /**
+   * `reference` (a row that stays points to a row that goes, or the other way), `unique` (the
+   * target tenant already has the value) or a code of the module.
+   */
+  code: string;
+  /** Rows in conflict. */
+  count: number;
+  message: string;
+  /** Keys of the first rows in conflict (at most 20). */
+  rows: string[];
+  table: string;
+};
+
+/** Split or merge. */
+export type RelocationKind = "split" | "merge";
+
+/** What a split or merge would do (dry run). Nothing is changed. */
+export type RelocationPlan = {
+  blocking: RelocationBlocker[];
+  conflicts: RelocationConflict[];
+  kind: RelocationKind;
+  /**
+   * Split: the root unit of the branch. Merge: the unit of the receiving tenant the merged
+   * tenant goes under.
+   */
+  org_id: string;
+  /** Placement (database) of the target. */
+  placement: string;
+  /** `true` when nothing blocks and there is no conflict. */
+  ready: boolean;
+  /** Rows that move or are copied. */
+  rows: number;
+  source: string;
+  /** Tenant whose rows go. */
+  source_tenant_id: string;
+  /** Every tenant-level table, in copy order. */
+  tables: RelocationTable[];
+  target: string;
+  /** Tenant that receives them (split: the new tenant, its id is the id of the branch unit). */
+  target_tenant_id: string;
+  warnings: RelocationWarning[];
+};
+
+/** A split or merge of tenants to run (platform staff). */
+export type RelocationRequest = {
+  /** Only report what would happen, changing nothing. Defaults to `true`: send `false` to run. */
+  dry_run?: boolean;
+  /** Merge: id or slug of the tenant that receives the rows. */
+  into?: string | null;
+  /** Split: the new tenant is a child of the source tenant. Defaults to `true`. */
+  keep_parent?: boolean;
+  /** `split`: a branch of `tenant` becomes a tenant of its own. `merge`: `tenant` joins `into`. */
+  kind: RelocationKind;
+  /** Split: name of the new tenant. */
+  name?: string | null;
+  /** Split: the root unit of the branch. The new tenant gets this id. */
+  org_id?: string | null;
+  /**
+   * Split: placement (database) of the new tenant; it must be another database than the
+   * source tenant's.
+   */
+  placement?: string | null;
+  /**
+   * Why the data moves between tenants (contract, consent); kept with the run and in the audit
+   * log.
+   */
+  reason: string;
+  /**
+   * Carry out this request of a tenant (from `POST /tenant/relocation-requests`); the other
+   * fields still apply.
+   */
+  request_id?: string | null;
+  /** Split: slug of the new tenant. */
+  slug?: string | null;
+  /**
+   * Id or slug of the tenant whose rows go (split: the tenant with the branch; merge: the
+   * tenant that is merged).
+   */
+  tenant: string;
+  /** Merge: the unit of `into` that the root of the merged tenant goes under. */
+  under_org?: string | null;
+};
+
+/** What happens to one table. */
+export type RelocationTable = {
+  /**
+   * `move` (copied to the target, then deleted from the source), `copy` (the source keeps
+   * them too), `stay`, `drain` (due queue rows that must run first) or `custom`.
+   */
+  action: string;
+  /**
+   * Merge: rows whose key the target already has (the copy made when the tenant was split);
+   * they are skipped as the same rows.
+   */
+  existing: number;
+  /**
+   * The policy of the table: `by_org`, `org_tree`, `follow_parent`, `referenced`,
+   * `tenant_wide`, `must_be_empty`, `handled_by` or `custom`.
+   */
+  policy: string;
+  /** Rows concerned. */
+  rows: number;
+  table: string;
+};
+
+/** Something the operator should know; it does not block. */
+export type RelocationWarning = {
+  code: string;
+  message: string;
+  table: string;
 };
 
 /** A new name for a tag. */
@@ -19995,6 +20426,30 @@ export type TenantMoveRequest = {
   to: string;
 };
 
+/** A split or merge of tenants. */
+export type TenantRelocation = {
+  created_at: string;
+  /** Why the last run stopped; running it again resumes it. */
+  error?: string | null;
+  finished_at?: string | null;
+  id: string;
+  kind: RelocationKind;
+  org_id?: string | null;
+  placement?: string | null;
+  plan?: RelocationPlan | null;
+  reason: string;
+  source_tenant_id: string;
+  /**
+   * `requested` (asked by the tenant, waiting for the platform staff), `planned`, `frozen`
+   * (the tenants answer 503), `copied`, `verified`, `switched`, `cleaned`, `done` or `failed`.
+   */
+  state: string;
+  /** Rows written to the target per table (after `copied`). */
+  tables: TenantTableRows[];
+  target_tenant_id?: string | null;
+  updated_at: string;
+};
+
 /** A setting the installed modules take per tenant, and its state in the current tenant. */
 export type TenantSettingState = {
   description: string;
@@ -20582,6 +21037,18 @@ export type UserRolesRequest = {
   role_ids: string[];
 };
 
+/** UTM parameters of the page URL. */
+export type Utm = {
+  /** `utm_campaign`, e.g. `tet_sale`. */
+  campaign?: string | null;
+  content?: string | null;
+  /** `utm_medium`, e.g. `cpc`. */
+  medium?: string | null;
+  /** `utm_source`, e.g. `facebook`. */
+  source?: string | null;
+  term?: string | null;
+};
+
 /** A smaller copy of an image. */
 export type VariantResponse = {
   /** `image/jpeg`, or `image/png` for images with transparency. */
@@ -20773,6 +21240,143 @@ export interface paths {
         200: Data_AiStatus;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/campaigns": {
+    /** List the UTM campaigns. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/event-types": {
+    /** List the event types (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_EventTypeInfo;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/funnels": {
+    /** List the funnels. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_FunnelInfo;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/funnels/{key}": {
+    /** Get a funnel. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { site?: string; from?: string; to?: string }; };
+      responses: {
+        200: Data_FunnelReport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/objects": {
+    /** List the most viewed objects. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number; kind?: string }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/overview": {
+    /** Get the visit overview of a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string }; };
+      responses: {
+        200: Data_Overview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/pages": {
+    /** List the most viewed pages. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/public/events": {
+    /** Send visit events (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { site?: string }; };
+      requestBody: EventBatch;
+      responses: {
+        202: Data_Ingested;
+        400: Problem;
+        403: Problem;
+        404: Problem;
+        415: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/sources": {
+    /** List the traffic sources. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/types": {
+    /** List the event types by count. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -26958,6 +27562,37 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/relocations": {
+    /** Split a tenant or merge tenants. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RelocationRequest;
+      responses: {
+        200: Data_RelocationPlan;
+        201: Data_TenantRelocation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/relocations/{id}": {
+    /** Get a split or merge of tenants. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_TenantRelocation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/resolve": {
     /** Open a record by its code. */
     get: {
@@ -27131,6 +27766,33 @@ export interface paths {
       responses: {
         200: Data_CurrentTenant;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenant/relocation-requests": {
+    /** Ask for a split or merge of your tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RelocationAsk;
+      responses: {
+        201: Data_TenantRelocation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenant/relocation-requests/{id}": {
+    /** Get a request of your tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_TenantRelocation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

@@ -512,7 +512,7 @@ pub(crate) struct SettingsService {
 
 /// Mục đích (AAD) khi mã hoá giá trị secret. Tên của dòng cũng nằm trong AAD: secret đặt dưới tên
 /// cũ của một cấu hình chỉ mở được bằng tên cũ đó — luôn mở bằng `row.name`.
-const PURPOSE: &str = "kernel.tenant_setting";
+pub(crate) const PURPOSE: &str = "kernel.tenant_setting";
 
 /// Trạng thái của `setting` ở một khách, từ dòng đã lưu `row` (nếu khách đã đặt).
 fn state(setting: &TenantSetting, row: Option<&entity::Model>) -> SettingState {

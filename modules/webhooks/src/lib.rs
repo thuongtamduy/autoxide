@@ -69,6 +69,16 @@ impl Module for WebhooksModule {
         "webhooks"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            // Điểm nhận webhook là cấu hình của khách nguồn (URL, secret): khách mới tự khai.
+            .stay(&["webhooks_endpoint"])
+            .follow("webhooks_delivery", "endpoint_id", "webhooks_endpoint")
+            .sealed("webhooks_endpoint", "secret", "webhooks.endpoint_secret", "id")
+    }
+
     fn description(&self) -> &'static str {
         "Signed webhooks (Standard Webhooks) that send module events to other systems, with \
          retries and delivery history."
