@@ -354,6 +354,8 @@ mod tests {
                 ("migrations", "ok"),
                 ("secret_key", "warning"),
                 ("auth.administrator", "warning"),
+                // Chưa đặt khoá ký access token: máy chủ tự sinh khoá mỗi lần khởi động.
+                ("auth.token_secret", "warning"),
                 ("files.storage", "ok"),
                 ("mail.smtp", "warning"),
                 // Chưa nhập danh mục đơn vị hành chính (D-314).
@@ -370,8 +372,9 @@ mod tests {
             assert!(lines.iter().all(|line| line.status != "failed"), "{lines:?}");
             let text = render(&lines, true);
             assert!(text.contains("→ Run `autoxide user create"), "{text}");
+            assert!(text.contains("→ Set AUTOXIDE_AUTH_TOKEN_SECRET"), "{text}");
             assert!(
-                text.ends_with("No failed checks; 6 warning(s) to look at before going live.\n"),
+                text.ends_with("No failed checks; 7 warning(s) to look at before going live.\n"),
                 "{text}"
             );
             let _ = std::fs::remove_dir_all(dir);

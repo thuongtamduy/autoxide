@@ -190,9 +190,10 @@ async fn world(test: &TestDatabase) -> World {
     let recorder = Arc::new(Recorder::default());
     let slot = Arc::new(Mutex::new(None));
     let app = TestApp::builder(test)
-        // Dời chờ TTL cache + thời gian tối đa của request: rút ngắn cho test.
+        // Dời chờ TTL cache + thời gian tối đa của request: test bỏ qua thời gian chờ bằng
+        // `skip_move_wait`, không hạ thời gian tối đa của request (hạ thì request chậm trên CI bị
+        // cắt). TTL cache ngắn để mọi chỗ đọc khách thấy trạng thái mới sớm.
         .setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "1")
-        .setting("AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS", "1")
         .module(Shop { recorder: recorder.clone(), outbox: slot.clone() })
         .tenant("a")
         .tenant("b")
@@ -322,6 +323,7 @@ async fn dry_run_khong_doi_gi_roi_doi_that_qua_rest_va_doi_ve() {
         assert_eq!(patch.json()["code"], json!("tenant_moving"));
 
         // Worker chạy job dời (và trả job của khách đang dời về hàng đợi).
+        world.app.skip_move_wait().await.unwrap();
         let worker = world.app.modules().worker(4).unwrap();
         worker.run_once().await.unwrap();
         let answer = world.app.get(&format!("/api/v1{status_path}")).token("platform").send().await;
@@ -377,6 +379,7 @@ async fn dry_run_khong_doi_gi_roi_doi_that_qua_rest_va_doi_ve() {
         // Dời về `main` bằng service (đường của CLI), chạy ngay.
         let moves = world.moves();
         let back = moves.start(Actor::system(), "a", "main", false, false).await.unwrap();
+        world.app.skip_move_wait().await.unwrap();
         let back = moves.run(back.id, "test").await.unwrap();
         assert_eq!(back.state, "done");
         assert_eq!(world.placement_of("a").await, "main");
@@ -452,6 +455,7 @@ async fn giu_ban_cu_huy_chay_tiep_va_tu_choi() {
 
         // Giữ bản cũ: dữ liệu còn ở nguồn, hàng đợi job và outbox ở nguồn thì không.
         let kept = moves.start(Actor::system(), "a", "spare", true, false).await.unwrap();
+        world.app.skip_move_wait().await.unwrap();
         let kept = moves.run(kept.id, "test").await.unwrap();
         assert_eq!((kept.state.as_str(), kept.keep_source), ("done", true));
         let spare = world.tenant("a").await.database().clone();
@@ -470,6 +474,7 @@ async fn giu_ban_cu_huy_chay_tiep_va_tu_choi() {
 
         // Huỷ lượt dời chưa đổi placement: dòng đã chép ở đích bị xoá, khách trở lại `active`.
         let moving = moves.start(Actor::system(), "b", "spare", false, false).await.unwrap();
+        world.app.skip_move_wait().await.unwrap();
         assert_eq!(start("b", "empty").await, "tenant_move_unfinished");
         let copied = moves.step(moving.id, "crashed").await.unwrap();
         assert_eq!(copied.state, "copied");
@@ -483,6 +488,7 @@ async fn giu_ban_cu_huy_chay_tiep_va_tu_choi() {
 
         // Chết sau khi chép, trước khi đổi placement: chạy lại thì tiếp đúng lượt đó, tới xong.
         let moving = moves.start(Actor::system(), "b", "spare", false, false).await.unwrap();
+        world.app.skip_move_wait().await.unwrap();
         let copied = moves.step(moving.id, "crashed").await.unwrap();
         assert_eq!(copied.state, "copied");
         let plan = moves.plan("b", "spare", false, Language::En).await.unwrap();

@@ -154,9 +154,23 @@ to choose your own, pipe it in and add `--password-stdin`:
 cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
 ```
 
+Import the reference data the server ships with. Neither step changes your own
+data, and running one again changes nothing:
+
+```bash
+# The Vietnamese administrative units (provinces, communes), used to check addresses.
+# Nothing imports it for you: run it once per installation, and again when an update
+# ships a newer list (`doctor` says so). See docs/ADDRESS.md.
+cargo run -p autoxide -- task address.import
+
+# The tax data pack (rates, withholding rules). A running server imports it by itself
+# within an hour; run this to have it at once. See docs/TAX.md.
+cargo run -p autoxide -- task tax.import_pack
+```
+
 Check the installation. `doctor` goes through the configuration, the database,
-the migrations, file storage, the SMTP server and the administrator account, and
-says how to fix each problem (`--json` for scripts and AI agents; it exits with
+the migrations, the signing keys, file storage, the SMTP server, the administrator
+account and the imported reference data, and says how to fix each problem (`--json` for scripts and AI agents; it exits with
 status 1 when a check failed):
 
 ```bash

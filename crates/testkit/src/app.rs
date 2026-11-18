@@ -155,6 +155,33 @@ impl TestApp {
         self.registry.tenant_by_slug(slug).await.map_err(|e| fail("tenant", e))
     }
 
+    /// Cho mọi lượt dời khách chưa xong coi như đã qua thời gian chờ máy chủ khác thấy lượt dời
+    /// (TTL cache + thời gian tối đa của một request): bước chép chạy ngay.
+    ///
+    /// Gọi sau `TenantMoves::start`, trước `run` / `step` / worker. Nhờ vậy test không phải hạ
+    /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` xuống 1 giây chỉ để thời gian chờ ngắn — mức đó
+    /// làm request bình thường của test thỉnh thoảng bị cắt (408) khi máy CI chậm.
+    pub async fn skip_move_wait(&self) -> Result<(), TestAppError> {
+        use sea_orm::ConnectionTrait as _;
+        use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
+
+        // Lùi `moving_since` một giờ: xa hơn mọi thời gian chờ test đặt, nhưng không đổi gì khác
+        // của lượt dời (trạng thái, lease, bảng đã chép).
+        let earlier = chrono::Utc::now() - chrono::Duration::hours(1);
+        let update = Query::update()
+            .table(Alias::new("kernel_tenant_moves"))
+            .value(Alias::new("moving_since"), earlier)
+            .and_where(Expr::col(Alias::new("finished_at")).is_null())
+            .to_owned();
+        self.registry
+            .control()
+            .write()
+            .execute(&update)
+            .await
+            .map_err(|e| fail("skip_move_wait", e))?;
+        Ok(())
+    }
+
     /// Bộ tra DNS giả của app: tên miền riêng được xác minh theo bản ghi TXT đặt ở đây
     /// ([`FakeDns::set_challenge`]); app không bao giờ hỏi DNS thật.
     pub fn dns(&self) -> &FakeDns {

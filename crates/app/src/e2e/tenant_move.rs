@@ -24,9 +24,9 @@ async fn app(test: &TestDatabase) -> TestApp {
     let mut builder = TestApp::builder(test)
         .setting("AUTOXIDE_FILES_DIR", &dir.join("files").display().to_string())
         .setting("AUTOXIDE_MAIL_FILE_DIR", &dir.join("mail").display().to_string())
-        // Dời chờ TTL cache + thời gian tối đa của request: rút ngắn cho test.
+        // Dời chờ TTL cache + thời gian tối đa của request: test bỏ qua bằng `skip_move_wait`
+        // thay vì hạ thời gian tối đa của request xuống 1 giây (request chậm trên CI bị cắt).
         .setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "1")
-        .setting("AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS", "1")
         .tenant("a")
         .tenant("b")
         .placement("spare")
@@ -111,6 +111,7 @@ async fn doi_khach_co_du_lieu_cua_nhieu_module_roi_doi_ve() {
 
         // Dời thật (đường của CLI).
         let started = moves.start(Actor::system(), "a", "spare", false, false).await.unwrap();
+        app.skip_move_wait().await.unwrap();
         let moved = moves.run(started.id, "e2e").await.unwrap();
         assert_eq!(moved.state, "done");
         for table in &moved.tables {
@@ -154,6 +155,7 @@ async fn doi_khach_co_du_lieu_cua_nhieu_module_roi_doi_ve() {
 
         // Dời về `main`.
         let back = moves.start(Actor::system(), "a", "main", false, false).await.unwrap();
+        app.skip_move_wait().await.unwrap();
         assert_eq!(moves.run(back.id, "e2e").await.unwrap().state, "done");
         let a = tenant(&app, "a").await;
         assert_eq!(a.placement(), main.placement());
@@ -196,7 +198,6 @@ async fn doi_khach_sang_placement_co_noi_luu_file_rieng() {
             .setting("AUTOXIDE_FILES_DIR", &shared_dir.display().to_string())
             .setting("AUTOXIDE_MAIL_FILE_DIR", &root.join("mail").display().to_string())
             .setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "1")
-            .setting("AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS", "1")
             .tenant("a")
             .placement("spare")
             .user_in("a", "token-a", 2, &["files.upload", "files.manage"]);
@@ -226,6 +227,7 @@ async fn doi_khach_sang_placement_co_noi_luu_file_rieng() {
         assert!(plan.ready, "{plan:?}");
         assert_eq!(plan.files, 1);
         let started = moves.start(Actor::system(), "a", "spare", false, false).await.unwrap();
+        app.skip_move_wait().await.unwrap();
         assert_eq!(moves.run(started.id, "e2e").await.unwrap().state, "done");
 
         let a = tenant(&app, "a").await;

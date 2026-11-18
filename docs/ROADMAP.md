@@ -6,7 +6,7 @@ thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/
 
 Trạng thái: **bước 0–37 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
 **kế tiếp bước 51**; bước 50 chờ chủ dự án công khai repo (D-199); bản
-phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
+phát hành mới nhất `v0.14.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
 xếp theo **thứ tự làm**; bước kế tiếp là bước đầu tiên (từ trên xuống) còn mục `[ ]` mà các bước nó phụ

@@ -20,6 +20,9 @@ endpoints are marked deprecated with a sunset date first.
   `reporting.read` (scoped) and `reporting.manage`. `ledger.entry_posted` / `ledger.entry_reversed` carry `lines`.
 - Kernel: `tenancy::distribution` lets a module send records from a parent tenant to its child tenants (also on
   other databases) through a job that can run again without making copies.
+- `autoxide doctor` warns when `AUTOXIDE_AUTH_TOKEN_SECRET` is not set (check `auth.token_secret`), as the
+  deployment guide already said; the README's installation steps now include importing the reference data
+  (`autoxide task address.import`, `autoxide task tax.import_pack`).
 - `ledger`: `POST /api/v1/ledger/bank-accounts/{id}/vietqr-preview` makes a sample VietQR code to scan before taking
   real payments (nothing is stored); `GET /api/v1/ledger/books/{id}/integrity` checks a book's hash chain on demand.
 - `invoices`: `POST /api/v1/invoices/documents/{id}/refresh` asks the e-invoice provider about a document now;
