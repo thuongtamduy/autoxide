@@ -166,8 +166,11 @@ async fn route_cua_module_nam_duoi_api_v1_ten_module() {
     // Tài liệu OpenAPI ghi đúng đường dẫn mà router phục vụ.
     let api = api_with(&default_config());
     let paths: Vec<&str> = api.openapi.paths.paths.keys().map(String::as_str).collect();
-    // `/llms.txt` (bước 40 P2) luôn có ở gốc.
-    assert_eq!(paths, ["/api/v1/notes", "/api/v1/notes/{id}", "/llms.txt"]);
+    // `/llms.txt` (bước 40 P2) và tài liệu theo module (D-20261118-module-contracts) luôn có.
+    assert_eq!(
+        paths,
+        ["/api/v1/notes", "/api/v1/notes/{id}", "/api/v1/openapi/{file}", "/llms.txt"]
+    );
     assert_eq!(api.openapi.info.title, "Autoxide API");
 }
 

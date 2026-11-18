@@ -217,5 +217,6 @@
   "text:The owner of an account reported an email change they did not make (from the mail sent to the old address): the account was signed out everywhere, its password, passkeys, API keys and two-step sign-in removed, and the old address restored when free (`before.email`, `after.email`).": "Chủ tài khoản báo một lần đổi email không phải do họ (từ thư gửi tới địa chỉ cũ): tài khoản bị đăng xuất khỏi mọi nơi, mật khẩu, passkey, API key và đăng nhập hai bước bị gỡ, địa chỉ cũ được trả lại nếu còn trống (`before.email`, `after.email`).",
   "text:The roles of a user changed.": "Role của một người dùng thay đổi.",
   "text:This tenant let holders of one of its roles work in a child tenant (`after`: child tenant, role, unit, expiry, reason).": "Khách này cho người giữ một role của mình làm việc ở một khách con (`after`: khách con, role, nút, hạn, lý do).",
-  "text:Two-step sign-in was turned off, by the user or by an administrator.": "Đăng nhập hai bước bị tắt, bởi người dùng hay quản trị viên."
+  "text:Two-step sign-in was turned off, by the user or by an administrator.": "Đăng nhập hai bước bị tắt, bởi người dùng hay quản trị viên.",
+  "text:Write notes.": "Viết ghi chú."
 }

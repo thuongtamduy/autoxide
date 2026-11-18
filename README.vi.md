@@ -352,7 +352,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 
 - [`STACK.md`](STACK.md) — dùng thư viện nào và vì sao
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — dựng gì, theo thứ tự nào
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) — nhật ký quyết định
+- [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) — nhật ký quyết định theo chủ đề (mục cũ
+  ở [`docs/DECISIONS.md`](docs/DECISIONS.md), mục mới mỗi mục một file trong `docs/decisions/`)
 - [`CLAUDE.md`](CLAUDE.md) — luật cho người đóng góp, là người hay AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — thay đổi của từng bản phát hành (tiếng Anh); image
   Docker đã phát hành ở `ghcr.io/<owner>/autoxide`

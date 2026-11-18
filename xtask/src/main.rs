@@ -9,7 +9,11 @@
 //! - `upgrade-test [--from <tag>] [--image <image>] [--database …]` — test nâng cấp từ bản phát
 //!   hành trước bằng image Docker của nó; chạy trong CI và lúc phát hành (xem `upgrade.rs`).
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
-//!   (`i18n.rs`) và tài liệu EN / VI (`docs.rs`). `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
+//!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), mục lục quyết định (`decisions.rs`) và độ dài
+//!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn).
+//!   `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
+//! - `decisions` — sinh lại mục lục `docs/decisions/INDEX.md` từ nhật ký quyết định (xem
+//!   `decisions.rs`).
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
 //!   `scaffold.rs`).
 //! - `test-all [--doc]` — mọi test của workspace, các file test chạy song song, trên database của
@@ -21,8 +25,10 @@
 mod affected;
 mod api_diff;
 mod boundaries;
+mod decisions;
 mod docs;
 mod i18n;
+mod lengths;
 mod scaffold;
 mod sdk;
 mod semver;
@@ -33,6 +39,7 @@ mod workspace;
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: cargo xtask check
+       cargo xtask decisions                     regenerate docs/decisions/INDEX.md
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
        cargo xtask semver [--base <tag>] [--deny] [--markdown]
        cargo xtask sdk [--check | --extract-examples <dir>]
@@ -48,6 +55,7 @@ fn main() -> ExitCode {
     // số mà không phải tự kiểm độ dài.
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["check"] => check(),
+        ["decisions"] => decisions(),
         ["api-diff"] => api_diff(None),
         ["api-diff", "--base", base] => api_diff(Some(base)),
         ["semver", rest @ ..] => semver(rest),
@@ -174,6 +182,12 @@ fn check() -> ExitCode {
         violations.extend(i18n::check_translations(&workspace)?);
         violations.extend(docs::check_docs(&workspace.root)?);
         violations.extend(tenancy::check_entities(&workspace)?);
+        violations.extend(decisions::check(&workspace.root)?);
+        let lengths = lengths::check(&workspace.root)?;
+        if let Some(warning) = lengths.warning {
+            eprintln!("{warning}");
+        }
+        violations.extend(lengths.violations);
         Ok(violations)
     }) {
         Ok(violations) => violations,
@@ -191,6 +205,22 @@ fn check() -> ExitCode {
     }
     eprintln!("xtask check: {} violation(s)", violations.len());
     ExitCode::FAILURE
+}
+
+fn decisions() -> ExitCode {
+    let result = workspace::load()
+        .map_err(|error| error.to_string())
+        .and_then(|workspace| decisions::write_index(&workspace.root));
+    match result {
+        Ok(count) => {
+            println!("decisions: wrote {} ({count} decisions)", decisions::INDEX_FILE);
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("xtask decisions: {error}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 fn new_module(module: &str, entity: &str) -> ExitCode {

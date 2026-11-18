@@ -51,6 +51,8 @@ Other MCP clients take a Streamable HTTP server with a header, e.g.:
 }
 ```
 
+An agent that works with one module only can connect to that module's own endpoint, `/mcp/<module>` (for example `https://api.example.com/mcp/content`): same authentication and permissions, but only that module's tools, resources and prompts, so the model does not have to read the descriptions of every tool on the server. `/llms.txt` links each module's endpoint.
+
 ## 3. What the agent can do
 
 `tools/list` shows only the tools the key's permissions allow. Each description ends with the permission it needs, and annotations say whether a tool is read-only or destructive (clients ask before calling those). A deprecated tool says so in its description and in every result (`_meta.autoxide/deprecation`), with the tool to use instead.
@@ -300,4 +302,11 @@ The resources and prompts of this version (`docs/mcp-tools.json` lists them too)
 <!-- example: llms-txt -->
 ```bash
 curl -sS "$API/llms.txt"
+```
+
+Under each module, `/llms.txt` links its own OpenAPI document and MCP endpoint and names its tools. A module's OpenAPI document holds only the endpoints under `/api/v1/<module>` and the schemas they use, with the same conventions as the whole document — enough to call that module correctly without loading the rest of the API:
+
+<!-- example: module-openapi -->
+```bash
+curl -sS "$API/api/v1/openapi/content.json"
 ```

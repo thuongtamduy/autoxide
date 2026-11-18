@@ -1,0 +1,434 @@
+# Mục lục quyết định
+
+> Sinh bằng `cargo xtask decisions` từ `docs/DECISIONS.md` và `docs/decisions/D-*.md` — **không sửa tay**; `cargo xtask check` (trong gate) báo khi file này lệch.
+
+Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
+
+385 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+
+## Phạm vi và mục tiêu (12)
+
+- **D-006** Phạm vi core — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-185*
+- **D-010** Tên, chỗ đặt, deploy — 2026-11-11 · **chủ dự án quyết**
+- **D-011** AI agent quyết định xuyên suốt — 2026-11-11 · **chủ dự án quyết**
+- **D-014** Mục tiêu của dự án — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-016*
+- **D-016** Mục đích sản phẩm — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-017, D-096*
+- **D-017** Mã nguồn mở, công khai toàn bộ — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-021*
+- **D-019** Bảy tiêu chí chất lượng — 2026-11-11 · **chủ dự án quyết**
+- **D-026** Core chỉ có API, không có giao diện web — 2026-11-11 · **chủ dự án quyết**
+- **D-164** Autoxide là sản phẩm có cửa cho module; mượn cái hay của framework khác; core chuẩn để sau nâng thành framework — 2026-11-13 · **chủ dự án quyết**
+- **D-175** Công khai repo; bật lại CI và phát hành tự động trên GitHub — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-199*
+- **D-185** Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 · **chủ dự án quyết**
+- **D-199** Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 · **chủ dự án quyết**
+
+## Quy trình, gate, lộ trình (55)
+
+- **D-004** GraphQL để sau, OpenAPI từ đầu — 2026-11-11 · **chủ dự án quyết**
+- **D-012** Rust edition 2024, toolchain ghim — 2026-11-11
+- **D-013** Tài liệu tiếng Việt, thuật ngữ kỹ thuật tiếng Anh — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-023*
+- **D-018** Được chia agent và subagent — 2026-11-11 · **chủ dự án quyết**
+- **D-021** License: MIT hoặc Apache-2.0 — 2026-11-11 · **chủ dự án quyết**
+- **D-023** Ngôn ngữ tài liệu: tách cho người ngoài và nội bộ — 2026-11-11 · **chủ dự án quyết**
+- **D-032** Ngoại lệ cho lỗ hổng của SQLite đóng gói kèm (RUSTSEC-2026-0459) — 2026-11-11
+- **D-033** Database cho test: mỗi test một database, qua `TestDatabase::run` — 2026-11-11
+- **D-041** OpenAPI: sinh từ code, nằm trong repo, kiểm trong gate — 2026-11-11
+- **D-072** Docker: build multi-stage, chạy Debian slim không root; compose có bước migrate — 2026-11-11
+- **D-074** CI trên GitHub Actions: gate đầy đủ trên PostgreSQL 16 và 18, quét secret bằng gitleaks — 2026-11-11 · *thay một phần bởi D-107, D-108*
+- **D-075** Thử gỡ ngoại lệ RUSTSEC-2026-0459: chưa gỡ được — 2026-11-11
+- **D-078** Phát hành: SemVer một số cho cả workspace, CHANGELOG, image trên GHCR, Dependabot — 2026-11-11 · *thay một phần bởi D-107*
+- **D-082** Gate kiểm tài liệu OpenAPI hợp lệ và mô tả gửi ra ngoài là tiếng Anh — 2026-11-12
+- **D-092** Dependabot bỏ qua `p256` ≥ 0.14 cho tới khi `webauthn_rp` nâng theo — 2026-11-12 · **chủ dự án quyết**
+- **D-106** Sửa lỗi sau lượt rà soát độc lập module `content` — 2026-11-12
+- **D-107** Tắt CI trên GitHub; gate cục bộ là gate duy nhất — 2026-11-12 · **chủ dự án quyết** · *thay bởi D-175* · *thay một phần bởi D-108*
+- **D-108** Quét secret bằng gitleaks trong gate — 2026-11-12 · **chủ dự án quyết**
+- **D-111** Bước 18: sửa sau lượt rà soát độc lập — 2026-11-12
+- **D-169** `autoxide task` và `Module::tasks`; mọi module test HTTP qua `TestApp` — 2026-11-13
+- **D-171** Agent tự phát hành sau mỗi bước lộ trình xong — 2026-11-13 · **chủ dự án quyết** · *thay bởi D-248*
+- **D-172** Build dev và test chỉ giữ thông tin dòng code (`debug = "line-tables-only"`) — 2026-11-13
+- **D-173** Gate hai mức: `./gate.sh --quick` lúc dev, gate đầy đủ trước khi merge và phát hành — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-300*
+- **D-177** SDK TypeScript nằm trong repo, không đăng npm — 2026-11-13 · **chủ dự án quyết**
+- **D-178** Gom bước 30–36 của lộ trình thành 30–33 — 2026-11-13 · **chủ dự án quyết**
+- **D-179** Bản release kiểm tràn số nguyên (`overflow-checks = true`) — 2026-11-13
+- **D-189** Sắp lại lộ trình: nền đa khách đứng trước vận hành và năng lực còn thiếu — 2026-11-13 · *thay một phần bởi D-190*
+- **D-192** Rà bước 30–40: thứ tự, phụ thuộc, đường nâng cấp — 2026-11-13
+- **D-197** Workflow GitHub tự chạy chỉ khi repo công khai; image hai kiến trúc, chứng thực và SBOM; quy tắc ứng xử — 2026-11-13
+- **D-198** Đặc tả từng bước trong `docs/steps/`, luật chung giữa các bước; giữ nguyên lịch sử git — 2026-11-13 · **chủ dự án quyết**
+- **D-205** Phân quyền chuẩn hàng đầu: bước 54 mới, hợp đồng quyền và test độ phủ ở bước 31 — 2026-11-13 · **chủ dự án quyết**
+- **D-221** Đưa tám mảng "để sau" lên lộ trình: bước 59–66 — 2026-11-14 · **chủ dự án quyết**
+- **D-228** Lộ trình xếp theo thứ tự làm; bước đã xong tách file; đặc tả một phiên bản — 2026-11-14 · **chủ dự án quyết**
+- **D-232** Đưa 11 mục "để sau / chờ quyết" vào các bước có sẵn — 2026-11-14 · **chủ dự án quyết**
+- **D-233** Viết đặc tả cho 6 việc "để sau" còn rải trong đặc tả; dọn câu "để sau" đã cũ — 2026-11-14 · **chủ dự án quyết**
+- **D-237** Rà lộ trình lần hai trước bước 31: tỉ giá về `ledger`, một chỗ cho thông tin cửa hàng, nhãn và ghi chú của `customers`, báo có hàng lại không trùng, sửa bảng phụ thuộc — 2026-11-14
+- **D-239** `cargo xtask api-diff`: luật phá vỡ của `/api/v1`, chỉ `x-sunset` trong tài liệu (bước 31 A1) — 2026-11-15
+- **D-242** `cargo xtask semver`: chỉ kernel và testkit, ép so như bản patch, báo cáo khi còn `0.x` (bước 31 A7) — 2026-11-15
+- **D-243** SDK TypeScript: bộ sinh viết bằng Rust trong `xtask`, gate kiểm khớp không cần Node, `tsc` trong CI (bước 31 A2) — 2026-11-15
+- **D-244** Hướng dẫn theo tình huống: dạng `curl` hẹp chạy như test, bảng tool kiểm theo code (bước 31 A3–A5) — 2026-11-15
+- **D-245** Hợp đồng quyền đọc được bằng máy và test độ phủ phân quyền (bước 31, đặc tả 54 P1) — 2026-11-15
+- **D-246** Test nâng cấp từ bản phát hành trước: Docker, ngoài gate (bước 31 B1) — 2026-11-15
+- **D-248** Phát hành gom thành bản lớn, không phát hành sau từng bước — 2026-11-15 · **chủ dự án quyết** · *thay một phần bởi D-300*
+- **D-263** Nhịp chạy gate khi làm việc: gom theo nhóm, gate đầy đủ chỉ trước khi merge — 2026-11-15 · **chủ dự án quyết** · *thay một phần bởi D-300*
+- **D-273** Merge vào `main` giữa bước 33 để giao diện dùng API mới, không phát hành — 2026-11-15 · **chủ dự án quyết**
+- **D-294** Yêu cầu website bán hàng (web-build-api-gaps, 16/11/2026): danh mục / thẻ công khai, xếp phần thương mại vào lộ trình — 2026-11-16
+- **D-295** Merge vào `main` trước khi gate đầy đủ chạy xong (một lần) — 2026-11-16 · **chủ dự án quyết**
+- **D-298** Merge D-296 và D-297 vào `main` trước gate đầy đủ (lần hai) — 2026-11-16 · **chủ dự án quyết**
+- **D-299** Làm nhanh vòng "viết → test": tối ưu thư viện trong bản test, gate nhanh so với lần xanh gần nhất, chạy file test song song — 2026-11-16 · **chủ dự án quyết**
+- **D-300** Gate đầy đủ chỉ bắt buộc trước khi phát hành — 2026-11-16 · **chủ dự án quyết**
+- **D-316** Mục "tạo tài khoản từ số điện thoại" chuyển sang bước 45 — 2026-11-16
+- **D-340** Giỏ ở quầy bán (yêu cầu W-053 của giao diện) vào đặc tả bước 45 — 2026-11-17
+- **D-346** Chấp nhận tạm `chrono` / `chrono-tz` / `humantime` "không còn bảo trì" — 2026-11-17
+- **[D-20261118-decision-ids](D-20261118-decision-ids.md)** Quyết định mới mỗi mục một file, ID theo ngày và tên; mục lục tự sinh — 2026-11-18
+- **[D-20261118-file-length](D-20261118-file-length.md)** Độ dài file `.rs`: cảnh báo trên 800 dòng, chặn trên 1200, danh sách miễn không được dài thêm — 2026-11-18
+
+## Kiến trúc module và kernel (10)
+
+- **D-005** Một binary, ranh giới module chặt — 2026-11-11 · **chủ dự án quyết**
+- **D-025** Không foreign key xuyên module, không ngoại lệ — 2026-11-11 · **chủ dự án quyết**
+- **D-031** Bố cục workspace và luật ranh giới kiểm tự động — 2026-11-11
+- **D-038** Hình dạng của hợp đồng module — 2026-11-11
+- **D-069** Module mẫu `notes` không đăng ký sẵn trong binary — 2026-11-11
+- **D-124** `AUTOXIDE_HTTP_PUBLIC_URL`, công bố bởi module nội bộ `kernel` — 2026-11-12
+- **D-167** Hợp đồng module: liệt kê thư viện công khai, `#[non_exhaustive]`, chính sách deprecate — 2026-11-13
+- **D-170** Hàm tạo cho các kiểu module dựng bằng literal, rồi `#[non_exhaustive]` — 2026-11-13
+- **D-351** Bộ dựng mẫu của kernel `autoxide_kernel::template` dùng `minijinja` (bước 37 mục 2, phần kernel) — 2026-11-17
+- **D-365** Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17
+
+## Database, dữ liệu, job, event (25)
+
+- **D-001** Database: SQLite và Postgres — 2026-11-11 · **chủ dự án quyết**
+- **D-002** UUIDv7 cho mọi ID — 2026-11-11 · **chủ dự án quyết**
+- **D-003** Stack: tokio + axum + SeaORM + utoipa — 2026-11-11 · **chủ dự án quyết**
+- **D-009** Xử lý giới hạn single-writer của SQLite — 2026-11-11 · **chủ dự án quyết**
+- **D-015** Tương thích SQLite và Postgres là luật số một — 2026-11-11 · **chủ dự án quyết**
+- **D-029** SeaORM mặc định, SQL trực tiếp chỉ khi đã đo — 2026-11-11
+- **D-030** Phiên bản database tối thiểu — 2026-11-11
+- **D-035** Chi tiết kết nối database tách đọc / ghi — 2026-11-11
+- **D-036** Migration theo module — 2026-11-11
+- **D-037** Kiểm luật sở hữu bảng bằng cách hỏi chính database — 2026-11-11
+- **D-054** Event: transactional outbox — 2026-11-11
+- **D-055** Audit log là một module nhận mọi event — 2026-11-11
+- **D-056** Job queue — 2026-11-11
+- **D-070** Chép dữ liệu giữa SQLite và Postgres bằng `autoxide copy` — 2026-11-11
+- **D-104** Tìm theo chữ không phân biệt dấu: `search::fold` — 2026-11-12
+- **D-122** Người thực hiện "người lạ" (`Actor::public`), cột `actor_kind` trong outbox và audit — 2026-11-12
+- **D-165** Lệnh sinh module: chép khuôn `notes` rồi đổi tên — 2026-11-13
+- **D-181** Khoá dòng và cập nhật có điều kiện: `autoxide_kernel::rows` thay mẹo "chạm dòng" — 2026-11-13
+- **D-182** Chạy lại thao tác ghi khi xung đột tạm thời: `Database::write_with_retry` — 2026-11-13
+- **D-224** `ActorKind` thống nhất cho audit, nhật ký lệnh và event — 2026-11-14
+- **D-329** Đánh số tuần tự, khoá chia sẻ, nhiều module cùng góp một trait (bước 36 phần 2) — 2026-11-17
+- **D-371** Gửi lại lần giao webhook và event theo bản ghi trên bàn kỹ thuật (bước 52 mục 1) — 2026-11-18
+- **D-377** Báo khi job xong và khi được nhắc trong ghi chú (bước 51 P13, P16) — 2026-11-18
+- **D-378** Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18
+- **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
+
+## HTTP, REST, OpenAPI (14)
+
+- **D-008** Cách làm mặc định của các dịch vụ core — 2026-11-11 · **chủ dự án quyết**
+- **D-039** Kiểu lỗi, hình dạng response, pagination — 2026-11-11
+- **D-040** Lớp HTTP và giai đoạn khởi động của module — 2026-11-11
+- **D-042** Health check — 2026-11-11
+- **D-057** i18n: bản dịch theo `code`, dịch ở lớp HTTP — 2026-11-11
+- **D-058** Idempotency key — 2026-11-11
+- **D-059** Endpoint deprecated — 2026-11-11
+- **D-084** Chống ghi đè: `ETag` từ `updated_at`, `If-Match` kiểm trong câu `UPDATE` — 2026-11-12
+- **D-140** Kernel báo tên schema OpenAPI trùng nhau giữa các module — 2026-11-12
+- **D-155** Sổ module đã cài: API chỉ đọc trong module nội bộ `kernel` — 2026-11-12 · **chủ dự án quyết**
+- **D-184** Chống trùng lệnh bằng mã tham chiếu của client: `autoxide_kernel::reference` — 2026-11-13
+- **D-213** Job API chung, xuất danh sách chung, yêu cầu duyệt đầy đủ (bước 51) — 2026-11-14
+- **D-336** Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17
+- **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
+
+## MCP, AI, agent dùng API (20)
+
+- **D-020** "Phù hợp với AI agent" nghĩa là gì — 2026-11-11
+- **D-022** MCP endpoint nằm trong core — 2026-11-11 · **chủ dự án quyết**
+- **D-050** API key cho máy và AI agent — 2026-11-11
+- **D-068** MCP endpoint: `rmcp` ở kernel, tool khai qua hợp đồng module — 2026-11-11
+- **D-083** Bước 14: kiểm đầu vào ở service và báo mọi lỗi một lần; `Created`; header chung trong OpenAPI; MCP cùng envelope với REST — 2026-11-12
+- **D-109** Tính năng AI: tầng kết nối trung lập, hai adapter, quyền cho agent, mặc định tắt — 2026-11-12 · **chủ dự án quyết**
+- **D-110** Bước 18 (AI): những chỗ đề bài chưa nói hoặc làm khác — 2026-11-12
+- **D-128** Tool MCP tạo / sửa form; không có tool xoá form; khoá phiên bản tên `etag` — 2026-11-12
+- **D-190** Bổ sung nền đa khách sau rà soát: thứ ngoài bảng, secret theo khách, luật kế toán, giao dịch điện tử, người tiêu dùng, AI — 2026-11-13
+- **D-229** Trang dựng từ khối và AI tạo trang (bước 67); tính năng AI hỗ trợ người dùng trong CMS — 2026-11-14 · **chủ dự án quyết** · *thay một phần bởi D-231*
+- **D-230** AI tự trả lời câu hỏi đơn giản đã có câu trả lời chính xác; câu phức tạp chỉ soạn nháp — 2026-11-14 · **chủ dự án quyết**
+- **D-231** Thử A/B trang, AI tạo ảnh, khối mã tự viết (bước 67) — 2026-11-14 · **chủ dự án quyết**
+- **D-240** Hợp đồng tool MCP: `docs/mcp-tools.json`, `Deprecation::tool`, cảnh báo trong kết quả (bước 31 A6) — 2026-11-15
+- **D-260** Quản lý khách: `TenantAdmin`, `Module::seed_tenant`, REST / MCP / CLI (bước 33 A9a) — 2026-11-15
+- **D-275** `ai` theo khách: hạn mức đếm riêng, khoá và mô hình riêng của khách (bước 33 B4) — 2026-11-15
+- **D-325** Kernel cưỡng chế quyền dùng ở bốn chỗ: route, tool MCP, job, event (bước 35 phần C) — 2026-11-16
+- **D-362** Nhãn nội dung viết với gợi ý của AI: `ai_assisted` / `alt_ai_assisted` (bước 37) — 2026-11-17
+- **D-372** Lời thường thành bộ lọc ở kernel, `POST /api/v1/kernel/filters/parse`; khôi phục bài đã lưu trữ (bước 52 mục 2, 3) — 2026-11-18
+- **D-374** MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18
+- **[D-20261118-module-contracts](D-20261118-module-contracts.md)** OpenAPI và MCP theo từng module, trỏ từ `/llms.txt` — 2026-11-18
+
+## Xác thực, phân quyền, bảo mật (50)
+
+- **D-024** Email, đặt lại mật khẩu, xác minh email nằm trong core — 2026-11-11 · **chủ dự án quyết**
+- **D-028** Tạo tài khoản: quản trị viên tạo, tự đăng ký là tuỳ chọn — 2026-11-11 · **chủ dự án quyết**
+- **D-044** Người dùng nằm trong module `auth`; mật khẩu hash bằng Argon2id — 2026-11-11
+- **D-045** Đăng nhập: access token JWT HS256 tự viết, refresh token xoay vòng — 2026-11-11
+- **D-046** Role và permission — 2026-11-11
+- **D-047** Rate limiting và login throttling — 2026-11-11
+- **D-048** Lệnh `autoxide user create` — 2026-11-11
+- **D-049** Quản lý người dùng qua API và tự đăng ký — 2026-11-11
+- **D-051** TOTP — 2026-11-11
+- **D-052** Recovery code — 2026-11-11
+- **D-053** Đăng nhập hai bước — 2026-11-11
+- **D-064** Tự đổi mật khẩu và mật khẩu đầu tiên do quản trị viên đặt — 2026-11-11
+- **D-076** Đo tải qua API thật; bật TCP_NODELAY; một câu query lấy quyền — 2026-11-11
+- **D-077** Passkey (WebAuthn) bằng `webauthn_rp`; hai ngoại lệ `cargo deny` — 2026-11-11 · **chủ dự án quyết**
+- **D-079** Rà soát bảo mật bước 13: đếm lượt trước khi kiểm, xác nhận lại mật khẩu, không tác động lên người quyền cao hơn — 2026-11-12
+- **D-080** Tài khoản: quản lý phiên, xoá tài khoản + xuất dữ liệu xuyên module, tìm người dùng — 2026-11-12
+- **D-113** Khoá ký của kernel: `AUTOXIDE_SECRET_KEY`, không đặt thì sinh một lần và lưu database; module nội bộ `kernel` — 2026-11-12
+- **D-114** Địa chỉ client: đếm proxy tin cậy (`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`), `ClientInfo` dùng chung — 2026-11-12
+- **D-115** Băm IP: gộp /24 – /64 rồi HMAC; `bucket` theo ngày, `fingerprint` cố định — 2026-11-12
+- **D-116** `Throttle` dùng chung trong kernel, đếm trong database; `auth` chuyển sang — 2026-11-12
+- **D-117** Token dùng một lần trong kernel (`OneTimeTokens`) — 2026-11-12
+- **D-118** `auth` dùng token và hàm băm của kernel; token xoá cùng tài khoản — 2026-11-12
+- **D-119** Chống spam hai pha trong core: module nội bộ `antispam`, `SpamGuard`, nonce là idempotency cho người lạ — 2026-11-12
+- **D-120** ALTCHA v2 tự viết, phiên bản giao thức và widget được ghim — 2026-11-12
+- **D-149** Rà soát bảo mật phần thêm sau D-079: sửa và các quy ước mới — 2026-11-12
+- **D-152** Địa chỉ client: tin proxy theo dải địa chỉ (`AUTOXIDE_HTTP_TRUSTED_PROXIES`) — 2026-11-12
+- **D-153** Dấu IP riêng theo phạm vi; cảnh báo khi khoá ký nằm trong database — 2026-11-12
+- **D-156** Bước 25 — `auth`: mật khẩu đổi thì mọi thứ mở bằng mật khẩu cũ đóng cùng lúc; cấp quyền kiểm lại trong transaction — 2026-11-12
+- **D-159** Lệnh `autoxide user reset-mfa`: người vận hành tắt xác thực hai bước — 2026-11-12
+- **D-162** Đặt lại mật khẩu: request chỉ xếp job, như đăng ký bản tin — 2026-11-12
+- **D-174** Một cách kiểm email cho dữ liệu người đọc gửi lên: `autoxide_kernel::email` — 2026-11-13
+- **D-250** `auth`: đổi email thì báo địa chỉ cũ, kèm cách báo "không phải tôi" (bước 32 B1) — 2026-11-15
+- **D-251** `auth`: quản trị viên xem và gỡ passkey của người khác; `autoxide user remove-passkeys` (bước 32 B2) — 2026-11-15
+- **D-257** Mã hoá secret khi lưu, upgrade dữ liệu, xoay khoá (bước 33 A6, dời từ bước 37) — 2026-11-15
+- **D-285** `auth` theo khách, lượt dữ liệu: bảng, role `admin` gieo mỗi khách, TOTP lưu mã hoá, CLI `--tenant` (bước 33 B12a) — 2026-11-15
+- **D-286** `auth` theo khách, lượt credential: token và API key mang khách (bước 33 B12b) — 2026-11-15
+- **D-287** `OptionalTenant` bỏ qua credential hỏng (bước 33) — 2026-11-15
+- **D-304** Membership, role và API key theo nút trong `auth` (bước 34 mục 2) — 2026-11-16
+- **D-308** Tài khoản: xác nhận lại danh tính, ưa thích, role bắt buộc MFA (bước 34 mục 9) — 2026-11-16
+- **D-309** Danh tính hai lớp: nhân sự và người mua (bước 34 mục 8) — 2026-11-16
+- **D-311** Đăng nhập bằng link qua email (bước 34 mục 11) — 2026-11-16
+- **D-312** Mời người dùng qua email (bước 34 mục 12) — 2026-11-16
+- **D-313** Quyền vào hỗ trợ của nhân sự nền tảng (bước 34 mục 13) — 2026-11-16
+- **D-319** Đường đã đăng nhập đọc người dùng cùng quyền trong một câu; `GET /me` còn ba câu — 2026-11-16 · **chủ dự án quyết**
+- **D-320** Header bảo mật chung cho mọi response (bước 40 P1) — 2026-11-16 · **chủ dự án quyết**
+- **D-321** Bộ đếm login throttling: một câu "chèn hoặc cộng" trả số đếm; số 232 req/s của D-302 là bài đo lẫn — 2026-11-16 · **chủ dự án quyết**
+- **D-339** `GET /auth/me` ở khách đang vào — 2026-11-17
+- **D-375** Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18
+- **D-376** Giải thích quyền theo gói và "đang dùng ở đâu" (bước 51 P11, D-267) — 2026-11-18
+- **D-380** Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18
+
+## Đa khách, tổ chức, gói (35)
+
+- **D-210** Tách nhánh thành khách riêng, chuyển database: chỉ nhân sự nền tảng (H3) — 2026-11-14
+- **D-211** Khách tự thu hồi quyền vào hỗ trợ (H4) — 2026-11-14
+- **D-223** Danh sách lý do theo khách: một cách làm cho mọi module — 2026-11-14
+- **D-234** Chủ đề theo mùa / ngày lễ / khung giờ và đầu trang, chân trang của website — 2026-11-14 · **chủ dự án quyết**
+- **D-253** Thiết kế đa khách: quyết định nền (bước 33) — 2026-11-15
+- **D-254** Bảng phụ trợ theo khách, worker và bộ phát trên nhiều database (bước 33 A4) — 2026-11-15
+- **D-255** Trait của kernel và `api` của module nhận khách (bước 33 A4b) — 2026-11-15
+- **D-256** Lọc theo khách và kiểm schema theo khách (bước 33 A5) — 2026-11-15
+- **D-258** Cấu hình và secret theo khách (bước 33 A7, D-190) — 2026-11-15
+- **D-259** Thứ ngoài bảng theo khách ở kernel (bước 33 A8, D-190) — 2026-11-15
+- **D-261** Placement: URL mã hoá, `schema_state`, `migrate --all` (bước 33 A9b) — 2026-11-15
+- **D-276** `audit` theo khách: mỗi khách một chuỗi băm (bước 33 B5) — 2026-11-15
+- **D-284** Mọi response mang `Vary: autoxide-tenant` (bước 33) — 2026-11-15
+- **D-289** Đóng phần B bước 33: chế độ `multi` bật được, bắt buộc `AUTOXIDE_SECRET_KEY` — 2026-11-15
+- **D-290** `autoxide backup` ở chế độ `multi` cảnh báo placement không được chép (bước 33 C3) — 2026-11-15
+- **D-291** Tên miền riêng của khách (bước 33 C1, D-190) — 2026-11-15
+- **D-292** Dời khách giữa placement (bước 33 C2) — 2026-11-16
+- **D-293** Nơi lưu file riêng theo placement; con trỏ pagination; kiểm lại tên miền hằng ngày (bước 33, đóng "Thứ ngoài bảng" và D-291 mục 8) — 2026-11-16
+- **D-302** Đo đường nóng sau bước 33; index `(tenant_id, id)` cho danh sách theo khách — 2026-11-16
+- **D-303** Cây tổ chức và quyền theo độ sâu ở kernel (bước 34 mục 1) — 2026-11-16
+- **D-306** Cài đặt kế thừa theo cây tổ chức (bước 34 mục 4) — 2026-11-16
+- **D-307** Đường dẫn và ngôn ngữ riêng theo website (bước 34) — 2026-11-16
+- **D-310** Uỷ quyền theo cây khách hàng và đường vào trong event (bước 34 mục 10) — 2026-11-16
+- **D-315** Hồ sơ công khai của nút (bước 34 mục 7) — 2026-11-16
+- **D-323** Quyền dùng theo khách ở kernel: tay cầm gắn muộn, `always_enabled`, sổ tính năng / hạn mức (bước 35 phần A) — 2026-11-16
+- **D-324** Module `plans`: gói là dữ liệu, quyền dùng gộp có bộ nhớ đệm, hạn mức giữ chỗ nguyên tử (bước 35 phần B và lõi phần D) — 2026-11-16
+- **D-326** Nối hạn mức vào module thật; đếm request API theo khách; job hết hạn giữ và đối soát (bước 35 phần D) — 2026-11-16
+- **D-328** Xuất toàn bộ dữ liệu một khách; số đo sau bước 35 — 2026-11-17
+- **D-330** Hạn mức chia phần — hạn mức theo loại nút (bước 35, A-3.12) — 2026-11-17
+- **D-331** Hồ sơ của website đang được gọi; `organizations` công bố `OrgNodes` — 2026-11-17
+- **D-332** Số người ở mỗi nút; dạng giá trị của cài đặt theo nút — 2026-11-17
+- **D-337** Xoá hẳn khách — 2026-11-17
+- **D-338** Cấp phát khách theo gói (phần nhân sự vận hành) — 2026-11-17
+- **D-358** "Bán trước khi thông báo website" (A-3.5): nhãn "bắt buộc theo luật", không chặn — 2026-11-17
+- **D-370** Nhật ký request theo khách và nhật ký lệnh của agent (bước 52 mục 1, D-202) — 2026-11-18
+
+## Hợp đồng cho giao diện (30)
+
+- **D-096** Module đầu tiên là `cms` (nội dung); giao diện là dự án riêng, công khai; chưa làm app — 2026-11-12 · **chủ dự án quyết** · *thay một phần bởi D-098, D-099, D-238*
+- **D-097** Stack của dự án giao diện — 2026-11-12
+- **D-194** Đối chiếu với nền tảng thương mại điện tử đang chạy: thêm thông báo, VietQR, khách hàng, đa kênh, tiếp thị liên kết — 2026-11-13
+- **D-200** Thiết kế giao diện 2: quản trị đa phân hệ, mặt tiền bán hàng; bước 51 cho phần core còn thiếu — 2026-11-13 · **chủ dự án quyết**
+- **D-201** Áp kết quả nghiên cứu các sản phẩm hàng đầu vào thiết kế 2; thêm mục bước 51 và bước 52 — 2026-11-13 · **chủ dự án quyết**
+- **D-202** API còn thiếu cho thiết kế giao diện 2: hỏi đáp, `alt` theo ngôn ngữ, trả hàng, đơn vãng lai, nhật ký lệnh MCP — 2026-11-13 · **chủ dự án quyết**
+- **D-207** API cho trợ giúp trong giao diện: cờ theo người dùng, định nghĩa số liệu — 2026-11-14
+- **D-212** Hộp việc không có nút "Đã xử lý" (H5) — 2026-11-14
+- **D-219** Giao diện cửa hàng qua API (bước 55) và chuyển dữ liệu từ nền tảng khác (bước 56) — 2026-11-13 · *thay một phần bởi D-220*
+- **D-235** Khách tự chỉnh không cần code: trường tự định nghĩa, nhãn, đổi câu chữ, loại nội dung, mã theo dõi và đồng ý cookie — 2026-11-14 · **chủ dự án quyết**
+- **D-262** Câu lỗi từng ô dịch theo `Accept-Language`: câu mẫu tiếng Anh làm khoá (đề bài giao diện A1) — 2026-11-15
+- **D-264** Đề bài giao diện, nhóm A: câu lỗi cho người dùng, `reason` của token, mô tả theo ngôn ngữ, `/me/permissions`, menu giữ id mục — 2026-11-15
+- **D-265** Đề bài giao diện, nhóm B (auth, audit, webhooks): dữ kiện theo lô, tên người qua sổ đối tượng, tự đặt mật khẩu qua thư — 2026-11-15
+- **D-266** Đề bài giao diện, nhóm B (content): lọc bài, đường dẫn công khai, lịch đăng mọi bài, SEO theo ngôn ngữ — 2026-11-15
+- **D-267** Đề bài giao diện, nhóm B (media): cờ `decorative`, `alt_missing`, tóm tắt thư viện; "đang dùng ở đâu" dời sang bước 51 — 2026-11-15
+- **D-268** Đề bài giao diện, nhóm B (forms): số bài theo trạng thái, nhãn lựa chọn theo phiên bản, kiểu của `value` — 2026-11-15
+- **D-269** Đề bài giao diện, nhóm B (newsletter): trang cài đặt, xem trước thư, số huỷ và bounce của chiến dịch — 2026-11-15
+- **D-270** Đề bài giao diện, nhóm B (comments): tiêu đề của đích qua sổ đối tượng, danh sách đích có ID riêng — 2026-11-15
+- **D-271** Cấu hình cho giao diện: `Module::client_config` và `GET /api/v1/kernel/client-config` (đề bài giao diện C) — 2026-11-15
+- **D-272** Đề bài giao diện, nhóm D (auth): cách đăng nhập và quốc gia của phiên, tên loại passkey, quản trị API key, xác nhận lại bằng passkey/TOTP — 2026-11-15
+- **D-296** Đối chiếu thiết kế 2 của bước 33: cấu hình nghiệp vụ theo khách, lọc danh sách khách, tách tạm khoá khỏi chỉ đọc — 2026-11-16
+- **D-297** Đối chiếu đợt 2 của bước 33: gắn tên miền với nút; nhóm `connection` và đổi tên setting bằng tên cũ — 2026-11-16
+- **D-301** Chép bản vẽ thiết kế giao diện vào repo, ở `docs/design/` — 2026-11-16 · **chủ dự án quyết**
+- **D-333** Bốn yêu cầu nhỏ của giao diện (PR #68) — 2026-11-17
+- **D-334** Lỗ nhỏ của backend từ phía giao diện (nhóm 2) — 2026-11-17
+- **D-335** Bước 35, đợt cho giao diện: hồ sơ xuất hoá đơn, màn của nhân sự nền tảng, quyền vào hỗ trợ — 2026-11-17
+- **D-350** Ba chế độ dòng tiền, tạm giữ, chi trả, VietQR tự khớp (bước 36 mục 4, 9 và hai mục đối chiếu) — 2026-11-17
+- **D-369** Sổ điều hướng cho điện thoại: gợi ý `mobile` trên `NavItem`, thanh đáy tối đa 5 mục (bước 52 mục 6, D-232) — 2026-11-18
+- **D-373** Phần còn lại của trường tự định nghĩa và gắn nhãn hàng loạt (bước 51 P19, P20) — 2026-11-18
+- **D-382** Trả nợ giao diện đợt 2: tổng số của danh sách và các chỗ thiếu trên module đã xong — 2026-11-18
+
+## Module nội dung, file, liên lạc (89)
+
+- **D-027** Thông báo mặc định bằng tiếng Anh — 2026-11-11 · **chủ dự án quyết**
+- **D-060** Không dịch thông báo của từng trường ở máy chủ — 2026-11-11
+- **D-061** Gửi mail — 2026-11-11
+- **D-062** Mẫu mail theo i18n key — 2026-11-11
+- **D-063** Đặt lại mật khẩu bằng token một lần qua mail — 2026-11-11
+- **D-065** Xác minh email và đổi email qua mail — 2026-11-11
+- **D-066** Lưu file: trait `Storage` của kernel, module `files` trên `object_store` — 2026-11-11
+- **D-067** API file: thân request là nội dung thô, metadata trong `files_file` — 2026-11-11
+- **D-073** Backup là một thư mục trung lập: SQLite + file — 2026-11-11
+- **D-081** Webhook: module `webhooks`, chuẩn Standard Webhooks, gửi qua job queue — 2026-11-12
+- **D-085** Nền chung cho danh sách sắp theo cột, endpoint công khai và nội dung tải về — 2026-11-12
+- **D-086** Module `media`: thư viện media tách khỏi `files` — 2026-11-12 · **chủ dự án quyết**
+- **D-087** Không sinh biến thể ảnh (thumbnail, đổi cỡ, WebP/AVIF) trong core — 2026-11-12 · *thay bởi D-093*
+- **D-088** Thư viện media dùng thư mục lồng nhau, không dùng nhãn — 2026-11-12
+- **D-089** Nhận loại thật tự viết; kích thước ảnh bằng `imagesize` — 2026-11-12
+- **D-090** Không tải lên media qua MCP ở bước này — 2026-11-12 · *thay bởi D-095*
+- **D-091** Module đầu tiên là `media` — 2026-11-12 · **chủ dự án quyết**
+- **D-093** `media` làm ảnh thu nhỏ bằng job nền, thư viện `image` — 2026-11-12 · **chủ dự án quyết**
+- **D-094** `media` có nhãn, song song với thư mục — 2026-11-12 · **chủ dự án quyết**
+- **D-095** Tải lên media qua MCP bằng base64, tối đa 1 MiB — 2026-11-12 · **chủ dự án quyết**
+- **D-098** Module nội dung tên là `content`, không phải `cms` — 2026-11-12 · **chủ dự án quyết**
+- **D-099** Nâng `files` thành thư viện media trước khi làm `content` — 2026-11-12 · **chủ dự án quyết** · *thay một phần bởi D-100*
+- **D-100** `files` giữ nguyên; thư viện media là module riêng `media` — 2026-11-12 · **chủ dự án quyết**
+- **D-101** Trang có cấp cha con ngay trong bước 17 — 2026-11-12 · **chủ dự án quyết**
+- **D-102** Thiết kế module `content` — 2026-11-12 · *thay một phần bởi D-238*
+- **D-103** Gộp nhánh đề bài `content` vào `main`: đánh số lại, bước 15–16 đã xong — 2026-11-12
+- **D-105** Module `content`: những chỗ đề bài chưa nói hoặc làm khác — 2026-11-12 · *thay một phần bởi D-238*
+- **D-112** Ba module `forms`, `newsletter`, `comments`, sau phần nền chung trong core — 2026-11-12 · **chủ dự án quyết**
+- **D-121** `Mail` có `reply_to`, header theo danh sách cho phép, khoá chống trùng; lỗi vĩnh viễn thành event — 2026-11-12
+- **D-123** Sổ đối tượng trung lập `ResourceDirectory`; `content` đăng ký `content.entry` — 2026-11-12
+- **D-125** Module `forms`: bảng, trường có phiên bản, đường dẫn, permission — 2026-11-12
+- **D-126** Bài gửi công khai của `forms`: `Origin`, email người gửi, bằng chứng đồng ý, trùng, giới hạn — 2026-11-12
+- **D-127** `forms`: mail báo quản trị viên qua event, event không mang câu trả lời, thời hạn giữ, CSV tự viết — 2026-11-12
+- **D-129** `newsletter`: bảng, trạng thái, không foreign key — 2026-11-12
+- **D-130** `newsletter`: token huỷ đăng ký: riêng cho từng mail, không phải từng đăng ký — 2026-11-12
+- **D-131** `newsletter`: huỷ một chạm nhận thân form-urlencoded — ngoại lệ của `ValidJson` — 2026-11-12
+- **D-132** `newsletter`: gửi chiến dịch: hai loại job, nhận dòng bằng `UPDATE` có điều kiện, nhiều nhất một lần — 2026-11-12
+- **D-133** `newsletter`: đăng ký công khai: một câu trả lời, giữ lại thì buộc xác nhận, giới hạn mail xác nhận — 2026-11-12
+- **D-134** `newsletter`: bounce và danh sách chặn — 2026-11-12
+- **D-135** `newsletter`: chiến dịch cho bài mới — 2026-11-12
+- **D-136** `newsletter`: thư quảng cáo — 2026-11-12
+- **D-137** `newsletter`: permission, `If-Match`, đường dẫn, MCP — 2026-11-12
+- **D-138** `newsletter`: dữ liệu cá nhân — 2026-11-12
+- **D-139** `newsletter`: cấu hình — 2026-11-12
+- **D-141** `comments`: bảng, trạng thái, hai cấp, số đếm — 2026-11-12
+- **D-142** `comments`: pipeline kiểm duyệt và chế độ duyệt; "đã từng được duyệt" chỉ theo tài khoản — 2026-11-12
+- **D-143** `comments`: endpoint công khai và câu trả lời giống nhau — 2026-11-12
+- **D-144** `comments`: kiểm duyệt, cấm, đích, MCP, permission — 2026-11-12
+- **D-145** `comments`: chữ thường, HTML an toàn tự viết — 2026-11-12
+- **D-146** `comments`: mail báo trả lời — 2026-11-12
+- **D-147** `comments`: dữ liệu cá nhân và thời hạn giữ — 2026-11-12
+- **D-148** `comments`: cấu hình — 2026-11-12
+- **D-150** Rà soát bảo mật forms, newsletter, comments và nền chung cho dữ liệu người lạ — 2026-11-12
+- **D-151** `comments`: so tên theo dạng "khung" — chữ Kirin / Hy Lạp giống chữ Latin thành chữ Latin — 2026-11-12
+- **D-154** `newsletter`: đăng ký công khai chỉ xếp job; việc theo trạng thái địa chỉ chạy nền — 2026-11-12
+- **D-157** Bước 25 — lớp HTTP, idempotency, webhooks, files: các phát hiện của lượt rà soát — 2026-11-12
+- **D-158** Bước 25 — job queue, event, mail, lưu trữ, backup: các phát hiện của lượt rà soát — 2026-11-12
+- **D-160** `files`: job dọn nội dung mồ côi hằng ngày — 2026-11-12
+- **D-161** `webhooks`: chạy lại job gửi đã hỏng thì gửi lại thật — 2026-11-12
+- **D-168** Bản công khai kèm ảnh trong thân bài (`body_media`) — 2026-11-13
+- **D-176** Ảnh thu nhỏ định dạng WebP trong module `media` — 2026-11-13 · **chủ dự án quyết**
+- **D-193** Đơn vị hành chính Việt Nam là phần nền: module `address`, chỉ danh mục sau sáp nhập — 2026-11-13 · **chủ dự án quyết**
+- **D-196** Bản WebP của ảnh thu nhỏ: thư viện `webp` (libwebp), địa chỉ `&format=webp`, trường `webp_url` — 2026-11-13
+- **D-206** Mẫu mail và thông báo động: bộ dựng mẫu dùng chung, không module `email` riêng — 2026-11-13 · **chủ dự án quyết**
+- **D-208** Nội dung và media theo website, theo nút tổ chức (H1) — 2026-11-14
+- **D-220** Thêm `analytics` (bước 57), `automations` (bước 58), tìm kiếm thay được, đẩy di động — 2026-11-14 · **chủ dự án quyết**
+- **D-238** Module `menus`: menu của website tách khỏi `content`, mục menu trỏ tới đối tượng của mọi module (bước 68) — 2026-11-14 · **chủ dự án quyết**
+- **D-241** Response thật khớp hợp đồng: bộ kiểm tự viết trong testkit, media type của lỗi, ngoại lệ đầu tiên của `api-diff` (bước 31 B4) — 2026-11-15
+- **D-247** Bố cục theo tính năng của bốn module và nhóm file của kernel (bước 32 A1, A2) — 2026-11-15
+- **D-249** `forms`: xuất CSV lớn bằng job, link tải ký, file theo dữ liệu cá nhân (bước 32 B3) — 2026-11-15
+- **D-252** `comments`: Markdown giới hạn bằng `pulldown-cmark` và bộ dựng theo danh sách cho phép (bước 32 B4) — 2026-11-15
+- **D-274** `mail` theo khách: hàng đợi trên database của khách, SMTP và người gửi riêng của khách (bước 33 B3) — 2026-11-15
+- **D-277** `files` theo khách: dòng theo khách, nội dung dưới tiền tố của khách, dọn mồ côi tra đúng database (bước 33 B6) — 2026-11-15 · *thay một phần bởi D-293*
+- **D-278** `webhooks` theo khách: chỉ gửi tới endpoint cùng khách, secret ký lưu mã hoá (bước 33 B7) — 2026-11-15
+- **D-279** `forms` theo khách: form, bài gửi, bản xuất theo khách; job dọn chạy theo từng khách trên database (bước 33 B8) — 2026-11-15
+- **D-280** `media` theo khách: item, thư mục, nhãn, ảnh thu nhỏ theo khách; khoá cây thư mục gieo mỗi khách (bước 33 B9) — 2026-11-15 · *thay một phần bởi D-293*
+- **D-281** `newsletter` theo khách; token trong link mang khách để huỷ đăng ký luôn chạy (bước 33 B10) — 2026-11-15
+- **D-282** `comments` theo khách; công cụ token trong link mang khách đưa lên kernel (bước 33 B11) — 2026-11-15
+- **D-283** `menus` theo khách: cache menu công khai và `ETag` theo khách; lệnh nhập menu cũ nhận khách (bước 33 B, D-238) — 2026-11-15
+- **D-288** `content` theo khách (bước 33 B13) — 2026-11-15
+- **D-305** Nội dung, media, form, menu theo nút và website (bước 34 mục 3) — 2026-11-16
+- **D-314** Module `address`: danh mục hành chính dùng chung, nhập từ nguồn chính thức (bước 34 mục 5–6) — 2026-11-16
+- **D-318** Bộ dữ liệu hành chính lấy từ provinces.open-api.vn — 2026-11-16 · **chủ dự án quyết**
+- **D-348** Module `notifications` — loại thông báo, kênh, đồng ý và khung giờ tin quảng cáo, thông báo của nền tảng — 2026-11-17
+- **D-356** Xác thực tài khoản đăng nội dung: số điện thoại bằng mã SMS một lần, mức định danh từ KYC, bộ hỏi `PostingVerifier` thật cho `comments` (bước 37 mục NĐ 147/2024) — 2026-11-17
+- **D-359** Mẫu trang bắt buộc trong `content`, biến từ hồ sơ pháp lý qua `LegalProfiles`; `PublishedEntries` (bước 37, mục "Trang bắt buộc có mẫu") — 2026-11-17
+- **D-366** Mẫu thông báo khách tự soạn: nháp / xuất bản / quay lại, khung mail MJML (`mrml`), thương hiệu (bước 37, D-206) — 2026-11-17
+- **D-367** `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17
+- **D-368** Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17
+
+## Tiền, thuế, chứng từ (18)
+
+- **D-007** Quy ước tiền và thời gian — 2026-11-11 · **chủ dự án quyết**
+- **D-180** Tiền là `autoxide_kernel::money::Money`: `i64` đơn vị nhỏ nhất + mã ISO 4217 — 2026-11-13
+- **D-187** Dòng tiền: core không tự giữ tiền; ba chế độ qua đối tác có giấy phép — 2026-11-13
+- **D-188** Thuế và chứng từ: engine thuế trong core, biểu thuế là dữ liệu có ngày hiệu lực, `rust_decimal` — 2026-11-13
+- **D-215** Thời điểm lập hoá đơn mặc định khi giao xong (H7) — 2026-11-14
+- **D-216** COD và nhiều chế độ dòng tiền trong một checkout (H8, H9) — 2026-11-14
+- **D-218** Thống nhất tiền giữa bước 36, 45, 46: tên tài khoản, tạm giữ, hạn thanh toán — 2026-11-14
+- **D-227** Chênh lệch tiền két khi đóng ca — 2026-11-14
+- **D-322** `rust_decimal` cho tính toán tiền, thuế, tỉ giá (bước 36 mục 1) — 2026-11-16 · **chủ dự án quyết**
+- **D-327** Vòng đời thuê bao, thu tay kỳ thanh toán, khoá hẳn khách, bộ lọc danh sách khách (bước 35 phần E và F) — 2026-11-16
+- **D-341** Module `tax` — engine thuế từ dữ liệu — 2026-11-17
+- **D-342** Module `ledger` lõi — sổ cái kép, khoá sổ, chuỗi băm — 2026-11-17
+- **D-343** Thanh toán qua đối tác trong `ledger` — 2026-11-17
+- **D-344** Module `invoices` — chứng từ, đánh số, hoá đơn điện tử — 2026-11-17
+- **D-345** Tính tiền thuê bao SaaS qua `invoices` và `ledger` — 2026-11-17
+- **D-352** Tỉ giá có ngày hiệu lực trong `ledger`; bút toán và chứng từ ngoại tệ giữ ảnh chụp tỉ giá (bước 36 mục 10) — 2026-11-17
+- **D-353** Mẫu in chứng từ: HTML từ mẫu của khách, PDF bố cục cố định bằng `krilla`; in qua `dyn Invoices::render` (bước 36 mục 11) — 2026-11-17
+- **D-354** Xuất dữ liệu kế toán: ba hồ sơ, CSV tự viết + `rust_xlsxwriter`, chưa có hồ sơ riêng của hãng (bước 36 mục 12) — 2026-11-17
+
+## Pháp luật và tuân thủ (11)
+
+- **D-183** Audit log là chuỗi băm; xoá dữ liệu cá nhân vẫn giữ được chuỗi — 2026-11-13
+- **D-186** Tuân thủ pháp luật Việt Nam là luật thường trực của dự án — 2026-11-13 · **chủ dự án quyết**
+- **D-217** Yêu cầu dữ liệu cá nhân người dùng tự làm không cần duyệt (H10) — 2026-11-14
+- **D-347** Module `compliance` — định danh, quy tắc pháp lý, văn bản pháp lý, sổ đồng ý — 2026-11-17
+- **D-349** Khách tự đăng ký → định danh → cấp phát (bước 35 mục 5, phần cuối) — 2026-11-17
+- **D-355** Lưu trữ 10 năm: bản lưu trữ ngoài thư mục khách, dọn chứng từ hết hạn (bước 36 mục 7, phần còn lại) — 2026-11-17
+- **D-357** Hồ sơ pháp lý website, danh sách kiểm, bộ hồ sơ và logo Bộ Công Thương trong `compliance` (bước 37, hai mục "Hồ sơ pháp lý website" và "Bộ hồ sơ Bộ Công Thương") — 2026-11-17
+- **D-360** Dữ liệu cá nhân trong `compliance`: sổ mục đích, thời hạn lưu (`Module::retention`), nơi lưu theo khách, sự cố 72 giờ, sổ yêu cầu của chủ thể (bước 37, mục "Dữ liệu cá nhân") — 2026-11-17
+- **D-361** Mã theo dõi quảng cáo và đồng ý cookie trong `compliance` (bước 37, D-235) — 2026-11-17
+- **D-363** Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17
+- **D-364** Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17
+
+## Thương mại (9)
+
+- **D-191** Module thương mại: sáu module, bước 41–46 — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-193*
+- **D-203** Nút "Đánh giá này hữu ích" cho đánh giá sản phẩm (bước 45) — 2026-11-13 · **chủ dự án quyết**
+- **D-204** Thêm module `support` (bước 53), hàng đặt trước, nguồn cấp sản phẩm cho Google / Meta — 2026-11-13 · **chủ dự án quyết**
+- **D-209** "Chờ xác nhận" đơn là chính sách theo nút (H2) — 2026-11-14
+- **D-214** Không chat với người bán trong core; huy hiệu chỉ từ dữ liệu có thật (H6) — 2026-11-14
+- **D-222** Bảng giá và khuyến mại theo các nền tảng lớn; chương trình, coupon, voucher, thẻ quà tặng — 2026-11-14 · **chủ dự án quyết**
+- **D-225** Khuyến mại: thời hạn bắt buộc, thông báo theo nơi nhận, kiểm trước khi bật, "Lưu mã", nhắc flash sale — 2026-11-14
+- **D-226** Che số điện thoại, email của khách; cơ sở tính điểm thưởng — 2026-11-14
+- **D-236** Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 · **chủ dự án quyết**
+
+## Vận hành và hiệu năng (7)
+
+- **D-034** Quy ước cấu hình — 2026-11-11
+- **D-043** Log, metrics, tracing — 2026-11-11
+- **D-071** Bộ đo hiệu năng tự viết, qua toàn bộ request — 2026-11-11
+- **D-163** Đo xác thực mỗi request: chạy song song các câu đọc không có lợi, không làm — 2026-11-12
+- **D-166** `autoxide doctor` và `Module::checks` — 2026-11-13
+- **D-195** Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13
+- **D-317** Số đo đường nóng sau bước 34 — 2026-11-16

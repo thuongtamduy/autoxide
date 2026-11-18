@@ -96,7 +96,7 @@ When the gate is red, fix the code. Do not loosen the gate, turn off a lint or s
   `docs/ROADMAP.md`, `docs/DECISIONS.md`) and code comments may be in Vietnamese.
 
 The full list, with the reasons behind each rule, is in [`CLAUDE.md`](CLAUDE.md); past
-decisions are in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+decisions are indexed by topic in [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md).
 
 ## Commits and pull requests
 

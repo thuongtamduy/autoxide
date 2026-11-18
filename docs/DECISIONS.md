@@ -1,5 +1,10 @@
 # Nhật ký quyết định
 
+> **Nhật ký cũ, đã đóng (D-001…D-381).** Từ 2026-11-18, mỗi quyết định mới là một file
+> `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` — ID theo ngày và tên để hai phiên làm song song
+> không chọn trùng số (D-20261118-decision-ids). Không thêm mục vào file này. Đọc mục lục theo chủ
+> đề trước: [`docs/decisions/INDEX.md`](decisions/INDEX.md). Cách ghi: skill `record-decision`.
+
 Chỉ thêm ở cuối, không sửa mục cũ. Đổi một quyết định = thêm mục mới ghi rõ nó
 thay mục nào. Mục ghi **chủ dự án quyết** thì agent không tự đảo.
 
