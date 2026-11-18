@@ -170,3 +170,33 @@ pub(crate) fn webhook_body() -> Error {
         "The webhook body is not UTF-8 text.",
     )
 }
+
+pub(crate) fn statement_duplicate(reference: &str) -> Error {
+    Error::conflict(
+        "shipping.statement_duplicate",
+        "The statement `{reference}` was already imported with other content.",
+    )
+    .with_param("reference", reference)
+}
+
+pub(crate) fn statement_not_available() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "shipping.statement_not_available",
+        "This carrier gives no statement through its API; import the CSV file instead.",
+    )
+}
+
+pub(crate) fn statement_not_found(id: Uuid) -> Error {
+    Error::not_found("shipping.statement_not_found", "There is no COD statement `{id}`.")
+        .with_param("id", id)
+}
+
+pub(crate) fn discrepancy_not_found(id: Uuid) -> Error {
+    Error::not_found("shipping.discrepancy_not_found", "There is no COD discrepancy `{id}`.")
+        .with_param("id", id)
+}
+
+pub(crate) fn discrepancy_resolved() -> Error {
+    Error::conflict("shipping.discrepancy_resolved", "This COD discrepancy is already resolved.")
+}

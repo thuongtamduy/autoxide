@@ -104,6 +104,21 @@ của nó; hãng không trả lời trong `AUTOXIDE_SHIPPING_CARRIER_TIMEOUT_SEC
 chỉ áp một lần (`event_key`); thân lớn hơn `AUTOXIDE_SHIPPING_WEBHOOK_MAX_BYTES` trả 413. Hãng không có webhook được hỏi
 mỗi 30 phút.
 
+## Thu hộ khi giao (COD)
+
+Hãng vận chuyển thu tiền và chuyển cho người bán theo hợp đồng với hãng; Autoxide chỉ ghi ai nợ ai và đối soát (không
+bao giờ giữ tiền). Khi có module `ledger`:
+
+- vận đơn COD giao xong ghi "hãng còn nợ số tiền này" (`clearing.carrier_cod`) đối ứng khoản phải thu của người mua;
+- `POST /api/v1/shipping/cod/statements` (permission `shipping.cod.manage`) nhập bảng kê của hãng: CSV có cột
+  `tracking_number`, `cod_amount`, `fee` (đơn vị nhỏ nhất) hay `fetch: true` với hãng có API bảng kê. Dòng khớp đối soát
+  vận đơn (tiền đang chuyển về + phí hãng đối ứng khoản hãng nợ; event `shipping.cod_settled` mang `seller_org_id`).
+  Cùng mã bảng kê, cùng nội dung không nhập hai lần.
+- Dòng lệch (số tiền, mã vận đơn lạ, chưa giao) và khoản COD quá `AUTOXIDE_SHIPPING_COD_SETTLEMENT_DAYS` ngày chưa có
+  trong bảng kê thành chênh lệch (`GET /cod/discrepancies`, event `shipping.cod_mismatch`). Giải quyết bằng một mã của
+  danh sách lý do `shipping.cod_resolution` kèm ghi chú; `written_off` xoá sổ phần thiếu. `refresh-tracking` hỏi lại
+  hành trình từ hãng trước.
+
 ## Hợp đồng cho module khác
 
 ```rust
@@ -145,9 +160,9 @@ Luật mọi bộ nối phải theo (ví dụ đầy đủ: `autoxide_shipping::
 `AUTOXIDE_SHIPPING_FAKE_CARRIER=true` đăng ký hãng giả `fake` để thử mọi thứ trên máy phát triển. `autoxide
 doctor` cảnh báo khi bật; không bao giờ bật trên production.
 
-## COD, ngày giao *(đang làm)*
+## Ngày giao *(đang làm)*
 
-Đối soát COD, lịch giao và ước tính công khai sẽ được ghi ở đây khi xong.
+Lịch giao và ước tính công khai sẽ được ghi ở đây khi xong.
 
 ## Cấu hình
 

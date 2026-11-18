@@ -108,6 +108,22 @@ body; a wrong signature answers 401 and nothing is stored. A valid body is store
 removed) and answered 202; a job applies it. Repeated updates are applied once (`event_key`); bodies above
 `AUTOXIDE_SHIPPING_WEBHOOK_MAX_BYTES` answer 413. Carriers without webhooks are polled every 30 minutes.
 
+## Cash on delivery (COD)
+
+The carrier collects the cash and pays it to the seller under its contract; Autoxide only records who owes what and
+reconciles (it never holds the money). With the `ledger` module installed:
+
+- a delivered COD shipment records "the carrier owes the amount" (`clearing.carrier_cod`) against the buyer's
+  receivable;
+- `POST /api/v1/shipping/cod/statements` (permission `shipping.cod.manage`) imports a carrier statement: CSV with the
+  columns `tracking_number`, `cod_amount`, `fee` (minor units) or `fetch: true` for carriers with a statement API.
+  Matching lines settle the shipment (money in transit + carrier fee against what the carrier owed; event
+  `shipping.cod_settled` with `seller_org_id`). The same reference with the same content is not imported twice.
+- Lines that differ (amount, unknown tracking number, not delivered) and COD still missing from statements after
+  `AUTOXIDE_SHIPPING_COD_SETTLEMENT_DAYS` become discrepancies (`GET /cod/discrepancies`, event
+  `shipping.cod_mismatch`). Resolve one with a code of the reason list `shipping.cod_resolution` and a note;
+  `written_off` writes the missing amount off. `refresh-tracking` asks the carrier for the latest tracking first.
+
 ## Contract for other modules
 
 ```rust
@@ -149,9 +165,9 @@ Rules every connector follows (see `autoxide_shipping::api::fake::FakeCarrier` f
 `AUTOXIDE_SHIPPING_FAKE_CARRIER=true` registers the fake carrier `fake` for trying everything on a development
 machine. `autoxide doctor` warns while it is on; never turn it on in production.
 
-## COD, delivery dates *(coming)*
+## Delivery dates *(coming)*
 
-COD reconciliation, delivery calendars and the public estimate are documented here as they land.
+Delivery calendars and the public estimate are documented here as they land.
 
 ## Configuration
 

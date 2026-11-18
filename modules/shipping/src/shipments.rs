@@ -27,7 +27,7 @@ use crate::api::{
 use crate::entity::{parcel, shipment, shipment_item, tracking_event};
 use crate::errors;
 use crate::events::{self, Change, RecordNamed};
-use crate::jobs::BookShipment;
+use crate::jobs::{BookShipment, PostCod};
 use crate::permissions::{SHIPMENTS_MANAGE, SHIPMENTS_READ};
 use crate::service::{ShippingService, now, unique_violation};
 use crate::settings::{find_method, readable, writable};
@@ -480,6 +480,16 @@ impl ShippingService {
             Err(error) => return Err(error.into()),
         };
         self.emit(transaction, tenant, actor, &names, Some(before), &after).await?;
+        if after.cod_status == "collected" && before.cod_status == "pending" {
+            self.jobs
+                .enqueue(
+                    transaction,
+                    tenant,
+                    &PostCod { shipment_id: after.id },
+                    EnqueueOptions::default().unique_key(format!("post_cod:{}", after.id)),
+                )
+                .await?;
+        }
         Ok(true)
     }
 

@@ -437,6 +437,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step41-catalog-design](D-20261118-step41-catalog-design.md)** `catalog`: giá chỉ thêm, thứ tự chọn bảng giá, hợp đồng `api` cho bước 42–44 — 2026-11-18
 - **[D-20261118-step44-shipping-api](D-20261118-step44-shipping-api.md)** Module `shipping`: hợp đồng `api` cho bước 45, sổ hãng `CarrierRegistry`, sổ địa chỉ không cần permission, địa chỉ nước ngoài trong `Address` — 2026-11-18
 - **[D-20261118-step44-shipping-carriers](D-20261118-step44-shipping-carriers.md)** `shipping`: tài khoản hãng mã hoá trong bảng, bảng chuyển trạng thái chung, đặt hãng giữa hai transaction, webhook ghi nguyên văn rồi xử lý bằng job — 2026-11-18
+- **[D-20261118-step44-shipping-cod](D-20261118-step44-shipping-cod.md)** `shipping`: tiền thu hộ (COD) chỉ ghi nghĩa vụ trong sổ cái, đối soát bảng kê CSV chung, chênh lệch giải quyết bằng danh sách lý do — 2026-11-18
 - **[D-20261118-step44-shipping-rates](D-20261118-step44-shipping-rates.md)** `shipping`: cân quy đổi số nguyên, bậc phí theo vùng tỉnh, phương thức kế thừa theo cây, thuế của phí giao do `orders` tính theo `tax_category` — 2026-11-18
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18

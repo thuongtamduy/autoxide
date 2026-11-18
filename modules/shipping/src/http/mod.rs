@@ -3,6 +3,7 @@
 
 pub(crate) mod addresses;
 mod carriers;
+mod cod;
 mod quote;
 mod settings;
 mod shipments;
@@ -44,5 +45,10 @@ pub(crate) fn routes(service: Arc<ShippingService>) -> OpenApiRouter {
         .routes(routes!(shipments::set_parcels))
         .routes(routes!(shipments::set_status))
         .routes(routes!(shipments::get_label))
+        .routes(routes!(cod::import_statement, cod::list_statements))
+        .routes(routes!(cod::get_statement))
+        .routes(routes!(cod::list_discrepancies))
+        .routes(routes!(cod::resolve_discrepancy))
+        .routes(routes!(cod::refresh_tracking))
         .with_state(service)
 }

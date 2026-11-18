@@ -80,5 +80,21 @@
   "text:A shipment was delivered to the buyer.": "Một vận đơn đã giao tới người mua.",
   "text:The carrier collected the cash on delivery of a shipment.": "Hãng vận chuyển đã thu tiền thu hộ (COD) của một vận đơn.",
   "text:The carrier refused a booking; the shipment is pending again.": "Hãng từ chối đặt vận đơn; vận đơn quay về chờ xử lý.",
-  "text:The status of a shipment changed (any change).": "Trạng thái của một vận đơn thay đổi (mọi lần đổi)."
+  "text:The status of a shipment changed (any change).": "Trạng thái của một vận đơn thay đổi (mọi lần đổi).",
+  "shipping.discrepancy_not_found": "Không tìm thấy chênh lệch COD `{id}`.",
+  "shipping.discrepancy_resolved": "Chênh lệch COD này đã được giải quyết.",
+  "shipping.statement_duplicate": "Bảng kê `{reference}` đã nhập với nội dung khác.",
+  "shipping.statement_not_available": "Hãng này không có bảng kê qua API; hãy nhập file CSV.",
+  "shipping.statement_not_found": "Không tìm thấy bảng kê COD `{id}`.",
+  "field:is not valid CSV: {problem}": "không phải CSV hợp lệ: {problem}",
+  "field:must be an active code of `{list}`": "phải là một mã đang bật của danh sách `{list}`",
+  "field:needs a tracking number and two amounts of 0 or more": "cần mã vận đơn và hai số tiền từ 0 trở lên",
+  "field:needs the columns `tracking_number`, `cod_amount` and `fee`": "cần các cột `tracking_number`, `cod_amount` và `fee`",
+  "text:A carrier statement does not match a shipment, or a delivered shipment is missing from statements for too long.": "Bảng kê của hãng không khớp vận đơn, hay vận đơn đã giao quá lâu mà chưa có trong bảng kê.",
+  "text:A carrier statement settled the cash on delivery of a shipment; carries `seller_org_id` and where the money was paid.": "Bảng kê của hãng đã đối soát tiền thu hộ của một vận đơn; mang `seller_org_id` và nơi nhận tiền.",
+  "text:A cash-on-delivery discrepancy was resolved with a reason code.": "Một chênh lệch COD đã được giải quyết kèm mã lý do.",
+  "text:Delivery confirmed with the carrier": "Đã xác nhận giao hàng với hãng",
+  "text:Return confirmed with the carrier": "Đã xác nhận hoàn hàng với hãng",
+  "text:The carrier corrected its statement": "Hãng đã sửa bảng kê",
+  "text:Written off: will not be collected": "Xoá sổ: không thu được"
 }

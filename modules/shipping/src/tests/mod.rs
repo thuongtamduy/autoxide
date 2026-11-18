@@ -2,6 +2,8 @@
 //! như binary bằng `TestApp` của testkit; gọi qua REST và qua trait trong `api`.
 
 mod addresses;
+mod cod;
+mod fake_ledger;
 pub(crate) mod rates;
 mod shipments;
 
@@ -105,6 +107,8 @@ pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::ShippingService> 
         databases: app.registry().clone(),
         secret: (*app.api::<autoxide_kernel::secret::SecretKey>().unwrap()).clone(),
         carriers,
+        ledger: None,
+        reasons: Default::default(),
         units: Some(Arc::new(FakeUnits)),
     };
     Arc::new(crate::service::ShippingService::new(parts, Default::default()))

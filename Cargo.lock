@@ -1084,6 +1084,7 @@ dependencies = [
  "async-trait",
  "autoxide-address",
  "autoxide-kernel",
+ "autoxide-ledger",
  "autoxide-testkit",
  "axum",
  "chrono",

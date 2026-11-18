@@ -20,6 +20,40 @@ pub(crate) const CANCEL: &str = "shipping.cancel";
 pub(crate) const PROCESS_WEBHOOK: &str = "shipping.process_webhook";
 pub(crate) const RECONCILE_BOOKINGS: &str = "shipping.reconcile_bookings";
 pub(crate) const POLL_TRACKING: &str = "shipping.poll_tracking";
+pub(crate) const POST_COD: &str = "shipping.post_cod";
+pub(crate) const SETTLE_COD: &str = "shipping.settle_cod";
+pub(crate) const WRITE_OFF_COD: &str = "shipping.write_off_cod";
+pub(crate) const COD_AGING: &str = "shipping.cod_aging";
+
+/// Ghi sổ cái khi giao xong có COD.
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct PostCod {
+    pub shipment_id: Uuid,
+}
+
+impl Job for PostCod {
+    const KIND: &'static str = POST_COD;
+}
+
+/// Ghi sổ cái cho một dòng bảng kê khớp.
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct SettleCod {
+    pub line_id: Uuid,
+}
+
+impl Job for SettleCod {
+    const KIND: &'static str = SETTLE_COD;
+}
+
+/// Ghi sổ cái xoá khoản COD không thu được.
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct WriteOffCod {
+    pub discrepancy_id: Uuid,
+}
+
+impl Job for WriteOffCod {
+    const KIND: &'static str = WRITE_OFF_COD;
+}
 
 /// Đặt vận đơn với hãng.
 #[derive(Debug, Serialize, Deserialize)]
@@ -58,6 +92,10 @@ pub(crate) fn registrations(service: &Arc<ShippingService>) -> Vec<JobRegistrati
         JobRegistration::new(PROCESS_WEBHOOK, Arc::new(Webhook(service.clone()))),
         JobRegistration::new(RECONCILE_BOOKINGS, Arc::new(Reconcile(service.clone()))),
         JobRegistration::new(POLL_TRACKING, Arc::new(Poll(service.clone()))),
+        JobRegistration::new(POST_COD, Arc::new(Cod(service.clone()))),
+        JobRegistration::new(SETTLE_COD, Arc::new(Settle(service.clone()))),
+        JobRegistration::new(WRITE_OFF_COD, Arc::new(WriteOff(service.clone()))),
+        JobRegistration::new(COD_AGING, Arc::new(Aging(service.clone()))),
     ]
 }
 
@@ -65,6 +103,7 @@ pub(crate) fn schedules() -> Vec<Schedule> {
     vec![
         Schedule::new(RECONCILE_BOOKINGS, RECONCILE_BOOKINGS, Duration::from_secs(5 * 60)),
         Schedule::new(POLL_TRACKING, POLL_TRACKING, Duration::from_secs(30 * 60)),
+        Schedule::new(COD_AGING, COD_AGING, Duration::from_secs(24 * 60 * 60)),
     ]
 }
 
@@ -170,6 +209,60 @@ impl JobHandler for Poll {
             }
             if let Err(error) = self.0.refresh_tracking(&tenant, id).await {
                 tracing::warn!(shipment_id = %id, error = %error, "cannot poll the carrier for tracking");
+            }
+        }
+        Ok(())
+    }
+}
+
+struct Cod(Arc<ShippingService>);
+
+#[async_trait::async_trait]
+impl JobHandler for Cod {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let PostCod { shipment_id } = payload(job)?;
+        self.0.post_cod(tenant_of(job)?, shipment_id).await
+    }
+}
+
+struct Settle(Arc<ShippingService>);
+
+#[async_trait::async_trait]
+impl JobHandler for Settle {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let SettleCod { line_id } = payload(job)?;
+        self.0.post_settlement(tenant_of(job)?, line_id).await
+    }
+}
+
+struct WriteOff(Arc<ShippingService>);
+
+#[async_trait::async_trait]
+impl JobHandler for WriteOff {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let WriteOffCod { discrepancy_id } = payload(job)?;
+        self.0.post_write_off(tenant_of(job)?, discrepancy_id).await
+    }
+}
+
+/// Lịch hằng ngày: khoản COD đã thu mà quá hạn chưa vào bảng kê → chênh lệch `overdue`.
+struct Aging(Arc<ShippingService>);
+
+#[async_trait::async_trait]
+impl JobHandler for Aging {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenants: Vec<Uuid> = shipment::Entity::find()
+            .select_only()
+            .column(shipment::Column::TenantId)
+            .filter(shipment::Column::CodStatus.eq("collected"))
+            .distinct()
+            .into_tuple()
+            .all(job.database.read())
+            .await?;
+        for tenant in tenants {
+            let tenant = self.0.databases.tenant(TenantId::from_uuid(tenant)).await?;
+            if let Err(error) = self.0.cod_aging(&tenant).await {
+                tracing::warn!(error = %error, "cannot check overdue cash on delivery");
             }
         }
         Ok(())

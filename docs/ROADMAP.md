@@ -596,7 +596,7 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
 - [x] Trait `ShippingCarrier` (báo giá, tạo vận đơn, huỷ, in nhãn, theo dõi) và bộ giả cho test; trạng thái
       kiểm tài khoản hãng; webhook trạng thái của hãng: kiểm chữ ký, không trùng, ánh xạ về trạng thái chung
 - [x] Vận đơn: một đơn nhiều kiện, giao một phần, giao thất bại, hoàn hàng; event cho `orders`
-- [ ] Thu hộ khi giao (COD): tiền do hãng thu và chuyển trả theo hợp đồng với hãng; sổ cái ghi phải thu từ hãng,
+- [x] Thu hộ khi giao (COD): tiền do hãng thu và chuyển trả theo hợp đồng với hãng; sổ cái ghi phải thu từ hãng,
       đối soát với bảng kê COD; lệch thì báo, khớp dòng lệch có lý do và audit; `shipping.cod_settled` mang
       `seller_org_id` và nơi nhận tiền (D-216)
 - [ ] Ngày giao dự kiến là ngày cụ thể (D-201): khoảng ngày tuyệt đối kèm giờ chốt trong ngày, theo múi giờ của

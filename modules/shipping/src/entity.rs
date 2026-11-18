@@ -346,3 +346,85 @@ pub(crate) mod webhook_inbox {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod cod_statement {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_cod_statements")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub carrier_account_id: Uuid,
+        pub statement_reference: String,
+        pub content_hash: String,
+        pub period_from: Date,
+        pub period_to: Date,
+        pub total_cod_minor: i64,
+        pub total_fee_minor: i64,
+        pub net_paid_minor: i64,
+        pub currency: String,
+        pub status: String,
+        pub imported_by: Option<Uuid>,
+        pub imported_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod cod_statement_line {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_cod_statement_lines")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub statement_id: Uuid,
+        pub position: i32,
+        pub tracking_number: String,
+        pub cod_minor: i64,
+        pub fee_minor: i64,
+        pub shipment_id: Option<Uuid>,
+        /// Cột `match`: `matched`, `amount_mismatch`, `unknown_tracking`, `not_delivered`.
+        #[sea_orm(column_name = "match")]
+        pub match_kind: String,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod cod_discrepancy {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_cod_discrepancies")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub discrepancy_key: String,
+        pub statement_line_id: Option<Uuid>,
+        pub shipment_id: Option<Uuid>,
+        pub kind: String,
+        pub expected_minor: i64,
+        pub reported_minor: i64,
+        pub currency: String,
+        pub status: String,
+        pub resolution_code: Option<String>,
+        pub resolution_note: String,
+        pub resolved_by: Option<Uuid>,
+        pub resolved_at: Option<DateTimeUtc>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

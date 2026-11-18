@@ -51,8 +51,10 @@ pub mod events {
     pub const COD_COLLECTED: &str = "shipping.cod_collected";
     /// Bảng kê của hãng khớp: tiền COD đã về người bán / đối tác thu hộ (D-216).
     pub const COD_SETTLED: &str = "shipping.cod_settled";
-    /// Bảng kê lệch với vận đơn.
+    /// Bảng kê lệch với vận đơn (hay vận đơn quá hạn chưa vào bảng kê).
     pub const COD_MISMATCH: &str = "shipping.cod_mismatch";
+    /// Một chênh lệch COD được giải quyết (mã lý do + ghi chú).
+    pub const COD_DISCREPANCY_RESOLVED: &str = "shipping.cod_discrepancy_resolved";
     /// Tài khoản hãng thêm / sửa / kiểm (không mang thông tin đăng nhập).
     pub const CARRIER_ACCOUNT_CHANGED: &str = "shipping.carrier_account_changed";
 }

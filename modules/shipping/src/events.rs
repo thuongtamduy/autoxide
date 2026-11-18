@@ -45,6 +45,9 @@ event!(ShipmentCancelled, names::SHIPMENT_CANCELLED);
 event!(BookingFailed, names::BOOKING_FAILED);
 event!(CodCollected, names::COD_COLLECTED);
 event!(CarrierAccountChanged, names::CARRIER_ACCOUNT_CHANGED);
+event!(CodSettled, names::COD_SETTLED);
+event!(CodMismatch, names::COD_MISMATCH);
+event!(CodDiscrepancyResolved, names::COD_DISCREPANCY_RESOLVED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -71,6 +74,20 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             names::COD_COLLECTED,
             "The carrier collected the cash on delivery of a shipment.",
+        ),
+        EventInfo::new(
+            names::COD_SETTLED,
+            "A carrier statement settled the cash on delivery of a shipment; carries `seller_org_id` and \
+             where the money was paid.",
+        ),
+        EventInfo::new(
+            names::COD_MISMATCH,
+            "A carrier statement does not match a shipment, or a delivered shipment is missing from \
+             statements for too long.",
+        ),
+        EventInfo::new(
+            names::COD_DISCREPANCY_RESOLVED,
+            "A cash-on-delivery discrepancy was resolved with a reason code.",
         ),
         EventInfo::new(
             names::CARRIER_ACCOUNT_CHANGED,
@@ -119,6 +136,9 @@ impl RecordNamed for Outbox {
             names::BOOKING_FAILED => go!(BookingFailed),
             names::COD_COLLECTED => go!(CodCollected),
             names::CARRIER_ACCOUNT_CHANGED => go!(CarrierAccountChanged),
+            names::COD_SETTLED => go!(CodSettled),
+            names::COD_MISMATCH => go!(CodMismatch),
+            names::COD_DISCREPANCY_RESOLVED => go!(CodDiscrepancyResolved),
             other => Err(Error::internal(format!("event `{other}` is not declared by `shipping`"))),
         }
     }
@@ -132,4 +152,9 @@ pub(crate) fn shipment_subject(id: Uuid) -> Option<String> {
 /// Chủ thể của event về tài khoản hãng `id`.
 pub(crate) fn account_subject(id: Uuid) -> Option<String> {
     Some(format!("shipping.carrier_account:{id}"))
+}
+
+/// Chủ thể của event về chênh lệch COD `id`.
+pub(crate) fn discrepancy_subject(id: Uuid) -> Option<String> {
+    Some(format!("shipping.cod_discrepancy:{id}"))
 }

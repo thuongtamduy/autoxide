@@ -22,6 +22,8 @@ pub(crate) struct Parts {
     pub databases: autoxide_kernel::tenancy::DatabaseRegistry,
     pub secret: autoxide_kernel::secret::SecretKey,
     pub carriers: Arc<crate::registry::Registry>,
+    pub ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
+    pub reasons: autoxide_kernel::reasons::ReasonCodes,
     pub units: Option<Arc<dyn AdministrativeUnits>>,
 }
 
@@ -61,6 +63,10 @@ pub(crate) struct ShippingService {
     pub(crate) secret: autoxide_kernel::secret::SecretKey,
     /// Sổ hãng vận chuyển (bộ nối đăng ký sau `shipping`).
     pub(crate) carriers: Arc<crate::registry::Registry>,
+    /// `dyn Ledger` khi module `ledger` đã cài: ghi nghĩa vụ COD.
+    pub(crate) ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
+    /// Danh sách lý do theo khách (`shipping.cod_resolution`).
+    pub(crate) reasons: autoxide_kernel::reasons::ReasonCodes,
     pub(crate) config: ShippingConfig,
     /// `dyn AdministrativeUnits` của module `address` khi đã cài: kiểm địa chỉ Việt Nam.
     pub(crate) units: Option<Arc<dyn AdministrativeUnits>>,
@@ -75,6 +81,8 @@ impl ShippingService {
             databases: parts.databases,
             secret: parts.secret,
             carriers: parts.carriers,
+            ledger: parts.ledger,
+            reasons: parts.reasons,
             units: parts.units,
             config,
         }

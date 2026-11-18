@@ -7,12 +7,14 @@ mod addresses;
 pub mod api;
 mod booking;
 mod carriers;
+mod cod;
 mod config;
 mod entity;
 mod errors;
 mod events;
 mod http;
 mod jobs;
+mod ledger;
 mod listeners;
 mod methods;
 mod migration;
@@ -98,6 +100,19 @@ impl Module for ShippingModule {
         jobs::schedules()
     }
 
+    fn reason_lists(&self) -> Vec<autoxide_kernel::reasons::ReasonList> {
+        use autoxide_kernel::reasons::{ReasonDefault, ReasonList};
+        vec![ReasonList::new(
+            cod::RESOLUTION_LIST,
+            vec![
+                ReasonDefault::new("carrier_corrected", "The carrier corrected its statement"),
+                ReasonDefault::new("delivered_confirmed", "Delivery confirmed with the carrier"),
+                ReasonDefault::new("returned_confirmed", "Return confirmed with the carrier"),
+                ReasonDefault::new("written_off", "Written off: will not be collected"),
+            ],
+        )]
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
@@ -123,6 +138,9 @@ impl Module for ShippingModule {
             databases: context.tenancy(),
             secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
             carriers: registry.clone(),
+            // `ledger` đăng ký trước `shipping`; chưa cài thì không ghi sổ COD.
+            ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
+            reasons: context.reason_codes(),
             units,
         };
         let service = Arc::new(ShippingService::new(parts, config));

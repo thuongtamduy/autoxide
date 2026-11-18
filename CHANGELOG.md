@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `shipping`: cash on delivery recorded as obligations in the ledger (never held), carrier statements imported
+  from CSV or the carrier's API and matched by tracking number, discrepancies (amount, unknown, overdue) resolved
+  with a reason code; `shipping.cod_settled` carries `seller_org_id`.
 - `shipping`: carrier accounts (encrypted credentials, connection test), carrier quotes with a timeout, shipments
   from `orders.fulfillment_requested` or by hand (parcels, partial delivery, booking between two transactions,
   cancel, labels), one status table for every carrier, signed carrier webhooks stored as received and applied by
