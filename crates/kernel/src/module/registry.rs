@@ -83,6 +83,8 @@ pub struct Modules {
     moves: crate::tenancy::moves::MoveSetup,
     /// Sổ database (bước 33); có sau [`start`](Self::start).
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
+    /// Nguồn số liệu báo cáo của mọi module (bước 38), đã kiểm.
+    facts: crate::report::FactCatalog,
 }
 
 impl Modules {
@@ -174,6 +176,12 @@ impl Modules {
             }
         }
         let resource_events = checked_resource_events(&modules, &events, &mut problems);
+        // Nguồn số liệu báo cáo (bước 38): chỉ event của chính module, đã khai.
+        let declared = modules.iter().map(|module| (module.name(), module.facts())).collect();
+        let facts = crate::report::FactCatalog::new(declared, &events).unwrap_or_else(|errors| {
+            problems.extend(errors);
+            crate::report::FactCatalog::default()
+        });
         let mut seen = Vec::new();
         let mut declared_settings = Vec::new();
         for module in &modules {
@@ -243,6 +251,7 @@ impl Modules {
                 orgs,
                 moves,
                 tenancy: None,
+                facts,
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -341,6 +350,7 @@ impl Modules {
                 org_settings: &self.org_settings,
                 entitlements: &self.entitlements,
                 counters: &mut counters,
+                facts: &self.facts,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))

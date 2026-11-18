@@ -7,13 +7,13 @@ use serde_json::Value;
 pub(crate) const ENTRY_POSTED: EventInfo = EventInfo::new(
     "ledger.entry_posted",
     "An entry was posted (`entry_id`, `book_id`, `org_id`, `effective_date`, `source_module`, \
-     `source_kind`, `source_id`, `reference`, `total`).",
+     `source_kind`, `source_id`, `reference`, `total`, `lines` — each `purpose`, `side`, `amount`).",
 );
 
 pub(crate) const ENTRY_REVERSED: EventInfo = EventInfo::new(
     "ledger.entry_reversed",
     "An entry was reversed (`entry_id` of the reversal, `reversed_entry_id`, `book_id`, `org_id`, \
-     `effective_date`).",
+     `effective_date`, `lines` — each `purpose`, `side`, `amount`).",
 );
 
 pub(crate) const PERIOD_CLOSED: EventInfo = EventInfo::new(
@@ -129,4 +129,75 @@ pub(crate) fn all() -> Vec<EventInfo> {
         PAYOUT_FAILED,
         HOLD_RELEASED,
     ]
+}
+
+/// Số liệu cho báo cáo gộp (bước 38): doanh thu theo mục đích tài khoản `revenue.*` và thuế GTGT
+/// đầu ra — bên có trừ bên nợ, nên bút toán đảo ra số âm.
+pub(crate) const REVENUE: autoxide_kernel::report::FactKind =
+    autoxide_kernel::report::FactKind::new(
+        "ledger.revenue",
+        "Revenue posted to `revenue.*` accounts (credits minus debits, so reversals count negative), \
+     in the currency of each entry; dimension `purpose` is the account purpose (e.g. \
+     `revenue.sales`).",
+        autoxide_kernel::report::Measure::Amount,
+        &["purpose"],
+    );
+
+pub(crate) const TAX_OUTPUT: autoxide_kernel::report::FactKind =
+    autoxide_kernel::report::FactKind::new(
+        "ledger.tax_output",
+        "Output VAT posted to `tax.vat_output` (credits minus debits), in the currency of each \
+         entry.",
+        autoxide_kernel::report::Measure::Amount,
+        &[],
+    );
+
+pub(crate) fn facts() -> Vec<autoxide_kernel::report::FactSource> {
+    use autoxide_kernel::report::FactSource;
+    vec![
+        FactSource::new(ENTRY_POSTED.name(), vec![REVENUE, TAX_OUTPUT], entry_facts),
+        FactSource::new(ENTRY_REVERSED.name(), vec![REVENUE, TAX_OUTPUT], entry_facts),
+    ]
+}
+
+/// Bút toán ghi / đảo → một số liệu doanh thu cho mỗi mục đích `revenue.*`, một số liệu thuế đầu
+/// ra; mục đích có tổng bằng 0 thì không sinh số liệu.
+pub(crate) fn entry_facts(
+    event: &autoxide_kernel::event::Delivered,
+) -> Result<Vec<autoxide_kernel::report::Fact>, autoxide_kernel::error::Error> {
+    use autoxide_kernel::money::Money;
+    use autoxide_kernel::report::{Fact, org_field};
+    use std::collections::BTreeMap;
+    let org = org_field(&event.payload);
+    let lines = event.payload.get("lines").and_then(Value::as_array).cloned().unwrap_or_default();
+    let mut sums: BTreeMap<String, Money> = BTreeMap::new();
+    for line in lines {
+        let purpose = line.get("purpose").and_then(Value::as_str).unwrap_or_default();
+        if !purpose.starts_with("revenue.") && purpose != "tax.vat_output" {
+            continue;
+        }
+        let Some(amount) = autoxide_kernel::report::money_field(&line, "amount")? else {
+            continue;
+        };
+        let signed = match line.get("side").and_then(Value::as_str) {
+            Some("credit") => amount,
+            _ => amount.checked_neg()?,
+        };
+        let slot = sums.entry(purpose.to_owned()).or_insert(Money::zero(amount.currency()));
+        *slot = slot.checked_add(signed)?;
+    }
+    Ok(sums
+        .into_iter()
+        .filter(|(_, amount)| !amount.is_zero())
+        .map(|(purpose, amount)| {
+            if purpose == "tax.vat_output" {
+                Fact::new(TAX_OUTPUT.kind, event.occurred_at).org(org).amount(amount)
+            } else {
+                Fact::new(REVENUE.kind, event.occurred_at)
+                    .org(org)
+                    .amount(amount)
+                    .dimension("purpose", purpose)
+            }
+        })
+        .collect())
 }

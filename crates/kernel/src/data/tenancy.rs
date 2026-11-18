@@ -22,6 +22,7 @@
 
 pub(crate) mod admin;
 mod config;
+pub mod distribution;
 pub(crate) mod domains;
 pub(crate) mod erasure;
 pub(crate) mod exports;
