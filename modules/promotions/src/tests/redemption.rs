@@ -154,7 +154,7 @@ async fn giu_lai_cung_order_id_va_tra_lai_dung_bo_dem() {
         let mut other = request.clone();
         other.cart.lines[0].quantity = 2;
         let error = setup.promotions().reserve(&setup.tenant(), &other).await.unwrap_err();
-        assert_eq!(error.code(), "reference_reused");
+        assert_eq!(error.code(), "promotions.reference_reused");
         // Hai lần trả đồng thời chỉ cộng lại một lần.
         let order = request.order_id;
         let (promotions, tenant) = (setup.promotions(), setup.tenant());
