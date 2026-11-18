@@ -1040,6 +1040,22 @@ export type CatalogCreateDocument = {
   number: string;
 };
 
+/** A new bulk price change. */
+export type CatalogCreatePriceChange = {
+  filter?: CatalogPriceChangeFilter;
+  /**
+   * `set` (the new price is `value`), `percent` (`value` in basis points, signed: `-1000` =
+   * 10% off) or `amount` (`value` minor units added, signed).
+   */
+  operation: string;
+  rounding_rule_id?: string | null;
+  /** When the new prices start; omitted: now. A future time schedules them. */
+  valid_from?: string | null;
+  /** End of a temporary change. */
+  valid_to?: string | null;
+  value: number;
+};
+
 /** A new price floor. */
 export type CatalogCreatePriceGuard = {
   action: CatalogFloorAction;
@@ -1056,17 +1072,28 @@ export type CatalogCreatePriceGuard = {
 
 /** A new price list. */
 export type CatalogCreatePriceList = {
+  /** Adjustment of a derived list in basis points, signed (`-1500` = 15% off), -10000 to 100000. */
+  adjust_bp?: number;
+  /** Amount added after the percentage, in minor units, signed. */
+  adjust_minor?: number | null;
   /** `consumer` (default) or `business`. */
   audience?: string;
   /** ISO 4217 code. Consumer prices in Viet Nam must be `VND`. */
   currency: string;
   /** Only for this customer group (a free code until customer groups exist, step 47). */
   customer_group?: string | null;
+  /**
+   * Make a derived list: its prices are written from this source list (which cannot itself be
+   * derived; `catalog.derived_chain`), adjusted and rounded. Same currency as the source.
+   */
+  derived_from?: string | null;
   name: string;
   /** The store or chain unit; prices apply there and below. Omit when you work in one unit. */
   org_id?: string | null;
   /** Higher wins among lists that tie on unit and filters. Default 0. */
   priority?: number;
+  /** Rounding rule of a derived list (`GET /rounding-rules`). */
+  rounding_rule_id?: string | null;
   /** Prices include tax; consumer prices in Viet Nam must. */
   tax_inclusive: boolean;
 };
@@ -1153,6 +1180,17 @@ export type CatalogCreateProduct = {
   warranty_months?: number | null;
 };
 
+/** A new rounding rule. */
+export type CatalogCreateRoundingRule = {
+  /** Ending in minor units, 0 or more and below `step_minor`, e.g. `9000`. */
+  ending_minor?: number | null;
+  /** `up`, `down` or `nearest`. */
+  mode: string;
+  name: string;
+  /** Step in minor units, above 0, e.g. `10000`. */
+  step_minor: number;
+};
+
 /** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
 export type CatalogFloorAction = "warn" | "block";
 
@@ -1210,6 +1248,44 @@ export type CatalogPrice = {
   variant_id: string;
 };
 
+/** A bulk price change. */
+export type CatalogPriceChange = {
+  /** Variants changed (known after the preview). */
+  affected: number;
+  approved_by?: string | null;
+  created_at: string;
+  created_by?: string | null;
+  filter: CatalogPriceChangeFilter;
+  id: string;
+  /** `set`, `percent` or `amount`. */
+  operation: string;
+  /**
+   * The preview: `samples` (up to 20 rows of `variant_id`, `before`, `after`), `floor_violations`,
+   * `blocked` and `warned` counts. Prices below a `block` floor are not written.
+   */
+  preview?: Record<string, unknown> | null;
+  price_list_id: string;
+  rounding_rule_id?: string | null;
+  /** `draft`, `previewed`, `approved`, `applied` or `cancelled`. */
+  status: string;
+  updated_at: string;
+  valid_from: string;
+  /** End of a temporary change; the earlier prices apply again after it. */
+  valid_to?: string | null;
+  /** New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed). */
+  value: number;
+};
+
+/**
+ * Which variants a bulk change covers: the union of the categories (with their subcategories),
+ * products and variants listed. All empty: every variant with a price in the list.
+ */
+export type CatalogPriceChangeFilter = {
+  category_ids?: string[];
+  product_ids?: string[];
+  variant_ids?: string[];
+};
+
 /** A price floor rule. */
 export type CatalogPriceGuard = {
   action: CatalogFloorAction;
@@ -1255,6 +1331,9 @@ export type CatalogPriceInput = {
 /** A price list. */
 export type CatalogPriceList = {
   active: boolean;
+  /** Adjustment of a derived list, basis points. */
+  adjust_bp: number;
+  adjust_minor?: number | null;
   /** `consumer` or `business`. */
   audience: string;
   /** Only for this sales channel (step 48). */
@@ -1265,6 +1344,8 @@ export type CatalogPriceList = {
   currency: string;
   /** Only for this customer group. */
   customer_group?: string | null;
+  /** Source list of a derived list. */
+  derived_from?: string | null;
   id: string;
   /** Only for this market (step 63). */
   market?: string | null;
@@ -1273,6 +1354,7 @@ export type CatalogPriceList = {
   org_id: string;
   /** Higher wins among lists that tie on unit and filters. */
   priority: number;
+  rounding_rule_id?: string | null;
   tax_inclusive: boolean;
   updated_at: string;
 };
@@ -1420,6 +1502,20 @@ export type CatalogRestrictionRule = {
   /** Document types a conditional product needs, valid on the day. */
   required_documents: string[];
   source_url: string;
+};
+
+/**
+ * A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +
+ * ending_minor` (step 10000 and ending 9000 give 129000, 199000…).
+ */
+export type CatalogRoundingRule = {
+  created_at: string;
+  ending_minor?: number | null;
+  id: string;
+  /** `up`, `down` or `nearest`. */
+  mode: string;
+  name: string;
+  step_minor: number;
 };
 
 /**
@@ -4550,6 +4646,37 @@ export type Data_CatalogCategoryRestrictions = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogPriceChange = {
+  /** A bulk price change. */
+  data: {
+    /** Variants changed (known after the preview). */
+    affected: number;
+    approved_by?: string | null;
+    created_at: string;
+    created_by?: string | null;
+    filter: CatalogPriceChangeFilter;
+    id: string;
+    /** `set`, `percent` or `amount`. */
+    operation: string;
+    /**
+     * The preview: `samples` (up to 20 rows of `variant_id`, `before`, `after`), `floor_violations`,
+     * `blocked` and `warned` counts. Prices below a `block` floor are not written.
+     */
+    preview?: Record<string, unknown> | null;
+    price_list_id: string;
+    rounding_rule_id?: string | null;
+    /** `draft`, `previewed`, `approved`, `applied` or `cancelled`. */
+    status: string;
+    updated_at: string;
+    valid_from: string;
+    /** End of a temporary change; the earlier prices apply again after it. */
+    valid_to?: string | null;
+    /** New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed). */
+    value: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogPriceGuard = {
   /** A price floor rule. */
   data: {
@@ -4571,6 +4698,9 @@ export type Data_CatalogPriceList = {
   /** A price list. */
   data: {
     active: boolean;
+    /** Adjustment of a derived list, basis points. */
+    adjust_bp: number;
+    adjust_minor?: number | null;
     /** `consumer` or `business`. */
     audience: string;
     /** Only for this sales channel (step 48). */
@@ -4581,6 +4711,8 @@ export type Data_CatalogPriceList = {
     currency: string;
     /** Only for this customer group. */
     customer_group?: string | null;
+    /** Source list of a derived list. */
+    derived_from?: string | null;
     id: string;
     /** Only for this market (step 63). */
     market?: string | null;
@@ -4589,6 +4721,7 @@ export type Data_CatalogPriceList = {
     org_id: string;
     /** Higher wins among lists that tie on unit and filters. */
     priority: number;
+    rounding_rule_id?: string | null;
     tax_inclusive: boolean;
     updated_at: string;
   };
@@ -4656,6 +4789,23 @@ export type Data_CatalogResolvedPrice = {
     candidates: CatalogPriceList[];
     price?: CatalogPriceSnapshot | null;
     variant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogRoundingRule = {
+  /**
+   * A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +
+   * ending_minor` (step 10000 and ending 9000 give 129000, 199000…).
+   */
+  data: {
+    created_at: string;
+    ending_minor?: number | null;
+    id: string;
+    /** `up`, `down` or `nearest`. */
+    mode: string;
+    name: string;
+    step_minor: number;
   };
 };
 
@@ -9837,6 +9987,19 @@ export type Data_Vec_CatalogRestrictionRule = {
     /** Document types a conditional product needs, valid on the day. */
     required_documents: string[];
     source_url: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogRoundingRule = {
+  data: {
+    created_at: string;
+    ending_minor?: number | null;
+    id: string;
+    /** `up`, `down` or `nearest`. */
+    mode: string;
+    name: string;
+    step_minor: number;
   }[];
 };
 
@@ -15279,6 +15442,9 @@ export type Page_CatalogPriceList = {
   /** The items of this page, in the requested order. */
   data: {
     active: boolean;
+    /** Adjustment of a derived list, basis points. */
+    adjust_bp: number;
+    adjust_minor?: number | null;
     /** `consumer` or `business`. */
     audience: string;
     /** Only for this sales channel (step 48). */
@@ -15289,6 +15455,8 @@ export type Page_CatalogPriceList = {
     currency: string;
     /** Only for this customer group. */
     customer_group?: string | null;
+    /** Source list of a derived list. */
+    derived_from?: string | null;
     id: string;
     /** Only for this market (step 63). */
     market?: string | null;
@@ -15297,6 +15465,7 @@ export type Page_CatalogPriceList = {
     org_id: string;
     /** Higher wins among lists that tie on unit and filters. */
     priority: number;
+    rounding_rule_id?: string | null;
     tax_inclusive: boolean;
     updated_at: string;
   }[];
@@ -24456,6 +24625,7 @@ export interface paths {
         201: Data_CatalogPriceList;
         401: Problem;
         403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
@@ -24472,6 +24642,63 @@ export interface paths {
         403: Problem;
         404: Problem;
         412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes": {
+    /** Create a bulk price change for a price list, as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCreatePriceChange;
+      responses: {
+        201: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}": {
+    /** Get a bulk price change. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}/approve": {
+    /** Approve a previewed bulk price change; a job writes the prices. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}/preview": {
+    /** Preview a bulk price change. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
@@ -24763,6 +24990,30 @@ export interface paths {
         200: Data_Vec_CatalogRestrictionRule;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/rounding-rules": {
+    /** List the rounding rules of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogRoundingRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a rounding rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateRoundingRule;
+      responses: {
+        201: Data_CatalogRoundingRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

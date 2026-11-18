@@ -737,7 +737,7 @@ database chỉ giữ `AUTOXIDE_BACKUP_KEEP` bản tốt mới nhất (mặc đ�
   không chép file vào từng bản backup.
 - Muốn khôi phục một bản thì chép thư mục của nó ra khỏi nơi lưu (S3:
   `aws s3 cp --recursive s3://<bucket>/kernel/backups/main/<id>/ ./restore/`; thư mục: `cp -r`), rồi khôi phục
-  thư mục đó như mục "6. Backup và khôi phục" ở trên.
+  thư mục đó như mục "Khôi phục từng bước" bên dưới.
 - Mỗi lượt được ghi vào bảng `kernel_backups` (trạng thái, cỡ, lỗi). `autoxide doctor` cảnh báo khi một
   database không có bản tốt nào trong hai chu kỳ gần nhất, và `/metrics` có
   `backup_last_success_timestamp_seconds`, `backup_runs_total`, `backup_duration_seconds` và
@@ -750,6 +750,28 @@ database chỉ giữ `AUTOXIDE_BACKUP_KEEP` bản tốt mới nhất (mặc đ�
   có chuyên môn pháp lý.)
 - Trong lúc backup một database SQLite, file `-wal` của nó lớn dần tới khi backup xong: chừa chỗ trống
   trên đĩa cho nó.
+
+### Khôi phục từng bước
+
+Tập trước khi cần: test `dien_tap_backup_restore_roi_khoi_dong` làm đúng các bước này ở mỗi lần chạy
+gate.
+
+1. **Lấy thư mục backup.** Bản backup theo lịch: chép `kernel/backups/<database>/<id>/` ra khỏi nơi lưu
+   file (S3: `aws s3 cp --recursive s3://<bucket>/kernel/backups/main/<id>/ ./restore/`; thư mục:
+   `cp -r`). Lấy dòng `succeeded` mới nhất trong `kernel_backups`, hay thư mục mới nhất. Bản của
+   `autoxide backup`: dùng nguyên thư mục đó. Chỉ khôi phục bản backup do chính bạn tạo.
+2. **Chuẩn bị đích trống**: một database mới, trống (`createdb` trên PostgreSQL, hay đường dẫn tới một
+   file SQLite chưa có) và một nơi lưu file trống. Dùng cùng `AUTOXIDE_SECRET_KEY` như lúc tạo bản
+   backup, không thì secret đã mã hoá trong đó không đọc được. Bản backup lấy từ PostgreSQL khôi phục
+   được vào SQLite và ngược lại.
+3. **Dừng các máy chủ** trỏ vào đích, rồi chạy `autoxide restore <thư mục>` với `DATABASE_URL` và cấu
+   hình nơi lưu file của đích. Lệnh áp dụng migration của phiên bản này, chép mọi bảng và file, và từ
+   chối database đã có bảng của Autoxide.
+4. **Khởi động và kiểm**: `autoxide doctor`, rồi `autoxide serve`; `/health/ready` phải trả `200` và quản
+   trị viên phải đăng nhập được. Ở chế độ nhiều khách, chạy `autoxide migrate up --all` trước.
+5. **Chế độ nhiều khách**: một bản backup chứa một database. Khôi phục database của từng placement theo
+   cùng cách. Muốn lấy lại dữ liệu của riêng một khách: khôi phục bản backup vào một bản cài tạm rồi đọc
+   hay xuất dữ liệu của khách đó từ đó; chưa có lệnh khôi phục một khách vào database đang chạy.
 
 ## Theo dõi (monitoring)
 

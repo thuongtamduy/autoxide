@@ -613,6 +613,12 @@ pub(crate) struct PriceListResponse {
     pub company_id: Option<Uuid>,
     /// Higher wins among lists that tie on unit and filters.
     pub priority: i32,
+    /// Source list of a derived list.
+    pub derived_from: Option<Uuid>,
+    /// Adjustment of a derived list, basis points.
+    pub adjust_bp: i64,
+    pub adjust_minor: Option<i64>,
+    pub rounding_rule_id: Option<Uuid>,
     pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -632,6 +638,10 @@ impl From<price_list::Model> for PriceListResponse {
             market: row.market,
             company_id: row.company_id,
             priority: row.priority,
+            derived_from: row.derived_from,
+            adjust_bp: row.adjust_bp,
+            adjust_minor: row.adjust_minor,
+            rounding_rule_id: row.rounding_rule_id,
             active: row.active,
             created_at: row.created_at,
             updated_at: row.updated_at,

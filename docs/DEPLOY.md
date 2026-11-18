@@ -766,7 +766,7 @@ and, with `AUTOXIDE_BACKUP_INCLUDE_FILES=true`, the stored files under `files/`.
   files are not copied into each backup by default.
 - To restore one, copy its directory out of the storage (for S3:
   `aws s3 cp --recursive s3://<bucket>/kernel/backups/main/<id>/ ./restore/`; for a directory,
-  `cp -r`), then restore that directory as in "6. Back up and restore" above.
+  `cp -r`), then restore that directory as in "Restoring, step by step" below.
 - Each run is recorded in the table `kernel_backups` (status, size, error). `autoxide doctor` warns
   when a database has no good backup from the last two intervals, and `/metrics` has
   `backup_last_success_timestamp_seconds`, `backup_runs_total`, `backup_duration_seconds` and
@@ -779,6 +779,31 @@ and, with `AUTOXIDE_BACKUP_INCLUDE_FILES=true`, the stored files under `files/`.
   or someone qualified.)
 - While a backup of a SQLite database runs, its `-wal` file grows until the backup ends: plan disk
   space for it.
+
+### Restoring, step by step
+
+Practise this before you need it: the test `dien_tap_backup_restore_roi_khoi_dong` does the same on
+every gate run.
+
+1. **Get the backup directory.** From a scheduled backup, copy `kernel/backups/<database>/<id>/` out
+   of the file storage (S3: `aws s3 cp --recursive s3://<bucket>/kernel/backups/main/<id>/ ./restore/`;
+   a directory: `cp -r`). Take the newest row with status `succeeded` in `kernel_backups`, or the
+   newest directory. From `autoxide backup`, use its directory as it is. Only restore backups you
+   made yourself.
+2. **Prepare an empty target**: a new, empty database (`createdb` on PostgreSQL, or a path to a
+   SQLite file that does not exist yet) and an empty file storage. Use the same
+   `AUTOXIDE_SECRET_KEY` as when the backup was made, or the encrypted secrets in it cannot be read.
+   A backup taken from PostgreSQL can be restored into SQLite and the other way round.
+3. **Stop the servers** that point at the target, then run `autoxide restore <directory>` with
+   `DATABASE_URL` and the file storage settings of the target. It applies the migrations of this
+   version, copies every table and file, and refuses a database that already has Autoxide tables.
+4. **Start and check**: `autoxide doctor`, then `autoxide serve`; `/health/ready` must answer `200`
+   and an administrator must be able to sign in. Run `autoxide migrate up --all` first in
+   multi-tenant mode.
+5. **Multi-tenant mode**: a backup holds one database. Restore each placement's database the same
+   way. To get back the data of a single tenant, restore the backup into a temporary installation
+   and read or export that tenant's data from there; there is no command that restores one tenant
+   into a live database.
 
 ## Monitoring
 
