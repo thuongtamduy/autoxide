@@ -91,6 +91,9 @@ pub(crate) struct KernelModule {
     request_timeout: std::time::Duration,
     /// Bản dịch của mọi module (dịch mô tả permission, event trong sổ module); có sau `start`.
     translations: crate::i18n::Translations,
+    /// Backup theo lịch (bước 39): cấu hình, và bộ chạy có sau `start`.
+    backup_config: crate::backup::scheduled::BackupConfig,
+    backups: Option<Arc<crate::backup::scheduled::ScheduledBackups>>,
 }
 
 impl KernelModule {
@@ -137,6 +140,8 @@ impl KernelModule {
             templates: crate::template::TemplateEngine::default(),
             flags,
             translations: crate::i18n::Translations::default(),
+            backup_config: crate::backup::scheduled::BackupConfig::default(),
+            backups: None,
         }
     }
 
@@ -280,6 +285,8 @@ impl Module for KernelModule {
             ),
             // Chỉ mục tìm kiếm mặc định (bước 40 P7): cấp khách hàng, mọi database dữ liệu.
             Box::new(crate::search::database::CreateSearchDocs),
+            // Sổ các lượt backup theo lịch (bước 39, mặt điều khiển).
+            Box::new(crate::backup::scheduled::CreateBackups),
         ]
     }
 
@@ -293,6 +300,7 @@ impl Module for KernelModule {
             "kernel_tenant_moves",
             "kernel_tenant_exports",
             "kernel_migration_runs",
+            "kernel_backups",
         ]
     }
 
@@ -336,9 +344,11 @@ impl Module for KernelModule {
             .get_with(&crate::ops::list_exports::FILE_RETENTION_DAYS, |raw| {
                 crate::config::parse_in_range(raw, 1u32, 365)
             });
+        let backup_config = crate::backup::scheduled::BackupConfig::read(reader);
         if let Some(seconds) = request_timeout(reader) {
             self.request_timeout = std::time::Duration::from_secs(seconds);
         }
+        self.backup_config = backup_config?;
         self.keys.set(secret?, previous?);
         self.public_url = public_url?;
         self.max_flags = max_flags?;
@@ -662,7 +672,30 @@ impl Module for KernelModule {
                 Arc::new(crate::tenancy::migration_runs::MigrateRunner(runs.clone())),
             ));
         }
+        if let Some(backups) = &self.backups {
+            jobs.push(
+                crate::job::JobRegistration::new(
+                    crate::backup::scheduled::BACKUP_JOB,
+                    Arc::new(crate::backup::scheduled::BackupRunner(backups.clone())),
+                )
+                .timeout(crate::backup::scheduled::BACKUP_TIMEOUT),
+            );
+        }
         jobs
+    }
+
+    fn checks(&self) -> Vec<crate::doctor::Check> {
+        match &self.registry {
+            Some(registry) => vec![crate::doctor::Check::new(
+                "backup_age",
+                "Every database has a recent scheduled backup.",
+                Arc::new(crate::backup::scheduled::BackupAge {
+                    registry: registry.clone(),
+                    config: self.backup_config,
+                }),
+            )],
+            None => Vec::new(),
+        }
     }
 
     fn tasks(&self) -> Vec<crate::task::Task> {
@@ -685,6 +718,12 @@ impl Module for KernelModule {
         }
         if self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some()) {
             schedules.push(crate::ops::list_exports::schedule());
+        }
+        // Không có nơi lưu file (module `files`) thì không có chỗ ghi: `autoxide doctor` báo.
+        if self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some())
+            && let Some(schedule) = self.backup_config.schedule()
+        {
+            schedules.push(schedule);
         }
         schedules
     }
@@ -760,6 +799,13 @@ impl Module for KernelModule {
         ));
         self.exports = Some(exports.clone());
         context.provide::<crate::tenancy::TenantExports>(exports)?;
+        let backups = Arc::new(crate::backup::scheduled::ScheduledBackups::new(
+            context.tenancy().clone(),
+            self.move_setup.clone(),
+            self.backup_config,
+        ));
+        self.backups = Some(backups.clone());
+        context.provide::<crate::backup::scheduled::ScheduledBackups>(backups)?;
         self.migration_runs = Some(Arc::new(crate::tenancy::migration_runs::MigrationRuns::new(
             context.tenancy().clone(),
             self.move_setup.clone(),

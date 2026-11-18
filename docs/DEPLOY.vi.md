@@ -673,6 +673,34 @@ hai giai đoạn:
 Chỉ một máy chủ, không có bộ cân bằng tải thì để khoảng rút là `0`: không có nơi nào khác
 để gửi request, rút chỉ làm việc dừng chậm thêm.
 
+## Backup theo lịch
+
+Ngoài `autoxide backup` chạy tay, mọi tiến trình chạy việc nền backup mọi database nó lo, mỗi
+`AUTOXIDE_BACKUP_INTERVAL_HOURS` giờ (mặc định 24; `0` để tắt), cùng cách với `autoxide backup`, vào
+nơi lưu file của module `files` (thư mục hay bucket S3) dưới `kernel/backups/<database>/<id>/`. Mỗi
+database chỉ giữ `AUTOXIDE_BACKUP_KEEP` bản tốt mới nhất (mặc định 7). Mỗi bản gồm `backup.json`,
+`database.sqlite` và, khi đặt `AUTOXIDE_BACKUP_INCLUDE_FILES=true`, các file đã lưu trong `files/`.
+
+- Bản backup nằm cùng nơi lưu với file tải lên, nên nó bảo vệ khi dữ liệu mất hay hỏng, không bảo vệ
+  khi mất chính nơi lưu đó: chép bucket hay thư mục (cả backup lẫn file tải lên) sang nơi khác, vd
+  bằng tính năng nhân bản của bucket hay một lệnh `rclone sync` hằng đêm. Đó cũng là lý do mặc định
+  không chép file vào từng bản backup.
+- Muốn khôi phục một bản thì chép thư mục của nó ra khỏi nơi lưu (S3:
+  `aws s3 cp --recursive s3://<bucket>/kernel/backups/main/<id>/ ./restore/`; thư mục: `cp -r`), rồi khôi phục
+  thư mục đó như mục "6. Backup và khôi phục" ở trên.
+- Mỗi lượt được ghi vào bảng `kernel_backups` (trạng thái, cỡ, lỗi). `autoxide doctor` cảnh báo khi một
+  database không có bản tốt nào trong hai chu kỳ gần nhất, và `/metrics` có
+  `backup_last_success_timestamp_seconds`, `backup_runs_total`, `backup_duration_seconds` và
+  `backup_size_bytes` (cảnh báo `AutoxideBackupTooOld`, `AutoxideBackupFailed`).
+- Bản backup chứa dữ liệu cá nhân. Dữ liệu đã xoá theo yêu cầu của một người vẫn còn trong các bản
+  backup làm trước đó, tới khi chúng bị xoay vòng (`AUTOXIDE_BACKUP_KEEP` × chu kỳ): ghi điều này vào
+  thông báo xử lý dữ liệu. Giữ nơi lưu ở chế độ riêng tư, ở nước mà dữ liệu của khách phải ở, và giữ
+  `AUTOXIDE_SECRET_KEY` tách khỏi nó. Chứng từ kế toán phải giữ 10 năm nằm ở module `invoices` và
+  `ledger`, không nằm trong bản backup xoay vòng. (Chi tiết pháp lý: cần đối chiếu văn bản gốc / người
+  có chuyên môn pháp lý.)
+- Trong lúc backup một database SQLite, file `-wal` của nó lớn dần tới khi backup xong: chừa chỗ trống
+  trên đĩa cho nó.
+
 ## Theo dõi (monitoring)
 
 Bật `AUTOXIDE_HTTP_METRICS=true` và để Prometheus đọc `/metrics` ngay trên máy (chặn `/metrics` ở
@@ -765,6 +793,17 @@ Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
   pg_total_relation_size(relid) DESC LIMIT 10;`.
 - **Sửa:** giải phóng hay thêm dung lượng đĩa trước. Job đã xong và event đã giao tự bị xoá sau 7 ngày;
   trên PostgreSQL chạy `VACUUM` cho bảng lớn sau khi xoá nhiều dòng.
+
+### Backup
+
+- **Dấu hiệu:** cảnh báo `AutoxideBackupTooOld` hay `AutoxideBackupFailed`; `autoxide doctor` cảnh báo
+  `kernel.backup_age`.
+- **Kiểm:** các dòng mới nhất của `kernel_backups` cho database đó (`status`, `error`), dòng log
+  `backup failed`, chỗ trống trên máy chủ (bản backup được dựng trước trong thư mục tạm, cỡ bằng
+  database) và trên nơi lưu file.
+- **Sửa:** theo lỗi (thiếu module `files`, đầy đĩa, thông tin đăng nhập nơi lưu). Dòng kẹt ở `running`
+  do tiến trình đã chết được lượt sau đánh `failed` sau 15 phút. Backup tay bằng
+  `autoxide backup <thư mục>` tới khi backup theo lịch chạy lại.
 
 ### Lộ khoá
 
