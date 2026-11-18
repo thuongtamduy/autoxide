@@ -15,3 +15,4 @@ Tiếng Anh: [`README.md`](README.md).
 - [Nối AI agent qua MCP](mcp.vi.md): key cho agent, cấu hình client, các tool
 - [Nhận event theo thời gian thực](realtime-events.vi.md): Server-Sent Events, `Last-Event-ID`, giới hạn
 - [Tải file lớn thẳng lên nơi lưu](direct-uploads.vi.md): link đã ký tới S3, xác nhận, kiểm file
+- [Tự động hoá công việc bằng luật](automations.vi.md): kích hoạt, điều kiện, tool MCP làm hành động, duyệt, cảnh báo số liệu bất thường

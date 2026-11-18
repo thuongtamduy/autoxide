@@ -25,6 +25,22 @@ export type AcceptedResponse = {
 /** What a schedule does: `publish` or `unpublish`. */
 export type Action = "publish" | "unpublish";
 
+/** An MCP tool that a rule can run as an action. */
+export type ActionInfo = {
+  description: string;
+  /** JSON Schema of `arguments`. */
+  input_schema: Record<string, unknown>;
+  /**
+   * The tool deletes or overwrites data, or needs a person's approval when an agent calls it:
+   * in a rule, the step waits for a person to approve each run.
+   */
+  needs_approval: boolean;
+  /** The permission the tool needs. */
+  permission?: string | null;
+  /** Full tool name `<module>.<tool>`. */
+  tool: string;
+};
+
 /** One line of a record's activity: a note, or an event recorded about it. */
 export type ActivityItem = {
   /** With `event`: its name, e.g. `content.entry_published`. */
@@ -812,6 +828,13 @@ export type CancelRequest = {
    * `false`: cancel now (data becomes read-only and is kept for the plan's retention days).
    */
   at_period_end?: boolean;
+};
+
+/** The triggers and actions you may use in rules. */
+export type Catalog = {
+  events: EventTriggerInfo[];
+  metrics: MetricTriggerInfo[];
+  tools: ActionInfo[];
 };
 
 /** A passkey ceremony in progress. */
@@ -2943,6 +2966,34 @@ export type CreateListRequest = {
   public?: boolean | null;
 };
 
+/**
+ * A new automation rule. Every problem (unknown event or tool, a tool you lack the permission
+ * for, arguments that do not fit the tool) is reported at once.
+ */
+export type CreateRuleRequest = {
+  /** See `actions` of the rule. */
+  actions: Record<string, unknown>[];
+  /** See `conditions` of the rule; omit for "always". */
+  conditions?: Record<string, unknown> | null;
+  /** Up to 2000 characters. */
+  description?: string | null;
+  /**
+   * `false` to save the rule disabled. Rules made by an AI agent always wait for a person to
+   * enable them.
+   */
+  enabled?: boolean;
+  /** 1 to 200 characters. */
+  name: string;
+  /**
+   * The organization unit of the rule; you need `automations.manage` there. Omit when you
+   * manage rules in one unit only (or for the whole tenant); otherwise
+   * `automations.org_required`.
+   */
+  org_id?: string | null;
+  /** See `trigger` of the rule. */
+  trigger: Record<string, unknown>;
+};
+
 /** A new menu. */
 export type CreateSiteMenuRequest = {
   items?: SiteMenuItemInput[];
@@ -3587,6 +3638,16 @@ export type Data_CampaignResponse = {
     status: CampaignStatus;
     subject: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Catalog = {
+  /** The triggers and actions you may use in rules. */
+  data: {
+    events: EventTriggerInfo[];
+    metrics: MetricTriggerInfo[];
+    tools: ActionInfo[];
   };
 };
 
@@ -4797,6 +4858,20 @@ export type Data_DeliveryResponse = {
     response_status?: number | null;
     /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
     status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_DryRun = {
+  /** What a run would do, without calling any tool. */
+  data: {
+    /** What the templates see. */
+    context: Record<string, unknown>;
+    /** The conditions hold for the sample: a real run would run the actions. */
+    matched: boolean;
+    /** No problem anywhere: the rule would run as written. */
+    ok: boolean;
+    steps: DryStep[];
   };
 };
 
@@ -7134,6 +7209,101 @@ export type Data_RoleResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_RuleResponse = {
+  /** An automation rule: "when the trigger happens and the conditions hold, run the actions". */
+  data: {
+    /**
+     * Steps in order: `{"tool": "<module>.<tool>", "arguments": {…}}` (values may use `{{
+     * event.… }}`), `{"wait": {"minutes": N}}`, `{"stop_if": <condition>}`, `{"notify": {"title",
+     * "body"}}`.
+     */
+    actions: Record<string, unknown>[];
+    /**
+     * A tree of `all` / `any` / `not` over comparisons `{"field": "event.total", "op": "gt",
+     * "value": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.
+     */
+    conditions?: Record<string, unknown> | null;
+    created_at: string;
+    created_by: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** When the schedule or metric check runs next. */
+    next_run_at?: string | null;
+    /** The organization unit the rule belongs to; the root unit has the id of the tenant. */
+    org_id: string;
+    /**
+     * The actions run with the current permissions of this user: the author, or whoever enabled
+     * the rule last.
+     */
+    run_as: string;
+    /**
+     * `active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or
+     * `paused` (stopped by itself; see `status_reason`).
+     */
+    status: string;
+    /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+    status_reason?: string | null;
+    /** IANA time zone of the schedule. */
+    timezone: string;
+    /**
+     * What starts a run: `{"type": "event", "event": "<module>.<event>"}`, `{"type":
+     * "schedule", "every": "hour" | "day" | "week", "weekday", "hour", "minute", "timezone"}`,
+     * `{"type": "manual"}` or `{"type": "metric", "metric", "operator", "value", "currency",
+     * "hour", "minute", "timezone"}`. See `GET /api/v1/automations/catalog`.
+     */
+    trigger: Record<string, unknown>;
+    updated_at: string;
+    /** Raised by one on every change of the rule; each run records the version it used. */
+    version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_RunResponse = {
+  /** One run of an automation rule, with the log of each step. */
+  data: {
+    /** The step waiting for approval. */
+    approval_step?: number | null;
+    /** The data of the trigger, as the templates see it: `event`, `trigger`. */
+    context: Record<string, unknown>;
+    created_at: string;
+    /** The next step to run, from 0. */
+    cursor: number;
+    /**
+     * 1 for a run started by a person, a schedule or an ordinary event; one more for each rule
+     * in a chain (a rule's action caused the event of the next rule).
+     */
+    depth: number;
+    error_code?: string | null;
+    error_message?: string | null;
+    event_id?: string | null;
+    event_name?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** The unit of the rule. */
+    org_id: string;
+    /** When a `wait` step ends. */
+    resume_at?: string | null;
+    rule_id: string;
+    /**
+     * The version of the rule the run uses (changing the rule does not change runs already
+     * started).
+     */
+    rule_version: number;
+    /**
+     * `queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for
+     * a person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).
+     */
+    status: string;
+    steps: StepLog[];
+    /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
+    trigger_key: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SavedView = {
   /** A saved list view. */
   data: {
@@ -9458,6 +9628,18 @@ export type Data_Vec_TaxWithholdingRateResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_TemplateInfo = {
+  data: {
+    description: string;
+    /** `<module>.<name>`. */
+    id: string;
+    /** `{"trigger", "conditions", "actions"}`: send it to `POST /rules` with a name. */
+    rule: Record<string, unknown>;
+    title: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_TenantExport = {
   data: {
     created_at: string;
@@ -9741,6 +9923,45 @@ export type DeliveryResponse = {
   status: string;
 };
 
+/** A problem a real run would hit. */
+export type DryProblem = {
+  code: string;
+  field: string;
+  message: string;
+};
+
+/** What a run would do, without calling any tool. */
+export type DryRun = {
+  /** What the templates see. */
+  context: Record<string, unknown>;
+  /** The conditions hold for the sample: a real run would run the actions. */
+  matched: boolean;
+  /** No problem anywhere: the rule would run as written. */
+  ok: boolean;
+  steps: DryStep[];
+};
+
+/** What one step would do in a dry run. */
+export type DryStep = {
+  /** The tool name, or `wait`, `stop_if`, `notify`. */
+  action: string;
+  /** The arguments after filling the templates with the sample. */
+  arguments?: Record<string, unknown> | null;
+  index: number;
+  /** The step waits for a person's approval in each real run. */
+  needs_approval: boolean;
+  /**
+   * What would go wrong: unknown tool, missing permission of the rule's `run_as`, arguments
+   * that do not fit the tool after filling.
+   */
+  problems: DryProblem[];
+  /**
+   * For `stop_if`: whether the run would stop here (results of earlier steps are unknown in a
+   * dry run and read as missing).
+   */
+  would_stop?: boolean | null;
+};
+
 /** What to call the copy of a form. */
 export type DuplicateFormRequest = {
   /** Key of the copy; omitted: `<key>-copy` (then `-copy-2`, `-copy-3`… when taken). */
@@ -9990,6 +10211,13 @@ export type EraseRequest = {
 export type ErasedResponse = {
   /** Submissions deleted. */
   deleted: number;
+};
+
+/** An event that can trigger a rule. */
+export type EventTriggerInfo = {
+  description: string;
+  /** `<module>.<event>`. */
+  name: string;
 };
 
 /** A kind of event that endpoints can subscribe to. */
@@ -11938,6 +12166,21 @@ export type MenuTarget = {
 export type MergeTag = {
   /** Every record of the merged tag gets this tag; the merged tag is deleted. */
   into: string;
+};
+
+/** A figure that a `metric` trigger can watch. */
+export type MetricTriggerInfo = {
+  description: string;
+  /**
+   * `fact:<kind>` (daily total of a report figure) or `summary:<id>` (a dashboard figure read
+   * at check time).
+   */
+  name: string;
+  /**
+   * `amount` (smallest unit of a currency), `quantity`, or `reading` (a dashboard figure;
+   * ratios in basis points, 1% = 100).
+   */
+  unit: string;
 };
 
 /**
@@ -14936,6 +15179,103 @@ export type Page_RoleResponse = {
 };
 
 /** One page of a list. */
+export type Page_RuleResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Steps in order: `{"tool": "<module>.<tool>", "arguments": {…}}` (values may use `{{
+     * event.… }}`), `{"wait": {"minutes": N}}`, `{"stop_if": <condition>}`, `{"notify": {"title",
+     * "body"}}`.
+     */
+    actions: Record<string, unknown>[];
+    /**
+     * A tree of `all` / `any` / `not` over comparisons `{"field": "event.total", "op": "gt",
+     * "value": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.
+     */
+    conditions?: Record<string, unknown> | null;
+    created_at: string;
+    created_by: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** When the schedule or metric check runs next. */
+    next_run_at?: string | null;
+    /** The organization unit the rule belongs to; the root unit has the id of the tenant. */
+    org_id: string;
+    /**
+     * The actions run with the current permissions of this user: the author, or whoever enabled
+     * the rule last.
+     */
+    run_as: string;
+    /**
+     * `active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or
+     * `paused` (stopped by itself; see `status_reason`).
+     */
+    status: string;
+    /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+    status_reason?: string | null;
+    /** IANA time zone of the schedule. */
+    timezone: string;
+    /**
+     * What starts a run: `{"type": "event", "event": "<module>.<event>"}`, `{"type":
+     * "schedule", "every": "hour" | "day" | "week", "weekday", "hour", "minute", "timezone"}`,
+     * `{"type": "manual"}` or `{"type": "metric", "metric", "operator", "value", "currency",
+     * "hour", "minute", "timezone"}`. See `GET /api/v1/automations/catalog`.
+     */
+    trigger: Record<string, unknown>;
+    updated_at: string;
+    /** Raised by one on every change of the rule; each run records the version it used. */
+    version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_RunResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The step waiting for approval. */
+    approval_step?: number | null;
+    /** The data of the trigger, as the templates see it: `event`, `trigger`. */
+    context: Record<string, unknown>;
+    created_at: string;
+    /** The next step to run, from 0. */
+    cursor: number;
+    /**
+     * 1 for a run started by a person, a schedule or an ordinary event; one more for each rule
+     * in a chain (a rule's action caused the event of the next rule).
+     */
+    depth: number;
+    error_code?: string | null;
+    error_message?: string | null;
+    event_id?: string | null;
+    event_name?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** The unit of the rule. */
+    org_id: string;
+    /** When a `wait` step ends. */
+    resume_at?: string | null;
+    rule_id: string;
+    /**
+     * The version of the rule the run uses (changing the rule does not change runs already
+     * started).
+     */
+    rule_version: number;
+    /**
+     * `queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for
+     * a person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).
+     */
+    status: string;
+    steps: StepLog[];
+    /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
+    trigger_key: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ScheduleResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17003,6 +17343,101 @@ export type RoleResponse = {
   updated_at: string;
 };
 
+/** An automation rule: "when the trigger happens and the conditions hold, run the actions". */
+export type RuleResponse = {
+  /**
+   * Steps in order: `{"tool": "<module>.<tool>", "arguments": {…}}` (values may use `{{
+   * event.… }}`), `{"wait": {"minutes": N}}`, `{"stop_if": <condition>}`, `{"notify": {"title",
+   * "body"}}`.
+   */
+  actions: Record<string, unknown>[];
+  /**
+   * A tree of `all` / `any` / `not` over comparisons `{"field": "event.total", "op": "gt",
+   * "value": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.
+   */
+  conditions?: Record<string, unknown> | null;
+  created_at: string;
+  created_by: string;
+  description?: string | null;
+  id: string;
+  name: string;
+  /** When the schedule or metric check runs next. */
+  next_run_at?: string | null;
+  /** The organization unit the rule belongs to; the root unit has the id of the tenant. */
+  org_id: string;
+  /**
+   * The actions run with the current permissions of this user: the author, or whoever enabled
+   * the rule last.
+   */
+  run_as: string;
+  /**
+   * `active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or
+   * `paused` (stopped by itself; see `status_reason`).
+   */
+  status: string;
+  /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+  status_reason?: string | null;
+  /** IANA time zone of the schedule. */
+  timezone: string;
+  /**
+   * What starts a run: `{"type": "event", "event": "<module>.<event>"}`, `{"type":
+   * "schedule", "every": "hour" | "day" | "week", "weekday", "hour", "minute", "timezone"}`,
+   * `{"type": "manual"}` or `{"type": "metric", "metric", "operator", "value", "currency",
+   * "hour", "minute", "timezone"}`. See `GET /api/v1/automations/catalog`.
+   */
+  trigger: Record<string, unknown>;
+  updated_at: string;
+  /** Raised by one on every change of the rule; each run records the version it used. */
+  version: number;
+};
+
+/** One run of an automation rule, with the log of each step. */
+export type RunResponse = {
+  /** The step waiting for approval. */
+  approval_step?: number | null;
+  /** The data of the trigger, as the templates see it: `event`, `trigger`. */
+  context: Record<string, unknown>;
+  created_at: string;
+  /** The next step to run, from 0. */
+  cursor: number;
+  /**
+   * 1 for a run started by a person, a schedule or an ordinary event; one more for each rule
+   * in a chain (a rule's action caused the event of the next rule).
+   */
+  depth: number;
+  error_code?: string | null;
+  error_message?: string | null;
+  event_id?: string | null;
+  event_name?: string | null;
+  finished_at?: string | null;
+  id: string;
+  /** The unit of the rule. */
+  org_id: string;
+  /** When a `wait` step ends. */
+  resume_at?: string | null;
+  rule_id: string;
+  /**
+   * The version of the rule the run uses (changing the rule does not change runs already
+   * started).
+   */
+  rule_version: number;
+  /**
+   * `queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for
+   * a person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).
+   */
+  status: string;
+  steps: StepLog[];
+  /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
+  trigger_key: string;
+  updated_at: string;
+};
+
+/** Data for a manual run. */
+export type RunRuleRequest = {
+  /** What the templates see as `event` (e.g. `{"order": {"id": "…"}}`); default `{}`. */
+  input?: Record<string, unknown> | null;
+};
+
 /** The object a saved item links to. With `include=targets`, also how it stands now. */
 export type SavedMenuTarget = {
   id: string;
@@ -17498,6 +17933,29 @@ export type StartUploadRequest = {
 
 /** Where an entry is in its life. */
 export type Status = "draft" | "published" | "archived";
+
+/** One step in the log of a run. */
+export type StepLog = {
+  /** The tool name, or `wait`, `stop_if`, `notify`. */
+  action: string;
+  /** Who approved the step, when it needed approval. */
+  approved_by?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  finished_at?: string | null;
+  /** `automation:<run id>:<step>`: calling again never does the step twice. */
+  idempotency_key?: string | null;
+  /** Position of the action in the rule, from 0. */
+  index: number;
+  /** The tool's result (cut down when large). */
+  result?: Record<string, unknown> | null;
+  started_at: string;
+  /**
+   * `succeeded`, `failed`, `skipped`, `waiting`, `awaiting_approval`, `stopped` (a `stop_if`
+   * that held) or `rejected`.
+   */
+  status: string;
+};
 
 /** Submissions of a form by status. */
 export type SubmissionCounts = {
@@ -18072,6 +18530,16 @@ export type TaxedLine = {
 /** What a term groups. */
 export type Taxonomy = "category" | "tag";
 
+/** A ready-made rule you can save now. */
+export type TemplateInfo = {
+  description: string;
+  /** `<module>.<name>`. */
+  id: string;
+  /** `{"trigger", "conditions", "actions"}`: send it to `POST /rules` with a name. */
+  rule: Record<string, unknown>;
+  title: string;
+};
+
 /** A customer (tenant) of the platform. */
 export type Tenant = {
   created_at: string;
@@ -18403,6 +18871,15 @@ export type TestRequest = {
   email: string;
 };
 
+/** Data for a dry run. */
+export type TestRuleRequest = {
+  /**
+   * What the templates and conditions see as `event` (e.g. a sample payload of the trigger
+   * event). Omit to use a sample for the trigger type.
+   */
+  event_sample?: Record<string, unknown> | null;
+};
+
 /** The tenant's wording. */
 export type TextInput = {
   /** Plain text (no HTML), 1 to 500 characters, with exactly the `{placeholders}` of the default. */
@@ -18723,6 +19200,22 @@ export type UpdateMeRequest = {
   name?: string | null;
   /** Preferred IANA time zone, e.g. `Asia/Ho_Chi_Minh`; `null` clears it. */
   time_zone?: string | null;
+};
+
+/**
+ * Changes to an automation rule. Omitted fields stay as they are. Changing the trigger,
+ * conditions or actions checks the whole rule again with your permissions, and the rule then
+ * runs as you.
+ */
+export type UpdateRuleRequest = {
+  actions?: Record<string, unknown>[] | null;
+  /** New conditions; `{}` removes them (the rule then always runs its actions). */
+  conditions?: Record<string, unknown> | null;
+  /** Up to 2000 characters; an empty text removes it. */
+  description?: string | null;
+  /** 1 to 200 characters. */
+  name?: string | null;
+  trigger?: Record<string, unknown> | null;
 };
 
 /** A new status for a submission. */
@@ -20374,6 +20867,221 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/catalog": {
+    /** List the triggers and actions you may use in automation rules. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Catalog;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules": {
+    /** List the automation rules in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; status?: string; trigger_type?: string }; };
+      responses: {
+        200: Page_RuleResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create an automation rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateRuleRequest;
+      responses: {
+        201: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}": {
+    /** Get an automation rule. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change an automation rule. */
+    patch: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateRuleRequest;
+      responses: {
+        200: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete an automation rule. */
+    delete: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}/disable": {
+    /** Disable an automation rule. */
+    post: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}/enable": {
+    /** Enable an automation rule. */
+    post: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}/run": {
+    /** Run an automation rule now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RunRuleRequest;
+      responses: {
+        202: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}/test": {
+    /** Dry-run an automation rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TestRuleRequest;
+      responses: {
+        200: Data_DryRun;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs": {
+    /** List the runs of automation rules in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; rule_id?: string; status?: string }; };
+      responses: {
+        200: Page_RunResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs/{id}": {
+    /** Get a run of an automation rule, with the log of each step. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs/{id}/approve": {
+    /** Approve the risky step a run waits on. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        202: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs/{id}/reject": {
+    /** Reject the risky step a run waits on: the run ends as `failed`. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs/{id}/retry": {
+    /** Retry a failed run from the step that failed. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        202: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/templates": {
+    /** List the ready-made rule templates you can use. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_TemplateInfo;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
