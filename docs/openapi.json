@@ -96849,19 +96849,6 @@
               ],
               "type": "string"
             }
-          },
-          {
-            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
-            "in": "header",
-            "name": "Idempotency-Key",
-            "required": false,
-            "schema": {
-              "examples": [
-                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
-              ],
-              "maxLength": 255,
-              "type": "string"
-            }
           }
         ],
         "requestBody": {

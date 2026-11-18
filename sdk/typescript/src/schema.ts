@@ -23147,7 +23147,7 @@ export interface paths {
   "/api/v1/kernel/bulk/{resource}/{action}": {
     /** Run an action on many records. */
     post: {
-      parameters: { header: { "Idempotency-Key": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { resource: string; action: string }; };
+      parameters: { header: { "Idempotency-Key": string; "Accept-Language"?: string }; path: { resource: string; action: string }; };
       requestBody: BulkRequest;
       responses: {
         200: Data_BulkPreview;

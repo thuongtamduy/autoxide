@@ -407,7 +407,7 @@ Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu 
 ### Tiền và số dư
 
 Module giữ số tiền, số dư hay giao dịch dùng các công cụ của kernel;
-`crates/kernel/tests/money.rs` dùng đủ cả trên một bảng ví mẫu, trên cả hai database.
+`crates/kernel/tests/integration/money.rs` dùng đủ cả trên một bảng ví mẫu, trên cả hai database.
 
 - **Số tiền là `autoxide_kernel::money::Money`**: số `i64` đơn vị nhỏ nhất của loại tiền
   (cent của `USD`, đồng của `VND`) cùng một `Currency` theo ISO 4217. Không bao giờ
