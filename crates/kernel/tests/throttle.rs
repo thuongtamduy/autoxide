@@ -162,6 +162,57 @@ async fn ban_dong_thoi_khong_vuot_gioi_han() {
     .unwrap();
 }
 
+/// `take` cấp đủ khi còn, cấp phần còn lại khi thiếu, cấp 0 khi hết; cửa sổ mới cấp lại từ đầu.
+#[tokio::test]
+async fn take_cap_phan_con_lai_roi_het() {
+    TestDatabase::run(async |test| {
+        let database = database(test).await;
+        let tenant = TenantContext::default_on(database.clone());
+        let throttle = Throttle::new("demo", 10, Duration::from_secs(60)).unwrap();
+        assert_eq!(throttle.take(&tenant, "key", 4).await.unwrap().granted, 4);
+        assert_eq!(throttle.take(&tenant, "key", 4).await.unwrap().granted, 4);
+        assert_eq!(throttle.take(&tenant, "key", 4).await.unwrap().granted, 2);
+        let empty = throttle.take(&tenant, "key", 4).await.unwrap();
+        assert_eq!(empty.granted, 0);
+        assert!(empty.window_left <= Duration::from_secs(60), "{empty:?}");
+        assert!(empty.window_left > Duration::from_secs(50), "{empty:?}");
+        // Khoá khác không bị ảnh hưởng; `take` không đụng tới khoá chặn của `hit`.
+        assert_eq!(throttle.take(&tenant, "other", 4).await.unwrap().granted, 4);
+        assert!(throttle.check(&tenant, "key").await.unwrap().is_allowed());
+
+        // Cửa sổ đã qua: đếm lại.
+        let backend = database.write().get_database_backend();
+        let old = "UPDATE demo_throttle SET window_started_at = '2000-01-01 00:00:00+00:00'";
+        database.write().execute_raw(Statement::from_string(backend, old)).await.unwrap();
+        assert_eq!(throttle.take(&tenant, "key", 4).await.unwrap().granted, 4);
+    })
+    .await
+    .unwrap();
+}
+
+/// Lấy lô đồng thời từ nhiều task (như nhiều máy chủ): tổng số lượt được cấp đúng bằng `limit`.
+#[tokio::test]
+async fn take_dong_thoi_khong_vuot_limit() {
+    TestDatabase::run(async |test| {
+        let database = database(test).await;
+        let tenant = TenantContext::default_on(database.clone());
+        let throttle = Arc::new(Throttle::new("demo", 25, Duration::from_secs(60)).unwrap());
+        let tasks: Vec<_> = (0..20)
+            .map(|_| {
+                let (throttle, tenant) = (throttle.clone(), tenant.clone());
+                tokio::spawn(async move { throttle.take(&tenant, "k", 3).await })
+            })
+            .collect();
+        let mut granted = 0;
+        for task in tasks {
+            granted += task.await.unwrap().unwrap().granted;
+        }
+        assert_eq!(granted, 25);
+    })
+    .await
+    .unwrap();
+}
+
 /// Hai khách cùng một khoá: đếm riêng, khách này bị chặn không làm khách kia bị chặn.
 #[tokio::test]
 async fn moi_khach_dem_rieng() {

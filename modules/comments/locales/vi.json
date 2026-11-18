@@ -35,6 +35,7 @@
   "field:must be `true` or `false`": "phải là `true` hay `false`",
   "field:must be a user id": "phải là id của một người dùng",
   "field:must be a whole number between 0 and {replies_max}": "phải là số nguyên từ 0 đến {replies_max}",
+  "field:must be a whole number from 1 to 200": "phải là số nguyên từ 1 đến 200",
   "field:must be a whole number from {min} to {max}": "phải là số nguyên từ {min} đến {max}",
   "field:must be at most 50 characters long": "phải dài tối đa 50 ký tự",
   "field:must be at most 500 characters, on one line": "phải dài tối đa 500 ký tự, trên một dòng",

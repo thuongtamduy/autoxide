@@ -249,6 +249,8 @@ pub(crate) struct ModuleInfo {
     /// permissions, events, error codes and job kinds start with `<name>`.
     #[schema(example = "notes")]
     name: String,
+    /// One sentence about what the module does; empty when the module gives none.
+    description: String,
     /// `true` for the modules the server always installs (`kernel`, `antispam`).
     internal: bool,
     /// Place in the start order, from 0. A module starts after the modules it depends on.
@@ -265,6 +267,10 @@ pub(crate) struct ModuleInfo {
     schedules: Vec<ModuleSchedule>,
     /// MCP tools the module offers at `/mcp`.
     tools: Vec<ModuleTool>,
+    /// MCP resources (read-only documents) the module offers at `/mcp`.
+    resources: Vec<ModuleResource>,
+    /// MCP prompts (templates for common jobs) the module offers at `/mcp`.
+    prompts: Vec<ModulePrompt>,
     /// Endpoints of the module that are deprecated.
     deprecations: Vec<ModuleDeprecation>,
     /// Languages, besides English, the module's error messages are translated to.
@@ -292,6 +298,47 @@ impl ModuleInfo {
         let deprecations = module.deprecations();
         ModuleInfo {
             name: name.to_owned(),
+            description: module.description().to_owned(),
+            resources: module
+                .mcp_resources()
+                .into_iter()
+                .map(|resource| {
+                    let resource = resource.qualify(name);
+                    ModuleResource {
+                        uri: resource.uri().to_owned(),
+                        name: resource.name().to_owned(),
+                        description: resource.description().to_owned(),
+                        mime_type: resource.mime_type().to_owned(),
+                        permissions: resource
+                            .permission()
+                            .map(|permission| permission.name().to_owned())
+                            .into_iter()
+                            .collect(),
+                    }
+                })
+                .collect(),
+            prompts: module
+                .prompts()
+                .into_iter()
+                .map(|prompt| ModulePrompt {
+                    name: format!("{name}.{}", prompt.name()),
+                    description: prompt.description().to_owned(),
+                    arguments: prompt
+                        .arguments()
+                        .iter()
+                        .map(|argument| ModulePromptArgument {
+                            name: argument.name.to_owned(),
+                            description: argument.description.to_owned(),
+                            required: argument.required,
+                        })
+                        .collect(),
+                    tools: prompt
+                        .uses_short()
+                        .iter()
+                        .map(|tool| format!("{name}.{tool}"))
+                        .collect(),
+                })
+                .collect(),
             internal: INTERNAL.contains(&name),
             position: u32::try_from(position).unwrap_or(u32::MAX),
             permissions: module
@@ -486,6 +533,43 @@ pub(crate) struct ModuleTool {
     deprecation: Option<ModuleToolDeprecation>,
 }
 
+/// An MCP resource: a read-only document an agent reads with `resources/read`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ModuleResource {
+    /// Full URI, `autoxide://<module>/<path>`.
+    #[schema(example = "autoxide://content/guide")]
+    uri: String,
+    name: String,
+    description: String,
+    #[schema(example = "text/markdown")]
+    mime_type: String,
+    /// The caller needs this permission to see and read the resource; empty means any
+    /// signed-in caller.
+    permissions: Vec<String>,
+}
+
+/// An MCP prompt: a template for a common job, fetched with `prompts/get`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ModulePrompt {
+    /// Full prompt name, `<module>.<prompt>`.
+    #[schema(example = "content.draft_post")]
+    name: String,
+    description: String,
+    arguments: Vec<ModulePromptArgument>,
+    /// Full names of the tools the prompt leads to; only callers who may call all of them see
+    /// the prompt.
+    tools: Vec<String>,
+}
+
+/// An argument of an MCP prompt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ModulePromptArgument {
+    #[schema(example = "topic")]
+    name: String,
+    description: String,
+    required: bool,
+}
+
 /// A deprecated MCP tool.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub(crate) struct ModuleToolDeprecation {
@@ -617,6 +701,28 @@ pub(crate) struct ModuleNameInput {
     /// Module name, e.g. `notes`.
     #[validate(length(min = 1, max = 64))]
     name: String,
+}
+
+/// Resource MCP của sổ: `autoxide://kernel/modules`, cùng nội dung với `GET /kernel/modules`.
+pub(crate) fn resources(state: CatalogState) -> Vec<crate::mcp::McpResource> {
+    vec![
+        crate::mcp::McpResource::new(
+            "modules",
+            "Installed modules",
+            "Every module installed in this server, in start order, with what each declares: \
+             permissions, events, MCP tools, resources and prompts. The same list as \
+             `GET /api/v1/kernel/modules`.",
+            "application/json",
+            move |_tenant, _principal| {
+                let catalog = state.catalog.clone();
+                async move {
+                    let modules = catalog.list()?;
+                    serde_json::to_string_pretty(&Data { data: modules }).map_err(Error::internal)
+                }
+            },
+        )
+        .requires(MODULES_READ),
+    ]
 }
 
 /// Tool MCP của sổ — gọi đúng các hàm REST dùng.

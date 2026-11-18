@@ -260,6 +260,12 @@ impl Module for KernelModule {
             Box::new(crate::ops::pins::CreatePins),
             // Nhật ký request theo khách (bước 52 mục 1).
             Box::new(crate::ops::request_log::CreateRequestLog),
+            // Bảng đếm rate limit theo API key dùng chung mọi máy chủ (bước 40 P6, D-375).
+            crate::throttle::throttle_migration("m0032_create_throttle", NAME),
+            crate::tenancy::migration::adopt(
+                "m0033_tenancy_throttle",
+                vec![crate::throttle::tenant_table(NAME)],
+            ),
         ]
     }
 
@@ -523,6 +529,15 @@ impl Module for KernelModule {
         self.flags.get().map_or_else(Vec::new, |flags| {
             vec![crate::event::Subscription::new(crate::privacy::USER_DELETED, flags)]
         })
+    }
+
+    fn description(&self) -> &'static str {
+        "The core: tenants and their databases, domains, settings, the module catalog, \
+         navigation, background jobs and the shared tools of every module."
+    }
+
+    fn mcp_resources(&self) -> Vec<crate::mcp::McpResource> {
+        self.catalog_state().map_or_else(Vec::new, module_catalog::resources)
     }
 
     fn tools(&self) -> Vec<crate::mcp::Tool> {

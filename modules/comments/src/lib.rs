@@ -12,6 +12,7 @@ mod config;
 mod entity;
 mod events;
 mod http;
+mod mcp;
 mod migration;
 mod moderation;
 mod notify;
@@ -239,6 +240,19 @@ impl Module for CommentsModule {
 
     fn tools(&self) -> Vec<Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    fn mcp_resources(&self) -> Vec<autoxide_kernel::mcp::McpResource> {
+        mcp::resources()
+    }
+
+    fn prompts(&self) -> Vec<autoxide_kernel::mcp::Prompt> {
+        mcp::prompts()
+    }
+
+    fn description(&self) -> &'static str {
+        "Comments and questions on any record (posts, products…), with threads, moderation, \
+         reports, bans and answers."
     }
 }
 

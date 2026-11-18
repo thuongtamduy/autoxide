@@ -32,13 +32,36 @@ pub fn run() -> ExitCode {
 /// object tự sắp (`serde_json` của workspace không bật `preserve_order`).
 pub async fn render(settings: Settings) -> Result<String, String> {
     let runtime = runtime::start(settings, runtime::Migrations::Ignore).await?;
-    let tools = runtime.modules.tools().map_err(|error| error.to_string());
+    let declared = runtime.modules.tools().and_then(|tools| {
+        Ok((tools, runtime.modules.mcp_resources()?, runtime.modules.prompts()?))
+    });
     runtime.database.close().await.map_err(|error| format!("database: {error}"))?;
-    let mut tools = tools?;
+    let (mut tools, mut resources, mut prompts) = declared.map_err(|error| error.to_string())?;
     tools.sort_by(|a, b| a.name().cmp(b.name()));
+    resources.sort_by(|a, b| a.uri().cmp(b.uri()));
+    prompts.sort_by(|a, b| a.name().cmp(b.name()));
+    // Resource và prompt (bước 40 P2): hai resource của kernel (`llms.txt`, `openapi.json`) do lớp
+    // HTTP thêm, không nằm ở đây.
     let manifest = json!({
         "manifest_version": 1,
         "tools": tools.iter().map(describe).collect::<Vec<Value>>(),
+        "resources": resources.iter().map(|resource| json!({
+            "uri": resource.uri(),
+            "name": resource.name(),
+            "description": resource.description(),
+            "mime_type": resource.mime_type(),
+            "permissions": resource.permission().map(|permission| permission.name()).into_iter().collect::<Vec<_>>(),
+        })).collect::<Vec<Value>>(),
+        "prompts": prompts.iter().map(|prompt| json!({
+            "name": prompt.name(),
+            "description": prompt.description(),
+            "arguments": prompt.arguments().iter().map(|argument| json!({
+                "name": argument.name,
+                "description": argument.description,
+                "required": argument.required,
+            })).collect::<Vec<Value>>(),
+            "tools": prompt.tools(),
+        })).collect::<Vec<Value>>(),
     });
     let mut document = serde_json::to_string_pretty(&manifest)
         .map_err(|error| format!("cannot serialize the MCP tool manifest: {error}"))?;

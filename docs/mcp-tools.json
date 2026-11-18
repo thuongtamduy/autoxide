@@ -1,5 +1,84 @@
 {
   "manifest_version": 1,
+  "prompts": [
+    {
+      "arguments": [
+        {
+          "description": "How many pending comments to handle, 1 to 200. Defaults to 20.",
+          "name": "limit",
+          "required": false
+        }
+      ],
+      "description": "Go through the comments waiting for moderation and approve, reject or mark each as spam, leaving unclear ones to a person.",
+      "name": "comments.moderate_queue",
+      "tools": [
+        "comments.queue",
+        "comments.moderate"
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "description": "What the post is about.",
+          "name": "topic",
+          "required": true
+        },
+        {
+          "description": "Language of the post, a BCP 47 code such as `vi` or `en`. Defaults to the site's default language.",
+          "name": "locale",
+          "required": false
+        },
+        {
+          "description": "Who the post is for, e.g. `first-time visitors`.",
+          "name": "audience",
+          "required": false
+        }
+      ],
+      "description": "Write a draft post about a topic and save it as a draft for a person to review. It never publishes.",
+      "name": "content.draft_post",
+      "tools": [
+        "content.create_draft"
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "description": "How an agent moderates comments: the statuses, the order of tools to call, and when to approve, reject, mark as spam or leave a comment to a person.",
+      "mime_type": "text/markdown",
+      "name": "Moderating comments",
+      "permissions": [
+        "comments.moderate"
+      ],
+      "uri": "autoxide://comments/guide"
+    },
+    {
+      "description": "How an agent writes posts and pages: the draft and published versions, the body format, the order of tools to call, and what to leave to people (publishing).",
+      "mime_type": "text/markdown",
+      "name": "Writing posts and pages",
+      "permissions": [
+        "content.read"
+      ],
+      "uri": "autoxide://content/guide"
+    },
+    {
+      "description": "JSON Schema of a post or page as the tools and the REST API return it.",
+      "mime_type": "application/schema+json",
+      "name": "EntryResponse",
+      "permissions": [
+        "content.read"
+      ],
+      "uri": "autoxide://content/schema/entry"
+    },
+    {
+      "description": "Every module installed in this server, in start order, with what each declares: permissions, events, MCP tools, resources and prompts. The same list as `GET /api/v1/kernel/modules`.",
+      "mime_type": "application/json",
+      "name": "Installed modules",
+      "permissions": [
+        "kernel.modules.read"
+      ],
+      "uri": "autoxide://kernel/modules"
+    }
+  ],
   "tools": [
     {
       "annotations": {

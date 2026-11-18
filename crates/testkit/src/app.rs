@@ -461,6 +461,14 @@ impl<'a> TestAppBuilder<'a> {
             .deprecations(modules.deprecations())
             .body_limits(modules.body_limits())
             .tools(modules.tools().map_err(|e| fail("tools", e))?)
+            .resources(modules.mcp_resources().map_err(|e| fail("resources", e))?)
+            .prompts(modules.prompts().map_err(|e| fail("prompts", e))?)
+            .modules(modules.descriptions())
+            .public_url(
+                modules
+                    .api::<autoxide_kernel::public_url::PublicUrl>()
+                    .and_then(|url| url.base().ok().map(str::to_owned)),
+            )
             .entitlements(modules.entitlements())
             .translations(modules.translations().clone());
         if let Some(registry) = modules.tenancy() {

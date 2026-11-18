@@ -11,6 +11,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 40, rate limits on several servers: `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` shares the limit per API key between
+  every server through the database (`kernel_throttle`, key per tenant and API key), taking requests in lots of
+  max(1, burst / 4), so a key gets at most one lot per server more than its limit each minute. `memory` stays the
+  default: measured, `database` costs 1–11% requests per second with one busy key (`docs/BENCHMARKS.md`). `autoxide
+  doctor` warns about `database` with SQLite. For module authors: `Throttle::take` takes up to n hits in one statement.
+- Step 40, MCP: the endpoint `/mcp` also serves **resources** (`resources/list`, `resources/read`) and **prompts**
+  (`prompts/list`, `prompts/get`), filtered by permission like tools; one the caller may not use answers like one that
+  does not exist. Resources: `autoxide://kernel/llms.txt`, `autoxide://kernel/openapi.json`, `autoxide://kernel/modules`
+  (`kernel.modules.read`), `autoxide://content/guide` and `autoxide://content/schema/entry` (`content.read`),
+  `autoxide://comments/guide` (`comments.moderate`). Prompts: `content.draft_post` (writes a draft, never publishes) and
+  `comments.moderate_queue`. `GET /llms.txt` (public, llmstxt.org format) tells agents where the OpenAPI document and
+  `/mcp` are, how to authenticate, the conventions and the installed modules; it is generated from the code at start.
+  The module catalog gains `description`, `resources` and `prompts`; `docs/mcp-tools.json` lists resources and prompts.
+  For module authors: `Module::{mcp_resources, prompts, description}` (empty by default), `McpResource`
+  (`text`, `schema::<T>`, `new`), `Prompt`, `PromptArgument`, `PromptArguments::fenced`.
 - Step 51 P19: list exports take `cf.<key>` columns for the tenant's active custom fields (by default every one is
   exported); custom fields of visibility `public` on posts and pages are copied into the published version and returned
   by the public reads (`custom_fields`); the plan limit `kernel.custom_fields` counts active fields (deleting one gives its

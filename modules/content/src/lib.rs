@@ -20,6 +20,7 @@ mod events;
 mod export;
 mod find;
 mod http;
+mod mcp;
 mod migration;
 mod permissions;
 mod privacy;
@@ -287,6 +288,19 @@ impl Module for ContentModule {
 
     fn tools(&self) -> Vec<Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    fn mcp_resources(&self) -> Vec<autoxide_kernel::mcp::McpResource> {
+        mcp::resources()
+    }
+
+    fn prompts(&self) -> Vec<autoxide_kernel::mcp::Prompt> {
+        mcp::prompts()
+    }
+
+    fn description(&self) -> &'static str {
+        "Posts and pages of a website in several languages: drafts, revisions, scheduling, \
+         categories, tags, authors and redirects."
     }
 }
 

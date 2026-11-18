@@ -255,3 +255,40 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `webhooks.redeliver` | `webhooks.manage` | writes |
 
 <!-- tools:end -->
+
+## 4. Resources and prompts
+
+Besides tools, `/mcp` offers **resources** (read-only documents: `resources/list`, `resources/read`) and **prompts** (templates for common jobs: `prompts/list`, `prompts/get`). Both follow permissions like tools: a resource is listed only to callers with its permission, and a prompt only to callers who may call every tool it leads to. A resource or prompt the caller may not use answers exactly like one that does not exist.
+
+Every signed-in caller can read `autoxide://kernel/llms.txt` (the same text as `/llms.txt`) and `autoxide://kernel/openapi.json` (the REST contract). Prompts never call anything by themselves: they return messages that tell the model which tools to call, and the user's arguments come inside tags such as `<topic>…</topic>`, marked as data.
+
+The resources and prompts of this version (`docs/mcp-tools.json` lists them too):
+
+<!-- resources:start -->
+
+| Resource | Permission | Type |
+|---|---|---|
+| `autoxide://comments/guide` | `comments.moderate` | text/markdown |
+| `autoxide://content/guide` | `content.read` | text/markdown |
+| `autoxide://content/schema/entry` | `content.read` | application/schema+json |
+| `autoxide://kernel/modules` | `kernel.modules.read` | application/json |
+
+<!-- resources:end -->
+
+<!-- prompts:start -->
+
+| Prompt | Arguments | Leads to |
+|---|---|---|
+| `comments.moderate_queue` | `limit` | `comments.queue`, `comments.moderate` |
+| `content.draft_post` | `topic` (required), `locale`, `audience` | `content.create_draft` |
+
+<!-- prompts:end -->
+
+## 5. Let the agent find its way: `/llms.txt`
+
+`/llms.txt` is a public page in the [llmstxt.org](https://llmstxt.org) format: where the OpenAPI document and `/mcp` are, how to authenticate, the conventions every endpoint follows, the installed modules and the MCP prompts and resources. It is generated from the code when the server starts, so it always matches this version. Links are absolute when `AUTOXIDE_HTTP_PUBLIC_URL` is set.
+
+<!-- example: llms-txt -->
+```bash
+curl -sS "$API/llms.txt"
+```

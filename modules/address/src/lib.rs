@@ -40,6 +40,11 @@ impl Module for AddressModule {
         "address"
     }
 
+    fn description(&self) -> &'static str {
+        "Administrative units of Vietnam (provinces and communes after the 2025 merger) and \
+         address checks, shared by every tenant."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true

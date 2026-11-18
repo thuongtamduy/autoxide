@@ -33,6 +33,10 @@ impl Module for IdempotencyModule {
         "idempotency"
     }
 
+    fn description(&self) -> &'static str {
+        "Storage of `Idempotency-Key` results, so retried writes run once."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true

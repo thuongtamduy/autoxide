@@ -60,6 +60,11 @@ impl Module for InvoicesModule {
         "invoices"
     }
 
+    fn description(&self) -> &'static str {
+        "Accounting documents and e-invoices: drafts, numbered issue, adjustment, replacement \
+         and cancellation."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true

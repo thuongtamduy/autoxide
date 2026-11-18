@@ -61,6 +61,10 @@ impl Module for FilesModule {
         "files"
     }
 
+    fn description(&self) -> &'static str {
+        "File storage for every module, on disk or on S3-compatible storage."
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
         vec![service::STORAGE_LIMIT]

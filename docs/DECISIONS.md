@@ -9167,3 +9167,60 @@ liệu cá nhân.
 5. **Gắn nhãn hàng loạt:** endpoint riêng `POST /kernel/tags/{id}/apply {kind, add, remove}` (tối đa 500, một transaction, một
    event mỗi bản ghi đổi) thay vì thêm tham số cho `BulkAction`: gắn nhãn dùng chung mọi loại bản ghi, không phải việc của từng
    module; chọn theo bộ lọc thì lấy ID bằng `dry_run` của thao tác hàng loạt.
+
+## D-374 · MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18 — agent quyết
+
+1. **Hai hàm mới của `Module`, mặc định rỗng (D-038):** `mcp_resources()` → `McpResource`, `prompts()` → `Prompt`, cùng
+   `description()` (một câu tiếng Anh, mặc định `""`). Tên `McpResource` để không lẫn với `autoxide_kernel::resource` (sổ loại
+   bản ghi của D-123). Kernel đặt URI `autoxide://<module>/<path>` và tên prompt `<module>.<tên>`; `Modules` kiểm lúc khởi động
+   như tool: tên / path đúng dạng, không trùng, permission có người khai, `uses` trỏ tới tool có thật của cùng module, mô tả
+   không có chữ chưa dịch. Như tool (D-245), resource phải `requires(…)` hoặc `for_any_signed_in()`; prompt phải có `uses` hoặc
+   `for_any_signed_in()` — thiếu là lỗi khởi động.
+2. **Quyền:** resource theo permission của nó; prompt hiện với người gọi được **mọi** tool của `uses` — không lộ việc người gọi
+   không làm được; cả hai bị ẩn khi gói của khách không có module (như tool, bước 35). `resources/read` / `prompts/get` với URI /
+   tên không có, không được dùng hay module bị gói tắt trả **cùng một** lỗi `invalid_params` ("Unknown resource … call
+   `resources/list`"). Lỗi khác (đối số thiếu / lạ, giá trị sai) là lỗi giao thức `invalid_params` với `data` cùng hình dạng
+   Problem (`code`, `message` đã dịch, `errors`); MCP không có "kết quả lỗi" cho resource / prompt như `isError` của tool.
+3. **Đối số là dữ liệu (D-109):** `PromptArguments::fenced` đặt giá trị trong `<tên>…</tên>` và thay `<` `>` của giá trị bằng `‹`
+   `›` để giá trị không tự đóng khối; mẫu nói rõ phần trong thẻ không phải chỉ dẫn. Prompt không gọi gì — chỉ trả tin nhắn; mọi
+   việc vẫn qua tool với permission của người gọi (luật kiến trúc 8). `content.draft_post` dặn không đăng.
+4. **Resource có sẵn:** `autoxide://kernel/llms.txt` và `autoxide://kernel/openapi.json` (ai đăng nhập cũng đọc, cùng nội dung với
+   hai trang công khai, dựng trong `http::build` vì cần tài liệu đã ghép), `autoxide://kernel/modules` (`kernel.modules.read`),
+   `autoxide://content/guide`, `autoxide://content/schema/entry` (= `EntryResponse`), `autoxide://comments/guide`. Hướng dẫn viết
+   trong `mcp_guide.md` cạnh code (`include_str!`). Schema dùng `McpResource::schema::<T>`: schema của `T` với kiểu con nhúng
+   trong `$defs` (`$ref` đổi `#/components/schemas/X` → `#/$defs/X`) để agent đọc một mình là đủ; test so với `openapi.json`.
+5. **`/llms.txt`** (llmstxt.org): sinh một lần lúc dựng router từ module đã đăng ký, `description()`, resource và prompt, đường
+   dẫn OpenAPI / MCP / trang tài liệu (chỉ khi bật); link tuyệt đối khi có `AUTOXIDE_HTTP_PUBLIC_URL`. Công khai,
+   `Cache-Control: public, max-age=300`. Liệt kê **mọi** resource / prompt kèm permission (không chỉ cái không cần quyền): đó là
+   thông tin về code, cùng mức với `openapi.json` và `docs/mcp-tools.json` vốn công khai. Liệt kê module của **bản cài**, không
+   lọc theo gói của khách (đặc tả để TODO tới sau bước 35): trang công khai không biết người gọi, lọc theo khách thì phải đọc
+   database mỗi request; endpoint / tool của module gói không có vẫn trả `module_not_enabled`, `tools/list` vẫn lọc. Chưa làm
+   `/llms-full.txt` (theo khuyến nghị của đặc tả) — hướng dẫn cho agent đã là resource MCP.
+6. `docs/mcp-tools.json` thêm `resources` và `prompts` (khoá mới, `api-diff` chỉ so `tools`); `docs/guides/mcp.md` có bảng
+   resource / prompt, test giữ khớp code như bảng tool.
+
+## D-375 · Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18 — agent quyết
+
+1. **`AUTOXIDE_HTTP_RATE_LIMIT_STORE` = `memory` (mặc định) | `database`.** `memory` giữ GCRA hiện có, mỗi tiến trình đếm
+   riêng — đúng hoàn toàn với SQLite (một tiến trình máy chủ). `database` đếm chung qua bảng `kernel_throttle`
+   (`throttle_migration` + nâng theo khách, migration `m0032` / `m0033` của kernel), trên database của khách mặc định để mọi
+   máy chủ thấy cùng số đếm; khoá `api_key:<tenant_id>:<api_key_id>` — khách A dùng hết lượt không chặn khách B.
+2. **Theo lô:** `Throttle::take(tenant, key, n)` — một câu `INSERT … ON CONFLICT DO UPDATE … RETURNING` cộng thẳng `n` vào số
+   đếm của cửa sổ (cửa sổ cũ đã qua thì bắt đầu lại), lượt được cấp = `min(n, limit − (count − n))`; database xếp hàng các
+   lượt đồng thời nên tổng lượt cấp trong một cửa sổ không vượt `limit` (test đồng thời trên cả hai database). Mỗi tiến
+   trình lấy lô `k = max(1, burst / 4)` cho một key rồi tiêu dần trong bộ nhớ (mỗi key một `tokio::Mutex`: request cùng key
+   chờ một lần hỏi thay vì cùng hỏi); cấp 0 thì chặn tới hết cửa sổ mà không hỏi lại. Cửa sổ cố định 60 giây, giới hạn
+   `max(per_minute, burst)`; sai số tối đa `k × số máy chủ` mỗi cửa sổ (ghi trong mô tả biến). Cửa sổ cố định cho phép dồn ở
+   ranh giới hai cửa sổ — chấp nhận, đây là chống lạm dụng chứ không phải tính tiền.
+3. **Database lỗi thì cho qua** (log `warn`, số đo `http_rate_limit_store_errors_total`): bộ giới hạn không làm sự cố
+   database nặng thêm. Dọn dòng cũ: mỗi tiến trình tối đa mỗi giờ một lần, chạy nền ngay trong bộ đếm (`Throttle::purge`),
+   không thêm job theo lịch — như nhật ký request (D-370); kernel chưa có job dọn chung như đặc tả giả định.
+4. **Giới hạn theo địa chỉ IP vẫn đếm trong bộ nhớ** (lệch đặc tả "tuỳ chọn theo IP"): nó chạy trước xác thực cho mọi request
+   kể cả ẩn danh — đếm trong database thì kẻ lạ gửi từ nhiều địa chỉ là ép máy chủ ghi database, đúng thứ bộ giới hạn phải chặn.
+   Chặn đoán mật khẩu đã đếm chung qua `throttle` (D-116). Giá trị theo khách / theo gói cho giới hạn API key: chưa làm — cần
+   một nơi khai cấu hình theo khách cho lớp HTTP (lớp chạy trước khi biết khách); để khi gói (bước 35) cần bán theo hạn mức
+   request.
+5. **Số đo** (`docs/BENCHMARKS.md`, 18/11/2026, một key, 64 kết nối, lô 7): `database` so `memory` — SQLite `GET /auth/me`
+   −1% req/s, p95 +4%; SQLite MCP −11%, p95 +22%; PostgreSQL `GET /auth/me` −8%, p95 +9%; PostgreSQL MCP −4%, p95 +3%. Một bài
+   vượt ngưỡng 10% của đặc tả → **giữ `memory` làm mặc định**. `autoxide doctor` cảnh báo khi `database` + SQLite.
+6. `scripts/loadtest.sh` thêm `LOADTEST_RATE_LIMIT_STORE` / `LOADTEST_RATE_LIMIT_BURST` / `LOADTEST_ONLY=api_key` để đo lại.

@@ -112,6 +112,11 @@ impl Module for ComplianceModule {
         "compliance"
     }
 
+    fn description(&self) -> &'static str {
+        "Vietnamese compliance basics: identity checks, legal documents and acceptances, \
+         website registration, personal data requests and incidents."
+    }
+
     // Tuân thủ pháp luật không phải tính năng bán theo gói (Luật số hai của CLAUDE.md).
     fn always_enabled(&self) -> bool {
         true

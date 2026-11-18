@@ -37,12 +37,14 @@ mod extract;
 mod health;
 mod idempotency;
 mod language;
+mod llms;
 mod log;
 mod mcp;
 mod metrics;
 mod openapi;
 mod problem;
 mod rate_limit;
+mod rate_limit_store;
 mod request_id;
 mod security_headers;
 mod server;
@@ -77,6 +79,7 @@ pub use disposition::{Disposition, content_disposition};
 pub use extract::ValidJson;
 pub(crate) use extract::{contains_nul_escape, nul_refused, value_contains_nul};
 pub use health::{Draining, Health, health_routes};
+pub use llms::LLMS_PATH;
 pub use mcp::MCP_PATH;
 pub use metrics::metrics_routes;
 pub(crate) use openapi::untranslated_text;
@@ -122,6 +125,15 @@ pub struct Extras {
     /// Tool MCP của các module, tên đầy đủ (`Modules::tools`). Endpoint `/mcp` có mặt
     /// khi có `authenticator`.
     pub tools: Vec<crate::mcp::Tool>,
+    /// Resource MCP của các module, URI đầy đủ (`Modules::mcp_resources`). Kernel thêm
+    /// `autoxide://kernel/llms.txt` và `autoxide://kernel/openapi.json`.
+    pub resources: Vec<crate::mcp::McpResource>,
+    /// Prompt MCP của các module, tên đầy đủ (`Modules::prompts`).
+    pub prompts: Vec<crate::mcp::Prompt>,
+    /// Tên và mô tả của các module (`Modules::descriptions`), cho `/llms.txt`.
+    pub modules: Vec<(&'static str, &'static str)>,
+    /// URL công khai của API (`AUTOXIDE_HTTP_PUBLIC_URL`): link của `/llms.txt` tuyệt đối khi có.
+    pub public_url: Option<String>,
     /// Bản dịch thông báo lỗi (mặc định: chỉ bản dịch của kernel thì dùng
     /// `Translations::new(Vec::new())`; rỗng thì mọi lỗi bằng tiếng Anh).
     pub translations: Translations,
@@ -177,6 +189,30 @@ impl Extras {
         self
     }
 
+    /// Sets the MCP resources of the modules, with full URIs.
+    pub fn resources(mut self, resources: Vec<crate::mcp::McpResource>) -> Self {
+        self.resources = resources;
+        self
+    }
+
+    /// Sets the MCP prompts of the modules, with full names.
+    pub fn prompts(mut self, prompts: Vec<crate::mcp::Prompt>) -> Self {
+        self.prompts = prompts;
+        self
+    }
+
+    /// Sets the names and one-line descriptions of the modules, for `/llms.txt`.
+    pub fn modules(mut self, modules: Vec<(&'static str, &'static str)>) -> Self {
+        self.modules = modules;
+        self
+    }
+
+    /// Sets the public address of the API (`AUTOXIDE_HTTP_PUBLIC_URL`).
+    pub fn public_url(mut self, public_url: Option<String>) -> Self {
+        self.public_url = public_url;
+        self
+    }
+
     /// Sets the translations of error messages.
     pub fn translations(mut self, translations: Translations) -> Self {
         self.translations = translations;
@@ -188,8 +224,29 @@ pub fn build(
     config: &HttpConfig,
     root: OpenApiRouter,
     modules: Vec<(&'static str, OpenApiRouter)>,
-    extras: Extras,
+    mut extras: Extras,
 ) -> Api {
+    // `/llms.txt` và hai resource của kernel (bước 40 P2): dựng một lần từ khai báo của module.
+    let mut resources = std::mem::take(&mut extras.resources);
+    let openapi_slot: Arc<std::sync::OnceLock<String>> = Arc::default();
+    let llms_slot: Arc<std::sync::OnceLock<String>> = Arc::default();
+    resources.extend(kernel_resources(&openapi_slot, &llms_slot));
+    let llms_text = llms::render(&llms::LlmsInputs {
+        base: extras.public_url.as_deref().unwrap_or_default(),
+        api_docs: config.api_docs,
+        mcp: extras.authenticator.is_some(),
+        health: root.get_openapi().paths.paths.contains_key("/health/live"),
+        catalog: modules.iter().any(|(name, routes)| {
+            *name == crate::builtin::NAME
+                && routes.get_openapi().paths.paths.contains_key("/modules/{name}")
+        }),
+        modules: &extras.modules,
+        resources: &resources,
+        prompts: &extras.prompts,
+    });
+    let _ = llms_slot.set(llms_text.clone());
+    let root = root.merge(llms::routes(llms_text));
+
     let schema_conflicts = openapi::schema_conflicts(
         std::iter::once(("kernel", root.get_openapi()))
             .chain(modules.iter().map(|(name, routes)| (*name, routes.get_openapi()))),
@@ -227,7 +284,9 @@ pub fn build(
 
     // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi. `Bytes` clone
     // chỉ tăng bộ đếm tham chiếu, không chép cả tài liệu (hơn 1 MB) mỗi request (D-158).
-    let document = axum::body::Bytes::from(openapi.to_json().unwrap_or_default());
+    let json = openapi.to_json().unwrap_or_default();
+    let _ = openapi_slot.set(json.clone());
+    let document = axum::body::Bytes::from(json);
     let mut router = router.route(
         OPENAPI_PATH,
         axum::routing::get(move || {
@@ -241,17 +300,26 @@ pub fn build(
 
     // REST và MCP xác thực qua bộ có giới hạn theo API key; lớp idempotency giữ bộ gốc (nó chỉ
     // xác thực để biết khoá thuộc về ai, không được đếm thêm một lần).
-    let limited = extras
-        .authenticator
-        .clone()
-        .map(|inner| rate_limit::ApiKeyLimited::wrap(inner, config.api_key_rate_limit));
+    let limited = extras.authenticator.clone().map(|inner| {
+        // Đếm chung qua database (bước 40 P6) cần sổ database; không có thì đếm trong bộ nhớ.
+        let shared = match config.rate_limit_store {
+            crate::config::RateLimitStore::Database => extras.tenancy.clone(),
+            _ => None,
+        };
+        rate_limit::ApiKeyLimited::wrap_in(inner, config.api_key_rate_limit, shared)
+    });
     let translations = Arc::new(extras.translations);
     // Nhật ký request theo khách (bước 52): chỉ khi có sổ database và hạn lưu > 0.
     let request_log = extras.tenancy.as_ref().and_then(|registry| {
         crate::ops::request_log::RequestLog::start(registry.clone(), config.request_log_days)
     });
+    let catalog = mcp::McpCatalog {
+        tools: extras.tools,
+        resources,
+        prompts: std::mem::take(&mut extras.prompts),
+    };
     if let Some(mcp) = mcp::router(
-        extras.tools,
+        catalog,
         translations.clone(),
         limited.clone(),
         &config.cors_origins,
@@ -344,6 +412,45 @@ pub fn build(
         .layer(middleware::from_fn(request_id::drop_untrusted));
 
     Api { router, openapi, schema_conflicts }
+}
+
+/// Hai resource của kernel: `/llms.txt` và tài liệu OpenAPI, ai đăng nhập cũng đọc được (cùng nội
+/// dung như hai trang công khai). Nội dung điền vào ô sau khi dựng xong.
+fn kernel_resources(
+    openapi: &Arc<std::sync::OnceLock<String>>,
+    llms: &Arc<std::sync::OnceLock<String>>,
+) -> Vec<crate::mcp::McpResource> {
+    let read = |slot: &Arc<std::sync::OnceLock<String>>| {
+        let slot = slot.clone();
+        move |_: crate::tenancy::TenantContext, _: crate::access::Principal| {
+            let text = slot.get().cloned();
+            async move { text.ok_or_else(|| Error::internal("the document is not built yet")) }
+        }
+    };
+    vec![
+        crate::mcp::McpResource::new(
+            "llms.txt",
+            "llms.txt",
+            "Overview of this server for agents: where the REST and MCP contracts are, how to \
+             authenticate, the conventions, the installed modules, prompts and resources. The \
+             same text as `/llms.txt`.",
+            "text/markdown",
+            read(llms),
+        )
+        .for_any_signed_in()
+        .qualify(crate::builtin::NAME),
+        crate::mcp::McpResource::new(
+            "openapi.json",
+            "OpenAPI document",
+            "The full REST contract (OpenAPI 3.1): every endpoint, its parameters, responses, \
+             error codes and the permission it needs. The same document as \
+             `/api/v1/openapi.json`.",
+            "application/json",
+            read(openapi),
+        )
+        .for_any_signed_in()
+        .qualify(crate::builtin::NAME),
+    ]
 }
 
 /// Từ chối request có ký tự NUL (`%00`) trong đường dẫn hay query: giá trị đó tới database thì

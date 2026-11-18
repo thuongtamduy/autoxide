@@ -639,6 +639,12 @@ API and the background work separately, run some processes with
 `AUTOXIDE_PROCESS_ROLE=api` and at least one with `worker`. SQLite allows one server
 process.
 
+Limits are counted per process by default: with N servers a client address or an API key gets
+up to N times its limit. To share the limit per API key between servers, set
+`AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`: every server counts in the database, taking requests
+in small lots (a quarter of `AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST`), so a key gets at most one
+lot per server more than its limit each minute. The limit per address stays per process.
+
 ### Updating without dropping requests
 
 When a server is told to stop (`SIGTERM`, as Docker, systemd and Kubernetes send), it

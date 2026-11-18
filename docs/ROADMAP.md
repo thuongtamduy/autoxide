@@ -93,14 +93,18 @@ cả SQLite và Postgres.
       gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
       `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
       máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình)
-- [ ] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
+- [x] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
       việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
       mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
-      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch
-- [ ] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
+      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch — `Module::{mcp_resources, prompts,
+      description}`, lọc theo permission như tool; resource của kernel / `content` / `comments`, prompt
+      `content.draft_post`, `comments.moderate_queue`; `/llms.txt` + `autoxide://kernel/llms.txt` (D-374)
+- [x] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
       chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
       chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
-      quyết định
+      quyết định — `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (bảng `kernel_throttle`, `Throttle::take` theo
+      lô burst / 4, khoá theo khách); đo: tới −11% req/s, +22% p95 → `memory` vẫn mặc định; IP vẫn trong
+      bộ nhớ (D-375)
 - [ ] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
       `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
       module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục

@@ -53,6 +53,10 @@ impl Module for AuditModule {
         "audit"
     }
 
+    fn description(&self) -> &'static str {
+        "Append-only audit log: who changed what, on which record, when, before and after."
+    }
+
     // Audit log nối chuỗi băm (D-183) nên không cắt bớt từng dòng theo tuổi: giữ tới khi xoá hẳn
     // khách. Phần dữ liệu cá nhân (`before` / `after` / `details`) bị xoá khi tài khoản bị xoá.
     fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {

@@ -232,6 +232,25 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Resource MCP của module (bước 40 P2): tài liệu chỉ đọc cho agent — hướng dẫn, JSON Schema
+    /// của một loại bản ghi. Gọi sau `start`. Path khai ngắn (`guide`); kernel ghép URI
+    /// `autoxide://<module>/<path>`. Mặc định: không có.
+    fn mcp_resources(&self) -> Vec<crate::mcp::McpResource> {
+        Vec::new()
+    }
+
+    /// Prompt MCP của module (bước 40 P2): mẫu lời nhắc cho việc hay làm. Gọi sau `start`. Tên
+    /// khai ngắn (`draft_post`); kernel thêm tiền tố `<module>.`. Mặc định: không có.
+    fn prompts(&self) -> Vec<crate::mcp::Prompt> {
+        Vec::new()
+    }
+
+    /// Một câu tiếng Anh nói module làm gì, cho `/llms.txt` và sổ module (bước 40 P2). Mặc định:
+    /// rỗng.
+    fn description(&self) -> &'static str {
+        ""
+    }
+
     /// Bước kiểm bản cài đặt cho `autoxide doctor` (D-166): nơi lưu ghi được không, máy chủ
     /// ngoài có trả lời không, thiếu dữ liệu ban đầu không… Gọi sau `start`. Tên khai ngắn
     /// (`storage`); kernel thêm tiền tố `<module>.`. Bước kiểm chỉ đọc, hoặc dọn thứ đã ghi thử.
