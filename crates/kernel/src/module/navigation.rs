@@ -58,6 +58,35 @@ impl NavGroup {
     }
 }
 
+/// Chỗ của một mục trên điện thoại (bước 52, D-232): giao diện vẽ thanh đáy từ mục `Primary`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MobilePlacement {
+    /// Thanh đáy; mỗi câu trả lời giữ tối đa 5 mục, phần dư thành `Secondary`.
+    Primary,
+    /// Menu "Thêm".
+    #[default]
+    Secondary,
+    /// Không hiện trên điện thoại.
+    Hidden,
+}
+
+impl MobilePlacement {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MobilePlacement::Primary => "primary",
+            MobilePlacement::Secondary => "secondary",
+            MobilePlacement::Hidden => "hidden",
+        }
+    }
+}
+
+/// Gợi ý cho điện thoại của một mục: chỗ và thứ tự trong chỗ đó.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MobileHint {
+    pub placement: MobilePlacement,
+    pub order: u16,
+}
+
 /// Một mục menu (một màn) trong một nhóm.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -75,6 +104,8 @@ pub struct NavItem {
     /// Nguồn số đếm của hộp việc (P2) để hiện cạnh tên mục.
     pub counter: Option<&'static str>,
     pub order: u16,
+    /// Gợi ý cho điện thoại; không khai thì `Secondary` với `order` của mục.
+    pub mobile: MobileHint,
 }
 
 impl NavItem {
@@ -88,6 +119,7 @@ impl NavItem {
             feature: None,
             counter: None,
             order,
+            mobile: MobileHint { placement: MobilePlacement::Secondary, order },
         }
     }
 
@@ -109,6 +141,12 @@ impl NavItem {
 
     pub fn section(mut self, section: &'static str) -> Self {
         self.section = Some(section);
+        self
+    }
+
+    /// Chỗ của mục trên điện thoại và thứ tự trong chỗ đó.
+    pub fn mobile(mut self, placement: MobilePlacement, order: u16) -> Self {
+        self.mobile = MobileHint { placement, order };
         self
     }
 }

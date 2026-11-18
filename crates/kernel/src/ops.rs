@@ -17,6 +17,7 @@ pub mod metrics;
 pub(crate) mod module_catalog;
 pub(crate) mod my_permissions;
 pub(crate) mod navigation;
+pub(crate) mod pins;
 pub mod reasons;
 pub(crate) mod records;
 pub mod resolve;

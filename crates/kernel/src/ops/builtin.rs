@@ -157,14 +157,21 @@ impl KernelModule {
 
 impl Module for KernelModule {
     fn navigation(&self) -> crate::module::navigation::Navigation {
-        use crate::module::navigation::{NavGroup, NavItem, Navigation};
+        use crate::module::navigation::{MobilePlacement, NavGroup, NavItem, Navigation};
         use crate::tenancy::{PLACEMENTS_READ, TENANTS_READ};
         Navigation::default()
             .group(NavGroup::new("home", "Home", "home", 10))
             .group(NavGroup::new("settings", "Settings", "gear", 110))
             .group(NavGroup::new("platform", "Platform", "server", 200).platform())
-            .item(NavItem::new("home.dashboard", "home", "Overview", 10))
-            .item(NavItem::new("home.work", "home", "Work and activity", 20).counter("work"))
+            .item(
+                NavItem::new("home.dashboard", "home", "Overview", 10)
+                    .mobile(MobilePlacement::Primary, 10),
+            )
+            .item(
+                NavItem::new("home.work", "home", "Work and activity", 20)
+                    .counter("work")
+                    .mobile(MobilePlacement::Primary, 20),
+            )
             .item(NavItem::new("settings.general", "settings", "General", 10).permissions(&[
                 crate::ops::module_catalog::MODULES_READ,
                 crate::tenancy::SETTINGS_MANAGE,
@@ -175,7 +182,8 @@ impl Module for KernelModule {
             )
             .item(
                 NavItem::new("platform.fleet", "platform", "Databases", 40)
-                    .permissions(&[PLACEMENTS_READ]),
+                    .permissions(&[PLACEMENTS_READ])
+                    .mobile(MobilePlacement::Hidden, 40),
             )
             .item(
                 NavItem::new("platform.health", "platform", "Health", 50)
@@ -248,6 +256,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::texts::CreateTextOverrides),
             // Trường tự định nghĩa (bước 51 P19).
             Box::new(crate::ops::custom_fields::CreateCustomFields),
+            // Ghim của người dùng (bước 52 mục 4).
+            Box::new(crate::ops::pins::CreatePins),
         ]
     }
 

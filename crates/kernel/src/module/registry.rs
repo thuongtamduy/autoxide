@@ -694,6 +694,10 @@ impl Modules {
             let me = crate::user_flags::routes(flags)
                 .merge(crate::ops::my_permissions::routes(mine))
                 .merge(crate::ops::views::routes(views))
+                .merge(crate::ops::pins::routes(crate::ops::pins::PinsState {
+                    catalog: self.catalog.clone(),
+                    translations: self.translations.clone(),
+                }))
                 .merge(crate::ops::can::routes(crate::ops::can::CanState {
                     permissions: self.permissions.clone(),
                     entitlements: self.entitlements.clone(),

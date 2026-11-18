@@ -9082,3 +9082,20 @@ push.
    hỏi khi cần secret thật"); là module riêng cài `MobilePushSender`, làm khi chủ dự án cấp khoá.
 4. Đóng bước 37: mọi mục `[x]`, chuyển sang `docs/roadmap/done.md` như bước 35 / 36. Còn lại có ghi: báo cáo đã lưu (A-b10) dời sang
    bước 51 / 38 (D-367); bộ nối thật (SMS brandname, Zalo ZNS, web push VAPID, FCM / APNs, VNeID / eKYC) chờ khoá của nhà cung cấp.
+
+## D-369 · Sổ điều hướng cho điện thoại: gợi ý `mobile` trên `NavItem`, thanh đáy tối đa 5 mục (bước 52 mục 6, D-232) — 2026-11-18 — agent quyết
+
+Bối cảnh: giao diện cần biết màn nào đặt ở thanh đáy của điện thoại. Kernel không có danh sách màn viết cứng (D-200), nên module
+tự khai cùng chỗ khai mục.
+
+1. `NavItem` thêm `mobile: MobileHint { placement, order }` (`Primary` / `Secondary` / `Hidden`), đặt bằng `.mobile(…)`. Hàm dựng
+   cho mặc định `Secondary` với `order` của mục — module cũ không phải sửa (như D-038).
+2. `GET /api/v1/kernel/navigation?device=mobile` (và tool `kernel.navigation` với `device`): lọc như desktop, bỏ mục `Hidden`, mỗi
+   mục thêm `mobile`, mục trong nhóm sắp theo chỗ rồi thứ tự. Giữ 5 mục `primary` có `order` nhỏ nhất trong số mục hiện và
+   `available`; phần dư và mục `locked` thành `secondary`. Không kiểm số mục lúc khởi động: tập module bật khác nhau theo khách.
+   `device` khác `desktop` / `mobile` → 422. `device=desktop` (mặc định) trả đúng như trước, không có trường `mobile`. `ETag` tính
+   cả `device`.
+3. Màn `primary` đầu tiên: Tổng quan (10), Việc và hoạt động (20), Bài viết và trang (30), Bình luận (40), Thư viện media (50) —
+   việc hằng ngày làm được trên điện thoại (xem số liệu, xử lý việc, duyệt bài, duyệt bình luận, tải ảnh). `Hidden`: khoá API,
+   webhook, cơ sở dữ liệu của nền tảng — việc của nhà phát triển / vận hành, cần màn hình lớn. Module thương mại sau này tự khai
+   (vd đơn hàng) và đẩy mục kém hơn xuống `secondary` theo `order`.

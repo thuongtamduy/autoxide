@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 52, phone admin: navigation items carry a `mobile` hint (`NavItem::mobile`, bottom bar / "More" / hidden);
+  `GET /api/v1/kernel/navigation?device=mobile` (and the MCP tool with `device`) returns at most 5 bottom-bar items,
+  leaves out items hidden on phones and orders by placement. `device=desktop` (the default) is unchanged.
+- Step 52, pins: `/api/v1/me/pins` lets each user pin up to 20 screens or records per tenant, reorder them
+  (`PUT /api/v1/me/pins/order`) and unpin; pins are in the personal-data export and removed with the account.
 - Custom fields (step 51): modules let tenants add their own fields to a record type
   (`Module::custom_field_targets`); `/api/v1/kernel/custom-fields` defines them (`kernel.custom_fields.manage`;
   14 types, labels and help by language, required, options, ranges, default, visibility, filterable). Values live

@@ -5866,6 +5866,29 @@ export type Data_PersonalDataResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Pin = {
+  /** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
+  data: {
+    created_at: string;
+    id: string;
+    /** `navigation` (a screen) or `record`. */
+    kind: string;
+    /**
+     * The screen's label in the language of `Accept-Language`, or the label sent when pinning
+     * a record.
+     */
+    label: string;
+    /** Display order, smallest first. */
+    position: number;
+    /**
+     * The screen id from `GET /api/v1/kernel/navigation` (e.g. `content.entries`), or
+     * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
+     */
+    target: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PlanResponse = {
   /** A plan: the modules, features and limits a tenant gets, and its prices. */
   data: {
@@ -7963,6 +7986,28 @@ export type Data_Vec_PermissionResponse = {
      * a person owns (`own`). `false`: it can only be granted for the whole tenant.
      */
     scoped: boolean;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_Pin = {
+  data: {
+    created_at: string;
+    id: string;
+    /** `navigation` (a screen) or `record`. */
+    kind: string;
+    /**
+     * The screen's label in the language of `Accept-Language`, or the label sent when pinning
+     * a record.
+     */
+    label: string;
+    /** Display order, smallest first. */
+    position: number;
+    /**
+     * The screen id from `GET /api/v1/kernel/navigation` (e.g. `content.entries`), or
+     * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
+     */
+    target: string;
   }[];
 };
 
@@ -10820,6 +10865,17 @@ export type MigrationRunRequest = {
   placement?: string | null;
 };
 
+/** Where an item goes on a phone. */
+export type MobileView = {
+  /** Order within the placement, smallest first. */
+  order: number;
+  /**
+   * `primary` (bottom bar, at most 5 in the answer) or `secondary` (the "More" menu). Items a
+   * module hides on phones are left out of the answer.
+   */
+  placement: string;
+};
+
 /** A deprecated endpoint. */
 export type ModuleDeprecation = {
   method: string;
@@ -11031,6 +11087,7 @@ export type NavItemView = {
   /** Stable key of the screen, e.g. `content.entries`. */
   id: string;
   label: string;
+  mobile?: MobileView | null;
   required_feature?: string | null;
   /** Label of the sub-group in the row of tabs, when there is one. */
   section?: string | null;
@@ -14077,6 +14134,48 @@ export type PermissionResponse = {
 export type PersonalDataResponse = Record<string, unknown> & {
   /** Your profile, roles, sessions, API keys, passkeys and two-step sign-in status. */
   auth: Record<string, unknown>;
+};
+
+/** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
+export type Pin = {
+  created_at: string;
+  id: string;
+  /** `navigation` (a screen) or `record`. */
+  kind: string;
+  /**
+   * The screen's label in the language of `Accept-Language`, or the label sent when pinning
+   * a record.
+   */
+  label: string;
+  /** Display order, smallest first. */
+  position: number;
+  /**
+   * The screen id from `GET /api/v1/kernel/navigation` (e.g. `content.entries`), or
+   * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
+   */
+  target: string;
+};
+
+/** What to pin. */
+export type PinInput = {
+  /** `navigation` or `record`. */
+  kind: string;
+  /**
+   * Required for `record` (1 to 200 characters, e.g. the record's title); ignored for
+   * `navigation`, whose label comes from the navigation.
+   */
+  label?: string | null;
+  /**
+   * For `navigation`, a screen id from `GET /api/v1/kernel/navigation`; for `record`,
+   * `<record kind>:<id>`.
+   */
+  target: string;
+};
+
+/** The new order of all my pins. */
+export type PinOrder = {
+  /** Ids of every pin of the caller, in the wanted order. */
+  ids: string[];
 };
 
 /** Where tenants' data is kept: one database. Connection URLs are never shown. */
@@ -21914,11 +22013,12 @@ export interface paths {
   "/api/v1/kernel/navigation": {
     /** Get the navigation of the admin interface. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; device?: string }; };
       responses: {
         200: Data_NavigationView;
         304: void;
         401: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -23151,6 +23251,55 @@ export interface paths {
       responses: {
         200: Data_Vec_MyPermission;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/pins": {
+    /** List my pins. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_Pin;
+        401: Problem;
+        default: Problem;
+      };
+    };
+    /** Pin a screen or a record. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PinInput;
+      responses: {
+        200: Data_Pin;
+        201: Data_Pin;
+        401: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/pins/order": {
+    /** Reorder my pins. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PinOrder;
+      responses: {
+        200: Data_Vec_Pin;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/pins/{id}": {
+    /** Unpin. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
         default: Problem;
       };
     };

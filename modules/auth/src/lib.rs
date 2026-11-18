@@ -107,7 +107,10 @@ impl Module for AuthModule {
                 NavItem::new("customers.accounts", "customers", "Buyer accounts", 10)
                     .permissions(&[crate::permissions::CUSTOMERS_READ]),
             )
-            .item(NavItem::new("settings.api_keys", "settings", "API keys", 20))
+            .item(
+                NavItem::new("settings.api_keys", "settings", "API keys", 20)
+                    .mobile(autoxide_kernel::module::navigation::MobilePlacement::Hidden, 20),
+            )
     }
 
     fn name(&self) -> &'static str {

@@ -288,7 +288,8 @@ impl PersonalData for UserFlags {
         let flags: Vec<Flag> = rows.into_iter().map(Flag::from).collect();
         // View đã lưu (P7) là thiết lập giao diện của người dùng như cờ: xuất cùng chỗ.
         let views = crate::ops::views::export_user(tenant, user_id).await?;
-        Ok(json!({ "user_flags": flags, "saved_views": views }))
+        let pins = crate::ops::pins::export_user(tenant, user_id).await?;
+        Ok(json!({ "user_flags": flags, "saved_views": views, "pins": pins }))
     }
 }
 
@@ -300,6 +301,7 @@ impl EventHandler for UserFlags {
             let count = self.forget(&event.tenant, user_id).await?;
             crate::ops::views::forget_user(event.tenant.database().write(), &event.tenant, user_id)
                 .await?;
+            crate::ops::pins::forget_user(&event.tenant, user_id).await?;
             tracing::info!(user_id = %user_id, count, "interface flags of a deleted user removed");
         }
         Ok(())

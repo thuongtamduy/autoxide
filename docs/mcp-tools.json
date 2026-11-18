@@ -4717,11 +4717,18 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Get the screens of the admin interface you may use in this tenant, grouped as in the side bar: `locked` screens need a feature the plan lacks. Use it to tell a person where to go.",
+      "description": "Get the screens of the admin interface you may use in this tenant, grouped as in the side bar: `locked` screens need a feature the plan lacks. Use it to tell a person where to go; pass `device: \"mobile\"` for the phone layout.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Where the caller works.",
         "properties": {
+          "device": {
+            "description": "`desktop` (default) or `mobile`: with `mobile` each item says where it goes on a phone.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "org_id": {
             "description": "The organization unit chosen; omitted: the whole tenant.",
             "format": "uuid",

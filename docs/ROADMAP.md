@@ -242,10 +242,12 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       tool MCP với quyền người gọi, mọi lệnh ghi là bản nháp hay yêu cầu duyệt, trả kèm tool đã gọi
 - [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình hay
       dùng (`/me/pins`)
+      - [x] `/api/v1/me/pins`: ghim màn hình hay bản ghi, tối đa 20, xếp lại, dữ liệu cá nhân
 - [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực), vi
       phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
 - [ ] Quản trị trên điện thoại (D-232): gợi ý `mobile` trên sổ điều hướng (tối đa 5 mục thanh đáy); tóm tắt
       cuối ngày tự bật theo giờ của người dùng (số liệu, việc gấp, cảnh báo bất thường)
+      - [x] Gợi ý `mobile` trên `NavItem`, `GET /kernel/navigation?device=mobile`, tool MCP nhận `device` (D-369)
 
 ## Giai đoạn C — Vận hành
 

@@ -73,13 +73,14 @@ struct CommentsModule {
 
 impl Module for CommentsModule {
     fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
-        use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
+        use autoxide_kernel::module::navigation::{MobilePlacement, NavGroup, NavItem, Navigation};
         Navigation::default().group(NavGroup::new("marketing", "Marketing", "megaphone", 40)).item(
             NavItem::new("marketing.comments", "marketing", "Comments", 40)
                 .permissions(&[
                     crate::permissions::COMMENTS_READ,
                     crate::permissions::COMMENTS_MODERATE,
                 ])
+                .mobile(MobilePlacement::Primary, 40)
                 .counter("comments.pending"),
         )
     }
