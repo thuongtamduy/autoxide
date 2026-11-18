@@ -438,6 +438,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step41-catalog-design](D-20261118-step41-catalog-design.md)** `catalog`: giá chỉ thêm, thứ tự chọn bảng giá, hợp đồng `api` cho bước 42–44 — 2026-11-18
 - **[D-20261118-step41-price-rules](D-20261118-step41-price-rules.md)** `catalog`: bảng giá suy ra, làm tròn giá đẹp, đổi giá hàng loạt — 2026-11-18
 - **[D-20261118-step41-readiness](D-20261118-step41-readiness.md)** `catalog`: thuộc tính bắt buộc, hàng cấm / có điều kiện và `readiness` — 2026-11-18
+- **[D-20261118-step42-order-events](D-20261118-step42-order-events.md)** `inventory` nhận event của `orders` qua `Subscription::optional`, lỗi nghiệp vụ chỉ ghi log — 2026-11-18
 - **[D-20261118-step42-reservations](D-20261118-step42-reservations.md)** Giữ chỗ tồn của `inventory`: chọn kho bằng số đọc rồi `adjust` làm trọng tài, khoá dòng chỗ giữ cho mọi chuyển trạng thái — 2026-11-18
 - **[D-20261118-step42-stock-model](D-20261118-step42-stock-model.md)** Mô hình tồn của `inventory`: `on_hand` / `available`, sổ chỉ thêm, giá vốn bình quân làm tròn nửa lên, nút giữ tồn — 2026-11-18
 - **[D-20261118-step44-shipping-api](D-20261118-step44-shipping-api.md)** Module `shipping`: hợp đồng `api` cho bước 45, sổ hãng `CarrierRegistry`, sổ địa chỉ không cần permission, địa chỉ nước ngoài trong `Address` — 2026-11-18
@@ -445,6 +446,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step44-shipping-cod](D-20261118-step44-shipping-cod.md)** `shipping`: tiền thu hộ (COD) chỉ ghi nghĩa vụ trong sổ cái, đối soát bảng kê CSV chung, chênh lệch giải quyết bằng danh sách lý do — 2026-11-18
 - **[D-20261118-step44-shipping-dates](D-20261118-step44-shipping-dates.md)** `shipping`: ngày giao dự kiến theo lịch giao, giờ sẵn sàng nhận tại cửa hàng, ước tính công khai đọc biến thể qua `Catalog` — 2026-11-18
 - **[D-20261118-step44-shipping-rates](D-20261118-step44-shipping-rates.md)** `shipping`: cân quy đổi số nguyên, bậc phí theo vùng tỉnh, phương thức kế thừa theo cây, thuế của phí giao do `orders` tính theo `tax_category` — 2026-11-18
+- **[D-20261118-step53-escalation](D-20261118-step53-escalation.md)** `support`: chuyển khiếu nại qua `ComplaintIntake` (đích là phiếu), liên kết qua sổ đối tượng, câu trả lời mẫu — 2026-11-18
 - **[D-20261118-step53-sla](D-20261118-step53-sla.md)** `support`: chính sách hỗ trợ là một văn bản JSON theo nút, giờ làm nằm trong chính sách, mặc định SLA — 2026-11-18
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
 - **[D-20261118-step53-teams](D-20261118-step53-teams.md)** `support`: nhóm nhân viên riêng, quy tắc phân công theo cột, chia vòng hỏi quyền hiện tại — 2026-11-18
@@ -461,4 +463,5 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-317** Số đo đường nóng sau bước 34 — 2026-11-16
 - **[D-20261118-step39-backlog-gauges](D-20261118-step39-backlog-gauges.md)** Gauge tồn đọng của job, event và pool kết nối — 2026-11-18
 - **[D-20261118-step39-monitoring-files](D-20261118-step39-monitoring-files.md)** Luật cảnh báo, dashboard và sổ tay sự cố nằm trong repo, `xtask` giữ khớp — 2026-11-18
+- **[D-20261118-step39-ops-backlog-api](D-20261118-step39-ops-backlog-api.md)** Tồn đọng qua REST và MCP, chỉ cho nhân sự nền tảng — 2026-11-18
 - **[D-20261118-step39-scheduled-backups](D-20261118-step39-scheduled-backups.md)** Backup theo lịch vào nơi lưu file, giữ N bản, không chép file mặc định — 2026-11-18

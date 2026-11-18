@@ -3,6 +3,7 @@
 //! chỉ dùng qua `api`).
 
 mod levels;
+mod orders;
 mod reservations;
 
 use std::collections::HashMap;

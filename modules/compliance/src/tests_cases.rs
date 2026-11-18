@@ -419,3 +419,38 @@ async fn ly_do_an_danh_gia_va_kenh_khieu_nai() {
     .await
     .unwrap();
 }
+
+/// Phiếu hỗ trợ chuyển thành khiếu nại (`ComplaintIntake`, bước 53): gọi lại cùng nguồn không tạo
+/// vụ việc thứ hai; vụ việc có hạn luật định và bên bị khiếu nại.
+#[tokio::test]
+async fn khieu_nai_tu_phieu_goi_lai_khong_tao_hai_vu_viec() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let intake = app.api::<dyn crate::api::ComplaintIntake>().unwrap();
+        let tenant = app.default_tenant();
+        let complaint = || crate::api::ComplaintFromTicket {
+            source_ref: "shop.item:1".to_owned(),
+            org_id: tenant.id().as_uuid(),
+            reporter_user_id: None,
+            name: Some("An".to_owned()),
+            email: Some("an@example.com".to_owned()),
+            phone: None,
+            claim: "Sản phẩm bị lỗi, cửa hàng không đổi.".to_owned(),
+        };
+        let first = intake.open(&tenant, complaint()).await.unwrap();
+        assert!(first.created);
+        let again = intake.open(&tenant, complaint()).await.unwrap();
+        assert_eq!((again.id, again.created), (first.id, false));
+        let row = case::Entity::find_by_id(first.id).one(app.database().read()).await.unwrap();
+        let row = row.unwrap();
+        assert_eq!((row.kind.as_str(), row.channel.as_str()), ("consumer_complaint", "support"));
+        let short = crate::api::ComplaintFromTicket {
+            claim: "ngắn".to_owned(),
+            source_ref: "shop.item:2".to_owned(),
+            ..complaint()
+        };
+        assert_eq!(intake.open(&tenant, short).await.unwrap_err().code(), "validation_failed");
+    })
+    .await
+    .unwrap();
+}
