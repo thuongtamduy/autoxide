@@ -103,6 +103,11 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `auth.update_oidc_provider` | `auth.oidc.manage` | writes |
 | `auth.update_user` | `auth.users.manage` | writes |
 | `auth.whoami` | — | read-only |
+| `automations.create_rule` | `automations.manage` | writes |
+| `automations.get_rule` | `automations.read` | read-only |
+| `automations.list_rules` | `automations.read` | read-only |
+| `automations.test_rule` | `automations.read` | read-only |
+| `automations.update_rule` | `automations.manage` | writes |
 | `catalog.add_prices` | `catalog.prices.write` | writes |
 | `catalog.create_product` | `catalog.products.write` | writes |
 | `catalog.delete_product` | `catalog.products.write` | destructive |

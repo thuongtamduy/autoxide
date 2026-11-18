@@ -287,19 +287,7 @@ impl McpServer {
         principal: Principal,
         arguments: Value,
     ) -> Result<Value, Error> {
-        // Gói của khách không có module của tool: cùng lỗi như REST.
-        let (enabled, plan_read_only) = self.plan_allows(tool, tenant.id()).await?;
-        if !enabled {
-            let module = tool.name().split('.').next().unwrap_or_default();
-            metrics::counter!("entitlement_denials_total", "kind" => "module").increment(1);
-            return Err(crate::entitlement::module_not_enabled(module));
-        }
-        // Khách chỉ đọc (trạng thái khách hay thuê bao): tool đọc vẫn chạy, tool ghi nhận cùng lỗi
-        // như REST.
-        if (tenant.read_only() || plan_read_only) && !tool.is_read_only() {
-            return Err(crate::tenancy::errors::tenant_read_only());
-        }
-        tool.call(tenant, principal, arguments).await
+        call_tool(&self.entitlements, tool, tenant, principal, arguments).await
     }
 
     /// Module của tool (`<module>.<tên>`) có được dùng ở khách `tenant` không, và khách có chỉ
@@ -309,8 +297,7 @@ impl McpServer {
         tool: &Tool,
         tenant: crate::tenancy::TenantId,
     ) -> Result<(bool, bool), Error> {
-        let module = tool.name().split('.').next().unwrap_or_default();
-        self.module_allowed(module, tenant).await
+        tool_allowed(&self.entitlements, tool, tenant).await
     }
 
     /// Module `module` có được dùng ở khách `tenant` không, và khách có chỉ đọc vì thuê bao không.
@@ -319,15 +306,7 @@ impl McpServer {
         module: &str,
         tenant: crate::tenancy::TenantId,
     ) -> Result<(bool, bool), Error> {
-        if !self.entitlements.is_enforced() || self.entitlements.catalog().is_always_enabled(module)
-        {
-            return Ok((true, false));
-        }
-        let snapshot = self.entitlements.snapshot(tenant).await?;
-        Ok((
-            snapshot.has_module(module),
-            snapshot.access == crate::entitlement::TenantAccess::ReadOnly,
-        ))
+        module_allowed(&self.entitlements, module, tenant).await
     }
 
     /// Lỗi khi đọc resource hay dựng prompt (không có "kết quả lỗi" như tool): lỗi giao thức
@@ -369,6 +348,55 @@ impl McpServer {
         }
         CallToolResult::structured_error(body)
     }
+}
+
+/// Chạy tool sau khi kiểm gói và trạng thái chỉ đọc của khách (không kiểm permission — bên gọi
+/// kiểm bằng `Tool::allows`). Endpoint `/mcp` và sổ tool của tự động hoá (bước 58) dùng chung, nên
+/// luật tự động hoá không làm được điều MCP không làm được.
+pub(crate) async fn call_tool(
+    entitlements: &crate::entitlement::EntitlementsHandle,
+    tool: &Tool,
+    tenant: TenantContext,
+    principal: Principal,
+    arguments: Value,
+) -> Result<Value, Error> {
+    // Gói của khách không có module của tool: cùng lỗi như REST.
+    let (enabled, plan_read_only) = tool_allowed(entitlements, tool, tenant.id()).await?;
+    if !enabled {
+        let module = tool.name().split('.').next().unwrap_or_default();
+        metrics::counter!("entitlement_denials_total", "kind" => "module").increment(1);
+        return Err(crate::entitlement::module_not_enabled(module));
+    }
+    // Khách chỉ đọc (trạng thái khách hay thuê bao): tool đọc vẫn chạy, tool ghi nhận cùng lỗi
+    // như REST.
+    if (tenant.read_only() || plan_read_only) && !tool.is_read_only() {
+        return Err(crate::tenancy::errors::tenant_read_only());
+    }
+    tool.call(tenant, principal, arguments).await
+}
+
+/// Module của tool (`<module>.<tên>`) có được dùng ở khách `tenant` không, và khách có chỉ đọc vì
+/// thuê bao không (bước 35). `(true, false)` khi không có gói nào áp dụng.
+pub(crate) async fn tool_allowed(
+    entitlements: &crate::entitlement::EntitlementsHandle,
+    tool: &Tool,
+    tenant: crate::tenancy::TenantId,
+) -> Result<(bool, bool), Error> {
+    let module = tool.name().split('.').next().unwrap_or_default();
+    module_allowed(entitlements, module, tenant).await
+}
+
+/// Module `module` có được dùng ở khách `tenant` không, và khách có chỉ đọc vì thuê bao không.
+pub(crate) async fn module_allowed(
+    entitlements: &crate::entitlement::EntitlementsHandle,
+    module: &str,
+    tenant: crate::tenancy::TenantId,
+) -> Result<(bool, bool), Error> {
+    if !entitlements.is_enforced() || entitlements.catalog().is_always_enabled(module) {
+        return Ok((true, false));
+    }
+    let snapshot = entitlements.snapshot(tenant).await?;
+    Ok((snapshot.has_module(module), snapshot.access == crate::entitlement::TenantAccess::ReadOnly))
 }
 
 /// Tool deprecated: kết quả giữ nguyên envelope `{"data": …}`, thêm `_meta`
