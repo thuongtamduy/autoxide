@@ -63,6 +63,18 @@ impl Module for OrganizationsModule {
         "organizations"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            .copy_on_split(&["organizations_unit_type"])
+            .table(
+                "organizations_unit",
+                autoxide_kernel::tenancy::TablePolicy::OrgTree { id: "id", parent: "parent_id" },
+            )
+            .by_org(&["organizations_setting", "organizations_profile"])
+    }
+
     fn description(&self) -> &'static str {
         "The organization tree inside each tenant (head office, regions, stores, sellers…), its \
          unit types, life cycle and settings."

@@ -22,6 +22,7 @@ mod service;
 mod tools;
 mod work;
 
+mod relocation;
 #[cfg(test)]
 mod tests;
 
@@ -191,5 +192,9 @@ impl Module for AutomationsModule {
 
     fn tools(&self) -> Vec<Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 }

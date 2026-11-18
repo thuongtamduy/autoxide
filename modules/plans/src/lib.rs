@@ -85,6 +85,28 @@ impl Module for PlansModule {
         "plans"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            // Thuê bao, hạn mức, hoá đơn thuê bao là của từng khách: không đi đâu cả. Khách mới khi
+            // tách bắt đầu không thuê bao; khách bị gộp giữ lịch sử của mình.
+            .ephemeral(&[
+                "plans_subscription",
+                "plans_subscription_addon",
+                "plans_override",
+                "plans_usage",
+                "plans_reservation",
+                "plans_usage_record",
+                "plans_billing_period",
+                "plans_billing_profile",
+                "plans_provisioning",
+                "plans_signup",
+                "plans_throttle",
+                "plans_antispam_nonces",
+            ])
+    }
+
     fn description(&self) -> &'static str {
         "Plans that sell modules, features and limits per tenant, with add-ons, overrides, \
          subscriptions and usage."

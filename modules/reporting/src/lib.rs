@@ -20,6 +20,7 @@ mod forward;
 mod http;
 mod migration;
 mod permissions;
+mod rehome;
 mod service;
 mod tools;
 
@@ -58,11 +59,28 @@ struct ReportingModule {
     /// Có sau `start`.
     service: Option<Arc<Reporting>>,
     sources: Vec<FactSource>,
+    /// Hàng đợi job của module (xếp `reporting.rehome`); có sau `start`.
+    jobs: Option<autoxide_kernel::job::JobQueue>,
 }
 
 impl Module for ReportingModule {
     fn name(&self) -> &'static str {
         "reporting"
+    }
+
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            .by_org(&["reporting_local_facts"])
+            // Kho của cây ở database của khách gốc: dời bằng job `reporting.rehome` khi nghe
+            // `kernel.relocation_finished`, không theo dòng của khách bị tách / gộp.
+            .ephemeral(&[
+                "reporting_facts",
+                "reporting_fact_dimensions",
+                "reporting_daily",
+                "reporting_rehomes",
+            ])
     }
 
     fn description(&self) -> &'static str {
@@ -98,19 +116,26 @@ impl Module for ReportingModule {
         ));
         self.sources = sources.into_iter().map(|(_, source)| source).collect();
         self.service = Some(service);
+        self.jobs = Some(context.jobs());
         Ok(())
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {
         let Some(service) = &self.service else { return Vec::new() };
-        self.sources
+        let mut subscriptions: Vec<Subscription> = self
+            .sources
             .iter()
             .map(|source| {
                 let handler =
                     extract::FactHandler { source: source.clone(), service: service.clone() };
                 Subscription::new(source.event(), Arc::new(handler))
             })
-            .collect()
+            .collect();
+        if let Some(jobs) = &self.jobs {
+            let listener = rehome::RelocationListener { jobs: jobs.clone() };
+            subscriptions.push(Subscription::new(rehome::RELOCATION_FINISHED, Arc::new(listener)));
+        }
+        subscriptions
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
@@ -121,6 +146,7 @@ impl Module for ReportingModule {
                 forward::PRUNE_LOCAL,
                 Arc::new(forward::PruneLocalJob(service.clone())),
             ),
+            JobRegistration::new(rehome::REHOME, Arc::new(rehome::RehomeJob(service.clone()))),
         ]
     }
 
