@@ -68,6 +68,12 @@ impl Module for TaxModule {
         "tax"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new().by_org(&["tax_profiles"])
+    }
+
     fn description(&self) -> &'static str {
         "Tax engine: tax groups and rates as dated data, tax profiles per organization unit, \
          withholding and invoice requirements."

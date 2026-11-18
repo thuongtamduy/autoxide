@@ -90,6 +90,21 @@ impl Module for CommentsModule {
         "comments"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            .stay(&[
+                "comments_comments",
+                "comments_targets",
+                "comments_bans",
+                "comments_reports",
+                "comments_reply_subscriptions",
+                "comments_profiles",
+            ])
+            .ephemeral(&["comments_throttle", "comments_tokens", "comments_antispam_nonces"])
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }

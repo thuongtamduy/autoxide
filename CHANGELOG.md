@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
+  `POST /api/v1/analytics/public/events` (up to 20, unknown or malformed ones dropped, bots and foreign pages
+  dropped, `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` per network block); anonymous sessions use a random key per day
+  that is deleted once the day is over, and neither addresses nor user agents are stored. Modules declare event
+  types (`Module::analytics_events`, from the browser or taken from their own events) and funnels
+  (`Module::funnels`). An hourly job adds events up per day; reports read only those totals: `/overview`, `/pages`,
+  `/sources`, `/campaigns`, `/objects`, `/types`, `/funnels/{key}`, per website (organization unit) with
+  `analytics.read`. Events are linked to a signed-in user only with consent `analytics.personal`; withdrawing
+  unlinks them. MCP tools `analytics.overview`, `analytics.top_pages`, `analytics.top_objects`, `analytics.funnel`
+  (read only); summary metric `analytics.visitors`; settings `AUTOXIDE_ANALYTICS_*`. Guide: `docs/ANALYTICS.md`.
 - Module `catalog` (step 41, first part; `docs/CATALOG.md`): products with variants, options, SKU and barcode
   unique per tenant, sale modes (in stock, backorder, pre-order), bundles, images from `media`; a category tree;
   price lists per store, chain and customer group with append-only price history, scheduled and temporary prices,
@@ -76,6 +86,16 @@ endpoints are marked deprecated with a sunset date first.
   `reporting.read` (scoped) and `reporting.manage`. `ledger.entry_posted` / `ledger.entry_reversed` carry `lines`.
 - Kernel: `tenancy::distribution` lets a module send records from a parent tenant to its child tenants (also on
   other databases) through a job that can run again without making copies.
+- Split a branch of a tenant into a tenant of its own on another database, and merge tenants back, keeping every id
+  and the history (step 38): `autoxide tenant split|merge|relocation-status` (`--dry-run`, `--resume`), and for
+  platform staff `POST /api/v1/kernel/relocations` (dry run by default, runs as a job) and
+  `GET /api/v1/kernel/relocations/{id}` (permission `kernel.tenants.relocate`). Tenants send a request with
+  `POST /api/v1/kernel/tenant/relocation-requests` (permission `kernel.relocations.request`); it lands in the work
+  inbox of the platform staff. Modules declare how their tables move (`Module::relocation`); the plan lists rows,
+  references across the boundary and unique conflicts before anything changes. The audit log of what moves is
+  written again into the target's hash chain; the report store follows (`reporting.rehome`). New setting
+  `AUTOXIDE_RELOCATION_DRAIN_SECONDS`; new tenant status `merged`; events `kernel.relocation_started`,
+  `kernel.relocation_finished`, `kernel.relocation_failed`.
 - `autoxide doctor` warns when `AUTOXIDE_AUTH_TOKEN_SECRET` is not set (check `auth.token_secret`), as the
   deployment guide already said; the README's installation steps now include importing the reference data
   (`autoxide task address.import`, `autoxide task tax.import_pack`).

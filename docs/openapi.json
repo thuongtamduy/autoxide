@@ -17929,6 +17929,48 @@
         ],
         "type": "object"
       },
+      "Data_FunnelReport": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A funnel over a range of days.",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "from": {
+                "format": "date",
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "steps": {
+                "items": {
+                  "$ref": "#/components/schemas/FunnelStep"
+                },
+                "type": "array"
+              },
+              "to": {
+                "format": "date",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "description",
+              "from",
+              "to",
+              "steps"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Health": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -18097,6 +18139,37 @@
               "subscribed",
               "unchanged",
               "kept_unsubscribed"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Ingested": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What was done with a batch.",
+            "properties": {
+              "accepted": {
+                "description": "Events stored.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "dropped": {
+                "description": "Events dropped (unknown type, wrong props, bot, foreign page, too many).",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "accepted",
+              "dropped"
             ],
             "type": "object"
           }
@@ -22044,6 +22117,85 @@
         ],
         "type": "object"
       },
+      "Data_Overview": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Visits of a website over a range of days.",
+            "properties": {
+              "bounce_rate": {
+                "description": "`bounces / visitors`, 0 to 1 (0 when there are no visitors).",
+                "format": "double",
+                "type": "number"
+              },
+              "bounces": {
+                "description": "Visits that saw exactly one page.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "days": {
+                "description": "One entry per day that had visits.",
+                "items": {
+                  "$ref": "#/components/schemas/DayCount"
+                },
+                "type": "array"
+              },
+              "events": {
+                "description": "All events.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "from": {
+                "format": "date",
+                "type": "string"
+              },
+              "site": {
+                "description": "The website (organization unit).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "to": {
+                "format": "date",
+                "type": "string"
+              },
+              "top_sources": {
+                "description": "The sources bringing the most page views from outside the website.",
+                "items": {
+                  "$ref": "#/components/schemas/Ranked"
+                },
+                "type": "array"
+              },
+              "views": {
+                "description": "Page views.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "visitors": {
+                "description": "Sum of the daily unique visitors (no cookies: one person on two days counts twice).",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "site",
+              "from",
+              "to",
+              "visitors",
+              "views",
+              "events",
+              "bounces",
+              "bounce_rate",
+              "top_sources",
+              "days"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ParsedFilters": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -23838,6 +23990,102 @@
               "source",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_RelocationPlan": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What a split or merge would do (dry run). Nothing is changed.",
+            "properties": {
+              "blocking": {
+                "items": {
+                  "$ref": "#/components/schemas/RelocationBlocker"
+                },
+                "type": "array"
+              },
+              "conflicts": {
+                "items": {
+                  "$ref": "#/components/schemas/RelocationConflict"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "$ref": "#/components/schemas/RelocationKind"
+              },
+              "org_id": {
+                "description": "Split: the root unit of the branch. Merge: the unit of the receiving tenant the merged\ntenant goes under.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "placement": {
+                "description": "Placement (database) of the target.",
+                "example": "acme-north-db",
+                "type": "string"
+              },
+              "ready": {
+                "description": "`true` when nothing blocks and there is no conflict.",
+                "type": "boolean"
+              },
+              "rows": {
+                "description": "Rows that move or are copied.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "source": {
+                "example": "acme",
+                "type": "string"
+              },
+              "source_tenant_id": {
+                "description": "Tenant whose rows go.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "tables": {
+                "description": "Every tenant-level table, in copy order.",
+                "items": {
+                  "$ref": "#/components/schemas/RelocationTable"
+                },
+                "type": "array"
+              },
+              "target": {
+                "example": "acme-north",
+                "type": "string"
+              },
+              "target_tenant_id": {
+                "description": "Tenant that receives them (split: the new tenant, its id is the id of the branch unit).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "warnings": {
+                "items": {
+                  "$ref": "#/components/schemas/RelocationWarning"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "kind",
+              "source_tenant_id",
+              "source",
+              "target_tenant_id",
+              "target",
+              "org_id",
+              "placement",
+              "ready",
+              "blocking",
+              "conflicts",
+              "warnings",
+              "tables",
+              "rows"
             ],
             "type": "object"
           }
@@ -26475,6 +26723,110 @@
         ],
         "type": "object"
       },
+      "Data_TenantRelocation": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A split or merge of tenants.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "error": {
+                "description": "Why the last run stopped; running it again resumes it.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "$ref": "#/components/schemas/RelocationKind"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "placement": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plan": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RelocationPlan",
+                    "description": "The plan made when it started (or when it was requested)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "source_tenant_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "state": {
+                "description": "`requested` (asked by the tenant, waiting for the platform staff), `planned`, `frozen`\n(the tenants answer 503), `copied`, `verified`, `switched`, `cleaned`, `done` or `failed`.",
+                "example": "done",
+                "type": "string"
+              },
+              "tables": {
+                "description": "Rows written to the target per table (after `copied`).",
+                "items": {
+                  "$ref": "#/components/schemas/TenantTableRows"
+                },
+                "type": "array"
+              },
+              "target_tenant_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "state",
+              "source_tenant_id",
+              "reason",
+              "tables",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_TenantSettingState": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28847,6 +29199,54 @@
         ],
         "type": "object"
       },
+      "Data_Vec_EventTypeInfo": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "An event type.",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "key": {
+                  "description": "The `type` to send, e.g. `catalog.product_viewed`.",
+                  "type": "string"
+                },
+                "object_kind": {
+                  "description": "When set, events must carry `object` = `<object_kind>:<id>`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "props": {
+                  "items": {
+                    "$ref": "#/components/schemas/PropInfo"
+                  },
+                  "type": "array"
+                },
+                "source": {
+                  "description": "`browser` (pages send it) or `server` (recorded by the server from what happened; pages\ncannot send it).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "description",
+                "source",
+                "props"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_EventTypeResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28865,6 +29265,42 @@
               "required": [
                 "name",
                 "description"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_FunnelInfo": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A funnel a module declares.",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "steps": {
+                  "description": "Event types of the steps, in order.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "key",
+                "description",
+                "steps"
               ],
               "type": "object"
             },
@@ -30956,6 +31392,49 @@
         ],
         "type": "object"
       },
+      "Data_Vec_Ranked": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "One row of a ranking.",
+              "properties": {
+                "events": {
+                  "description": "Events (for event types and objects).",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "value": {
+                  "description": "The page path, source, campaign, object (`<kind>:<id>`) or event type.",
+                  "type": "string"
+                },
+                "views": {
+                  "description": "Page views (for objects: events about the object).",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "visitors": {
+                  "description": "Sum of the daily unique visitors.",
+                  "format": "int64",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value",
+                "views",
+                "visitors",
+                "events"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_ReasonView": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -32715,6 +33194,29 @@
         ],
         "type": "object"
       },
+      "DayCount": {
+        "description": "One day of the overview.",
+        "properties": {
+          "day": {
+            "format": "date",
+            "type": "string"
+          },
+          "views": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "visitors": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "views",
+          "visitors"
+        ],
+        "type": "object"
+      },
       "DecimalString": {
         "description": "A decimal number written as a string, like \"12.5\" or \"-0.08\": a dot before the fraction, no thousands separators, no exponent, at most 28 digits.",
         "examples": [
@@ -33756,6 +34258,25 @@
         ],
         "type": "object"
       },
+      "EventBatch": {
+        "additionalProperties": false,
+        "description": "A batch of events from a page.",
+        "properties": {
+          "events": {
+            "description": "1 to 20 events. Events of unknown types, with undeclared or wrongly typed `props`, or\notherwise malformed are dropped one by one; the batch is never refused for them.",
+            "items": {
+              "$ref": "#/components/schemas/IncomingEvent"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "type": "object"
+      },
       "EventTriggerInfo": {
         "description": "An event that can trigger a rule.",
         "properties": {
@@ -33771,6 +34292,42 @@
         "required": [
           "name",
           "description"
+        ],
+        "type": "object"
+      },
+      "EventTypeInfo": {
+        "description": "An event type.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "key": {
+            "description": "The `type` to send, e.g. `catalog.product_viewed`.",
+            "type": "string"
+          },
+          "object_kind": {
+            "description": "When set, events must carry `object` = `<object_kind>:<id>`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "props": {
+            "items": {
+              "$ref": "#/components/schemas/PropInfo"
+            },
+            "type": "array"
+          },
+          "source": {
+            "description": "`browser` (pages send it) or `server` (recorded by the server from what happened; pages\ncannot send it).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "source",
+          "props"
         ],
         "type": "object"
       },
@@ -34569,6 +35126,100 @@
         ],
         "type": "object"
       },
+      "FunnelInfo": {
+        "description": "A funnel a module declares.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "steps": {
+            "description": "Event types of the steps, in order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "steps"
+        ],
+        "type": "object"
+      },
+      "FunnelReport": {
+        "description": "A funnel over a range of days.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/FunnelStep"
+            },
+            "type": "array"
+          },
+          "to": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "from",
+          "to",
+          "steps"
+        ],
+        "type": "object"
+      },
+      "FunnelStep": {
+        "description": "One step of a funnel.",
+        "properties": {
+          "from_previous": {
+            "description": "`sessions` of this step divided by the previous step's.",
+            "format": "double",
+            "type": "number"
+          },
+          "from_start": {
+            "description": "`sessions` of this step divided by the first step's, 0 to 1 and more (steps are counted\nindependently, see the funnel endpoint).",
+            "format": "double",
+            "type": "number"
+          },
+          "key": {
+            "description": "The event type of the step.",
+            "type": "string"
+          },
+          "sessions": {
+            "description": "Sessions with the event, summed over the days.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "step": {
+            "description": "Position, from 0.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "step",
+          "key",
+          "sessions",
+          "from_start",
+          "from_previous"
+        ],
+        "type": "object"
+      },
       "GuestCancelRequest": {
         "additionalProperties": false,
         "description": "A guest cancels a booking.",
@@ -34858,6 +35509,79 @@
         "required": [
           "key",
           "locale"
+        ],
+        "type": "object"
+      },
+      "IncomingEvent": {
+        "description": "One event sent by a page.",
+        "properties": {
+          "object": {
+            "description": "What the event is about, `<kind>:<id>`, e.g. `catalog.product:0190…`. Required when the\nevent type names an object kind.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "description": "Path of the page, starting with `/` (query and fragment are cut off; up to 512\ncharacters).",
+            "example": "/products/ao-dai",
+            "type": "string"
+          },
+          "props": {
+            "description": "Extra values the event type declares; anything else drops the event.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "referrer": {
+            "description": "`document.referrer`: only its host is kept.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "description": "A declared event type, e.g. `analytics.page_view` or `catalog.product_viewed`; see\n`GET /api/v1/analytics/event-types`. Unknown types are dropped.",
+            "example": "analytics.page_view",
+            "type": "string"
+          },
+          "utm": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Utm"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "path"
+        ],
+        "type": "object"
+      },
+      "Ingested": {
+        "description": "What was done with a batch.",
+        "properties": {
+          "accepted": {
+            "description": "Events stored.",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "dropped": {
+            "description": "Events dropped (unknown type, wrong props, bot, foreign page, too many).",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "dropped"
         ],
         "type": "object"
       },
@@ -42448,6 +43172,76 @@
           "key",
           "reason",
           "created_at"
+        ],
+        "type": "object"
+      },
+      "Overview": {
+        "description": "Visits of a website over a range of days.",
+        "properties": {
+          "bounce_rate": {
+            "description": "`bounces / visitors`, 0 to 1 (0 when there are no visitors).",
+            "format": "double",
+            "type": "number"
+          },
+          "bounces": {
+            "description": "Visits that saw exactly one page.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "days": {
+            "description": "One entry per day that had visits.",
+            "items": {
+              "$ref": "#/components/schemas/DayCount"
+            },
+            "type": "array"
+          },
+          "events": {
+            "description": "All events.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "site": {
+            "description": "The website (organization unit).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "type": "string"
+          },
+          "top_sources": {
+            "description": "The sources bringing the most page views from outside the website.",
+            "items": {
+              "$ref": "#/components/schemas/Ranked"
+            },
+            "type": "array"
+          },
+          "views": {
+            "description": "Page views.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "visitors": {
+            "description": "Sum of the daily unique visitors (no cookies: one person on two days counts twice).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "site",
+          "from",
+          "to",
+          "visitors",
+          "views",
+          "events",
+          "bounces",
+          "bounce_rate",
+          "top_sources",
+          "days"
         ],
         "type": "object"
       },
@@ -52917,6 +53711,23 @@
         ],
         "type": "object"
       },
+      "PropInfo": {
+        "description": "A prop an event type takes.",
+        "properties": {
+          "kind": {
+            "description": "`text` (up to 100 characters), `number` or `boolean`.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ],
+        "type": "object"
+      },
       "ProviderPatch": {
         "additionalProperties": false,
         "description": "Changes to a sign-in provider; fields left out stay as they are, `null` clears.",
@@ -54946,6 +55757,37 @@
         ],
         "type": "object"
       },
+      "Ranked": {
+        "description": "One row of a ranking.",
+        "properties": {
+          "events": {
+            "description": "Events (for event types and objects).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "value": {
+            "description": "The page path, source, campaign, object (`<kind>:<id>`) or event type.",
+            "type": "string"
+          },
+          "views": {
+            "description": "Page views (for objects: events about the object).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "visitors": {
+            "description": "Sum of the daily unique visitors.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value",
+          "views",
+          "visitors",
+          "events"
+        ],
+        "type": "object"
+      },
       "Realm": {
         "description": "The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of\none tenant's shop, without permissions).",
         "enum": [
@@ -55518,6 +56360,367 @@
         "required": [
           "kind",
           "items"
+        ],
+        "type": "object"
+      },
+      "RelocationAsk": {
+        "additionalProperties": false,
+        "description": "What a tenant asks the platform staff to do.",
+        "properties": {
+          "into": {
+            "description": "Merge: id or slug of the tenant to join.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelocationKind",
+            "description": "`split`: a branch of your tenant becomes a tenant of its own. `merge`: your tenant joins\n`into`."
+          },
+          "name": {
+            "description": "Split: wished name of the new tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Split: the root unit of the branch.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "description": "Split: wished placement (database), if the platform offers a choice.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why (contract, consent of the people whose data moves).",
+            "type": "string"
+          },
+          "slug": {
+            "description": "Split: wished slug of the new tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "under_org": {
+            "description": "Merge: the unit of `into` to go under.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "RelocationBlocker": {
+        "description": "Something that blocks a split or merge.",
+        "properties": {
+          "code": {
+            "description": "Stable code, the same as the error a real run would answer.",
+            "example": "tenancy.relocation_same_database",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "RelocationConflict": {
+        "description": "Rows that cannot move as they are: a reference across the boundary or a unique value taken in\nthe target.",
+        "properties": {
+          "code": {
+            "description": "`reference` (a row that stays points to a row that goes, or the other way), `unique` (the\ntarget tenant already has the value) or a code of the module.",
+            "example": "unique",
+            "type": "string"
+          },
+          "count": {
+            "description": "Rows in conflict.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rows": {
+            "description": "Keys of the first rows in conflict (at most 20).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "table": {
+            "example": "content_entries",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "code",
+          "message",
+          "count",
+          "rows"
+        ],
+        "type": "object"
+      },
+      "RelocationKind": {
+        "description": "Split or merge.",
+        "enum": [
+          "split",
+          "merge"
+        ],
+        "type": "string"
+      },
+      "RelocationPlan": {
+        "description": "What a split or merge would do (dry run). Nothing is changed.",
+        "properties": {
+          "blocking": {
+            "items": {
+              "$ref": "#/components/schemas/RelocationBlocker"
+            },
+            "type": "array"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/RelocationConflict"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelocationKind"
+          },
+          "org_id": {
+            "description": "Split: the root unit of the branch. Merge: the unit of the receiving tenant the merged\ntenant goes under.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "placement": {
+            "description": "Placement (database) of the target.",
+            "example": "acme-north-db",
+            "type": "string"
+          },
+          "ready": {
+            "description": "`true` when nothing blocks and there is no conflict.",
+            "type": "boolean"
+          },
+          "rows": {
+            "description": "Rows that move or are copied.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "source": {
+            "example": "acme",
+            "type": "string"
+          },
+          "source_tenant_id": {
+            "description": "Tenant whose rows go.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "tables": {
+            "description": "Every tenant-level table, in copy order.",
+            "items": {
+              "$ref": "#/components/schemas/RelocationTable"
+            },
+            "type": "array"
+          },
+          "target": {
+            "example": "acme-north",
+            "type": "string"
+          },
+          "target_tenant_id": {
+            "description": "Tenant that receives them (split: the new tenant, its id is the id of the branch unit).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RelocationWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "source_tenant_id",
+          "source",
+          "target_tenant_id",
+          "target",
+          "org_id",
+          "placement",
+          "ready",
+          "blocking",
+          "conflicts",
+          "warnings",
+          "tables",
+          "rows"
+        ],
+        "type": "object"
+      },
+      "RelocationRequest": {
+        "additionalProperties": false,
+        "description": "A split or merge of tenants to run (platform staff).",
+        "properties": {
+          "dry_run": {
+            "default": true,
+            "description": "Only report what would happen, changing nothing. Defaults to `true`: send `false` to run.",
+            "type": "boolean"
+          },
+          "into": {
+            "description": "Merge: id or slug of the tenant that receives the rows.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "keep_parent": {
+            "default": true,
+            "description": "Split: the new tenant is a child of the source tenant. Defaults to `true`.",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelocationKind",
+            "description": "`split`: a branch of `tenant` becomes a tenant of its own. `merge`: `tenant` joins `into`."
+          },
+          "name": {
+            "description": "Split: name of the new tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Split: the root unit of the branch. The new tenant gets this id.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "description": "Split: placement (database) of the new tenant; it must be another database than the\nsource tenant's.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why the data moves between tenants (contract, consent); kept with the run and in the audit\nlog.",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "Carry out this request of a tenant (from `POST /tenant/relocation-requests`); the other\nfields still apply.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "description": "Split: slug of the new tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant": {
+            "description": "Id or slug of the tenant whose rows go (split: the tenant with the branch; merge: the\ntenant that is merged).",
+            "type": "string"
+          },
+          "under_org": {
+            "description": "Merge: the unit of `into` that the root of the merged tenant goes under.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "tenant",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "RelocationTable": {
+        "description": "What happens to one table.",
+        "properties": {
+          "action": {
+            "description": "`move` (copied to the target, then deleted from the source), `copy` (the source keeps\nthem too), `stay`, `drain` (due queue rows that must run first) or `custom`.",
+            "example": "move",
+            "type": "string"
+          },
+          "existing": {
+            "description": "Merge: rows whose key the target already has (the copy made when the tenant was split);\nthey are skipped as the same rows.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "policy": {
+            "description": "The policy of the table: `by_org`, `org_tree`, `follow_parent`, `referenced`,\n`tenant_wide`, `must_be_empty`, `handled_by` or `custom`.",
+            "example": "follow_parent",
+            "type": "string"
+          },
+          "rows": {
+            "description": "Rows concerned.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "table": {
+            "example": "ledger_entries",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "policy",
+          "action",
+          "rows",
+          "existing"
+        ],
+        "type": "object"
+      },
+      "RelocationWarning": {
+        "description": "Something the operator should know; it does not block.",
+        "properties": {
+          "code": {
+            "example": "relocation_policy_inferred",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "table": {
+            "example": "shop_notes",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "code",
+          "message"
         ],
         "type": "object"
       },
@@ -60397,6 +61600,101 @@
         ],
         "type": "object"
       },
+      "TenantRelocation": {
+        "description": "A split or merge of tenants.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "description": "Why the last run stopped; running it again resumes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelocationKind"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RelocationPlan",
+                "description": "The plan made when it started (or when it was requested)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "source_tenant_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "state": {
+            "description": "`requested` (asked by the tenant, waiting for the platform staff), `planned`, `frozen`\n(the tenants answer 503), `copied`, `verified`, `switched`, `cleaned`, `done` or `failed`.",
+            "example": "done",
+            "type": "string"
+          },
+          "tables": {
+            "description": "Rows written to the target per table (after `copied`).",
+            "items": {
+              "$ref": "#/components/schemas/TenantTableRows"
+            },
+            "type": "array"
+          },
+          "target_tenant_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "source_tenant_id",
+          "reason",
+          "tables",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "TenantSettingState": {
         "description": "A setting the installed modules take per tenant, and its state in the current tenant.",
         "properties": {
@@ -62151,6 +63449,45 @@
         ],
         "type": "object"
       },
+      "Utm": {
+        "description": "UTM parameters of the page URL.",
+        "properties": {
+          "campaign": {
+            "description": "`utm_campaign`, e.g. `tet_sale`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "medium": {
+            "description": "`utm_medium`, e.g. `cpc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "description": "`utm_source`, e.g. `facebook`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "term": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "VariantResponse": {
         "description": "A smaller copy of an image.",
         "properties": {
@@ -63133,6 +64470,1226 @@
         ],
         "x-permissions": [
           "ai.view"
+        ]
+      }
+    },
+    "/api/v1/analytics/campaigns": {
+      "get": {
+        "description": "Requires `analytics.read` at the website's unit. `utm_campaign` values (lowercased) by page\nviews that started outside the website.",
+        "operationId": "analytics_list_analytics_campaigns",
+        "parameters": [
+          {
+            "description": "The website (organization unit); omitted: the website of the whole tenant. You need\n`analytics.read` at that unit.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Rows to return, 1 to 100; defaults to 10.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_Ranked"
+                }
+              }
+            },
+            "description": "Campaigns, most page views first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `analytics.read` at the website's unit. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "There is no such website; code `analytics.site_unknown`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The range is too long or reversed."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the UTM campaigns.",
+        "tags": [
+          "analytics"
+        ],
+        "x-permissions": [
+          "analytics.read"
+        ]
+      }
+    },
+    "/api/v1/analytics/event-types": {
+      "get": {
+        "description": "No sign-in needed. Every event type the installed modules declare: what pages may send and\nwhich props each type takes.",
+        "operationId": "analytics_list_analytics_event_types",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_EventTypeInfo"
+                }
+              }
+            },
+            "description": "The event types."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the event types (public).",
+        "tags": [
+          "analytics"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/analytics/funnels": {
+      "get": {
+        "description": "Requires `analytics.read`. Funnels are declared by the installed modules.",
+        "operationId": "analytics_list_analytics_funnels",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_FunnelInfo"
+                }
+              }
+            },
+            "description": "The funnels."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `analytics.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the funnels.",
+        "tags": [
+          "analytics"
+        ],
+        "x-permissions": [
+          "analytics.read"
+        ]
+      }
+    },
+    "/api/v1/analytics/funnels/{key}": {
+      "get": {
+        "description": "Requires `analytics.read` at the website's unit. For each step, the sessions with its event,\nsummed over the days. Cookieless sessions cannot be linked to what the server records (e.g. a\npaid order), so each step is counted on its own: a later step may exceed an earlier one.",
+        "operationId": "analytics_get_analytics_funnel",
+        "parameters": [
+          {
+            "description": "The funnel, e.g. `orders.checkout`.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit); omitted: the website of the whole tenant. You need\n`analytics.read` at that unit.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FunnelReport"
+                }
+              }
+            },
+            "description": "The funnel."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `analytics.read` at the website's unit. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such website (`analytics.site_unknown`) or funnel (`analytics.funnel_unknown`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The range is too long or reversed."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a funnel.",
+        "tags": [
+          "analytics"
+        ],
+        "x-permissions": [
+          "analytics.read"
+        ]
+      }
+    },
+    "/api/v1/analytics/objects": {
+      "get": {
+        "description": "Requires `analytics.read` at the website's unit. Objects (`<kind>:<id>`) by the events about\nthem, most first.",
+        "operationId": "analytics_list_analytics_objects",
+        "parameters": [
+          {
+            "description": "The website (organization unit); omitted: the website of the whole tenant. You need\n`analytics.read` at that unit.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Rows to return, 1 to 100; defaults to 10.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only objects of this kind, e.g. `catalog.product`; omitted: every kind.",
+            "example": "catalog.product",
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_Ranked"
+                }
+              }
+            },
+            "description": "Objects, most viewed first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `analytics.read` at the website's unit. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "There is no such website; code `analytics.site_unknown`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The range is too long or reversed, or `kind` is malformed (`analytics.kind_invalid`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the most viewed objects.",
+        "tags": [
+          "analytics"
+        ],
+        "x-permissions": [
+          "analytics.read"
+        ]
+      }
+    },
+    "/api/v1/analytics/overview": {
+      "get": {
+        "description": "Requires `analytics.read` at the website's unit. Visitors, page views, events, bounce rate, the\ntop sources and one entry per day, from the hourly daily totals (today's numbers lag by up to\nan hour).",
+        "operationId": "analytics_get_analytics_overview",
+        "parameters": [
+          {
+            "description": "The website (organization unit); omitted: the website of the whole tenant. You need\n`analytics.read` at that unit.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Overview"
+                }
+              }
+            },
+            "description": "The overview."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `analytics.read` at the website's unit; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "There is no such website; code `analytics.site_unknown`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The range is longer than 400 days (`analytics.range_too_long`) or reversed (`analytics.range_reversed`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the visit overview of a website.",
+        "tags": [
+          "analytics"
+        ],
+        "x-permissions": [
+          "analytics.read"
+        ]
+      }
+    },
+    "/api/v1/analytics/pages": {
+      "get": {
+        "description": "Requires `analytics.read` at the website's unit. Page paths by page views, most first.",
+        "operationId": "analytics_list_analytics_pages",
+        "parameters": [
+          {
+            "description": "The website (organization unit); omitted: the website of the whole tenant. You need\n`analytics.read` at that unit.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Rows to return, 1 to 100; defaults to 10.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_Ranked"
+                }
+              }
+            },
+            "description": "Pages, most viewed first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `analytics.read` at the website's unit. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "There is no such website; code `analytics.site_unknown`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The range is too long or reversed."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the most viewed pages.",
+        "tags": [
+          "analytics"
+        ],
+        "x-permissions": [
+          "analytics.read"
+        ]
+      }
+    },
+    "/api/v1/analytics/public/events": {
+      "post": {
+        "description": "No sign-in needed; call it from the pages of the website, e.g. with `fetch(url, {method:\n\"POST\", keepalive: true, headers: {\"content-type\": \"application/json\"}, body})`, which still\ngoes out while the page closes. No cookie is set or read. The website is the one of the domain\ncalled (or `?site=`). Batches from known bots, from pages whose `Origin` (or `Referer`) is not\na domain of this website, or over the per-network limit are dropped silently. Signed-in users\nwho consented to `analytics.personal` have their events linked to their account; nobody else.",
+        "operationId": "analytics_collect_analytics_events",
+        "parameters": [
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Ingested"
+                }
+              }
+            },
+            "description": "The batch was taken; `accepted` events were stored and `dropped` were not."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No tenant could be told for the request; code `tenant_required`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "There is no such website; code `site_not_found`."
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not `application/json`; code `unsupported_media_type`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The batch is empty or holds more than 20 events; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send visit events (public).",
+        "tags": [
+          "analytics"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/analytics/sources": {
+      "get": {
+        "description": "Requires `analytics.read` at the website's unit. Where visits came from, by page views that\nstarted outside the website: the `utm_source`, else the referring site (without `www.`), else\n`direct`.",
+        "operationId": "analytics_list_analytics_sources",
+        "parameters": [
+          {
+            "description": "The website (organization unit); omitted: the website of the whole tenant. You need\n`analytics.read` at that unit.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Rows to return, 1 to 100; defaults to 10.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_Ranked"
+                }
+              }
+            },
+            "description": "Sources, most page views first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `analytics.read` at the website's unit. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "There is no such website; code `analytics.site_unknown`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The range is too long or reversed."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the traffic sources.",
+        "tags": [
+          "analytics"
+        ],
+        "x-permissions": [
+          "analytics.read"
+        ]
+      }
+    },
+    "/api/v1/analytics/types": {
+      "get": {
+        "description": "Requires `analytics.read` at the website's unit. Every event type seen, most events first.",
+        "operationId": "analytics_list_analytics_type_counts",
+        "parameters": [
+          {
+            "description": "The website (organization unit); omitted: the website of the whole tenant. You need\n`analytics.read` at that unit.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Rows to return, 1 to 100; defaults to 10.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_Ranked"
+                }
+              }
+            },
+            "description": "Event types, most events first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `analytics.read` at the website's unit. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "There is no such website; code `analytics.site_unknown`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The range is too long or reversed."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the event types by count.",
+        "tags": [
+          "analytics"
+        ],
+        "x-permissions": [
+          "analytics.read"
         ]
       }
     },
@@ -118649,6 +121206,255 @@
         "x-permissions": []
       }
     },
+    "/api/v1/kernel/relocations": {
+      "post": {
+        "description": "Requires `kernel.tenants.relocate` and an account of the platform tenant. With `dry_run` (the\ndefault) nothing changes: the answer lists what blocks, the conflicts (rows pointing across the\nboundary, unique values the target already has) and the rows of every table. With\n`\"dry_run\": false` the tenants answer `503 tenant_maintenance` while a background job copies the\nrows (keeping their ids), checks them, switches the tenants and cleans the source; follow it at\nthe `Location` of the answer. Source and target must be two databases.",
+        "operationId": "kernel_relocate_tenant",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RelocationPlan"
+                }
+              }
+            },
+            "description": "Dry run: what would happen; nothing changed."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantRelocation"
+                }
+              }
+            },
+            "description": "The run started in the background; `Location` is its status.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.tenants.relocate` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tenant, placement or request; code `tenant_not_found`, `tenant_placement_not_found` or `tenancy.relocation_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "It cannot run now; code `tenancy.relocation_conflict` (see the plan of the run), `tenancy.relocation_in_progress`, `tenancy.relocation_not_active`, `tenancy.relocation_org_invalid`, `tenancy.relocation_same_database`, `tenancy.relocation_tenant_exists`, `tenancy.relocation_platform`, `tenancy.relocation_cycle`, `tenancy.relocation_schema_differs`, `tenant_slug_taken` or `tenant_placement_behind`. A dry run lists every reason."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid or missing; see `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A database cannot be reached; code `tenant_move_unreachable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Split a tenant or merge tenants.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.tenants.relocate"
+        ]
+      }
+    },
+    "/api/v1/kernel/relocations/{id}": {
+      "get": {
+        "description": "Requires `kernel.tenants.read` and an account of the platform tenant. `state` goes `planned` →\n`frozen` → `copied` → `verified` → `switched` → `cleaned` → `done` (or `failed`); `error` tells\nwhy a run stopped (the job runs it again).",
+        "operationId": "kernel_get_relocation",
+        "parameters": [
+          {
+            "description": "Id of the split or merge.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantRelocation"
+                }
+              }
+            },
+            "description": "The split or merge."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.tenants.read` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such run; code `tenancy.relocation_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a split or merge of tenants.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.tenants.read"
+        ]
+      }
+    },
     "/api/v1/kernel/resolve": {
       "get": {
         "description": "Any signed-in user. Asks the modules' code readers (order numbers, tracking numbers, invoice\nnumbers, page addresses…), among those the caller has permission for, and answers the first\nrecord found. No record and no permission answer the same 404, so a code never reveals that a\nrecord exists.",
@@ -120018,6 +122824,215 @@
           "kernel"
         ],
         "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/tenant/relocation-requests": {
+      "post": {
+        "description": "Requires `kernel.relocations.request`. Nothing changes: the request goes to the work inbox of\nthe platform staff, who check it and run it (or not). Follow it at the `Location` of the answer.",
+        "operationId": "kernel_request_relocation",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelocationAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantRelocation"
+                }
+              }
+            },
+            "description": "The request was sent to the platform staff.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.relocations.request`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid or missing; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask for a split or merge of your tenant.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.relocations.request"
+        ]
+      }
+    },
+    "/api/v1/kernel/tenant/relocation-requests/{id}": {
+      "get": {
+        "description": "Requires `kernel.relocations.request`. `state` is `requested` until the platform staff run it.",
+        "operationId": "kernel_get_relocation_request",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantRelocation"
+                }
+              }
+            },
+            "description": "The request (and the run, once started)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.relocations.request`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Your tenant has no such request; code `tenancy.relocation_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a request of your tenant.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.relocations.request"
+        ]
       }
     },
     "/api/v1/kernel/tenants": {

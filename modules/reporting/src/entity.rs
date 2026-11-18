@@ -124,3 +124,29 @@ pub(crate) mod daily {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod rehome {
+    //! Nhật ký dời kho báo cáo (bước 38): một dòng mỗi lượt tách / gộp, ở database của khách nhận.
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "reporting_rehomes")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// Khách nhận của lượt tách / gộp.
+        pub tenant_id: Uuid,
+        pub relocation_id: Uuid,
+        pub from_root: Uuid,
+        pub to_root: Uuid,
+        /// `running` / `done`.
+        pub status: String,
+        pub moved_facts: i64,
+        pub started_at: DateTimeUtc,
+        pub finished_at: Option<DateTimeUtc>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

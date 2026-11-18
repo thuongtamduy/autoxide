@@ -54,6 +54,12 @@ impl Module for AiModule {
         "ai"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new().ephemeral(&["ai_usage"])
+    }
+
     fn description(&self) -> &'static str {
         "Connection to AI models (text generation and embeddings) for every module; off by default."
     }
