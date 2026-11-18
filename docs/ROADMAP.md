@@ -4,8 +4,8 @@ Mỗi bước xong khi `./gate.sh --quick` xanh; agent đánh dấu `[x]`, commi
 và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–37 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **kế tiếp bước
-40**; bước 50 chờ chủ dự án công khai repo (D-199); bản
+Trạng thái: **bước 0–37 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
+**kế tiếp bước 51**; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
@@ -64,54 +64,7 @@ Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một ngư�
 
 ## Giai đoạn A — Hợp đồng và nền lõi
 
-## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
-
-Đặc tả: [`docs/steps/40-core-capabilities.md`](steps/40-core-capabilities.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-So với những gì một lõi backend hiện đại thường có sẵn, core còn thiếu sáu năng lực chung, không
-gắn với ngành nào. Header bảo mật và MCP đầy đủ hơn không phụ thuộc nền đa khách: làm được ngay.
-Bốn mục còn lại (OIDC, tải thẳng lên S3, SSE, rate limit) bắt đầu SAU bước 34 vì phải theo khách hàng
-và tổ chức. Endpoint mới có OpenAPI và tool MCP
-tương ứng; thêm thư viện thì kiểm đúng phiên bản và ghi `STACK.md`; mọi mục chạy và có test trên
-cả SQLite và Postgres.
-
-- [ ] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
-      OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
-      kiểm chữ ký `id_token` qua JWKS; liên kết với tài khoản sẵn có theo email đã xác minh, không
-      tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình
-- [x] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
-      cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
-      lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
-      chung; file tải lên mà không xác nhận được dọn bằng job — `Storage::{presign_upload, head}`,
-      `autoxide_kernel::upload` (`<module>_uploads`), `POST /files/uploads` + `/complete`, `/media/uploads` + `/complete`,
-      4 tool MCP, job dọn mỗi giờ; ký `content-type` + checksum (không ký được `content-length`), xác nhận luôn đọc lại;
-      loại thật kiểm ở `media`, `files` giữ loại khai như tải qua máy chủ (D-379)
-- [x] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
-      `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
-      HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
-      có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
-- [x] Đẩy event theo thời gian thực bằng Server-Sent Events — stream event do module phát, KHÔNG
-      tự đẩy mọi thay đổi của bảng ("realtime theo bảng" mà `docs/research/frameworks.md` đã không
-      mượn); ghi quyết định nêu khác biệt đó. Một endpoint stream các event mà người
-      gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
-      `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
-      máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình) — `GET /api/v1/kernel/events/stream`, `EventInfo::streamable`, `StreamHub` hỏi bảng
-      event lùi `GRACE` 5 s; quyền hẹp hơn khách chỉ nhận việc của mình (event chưa có `org_id`); không có tool MCP (D-378)
-- [x] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
-      việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
-      mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
-      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch — `Module::{mcp_resources, prompts,
-      description}`, lọc theo permission như tool; resource của kernel / `content` / `comments`, prompt
-      `content.draft_post`, `comments.moderate_queue`; `/llms.txt` + `autoxide://kernel/llms.txt` (D-374)
-- [x] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
-      chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
-      chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
-      quyết định — `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (bảng `kernel_throttle`, `Throttle::take` theo
-      lô burst / 4, khoá theo khách); đo: tới −11% req/s, +22% p95 → `memory` vẫn mặc định; IP vẫn trong
-      bộ nhớ (D-375)
-- [ ] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
-      `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
-      module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục
+Xong cả giai đoạn (33–37, 40): xem [`roadmap/done.md`](roadmap/done.md).
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

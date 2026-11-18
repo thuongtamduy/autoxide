@@ -456,6 +456,8 @@ impl UserService {
         autoxide_kernel::tokens::OneTimeTokens::new("auth")
             .forget(&transaction, tenant, &id.to_string())
             .await?;
+        // Liên kết đăng nhập ngoài (bước 40 P3): không có foreign key, xoá cùng transaction.
+        crate::oidc::identity::delete_for_user(&transaction, tenant, id).await?;
         // Chỉ ghi id: audit log không giữ lại email hay tên của người đã xin xoá.
         let event =
             events::UserDeleted { before: Some(serde_json::json!({"id": id})), after: None };

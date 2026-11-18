@@ -9315,3 +9315,72 @@ liệu cá nhân.
    `AUTOXIDE_FILES_DIRECT_MAX_BYTES` (5 GiB), `AUTOXIDE_FILES_DIRECT_UPLOAD_SECONDS` (900), `AUTOXIDE_MEDIA_DIRECT_MAX_BYTES`
    (1 GiB — xác nhận đọc lại cả item), `AUTOXIDE_MEDIA_DIRECT_UPLOAD_SECONDS` (900). Test: link giả của `MemoryStorage::presign`
    (testkit) trên hai database; S3 thật (moto) ở `files` và e2e `media`.
+
+## D-380 · Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18 — agent quyết
+
+1. **Không thêm thư viện:** kiểm `id_token` tự viết (`modules/auth/src/oidc/jwt.rs`, như D-045) — chỉ `RS256` (`ring`
+   `RsaPublicKeyComponents::verify`, `RSA_PKCS1_2048_8192_SHA256`) và `ES256` (`p256`, khoá dựng từ SEC1 `04‖x‖y`); không
+   bao giờ `none` / `HS*`. `ring` và `p256` thành phụ thuộc trực tiếp của `auth` (đều đã có trong cây) — không `rsa`,
+   `jsonwebtoken`, `openidconnect`, không mở rộng ngoại lệ RUSTSEC của D-077. RS256 kiểm bằng ví dụ RFC 7515 A.2 (chỉ
+   khoá công khai); ES256 ký bằng khoá sinh lúc chạy trong máy chủ OIDC giả của test.
+2. **Bộ lọc SSRF dời vào kernel:** `webhooks/src/network.rs` → `autoxide_kernel::net` (`is_public`, `is_public_host`,
+   `PublicOnly`); `webhooks` dùng lại. Kernel thêm `reqwest` (đã có trong cây) cho trait phân giải. Client OIDC: không
+   theo chuyển hướng, không proxy hệ thống, kiểm host là IP trước MỖI lần gọi (reqwest không hỏi bộ phân giải cho IP),
+   `https://` bắt buộc trừ khi `AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=true`, thân trả lời tối đa 1 MiB, hạn 10 s.
+3. **Cache:** discovery và JWKS trong bộ nhớ theo `max-age` (kẹp 5 phút – 24 giờ). `kid` lạ khi đang giữ JWKS còn hạn → tải
+   lại tối đa một lần mỗi phút mỗi issuer (lần tải đầu không tính).
+4. **`state`:** token một lần của kernel (`auth_tokens`, `purpose = oidc_state`, `subject` = ID nhà cung cấp, tra bằng
+   bản băm), mang khách theo `link_token` như link trong mail. `nonce`, `code_verifier`, `redirect_uri`, `link_user_id` lưu
+   trong `data`, mã hoá bằng `Sealer` (AAD: khách + ID nhà cung cấp). Lượt liên kết (`link_user_id`) không dùng được để
+   đăng nhập và ngược lại. Đặc tả có cờ `link` ở `/oidc/{slug}/start` — bỏ: liên kết đi qua
+   `/me/identities/{slug}/start` (đòi mật khẩu hay `reauth_token`), một cách làm.
+5. **Liên kết tài khoản:** liên kết sẵn có → tài khoản đó; khớp email → chỉ khi CẢ email nhà cung cấp (Google / OIDC
+   `email_verified`, GitHub email `primary && verified`, Microsoft chỉ `xms_edov = true`) lẫn email trong Autoxide đã xác
+   minh, không thì `auth.oidc_link_required`; không khớp → tài khoản mới (email đã xác minh, không mật khẩu) khi
+   `allow_signup` **và** (đăng ký mở — `AUTOXIDE_AUTH_SELF_REGISTRATION` cho nhân sự, `auth.customer_registration` cho người
+   mua — **hoặc** nhà cung cấp có `default_role_id`: quản trị khách chủ động cho người của IdP công ty vào, lệch đặc tả để
+   chuỗi dùng Entra không phải mở đăng ký công khai). Email chưa xác minh không bao giờ tạo tài khoản
+   (`auth.oidc_email_unverified`). Người khai `default_role_id` phải có mọi permission của role (`grant_problems`), giữ chỗ
+   hạn mức số nhân sự như lời mời (D-326). MFA qua `SessionService::login_verified` (chung với link qua email): phiên
+   `method = "oidc"`.
+6. **Bảng:** `auth_oidc_provider`, `auth_identity` — tên số ít theo quy ước bảng của `auth` (đặc tả ghi số nhiều); khoá
+   chính `(tenant_id, id)`, không foreign key: xoá tài khoản / nhà cung cấp xoá liên kết trong cùng transaction. Thêm cột
+   `realm` (`staff` | `customer`, D-309) — sàn cho người mua đăng nhập Google. `client_secret` mã hoá AEAD (mang `key_id`).
+7. **Permission:** thêm `auth.oidc.read` (xem danh sách nhà cung cấp, đọc được qua tool read-only — luật e2e: tool
+   read-only phải có permission mức đọc) bên cạnh `auth.oidc.manage` của đặc tả. **Mã lỗi:** theo đặc tả, trừ
+   `auth.oidc_provider_unavailable` là **503** (`ErrorKind` không có 502) và thêm
+   `auth.identity_taken` (409, danh tính đã liên kết với tài khoản khác). Tool MCP: `auth.list_oidc_providers`,
+   `auth.create_oidc_provider`, `auth.update_oidc_provider` (đầu vào phẳng — MCP không theo `$ref`),
+   `auth.delete_oidc_provider`, `auth.list_my_identities`; luồng đăng nhập không có tool. GitHub Enterprise Server: `kind`
+   `github` có `issuer` là địa chỉ gốc (API ở `/api/v3`) — cũng là cách test chạy trên máy chủ giả.
+8. **Pháp lý:** danh tính ở nhà cung cấp (subject, email) là dữ liệu cá nhân (Luật 91/2025/QH15, NĐ 356/2025, hiệu lực
+   01/01/2026): chỉ xin scope `openid email profile`, có trong `GET /me/export`, xoá cùng tài khoản. Đăng nhập Google / GitHub
+   không thay xác thực số điện thoại của NĐ 147/2024/NĐ-CP — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý về sổ
+   đồng ý khi liên kết.
+
+## D-381 · Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18 — agent quyết
+
+1. **Xây trên cái sẵn có, không phá API:** `autoxide_kernel::search` giữ nguyên `fold` / `exact_key` / `contains*` (ô tìm
+   của module); tìm xuyên phân hệ bước 51 (`autoxide_kernel::find`, `FinderSource`, `SearchQuery`) giữ nguyên trên bảng
+   của từng module. Phần mới nằm cùng mô-đun `search`: trait `SearchBackend` (`index`, `remove`, `clear`, `query`),
+   `SearchSource` (`load`, `scan`), `SearchKind`, `SearchDoc`, `SearchRequest`, `OrgScope`, `SearchHits = Page<SearchHit>`,
+   sổ `SearchIndex` và bộ máy mặc định `DatabaseSearch`. Lệch đặc tả: tên `SearchRequest` thay `SearchQuery` (đã là
+   truy vấn của bước 51); thêm `clear` (dựng lại chỉ mục bỏ được tài liệu mồ côi); một truy vấn một loại.
+2. **Khai báo qua `StartContext`**, không qua `Module::search_documents` của đặc tả: `context.search_documents(kind,
+   source)` như `finder_source` — nguồn cần trạng thái có sau `start`. `context.search_backend(name, backend)` cho
+   module bộ máy ngoài; `AUTOXIDE_SEARCH_BACKEND` (`database` mặc định) chọn bộ máy, tra lúc dùng (bộ máy tên khác mà
+   không module nào thêm → lỗi nội bộ nêu rõ biến).
+3. **`DatabaseSearch`:** `kernel_search_docs` (khoá `(tenant_id, kind, id)`, index `(tenant_id, kind, org_id)`, bốn cột
+   khoá tìm) + `kernel_search_filters` (khoá `(tenant_id, kind, doc_id, name)`, index `(tenant_id, kind, name, value)`;
+   bộ lọc so bằng qua `EXISTS`). Xếp bốn tầng bằng `fetch_page_tiers`: tiêu đề (trường trọng số cao nhất) đúng dấu, mọi
+   trường đúng dấu, tiêu đề không dấu, mọi trường không dấu; trong tầng theo ID — trọng số chỉ phân "tiêu đề" và "phần
+   còn lại" (đủ cho cách xếp D-202; bộ máy ngoài dùng trọng số đầy đủ). Phạm vi nút lọc trong câu SQL
+   (`OrgTree::subtree_condition`, nút đúng, hàng rào) như `Principal::scope_condition`.
+4. **Đồng bộ:** module gọi `SearchIndex::enqueue(&transaction, …)` trong transaction của thay đổi → job
+   `kernel.search_sync` (hàng đợi `kernel`, cùng database của khách) mang loại + ID; job gọi `SearchSource::load`, đưa
+   tài liệu còn vào chỉ mục và bỏ ID không còn — chạy lại cho cùng kết quả, không gọi mạng trong transaction ghi.
+   `autoxide task kernel.reindex [kind=…] [tenant=…]` dựng lại theo lô 200 (`clear` rồi `scan`); `DatabaseRegistry::
+   all_tenants` duyệt mọi khách.
+5. **Chưa đo:** chưa module nào dùng chỉ mục (module tự chuyển khi bảng lớn — catalog bước 41 là chỗ đầu tiên); số đo
+   trên bộ dữ liệu lớn của bước 39 và khuyến nghị bộ máy ngoài ghi vào `docs/BENCHMARKS.md` khi đó. Test (SQLite và
+   Postgres): `tests/search_index.rs` với module mẫu và bộ máy giả.

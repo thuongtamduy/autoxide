@@ -15,7 +15,20 @@
 //! migration tính lại mọi cột khoá tìm đã lưu.
 //!
 //! "Chứa" không dùng được index: database quét các dòng còn lại sau những bộ lọc khác.
-//! Đủ cho bảng vài trăm nghìn dòng; lớn hơn thì cần full-text search riêng.
+//! Đủ cho bảng vài trăm nghìn dòng; lớn hơn thì dùng chỉ mục tìm kiếm thay được ([`SearchIndex`],
+//! bước 40 P7): module khai loại tài liệu, bộ máy mặc định [`DatabaseSearch`] hay bộ máy ngoài.
+
+mod backend;
+pub(crate) mod database;
+mod index;
+
+pub use backend::{
+    OrgScope, SearchBackend, SearchDoc, SearchHit, SearchHits, SearchKind, SearchRequest,
+    SearchSource,
+};
+pub use database::DatabaseSearch;
+pub use index::{DATABASE_BACKEND, SearchIndex};
+pub(crate) use index::{SEARCH_BACKEND, SEARCH_SYNC, SyncRunner, reindex_task};
 
 use sea_orm::ColumnTrait;
 use sea_orm::sea_query::{Expr, LikeExpr};

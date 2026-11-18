@@ -7,6 +7,7 @@ Vietnamese: [`README.vi.md`](README.vi.md).
 
 - [Showing posts and pictures on a website](website.md): public endpoints, `srcset` and WebP, ETag and 304
 - [Signing in and staying signed in](authentication.md): access and refresh tokens, signing out
+- [Signing in with Google, Microsoft, GitHub or OpenID Connect](oidc.md): providers per tenant, linking accounts safely
 - [API keys for programs and AI agents](api-keys.md): least permissions, rate limit, revoking
 - [Retrying safely](retries.md): `Idempotency-Key`
 - [Reading long lists](pagination.md): `limit`, `cursor`, `order`

@@ -528,6 +528,14 @@ export type BulkRequest = {
   ids?: string[] | null;
 };
 
+/** What the provider sent back to `redirect_uri`. */
+export type CallbackRequest = {
+  /** The `code` query parameter. */
+  code: string;
+  /** The `state` query parameter, unchanged. */
+  state: string;
+};
+
 /** A campaign mail exactly as subscribers get it. */
 export type CampaignPreviewResponse = {
   /**
@@ -4630,6 +4638,26 @@ export type Data_Health = {
 };
 
 /** Envelope of a single result. */
+export type Data_IdentityResponse = {
+  /** A sign-in with an outside provider linked to your account. */
+  data: {
+    created_at: string;
+    /** The email the provider gave at the last sign-in. */
+    email?: string | null;
+    /** Whether the provider said it verified that email. */
+    email_verified: boolean;
+    id: string;
+    /** `google`, `microsoft`, `github` or `oidc`. */
+    kind: string;
+    last_login_at?: string | null;
+    /** Slug of the provider; empty if the provider was removed meanwhile. */
+    provider: string;
+    provider_id: string;
+    provider_name: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ImportContentMenusReport = {
   /** What the import did (or, with `dry_run`, would do). */
   data: {
@@ -6167,6 +6195,40 @@ export type Data_PreviewToken = {
 };
 
 /** Envelope of a single result. */
+export type Data_ProviderResponse = {
+  /** A sign-in provider of the tenant, as administrators see it. The client secret is never shown. */
+  data: {
+    /** Whether someone without an account may get one by signing in. */
+    allow_signup: boolean;
+    /** Only emails at these domains may sign in; `null`: any. */
+    allowed_email_domains?: string[] | null;
+    client_id: string;
+    created_at: string;
+    /** Unit where new accounts get `default_role_id`; `null`: the root unit. */
+    default_org_id?: string | null;
+    /** Role new accounts get; `null`: none. */
+    default_role_id?: string | null;
+    enabled: boolean;
+    /** Whether a client secret is stored. The secret itself is never returned. */
+    has_secret: boolean;
+    id: string;
+    /** Issuer address; `null` for github.com. */
+    issuer?: string | null;
+    /** `google`, `microsoft`, `github` or `oidc`. */
+    kind: string;
+    name: string;
+    /** `staff` or `customer`: which accounts sign in with it. */
+    realm: Realm;
+    /** Pages of the interface the provider may send the browser back to. */
+    redirect_uris: string[];
+    /** Space-separated scopes asked for. */
+    scopes: string;
+    slug: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ProvisioningResponse = {
   /** A request to create a tenant on a plan, and how far it went. */
   data: {
@@ -6675,6 +6737,20 @@ export type Data_SiteMenu = {
     /** The website (organization unit) of the menu; the id of the tenant for the whole tenant. */
     org_id: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_StartResponse = {
+  /** Where to send the browser. */
+  data: {
+    /**
+     * Open this address in the browser. The provider comes back to `redirect_uri` with `code`
+     * and `state` in the query.
+     */
+    authorization_url: string;
+    /** Seconds left to finish; after that, start again. */
+    expires_in: number;
   };
 };
 
@@ -7784,6 +7860,25 @@ export type Data_Vec_EventTypeResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_IdentityResponse = {
+  data: {
+    created_at: string;
+    /** The email the provider gave at the last sign-in. */
+    email?: string | null;
+    /** Whether the provider said it verified that email. */
+    email_verified: boolean;
+    id: string;
+    /** `google`, `microsoft`, `github` or `oidc`. */
+    kind: string;
+    last_login_at?: string | null;
+    /** Slug of the provider; empty if the provider was removed meanwhile. */
+    provider: string;
+    provider_id: string;
+    provider_name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_InvoicesExportProfile = {
   data: {
     description: string;
@@ -8215,6 +8310,39 @@ export type Data_Vec_PlanResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_ProviderResponse = {
+  data: {
+    /** Whether someone without an account may get one by signing in. */
+    allow_signup: boolean;
+    /** Only emails at these domains may sign in; `null`: any. */
+    allowed_email_domains?: string[] | null;
+    client_id: string;
+    created_at: string;
+    /** Unit where new accounts get `default_role_id`; `null`: the root unit. */
+    default_org_id?: string | null;
+    /** Role new accounts get; `null`: none. */
+    default_role_id?: string | null;
+    enabled: boolean;
+    /** Whether a client secret is stored. The secret itself is never returned. */
+    has_secret: boolean;
+    id: string;
+    /** Issuer address; `null` for github.com. */
+    issuer?: string | null;
+    /** `google`, `microsoft`, `github` or `oidc`. */
+    kind: string;
+    name: string;
+    /** `staff` or `customer`: which accounts sign in with it. */
+    realm: Realm;
+    /** Pages of the interface the provider may send the browser back to. */
+    redirect_uris: string[];
+    /** Space-separated scopes asked for. */
+    scopes: string;
+    slug: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PublicEntryResponse = {
   data: {
     /**
@@ -8321,6 +8449,19 @@ export type Data_Vec_PublicProfileResponse = {
     unit_type: string;
     /** `null` until the profile is first saved. */
     updated_at?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PublicProviderResponse = {
+  data: {
+    id: string;
+    /** `google`, `microsoft`, `github` or `oidc`. */
+    kind: string;
+    /** Label for the "Sign in with …" button. */
+    name: string;
+    /** Name in the sign-in paths, e.g. `google` in `/api/v1/auth/oidc/google/start`. */
+    slug: string;
   }[];
 };
 
@@ -9430,6 +9571,23 @@ export type FoundView = {
 export type Health = {
   /** Always `ok`; a service that is not healthy answers with an error instead. */
   status: string;
+};
+
+/** A sign-in with an outside provider linked to your account. */
+export type IdentityResponse = {
+  created_at: string;
+  /** The email the provider gave at the last sign-in. */
+  email?: string | null;
+  /** Whether the provider said it verified that email. */
+  email_verified: boolean;
+  id: string;
+  /** `google`, `microsoft`, `github` or `oidc`. */
+  kind: string;
+  last_login_at?: string | null;
+  /** Slug of the provider; empty if the provider was removed meanwhile. */
+  provider: string;
+  provider_id: string;
+  provider_name: string;
 };
 
 /** What the import did (or, with `dry_run`, would do). */
@@ -10568,6 +10726,19 @@ export type LimitUse = {
   over_limit: boolean;
   /** In use now (for `metered`: this month). */
   used: number;
+};
+
+/** Start linking a provider to your account; proves it is you first. */
+export type LinkStartRequest = {
+  /** Your current password. */
+  current_password?: string;
+  /**
+   * A confirmation token from `POST /api/v1/auth/me/reauth`, instead of `current_password`
+   * (accounts without a password use this). Exactly one of the two.
+   */
+  reauth_token?: string | null;
+  /** A page of the interface, exactly as listed in the provider's `redirect_uris`. */
+  redirect_uri: string;
 };
 
 /** One list choice. */
@@ -14860,6 +15031,95 @@ export type ProfileRequest = {
   display_name: string;
 };
 
+/** Changes to a sign-in provider; fields left out stay as they are, `null` clears. */
+export type ProviderPatch = {
+  allow_signup?: boolean | null;
+  allowed_email_domains?: string[] | null;
+  client_id?: string | null;
+  /** A new client secret (write-only). */
+  client_secret?: string | null;
+  default_org_id?: string | null;
+  default_role_id?: string | null;
+  enabled?: boolean | null;
+  issuer?: string | null;
+  name?: string | null;
+  redirect_uris?: string[] | null;
+  scopes?: string | null;
+};
+
+/** A new sign-in provider. */
+export type ProviderRequest = {
+  /**
+   * Let someone without an account get one by signing in (still needs registration open, or
+   * `default_role_id`). Default `false`.
+   */
+  allow_signup?: boolean;
+  /** Only emails at these domains may sign in; omit for any. */
+  allowed_email_domains?: string[] | null;
+  /** The client (application) id registered at the provider. */
+  client_id: string;
+  /**
+   * The client secret registered at the provider; write-only. Required except for `oidc`
+   * public clients.
+   */
+  client_secret?: string | null;
+  /** Unit where new accounts get `default_role_id`; omit for the root unit. */
+  default_org_id?: string | null;
+  /** Role new accounts get (staff only). You must hold every permission of it. */
+  default_role_id?: string | null;
+  /** Default `true`. */
+  enabled?: boolean;
+  /**
+   * `oidc`: the issuer (required). `microsoft`: omit for any work or school account
+   * (`https://login.microsoftonline.com/organizations/v2.0`) or give
+   * `https://login.microsoftonline.com/<tenant id>/v2.0`. `github`: omit for github.com, or the
+   * address of a GitHub Enterprise Server. `google`: omit.
+   */
+  issuer?: string | null;
+  /** `google`, `microsoft`, `github` or `oidc`. */
+  kind: string;
+  /** Label for the "Sign in with …" button, 1 to 100 characters. */
+  name: string;
+  realm?: ("staff" | "customer") & Record<string, unknown>;
+  /** Pages of the interface the provider may send the browser back to (1 to 20, exact match). */
+  redirect_uris: string[];
+  /** Space-separated scopes; default `openid email profile` (`read:user user:email` for GitHub). */
+  scopes?: string | null;
+  /** Unique in the tenant: lowercase letters, digits and `-`, starting with a letter. */
+  slug: string;
+};
+
+/** A sign-in provider of the tenant, as administrators see it. The client secret is never shown. */
+export type ProviderResponse = {
+  /** Whether someone without an account may get one by signing in. */
+  allow_signup: boolean;
+  /** Only emails at these domains may sign in; `null`: any. */
+  allowed_email_domains?: string[] | null;
+  client_id: string;
+  created_at: string;
+  /** Unit where new accounts get `default_role_id`; `null`: the root unit. */
+  default_org_id?: string | null;
+  /** Role new accounts get; `null`: none. */
+  default_role_id?: string | null;
+  enabled: boolean;
+  /** Whether a client secret is stored. The secret itself is never returned. */
+  has_secret: boolean;
+  id: string;
+  /** Issuer address; `null` for github.com. */
+  issuer?: string | null;
+  /** `google`, `microsoft`, `github` or `oidc`. */
+  kind: string;
+  name: string;
+  /** `staff` or `customer`: which accounts sign in with it. */
+  realm: Realm;
+  /** Pages of the interface the provider may send the browser back to. */
+  redirect_uris: string[];
+  /** Space-separated scopes asked for. */
+  scopes: string;
+  slug: string;
+  updated_at: string;
+};
+
 /** Create a tenant on a plan. */
 export type ProvisioningRequest = {
   /** Who administers the new tenant: invited by email with the role `admin`. */
@@ -15271,6 +15531,17 @@ export type PublicProfileResponse = {
   unit_type: string;
   /** `null` until the profile is first saved. */
   updated_at?: string | null;
+};
+
+/** A sign-in provider people of this tenant can use. */
+export type PublicProviderResponse = {
+  id: string;
+  /** `google`, `microsoft`, `github` or `oidc`. */
+  kind: string;
+  /** Label for the "Sign in with …" button. */
+  name: string;
+  /** Name in the sign-in paths, e.g. `google` in `/api/v1/auth/oidc/google/start`. */
+  slug: string;
 };
 
 /** Search engine and sharing data. */
@@ -16188,6 +16459,23 @@ export type StartPasskeyRegistrationRequest = {
    * (accounts without a password use this). Exactly one of the two.
    */
   reauth_token?: string | null;
+};
+
+/** Where the interface wants the provider to send the browser back. */
+export type StartRequest = {
+  /** A page of the interface, exactly as listed in the provider's `redirect_uris`. */
+  redirect_uri: string;
+};
+
+/** Where to send the browser. */
+export type StartResponse = {
+  /**
+   * Open this address in the browser. The provider comes back to `redirect_uri` with `code`
+   * and `state` in the query.
+   */
+  authorization_url: string;
+  /** Seconds left to finish; after that, start again. */
+  expires_in: number;
 };
 
 /** Confirms starting two-step sign-in. */
@@ -18202,6 +18490,67 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/me/identities": {
+    /** List the outside sign-ins linked to your account. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_IdentityResponse;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/me/identities/{id}": {
+    /** Remove an outside sign-in from your account. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/me/identities/{slug}/callback": {
+    /** Finish linking a provider to your account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { slug: string }; };
+      requestBody: CallbackRequest;
+      responses: {
+        201: Data_IdentityResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/me/identities/{slug}/start": {
+    /** Start linking a provider to your account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { slug: string }; };
+      requestBody: LinkStartRequest;
+      responses: {
+        200: Data_StartResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/me/memberships": {
     /** List the organization units you work in, with your roles there. */
     get: {
@@ -18440,6 +18789,112 @@ export interface paths {
         200: Data_Vec_MemberCountResponse;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oidc-providers": {
+    /** List the sign-in providers of this tenant, for administrators. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ProviderResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a sign-in provider to this tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ProviderRequest;
+      responses: {
+        201: Data_ProviderResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oidc-providers/{id}": {
+    /** Get a sign-in provider of this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ProviderResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a sign-in provider of this tenant. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ProviderPatch;
+      responses: {
+        200: Data_ProviderResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a sign-in provider from this tenant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oidc/providers": {
+    /** List the sign-in providers of this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PublicProviderResponse;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oidc/{slug}/callback": {
+    /** Finish signing in with a provider. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; };
+      requestBody: CallbackRequest;
+      responses: {
+        200: Data_TokenResponse;
+        202: Data_MfaChallengeResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oidc/{slug}/start": {
+    /** Start signing in with a provider. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; };
+      requestBody: StartRequest;
+      responses: {
+        200: Data_StartResponse;
+        404: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };

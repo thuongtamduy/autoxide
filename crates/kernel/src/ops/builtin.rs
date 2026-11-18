@@ -80,6 +80,10 @@ pub(crate) struct KernelModule {
     stream_config: crate::event::stream::StreamConfig,
     /// Hub stream event SSE; có sau `start`.
     stream: Option<crate::event::StreamHub>,
+    /// `AUTOXIDE_SEARCH_BACKEND` (bước 40 P7); điền lúc `configure`.
+    search_backend: String,
+    /// Sổ loại tài liệu tìm được và bộ máy tìm; có sau `start`.
+    search: Option<crate::search::SearchIndex>,
     /// Sổ đối tượng và sổ permission (ghi chú trên bản ghi, bước 51 P13); có sau `start`.
     resources: Option<(crate::resource::ResourceDirectory, crate::access::PermissionCatalog)>,
     /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (đọc ở cấu hình kernel): dời khách chờ request đang
@@ -112,6 +116,8 @@ impl KernelModule {
             jobs: None,
             stream_config: Default::default(),
             stream: None,
+            search_backend: crate::search::DATABASE_BACKEND.to_owned(),
+            search: None,
             resources: None,
             request_timeout: std::time::Duration::from_secs(30),
             keys,
@@ -272,6 +278,8 @@ impl Module for KernelModule {
                 "m0033_tenancy_throttle",
                 vec![crate::throttle::tenant_table(NAME)],
             ),
+            // Chỉ mục tìm kiếm mặc định (bước 40 P7): cấp khách hàng, mọi database dữ liệu.
+            Box::new(crate::search::database::CreateSearchDocs),
         ]
     }
 
@@ -311,6 +319,19 @@ impl Module for KernelModule {
             crate::config::parse_in_range(raw, 1u64, 100_000)
         });
         let stream_config = crate::event::stream::StreamConfig::read(reader);
+        let search_backend = reader.get_with(&crate::search::SEARCH_BACKEND, |raw| {
+            let name = raw.trim();
+            let valid = !name.is_empty()
+                && name.len() <= 32
+                && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+            if valid {
+                Ok(name.to_owned())
+            } else {
+                Err("must be `database` or the name of a search engine module (lowercase letters, \
+                     digits and `_`)"
+                    .to_owned())
+            }
+        });
         let job_file_days = reader
             .get_with(&crate::ops::list_exports::FILE_RETENTION_DAYS, |raw| {
                 crate::config::parse_in_range(raw, 1u32, 365)
@@ -325,6 +346,7 @@ impl Module for KernelModule {
         self.export_days = export_days?;
         self.job_file_days = job_file_days?;
         self.stream_config = stream_config?;
+        self.search_backend = search_backend?;
         self.catalog.text_overrides().set_ui_max(ui_texts?);
         Ok(())
     }
@@ -588,6 +610,12 @@ impl Module for KernelModule {
 
     fn jobs(&self) -> Vec<crate::job::JobRegistration> {
         let mut jobs = Vec::new();
+        if let Some(search) = &self.search {
+            jobs.push(crate::job::JobRegistration::new(
+                crate::search::SEARCH_SYNC,
+                Arc::new(crate::search::SyncRunner(search.clone())),
+            ));
+        }
         if let Some(registry) = &self.registry {
             jobs.push(crate::job::JobRegistration::new(
                 crate::ops::list_exports::EXPORT_LIST,
@@ -637,6 +665,15 @@ impl Module for KernelModule {
         jobs
     }
 
+    fn tasks(&self) -> Vec<crate::task::Task> {
+        match (&self.search, &self.registry) {
+            (Some(search), Some(registry)) => {
+                vec![crate::search::reindex_task(search.clone(), registry.clone())]
+            }
+            _ => Vec::new(),
+        }
+    }
+
     fn schedules(&self) -> Vec<crate::job::Schedule> {
         // Tên miền riêng chỉ có ở chế độ `multi`: chế độ `single` không thêm job nào mỗi 10 phút.
         let mut schedules = match &self.domains {
@@ -663,6 +700,10 @@ impl Module for KernelModule {
         let hub = crate::event::StreamHub::new(self.stream_config.clone(), context.events());
         self.stream = Some(hub.clone());
         context.provide::<crate::event::StreamHub>(Arc::new(hub))?;
+        // Chỉ mục tìm kiếm thay được (bước 40 P7): module khai loại tài liệu, bộ máy theo cấu hình.
+        let search = crate::search::SearchIndex::new(&self.search_backend);
+        self.search = Some(search.clone());
+        context.provide::<crate::search::SearchIndex>(Arc::new(search))?;
         // Yêu cầu duyệt của agent vào hộp việc của người quyết được (bước 51 P12).
         context.work_source(Arc::new(crate::ops::approvals::ApprovalsWork))?;
         let flags = Arc::new(UserFlags::new(self.max_flags));

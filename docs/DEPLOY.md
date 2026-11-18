@@ -494,7 +494,13 @@ The mail carries a one-time link to `AUTOXIDE_AUTH_INVITATION_URL` (a page of yo
 Accepting creates the account (or, when the email already has one, adds the roles after the person
 signs in). **Signing in with a link** (no password) is off by default; turn it on with
 `AUTOXIDE_AUTH_LOGIN_LINK=true` and set `AUTOXIDE_AUTH_LOGIN_LINK_URL` to your interface's page.
-Both need working mail (`AUTOXIDE_MAIL_SMTP_URL`) and a running worker. The organization tree of
+**Signing in with Google, Microsoft, GitHub or OpenID Connect** is off by default; turn it on with
+`AUTOXIDE_AUTH_OIDC=true`. Each tenant registers its application at the provider and adds it with
+`POST /api/v1/auth/oidc-providers` ([`docs/guides/oidc.md`](guides/oidc.md)); client secrets are
+stored encrypted with `AUTOXIDE_SECRET_KEY`. The server calls providers only on public addresses;
+keep `AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=false` in production, and let the server reach the
+providers over HTTPS (outbound port 443).
+Links and invitations need working mail (`AUTOXIDE_MAIL_SMTP_URL`) and a running worker. The organization tree of
 a tenant is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (8 by default). Import the list of
 administrative units once, for checking addresses: `autoxide task address.import`
 ([`docs/ADDRESS.md`](ADDRESS.md)).

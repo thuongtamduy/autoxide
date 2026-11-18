@@ -237,6 +237,12 @@ và `POST /api/v1/auth/login/passkey` — không cần email. `options` trả v�
 `PublicKeyCredential.parseCreationOptionsFromJSON()` / `parseRequestOptionsFromJSON()` của
 trình duyệt.
 
+Đăng nhập bằng Google, Microsoft, GitHub hay nhà cung cấp OpenID Connect bất kỳ tắt mặc định;
+bật bằng `AUTOXIDE_AUTH_OIDC=true`, rồi mỗi khách thêm nhà cung cấp của mình bằng
+`POST /api/v1/auth/oidc-providers` (permission `auth.oidc.manage`). Tài khoản sẵn có chỉ được liên
+kết khi cả hai phía đã xác minh email, và đăng nhập hai bước vẫn áp dụng. Xem
+[`docs/guides/oidc.vi.md`](docs/guides/oidc.vi.md).
+
 Người dùng có permission `files.upload` tải file lên bằng cách gửi nguyên nội dung tới
 `POST /api/v1/files?name=report.pdf` kèm `Content-Type` của nó, rồi xem danh sách, tải
 xuống (`GET /api/v1/files/{id}/content`) và xoá file của mình; `files.manage` với tới

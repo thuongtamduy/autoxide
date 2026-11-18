@@ -26,6 +26,7 @@ mod invitation;
 mod login_link;
 mod mfa;
 mod migration;
+mod oidc;
 #[cfg(test)]
 mod org_tests;
 mod passkey;
@@ -335,6 +336,22 @@ impl Module for AuthModule {
             databases: databases.clone(),
         });
         self.login_links = Some(login_links.clone());
+        let oidc = Arc::new(oidc::OidcService {
+            enabled: config.oidc,
+            providers: oidc::ProviderService {
+                secrets: secrets.as_ref().clone(),
+                outbox: outbox.clone(),
+            },
+            client: oidc::OidcClient::new(config.oidc_allow_private_networks)?,
+            users: users.clone(),
+            sessions: sessions.clone(),
+            outbox: outbox.clone(),
+            secrets: secrets.as_ref().clone(),
+            databases: databases.clone(),
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            entitlements: context.entitlements(),
+            self_registration: config.self_registration,
+        });
         let invitations = Arc::new(invitation::Invitations {
             users: users.clone(),
             sessions: sessions.clone(),
@@ -351,6 +368,7 @@ impl Module for AuthModule {
         context.provide::<dyn api::Invitations>(invitations.clone())?;
         self.invitations = Some(invitations.clone());
         self.state = Some(http::HttpState {
+            oidc,
             support,
             invitations,
             login_links,

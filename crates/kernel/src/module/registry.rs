@@ -1075,6 +1075,7 @@ mod tests {
                 "AUTOXIDE_JOBS_FILE_RETENTION_DAYS",
                 "AUTOXIDE_TEXT_OVERRIDES_UI_MAX",
                 "AUTOXIDE_TEMPLATE_MAX_BYTES",
+                "AUTOXIDE_SEARCH_BACKEND",
             ]
             .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
