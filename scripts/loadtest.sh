@@ -88,6 +88,8 @@ export AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS=86400
 export AUTOXIDE_FILES_MAX_BYTES=1048576
 if [ -n "${LOADTEST_DATASET:-}" ]; then
   export AUTOXIDE_CONTENT_LOCALES=en,vi
+  # Tìm công khai tắt mặc định; không có mô hình embedding thì tìm theo từ.
+  export AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true
 fi
 TENANCY="${LOADTEST_TENANCY:-single}"
 if [ "$TENANCY" = multi ]; then
