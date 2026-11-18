@@ -62,6 +62,7 @@ autoxide-invoices = { path = "modules/invoices" }
 autoxide-compliance = { path = "modules/compliance" }
 autoxide-notifications = { path = "modules/notifications" }
 autoxide-analytics = { path = "modules/analytics" }
+autoxide-support = { path = "modules/support" }
 autoxide-bookings = { path = "modules/bookings" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
