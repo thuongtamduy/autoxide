@@ -83,6 +83,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // người tiêu dùng), nên đứng sau `media` và `tax`; đứng sau `comments` để hỏi đáp sản phẩm
         // (D-202). Module thương mại sau (`inventory`, `promotions`, `shipping`…) đăng ký SAU nó.
         Box::new(autoxide_catalog::module()),
+        // Kho (bước 42): cần `dyn Catalog` (biến thể, combo, chế độ bán) nên đứng sau `catalog`;
+        // dùng `dyn OrgDirectory` (loại nút) và `dyn Ledger` (công nợ nhà cung cấp) nếu có. `orders`
+        // (bước 45) giữ chỗ qua `dyn Inventory`, nên đăng ký SAU nó.
+        Box::new(autoxide_inventory::module()),
         // Vận chuyển (bước 44): cần `dyn AdministrativeUnits` (kiểm địa chỉ), đứng sau `catalog`
         // (cạnh `inventory`, `promotions`) và trước `orders`. Bộ nối hãng đăng ký SAU nó.
         Box::new(autoxide_shipping::module()),

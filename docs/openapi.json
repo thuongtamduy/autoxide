@@ -18862,6 +18862,137 @@
         ],
         "type": "object"
       },
+      "Data_InventoryAdjustment": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A stock adjustment with the ledger lines it wrote.",
+            "properties": {
+              "actor_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "movements": {
+                "items": {
+                  "$ref": "#/components/schemas/InventoryMovement"
+                },
+                "type": "array"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "reference",
+              "created_at",
+              "movements"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventoryLevel": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The stock of one variant in one warehouse or store.",
+            "properties": {
+              "available": {
+                "description": "Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that\nmay be sold out of stock is oversold.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "average_cost": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money",
+                    "description": "Weighted average unit cost of the stock; `null` until goods with a cost come in."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "incoming": {
+                "description": "Units on the way (transfers in transit, purchase orders).",
+                "format": "int64",
+                "type": "integer"
+              },
+              "on_hand": {
+                "description": "Units physically in the warehouse: the sum of the movement ledger.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "org_id": {
+                "description": "The warehouse or store (organization unit).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "reorder_point": {
+                "description": "`inventory.low_stock` fires when `available` falls to this or below; `null`: never.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "reserved": {
+                "description": "Units held for orders not shipped yet.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "variant_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "variant_id",
+              "on_hand",
+              "available",
+              "reserved",
+              "incoming",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_InvitationResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -36886,6 +37017,297 @@
         ],
         "type": "object"
       },
+      "InventoryAdjustment": {
+        "description": "A stock adjustment with the ledger lines it wrote.",
+        "properties": {
+          "actor_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "movements": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryMovement"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "reference",
+          "created_at",
+          "movements"
+        ],
+        "type": "object"
+      },
+      "InventoryAdjustmentLine": {
+        "additionalProperties": false,
+        "description": "One line of a stock adjustment.",
+        "properties": {
+          "note": {
+            "description": "Up to 500 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "description": "Units to add (positive) or remove (negative); not 0.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason_code": {
+            "description": "Code from the reason list `inventory.adjustment` (see\n`GET /api/v1/kernel/reasons/inventory.adjustment`), e.g. `damaged`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_cost": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Unit cost of the units added (e.g. opening stock); updates the average cost. Only with a\npositive quantity."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "InventoryAdjustmentRequest": {
+        "additionalProperties": false,
+        "description": "A stock adjustment to make in one warehouse.",
+        "properties": {
+          "lines": {
+            "description": "1 to 500 lines.",
+            "items": {
+              "$ref": "#/components/schemas/InventoryAdjustmentLine"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The warehouse or store.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your id of this adjustment (1 to 100 visible ASCII characters). Sending the same\nreference and content again returns the adjustment already made.",
+            "example": "ADJ-2026-0042",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InventoryLevel": {
+        "description": "The stock of one variant in one warehouse or store.",
+        "properties": {
+          "available": {
+            "description": "Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that\nmay be sold out of stock is oversold.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "average_cost": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Weighted average unit cost of the stock; `null` until goods with a cost come in."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "incoming": {
+            "description": "Units on the way (transfers in transit, purchase orders).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "on_hand": {
+            "description": "Units physically in the warehouse: the sum of the movement ledger.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "org_id": {
+            "description": "The warehouse or store (organization unit).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reorder_point": {
+            "description": "`inventory.low_stock` fires when `available` falls to this or below; `null`: never.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reserved": {
+            "description": "Units held for orders not shipped yet.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "variant_id",
+          "on_hand",
+          "available",
+          "reserved",
+          "incoming",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "InventoryLevelUpdate": {
+        "additionalProperties": false,
+        "description": "Settings of a stock level.",
+        "properties": {
+          "reorder_point": {
+            "description": "Reorder point, 0 to 1 000 000; `null` turns low-stock alerts off.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "InventoryMovement": {
+        "description": "One line of the stock movement ledger. Lines are only ever added.",
+        "properties": {
+          "actor_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,\n`expiry` or `supplier_return`.",
+            "type": "string"
+          },
+          "level_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Signed: positive came in, negative went out.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason_code": {
+            "description": "Code from the reason list `inventory.adjustment`, for adjustments and counts.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "source_type": {
+            "description": "What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`…",
+            "type": "string"
+          },
+          "unit_cost": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "level_id",
+          "org_id",
+          "variant_id",
+          "kind",
+          "quantity",
+          "note",
+          "source_type",
+          "source_id",
+          "created_at"
+        ],
+        "type": "object"
+      },
       "InvitationRequest": {
         "additionalProperties": false,
         "description": "A new invitation.",
@@ -48058,6 +48480,201 @@
                 "token_scope",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventoryLevel": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "The stock of one variant in one warehouse or store.",
+              "properties": {
+                "available": {
+                  "description": "Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that\nmay be sold out of stock is oversold.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "average_cost": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money",
+                      "description": "Weighted average unit cost of the stock; `null` until goods with a cost come in."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "incoming": {
+                  "description": "Units on the way (transfers in transit, purchase orders).",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "on_hand": {
+                  "description": "Units physically in the warehouse: the sum of the movement ledger.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "org_id": {
+                  "description": "The warehouse or store (organization unit).",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "reorder_point": {
+                  "description": "`inventory.low_stock` fires when `available` falls to this or below; `null`: never.",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "reserved": {
+                  "description": "Units held for orders not shipped yet.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "variant_id",
+                "on_hand",
+                "available",
+                "reserved",
+                "incoming",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventoryMovement": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "One line of the stock movement ledger. Lines are only ever added.",
+              "properties": {
+                "actor_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,\n`expiry` or `supplier_return`.",
+                  "type": "string"
+                },
+                "level_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lot_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "quantity": {
+                  "description": "Signed: positive came in, negative went out.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "reason_code": {
+                  "description": "Code from the reason list `inventory.adjustment`, for adjustments and counts.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "source_type": {
+                  "description": "What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`…",
+                  "type": "string"
+                },
+                "unit_cost": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "level_id",
+                "org_id",
+                "variant_id",
+                "kind",
+                "quantity",
+                "note",
+                "source_type",
+                "source_id",
+                "created_at"
               ],
               "type": "object"
             },
@@ -114697,6 +115314,919 @@
         ],
         "x-permissions": [
           "forms.export"
+        ]
+      }
+    },
+    "/api/v1/inventory/adjustments": {
+      "post": {
+        "description": "Requires `inventory.adjust` covering the warehouse. Every line needs a `reason_code` from the\ntenant's reason list `inventory.adjustment`. On hand never goes below 0. Send the same\n`reference` and content again to get the adjustment already made (`200`).",
+        "operationId": "inventory_create_inventory_adjustment",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryAdjustmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryAdjustment"
+                }
+              }
+            },
+            "description": "The adjustment was made before with this `reference` and content."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryAdjustment"
+                }
+              }
+            },
+            "description": "The adjustment.",
+            "headers": {
+              "Location": {
+                "description": "Path of the adjustment.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.adjust` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`), or the plan does not allow another warehouse (`feature_not_enabled`, `limit_exceeded`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A variant does not exist; code `inventory.variant_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "On hand would go below 0; code `inventory.insufficient_stock`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A line has no reason (`inventory.reason_required`) or an unknown one (`kernel.reason_unknown`), the unit holds no stock (`inventory.not_a_warehouse`), the variant tracks no stock (`inventory.not_tracked`), the cost currency differs (`inventory.currency_mismatch`), the reference was used for other content (`reference_reused`), or a value is invalid."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Adjust stock in one warehouse, each line with a reason.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.adjust"
+        ]
+      }
+    },
+    "/api/v1/inventory/adjustments/{id}": {
+      "get": {
+        "description": "Requires `inventory.read` covering the warehouse; an adjustment outside your scope answers\n404.",
+        "operationId": "inventory_get_inventory_adjustment",
+        "parameters": [
+          {
+            "description": "Id of the adjustment.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryAdjustment"
+                }
+              }
+            },
+            "description": "The adjustment."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No adjustment with this id in your scope; code `inventory.adjustment_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a stock adjustment with the ledger lines it wrote.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/levels": {
+      "get": {
+        "description": "Requires `inventory.read`; its scope decides which warehouses you see.",
+        "operationId": "inventory_list_inventory_levels",
+        "parameters": [
+          {
+            "description": "Only this warehouse or store.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only this variant.",
+            "in": "query",
+            "name": "variant_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "`true`: only levels whose available stock is at or below their reorder point.",
+            "in": "query",
+            "name": "below_reorder",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryLevel"
+                }
+              }
+            },
+            "description": "One page of stock levels."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List stock levels (variant × warehouse) in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only this warehouse or store.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this variant.",
+            "kind": "uuid",
+            "name": "variant_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true`: only levels whose available stock is at or below their reorder point.",
+            "kind": "boolean",
+            "name": "below_reorder",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_levels",
+        "x-permissions": [
+          "inventory.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/levels/{id}": {
+      "get": {
+        "description": "Requires `inventory.read` covering the warehouse; a level outside your scope answers 404.",
+        "operationId": "inventory_get_inventory_level",
+        "parameters": [
+          {
+            "description": "Id of the stock level.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryLevel"
+                }
+              }
+            },
+            "description": "The stock level."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No stock level with this id in your scope; code `inventory.level_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one stock level.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `inventory.settings.manage` covering the warehouse. `inventory.low_stock` fires\nwhen the available stock falls from above the reorder point to it or below.",
+        "operationId": "inventory_update_inventory_level",
+        "parameters": [
+          {
+            "description": "Id of the stock level.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryLevelUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryLevel"
+                }
+              }
+            },
+            "description": "The stock level."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.settings.manage` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No stock level with this id in your scope; code `inventory.level_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The reorder point is out of range; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change the reorder point of a stock level.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/movements": {
+      "get": {
+        "description": "Requires `inventory.read`. Newest first unless `order=asc`. The ledger is append-only: each\nreceipt, sale, return, adjustment, count, transfer or expiry adds lines and never changes\nthem.",
+        "operationId": "inventory_list_inventory_movements",
+        "parameters": [
+          {
+            "description": "Only this warehouse or store.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only this variant.",
+            "in": "query",
+            "name": "variant_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only this kind of line.",
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "description": "Kind of a movement ledger line.",
+                  "enum": [
+                    "receipt",
+                    "sale",
+                    "return",
+                    "adjustment",
+                    "count",
+                    "transfer_out",
+                    "transfer_in",
+                    "expiry",
+                    "supplier_return"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "description": "Lines written at or after this time.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Lines written before this time.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryMovement"
+                }
+              }
+            },
+            "description": "One page of ledger lines."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the stock movement ledger in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only this warehouse or store.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this variant.",
+            "kind": "uuid",
+            "name": "variant_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this kind of line.",
+            "kind": "string",
+            "name": "kind",
+            "operator": "eq",
+            "values": [
+              "receipt",
+              "sale",
+              "return",
+              "adjustment",
+              "count",
+              "transfer_out",
+              "transfer_in",
+              "expiry",
+              "supplier_return"
+            ]
+          },
+          {
+            "description": "Lines written at or after this time.",
+            "kind": "date-time",
+            "name": "from",
+            "operator": "eq"
+          },
+          {
+            "description": "Lines written before this time.",
+            "kind": "date-time",
+            "name": "to",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_movements",
+        "x-permissions": [
+          "inventory.read"
         ]
       }
     },

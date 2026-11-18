@@ -386,6 +386,7 @@ dependencies = [
  "autoxide-files",
  "autoxide-forms",
  "autoxide-idempotency",
+ "autoxide-inventory",
  "autoxide-invoices",
  "autoxide-kernel",
  "autoxide-ledger",
@@ -754,6 +755,29 @@ dependencies = [
  "utoipa",
  "utoipa-axum",
  "uuid",
+]
+
+[[package]]
+name = "autoxide-inventory"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-catalog",
+ "autoxide-kernel",
+ "autoxide-organizations",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
