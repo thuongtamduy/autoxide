@@ -126,3 +126,16 @@ pub trait OrgDirectory: Send + Sync {
         key: &str,
     ) -> Result<Option<EffectiveSetting>, Error>;
 }
+
+/// Nhóm nút ngoài cây (bước 38, D-232): `organizations` công bố, `reporting` lấy bằng
+/// `context.require::<dyn OrgGroups>()` để lọc / gom báo cáo. Nhóm không cấp quyền.
+#[async_trait::async_trait]
+pub trait OrgGroups: Send + Sync {
+    /// Nút thành viên của nhóm `group`; `None` khi khách không có nhóm này. KHÔNG lọc theo quyền —
+    /// bên gọi giao với phạm vi của người xem.
+    async fn members(
+        &self,
+        tenant: &TenantContext,
+        group: uuid::Uuid,
+    ) -> Result<Option<Vec<OrgId>>, Error>;
+}

@@ -258,6 +258,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-358** "Bán trước khi thông báo website" (A-3.5): nhãn "bắt buộc theo luật", không chặn — 2026-11-17
 - **D-370** Nhật ký request theo khách và nhật ký lệnh của agent (bước 52 mục 1, D-202) — 2026-11-18
 - **[D-20261118-step38-distribution](D-20261118-step38-distribution.md)** Phân phối cha → con và vào ngữ cảnh con xuyên database — 2026-11-18
+- **[D-20261118-step38-groups](D-20261118-step38-groups.md)** Nhóm nút ngoài cây cho báo cáo: số nút bị bỏ ở chi tiết nhóm, `group_by=group` cần `group_ids` — 2026-11-18
 - **[D-20261118-step38-relocation](D-20261118-step38-relocation.md)** Tách / gộp khách: chính sách theo bảng, giữ khoá chính, audit ghi lại ở đích, chỉ nhân sự nền tảng chạy — 2026-11-18
 - **[D-20261118-step38-report-facts](D-20261118-step38-report-facts.md)** Báo cáo gộp: `Module::facts`, kho ở database của khách gốc, hai chặng cục bộ → gốc — 2026-11-18
 

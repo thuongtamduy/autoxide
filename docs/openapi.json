@@ -203,6 +203,24 @@
         ],
         "type": "object"
       },
+      "AddMembersRequest": {
+        "additionalProperties": false,
+        "description": "Units to add to a group.",
+        "properties": {
+          "org_ids": {
+            "description": "1 to 200 unit ids of this tenant, from any branch. Units already in the group are skipped.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "org_ids"
+        ],
+        "type": "object"
+      },
       "AddPasskeyRequest": {
         "description": "The authenticator's answer to an add-passkey ceremony.",
         "properties": {
@@ -263,6 +281,28 @@
         },
         "required": [
           "body"
+        ],
+        "type": "object"
+      },
+      "AddedResponse": {
+        "description": "Result of adding units to a group.",
+        "properties": {
+          "added": {
+            "description": "Units that were not in the group before.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "member_count": {
+            "description": "Units in the group now (all of them, whatever your scope).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "member_count"
         ],
         "type": "object"
       },
@@ -10467,6 +10507,28 @@
         ],
         "type": "object"
       },
+      "CreateGroupRequest": {
+        "additionalProperties": false,
+        "description": "A new unit group.",
+        "properties": {
+          "description": {
+            "description": "Up to 1000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 200 characters, unique in the tenant (accents and case ignored).",
+            "example": "Stores in the north",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "CreateListRequest": {
         "additionalProperties": false,
         "description": "A new list.",
@@ -11203,6 +11265,37 @@
             },
             "required": [
               "user_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_AddedResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Result of adding units to a group.",
+            "properties": {
+              "added": {
+                "description": "Units that were not in the group before.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "member_count": {
+                "description": "Units in the group now (all of them, whatever your scope).",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "added",
+              "member_count"
             ],
             "type": "object"
           }
@@ -17881,6 +17974,63 @@
               "from",
               "to",
               "steps"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_GroupResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A unit group: any units of the tenant gathered to filter and group reports (e.g. \"stores in\nthe north\"). A group grants no access.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "excluded_org_count": {
+                "description": "Units of the group outside your scope: only counted, never listed or named.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "member_count": {
+                "description": "Units of the group within your `organizations.units.read` scope; units outside it are not\ncounted.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "name": {
+                "example": "Stores in the north",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "member_count",
+              "excluded_org_count",
+              "created_at",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -35139,6 +35289,73 @@
         ],
         "type": "object"
       },
+      "GroupMemberResponse": {
+        "description": "A unit in a group.",
+        "properties": {
+          "added_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Id of the unit (see `GET /api/v1/organizations/units/{id}`).",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "added_at"
+        ],
+        "type": "object"
+      },
+      "GroupResponse": {
+        "description": "A unit group: any units of the tenant gathered to filter and group reports (e.g. \"stores in\nthe north\"). A group grants no access.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "excluded_org_count": {
+            "description": "Units of the group outside your scope: only counted, never listed or named.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "member_count": {
+            "description": "Units of the group within your `organizations.units.read` scope; units outside it are not\ncounted.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "example": "Stores in the north",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "member_count",
+          "excluded_org_count",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "Health": {
         "description": "Health of the service.",
         "properties": {
@@ -46621,6 +46838,107 @@
                 "success_message",
                 "notify_emails",
                 "token_scope",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_GroupMemberResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A unit in a group.",
+              "properties": {
+                "added_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "Id of the unit (see `GET /api/v1/organizations/units/{id}`).",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "org_id",
+                "added_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_GroupResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A unit group: any units of the tenant gathered to filter and group reports (e.g. \"stores in\nthe north\"). A group grants no access.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "excluded_org_count": {
+                  "description": "Units of the group outside your scope: only counted, never listed or named.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "member_count": {
+                  "description": "Units of the group within your `organizations.units.read` scope; units outside it are not\ncounted.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "name": {
+                  "example": "Stores in the north",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "member_count",
+                "excluded_org_count",
                 "created_at",
                 "updated_at"
               ],
@@ -59210,8 +59528,17 @@
               }
             ]
           },
+          "excluded_org_count": {
+            "description": "With `group_ids` (on `totals`) or `group_by=group` (on each group): units of the asked\ngroups outside your scope, left out of the sums. Absent otherwise.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "key": {
-            "description": "The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id or a unit id;\n`total` for the totals.",
+            "description": "The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id, a unit id or a\nunit group id; `total` for the totals.",
             "example": "2026-11-18",
             "type": "string"
           }
@@ -62689,6 +63016,27 @@
               {
                 "type": "null"
               }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateGroupRequest": {
+        "additionalProperties": false,
+        "description": "Changes to a unit group; omitted fields stay as they are.",
+        "properties": {
+          "description": {
+            "description": "New description, up to 1000 characters; an empty string removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "New name, 1 to 200 characters.",
+            "type": [
+              "string",
+              "null"
             ]
           }
         },
@@ -144874,6 +145222,1042 @@
         "x-public": true
       }
     },
+    "/api/v1/organizations/groups": {
+      "get": {
+        "description": "Requires `organizations.units.read` (any scope). `member_count` only counts the units within\nyour scope.",
+        "operationId": "organizations_list_unit_groups",
+        "parameters": [
+          {
+            "description": "Words in the name; accents and case are ignored.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GroupResponse"
+                }
+              }
+            },
+            "description": "One page of groups."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the unit groups of the tenant.",
+        "tags": [
+          "organizations"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Words in the name; accents and case are ignored.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "organizations.list_unit_groups",
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `organizations.groups.manage` (granted for the whole tenant only). A group only filters\nand groups reports (`group_ids`, `group_by=group` of `GET /api/v1/reporting/summary`); it grants\nno access.",
+        "operationId": "organizations_create_unit_group",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_GroupResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another group has this name; code `organizations.group_name_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a unit group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/groups/{id}": {
+      "delete": {
+        "description": "Requires `organizations.groups.manage`. The units and the report facts stay; only the group and\nits member list go.",
+        "operationId": "organizations_delete_unit_group",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a unit group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `organizations.units.read` (any scope); `member_count` only counts units within it.",
+        "operationId": "organizations_get_unit_group",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_GroupResponse"
+                }
+              }
+            },
+            "description": "The group.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a unit group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `organizations.groups.manage`.",
+        "operationId": "organizations_update_unit_group",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_GroupResponse"
+                }
+              }
+            },
+            "description": "The group after the change.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another group has this name; code `organizations.group_name_taken`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rename a unit group or change its description.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/groups/{id}/members": {
+      "get": {
+        "description": "Requires `organizations.units.read`. Units outside your scope are never listed; their number is\n`excluded_org_count` of `GET /groups/{id}`.",
+        "operationId": "organizations_list_unit_group_members",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GroupMemberResponse"
+                }
+              }
+            },
+            "description": "One page of the units within your scope."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the units of a group that are within your scope.",
+        "tags": [
+          "organizations"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "organizations.list_unit_group_members",
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `organizations.groups.manage`. Units already in the group are skipped, so calling again\nis safe. A group has at most 1000 units.",
+        "operationId": "organizations_add_unit_group_members",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMembersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AddedResponse"
+                }
+              }
+            },
+            "description": "How many units were added and how many the group has now."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A unit is not in this tenant (`organizations.group_member_invalid`), the group would pass 1000 units (`organizations.group_too_large`), or `org_ids` is empty or too long (`validation_failed`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add units to a group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/groups/{id}/members/{org_id}": {
+      "delete": {
+        "description": "Requires `organizations.groups.manage`. Removing a unit that is not in the group also answers\n204.",
+        "operationId": "organizations_remove_unit_group_member",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The unit is not in the group (any more)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a unit from a group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      }
+    },
     "/api/v1/organizations/public/site": {
       "get": {
         "description": "No sign-in needed. The website is the organization unit the domain of the request is bound to\n(see `PATCH /api/v1/kernel/domains/{id}`), or the one named with `site` when the page is not\nserved on its own domain; otherwise the whole tenant (its root unit). A store's own domain thus\nshows the store's name, address and hours, not the head office's. Use `unit_id` as `site` in\nother public calls (menus, content) when they are not made on that domain.",
@@ -151761,6 +153145,15 @@
             }
           },
           {
+            "description": "Only the units of these unit groups (`GET /api/v1/organizations/groups`), comma-separated\nids, and only facts of your own tenant (not of the tenants below it). A group grants no\naccess: its units outside your scope are left out and counted in `excluded_org_count` of\nthe summary. An unknown group answers 404 `reporting.group_not_found`.",
+            "in": "query",
+            "name": "group_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Only facts with these dimension values, comma-separated `name:value` pairs, e.g.\n`kind:vat_invoice` (needs `kind`; see `dimensions` in `GET /kinds`).",
             "example": "kind:vat_invoice",
             "in": "query",
@@ -151939,6 +153332,12 @@
             "description": "Only these organization units, comma-separated ids; units outside your scope are left out.",
             "kind": "string",
             "name": "org_ids",
+            "operator": "eq"
+          },
+          {
+            "description": "Only the units of these unit groups (`GET /api/v1/organizations/groups`), comma-separated\nids, and only facts of your own tenant (not of the tenants below it). A group grants no\naccess: its units outside your scope are left out and counted in `excluded_org_count` of\nthe summary. An unknown group answers 404 `reporting.group_not_found`.",
+            "kind": "string",
+            "name": "group_ids",
             "operator": "eq"
           },
           {
@@ -152278,6 +153677,15 @@
             }
           },
           {
+            "description": "Only the units of these unit groups (`GET /api/v1/organizations/groups`), comma-separated\nids, and only facts of your own tenant (not of the tenants below it). A group grants no\naccess: its units outside your scope are left out and counted in `excluded_org_count` of\nthe summary. An unknown group answers 404 `reporting.group_not_found`.",
+            "in": "query",
+            "name": "group_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Only facts with these dimension values, comma-separated `name:value` pairs, e.g.\n`kind:vat_invoice` (needs `kind`; see `dimensions` in `GET /kinds`).",
             "example": "kind:vat_invoice",
             "in": "query",
@@ -152288,7 +153696,7 @@
             }
           },
           {
-            "description": "`day` (the default; at most 366 days), `week` (keyed by its Monday), `month` (keyed by its\nfirst day), `tenant` (keyed by the source tenant id) or `org` (keyed by the unit id).",
+            "description": "`day` (the default; at most 366 days), `week` (keyed by its Monday), `month` (keyed by its\nfirst day), `tenant` (keyed by the source tenant id), `org` (keyed by the unit id) or\n`group` (keyed by the unit group id; needs `group_ids`). With `group`, a unit in two groups\ncounts in both, so the groups can add up to more than `totals`.",
             "example": "day",
             "in": "query",
             "name": "group_by",

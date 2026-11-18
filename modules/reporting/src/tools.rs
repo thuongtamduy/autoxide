@@ -30,7 +30,8 @@ pub(crate) struct SummaryInput {
     from: Option<String>,
     /// Last day (inclusive), `YYYY-MM-DD`; defaults to today (UTC).
     to: Option<String>,
-    /// `day` (default, at most 366 days), `week`, `month`, `tenant` or `org`.
+    /// `day` (default, at most 366 days), `week`, `month`, `tenant`, `org` or `group` (needs
+    /// `group_ids`; a unit in two groups counts in both).
     group_by: Option<String>,
     /// Also convert every sum to this ISO 4217 currency with your tenant's exchange rates.
     currency: Option<String>,
@@ -38,6 +39,9 @@ pub(crate) struct SummaryInput {
     tenant_ids: Option<String>,
     /// Only these organization units, comma-separated ids.
     org_ids: Option<String>,
+    /// Only the units of these unit groups, comma-separated ids (your own tenant only; units
+    /// outside your scope are left out and counted in `excluded_org_count`).
+    group_ids: Option<String>,
 }
 
 /// Which report facts to list.
@@ -54,6 +58,8 @@ pub(crate) struct FactsInput {
     tenant_ids: Option<String>,
     /// Only these organization units, comma-separated ids.
     org_ids: Option<String>,
+    /// Only the units of these unit groups, comma-separated ids (your own tenant only).
+    group_ids: Option<String>,
     /// Comma-separated `name:value` pairs, e.g. `kind:vat_invoice` (needs `kind`).
     dimensions: Option<String>,
     /// Maximum number of facts, 1 to 200 (default 50).
@@ -94,6 +100,7 @@ pub(crate) fn all(service: &Arc<Reporting>) -> Vec<Tool> {
                         to: input.to,
                         tenant_ids: input.tenant_ids,
                         org_ids: input.org_ids,
+                        group_ids: input.group_ids,
                         dimensions: None,
                     };
                     let options =
@@ -121,6 +128,7 @@ pub(crate) fn all(service: &Arc<Reporting>) -> Vec<Tool> {
                         to: input.to,
                         tenant_ids: input.tenant_ids,
                         org_ids: input.org_ids,
+                        group_ids: input.group_ids,
                         dimensions: input.dimensions,
                     };
                     let mut problems = Vec::new();

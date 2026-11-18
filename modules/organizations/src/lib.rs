@@ -9,7 +9,9 @@ pub mod api;
 mod config;
 mod entity;
 mod events;
+mod groups;
 mod http;
+mod http_groups;
 mod http_profile;
 mod migration;
 mod permissions;
@@ -17,6 +19,7 @@ mod profile;
 mod service;
 mod settings;
 mod tools;
+mod tools_groups;
 mod unit_resource;
 
 #[cfg(test)]
@@ -73,6 +76,13 @@ impl Module for OrganizationsModule {
                 autoxide_kernel::tenancy::TablePolicy::OrgTree { id: "id", parent: "parent_id" },
             )
             .by_org(&["organizations_setting", "organizations_profile"])
+            // Nhóm nút (D-232): nhóm chép sang khách mới khi tách (nhập khi gộp), thành viên đi theo
+            // nút của nó.
+            .copy_on_split(&["organizations_group"])
+            .table(
+                "organizations_group_member",
+                autoxide_kernel::tenancy::TablePolicy::ByOrg { column: "org_id" },
+            )
     }
 
     fn description(&self) -> &'static str {
@@ -129,6 +139,7 @@ impl Module for OrganizationsModule {
         self.service = Some(service.clone());
         // Kernel hỏi "nút này có thuộc khách không" (gắn tên miền với một cửa hàng…).
         context.provide::<dyn autoxide_kernel::tenancy::OrgNodes>(service.clone())?;
+        context.provide::<dyn api::OrgGroups>(service.clone())?;
         context.provide::<dyn api::OrgDirectory>(service)
     }
 

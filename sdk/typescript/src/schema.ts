@@ -74,6 +74,12 @@ export type ActivityResponse = {
   subject?: string | null;
 };
 
+/** Units to add to a group. */
+export type AddMembersRequest = {
+  /** 1 to 200 unit ids of this tenant, from any branch. Units already in the group are skipped. */
+  org_ids: string[];
+};
+
 /** The authenticator's answer to an add-passkey ceremony. */
 export type AddPasskeyRequest = {
   /** The `ceremony_id` from `POST /api/v1/auth/me/passkeys/registration`. */
@@ -96,6 +102,14 @@ export type AddSupportMessageRequest = {
   media_ids?: string[];
   /** Colleagues to notify, in an internal note (at most 20). */
   mentions?: string[];
+};
+
+/** Result of adding units to a group. */
+export type AddedResponse = {
+  /** Units that were not in the group before. */
+  added: number;
+  /** Units in the group now (all of them, whatever your scope). */
+  member_count: number;
 };
 
 /** An add-on of a subscription. */
@@ -3548,6 +3562,14 @@ export type CreateFormRequest = {
   success_message?: Localized | null;
 };
 
+/** A new unit group. */
+export type CreateGroupRequest = {
+  /** Up to 1000 characters. */
+  description?: string | null;
+  /** 1 to 200 characters, unique in the tenant (accents and case ignored). */
+  name: string;
+};
+
 /** A new list. */
 export type CreateListRequest = {
   description?: NewsletterText | null;
@@ -3810,6 +3832,17 @@ export type Data_AcceptedResponse = {
     tokens?: TokenResponse | null;
     /** The account that now has the roles. */
     user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AddedResponse = {
+  /** Result of adding units to a group. */
+  data: {
+    /** Units that were not in the group before. */
+    added: number;
+    /** Units in the group now (all of them, whatever your scope). */
+    member_count: number;
   };
 };
 
@@ -5985,6 +6018,28 @@ export type Data_FunnelReport = {
     key: string;
     steps: FunnelStep[];
     to: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_GroupResponse = {
+  /**
+   * A unit group: any units of the tenant gathered to filter and group reports (e.g. "stores in
+   * the north"). A group grants no access.
+   */
+  data: {
+    created_at: string;
+    description?: string | null;
+    /** Units of the group outside your scope: only counted, never listed or named. */
+    excluded_org_count: number;
+    id: string;
+    /**
+     * Units of the group within your `organizations.units.read` scope; units outside it are not
+     * counted.
+     */
+    member_count: number;
+    name: string;
+    updated_at: string;
   };
 };
 
@@ -11601,6 +11656,32 @@ export type FunnelStep = {
   step: number;
 };
 
+/** A unit in a group. */
+export type GroupMemberResponse = {
+  added_at: string;
+  /** Id of the unit (see `GET /api/v1/organizations/units/{id}`). */
+  org_id: string;
+};
+
+/**
+ * A unit group: any units of the tenant gathered to filter and group reports (e.g. "stores in
+ * the north"). A group grants no access.
+ */
+export type GroupResponse = {
+  created_at: string;
+  description?: string | null;
+  /** Units of the group outside your scope: only counted, never listed or named. */
+  excluded_org_count: number;
+  id: string;
+  /**
+   * Units of the group within your `organizations.units.read` scope; units outside it are not
+   * counted.
+   */
+  member_count: number;
+  name: string;
+  updated_at: string;
+};
+
 /** Health of the service. */
 export type Health = {
   /** Always `ok`; a service that is not healthy answers with an error instead. */
@@ -15399,6 +15480,37 @@ export type Page_FormResponse = {
      * the version it was sent with, and is shown with that version's labels.
      */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_GroupMemberResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    added_at: string;
+    /** Id of the unit (see `GET /api/v1/organizations/units/{id}`). */
+    org_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_GroupResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    description?: string | null;
+    /** Units of the group outside your scope: only counted, never listed or named. */
+    excluded_org_count: number;
+    id: string;
+    /**
+     * Units of the group within your `organizations.units.read` scope; units outside it are not
+     * counted.
+     */
+    member_count: number;
+    name: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -19660,8 +19772,13 @@ export type SummaryGroupResponse = {
   by_currency: CurrencyTotalResponse[];
   converted?: Money | null;
   /**
-   * The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id or a unit id;
-   * `total` for the totals.
+   * With `group_ids` (on `totals`) or `group_by=group` (on each group): units of the asked
+   * groups outside your scope, left out of the sums. Absent otherwise.
+   */
+  excluded_org_count?: number | null;
+  /**
+   * The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id, a unit id or a
+   * unit group id; `total` for the totals.
    */
   key: string;
 };
@@ -20817,6 +20934,14 @@ export type UpdateFormRequest = {
   retention_days?: number | null;
   status?: FormStatus | null;
   success_message?: Localized | null;
+};
+
+/** Changes to a unit group; omitted fields stay as they are. */
+export type UpdateGroupRequest = {
+  /** New description, up to 1000 characters; an empty string removes it. */
+  description?: string | null;
+  /** New name, 1 to 200 characters. */
+  name?: string | null;
 };
 
 /** Changes to a media item. Omitted fields stay as they are. */
@@ -30225,6 +30350,111 @@ export interface paths {
       };
     };
   };
+  "/api/v1/organizations/groups": {
+    /** List the unit groups of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_GroupResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a unit group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateGroupRequest;
+      responses: {
+        201: Data_GroupResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/groups/{id}": {
+    /** Get a unit group. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_GroupResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename a unit group or change its description. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateGroupRequest;
+      responses: {
+        200: Data_GroupResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a unit group. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/groups/{id}/members": {
+    /** List the units of a group that are within your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_GroupMemberResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add units to a group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AddMembersRequest;
+      responses: {
+        200: Data_AddedResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/groups/{id}/members/{org_id}": {
+    /** Remove a unit from a group. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; org_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/organizations/public/site": {
     /** Get the profile of the website being visited. */
     get: {
@@ -31033,7 +31263,7 @@ export interface paths {
   "/api/v1/reporting/facts": {
     /** List report facts. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; dimensions?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; group_ids?: string; dimensions?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_FactResponse;
         401: Problem;
@@ -31087,7 +31317,7 @@ export interface paths {
   "/api/v1/reporting/summary": {
     /** Sum a report figure over a period. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; dimensions?: string; group_by?: string; currency?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; group_ids?: string; dimensions?: string; group_by?: string; currency?: string }; };
       responses: {
         200: Data_SummaryResponse;
         401: Problem;
