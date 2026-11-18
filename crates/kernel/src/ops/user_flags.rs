@@ -492,6 +492,7 @@ mod tests {
             Box::new(CreateUserFlags),
             adopt_tenancy(),
             Box::new(crate::ops::views::CreateSavedViews),
+            Box::new(crate::ops::pins::CreatePins),
         ];
         Migrator::new(vec![ModuleMigrations::new("kernel", migrations)])
             .unwrap()
