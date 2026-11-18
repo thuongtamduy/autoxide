@@ -178,6 +178,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.migrate_placements` | `kernel.tenants.operate` | writes |
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
 | `kernel.navigation` | — | read-only |
+| `kernel.request_log` | `kernel.devtools.read` | read-only |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
 | `ledger.balance` | `ledger.read` | read-only |
