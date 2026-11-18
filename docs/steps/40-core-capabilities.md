@@ -517,26 +517,40 @@ Mọi test chạm database qua `TestDatabase::run` (SQLite và Postgres), qua RE
 nghìn dòng. Thêm trait để sàn có hàng triệu sản phẩm cắm bộ tìm chuyên dụng mà module không phải sửa:
 
 ```rust
-#[async_trait] pub trait SearchBackend: Send + Sync {
+#[async_trait] pub trait SearchBackend: Send + Sync {          // autoxide_kernel::search (D-381)
     async fn index(&self, tenant: &TenantContext, docs: &[SearchDoc]) -> Result<(), Error>;   // upsert
     async fn remove(&self, tenant: &TenantContext, kind: &str, ids: &[Uuid]) -> Result<(), Error>;
-    async fn query(&self, tenant: &TenantContext, q: &SearchQuery) -> Result<SearchHits, Error>;
+    async fn clear(&self, tenant: &TenantContext, kind: &str) -> Result<(), Error>;            // trước khi dựng lại
+    async fn query(&self, tenant: &TenantContext, kind: &SearchKind, request: &SearchRequest)
+        -> Result<SearchHits, Error>;                                                           // Page<SearchHit>
 }
 pub struct SearchDoc { pub kind: String, pub id: Uuid, pub org_id: OrgId, pub locale: String,
-    pub fields: BTreeMap<String, String> /* đã khai trọng số */, pub filters: BTreeMap<String, Value> }
+    pub fields: BTreeMap<String, String>, pub filters: BTreeMap<String, Value> }
+pub struct SearchRequest { pub kind: String, pub text: String, pub filters: BTreeMap<String, String>,
+    pub locale: Option<String>, pub scope: Option<OrgScope>, pub page: PageRequest }
 ```
 
-- **Mặc định `DatabaseSearch`** (trong kernel): bảng `kernel_search_docs` (một dòng mỗi tài liệu, cột
-  `exact_key` và `fold_key` như D-202, bộ lọc là cột có index), hai tầng đúng dấu / không dấu
-  (`fetch_page_tiers`) — chạy như nhau trên hai database, không cần dịch vụ ngoài.
+Tên `SearchRequest` (không `SearchQuery`: tên đó đã là truy vấn đã phân tích của tìm xuyên phân hệ bước 51,
+`autoxide_kernel::find`). Một truy vấn một loại; `OrgScope` (`subtrees`, `units`, `fence`) do `SearchIndex::search`
+dựng từ grant của người gọi cho permission của loại (D-381).
+
+- **Mặc định `DatabaseSearch`** (trong kernel): bảng `kernel_search_docs` (một dòng mỗi tài liệu, khoá
+  `(tenant_id, kind, id)`, cột `primary_exact` / `primary_fold` cho trường trọng số cao nhất và `exact_key` /
+  `fold_key` cho mọi trường như D-202) và `kernel_search_filters` (một dòng mỗi bộ lọc, index `(tenant_id, kind,
+  name, value)` — bộ lọc là cột có index mà không đổi schema theo module); bốn tầng (`fetch_page_tiers`): tiêu đề
+  đúng dấu, nội dung đúng dấu, tiêu đề không dấu, nội dung không dấu — chạy như nhau trên hai database.
 - **Bộ cắm ngoài** (Meilisearch, Typesense, OpenSearch) là module riêng làm khi có nhu cầu đo được, đăng ký
-  bằng `context.search_backend(…)`; chọn bằng `AUTOXIDE_SEARCH_BACKEND` (`database` mặc định). Gọi mạng
-  ngoài transaction: module ghi tài liệu cần đánh chỉ mục vào outbox, job đồng bộ sang backend (chịu nhận lại).
-- Module khai loại tài liệu tìm được (`Module::search_documents` → loại, trường, trọng số, bộ lọc, quyền
-  đọc) — dùng chung cho tìm công khai (gợi ý tìm bước 41) và tìm xuyên phân hệ (P3 bước 51). Kết quả luôn lọc
-  theo khách và phạm vi nút **trong** backend (bộ lọc `org_id`), không lọc sau.
-- `autoxide task kernel.reindex [--kind]` dựng lại chỉ mục. Đo trên bộ dữ liệu lớn của bước 39 trước khi
-  khuyên dùng backend ngoài; ghi số đo vào `docs/BENCHMARKS.md`.
+  bằng `context.search_backend(name, …)`; chọn bằng `AUTOXIDE_SEARCH_BACKEND` (`database` mặc định). Gọi mạng
+  ngoài transaction: trong transaction của thay đổi, module gọi `SearchIndex::enqueue` (xếp job
+  `kernel.search_sync` mang loại + ID, cùng transaction như outbox); job đọc lại tài liệu qua
+  `SearchSource::load` — còn thì `index`, mất thì `remove` — chịu nhận lại.
+- Module khai loại tài liệu tìm được bằng `context.search_documents(SearchKind, Arc<dyn SearchSource>)` (loại,
+  trường + trọng số, bộ lọc, permission đọc; nguồn `load` / `scan` từ bảng của module) — như `finder_source`, vì
+  nguồn cần trạng thái có sau `start` (D-381, thay `Module::search_documents`). Tìm xuyên phân hệ bước 51 và ô tìm
+  của module giữ nguyên trên bảng của module (không phá API); module chuyển sang chỉ mục khi bảng lớn (catalog
+  bước 41). Kết quả luôn lọc theo khách và phạm vi nút **trong** backend (bộ lọc `org_id`), không lọc sau.
+- `autoxide task kernel.reindex [kind=…] [tenant=…]` dựng lại chỉ mục. Đo trên bộ dữ liệu lớn của bước 39 trước
+  khi khuyên dùng backend ngoài — khi module đầu tiên dùng chỉ mục (D-381); ghi số đo vào `docs/BENCHMARKS.md`.
 - Test (cả hai database): `tim_khong_dau_dung_dau_xep_truoc`, `ket_qua_khong_lo_sang_khach_khac`,
   `ket_qua_loc_theo_pham_vi_nut`, `xoa_ban_ghi_thi_bien_khoi_ket_qua`, `dong_bo_chiu_nhan_lai_event`,
   `backend_gia_thay_duoc_khong_sua_module`.

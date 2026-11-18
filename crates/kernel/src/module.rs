@@ -483,6 +483,27 @@ impl StartContext<'_> {
         self.finders.register(self.module, source)
     }
 
+    /// Khai loại tài liệu tìm được của module (bước 40 P7): `kind.kind` là `<module>.<loại>`,
+    /// `source` đọc tài liệu từ bảng của module. Khi bản ghi đổi, gọi `SearchIndex::enqueue` trong
+    /// transaction của thay đổi (lấy bằng `context.require::<SearchIndex>()`); job đồng bộ sau commit.
+    pub fn search_documents(
+        &mut self,
+        kind: crate::search::SearchKind,
+        source: Arc<dyn crate::search::SearchSource>,
+    ) -> Result<(), Error> {
+        self.require::<crate::search::SearchIndex>()?.register(self.module, kind, source)
+    }
+
+    /// Thêm bộ máy tìm tên `name` (module bộ máy ngoài như Meilisearch, D-220); được dùng khi
+    /// `AUTOXIDE_SEARCH_BACKEND = name`. Module nghiệp vụ không phải sửa gì.
+    pub fn search_backend(
+        &mut self,
+        name: &str,
+        backend: Arc<dyn crate::search::SearchBackend>,
+    ) -> Result<(), Error> {
+        self.require::<crate::search::SearchIndex>()?.add_backend(name, backend)
+    }
+
     /// Đăng ký số liệu tóm tắt (bước 51 P4); id phải là `<module>.<số liệu>`, phải có định nghĩa.
     pub fn summary_metric(
         &mut self,

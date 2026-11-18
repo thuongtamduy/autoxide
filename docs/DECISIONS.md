@@ -9357,3 +9357,30 @@ liệu cá nhân.
    01/01/2026): chỉ xin scope `openid email profile`, có trong `GET /me/export`, xoá cùng tài khoản. Đăng nhập Google / GitHub
    không thay xác thực số điện thoại của NĐ 147/2024/NĐ-CP — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý về sổ
    đồng ý khi liên kết.
+
+## D-381 · Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18 — agent quyết
+
+1. **Xây trên cái sẵn có, không phá API:** `autoxide_kernel::search` giữ nguyên `fold` / `exact_key` / `contains*` (ô tìm
+   của module); tìm xuyên phân hệ bước 51 (`autoxide_kernel::find`, `FinderSource`, `SearchQuery`) giữ nguyên trên bảng
+   của từng module. Phần mới nằm cùng mô-đun `search`: trait `SearchBackend` (`index`, `remove`, `clear`, `query`),
+   `SearchSource` (`load`, `scan`), `SearchKind`, `SearchDoc`, `SearchRequest`, `OrgScope`, `SearchHits = Page<SearchHit>`,
+   sổ `SearchIndex` và bộ máy mặc định `DatabaseSearch`. Lệch đặc tả: tên `SearchRequest` thay `SearchQuery` (đã là
+   truy vấn của bước 51); thêm `clear` (dựng lại chỉ mục bỏ được tài liệu mồ côi); một truy vấn một loại.
+2. **Khai báo qua `StartContext`**, không qua `Module::search_documents` của đặc tả: `context.search_documents(kind,
+   source)` như `finder_source` — nguồn cần trạng thái có sau `start`. `context.search_backend(name, backend)` cho
+   module bộ máy ngoài; `AUTOXIDE_SEARCH_BACKEND` (`database` mặc định) chọn bộ máy, tra lúc dùng (bộ máy tên khác mà
+   không module nào thêm → lỗi nội bộ nêu rõ biến).
+3. **`DatabaseSearch`:** `kernel_search_docs` (khoá `(tenant_id, kind, id)`, index `(tenant_id, kind, org_id)`, bốn cột
+   khoá tìm) + `kernel_search_filters` (khoá `(tenant_id, kind, doc_id, name)`, index `(tenant_id, kind, name, value)`;
+   bộ lọc so bằng qua `EXISTS`). Xếp bốn tầng bằng `fetch_page_tiers`: tiêu đề (trường trọng số cao nhất) đúng dấu, mọi
+   trường đúng dấu, tiêu đề không dấu, mọi trường không dấu; trong tầng theo ID — trọng số chỉ phân "tiêu đề" và "phần
+   còn lại" (đủ cho cách xếp D-202; bộ máy ngoài dùng trọng số đầy đủ). Phạm vi nút lọc trong câu SQL
+   (`OrgTree::subtree_condition`, nút đúng, hàng rào) như `Principal::scope_condition`.
+4. **Đồng bộ:** module gọi `SearchIndex::enqueue(&transaction, …)` trong transaction của thay đổi → job
+   `kernel.search_sync` (hàng đợi `kernel`, cùng database của khách) mang loại + ID; job gọi `SearchSource::load`, đưa
+   tài liệu còn vào chỉ mục và bỏ ID không còn — chạy lại cho cùng kết quả, không gọi mạng trong transaction ghi.
+   `autoxide task kernel.reindex [kind=…] [tenant=…]` dựng lại theo lô 200 (`clear` rồi `scan`); `DatabaseRegistry::
+   all_tenants` duyệt mọi khách.
+5. **Chưa đo:** chưa module nào dùng chỉ mục (module tự chuyển khi bảng lớn — catalog bước 41 là chỗ đầu tiên); số đo
+   trên bộ dữ liệu lớn của bước 39 và khuyến nghị bộ máy ngoài ghi vào `docs/BENCHMARKS.md` khi đó. Test (SQLite và
+   Postgres): `tests/search_index.rs` với module mẫu và bộ máy giả.

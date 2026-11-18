@@ -112,9 +112,12 @@ cả SQLite và Postgres.
       quyết định — `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` (bảng `kernel_throttle`, `Throttle::take` theo
       lô burst / 4, khoá theo khách); đo: tới −11% req/s, +22% p95 → `memory` vẫn mặc định; IP vẫn trong
       bộ nhớ (D-375)
-- [ ] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
+- [x] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
       `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
-      module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục
+      module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục —
+      `autoxide_kernel::search::{SearchBackend, SearchIndex, DatabaseSearch}`, `context.search_documents` /
+      `search_backend`, job `kernel.search_sync` xếp cùng transaction, `autoxide task kernel.reindex`,
+      `AUTOXIDE_SEARCH_BACKEND`; tìm xuyên phân hệ bước 51 giữ nguyên (D-381)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
