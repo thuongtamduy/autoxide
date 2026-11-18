@@ -279,7 +279,7 @@ Nhóm A — vận hành:
 - [x] Dashboard và cảnh báo có sẵn: file dashboard Grafana và luật cảnh báo Prometheus trong repo
       (tỉ lệ 5xx, độ trễ p95, job chờ quá lâu, dead-letter tăng, event tồn, hết kết nối database,
       backup quá cũ), mỗi cảnh báo kèm câu "làm gì"; hướng dẫn dùng trong `docs/DEPLOY.md` (EN + VI)
-- [ ] Xoay khoá không gián đoạn: `AUTOXIDE_AUTH_TOKEN_SECRET` (và các khoá ký khác) nhận thêm khoá
+- [x] Xoay khoá không gián đoạn: `AUTOXIDE_AUTH_TOKEN_SECRET` (và các khoá ký khác) nhận thêm khoá
       cũ trong một khoảng chuyển tiếp — ký bằng khoá mới, kiểm bằng cả hai — để đổi khoá (định kỳ
       hay khi bị lộ) không đăng xuất mọi người; test; quy trình trong `docs/DEPLOY.md`
 - [x] Sổ tay xử lý sự cố trong `docs/DEPLOY.md` (EN + VI): hàng đợi kẹt, job trong dead-letter
@@ -517,7 +517,7 @@ bước 35.
 
 Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều request cùng lúc, trên cả hai database.
 
-- [ ] Kho là nút tổ chức loại `warehouse` hay cửa hàng (bước 34); tồn theo biến thể × kho; **sổ biến động kho
+- [x] Kho là nút tổ chức loại `warehouse` hay cửa hàng (bước 34); tồn theo biến thể × kho; **sổ biến động kho
       chỉ thêm** (nhập, xuất, điều chỉnh, chuyển); tồn hiện tại suy từ sổ và giữ bằng khoá dòng của kernel
 - [ ] Giữ chỗ tồn: giữ có hạn theo `order_id` → xác nhận khi đặt hàng → trả lại khi huỷ hay hết hạn (job); chọn
       kho theo quy tắc (gần người mua, đủ hàng); test đồng thời "100 người mua 1 cái cuối"
@@ -588,7 +588,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 
 Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua event, báo trạng thái qua event.
 
-- [ ] Sổ địa chỉ của người mua dùng `Address` của module nền `address` (bước 34, D-193); địa chỉ nước ngoài
+- [x] Sổ địa chỉ của người mua dùng `Address` của module nền `address` (bước 34, D-193); địa chỉ nước ngoài
       dạng chung
 - [ ] Phí vận chuyển khách tự đặt: vùng theo tỉnh, bậc cân nặng / kích thước, miễn phí từ một giá trị đơn,
       nhận tại cửa hàng (chuỗi); API báo giá cho `orders`; thuế GTGT trên phí giao (Luật 48/2024 — cần đối
@@ -844,7 +844,7 @@ Bắt đầu SAU bước 34 và 36; không cần phần bán hàng. Spa, salon, 
       theo múi giờ của nút; tính giờ trống công khai
 - [x] Đặt chỗ không bao giờ chồng giờ khi nhiều người đặt cùng lúc (ô giờ có khoá duy nhất, chạy trên cả hai
       database); giữ tạm khi trả cọc qua đối tác; huỷ, đổi giờ, vắng mặt theo chính sách
-- [ ] Nhắc lịch qua `notifications`, khách vãng lai đặt bằng OTP, `/me/bookings`, tool MCP; test trên cả hai
+- [x] Nhắc lịch qua `notifications`, khách vãng lai đặt bằng OTP, `/me/bookings`, tool MCP; test trên cả hai
       database
 
 ## 61. Chat chăm sóc khách (`conversations`) (chủ dự án giao ngày 14/11/2026, D-221)

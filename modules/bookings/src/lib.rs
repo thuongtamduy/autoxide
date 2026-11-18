@@ -15,8 +15,10 @@ mod availability;
 mod booking;
 mod entity;
 mod events;
+mod guests;
 mod http_bookings;
 mod http_customer;
+mod http_me;
 mod http_public;
 mod http_setup;
 mod jobs;
@@ -24,9 +26,11 @@ mod listing;
 mod migration;
 mod openings;
 mod permissions;
+mod reminders;
 mod service;
 mod settings;
 mod setup;
+mod tools;
 
 mod relocation;
 #[cfg(test)]
@@ -111,17 +115,32 @@ impl Module for BookingsModule {
             jobs: context.jobs(),
             databases: context.tenancy(),
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
+            notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
+            sms: context.require::<dyn autoxide_kernel::sms::SmsSender>().ok(),
+            secret: context
+                .require::<autoxide_kernel::secret::SecretKey>()
+                .ok()
+                .map(|key| (*key).clone()),
         });
+        if let Some(notifier) = &service.notifier {
+            reminders::declare(notifier.as_ref())?;
+        }
         self.service = Some(service);
         Ok(())
     }
 
     fn jobs(&self) -> Vec<autoxide_kernel::job::JobRegistration> {
-        self.service.as_ref().map_or_else(Vec::new, jobs::registrations)
+        self.service.as_ref().map_or_else(Vec::new, |service| {
+            let mut all = jobs::registrations(service);
+            all.extend(reminders::registrations(service));
+            all
+        })
     }
 
     fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
-        jobs::schedules()
+        let mut all = jobs::schedules();
+        all.extend(reminders::schedules());
+        all
     }
 
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
@@ -134,11 +153,16 @@ impl Module for BookingsModule {
         })
     }
 
+    fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
+        self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
             http_setup::routes(service.clone())
                 .merge(http_bookings::routes(service.clone()))
                 .merge(http_customer::routes(service.clone()))
+                .merge(http_me::routes(service.clone()))
                 .merge(http_public::routes(service))
         })
     }

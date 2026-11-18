@@ -386,6 +386,7 @@ dependencies = [
  "autoxide-files",
  "autoxide-forms",
  "autoxide-idempotency",
+ "autoxide-inventory",
  "autoxide-invoices",
  "autoxide-kernel",
  "autoxide-ledger",
@@ -398,6 +399,7 @@ dependencies = [
  "autoxide-organizations",
  "autoxide-plans",
  "autoxide-reporting",
+ "autoxide-shipping",
  "autoxide-support",
  "autoxide-tax",
  "autoxide-testkit",
@@ -574,11 +576,13 @@ dependencies = [
  "async-trait",
  "autoxide-kernel",
  "autoxide-ledger",
+ "autoxide-notifications",
  "autoxide-organizations",
  "autoxide-testkit",
  "axum",
  "chrono",
  "chrono-tz",
+ "getrandom 0.4.3",
  "rmcp",
  "sea-orm",
  "serde",
@@ -753,6 +757,29 @@ dependencies = [
  "utoipa",
  "utoipa-axum",
  "uuid",
+]
+
+[[package]]
+name = "autoxide-inventory"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-catalog",
+ "autoxide-kernel",
+ "autoxide-organizations",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
@@ -1068,6 +1095,29 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-shipping"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-address",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "hmac 0.13.0",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
  "tokio",
  "tracing",
  "utoipa",

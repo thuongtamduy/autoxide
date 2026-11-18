@@ -219,6 +219,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-375** Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18
 - **D-376** Giải thích quyền theo gói và "đang dùng ở đâu" (bước 51 P11, D-267) — 2026-11-18
 - **D-380** Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18
+- **[D-20261118-step39-key-rotation](D-20261118-step39-key-rotation.md)** Đổi khoá ký access token không đăng xuất ai — 2026-11-18
 
 ## Đa khách, tổ chức, gói
 
@@ -436,6 +437,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-236** Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 · **chủ dự án quyết**
 - **[D-20261118-step41-catalog-design](D-20261118-step41-catalog-design.md)** `catalog`: giá chỉ thêm, thứ tự chọn bảng giá, hợp đồng `api` cho bước 42–44 — 2026-11-18
 - **[D-20261118-step41-readiness](D-20261118-step41-readiness.md)** `catalog`: thuộc tính bắt buộc, hàng cấm / có điều kiện và `readiness` — 2026-11-18
+- **[D-20261118-step42-stock-model](D-20261118-step42-stock-model.md)** Mô hình tồn của `inventory`: `on_hand` / `available`, sổ chỉ thêm, giá vốn bình quân làm tròn nửa lên, nút giữ tồn — 2026-11-18
+- **[D-20261118-step44-shipping-api](D-20261118-step44-shipping-api.md)** Module `shipping`: hợp đồng `api` cho bước 45, sổ hãng `CarrierRegistry`, sổ địa chỉ không cần permission, địa chỉ nước ngoài trong `Address` — 2026-11-18
 - **[D-20261118-step53-sla](D-20261118-step53-sla.md)** `support`: chính sách hỗ trợ là một văn bản JSON theo nút, giờ làm nằm trong chính sách, mặc định SLA — 2026-11-18
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
 - **[D-20261118-step53-teams](D-20261118-step53-teams.md)** `support`: nhóm nhân viên riêng, quy tắc phân công theo cột, chia vòng hỏi quyền hiện tại — 2026-11-18

@@ -33,8 +33,12 @@ chmod 600 .env
 ```
 
 - `POSTGRES_PASSWORD` protects the database.
-- `AUTOXIDE_AUTH_TOKEN_SECRET` signs access tokens. Keep it stable: changing it signs
-  everyone out.
+- `AUTOXIDE_AUTH_TOKEN_SECRET` signs access tokens. To change it without signing anyone out
+  (as a routine, every few months): put the new value in it and the old one in
+  `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` on every server, restart them, and remove
+  `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` after `AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS` (15 minutes by
+  default): tokens signed with the old key are accepted until they expire. Changing it without
+  the old key signs every access token out.
 - `AUTOXIDE_SECRET_KEY` signs short-lived tokens (forms, anti-spam), keys the hashes of
   visitors' IP addresses and encrypts the secrets the server keeps (two-step sign-in, webhook
   signing secrets). Kept outside the database, a copy of the database (a backup) reveals
@@ -324,6 +328,7 @@ into a new database.
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
 | `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module and keys the hashes of visitors' IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can open the secrets stored encrypted and work the IP blocks back out of the stored hashes |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Old values of `AUTOXIDE_SECRET_KEY`, separated by commas, while rotating the key; remove them after `autoxide secrets reseal` |
+| `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` | Old values of `AUTOXIDE_AUTH_TOKEN_SECRET`, separated by commas, while rotating it; only used to check tokens, remove after the access token lifetime |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Behind a reverse proxy: the header with the client address |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | How many of your proxies a request passes (default `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Instead of a count: the addresses and ranges of your proxies, e.g. `10.0.0.0/8, 192.0.2.7` |
@@ -883,8 +888,10 @@ Each case: what you see, how to check, how to fix it.
 
 ### A key leaked
 
-- `AUTOXIDE_AUTH_TOKEN_SECRET`: set a new value on every server and restart. Every access token stops
-  working; clients sign in again with their refresh token, which stays valid.
+- `AUTOXIDE_AUTH_TOKEN_SECRET`: set a new value on every server and restart, WITHOUT putting the leaked
+  one in `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS`. Every access token stops working; clients get a new
+  one with their refresh token, which stays valid. (Routine changes keep the old key there for a
+  while so nobody notices — see "Get the code and set the secrets".)
 - `AUTOXIDE_SECRET_KEY`: rotate it as described in "Get the code and set the secrets" (new value,
   old one in `AUTOXIDE_SECRET_KEY_PREVIOUS`, `autoxide secrets reseal`). Backups taken before still open
   with the old key: delete them or keep them as safe as the key. Counters by visitor address start

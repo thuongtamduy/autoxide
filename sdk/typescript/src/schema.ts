@@ -539,6 +539,14 @@ export type BookingCheckout = {
   qr_payload?: string | null;
 };
 
+/** A code was sent. */
+export type BookingCodeSent = {
+  /** Send it back with the code. */
+  challenge_id: string;
+  /** The code works until this moment, once. */
+  expires_at: string;
+};
+
 /** A booking just made, with the deposit checkout when one is due. */
 export type BookingCreated = {
   booking: BookingRecord;
@@ -607,6 +615,14 @@ export type BookingOpening = {
   /** Places left (always 1 for one-to-one services). */
   seats_left: number;
   starts_at: string;
+};
+
+/** A one-time code sent by SMS, to prove a guest owns the phone number. */
+export type BookingPhoneCode = {
+  /** The `challenge_id` from `POST /api/v1/bookings/public/phone-codes`. */
+  challenge_id: string;
+  /** The 6 digits received by SMS. */
+  code: string;
 };
 
 /** A booking. */
@@ -3972,6 +3988,7 @@ export type CustomerBookingRequest = {
   note?: string;
   /** How to pay the deposit, e.g. `card`, `wallet` or `vietqr`; default `card`. */
   payment_method?: string | null;
+  phone_code?: BookingPhoneCode | null;
   /** A staff member (or court, room…) from the availability; omitted: the first one free. */
   resource_id?: string | null;
   /** Page of the shop to open after paying the deposit. */
@@ -4267,6 +4284,17 @@ export type Data_BookingAvailability = {
     terms: PublicBookingTerms;
     /** IANA time zone of the unit, e.g. `Asia/Ho_Chi_Minh`. */
     timezone: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingCodeSent = {
+  /** A code was sent. */
+  data: {
+    /** Send it back with the code. */
+    challenge_id: string;
+    /** The code works until this moment, once. */
+    expires_at: string;
   };
 };
 
@@ -6298,6 +6326,45 @@ export type Data_Ingested = {
     accepted: number;
     /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
     dropped: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryAdjustment = {
+  /** A stock adjustment with the ledger lines it wrote. */
+  data: {
+    actor_id?: string | null;
+    created_at: string;
+    id: string;
+    movements: InventoryMovement[];
+    org_id: string;
+    reference: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryLevel = {
+  /** The stock of one variant in one warehouse or store. */
+  data: {
+    /**
+     * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+     * may be sold out of stock is oversold.
+     */
+    available: number;
+    average_cost?: Money | null;
+    id: string;
+    /** Units on the way (transfers in transit, purchase orders). */
+    incoming: number;
+    /** Units physically in the warehouse: the sum of the movement ledger. */
+    on_hand: number;
+    /** The warehouse or store (organization unit). */
+    org_id: string;
+    /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+    reorder_point?: number | null;
+    /** Units held for orders not shipped yet. */
+    reserved: number;
+    updated_at: string;
+    variant_id: string;
   };
 };
 
@@ -8492,6 +8559,27 @@ export type Data_SetupView = {
     incomplete: string[];
     steps: SetupStepView[];
     total: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingAddress = {
+  /** An address of a buyer's address book. */
+  data: {
+    /**
+     * The address, with the names of the province and commune when it was saved. Outside
+     * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+     * `commune_code` is empty.
+     */
+    address: Address;
+    buyer_id: string;
+    id: string;
+    is_default: boolean;
+    label: string;
+    phone: string;
+    postal_code?: string | null;
+    recipient_name: string;
+    updated_at: string;
   };
 };
 
@@ -12038,6 +12126,14 @@ export type FunnelStep = {
   step: number;
 };
 
+/** A guest cancels a booking. */
+export type GuestCancelRequest = {
+  /** A fresh code sent to the phone number of the booking. */
+  phone_code: BookingPhoneCode;
+  /** Up to 200 characters. */
+  reason?: string | null;
+};
+
 /** Health of the service. */
 export type Health = {
   /** Always `ok`; a service that is not healthy answers with an error instead. */
@@ -12155,6 +12251,98 @@ export type Ingested = {
   accepted: number;
   /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
   dropped: number;
+};
+
+/** A stock adjustment with the ledger lines it wrote. */
+export type InventoryAdjustment = {
+  actor_id?: string | null;
+  created_at: string;
+  id: string;
+  movements: InventoryMovement[];
+  org_id: string;
+  reference: string;
+};
+
+/** One line of a stock adjustment. */
+export type InventoryAdjustmentLine = {
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** Units to add (positive) or remove (negative); not 0. */
+  quantity: number;
+  /**
+   * Code from the reason list `inventory.adjustment` (see
+   * `GET /api/v1/kernel/reasons/inventory.adjustment`), e.g. `damaged`.
+   */
+  reason_code?: string | null;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A stock adjustment to make in one warehouse. */
+export type InventoryAdjustmentRequest = {
+  /** 1 to 500 lines. */
+  lines: InventoryAdjustmentLine[];
+  /** The warehouse or store. */
+  org_id: string;
+  /**
+   * Your id of this adjustment (1 to 100 visible ASCII characters). Sending the same
+   * reference and content again returns the adjustment already made.
+   */
+  reference: string;
+};
+
+/** The stock of one variant in one warehouse or store. */
+export type InventoryLevel = {
+  /**
+   * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+   * may be sold out of stock is oversold.
+   */
+  available: number;
+  average_cost?: Money | null;
+  id: string;
+  /** Units on the way (transfers in transit, purchase orders). */
+  incoming: number;
+  /** Units physically in the warehouse: the sum of the movement ledger. */
+  on_hand: number;
+  /** The warehouse or store (organization unit). */
+  org_id: string;
+  /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+  reorder_point?: number | null;
+  /** Units held for orders not shipped yet. */
+  reserved: number;
+  updated_at: string;
+  variant_id: string;
+};
+
+/** Settings of a stock level. */
+export type InventoryLevelUpdate = {
+  /** Reorder point, 0 to 1 000 000; `null` turns low-stock alerts off. */
+  reorder_point?: number | null;
+};
+
+/** One line of the stock movement ledger. Lines are only ever added. */
+export type InventoryMovement = {
+  actor_id?: string | null;
+  created_at: string;
+  id: string;
+  /**
+   * `receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,
+   * `expiry` or `supplier_return`.
+   */
+  kind: string;
+  level_id: string;
+  lot_id?: string | null;
+  note: string;
+  org_id: string;
+  /** Signed: positive came in, negative went out. */
+  quantity: number;
+  /** Code from the reason list `inventory.adjustment`, for adjustments and counts. */
+  reason_code?: string | null;
+  source_id: string;
+  /** What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`… */
+  source_type: string;
+  unit_cost?: Money | null;
+  variant_id: string;
 };
 
 /** A new invitation. */
@@ -14202,6 +14390,19 @@ export type NewRecordNote = {
   mentions?: string[];
 };
 
+/** A new address in the address book. */
+export type NewShippingAddress = {
+  address: ShippingPostalAddress;
+  /** Make it the default address. The first address is always the default. */
+  is_default?: boolean;
+  /** Your name for it, e.g. `Home` (up to 100 characters). */
+  label?: string;
+  /** Phone number of the recipient, for the carrier. */
+  phone: string;
+  /** Who receives the parcel (1 to 200 characters). */
+  recipient_name: string;
+};
+
 /** A tag to create. */
 export type NewTag = {
   /** A color of the fixed palette; `gray` by default. */
@@ -15841,6 +16042,62 @@ export type Page_FormResponse = {
 };
 
 /** One page of a list. */
+export type Page_InventoryLevel = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+     * may be sold out of stock is oversold.
+     */
+    available: number;
+    average_cost?: Money | null;
+    id: string;
+    /** Units on the way (transfers in transit, purchase orders). */
+    incoming: number;
+    /** Units physically in the warehouse: the sum of the movement ledger. */
+    on_hand: number;
+    /** The warehouse or store (organization unit). */
+    org_id: string;
+    /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+    reorder_point?: number | null;
+    /** Units held for orders not shipped yet. */
+    reserved: number;
+    updated_at: string;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryMovement = {
+  /** The items of this page, in the requested order. */
+  data: {
+    actor_id?: string | null;
+    created_at: string;
+    id: string;
+    /**
+     * `receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,
+     * `expiry` or `supplier_return`.
+     */
+    kind: string;
+    level_id: string;
+    lot_id?: string | null;
+    note: string;
+    org_id: string;
+    /** Signed: positive came in, negative went out. */
+    quantity: number;
+    /** Code from the reason list `inventory.adjustment`, for adjustments and counts. */
+    reason_code?: string | null;
+    source_id: string;
+    /** What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`… */
+    source_type: string;
+    unit_cost?: Money | null;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InvitationResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17104,6 +17361,28 @@ export type Page_SessionResponse = {
      * none was sent.
      */
     user_agent?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingAddress = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The address, with the names of the province and commune when it was saved. Outside
+     * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+     * `commune_code` is empty.
+     */
+    address: Address;
+    buyer_id: string;
+    id: string;
+    is_default: boolean;
+    label: string;
+    phone: string;
+    postal_code?: string | null;
+    recipient_name: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -19514,6 +19793,12 @@ export type SecretResponse = {
   secret: string;
 };
 
+/** The phone number to send a code to. */
+export type SendBookingCodeRequest = {
+  /** E.g. `0912345678` or `+84912345678`. */
+  phone: string;
+};
+
 /** Something to fix or review. */
 export type SeoFinding = {
   /**
@@ -19643,6 +19928,52 @@ export type SetupView = {
 
 /** How urgent a piece of work is. */
 export type Severity = "blocking" | "attention" | "info";
+
+/** An address of a buyer's address book. */
+export type ShippingAddress = {
+  /**
+   * The address, with the names of the province and commune when it was saved. Outside
+   * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+   * `commune_code` is empty.
+   */
+  address: Address;
+  buyer_id: string;
+  id: string;
+  is_default: boolean;
+  label: string;
+  phone: string;
+  postal_code?: string | null;
+  recipient_name: string;
+  updated_at: string;
+};
+
+/** Fields to change; leave out what stays. */
+export type ShippingAddressChanges = {
+  address?: ShippingPostalAddress | null;
+  label?: string | null;
+  phone?: string | null;
+  recipient_name?: string | null;
+};
+
+/**
+ * A postal address. In Vietnam: `province_code` and `commune_code` from the official list of
+ * administrative units (`GET /api/v1/address/provinces`). Elsewhere: `province_code` is the
+ * region (state, province…), `city` the city, with an optional `postal_code`.
+ */
+export type ShippingPostalAddress = {
+  /** Outside Vietnam: the city (required). */
+  city?: string | null;
+  /** Vietnam: code of the commune, ward or special zone (required). */
+  commune_code?: string | null;
+  /** ISO 3166-1 alpha-2 country code. */
+  country: string;
+  /** House number, street, village… (1 to 300 characters). */
+  line: string;
+  /** Postal code, mostly for addresses outside Vietnam. */
+  postal_code?: string | null;
+  /** Vietnam: code of the province. Elsewhere: the region. */
+  province_code: string;
+};
 
 /** The answer to a sign-up: always the same. */
 export type SignupAccepted = {
@@ -23527,6 +23858,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/bookings/{id}/calendar.ics": {
+    /** Download a booking as a calendar file. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/bookings/{id}/cancel": {
     /** Cancel a booking. */
     post: {
@@ -23654,6 +23998,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/me/bookings": {
+    /** List my bookings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; resource_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingRecord;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/me/bookings/{id}/calendar.ics": {
+    /** Download one of my bookings as a calendar file. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/public/availability": {
     /** Find free times (public). */
     get: {
@@ -23674,11 +24044,40 @@ export interface paths {
       requestBody: CustomerBookingRequest;
       responses: {
         201: Data_BookingCreated;
-        401: Problem;
         403: Problem;
         404: Problem;
         409: Problem;
         422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/bookings/{id}/cancel": {
+    /** Cancel a guest booking (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: GuestCancelRequest;
+      responses: {
+        200: Data_BookingRecord;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/phone-codes": {
+    /** Send a booking code by SMS (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SendBookingCodeRequest;
+      responses: {
+        200: Data_BookingCodeSent;
+        403: Problem;
+        422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -27253,6 +27652,88 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/adjustments": {
+    /** Adjust stock in one warehouse, each line with a reason. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryAdjustmentRequest;
+      responses: {
+        200: Data_InventoryAdjustment;
+        201: Data_InventoryAdjustment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/adjustments/{id}": {
+    /** Get a stock adjustment with the ledger lines it wrote. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryAdjustment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/levels": {
+    /** List stock levels (variant × warehouse) in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; below_reorder?: boolean | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/levels/{id}": {
+    /** Get one stock level. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the reorder point of a stock level. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryLevelUpdate;
+      responses: {
+        200: Data_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/movements": {
+    /** List the stock movement ledger in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; kind?: "receipt" | "sale" | "return" | "adjustment" | "count" | "transfer_out" | "transfer_in" | "expiry" | "supplier_return" | null; from?: string | null; to?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryMovement;
+        401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -31855,6 +32336,95 @@ export interface paths {
         404: Problem;
         422: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/buyers/{buyer_id}/addresses": {
+    /** List the saved addresses of a buyer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { buyer_id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses": {
+    /** List your saved delivery addresses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Save a delivery address. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingAddress;
+      responses: {
+        201: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses/{id}": {
+    /** Get one of your saved addresses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change one of your saved addresses. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingAddressChanges;
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete one of your saved addresses. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses/{id}/default": {
+    /** Make one of your saved addresses the default. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

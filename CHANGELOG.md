@@ -11,10 +11,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
+  `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
+  `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
+  `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
+  tools `inventory.*`.
+- New module `shipping` (step 44, first part; `docs/SHIPPING.md`): buyer address books (Vietnamese addresses checked
+  against the administrative units of `address`, generic foreign addresses, exactly one default, export and erasure
+  with the account) and the contract for `orders` and carrier connectors in `autoxide_shipping::api`
+  (`ShippingRates`, `AddressBook`, `CarrierRegistry`, `ShippingCarrier`, an in-memory `FakeCarrier`).
 - `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
   conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
   product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category
   checked against the tax engine on going on sale, and the public `path` of each product translation.
+- `auth`: `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` — while changing `AUTOXIDE_AUTH_TOKEN_SECRET`, access tokens signed with
+  an old key are still accepted, so nobody is signed out (step 39). `docs/DEPLOY.md` has the steps.
 - New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
   `POST /api/v1/analytics/public/events` (up to 20, unknown or malformed ones dropped, bots and foreign pages
   dropped, `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` per network block); anonymous sessions use a random key per day
@@ -70,6 +81,10 @@ endpoints are marked deprecated with a sunset date first.
   the booking while the customer pays through `ledger`; unpaid holds are released. Confirm, check in, complete,
   no-show, cancel and reschedule follow the unit's policy, with refunds through the payment partner. New permission
   `bookings.read`.
+- Booking reminders through `notifications` 24 hours and 2 hours before the start, never sent twice; guests book
+  and cancel with a one-time SMS code (`POST /api/v1/bookings/public/phone-codes`); customers list their bookings at
+  `GET /api/v1/bookings/me/bookings`; `.ics` calendar files; MCP tools `bookings.availability`,
+  `bookings.list_bookings`, `bookings.create_booking`, `bookings.reschedule_booking`, `bookings.cancel_booking`.
 - Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and
