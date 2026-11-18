@@ -368,6 +368,8 @@ mod tests {
                 ("ledger.balances", "ok"),
                 // Chưa có website nào có hồ sơ Bộ Công Thương (D-357): cảnh báo, không hỏng.
                 ("compliance.moit_readiness", "warning"),
+                // Chưa nạp dữ liệu luật khuyến mại (bước 43): cảnh báo, không hỏng.
+                ("promotions.promotion_limits", "warning"),
             ] {
                 assert!(found.contains(&expected), "{expected:?} not in {found:?}");
             }
@@ -376,7 +378,7 @@ mod tests {
             assert!(text.contains("→ Run `autoxide user create"), "{text}");
             assert!(text.contains("→ Set AUTOXIDE_AUTH_TOKEN_SECRET"), "{text}");
             assert!(
-                text.ends_with("No failed checks; 8 warning(s) to look at before going live.\n"),
+                text.ends_with("No failed checks; 9 warning(s) to look at before going live.\n"),
                 "{text}"
             );
             let _ = std::fs::remove_dir_all(dir);
