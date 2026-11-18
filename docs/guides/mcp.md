@@ -190,9 +190,11 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
 | `inventory.adjust_stock` | `inventory.adjust` | writes |
+| `inventory.create_transfer` | `inventory.transfer` | writes |
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |
 | `inventory.list_movements` | `inventory.read` | read-only |
+| `inventory.receive_transfer` | `inventory.transfer` | writes |
 | `inventory.release_reservation` | `inventory.adjust` | destructive |
 | `invoices.create_draft` | `invoices.write` | writes |
 | `invoices.create_export` | `invoices.export` | writes |

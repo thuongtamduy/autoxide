@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory`: stock transfers between warehouses (draft, in transit with `incoming`, partial receipt carrying
+  the source's average cost, close, cancel; numbers `CK-…`) and stock counts (`KK-…`, counting while selling, CSV
+  import, differences applied as `count` ledger lines with a reason); MCP tools `inventory.create_transfer`,
+  `inventory.receive_transfer`.
 - Module `inventory` listens to `orders.order_confirmed`, `orders.order_cancelled` and `orders.return_received`
   (optional subscriptions) and confirms, releases or restocks once even when an event arrives again.
 - Module `inventory` (step 42): stock reservations for orders through `autoxide_inventory::api::Inventory`
