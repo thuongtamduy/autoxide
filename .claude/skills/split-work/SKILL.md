@@ -76,7 +76,8 @@ bước thì là ứng viên chạy song song (vd bước 34: module `address` s
 - **Ranh giới chia = ranh giới crate.** Mỗi agent một crate hoặc một module; không
   agent nào sửa file của agent khác.
 - **File dùng chung do agent chính giữ:** `Cargo.toml` gốc, `Cargo.lock`, chỗ đăng
-  ký module, `docs/ROADMAP.md`, `docs/DECISIONS.md`, `STACK.md`, `CLAUDE.md`.
+  ký module, `docs/ROADMAP.md`, `docs/decisions/INDEX.md` (sinh lại sau khi gộp), `STACK.md`,
+  `CLAUDE.md`. Quyết định mới mỗi mục một file nên subagent tự ghi được, không giẫm nhau.
   Subagent cần đổi những file này thì báo lại, agent chính sửa.
 - **Migration không chia song song** trong cùng một module: thứ tự là một phần của
   nội dung.

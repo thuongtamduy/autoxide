@@ -1548,7 +1548,7 @@ mod tests {
             base: base.to_owned(),
             rule: "response.property_removed".to_owned(),
             at: "GET /api/v1/x 200 $.a".to_owned(),
-            decision: Some("D-999".to_owned()),
+            decision: Some("D-239".to_owned()),
         };
         let mut report = diff(&old, &new, today());
         assert_eq!(

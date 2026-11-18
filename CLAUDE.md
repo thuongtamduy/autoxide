@@ -105,10 +105,13 @@ thiệp**, và kết quả phải chuẩn chỉnh, đầy đủ.
 
 - **Tự quyết, không hỏi.** Việc có nhiều cách thì chọn cách đơn giản nhất mà giải
   quyết trọn vấn đề, làm, rồi sang bước kế trong lộ trình.
-- **Quyết định có ảnh hưởng lâu dài phải ghi lại** vào `docs/DECISIONS.md` (thêm
-  mục mới ở cuối, không sửa mục cũ): đổi thư viện, đổi quy ước, thêm ngoại lệ cho
-  một luật ở file này.
-- **Quyết định đã chốt trong `docs/DECISIONS.md` không tự đảo.** Thấy cần đổi thì
+- **Quyết định có ảnh hưởng lâu dài phải ghi lại** bằng skill `record-decision`: đổi thư
+  viện, đổi quy ước, thêm ngoại lệ cho một luật ở file này. Mỗi mục mới là **một file**
+  `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (ID theo ngày và tên, không theo số tuần tự: hai
+  phiên song song không chọn trùng), rồi `cargo xtask decisions` sinh lại mục lục. Không thêm
+  mục vào `docs/DECISIONS.md` (nhật ký cũ D-001…D-381, đóng), không sửa mục cũ. Gate chặn ID
+  trùng và tham chiếu tới ID không có (D-20261118-decision-ids).
+- **Quyết định đã chốt không tự đảo.** Thấy cần đổi thì
   ghi mục mới nêu lý do và mục bị thay; riêng các mục ghi "chủ dự án quyết" thì
   dừng lại hỏi.
 - **Chỉ dừng lại hỏi khi:** cần secret thật (mật khẩu database production, access key
@@ -173,7 +176,7 @@ bảng. Đổi cấu hình hay API thì sinh lại file tương ứng — thông
 sẵn lệnh.
 
 - Gate đỏ thì sửa code, **không** nới gate, không tắt lint, không đánh dấu test
-  bỏ qua. Ngoại lệ thật sự cần thiết phải ghi vào `docs/DECISIONS.md`.
+  bỏ qua. Ngoại lệ thật sự cần thiết phải ghi thành một quyết định (skill `record-decision`).
 - Code mới phải có test. Thứ liên quan ghi đồng thời (job, idempotency, refresh
   token) phải có test đồng thời chạy trên cả hai database.
 - Test chạm database lấy database qua `TestDatabase::run(async |database| { … })`

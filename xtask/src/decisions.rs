@@ -1,5 +1,7 @@
 //! Mục lục nhật ký quyết định: `cargo xtask decisions` sinh `docs/decisions/INDEX.md` từ
-//! `docs/DECISIONS.md`; `cargo xtask check` báo khi file đã commit lệch.
+//! `docs/DECISIONS.md` (mục cũ D-001…, đóng) và `docs/decisions/D-<ngày>-<tên>.md` (mỗi mục mới một
+//! file, D-20261118-decision-ids); `cargo xtask check` báo khi file đã commit lệch. Luật về ID (không
+//! trùng, đúng dạng, tham chiếu có thật) ở `decisions/rules.rs`.
 //!
 //! Nhật ký dài (hàng trăm mục, hàng nghìn dòng): agent đọc mục lục để biết đã quyết gì về một chủ
 //! đề, mục nào đã bị thay, rồi mới mở đúng mục. Mục lục sinh từ chính nhật ký nên không lệch được:
@@ -18,8 +20,12 @@ use std::path::Path;
 
 use crate::boundaries::Violation;
 
-/// Nhật ký, tính từ gốc repo.
+mod rules;
+
+/// Nhật ký cũ (D-001…, mỗi mục một số tuần tự), tính từ gốc repo. Đóng: mục mới là file riêng.
 pub const LOG_FILE: &str = "docs/DECISIONS.md";
+/// Thư mục của mục mới (`D-<YYYYMMDD>-<tên>.md`, một mục một file) và của mục lục.
+pub const DIR: &str = "docs/decisions";
 /// Mục lục sinh ra, tính từ gốc repo.
 pub const INDEX_FILE: &str = "docs/decisions/INDEX.md";
 
@@ -163,6 +169,8 @@ pub struct Entry {
     pub topic: Option<String>,
     /// Mục mà mục này thay: (ID, chỉ thay một phần).
     pub replaces: Vec<(String, bool)>,
+    /// File chứa mục, tính từ gốc repo.
+    pub file: String,
     /// Dòng của tiêu đề trong file (đếm từ 1), cho thông báo lỗi.
     pub line: usize,
 }
@@ -217,6 +225,7 @@ fn heading(line: &str, number: usize) -> Result<Entry, String> {
         who: who.trim().to_owned(),
         topic: None,
         replaces: Vec::new(),
+        file: String::new(),
         line: number,
     })
 }
@@ -427,11 +436,22 @@ fn guess_topic(title: &str) -> &'static str {
     OTHER
 }
 
-/// Mọi mục của nhật ký, theo thứ tự trong file.
+/// Mọi mục: nhật ký cũ theo thứ tự trong file, rồi mục mới theo ID (ngày, rồi tên).
 pub fn load(root: &Path) -> Result<Vec<Entry>, String> {
-    let path = root.join(LOG_FILE);
-    let text = fs::read_to_string(&path).map_err(|error| format!("{LOG_FILE}: {error}"))?;
-    parse(&text).map_err(|error| format!("{LOG_FILE}: {error}"))
+    let mut entries = read_file(root, LOG_FILE)?;
+    for file in rules::entry_files(root)? {
+        entries.extend(read_file(root, &file)?);
+    }
+    Ok(entries)
+}
+
+fn read_file(root: &Path, file: &str) -> Result<Vec<Entry>, String> {
+    let text = fs::read_to_string(root.join(file)).map_err(|error| format!("{file}: {error}"))?;
+    let mut entries = parse(&text).map_err(|error| format!("{file}: {error}"))?;
+    for entry in &mut entries {
+        entry.file = file.to_owned();
+    }
+    Ok(entries)
 }
 
 /// Nội dung mục lục.
@@ -447,15 +467,22 @@ pub fn render(entries: &[Entry]) -> String {
     let _ = writeln!(text, "# Mục lục quyết định\n");
     let _ = writeln!(
         text,
-        "> Sinh bằng `cargo xtask decisions` từ `{LOG_FILE}` — **không sửa tay**; `cargo xtask \
-         check` (trong gate) báo khi file này lệch.\n"
+        "> Sinh bằng `cargo xtask decisions` từ `{LOG_FILE}` và `{DIR}/D-*.md` — **không sửa \
+         tay**; `cargo xtask check` (trong gate) báo khi file này lệch.\n"
+    );
+    let _ = writeln!(
+        text,
+        "Ghi quyết định mới: tạo file `{DIR}/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo \
+         ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. \
+         Mẫu và luật: skill `record-decision`. `{LOG_FILE}` là nhật ký cũ (D-001…), không thêm mục \
+         vào đó.\n"
     );
     let _ = writeln!(
         text,
         "{} mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: \
          số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. \"Thay bởi\" \
-         nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Tìm nội dung đầy đủ: `grep -n '^## \
-         D-123 ' {LOG_FILE}`.\n",
+         nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n \
+         '^## D-123 ' {LOG_FILE}`; mục mới có link tới file của nó.\n",
         entries.len()
     );
     for (name, _) in TOPICS {
@@ -471,7 +498,14 @@ pub fn render(entries: &[Entry]) -> String {
             } else {
                 ""
             };
-            let _ = write!(text, "- **{}** {} — {}{who}", entry.id, entry.title, entry.date);
+            if entry.file == LOG_FILE {
+                let _ = write!(text, "- **{}** {} — {}{who}", entry.id, entry.title, entry.date);
+            } else {
+                // Link tương đối: mục lục nằm cùng thư mục với file của mục.
+                let name = entry.file.rsplit('/').next().unwrap_or_default();
+                let (id, title, date) = (&entry.id, &entry.title, &entry.date);
+                let _ = write!(text, "- **[{id}]({name})** {title} — {date}{who}");
+            }
             if let Some(by) = replaced_by.get(entry.id.as_str()) {
                 let full: Vec<String> = by
                     .iter()
@@ -512,22 +546,23 @@ pub fn write_index(root: &Path) -> Result<usize, String> {
     Ok(entries.len())
 }
 
-/// Luật `decisions-index`: mục lục đã commit khớp nhật ký.
+/// Luật `decisions-index` (mục lục đã commit khớp nhật ký) và các luật về ID của `rules`.
 pub fn check(root: &Path) -> Result<Vec<Violation>, String> {
     let entries = load(root)?;
+    let mut violations = rules::check(root, &entries)?;
     let expected = render(&entries);
     let actual = fs::read_to_string(root.join(INDEX_FILE)).unwrap_or_default();
-    if actual == expected {
-        return Ok(Vec::new());
+    if actual != expected {
+        violations.push(Violation {
+            rule: "decisions-index",
+            location: INDEX_FILE.to_owned(),
+            message: format!(
+                "out of date with {LOG_FILE} and {DIR}/D-*.md — regenerate it with `cargo xtask \
+                 decisions` and commit the result"
+            ),
+        });
     }
-    Ok(vec![Violation {
-        rule: "decisions-index",
-        location: INDEX_FILE.to_owned(),
-        message: format!(
-            "out of date with {LOG_FILE} — regenerate it with `cargo xtask decisions` and commit \
-             the result"
-        ),
-    }])
+    Ok(violations)
 }
 
 #[cfg(test)]
@@ -558,7 +593,18 @@ mod tests {
 
     #[test]
     fn muc_luc_ghi_thay_boi() {
-        let index = render(&parse(LOG).unwrap());
+        let mut entries = parse(LOG).unwrap();
+        entries.iter_mut().for_each(|entry| entry.file = LOG_FILE.to_owned());
+        let mut new = entries[3].clone();
+        new.id = "D-20261118-new-rule".to_owned();
+        new.file = format!("{DIR}/D-20261118-new-rule.md");
+        new.replaces.clear();
+        entries.push(new);
+        let index = render(&entries);
+        assert!(
+            index.contains("- **[D-20261118-new-rule](D-20261118-new-rule.md)** Mục mới"),
+            "{index}"
+        );
         assert!(index.contains("**D-001** Database: SQLite và Postgres — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-002*"), "{index}");
         assert!(index.contains("**D-003** Gate — 2026-11-13 · *thay bởi D-004*"), "{index}");
         assert!(index.ends_with("\n") && !index.ends_with("\n\n"));
