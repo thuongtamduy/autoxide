@@ -12,6 +12,7 @@ mod events;
 mod http;
 mod levels;
 mod migration;
+mod orders_events;
 mod permissions;
 mod relocation;
 mod reservations;
@@ -125,7 +126,10 @@ impl Module for InventoryModule {
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {
-        self.service.as_ref().map_or_else(Vec::new, contract::subscriptions)
+        let Some(service) = &self.service else { return Vec::new() };
+        let mut subscriptions = contract::subscriptions(service);
+        subscriptions.extend(orders_events::subscriptions(service));
+        subscriptions
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {

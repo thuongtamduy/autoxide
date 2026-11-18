@@ -18,6 +18,7 @@
 //! hết hạn giữ. Bộ chạy phải chịu được việc chạy lại.
 
 pub mod backlog;
+pub(crate) mod backlog_api;
 mod claim;
 mod migration;
 pub(crate) mod queue;

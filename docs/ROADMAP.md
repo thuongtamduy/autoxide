@@ -272,7 +272,7 @@ Nhóm A — vận hành:
 - [x] Diễn tập restore: test đầu-cuối backup → restore vào database trống → chương trình khởi
       động, dữ liệu và file khớp, trên cả hai database (cả chép chéo SQLite ↔ Postgres nếu
       `autoxide copy` hỗ trợ); `docs/DEPLOY.md` (EN + VI) có quy trình restore từng bước
-- [ ] Số đo tồn đọng (gauge, cập nhật định kỳ, tên có tiền tố như luật code): job đang chờ và tuổi
+- [x] Số đo tồn đọng (gauge, cập nhật định kỳ, tên có tiền tố như luật code): job đang chờ và tuổi
       của job chờ lâu nhất theo module, job trong dead-letter queue, event chưa giao và tuổi của
       event cũ nhất, kết nối database đang dùng / còn rảnh. Hiện chỉ có bộ đếm cộng dồn
       (`jobs_failed_total`, `events_failed_total`…), không thấy được hàng đợi kẹt
@@ -525,7 +525,7 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
       theo khách, D-223), cảnh báo tồn thấp (event), cho phép bán khi hết hàng hay không theo sản phẩm
 - [ ] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn trước, ngưỡng
       sắp hết hạn theo nút), số serial — bật theo sản phẩm
-- [ ] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
+- [x] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
 - [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, trả hàng cho nhà cung
       cấp; công nợ phải trả vào sổ cái, trạng thái ghi sổ của phiếu nhập (ghi lại được), công nợ từng nhà
       cung cấp qua `ledger`

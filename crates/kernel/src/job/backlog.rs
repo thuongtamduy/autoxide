@@ -371,3 +371,39 @@ mod tests {
         }
     }
 }
+
+/// Module có bảng job và bảng event, cho [`status`] (REST, MCP). `Modules` điền sau khi mọi module
+/// khởi động; trước đó trống. `Clone` rẻ (con trỏ đếm tham chiếu).
+#[derive(Clone, Default)]
+pub(crate) struct BacklogModules(std::sync::Arc<std::sync::OnceLock<ModuleLists>>);
+
+type ModuleLists = (Vec<&'static str>, Vec<&'static str>);
+
+impl BacklogModules {
+    pub(crate) fn fill(&self, jobs: Vec<&'static str>, events: Vec<&'static str>) {
+        let _ = self.0.set((jobs, events));
+    }
+
+    fn get(&self) -> Result<&ModuleLists, Error> {
+        self.0.get().ok_or_else(|| Error::internal("the backlog is read before modules started"))
+    }
+}
+
+/// Tồn đọng của mọi database, kèm bản backup tốt mới nhất của mỗi database — cho
+/// `GET /api/v1/kernel/ops/backlog` và tool MCP `kernel.ops_backlog`.
+pub(crate) async fn status(
+    registry: &DatabaseRegistry,
+    modules: &BacklogModules,
+) -> Result<super::backlog_api::OpsBacklog, Error> {
+    let (jobs, events) = modules.get()?;
+    let now = Utc::now();
+    let backups = crate::backup::scheduled::latest_successes(registry.control()).await?;
+    let mut databases = Vec::new();
+    for (_, name, database) in registry.databases().await? {
+        let snapshot = backlog(&database, &name, jobs, events, now).await?;
+        let last_backup_at = backups.iter().find(|(known, _)| *known == name).map(|(_, at)| *at);
+        databases
+            .push(super::backlog_api::DatabaseBacklog::from_snapshot(snapshot, last_backup_at));
+    }
+    Ok(super::backlog_api::OpsBacklog { checked_at: now, databases })
+}
