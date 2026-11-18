@@ -327,6 +327,19 @@ pub trait Module: Send + Sync {
     fn facts(&self) -> Vec<crate::report::FactSource> {
         Vec::new()
     }
+
+    /// Loại sự kiện phân tích truy cập của module (bước 57, D-220): website gửi loại `browser`, loại
+    /// `server` rút từ event của chính module. Module `analytics` chỉ nhận loại đã khai. Kernel kiểm
+    /// khai báo lúc khởi động. Mặc định: không có.
+    fn analytics_events(&self) -> Vec<crate::analytics::AnalyticsEvent> {
+        Vec::new()
+    }
+
+    /// Phễu module khai (bước 57), vd `orders.checkout`: các bước là loại sự kiện đã khai (của bất
+    /// kỳ module nào). Mặc định: không có.
+    fn funnels(&self) -> Vec<crate::analytics::Funnel> {
+        Vec::new()
+    }
 }
 
 /// Những gì một module nhận được lúc khởi động.
@@ -362,6 +375,7 @@ pub struct StartContext<'a> {
     counters:
         &'a mut std::collections::BTreeMap<&'static str, Arc<dyn crate::entitlement::UsageCounter>>,
     facts: &'a crate::report::FactCatalog,
+    analytics: &'a crate::analytics::AnalyticsCatalog,
 }
 
 impl StartContext<'_> {
@@ -678,6 +692,12 @@ impl StartContext<'_> {
     /// event đó.
     pub fn fact_sources(&self) -> Vec<(&'static str, crate::report::FactSource)> {
         self.facts.sources()
+    }
+
+    /// Mọi loại sự kiện phân tích và phễu của mọi module đã đăng ký — kể cả module đăng ký sau
+    /// (bước 57). Module `analytics` đọc để biết nhận sự kiện nào.
+    pub fn analytics_catalog(&self) -> crate::analytics::AnalyticsCatalog {
+        self.analytics.clone()
     }
 
     /// Bộ phân phối dữ liệu khách cha → khách con của module này (bước 38): ghi bản phân phối

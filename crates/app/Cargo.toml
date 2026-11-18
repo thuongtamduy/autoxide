@@ -28,6 +28,7 @@ autoxide-plans.workspace = true
 autoxide-tax.workspace = true
 autoxide-ledger.workspace = true
 autoxide-invoices.workspace = true
+autoxide-analytics.workspace = true
 autoxide-compliance.workspace = true
 autoxide-notifications.workspace = true
 autoxide-reporting.workspace = true

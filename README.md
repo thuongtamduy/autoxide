@@ -398,6 +398,8 @@ never share foreign keys. These rules are checked automatically by the gate.
   website's thread and comment box, moderation, reports and bans, reply mails, legal notes
 - [`docs/MENUS.md`](docs/MENUS.md) — using the menus module: items, objects of other modules,
   badges, the public endpoint and its caching, moving from the content module's menus
+- [`docs/ANALYTICS.md`](docs/ANALYTICS.md) — cookieless website analytics: sending events from a
+  website, reports, funnels, consent for per-person tracking, legal notes
 - [`docs/ADDRESS.md`](docs/ADDRESS.md) — administrative units and addresses: reading the list,
   importing the official list
 - [`docs/TAX.md`](docs/TAX.md) — taxes: the Vietnam tax data pack, computing taxes, tax profiles

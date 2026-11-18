@@ -4741,6 +4741,18 @@ export type Data_FormTokenResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_FunnelReport = {
+  /** A funnel over a range of days. */
+  data: {
+    description: string;
+    from: string;
+    key: string;
+    steps: FunnelStep[];
+    to: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Health = {
   /** Health of the service. */
   data: {
@@ -4794,6 +4806,17 @@ export type Data_ImportReport = {
     subscribed: number;
     /** Subscriptions already confirmed. */
     unchanged: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Ingested = {
+  /** What was done with a batch. */
+  data: {
+    /** Events stored. */
+    accepted: number;
+    /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
+    dropped: number;
   };
 };
 
@@ -6072,6 +6095,31 @@ export type Data_OverrideResponse = {
     reason: string;
     /** The tenant it applies to. */
     tenant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Overview = {
+  /** Visits of a website over a range of days. */
+  data: {
+    /** `bounces / visitors`, 0 to 1 (0 when there are no visitors). */
+    bounce_rate: number;
+    /** Visits that saw exactly one page. */
+    bounces: number;
+    /** One entry per day that had visits. */
+    days: DayCount[];
+    /** All events. */
+    events: number;
+    from: string;
+    /** The website (organization unit). */
+    site: string;
+    to: string;
+    /** The sources bringing the most page views from outside the website. */
+    top_sources: Ranked[];
+    /** Page views. */
+    views: number;
+    /** Sum of the daily unique visitors (no cookies: one person on two days counts twice). */
+    visitors: number;
   };
 };
 
@@ -8048,10 +8096,37 @@ export type Data_Vec_DelegationResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_EventTypeInfo = {
+  data: {
+    description: string;
+    /** The `type` to send, e.g. `catalog.product_viewed`. */
+    key: string;
+    /** When set, events must carry `object` = `<object_kind>:<id>`. */
+    object_kind?: string | null;
+    props: PropInfo[];
+    /**
+     * `browser` (pages send it) or `server` (recorded by the server from what happened; pages
+     * cannot send it).
+     */
+    source: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_EventTypeResponse = {
   data: {
     description: string;
     name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_FunnelInfo = {
+  data: {
+    description: string;
+    key: string;
+    /** Event types of the steps, in order. */
+    steps: string[];
   }[];
 };
 
@@ -8690,6 +8765,20 @@ export type Data_Vec_PublicProviderResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_Ranked = {
+  data: {
+    /** Events (for event types and objects). */
+    events: number;
+    /** The page path, source, campaign, object (`<kind>:<id>`) or event type. */
+    value: string;
+    /** Page views (for objects: events about the object). */
+    views: number;
+    /** Sum of the daily unique visitors. */
+    visitors: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ReasonView = {
   data: {
     active: boolean;
@@ -9218,6 +9307,13 @@ export type Data_WorkView = {
   };
 };
 
+/** One day of the overview. */
+export type DayCount = {
+  day: string;
+  views: number;
+  visitors: number;
+};
+
 /** A decimal number written as a string, like "12.5" or "-0.08": a dot before the fraction, no thousands separators, no exponent, at most 28 digits. */
 export type DecimalString = string;
 
@@ -9571,6 +9667,30 @@ export type ErasedResponse = {
   deleted: number;
 };
 
+/** A batch of events from a page. */
+export type EventBatch = {
+  /**
+   * 1 to 20 events. Events of unknown types, with undeclared or wrongly typed `props`, or
+   * otherwise malformed are dropped one by one; the batch is never refused for them.
+   */
+  events: IncomingEvent[];
+};
+
+/** An event type. */
+export type EventTypeInfo = {
+  description: string;
+  /** The `type` to send, e.g. `catalog.product_viewed`. */
+  key: string;
+  /** When set, events must carry `object` = `<object_kind>:<id>`. */
+  object_kind?: string | null;
+  props: PropInfo[];
+  /**
+   * `browser` (pages send it) or `server` (recorded by the server from what happened; pages
+   * cannot send it).
+   */
+  source: string;
+};
+
 /** A kind of event that endpoints can subscribe to. */
 export type EventTypeResponse = {
   description: string;
@@ -9826,6 +9946,40 @@ export type FoundView = {
   title: string;
 };
 
+/** A funnel a module declares. */
+export type FunnelInfo = {
+  description: string;
+  key: string;
+  /** Event types of the steps, in order. */
+  steps: string[];
+};
+
+/** A funnel over a range of days. */
+export type FunnelReport = {
+  description: string;
+  from: string;
+  key: string;
+  steps: FunnelStep[];
+  to: string;
+};
+
+/** One step of a funnel. */
+export type FunnelStep = {
+  /** `sessions` of this step divided by the previous step's. */
+  from_previous: number;
+  /**
+   * `sessions` of this step divided by the first step's, 0 to 1 and more (steps are counted
+   * independently, see the funnel endpoint).
+   */
+  from_start: number;
+  /** The event type of the step. */
+  key: string;
+  /** Sessions with the event, summed over the days. */
+  sessions: number;
+  /** Position, from 0. */
+  step: number;
+};
+
 /** Health of the service. */
 export type Health = {
   /** Always `ok`; a service that is not healthy answers with an error instead. */
@@ -9905,6 +10059,38 @@ export type ImportRequest = {
 export type ImportedMenu = {
   key: string;
   locale: string;
+};
+
+/** One event sent by a page. */
+export type IncomingEvent = {
+  /**
+   * What the event is about, `<kind>:<id>`, e.g. `catalog.product:0190…`. Required when the
+   * event type names an object kind.
+   */
+  object?: string | null;
+  /**
+   * Path of the page, starting with `/` (query and fragment are cut off; up to 512
+   * characters).
+   */
+  path: string;
+  /** Extra values the event type declares; anything else drops the event. */
+  props?: Record<string, unknown> | null;
+  /** `document.referrer`: only its host is kept. */
+  referrer?: string | null;
+  /**
+   * A declared event type, e.g. `analytics.page_view` or `catalog.product_viewed`; see
+   * `GET /api/v1/analytics/event-types`. Unknown types are dropped.
+   */
+  type: string;
+  utm?: Utm | null;
+};
+
+/** What was done with a batch. */
+export type Ingested = {
+  /** Events stored. */
+  accepted: number;
+  /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
+  dropped: number;
 };
 
 /** A new invitation. */
@@ -12466,6 +12652,28 @@ export type OverrideResponse = {
   reason: string;
   /** The tenant it applies to. */
   tenant_id: string;
+};
+
+/** Visits of a website over a range of days. */
+export type Overview = {
+  /** `bounces / visitors`, 0 to 1 (0 when there are no visitors). */
+  bounce_rate: number;
+  /** Visits that saw exactly one page. */
+  bounces: number;
+  /** One entry per day that had visits. */
+  days: DayCount[];
+  /** All events. */
+  events: number;
+  from: string;
+  /** The website (organization unit). */
+  site: string;
+  to: string;
+  /** The sources bringing the most page views from outside the website. */
+  top_sources: Ranked[];
+  /** Page views. */
+  views: number;
+  /** Sum of the daily unique visitors (no cookies: one person on two days counts twice). */
+  visitors: number;
 };
 
 /** One page of a list. */
@@ -15461,6 +15669,13 @@ export type ProfileRequest = {
   display_name: string;
 };
 
+/** A prop an event type takes. */
+export type PropInfo = {
+  /** `text` (up to 100 characters), `number` or `boolean`. */
+  kind: string;
+  name: string;
+};
+
 /** Changes to a sign-in provider; fields left out stay as they are, `null` clears. */
 export type ProviderPatch = {
   allow_signup?: boolean | null;
@@ -16080,6 +16295,18 @@ export type PublishRequest = {
 export type PutMenuRequest = {
   /** At most 200 items in all. */
   items: MenuItemInput[];
+};
+
+/** One row of a ranking. */
+export type Ranked = {
+  /** Events (for event types and objects). */
+  events: number;
+  /** The page path, source, campaign, object (`<kind>:<id>`) or event type. */
+  value: string;
+  /** Page views (for objects: events about the object). */
+  views: number;
+  /** Sum of the daily unique visitors. */
+  visitors: number;
 };
 
 /**
@@ -18296,6 +18523,18 @@ export type UserRolesRequest = {
   role_ids: string[];
 };
 
+/** UTM parameters of the page URL. */
+export type Utm = {
+  /** `utm_campaign`, e.g. `tet_sale`. */
+  campaign?: string | null;
+  content?: string | null;
+  /** `utm_medium`, e.g. `cpc`. */
+  medium?: string | null;
+  /** `utm_source`, e.g. `facebook`. */
+  source?: string | null;
+  term?: string | null;
+};
+
 /** A smaller copy of an image. */
 export type VariantResponse = {
   /** `image/jpeg`, or `image/png` for images with transparency. */
@@ -18479,6 +18718,143 @@ export interface paths {
         200: Data_AiStatus;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/campaigns": {
+    /** List the UTM campaigns. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/event-types": {
+    /** List the event types (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_EventTypeInfo;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/funnels": {
+    /** List the funnels. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_FunnelInfo;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/funnels/{key}": {
+    /** Get a funnel. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { site?: string; from?: string; to?: string }; };
+      responses: {
+        200: Data_FunnelReport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/objects": {
+    /** List the most viewed objects. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number; kind?: string }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/overview": {
+    /** Get the visit overview of a website. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string }; };
+      responses: {
+        200: Data_Overview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/pages": {
+    /** List the most viewed pages. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/public/events": {
+    /** Send visit events (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { site?: string }; };
+      requestBody: EventBatch;
+      responses: {
+        202: Data_Ingested;
+        400: Problem;
+        403: Problem;
+        404: Problem;
+        415: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/sources": {
+    /** List the traffic sources. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/analytics/types": {
+    /** List the event types by count. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string; from?: string; to?: string; limit?: number }; };
+      responses: {
+        200: Data_Vec_Ranked;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
