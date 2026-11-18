@@ -248,6 +248,7 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
         (thương mại) thêm `dry_run` khi làm tới.
 - [ ] AI trong quản trị (D-109): lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`); trợ lý chạy
       tool MCP với quyền người gọi, mọi lệnh ghi là bản nháp hay yêu cầu duyệt, trả kèm tool đã gọi
+      - [x] `POST /kernel/filters/parse`: lời thường thành bộ lọc đã kiểm theo schema (D-372). Còn: trợ lý.
 - [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình hay
       dùng (`/me/pins`)
       - [x] `/api/v1/me/pins`: ghim màn hình hay bản ghi, tối đa 20, xếp lại, dữ liệu cá nhân

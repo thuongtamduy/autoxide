@@ -296,6 +296,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/custom-fields/{id}".to_owned(),
                     "/devtools/events".to_owned(),
                     "/devtools/requests".to_owned(),
+                    "/filters/parse".to_owned(),
                     "/domains".to_owned(),
                     "/domains/allowed".to_owned(),
                     "/domains/{id}".to_owned(),

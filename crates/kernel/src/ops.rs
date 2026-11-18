@@ -10,6 +10,7 @@ pub(crate) mod client_config;
 pub mod connections;
 pub mod custom_fields;
 pub mod doctor;
+pub(crate) mod filter_parse;
 pub mod find;
 pub mod list_exports;
 pub mod logging;

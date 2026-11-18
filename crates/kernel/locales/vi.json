@@ -192,6 +192,7 @@
   "kernel.export_not_found": "Khách hàng này không có lượt xuất dữ liệu `{id}`.",
   "kernel.export_not_ready": "Lượt xuất dữ liệu đang `{status}`: chỉ tải được lượt đã `ready`.",
   "kernel.export_storage_unavailable": "Xuất dữ liệu cần nơi lưu file; chưa cài module `files`.",
+  "kernel.filters_need_ai": "Đổi câu thành bộ lọc cần AI mà máy chủ này chưa có. Hãy cài và cấu hình module `ai`, hoặc tự tạo bộ lọc.",
   "kernel.flag_limit_reached": "Bạn đã có {max} cờ giao diện, mức tối đa cho phép. Xoá các cờ không cần nữa bằng `DELETE /api/v1/me/flags/{key}` rồi thử lại.",
   "kernel.job_file_not_found": "Job `{id}` không có file để tải.",
   "kernel.job_not_failed": "Job `{id}` chưa hỏng; chỉ job đã hỏng mới chạy lại được.",
