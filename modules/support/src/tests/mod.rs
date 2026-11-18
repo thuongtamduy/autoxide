@@ -1,6 +1,7 @@
 //! Test của module `support`, trên database gate đang chọn (gate chạy cả SQLite và Postgres).
 //! `TestApp` dựng module như binary: migration → start → route → lớp HTTP của kernel.
 
+mod extras;
 mod guests;
 mod scope;
 mod sla;
@@ -176,6 +177,8 @@ pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::SupportService> {
         media: None,
         accounts: None,
         authenticator: None,
+        resources: None,
+        complaints: None,
     };
     Arc::new(crate::service::SupportService::new(parts, Default::default()))
 }

@@ -229,3 +229,14 @@ impl crate::api::ModerationPolicy for Provider {
         self.0.check_hide_reason(&tenant, surface, reason).await
     }
 }
+
+#[async_trait::async_trait]
+impl crate::api::ComplaintIntake for Provider {
+    async fn open(
+        &self,
+        tenant: &TenantContext,
+        complaint: crate::api::ComplaintFromTicket,
+    ) -> Result<crate::api::CaseRef, Error> {
+        self.0.complaint_from_ticket(tenant, complaint).await
+    }
+}
