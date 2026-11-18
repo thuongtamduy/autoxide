@@ -696,6 +696,134 @@ For a rolling update behind a load balancer:
 With a single server and no load balancer, keep the drain at `0`: there is nowhere else to
 send requests, and the drain would only delay the stop.
 
+## Monitoring
+
+Turn on `AUTOXIDE_HTTP_METRICS=true` and let Prometheus scrape `/metrics` from the machine itself
+(block `/metrics` in the reverse proxy). Besides the request figures (`http_requests_total`,
+`http_request_duration_seconds`), every process that runs background work (`AUTOXIDE_PROCESS_ROLE`
+`all` or `worker`) updates the backlog gauges every `AUTOXIDE_METRICS_BACKLOG_SECONDS` (default 30),
+labelled by `database` and `module`:
+
+| Gauge | Meaning |
+|---|---|
+| `jobs_pending` | Jobs not done yet, scheduled ones included |
+| `jobs_oldest_pending_seconds` | How long the oldest job that is due has waited (0 when none) |
+| `jobs_dead` | Jobs in the dead-letter queue (`autoxide jobs failed`) |
+| `events_pending`, `events_oldest_pending_seconds`, `events_dead` | The same for events waiting to be delivered to subscribers |
+| `database_connections{pool,state}`, `database_connections_max{pool}` | Connections of the `read` and `write` pools, `in_use` or `idle`, and their maximum |
+
+The `database` label names the database (`main`, or the placement of a tenant with its own database);
+past `AUTOXIDE_METRICS_MAX_DATABASE_LABELS` (default 50) databases, the others are added up under
+`database="other"`. There is no label per tenant: look a tenant up in the logs and traces.
+
+The repository ships ready-made files:
+
+- [`deploy/prometheus/autoxide-alerts.yml`](../deploy/prometheus/autoxide-alerts.yml): alerting
+  rules — server errors above 2%, slow p95, a job waiting more than 10 minutes, jobs going to the
+  dead-letter queue, events not delivered for 5 minutes, a connection pool 90% used. Each rule has an
+  `action` annotation saying what to do; the steps are in the runbook below. Add it to `rule_files`
+  in `prometheus.yml` and route the alerts with Alertmanager.
+- [`deploy/grafana/autoxide-dashboard.json`](../deploy/grafana/autoxide-dashboard.json): a Grafana
+  dashboard (Dashboards › New › Import) with requests, errors, p95 by route, backlogs, the dead-letter
+  queue and connections, filtered by database.
+
+With several worker processes each one publishes the same gauges (one series per `instance`); the
+rules and the dashboard take the largest value, not the sum.
+
+## Runbook
+
+Each case: what you see, how to check, how to fix it.
+
+### Server errors
+
+- **Sign:** alert `AutoxideHigh5xxRate`; clients get `500` problems.
+- **Check:** every error response carries a `request_id`; search the logs for it. `autoxide doctor`
+  checks the configuration, the database, migrations, file storage and mail in one go.
+- **Fix:** what the log says (a database that went away, a full disk, an outside service down). An
+  error inside the code is a bug: report it with the log lines, without secrets or personal data.
+
+### Slow requests
+
+- **Sign:** alert `AutoxideSlowP95` names the route.
+- **Check:** whether `database_connections` is near its maximum (requests wait for a connection), and
+  the query plan of that route's queries (`EXPLAIN ANALYZE` on PostgreSQL, `EXPLAIN QUERY PLAN` on
+  SQLite).
+- **Fix:** a missing index belongs in a new migration of the module that owns the table; a pool too
+  small, see "Database connections".
+
+### Stuck queue
+
+- **Sign:** alert `AutoxideJobsStuck` or `AutoxideEventsBacklog`; mail, webhooks or reports arrive late.
+- **Check:** that at least one process runs with `AUTOXIDE_PROCESS_ROLE` `all` or `worker`
+  (`/health/ready` of that process, its logs); `jobs_pending` by module shows which module is behind;
+  in multi-tenant mode a database still being migrated (`503 tenant_maintenance`) waits until
+  `autoxide migrate up --all` finishes.
+- **Fix:** start (or restart) the worker; raise `AUTOXIDE_JOBS_CONCURRENCY` or add worker processes
+  when one module always has a long queue. Events wait for a subscriber that keeps failing: its error
+  is in the logs (`event delivery failed`).
+
+### Dead-letter queue
+
+- **Sign:** alert `AutoxideDeadLetterGrowing`; `jobs_dead` goes up.
+- **Check:** `autoxide jobs failed` lists the jobs that gave up, newest first, with their last error
+  (`--module` to narrow).
+- **Fix:** fix the cause first (a wrong SMTP password, an outside service down), then
+  `autoxide jobs retry <module> <id>` for each job. A job retried before the fix goes back to the
+  queue only to fail again.
+
+### Database connections
+
+- **Sign:** alert `AutoxideDbPoolExhausted`; slow requests that wait for a connection.
+- **Check:** `database_connections{state="in_use"}` by pool; on PostgreSQL, long queries in
+  `pg_stat_activity`.
+- **Fix:** end what holds connections (a slow query, a stuck job), then raise
+  `AUTOXIDE_DATABASE_READ_CONNECTIONS` / `AUTOXIDE_DATABASE_WRITE_CONNECTIONS` — every process opens
+  that many, so keep the total under the server's `max_connections`. SQLite has one write connection
+  by design.
+
+### Database full
+
+- **Sign:** writes fail with "disk full" or "no space left on device" in the logs.
+- **Check:** SQLite: the size of the database file and of its `-wal` file (a long-running read, a
+  backup for example, keeps the `-wal` file growing until it ends). PostgreSQL: the largest tables,
+  `SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) FROM pg_statio_user_tables ORDER BY
+  pg_total_relation_size(relid) DESC LIMIT 10;`.
+- **Fix:** free or add disk space first. Finished jobs and delivered events are removed after 7 days
+  on their own; on PostgreSQL run `VACUUM` on a large table after deleting much from it.
+
+### A key leaked
+
+- `AUTOXIDE_AUTH_TOKEN_SECRET`: set a new value on every server and restart. Every access token stops
+  working; clients sign in again with their refresh token, which stays valid.
+- `AUTOXIDE_SECRET_KEY`: rotate it as described in "Get the code and set the secrets" (new value,
+  old one in `AUTOXIDE_SECRET_KEY_PREVIOUS`, `autoxide secrets reseal`). Backups taken before still open
+  with the old key: delete them or keep them as safe as the key. Counters by visitor address start
+  again under the new key.
+- An API key or a webhook secret: revoke the key, rotate the webhook secret from the API.
+
+### The last administrator is gone
+
+- **Sign:** nobody can sign in with the `admin` role (the account was removed, locked out, or the
+  person left). `autoxide doctor` warns when no active administrator exists.
+- **Fix:** on the server, `autoxide user create --email … --name … --admin` makes a new administrator
+  and prints its password. For an administrator who only lost their second factor or passkeys:
+  `autoxide user reset-mfa` / `autoxide user remove-passkeys`.
+
+### Updating while two versions run
+
+During a rolling update, old and new servers run side by side on the same database, so a release
+changes the database in two steps ("expand, then contract"):
+
+1. **Expand:** the new version adds what it needs (a new column, nullable or with a default; a new
+   table) and writes both the old and the new shape. The old version keeps working: it does not know
+   the new column.
+2. **Contract:** a later release, once no server of the old version runs, stops writing the old shape
+   and drops it.
+
+`autoxide serve` refuses to start while migrations are missing, so run `autoxide migrate up` (with
+`--all` in multi-tenant mode) before starting the new servers, then replace the old ones as in
+"Updating without dropping requests".
+
 ## Checklist before going live
 
 - [ ] `AUTOXIDE_AUTH_TOKEN_SECRET` and `AUTOXIDE_SECRET_KEY` set to long random values, kept

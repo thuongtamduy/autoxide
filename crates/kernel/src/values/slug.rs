@@ -1,14 +1,15 @@
-//! Slug: phần cuối của đường dẫn (`duong-den-da-lat`). Sinh từ tiêu đề bằng crate `slug`
+//! Slug: phần cuối của đường dẫn (`duong-den-da-lat`), dùng chung mọi module (`content`, `catalog`…;
+//! dời từ `content` ở bước 41). Sinh từ tiêu đề bằng crate `slug`
 //! (chuyển mọi chữ sang ASCII: bỏ dấu, `đ` → `d`); slug người dùng gửi phải đúng dạng
 //! `[a-z0-9]+(-[a-z0-9]+)*`, dài tối đa [`MAX_LENGTH`] ký tự (D-102).
 
 use uuid::Uuid;
 
 /// Độ dài tối đa của slug.
-pub(crate) const MAX_LENGTH: usize = 100;
+pub const MAX_LENGTH: usize = 100;
 
 /// Slug có đúng dạng không.
-pub(crate) fn is_valid(slug: &str) -> bool {
+pub fn is_valid(slug: &str) -> bool {
     !slug.is_empty()
         && slug.len() <= MAX_LENGTH
         && slug.split('-').all(|part| {
@@ -18,7 +19,7 @@ pub(crate) fn is_valid(slug: &str) -> bool {
 
 /// Slug sinh từ `title` (bỏ emoji, ký hiệu); tiêu đề không cho ra chữ nào (vd chỉ có emoji)
 /// thì dùng đoạn đầu của `id`.
-pub(crate) fn from_title(title: &str, id: Uuid) -> String {
+pub fn from_title(title: &str, id: Uuid) -> String {
     // Chỉ giữ chữ, số và dấu ngăn từ: emoji và ký hiệu bị bỏ (không thì thành chữ tiếng Anh).
     let kept: String = title.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).collect();
     let full = slug::slugify(kept);
@@ -44,7 +45,7 @@ pub(crate) fn from_title(title: &str, id: Uuid) -> String {
 }
 
 /// `base` kèm hậu tố thứ `n` (`n` ≥ 2): `slug-2`, cắt bớt `base` cho vừa giới hạn.
-pub(crate) fn with_suffix(base: &str, n: u32) -> String {
+pub fn with_suffix(base: &str, n: u32) -> String {
     let suffix = format!("-{n}");
     let room = MAX_LENGTH.saturating_sub(suffix.len());
     let trimmed = base.get(..room.min(base.len())).unwrap_or(base).trim_end_matches('-');
