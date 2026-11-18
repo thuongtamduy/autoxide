@@ -12,6 +12,7 @@ pub(crate) mod cases;
 pub(crate) mod catalog;
 pub(crate) mod child_context;
 pub(crate) mod guides;
+pub(crate) mod inventory;
 pub(crate) mod invoices;
 pub(crate) mod invoices_print;
 pub(crate) mod ledger_flows;

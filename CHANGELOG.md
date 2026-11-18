@@ -11,10 +11,17 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
+  `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
+  `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
+  `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
+  tools `inventory.*`.
 - `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
   conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
   product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category
   checked against the tax engine on going on sale, and the public `path` of each product translation.
+- `auth`: `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` — while changing `AUTOXIDE_AUTH_TOKEN_SECRET`, access tokens signed with
+  an old key are still accepted, so nobody is signed out (step 39). `docs/DEPLOY.md` has the steps.
 - New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
   `POST /api/v1/analytics/public/events` (up to 20, unknown or malformed ones dropped, bots and foreign pages
   dropped, `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` per network block); anonymous sessions use a random key per day

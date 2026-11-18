@@ -6102,6 +6102,289 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Adjust stock in one warehouse; every line needs a reason code from the list `inventory.adjustment`. Sending the same `reference` and content again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A stock adjustment in one warehouse.",
+        "properties": {
+          "lines": {
+            "description": "1 to 500 lines.",
+            "items": {
+              "additionalProperties": false,
+              "description": "One line of a stock adjustment.",
+              "properties": {
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quantity": {
+                  "description": "Units to add (positive) or remove (negative); not 0.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "reason_code": {
+                  "description": "Code from the reason list `inventory.adjustment`, e.g. `damaged`.",
+                  "type": "string"
+                },
+                "unit_cost_amount": {
+                  "description": "Unit cost of added units, integer minor units as a string, e.g. `\"150000\"`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit_cost_currency": {
+                  "description": "Currency of `unit_cost_amount`, e.g. `VND`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity",
+                "reason_code"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The warehouse or store.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your id of this adjustment; the same reference and content again changes nothing.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.adjust_stock",
+      "output_schema": null,
+      "permissions": [
+        "inventory.adjust"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List stock levels (variant × warehouse) in your scope with on hand, available, reserved and average cost; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Stock levels to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of levels, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only this warehouse or store.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "description": "Only this variant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.get_levels",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List stock levels whose available stock is at or below their reorder point.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Stock levels to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of levels, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only this warehouse or store.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "description": "Only this variant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.list_low_stock",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the append-only stock movement ledger in your scope, newest first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Ledger lines to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "Lines written at or after this time.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "description": "Kind of a movement ledger line.",
+                "enum": [
+                  "receipt",
+                  "sale",
+                  "return",
+                  "adjustment",
+                  "count",
+                  "transfer_out",
+                  "transfer_in",
+                  "expiry",
+                  "supplier_return"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of lines, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Lines written before this time.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.list_movements",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Write a draft document; taxes are computed from the tax categories. A draft has no number until it is issued.",
       "input_schema": {
         "additionalProperties": false,
