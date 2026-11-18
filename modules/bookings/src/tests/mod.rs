@@ -4,6 +4,7 @@
 
 mod bookings;
 mod fakes;
+mod guests;
 mod setup;
 
 use std::collections::HashMap;

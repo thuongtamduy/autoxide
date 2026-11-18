@@ -23,6 +23,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![autoxide_kernel::job::tenant_table("catalog")],
         ),
         Box::new(CreateAttributes),
+        Box::new(CreatePriceChanges),
     ]
 }
 
@@ -669,5 +670,51 @@ impl MigrationTrait for CreateAttributes {
             manager.drop_table(Table::drop().table(Alias::new(*name)).to_owned()).await?;
         }
         Ok(())
+    }
+}
+
+struct CreatePriceChanges;
+
+impl MigrationName for CreatePriceChanges {
+    fn name(&self) -> &str {
+        "m0008_price_changes"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreatePriceChanges {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Đổi giá hàng loạt (D-222): nháp → xem trước → duyệt → job ghi dòng giá `bulk`.
+        let mut changes = table("catalog_price_changes");
+        changes
+            .col(schema::uuid("price_list_id"))
+            .col(schema::text("filter"))
+            .col(schema::string_len("operation", 16))
+            .col(schema::big_integer("value"))
+            .col(schema::uuid_null("rounding_rule_id"))
+            .col(schema::timestamp_with_time_zone("valid_from"))
+            .col(schema::timestamp_with_time_zone_null("valid_to"))
+            .col(schema::string_len("status", 16))
+            .col(schema::big_integer("affected"))
+            .col(schema::text_null("preview"))
+            .col(schema::uuid_null("created_by"))
+            .col(schema::uuid_null("approved_by"))
+            .col(schema::timestamp_with_time_zone("created_at"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(changes).await?;
+        index(
+            manager,
+            "catalog_price_changes",
+            "catalog_price_changes_list_idx",
+            &["tenant_id", "price_list_id", "id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Alias::new("catalog_price_changes")).to_owned())
+            .await
     }
 }
