@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
+  conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
+  product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category
+  checked against the tax engine on going on sale, and the public `path` of each product translation.
 - Module `catalog` (step 41, first part; `docs/CATALOG.md`): products with variants, options, SKU and barcode
   unique per tenant, sale modes (in stock, backorder, pre-order), bundles, images from `media`; a category tree;
   price lists per store, chain and customer group with append-only price history, scheduled and temporary prices,

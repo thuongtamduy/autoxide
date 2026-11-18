@@ -869,6 +869,52 @@ export type CatalogAddedPrices = {
   warnings: CatalogPriceWarning[];
 };
 
+/** An attribute products can have (origin, material, size of the box…). */
+export type CatalogAttribute = {
+  code: string;
+  /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+  data_type: string;
+  /** Offered as a storefront filter. */
+  filterable: boolean;
+  id: string;
+  /** Law the attribute comes from, for legally required label contents. */
+  legal_basis?: string | null;
+  names: {
+    [key: string]: string;
+  };
+  options: CatalogAttributeOption[];
+  /** Decimal places of a `decimal` attribute. */
+  scale: number;
+  unit?: string | null;
+  updated_at: string;
+};
+
+/** A choosable value of an `option` / `options` attribute. */
+export type CatalogAttributeOption = {
+  /** 1 to 64 lower-case letters, digits, `_` or `-`; unique in the attribute. */
+  code: string;
+  /** Label per language, e.g. `{"en": "Cotton"}`. */
+  labels: {
+    [key: string]: string;
+  };
+};
+
+/** The whole set of options of an attribute. */
+export type CatalogAttributeOptions = {
+  /** Up to 500 options, in display order. Options are matched by `code`. */
+  options: CatalogAttributeOption[];
+};
+
+/** A value of an attribute on a product. */
+export type CatalogAttributeValue = {
+  attribute_id: string;
+  /**
+   * By the attribute's type: text, a whole number, a decimal written as text (`"12.5"`),
+   * `true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes.
+   */
+  value: Record<string, unknown>;
+};
+
 /** A category of the tenant's tree. */
 export type CatalogCategory = {
   /** 0 for a top category. */
@@ -884,6 +930,32 @@ export type CatalogCategory = {
   updated_at: string;
   /** Shown on the storefront. */
   visible: boolean;
+};
+
+/** An attribute of a category. */
+export type CatalogCategoryAttribute = {
+  /** Also for products of the subcategories. */
+  applies_to_descendants?: boolean;
+  attribute_id: string;
+  /** The rule applies from this day (e.g. when a new labelling rule takes effect). */
+  effective_from: string;
+  /** The rule stops applying on this day. */
+  effective_to?: string | null;
+  /** Law the rule comes from. */
+  legal_basis?: string | null;
+  /** Products in the category cannot go on sale without a value. */
+  required?: boolean;
+};
+
+/** The whole set of attributes of a category. */
+export type CatalogCategoryAttributes = {
+  attributes: CatalogCategoryAttribute[];
+};
+
+/** The restricted-goods rules linked to a category. */
+export type CatalogCategoryRestrictions = {
+  /** Rule codes of `GET /restriction-rules`. */
+  rule_codes: string[];
 };
 
 /** Name and slug of a category in one language. */
@@ -906,6 +978,26 @@ export type CatalogComponents = {
   components: CatalogComponent[];
 };
 
+/** A new attribute. */
+export type CatalogCreateAttribute = {
+  /**
+   * 1 to 64 lower-case letters, digits or `_`; unique in the tenant
+   * (`catalog.attribute_code_taken`).
+   */
+  code: string;
+  /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+  data_type: string;
+  filterable?: boolean;
+  legal_basis?: string | null;
+  /** Name per language. */
+  names: {
+    [key: string]: string;
+  };
+  /** Decimal places of a `decimal` attribute, 0 to 6. Default 0. */
+  scale?: number;
+  unit?: string | null;
+};
+
 /** A new category. */
 export type CatalogCreateCategory = {
   /** Omitted: a top category. Categories nest at most 7 levels deep. */
@@ -918,6 +1010,18 @@ export type CatalogCreateCategory = {
   };
   /** Shown on the storefront; default `true`. */
   visible?: boolean;
+};
+
+/** A new document. */
+export type CatalogCreateDocument = {
+  /** A document type a rule requires, e.g. `alcohol_retail_licence`. */
+  document_type: string;
+  expires_on?: string | null;
+  /** Key of a scanned file already stored. */
+  file_key?: string | null;
+  issued_by: string;
+  issued_on: string;
+  number: string;
 };
 
 /** A new price floor. */
@@ -1210,10 +1314,39 @@ export type CatalogProduct = {
   warranty_months?: number | null;
 };
 
+/** The whole set of attribute values of a product. */
+export type CatalogProductAttributes = {
+  attributes: CatalogAttributeValue[];
+};
+
 /** The whole set of categories of a product. */
 export type CatalogProductCategories = {
   /** The first is the main category. */
   category_ids: string[];
+};
+
+/** A count of products. */
+export type CatalogProductCount = {
+  count: number;
+  /**
+   * A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,
+   * `missing_attributes`, `missing_documents`, `restricted`).
+   */
+  key: string;
+};
+
+/** A licence or certificate of a conditional product. */
+export type CatalogProductDocument = {
+  created_at: string;
+  document_type: string;
+  /** The document is valid until the end of this day; `null`: no end. */
+  expires_on?: string | null;
+  /** Key of the scanned file in storage. */
+  file_key?: string | null;
+  id: string;
+  issued_by: string;
+  issued_on: string;
+  number: string;
 };
 
 /** The whole set of images of a product. */
@@ -1255,6 +1388,24 @@ export type CatalogResolvedPrice = {
   variant_id: string;
 };
 
+/** A rule of prohibited or conditional goods (shared data, read only). */
+export type CatalogRestrictionRule = {
+  code: string;
+  effective_from: string;
+  effective_to?: string | null;
+  jurisdiction: string;
+  legal_basis: string;
+  /** `prohibited` or `conditional`. */
+  level: string;
+  names: {
+    [key: string]: string;
+  };
+  pack_version: string;
+  /** Document types a conditional product needs, valid on the day. */
+  required_documents: string[];
+  source_url: string;
+};
+
 /**
  * How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),
  * `preorder` (before it arrives, see `preorder_available_on`).
@@ -1271,6 +1422,16 @@ export type CatalogStatusChange = {
    * `draft`.
    */
   status: CatalogStatus;
+};
+
+/** A stored attribute value (decimals are stored scaled by the attribute's `scale`). */
+export type CatalogStoredAttributeValue = {
+  attribute_id: string;
+  option_id?: string | null;
+  value_boolean?: boolean | null;
+  value_date?: string | null;
+  value_integer?: number | null;
+  value_text?: string | null;
 };
 
 /** Texts of a product in one language. */
@@ -1300,8 +1461,23 @@ export type CatalogTranslation = {
   meta_description?: string | null;
   meta_title?: string | null;
   name: string;
+  /**
+   * Public address of the product in this language, computed by the server:
+   * `/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`, without a language prefix.
+   */
+  path: string;
   short_description: string;
   slug: string;
+};
+
+/** Changes to an attribute; its code and type cannot change. */
+export type CatalogUpdateAttribute = {
+  filterable?: boolean | null;
+  legal_basis?: string | null;
+  names?: {
+    [key: string]: string;
+  } | null;
+  unit?: string | null;
 };
 
 /** Changes to a category. Omitted fields stay as they are. */
@@ -4274,6 +4450,29 @@ export type Data_CatalogAddedPrices = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogAttribute = {
+  /** An attribute products can have (origin, material, size of the box…). */
+  data: {
+    code: string;
+    /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+    data_type: string;
+    /** Offered as a storefront filter. */
+    filterable: boolean;
+    id: string;
+    /** Law the attribute comes from, for legally required label contents. */
+    legal_basis?: string | null;
+    names: {
+      [key: string]: string;
+    };
+    options: CatalogAttributeOption[];
+    /** Decimal places of a `decimal` attribute. */
+    scale: number;
+    unit?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogCategory = {
   /** A category of the tenant's tree. */
   data: {
@@ -4290,6 +4489,15 @@ export type Data_CatalogCategory = {
     updated_at: string;
     /** Shown on the storefront. */
     visible: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogCategoryRestrictions = {
+  /** The restricted-goods rules linked to a category. */
+  data: {
+    /** Rule codes of `GET /restriction-rules`. */
+    rule_codes: string[];
   };
 };
 
@@ -4372,6 +4580,23 @@ export type Data_CatalogProduct = {
     updated_at: string;
     variants: CatalogVariant[];
     warranty_months?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogProductDocument = {
+  /** A licence or certificate of a conditional product. */
+  data: {
+    created_at: string;
+    document_type: string;
+    /** The document is valid until the end of this day; `null`: no end. */
+    expires_on?: string | null;
+    /** Key of the scanned file in storage. */
+    file_key?: string | null;
+    id: string;
+    issued_by: string;
+    issued_on: string;
+    number: string;
   };
 };
 
@@ -9209,6 +9434,28 @@ export type Data_Vec_CanAnswer = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogAttribute = {
+  data: {
+    code: string;
+    /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+    data_type: string;
+    /** Offered as a storefront filter. */
+    filterable: boolean;
+    id: string;
+    /** Law the attribute comes from, for legally required label contents. */
+    legal_basis?: string | null;
+    names: {
+      [key: string]: string;
+    };
+    options: CatalogAttributeOption[];
+    /** Decimal places of a `decimal` attribute. */
+    scale: number;
+    unit?: string | null;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogCategory = {
   data: {
     /** 0 for a top category. */
@@ -9228,11 +9475,88 @@ export type Data_Vec_CatalogCategory = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogCategoryAttribute = {
+  data: {
+    /** Also for products of the subcategories. */
+    applies_to_descendants?: boolean;
+    attribute_id: string;
+    /** The rule applies from this day (e.g. when a new labelling rule takes effect). */
+    effective_from: string;
+    /** The rule stops applying on this day. */
+    effective_to?: string | null;
+    /** Law the rule comes from. */
+    legal_basis?: string | null;
+    /** Products in the category cannot go on sale without a value. */
+    required?: boolean;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogComponent = {
   data: {
     /** Units of the component in one bundle, 1 to 10000. */
     quantity: number;
     variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogProductCount = {
+  data: {
+    count: number;
+    /**
+     * A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,
+     * `missing_attributes`, `missing_documents`, `restricted`).
+     */
+    key: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogProductDocument = {
+  data: {
+    created_at: string;
+    document_type: string;
+    /** The document is valid until the end of this day; `null`: no end. */
+    expires_on?: string | null;
+    /** Key of the scanned file in storage. */
+    file_key?: string | null;
+    id: string;
+    issued_by: string;
+    issued_on: string;
+    number: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogRestrictionRule = {
+  data: {
+    code: string;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    /** `prohibited` or `conditional`. */
+    level: string;
+    names: {
+      [key: string]: string;
+    };
+    pack_version: string;
+    /** Document types a conditional product needs, valid on the day. */
+    required_documents: string[];
+    source_url: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogStoredAttributeValue = {
+  data: {
+    attribute_id: string;
+    option_id?: string | null;
+    value_boolean?: boolean | null;
+    value_date?: string | null;
+    value_integer?: number | null;
+    value_text?: string | null;
   }[];
 };
 
@@ -22654,6 +22978,62 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/attributes": {
+    /** List every attribute of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create an attribute. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateAttribute;
+      responses: {
+        201: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/attributes/{id}": {
+    /** Change an attribute. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdateAttribute;
+      responses: {
+        200: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/attributes/{id}/options": {
+    /** Replace the options of an `option` / `options` attribute. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogAttributeOptions;
+      responses: {
+        200: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/categories": {
     /** List every category of the tenant. */
     get: {
@@ -22708,6 +23088,31 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/categories/{id}/attributes": {
+    /** List the attributes of a category. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogCategoryAttribute;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the attributes of a category. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCategoryAttributes;
+      responses: {
+        200: Data_Vec_CatalogCategoryAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/categories/{id}/move": {
     /** Move a category with everything below it. */
     post: {
@@ -22720,6 +23125,30 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/categories/{id}/restrictions": {
+    /** List the restricted-goods rules of a category. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogCategoryRestrictions;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Link restricted-goods rules to a category. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCategoryRestrictions;
+      responses: {
+        200: Data_CatalogCategoryRestrictions;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -22858,6 +23287,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/products/counts": {
+    /** Count the products in your scope by status or readiness. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { group_by?: string | null }; };
+      responses: {
+        200: Data_Vec_CatalogProductCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/products/{id}": {
     /** Get a product with its texts, options, variants, categories and images. */
     get: {
@@ -22897,6 +23339,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/products/{id}/attributes": {
+    /** List the attribute values of a product. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogStoredAttributeValue;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the attribute values of a product. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogProductAttributes;
+      responses: {
+        200: Data_Vec_CatalogStoredAttributeValue;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/products/{id}/categories": {
     /** Replace the categories of a product. */
     put: {
@@ -22908,6 +23376,45 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/documents": {
+    /** List the documents of a product. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogProductDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a document to a product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCreateDocument;
+      responses: {
+        201: Data_CatalogProductDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/documents/{document_id}": {
+    /** Remove a document from a product. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; document_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -23000,6 +23507,18 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/restriction-rules": {
+    /** List the rules of prohibited and conditional goods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogRestrictionRule;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };

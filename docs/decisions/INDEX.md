@@ -4,7 +4,7 @@
 
 Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
 
-399 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+400 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
 
 ## Phạm vi và mục tiêu (12)
 
@@ -420,7 +420,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-363** Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17
 - **D-364** Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17
 
-## Thương mại (12)
+## Thương mại (13)
 
 - **D-191** Module thương mại: sáu module, bước 41–46 — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-193*
 - **D-203** Nút "Đánh giá này hữu ích" cho đánh giá sản phẩm (bước 45) — 2026-11-13 · **chủ dự án quyết**
@@ -432,6 +432,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-226** Che số điện thoại, email của khách; cơ sở tính điểm thưởng — 2026-11-14
 - **D-236** Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 · **chủ dự án quyết**
 - **[D-20261118-step41-catalog-design](D-20261118-step41-catalog-design.md)** `catalog`: giá chỉ thêm, thứ tự chọn bảng giá, hợp đồng `api` cho bước 42–44 — 2026-11-18
+- **[D-20261118-step41-readiness](D-20261118-step41-readiness.md)** `catalog`: thuộc tính bắt buộc, hàng cấm / có điều kiện và `readiness` — 2026-11-18
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
 
