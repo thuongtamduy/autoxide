@@ -12,6 +12,7 @@ mod http;
 mod levels;
 mod migration;
 mod permissions;
+mod relocation;
 mod service;
 mod stock;
 mod tools;
@@ -33,7 +34,7 @@ use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::reasons::ReasonList;
 use autoxide_kernel::task::Task;
-use autoxide_kernel::tenancy::DatabaseRegistry;
+use autoxide_kernel::tenancy::{DatabaseRegistry, Relocation};
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::config::InventoryConfig;
@@ -84,6 +85,10 @@ impl Module for InventoryModule {
 
     fn limits(&self) -> Vec<Limit> {
         vec![service::WAREHOUSES_LIMIT]
+    }
+
+    fn relocation(&self) -> Relocation {
+        relocation::relocation()
     }
 
     fn reason_lists(&self) -> Vec<ReasonList> {
