@@ -17,6 +17,10 @@
 //! Mọi danh sách dùng chung ba tham số query `limit`, `cursor`, `order` và cùng
 //! hình dạng response — học một endpoint là biết mọi endpoint.
 //!
+//! Client cần tổng số dòng khớp bộ lọc (ô số liệu, số trên tab) thì gửi `count=true`: trang
+//! đầu trả thêm `pagination.total`. Đếm là một câu `COUNT` riêng trên cùng bộ lọc — chỉ chạy khi
+//! được hỏi, và chỉ ở trang đầu (lật trang tiếp không đếm lại), để đường lật trang vẫn rẻ.
+//!
 //! Danh sách sắp theo một cột khác (tên, kích thước…) dùng [`fetch_page_by`]: con trỏ
 //! khi đó mang cả giá trị của cột đó lẫn ID ("keyset pagination"), vẫn đi thẳng tới chỗ
 //! cần đọc bằng index `(cột, id)` — cùng hai ưu điểm trên. Endpoint tự khai tham số
@@ -74,12 +78,23 @@ pub struct PageQuery {
     /// order (and `sort`, where offered) while following `next_cursor`.
     #[param(value_type = Option<Order>, inline)]
     pub order: Option<String>,
+    /// `true` to also get `pagination.total`, the number of items matching the filters, on the
+    /// first page (without `cursor`). Costs one more query; leave it out when not needed.
+    #[param(value_type = Option<bool>, example = true)]
+    pub count: Option<String>,
 }
 
 impl PageQuery {
     /// The query parameters exactly as a client sends them (all text, each optional).
     pub const fn new(limit: Option<String>, cursor: Option<String>, order: Option<String>) -> Self {
-        PageQuery { limit, cursor, order }
+        PageQuery { limit, cursor, order, count: None }
+    }
+
+    /// Như [`PageQuery::new`], kèm hỏi tổng số (`count=true`).
+    #[must_use]
+    pub fn with_count(mut self, count: bool) -> Self {
+        self.count = Some(count.to_string());
+        self
     }
 }
 
@@ -89,6 +104,8 @@ pub struct PageRequest {
     limit: u32,
     position: Option<Position>,
     order: Order,
+    /// Client hỏi tổng số (`count=true`).
+    count: bool,
 }
 
 /// Chỗ trang kế bắt đầu: sau dòng có ID này, hoặc (danh sách sắp theo cột khác) sau dòng
@@ -160,7 +177,19 @@ fn wrong_cursor() -> Error {
 impl PageRequest {
     /// Trang đầu tiên. `limit` bị kẹp vào khoảng `1..=MAX_LIMIT`.
     pub fn first(limit: u32, order: Order) -> Self {
-        PageRequest { limit: limit.clamp(1, MAX_LIMIT), position: None, order }
+        PageRequest { limit: limit.clamp(1, MAX_LIMIT), position: None, order, count: false }
+    }
+
+    /// Hỏi thêm tổng số dòng khớp bộ lọc (`pagination.total`).
+    #[must_use]
+    pub fn counted(mut self) -> Self {
+        self.count = true;
+        self
+    }
+
+    /// Có phải đếm tổng số cho trang này không: client hỏi, và đây là trang đầu.
+    pub fn wants_total(&self) -> bool {
+        self.count && self.position.is_none()
     }
 
     /// Trang đứng sau dòng có ID `cursor`.
@@ -246,8 +275,17 @@ impl TryFrom<PageQuery> for PageRequest {
             }
         };
 
+        let count = match query.count.as_deref().map(str::trim) {
+            None | Some("" | "false") => false,
+            Some("true") => true,
+            Some(_) => {
+                problems.push(FieldError::new("count", "invalid", "must be `true` or `false`"));
+                false
+            }
+        };
+
         if problems.is_empty() {
-            Ok(PageRequest { limit, position, order })
+            Ok(PageRequest { limit, position, order, count })
         } else {
             Err(Error::validation(problems))
         }
@@ -272,12 +310,24 @@ pub struct Pagination {
     /// Pass this as `cursor` to get the next page. `null` means this is the last
     /// page.
     pub next_cursor: Option<String>,
+    /// Number of items matching the filters, over all pages. Only on the first page of a request
+    /// with `count=true`; left out otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = 1234)]
+    pub total: Option<u64>,
 }
 
 impl Pagination {
     /// The applied limit and the cursor of the next page (`None` on the last page).
     pub const fn new(limit: u32, next_cursor: Option<String>) -> Self {
-        Pagination { limit, next_cursor }
+        Pagination { limit, next_cursor, total: None }
+    }
+
+    /// Kèm tổng số dòng khớp bộ lọc.
+    #[must_use]
+    pub const fn with_total(mut self, total: Option<u64>) -> Self {
+        self.total = total;
+        self
     }
 }
 
@@ -312,6 +362,7 @@ where
     E: EntityTrait,
     C: ConnectionTrait,
 {
+    let total = total_of(&select, request, connection).await?;
     let select = match (&request.position, request.order) {
         (None, _) => select,
         (Some(Position::Id(cursor)), Order::Asc) => select.filter(id_column.gt(*cursor)),
@@ -325,7 +376,7 @@ where
     let (rows, has_more) = fetch_rows(select, request, connection).await?;
     let next_cursor = if has_more { rows.last().map(|row| id_of(row).to_string()) } else { None };
 
-    Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor } })
+    Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor, total } })
 }
 
 /// Như [`fetch_page`], nhưng sắp theo cột `sort_column` trước, rồi theo ID (để hai dòng
@@ -349,6 +400,7 @@ where
     E: EntityTrait,
     C: ConnectionTrait,
 {
+    let total = total_of(&select, request, connection).await?;
     let column_name = sort_column.as_str();
     let select = match &request.position {
         None => select,
@@ -378,7 +430,7 @@ where
             .encode()
     });
 
-    Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor } })
+    Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor, total } })
 }
 
 /// Tên "cột" trong con trỏ của [`fetch_page_tiers`].
@@ -411,6 +463,12 @@ where
             (usize::try_from(*tier).unwrap_or_default(), Some(*id))
         }
         Some(_) => return Err(wrong_cursor()),
+    };
+    let total = if request.wants_total() {
+        let any = tiers.iter().fold(Condition::any(), |any, tier| any.add(tier.clone()));
+        Some(count_rows(select.clone().filter(any), connection).await?)
+    } else {
+        None
     };
     let wanted = request.limit as usize + 1;
     let mut rows: Vec<(usize, E::Model)> = Vec::new();
@@ -449,8 +507,44 @@ where
     });
     Ok(Page {
         data: rows.into_iter().map(|(_, row)| row).collect(),
-        pagination: Pagination { limit: request.limit, next_cursor },
+        pagination: Pagination { limit: request.limit, next_cursor, total },
     })
+}
+
+/// Tổng số dòng của `select` (chỉ bộ lọc, chưa con trỏ) khi client hỏi và đây là trang đầu.
+pub async fn total_of<E, C>(
+    select: &Select<E>,
+    request: &PageRequest,
+    connection: &C,
+) -> Result<Option<u64>, Error>
+where
+    E: EntityTrait,
+    C: ConnectionTrait,
+{
+    if !request.wants_total() {
+        return Ok(None);
+    }
+    Ok(Some(count_rows(select.clone(), connection).await?))
+}
+
+/// `SELECT COUNT(*)` bọc ngoài câu của `select` (giữ nguyên mọi bộ lọc, join). Tự dựng câu thay vì
+/// `PaginatorTrait::count` để hàm phân trang khỏi phải đòi thêm ràng buộc `Sync` cho kiểu dòng.
+async fn count_rows<E, C>(select: Select<E>, connection: &C) -> Result<u64, Error>
+where
+    E: EntityTrait,
+    C: ConnectionTrait,
+{
+    use sea_orm::QueryTrait as _;
+    use sea_orm::sea_query::{Alias, Expr, Query};
+    let statement = Query::select()
+        .expr(Expr::cust("COUNT(*)"))
+        .from_subquery(select.into_query(), Alias::new("counted"))
+        .to_owned();
+    let total: i64 = match connection.query_one(&statement).await? {
+        Some(row) => row.try_get_by_index(0)?,
+        None => 0,
+    };
+    Ok(u64::try_from(total).unwrap_or_default())
 }
 
 /// Giá trị trong con trỏ có đúng kiểu của cột không. Con trỏ do client gửi lại nên có thể
@@ -506,6 +600,7 @@ mod tests {
             limit: limit.map(str::to_owned),
             cursor: cursor.map(str::to_owned),
             order: order.map(str::to_owned),
+            count: None,
         }
     }
 
@@ -576,6 +671,19 @@ mod tests {
     }
 
     #[test]
+    fn count_chi_dem_o_trang_dau() {
+        let first = PageRequest::try_from(PageQuery::new(None, None, None).with_count(true));
+        assert!(first.unwrap().wants_total());
+        let next = PageQuery::new(None, Some(Uuid::now_v7().to_string()), None).with_count(true);
+        assert!(!PageRequest::try_from(next).unwrap().wants_total());
+        assert!(!PageRequest::default().wants_total());
+        assert!(PageRequest::default().counted().wants_total());
+        let wrong = PageQuery { count: Some("yes".to_owned()), ..PageQuery::default() };
+        let error = PageRequest::try_from(wrong).unwrap_err();
+        assert_eq!(error.fields()[0].field, "count");
+    }
+
+    #[test]
     fn trang_dau_tao_bang_code_bi_kep_vao_khoang_hop_le() {
         assert_eq!(PageRequest::first(0, Order::Asc).limit(), 1);
         assert_eq!(PageRequest::first(10_000, Order::Asc).limit(), MAX_LIMIT);
@@ -585,10 +693,7 @@ mod tests {
 
     #[test]
     fn page_thanh_json_va_doi_kieu_duoc() {
-        let page = Page {
-            data: vec![1, 2],
-            pagination: Pagination { limit: 2, next_cursor: Some("c".to_owned()) },
-        };
+        let page = Page { data: vec![1, 2], pagination: Pagination::new(2, Some("c".to_owned())) };
 
         let mapped = page.map(|number| number.to_string());
 
@@ -597,10 +702,10 @@ mod tests {
             serde_json::json!({"data": ["1", "2"], "pagination": {"limit": 2, "next_cursor": "c"}})
         );
         let last =
-            Page::<u8> { data: vec![], pagination: Pagination { limit: 2, next_cursor: None } };
+            Page::<u8> { data: vec![], pagination: Pagination::new(2, None).with_total(Some(0)) };
         assert_eq!(
-            serde_json::to_value(&last).unwrap()["pagination"]["next_cursor"],
-            serde_json::Value::Null
+            serde_json::to_value(&last).unwrap()["pagination"],
+            serde_json::json!({"limit": 2, "next_cursor": null, "total": 0})
         );
     }
 
@@ -631,7 +736,7 @@ mod tests {
         #[test]
         fn con_tro_rac_khong_panic(raw in "\\PC{0,120}") {
             let _ = KeyCursor::decode(&raw);
-            let query = PageQuery { limit: None, cursor: Some(raw.clone()), order: None };
+            let query = PageQuery::new(None, Some(raw.clone()), None);
             if let Err(error) = PageRequest::try_from(query) {
                 proptest::prop_assert_eq!(error.fields()[0].field.as_str(), "cursor");
             }

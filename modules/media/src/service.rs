@@ -266,7 +266,8 @@ impl MediaService {
                 crate::library::tags::find_tag(tenant.database().read(), tenant, tag).await?
             else {
                 // Không có nhãn đó: không item nào mang nó.
-                let pagination = Pagination::new(page.limit(), None);
+                let pagination =
+                    Pagination::new(page.limit(), None).with_total(page.wants_total().then_some(0));
                 return Ok(Page { data: Vec::new(), pagination });
             };
             select = select.filter(crate::library::tags::has_tag(tenant, tag_id));

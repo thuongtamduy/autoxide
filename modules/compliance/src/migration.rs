@@ -39,6 +39,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0017_tenancy_antispam_nonces",
             vec![autoxide_kernel::antispam::tenant_table("compliance")],
         ),
+        Box::new(ConsentStatsIndex),
     ]
 }
 
@@ -1060,5 +1061,40 @@ impl MigrationTrait for Cases {
             ],
         )
         .await
+    }
+}
+
+/// Index đếm người đồng ý / đã rút theo mục đích (`GET /purposes`, D-382): đọc thẳng từ index, không
+/// quét bảng đồng ý.
+struct ConsentStatsIndex;
+
+impl MigrationName for ConsentStatsIndex {
+    fn name(&self) -> &str {
+        "m0018_consent_stats_index"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for ConsentStatsIndex {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        index(
+            manager,
+            "compliance_consents",
+            "compliance_consents_stats_idx",
+            &["tenant_id", "purpose", "state", "subject_key"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("compliance_consents_stats_idx")
+                    .table(Alias::new("compliance_consents"))
+                    .to_owned(),
+            )
+            .await
     }
 }

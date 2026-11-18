@@ -900,8 +900,15 @@
       "description": "List your API keys (never their secrets); follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
             "type": [
@@ -1127,8 +1134,15 @@
       "description": "List roles with the permissions they grant; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
             "type": [
@@ -3792,8 +3806,15 @@
       "description": "List the files you uploaded, newest first; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
             "type": [
@@ -5058,8 +5079,15 @@
       "description": "List the current tenant's own domains, newest first, with their status (`pending`, `verified`, `failed`) and the DNS TXT record that verifies each.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
             "type": [
@@ -5154,8 +5182,15 @@
       "description": "List the tenants of the platform, newest first (platform staff only).",
       "input_schema": {
         "additionalProperties": false,
-        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
             "type": [
@@ -5309,7 +5344,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the recent API and MCP calls made in this tenant (who, which route or tool, status, error code), newest first. Filter by `actor_kind` (e.g. `agent`), `api_key_id`, exact `path` (e.g. `mcp:content.publish_entry`) or `status`.",
+      "description": "List the recent API and MCP calls made in this tenant (who, which route or tool, status, error code), newest first. Filter by `actor_kind` (e.g. `agent`), `api_key_id`, exact `path` (e.g. `mcp:content.publish_entry`), `status` or `status_class` (e.g. `5xx`).",
       "input_schema": {
         "additionalProperties": false,
         "description": "Which calls to list (the same filters as the REST endpoint).",
@@ -5366,6 +5401,13 @@
             "minimum": 0,
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "status_class": {
+            "description": "Only calls whose status is in this class: `2xx`, `3xx`, `4xx` or `5xx`.",
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -6891,8 +6933,15 @@
       "description": "List the website menus (every key and language), newest first; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
-        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "description": "Paging of a list: the same as the `limit`, `cursor`, `order` and `count` query parameters\nof the REST list endpoints.",
         "properties": {
+          "count": {
+            "description": "`true` to also get `pagination.total` (the number of matching items) on the first page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
             "type": [

@@ -305,3 +305,119 @@ async fn webhook_sai_chu_ky_va_tai_khoan_khong_hop_le() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn sua_tai_khoan_ngan_hang_tat_thi_khong_nhan_thanh_toan_moi() {
+    TestDatabase::run(async |test| {
+        let (app, _feed, account) = setup(test).await;
+        let uri = format!("/bank-accounts/{account}");
+
+        // Sai cả ba trường: báo một lần.
+        let (status, problem) = call(
+            &app,
+            "PATCH",
+            &uri,
+            Some(json!({"account_name": "", "feed_provider": "nope", "status": "closed"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        let fields: Vec<&str> = problem["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["field"].as_str().unwrap())
+            .collect();
+        assert_eq!(fields, ["account_name", "feed_provider", "status"]);
+
+        // Đổi tên, bỏ nguồn biến động; số tài khoản giữ nguyên.
+        let (status, changed) = call(
+            &app,
+            "PATCH",
+            &uri,
+            Some(json!({"account_name": "  CUA HANG B ", "feed_provider": null})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{changed}");
+        assert_eq!(changed["data"]["account_name"], "CUA HANG B");
+        assert_eq!(changed["data"]["feed_provider"], Value::Null);
+        assert_eq!(changed["data"]["account_number"], ACCOUNT);
+        assert_eq!(changed["data"]["status"], "active");
+
+        // Không được đổi số tài khoản.
+        let (status, _) = call(&app, "PATCH", &uri, Some(json!({"account_number": "123"}))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // Tắt: thanh toán VietQR mới không còn tài khoản nhận.
+        let (status, changed) =
+            call(&app, "PATCH", &uri, Some(json!({"status": "disabled"}))).await;
+        assert_eq!(status, StatusCode::OK, "{changed}");
+        assert_eq!(changed["data"]["status"], "disabled");
+        let (status, problem) = call(
+            &app,
+            "POST",
+            "/payments/vietqr",
+            Some(json!({"amount": {"amount": "1000", "currency": "VND"},
+                        "description": "Order", "source_id": "O-2", "reference": "R-2"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
+        assert_eq!(problem["code"], "ledger.bank_account_not_found");
+
+        let (status, problem) = call(
+            &app,
+            "PATCH",
+            &format!("/bank-accounts/{}", uuid::Uuid::now_v7()),
+            Some(json!({"status": "active"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(problem["code"], "ledger.bank_account_not_found");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn loc_thanh_toan_theo_so_tien_tien_te_va_nut() {
+    TestDatabase::run(async |test| {
+        let (app, _feed, _account) = setup(test).await;
+        let small = pay(&app, 150_000, "P-1").await;
+        pay(&app, 990_000, "P-2").await;
+
+        let ids = |listed: &Value| -> Vec<String> {
+            listed["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["id"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let (status, listed) =
+            call(&app, "GET", "/payments?amount=150000&currency=VND&status=pending", None).await;
+        assert_eq!(status, StatusCode::OK, "{listed}");
+        assert_eq!(ids(&listed), [small["id"].as_str().unwrap()]);
+
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let (_, listed) = call(&app, "GET", &format!("/payments?org_id={root}"), None).await;
+        assert_eq!(ids(&listed).len(), 2);
+        let (_, listed) =
+            call(&app, "GET", &format!("/payments?org_id={}", uuid::Uuid::now_v7()), None).await;
+        assert!(ids(&listed).is_empty());
+        let (_, listed) = call(&app, "GET", "/payments?currency=USD", None).await;
+        assert!(ids(&listed).is_empty());
+
+        // Mọi tham số sai báo một lần.
+        let (status, problem) =
+            call(&app, "GET", "/payments?amount=1.5&currency=XYZ&limit=0", None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        let fields: Vec<&str> = problem["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["field"].as_str().unwrap())
+            .collect();
+        assert_eq!(fields, ["amount", "currency", "limit"]);
+    })
+    .await
+    .unwrap();
+}

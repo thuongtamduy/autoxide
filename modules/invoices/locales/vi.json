@@ -35,6 +35,7 @@
   "invoices.einvoice_not_ready": "Hoá đơn điện tử chưa được gửi (trạng thái `{status}`).",
   "invoices.export_not_found": "Không tìm thấy bản xuất này.",
   "invoices.export_not_ready": "Bản xuất chưa xong (trạng thái `{status}`).",
+  "invoices.export_not_retryable": "Chỉ lập lại được bản xuất bị lỗi; hãy yêu cầu bản xuất mới.",
   "invoices.mandate_missing": "Chưa có uỷ nhiệm còn hiệu lực để lập hoá đơn thay người bán này.",
   "invoices.mandate_not_found": "Không tìm thấy uỷ nhiệm này.",
   "invoices.not_cancellable": "Chứng từ ở trạng thái `{status}` không huỷ được.",

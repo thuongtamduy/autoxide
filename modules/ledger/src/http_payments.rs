@@ -5,7 +5,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
-use autoxide_kernel::money::Money;
+use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::response::{Created, Data, Problem};
@@ -97,6 +97,15 @@ pub(crate) struct PaymentsQuery {
     source_module: Option<String>,
     /// Only payments for this document.
     source_id: Option<String>,
+    /// Only payments of this amount, in the smallest unit of the currency (e.g. `150000` for
+    /// 150,000 VND) — to find the payment a bank transfer was meant for.
+    #[param(value_type = Option<String>, example = "150000")]
+    amount: Option<String>,
+    /// Only payments in this currency (ISO 4217, e.g. `VND`).
+    #[param(value_type = Option<String>, example = "VND")]
+    currency: Option<String>,
+    /// Only payments received by this unit (not the units below it).
+    org_id: Option<Uuid>,
 }
 
 /// Create a payment through a payment partner.
@@ -167,13 +176,43 @@ async fn list_payments(
     Query(query): Query<PaymentsQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<Payment>, Error> {
+    let mut problems = Vec::new();
+    let amount_minor = query.amount.as_deref().map(str::trim).and_then(|raw| {
+        raw.parse::<i64>().ok().or_else(|| {
+            problems.push(FieldError::new(
+                "amount",
+                "invalid",
+                "must be a whole number in the smallest unit of the currency, e.g. `150000`",
+            ));
+            None
+        })
+    });
+    let currency = query.currency.as_deref().map(str::trim).and_then(|raw| {
+        Currency::parse(raw).ok().map(|currency| currency.code().to_owned()).or_else(|| {
+            problems.push(FieldError::new(
+                "currency",
+                "unknown",
+                "must be an ISO 4217 currency code, e.g. `VND`",
+            ));
+            None
+        })
+    });
+    let page = PageRequest::try_from(page);
+    if let Err(error) = &page {
+        problems.extend(error.fields().iter().cloned());
+    }
+    if !problems.is_empty() {
+        return Err(Error::validation(problems));
+    }
     let filter = PaymentFilter {
         status: query.status,
         source_module: query.source_module,
         source_id: query.source_id,
+        amount_minor,
+        currency,
+        org_id: query.org_id,
     };
-    let page =
-        service.list_payments(&tenant, &principal, filter, &PageRequest::try_from(page)?).await?;
+    let page = service.list_payments(&tenant, &principal, filter, &page?).await?;
     let Page { data, pagination } = page;
     let data = data.iter().map(describe_payment).collect::<Result<Vec<_>, _>>()?;
     Ok(Page { data, pagination })

@@ -71,6 +71,7 @@
   "field:must be 1 to {max} characters long": "phải dài 1 đến {max} ký tự",
   "field:must be 1 to {value_max} characters long; remove the setting with `DELETE` instead of setting it empty": "phải dài 1 đến {value_max} ký tự; muốn bỏ cấu hình thì dùng `DELETE` thay vì để trống",
   "field:must be 3 to 63 lower-case letters, digits, `-` and `.`": "phải dài 3 đến 63 ký tự gồm chữ thường, số, `-` và `.`",
+  "field:must be `2xx`, `3xx`, `4xx` or `5xx`": "phải là `2xx`, `3xx`, `4xx` hoặc `5xx`",
   "field:must be `<eq|in|gte|lte|prefix>:<value>` with a value of the field's type": "phải có dạng `<eq|in|gte|lte|prefix>:<giá trị>` với giá trị đúng kiểu của trường",
   "field:must be `<record kind>:<id>`, e.g. `content.entry:0190…`": "phải có dạng `<loại bản ghi>:<id>`, ví dụ `content.entry:0190…`",
   "field:must be `accessible`, `node` or `subtree`": "phải là `accessible`, `node` hoặc `subtree`",

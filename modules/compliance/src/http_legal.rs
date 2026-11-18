@@ -22,7 +22,7 @@ use validator::Validate;
 use crate::api::{Consent, ConsentEvidence, ConsentKey, ConsentSubject, Rule, Subject};
 use crate::documents::{NewAcceptance, NewVersion};
 use crate::entity::{acceptance, document, policy, version};
-use crate::service::{ComplianceService, describe_rule};
+use crate::service::{ComplianceService, RuleFilter, describe_rule};
 
 pub(crate) fn routes(service: Arc<ComplianceService>) -> OpenApiRouter {
     OpenApiRouter::new()
@@ -592,26 +592,48 @@ async fn set_my_consent(
 
 // ---- Quy tắc, chính sách -------------------------------------------------------------------------
 
-/// List the legal rules (every version).
+/// Which rules.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct RulesQuery {
+    /// Only rules of this jurisdiction, e.g. `vn`.
+    #[param(example = "vn")]
+    jurisdiction: Option<String>,
+    /// Only the versions of this rule, e.g. `promotions.max_discount`.
+    key: Option<String>,
+    /// Only the version of each rule in effect at this time (RFC 3339), e.g. to see the rules on the
+    /// day an order was placed. Omit to get every version (the history).
+    as_of: Option<DateTime<Utc>>,
+}
+
+/// List the legal rules: every version, or those in effect at a time.
 ///
-/// Requires `compliance.rules.read`.
+/// Requires `compliance.rules.read`. Without `as_of`: every version of every rule, the latest
+/// effective date first per rule — the history of each rule. With `as_of`: for each rule only the
+/// version in effect then (the latest `effective_from` not after it, not yet ended).
 #[utoipa::path(
     get,
     path = "/rules",
     extensions(("x-permissions" = json!(["compliance.rules.read"]))),
     operation_id = "list_compliance_rules",
     security(("bearer" = [])),
+    params(RulesQuery),
     responses(
-        (status = 200, description = "The rules, newest version first per key.", body = Data<Vec<Rule>>),
+        (status = 200, description = "The rules, newest effective version first per rule.", body = Data<Vec<Rule>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.rules.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A parameter is invalid (e.g. `as_of` is not RFC 3339); see `errors`.", body = Problem),
     )
 )]
 async fn list_rules(
     State(service): State<Arc<ComplianceService>>,
     principal: Principal,
+    Query(query): Query<RulesQuery>,
 ) -> Result<Data<Vec<Rule>>, Error> {
-    Ok(Data { data: service.list_rules(&principal).await?.iter().map(describe_rule).collect() })
+    let filter =
+        RuleFilter { jurisdiction: query.jurisdiction, key: query.key, as_of: query.as_of };
+    let rules = service.list_rules(&principal, filter).await?;
+    Ok(Data { data: rules.iter().map(describe_rule).collect() })
 }
 
 /// Rules to import.

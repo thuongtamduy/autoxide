@@ -241,8 +241,8 @@ impl SearchBackend for DatabaseSearch {
         }
         if let Some(scope) = &request.scope {
             if scope.subtrees.is_empty() && scope.units.is_empty() {
-                let limit = request.page.limit();
-                let pagination = crate::pagination::Pagination { limit, next_cursor: None };
+                let pagination = crate::pagination::Pagination::new(request.page.limit(), None)
+                    .with_total(request.page.wants_total().then_some(0));
                 return Ok(Page { data: Vec::new(), pagination });
             }
             let mut any = Condition::any();

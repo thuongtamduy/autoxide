@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Every list endpoint takes `count=true` and answers `pagination.total`, the number of items matching the filters, on
+  the first page (one extra query, only when asked). MCP list tools take `count` too.
+- `ledger`: `PATCH /api/v1/ledger/bank-accounts/{id}` (account name, bank feed, `active` / `disabled`); accounting
+  periods carry `entries` and `sealed_entries`; `GET /api/v1/ledger/payments` filters by `amount`, `currency` and
+  `org_id`.
+- `invoices`: `POST /api/v1/invoices/exports/{id}/retry` makes a failed accounting export again
+  (`invoices.export_not_retryable` for one already `ready`).
+- `compliance`: `GET /api/v1/compliance/purposes` counts the people who consented and who withdrew per purpose;
+  `GET /api/v1/compliance/rules` takes `as_of` (the version of each rule in effect then), `jurisdiction` and `key`.
+- `GET /api/v1/kernel/devtools/requests` (and the `request_log` tool) filter by `status_class` (`2xx` … `5xx`).
 - Step 40, signing in with Google, Microsoft, GitHub or any OpenID Connect provider (off by default,
   `AUTOXIDE_AUTH_OIDC`): each tenant adds its providers with `POST /api/v1/auth/oidc-providers` (permissions
   `auth.oidc.manage`, `auth.oidc.read`; `GET/PATCH/DELETE /api/v1/auth/oidc-providers/{id}`; client secrets stored

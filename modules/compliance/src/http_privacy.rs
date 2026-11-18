@@ -24,7 +24,8 @@ use validator::Validate;
 use crate::entity::{incident, incident_entry, subject_request};
 use crate::incidents::{IncidentChange, NewIncident};
 use crate::privacy::{
-    ProcessingRegister, Purpose, PurposeInput, Recipient, ResidencyView, RetentionItem,
+    ProcessingRegister, Purpose, PurposeInput, PurposeWithCounts, Recipient, ResidencyView,
+    RetentionItem,
 };
 use crate::service::ComplianceService;
 use crate::subject_requests::NewRequest;
@@ -101,7 +102,8 @@ where
 /// List the processing purposes of the tenant.
 ///
 /// Requires `compliance.privacy.read`. The defaults of the legal rules (`privacy.default_purposes`)
-/// merged with the purposes the tenant added or changed.
+/// merged with the purposes the tenant added or changed, each with the number of people who
+/// consented and who withdrew.
 #[utoipa::path(
     get,
     path = "/purposes",
@@ -109,7 +111,7 @@ where
     operation_id = "list_compliance_purposes",
     security(("bearer" = [])),
     responses(
-        (status = 200, description = "Every purpose.", body = Data<Vec<Purpose>>),
+        (status = 200, description = "Every purpose, with how many people consented and withdrew.", body = Data<Vec<PurposeWithCounts>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `compliance.privacy.read`; code `permission_denied`.", body = Problem),
     )
@@ -118,7 +120,7 @@ async fn list_purposes(
     State(service): State<Arc<ComplianceService>>,
     tenant: TenantContext,
     principal: Principal,
-) -> Result<Data<Vec<Purpose>>, Error> {
+) -> Result<Data<Vec<PurposeWithCounts>>, Error> {
     Ok(Data { data: service.list_purposes(&tenant, &principal).await? })
 }
 

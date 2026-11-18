@@ -74,7 +74,8 @@ impl LedgerService {
                         pagination: autoxide_kernel::pagination::Pagination::new(
                             query.page.limit(),
                             None,
-                        ),
+                        )
+                        .with_total(query.page.wants_total().then_some(0)),
                     });
                 }
             }

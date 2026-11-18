@@ -5768,6 +5768,35 @@
         ],
         "type": "object"
       },
+      "CompliancePurposeWithCounts": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CompliancePurpose"
+          },
+          {
+            "properties": {
+              "consented": {
+                "description": "People (distinct email, phone or account) with a consent to this purpose now given, on at\nleast one channel.",
+                "example": 1520,
+                "format": "int64",
+                "type": "integer"
+              },
+              "withdrawn": {
+                "description": "People with a consent to this purpose withdrawn, on at least one channel.",
+                "example": 34,
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "consented",
+              "withdrawn"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "A processing purpose with how many people consented to it and how many withdrew."
+      },
       "ComplianceResidency": {
         "description": "Where the tenant's data is kept.",
         "properties": {
@@ -15394,9 +15423,21 @@
                 "format": "date",
                 "type": "string"
               },
+              "entries": {
+                "description": "Number of entries dated in the period.",
+                "example": 120,
+                "format": "int64",
+                "type": "integer"
+              },
               "id": {
                 "format": "uuid",
                 "type": "string"
+              },
+              "sealed_entries": {
+                "description": "How many of them are already sealed into the book's hash chain (sealing runs in the\nbackground shortly after posting).",
+                "example": 118,
+                "format": "int64",
+                "type": "integer"
               },
               "starts_on": {
                 "format": "date",
@@ -15412,7 +15453,9 @@
               "book_id",
               "starts_on",
               "ends_on",
-              "status"
+              "status",
+              "entries",
+              "sealed_entries"
             ],
             "type": "object"
           }
@@ -22789,6 +22832,47 @@
                 "source"
               ],
               "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CompliancePurposeWithCounts": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/CompliancePurpose"
+                },
+                {
+                  "properties": {
+                    "consented": {
+                      "description": "People (distinct email, phone or account) with a consent to this purpose now given, on at\nleast one channel.",
+                      "example": 1520,
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "withdrawn": {
+                      "description": "People with a consent to this purpose withdrawn, on at least one channel.",
+                      "example": 34,
+                      "format": "int64",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "consented",
+                    "withdrawn"
+                  ],
+                  "type": "object"
+                }
+              ],
+              "description": "A processing purpose with how many people consented to it and how many withdrew."
             },
             "type": "array"
           }
@@ -30657,6 +30741,34 @@
         ],
         "type": "object"
       },
+      "LedgerBankAccountChangeRequest": {
+        "additionalProperties": false,
+        "description": "Changes to a bank account. Fields left out stay as they are.",
+        "properties": {
+          "account_name": {
+            "description": "Name on the account, 1 to 50 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "feed_provider": {
+            "description": "Bank feed that reports transfers into this account; `null` stops reading a feed. Changing\nit reads the new feed from its start.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`active`, or `disabled`: new VietQR payments no longer go to it and its feed is not read;\npayments already created are still matched.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "LedgerBankAccountRequest": {
         "additionalProperties": false,
         "description": "A bank account to register.",
@@ -31734,9 +31846,21 @@
             "format": "date",
             "type": "string"
           },
+          "entries": {
+            "description": "Number of entries dated in the period.",
+            "example": 120,
+            "format": "int64",
+            "type": "integer"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
+          },
+          "sealed_entries": {
+            "description": "How many of them are already sealed into the book's hash chain (sealing runs in the\nbackground shortly after posting).",
+            "example": 118,
+            "format": "int64",
+            "type": "integer"
           },
           "starts_on": {
             "format": "date",
@@ -31752,7 +31876,9 @@
           "book_id",
           "starts_on",
           "ends_on",
-          "status"
+          "status",
+          "entries",
+          "sealed_entries"
         ],
         "type": "object"
       },
@@ -40335,9 +40461,21 @@
                   "format": "date",
                   "type": "string"
                 },
+                "entries": {
+                  "description": "Number of entries dated in the period.",
+                  "example": 120,
+                  "format": "int64",
+                  "type": "integer"
+                },
                 "id": {
                   "format": "uuid",
                   "type": "string"
+                },
+                "sealed_entries": {
+                  "description": "How many of them are already sealed into the book's hash chain (sealing runs in the\nbackground shortly after posting).",
+                  "example": 118,
+                  "format": "int64",
+                  "type": "integer"
                 },
                 "starts_on": {
                   "format": "date",
@@ -40353,7 +40491,9 @@
                 "book_id",
                 "starts_on",
                 "ends_on",
-                "status"
+                "status",
+                "entries",
+                "sealed_entries"
               ],
               "type": "object"
             },
@@ -43755,6 +43895,16 @@
             "description": "Pass this as `cursor` to get the next page. `null` means this is the last\npage.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "total": {
+            "description": "Number of items matching the filters, over all pages. Only on the first page of a request\nwith `count=true`; left out otherwise.",
+            "example": 1234,
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
               "null"
             ]
           }
@@ -53757,6 +53907,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -53833,6 +53993,12 @@
             "description": "`1`: provinces; `2`: communes.",
             "kind": "integer",
             "name": "level",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -54259,6 +54425,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -54361,6 +54537,12 @@
             "description": "Only changes made by these kinds of actor, comma-separated: `user` (a person), `agent`,\n`service`, `support`, `app`, `scim`, `system` or `public` (see `actor_kind`).",
             "kind": "string",
             "name": "actor_kind",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -54599,6 +54781,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -54677,6 +54869,12 @@
             "description": "Only the keys of this user.",
             "kind": "uuid",
             "name": "user_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -54828,6 +55026,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -54891,7 +55099,14 @@
         "tags": [
           "auth"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "auth.list_api_keys",
         "x-permissions": []
       },
@@ -55190,6 +55405,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -55279,6 +55504,12 @@
               "active",
               "disabled"
             ]
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "auth.list_customers",
@@ -56123,6 +56354,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -56201,6 +56442,12 @@
             "description": "Only `pending`, `accepted` or `revoked` invitations.",
             "kind": "string",
             "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -59030,6 +59277,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -59093,7 +59350,14 @@
         "tags": [
           "auth"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "auth.list_passkeys",
         "x-permissions": []
       },
@@ -59847,6 +60111,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -59920,7 +60194,14 @@
         "tags": [
           "auth"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "auth.list_sessions",
         "x-permissions": []
       }
@@ -60166,6 +60447,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -60262,6 +60553,12 @@
             "description": "With `org_id`: also list memberships on the units above it, which reach it through\n`subtree` or `tenant` scopes. Default `false`.",
             "kind": "boolean",
             "name": "inherited",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -61586,6 +61883,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -61659,7 +61966,14 @@
         "tags": [
           "auth"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "auth.list_roles",
         "x-permissions": [
           "auth.roles.read"
@@ -62905,6 +63219,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -62994,6 +63318,12 @@
               "active",
               "disabled"
             ]
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "auth.list_users",
@@ -64089,6 +64419,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -64172,7 +64512,14 @@
         "tags": [
           "auth"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "auth.list_user_passkeys",
         "x-permissions": [
           "auth.passkeys.manage"
@@ -64850,6 +65197,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -64960,6 +65317,12 @@
             "kind": "boolean",
             "name": "unanswered",
             "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "comments.list_comments",
@@ -65025,6 +65388,16 @@
                 "desc"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -65112,6 +65485,12 @@
             "description": "`true`: only bans still in force.",
             "kind": "boolean",
             "name": "active",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -66261,6 +66640,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -66335,7 +66724,14 @@
         "tags": [
           "comments"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "comments.list_comment_replies",
         "x-public": true
       }
@@ -66815,6 +67211,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -66913,6 +67319,12 @@
             "kind": "string",
             "name": "q",
             "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "comments.list_comment_thread",
@@ -67175,6 +67587,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -67269,6 +67691,12 @@
             "description": "`true`: only targets with comments waiting for approval; `false`: only those without.",
             "kind": "boolean",
             "name": "pending",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -67992,6 +68420,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -68075,7 +68513,14 @@
         "tags": [
           "comments"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "comments.list_comment_reports",
         "x-permissions": [
           "comments.read"
@@ -68166,6 +68611,16 @@
                 "desc"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -68271,6 +68726,12 @@
             "description": "`true`: only cases the anti-spam checks held (status `received`); default: the others.",
             "kind": "boolean",
             "name": "held",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -69728,6 +70189,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -69806,6 +70277,12 @@
             "description": "Only the disclosures of this case.",
             "kind": "uuid",
             "name": "case_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -70375,6 +70852,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -70458,7 +70945,14 @@
         "tags": [
           "compliance"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "compliance.list_compliance_acceptances",
         "x-permissions": [
           "compliance.documents.read"
@@ -70670,6 +71164,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -70754,6 +71258,12 @@
             "description": "Only records past their deadline and not done.",
             "kind": "boolean",
             "name": "overdue",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -71521,6 +72031,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -71599,6 +72119,12 @@
             "description": "Only profiles with this status.",
             "kind": "string",
             "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -72659,6 +73185,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -72732,7 +73268,14 @@
         "tags": [
           "compliance"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "compliance.list_compliance_legal_profiles",
         "x-permissions": [
           "compliance.legal.read"
@@ -75526,7 +76069,7 @@
     },
     "/api/v1/compliance/purposes": {
       "get": {
-        "description": "Requires `compliance.privacy.read`. The defaults of the legal rules (`privacy.default_purposes`)\nmerged with the purposes the tenant added or changed.",
+        "description": "Requires `compliance.privacy.read`. The defaults of the legal rules (`privacy.default_purposes`)\nmerged with the purposes the tenant added or changed, each with the number of people who\nconsented and who withdrew.",
         "operationId": "compliance_list_compliance_purposes",
         "parameters": [
           {
@@ -75547,11 +76090,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_Vec_CompliancePurpose"
+                  "$ref": "#/components/schemas/Data_Vec_CompliancePurposeWithCounts"
                 }
               }
             },
-            "description": "Every purpose."
+            "description": "Every purpose, with how many people consented and withdrew."
           },
           "401": {
             "content": {
@@ -76088,6 +76631,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -76151,7 +76704,14 @@
         "tags": [
           "compliance"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "compliance.list_my_compliance_cases",
         "x-permissions": []
       }
@@ -76232,9 +76792,38 @@
     },
     "/api/v1/compliance/rules": {
       "get": {
-        "description": "Requires `compliance.rules.read`.",
+        "description": "Requires `compliance.rules.read`. Without `as_of`: every version of every rule, the latest\neffective date first per rule — the history of each rule. With `as_of`: for each rule only the\nversion in effect then (the latest `effective_from` not after it, not yet ended).",
         "operationId": "compliance_list_compliance_rules",
         "parameters": [
+          {
+            "description": "Only rules of this jurisdiction, e.g. `vn`.",
+            "example": "vn",
+            "in": "query",
+            "name": "jurisdiction",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the versions of this rule, e.g. `promotions.max_discount`.",
+            "in": "query",
+            "name": "key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the version of each rule in effect at this time (RFC 3339), e.g. to see the rules on the\nday an order was placed. Omit to get every version (the history).",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
           {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
@@ -76257,7 +76846,7 @@
                 }
               }
             },
-            "description": "The rules, newest version first per key."
+            "description": "The rules, newest effective version first per rule."
           },
           "401": {
             "content": {
@@ -76279,6 +76868,16 @@
             },
             "description": "Missing `compliance.rules.read`; code `permission_denied`."
           },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A parameter is invalid (e.g. `as_of` is not RFC 3339); see `errors`."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -76295,7 +76894,7 @@
             "bearer": []
           }
         ],
-        "summary": "List the legal rules (every version).",
+        "summary": "List the legal rules: every version, or those in effect at a time.",
         "tags": [
           "compliance"
         ],
@@ -76469,6 +77068,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -76553,6 +77162,12 @@
             "description": "Only records past their deadline and not done.",
             "kind": "boolean",
             "name": "overdue",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -77187,6 +77802,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -77265,6 +77890,12 @@
             "description": "Only the tags of this unit (website).",
             "kind": "uuid",
             "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -77776,6 +78407,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -77849,7 +78490,14 @@
         "tags": [
           "compliance"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "compliance.list_compliance_websites",
         "x-permissions": [
           "compliance.legal.read"
@@ -78895,6 +79543,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -78974,6 +79632,12 @@
             "kind": "string",
             "name": "q",
             "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "content.list_content_authors",
@@ -79696,6 +80360,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -79879,6 +80553,12 @@
             "description": "Only entries with every one of these internal tags (comma-separated ids).",
             "kind": "string",
             "name": "tags_all",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -81513,6 +82193,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -81586,7 +82276,14 @@
         "tags": [
           "content"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "content.list_content_revisions",
         "x-permissions": [
           "content.read"
@@ -82690,6 +83387,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -82763,7 +83470,14 @@
         "tags": [
           "content"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "content.list_content_translation_requests",
         "x-permissions": [
           "content.read"
@@ -83929,6 +84643,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
             "in": "query",
             "name": "site",
@@ -84027,6 +84751,12 @@
             "kind": "string",
             "name": "q",
             "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           },
           {
             "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
@@ -84451,6 +85181,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
             "in": "query",
             "name": "site",
@@ -84533,6 +85273,12 @@
             "operator": "eq"
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          },
+          {
             "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
             "kind": "uuid",
             "name": "site",
@@ -84601,6 +85347,16 @@
                 "desc"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -84684,6 +85440,12 @@
               "category",
               "tag"
             ]
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "content.list_public_content_terms",
@@ -84869,6 +85631,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -84960,6 +85732,12 @@
             "kind": "string",
             "name": "q",
             "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "content.list_content_redirects",
@@ -85507,6 +86285,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -85585,6 +86373,12 @@
             "description": "`scheduled` (waiting), `succeeded`, `failed` or `canceled`.",
             "kind": "string",
             "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -86124,6 +86918,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -86213,6 +87017,12 @@
             "kind": "string",
             "name": "q",
             "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "content.list_content_terms",
@@ -86856,6 +87666,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -86929,7 +87749,14 @@
         "tags": [
           "files"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "files.list_files",
         "x-permissions": [
           "files.upload"
@@ -87726,6 +88553,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -87814,6 +88651,12 @@
             "description": "Only the forms of this organization unit.",
             "kind": "uuid",
             "name": "owner_org",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -89628,6 +90471,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -89729,6 +90582,12 @@
             "kind": "string",
             "name": "q",
             "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "forms.list_form_submissions",
@@ -90072,6 +90931,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -90145,7 +91014,14 @@
         "tags": [
           "invoices"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "invoices.list_invoice_archives",
         "x-permissions": [
           "invoices.archive"
@@ -90340,6 +91216,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -90439,6 +91325,12 @@
           {
             "kind": "string",
             "name": "source_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -91871,6 +92763,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -91944,7 +92846,14 @@
         "tags": [
           "invoices"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "invoices.list_invoice_exports",
         "x-permissions": [
           "invoices.export"
@@ -92285,6 +93194,133 @@
         ]
       }
     },
+    "/api/v1/invoices/exports/{id}/retry": {
+      "post": {
+        "description": "Requires `invoices.export`. Puts the export back to `pending` with the same profile, format and\nperiod, and starts the job again; follow it with `GET /api/v1/invoices/exports/{id}`. Safe to call\nagain: an export already `pending` or `running` is returned as it is.",
+        "operationId": "invoices_retry_invoice_export",
+        "parameters": [
+          {
+            "description": "Id of the export.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InvoicesExport"
+                }
+              }
+            },
+            "description": "The export, `pending` again (or still `pending` / `running`)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `invoices.export`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such export; code `invoices.export_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The export is `ready`; ask for a new one. Code `invoices.export_not_retryable`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No file storage is set up; code `invoices.storage_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Make a failed accounting export again.",
+        "tags": [
+          "invoices"
+        ],
+        "x-permissions": [
+          "invoices.export"
+        ]
+      }
+    },
     "/api/v1/invoices/mandates": {
       "get": {
         "description": "Requires `invoices.read`.",
@@ -92324,6 +93360,16 @@
                 "desc"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -92400,7 +93446,14 @@
         "tags": [
           "invoices"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "invoices.list_invoice_mandates",
         "x-permissions": [
           "invoices.read"
@@ -92669,6 +93722,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -92742,7 +93805,14 @@
         "tags": [
           "invoices"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "invoices.list_invoice_series",
         "x-permissions": [
           "invoices.read"
@@ -93115,6 +94185,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -93188,7 +94268,14 @@
         "tags": [
           "invoices"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "invoices.list_invoice_templates",
         "x-permissions": [
           "invoices.read"
@@ -95114,6 +96201,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Only calls of these kinds of actor, comma-separated, e.g. `agent,service`.",
             "example": "agent",
             "in": "query",
@@ -95151,6 +96248,16 @@
               "format": "int32",
               "minimum": 0,
               "type": "integer"
+            }
+          },
+          {
+            "description": "Only calls whose HTTP status is in this class: `2xx`, `3xx`, `4xx` or `5xx` (e.g. `5xx` for\nserver errors).",
+            "example": "5xx",
+            "in": "query",
+            "name": "status_class",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -95249,6 +96356,12 @@
         ],
         "x-autoxide-filters": [
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          },
+          {
             "description": "Only calls of these kinds of actor, comma-separated, e.g. `agent,service`.",
             "kind": "string",
             "name": "actor_kind",
@@ -95270,6 +96383,12 @@
             "description": "Only calls that ended with this HTTP status.",
             "kind": "integer",
             "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only calls whose HTTP status is in this class: `2xx`, `3xx`, `4xx` or `5xx` (e.g. `5xx` for\nserver errors).",
+            "kind": "string",
+            "name": "status_class",
             "operator": "eq"
           },
           {
@@ -95330,6 +96449,16 @@
                 "desc"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -95406,7 +96535,14 @@
         "tags": [
           "kernel"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "kernel.list_tenant_domains",
         "x-permissions": [
           "kernel.domains.manage"
@@ -100068,6 +101204,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Only tenants in this state: `provisioning`, `active`, `suspended`, `maintenance` or\n`moving`.",
             "in": "query",
             "name": "status",
@@ -100219,6 +101365,12 @@
           "kernel"
         ],
         "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          },
           {
             "description": "Only tenants in this state: `provisioning`, `active`, `suspended`, `maintenance` or\n`moving`.",
             "kind": "string",
@@ -102682,6 +103834,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -102788,6 +103950,12 @@
             "description": "Only this counterparty.",
             "kind": "string",
             "name": "counterparty_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -103305,6 +104473,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -103388,7 +104566,14 @@
         "tags": [
           "ledger"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "ledger.list_ledger_account_lines",
         "x-permissions": [
           "ledger.read"
@@ -103434,6 +104619,16 @@
                 "desc"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -103510,7 +104705,14 @@
         "tags": [
           "ledger"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "ledger.list_ledger_bank_accounts",
         "x-permissions": [
           "ledger.read"
@@ -103632,6 +104834,133 @@
           }
         ],
         "summary": "Register a bank account for VietQR transfers.",
+        "tags": [
+          "ledger"
+        ],
+        "x-permissions": [
+          "ledger.settings_manage"
+        ]
+      }
+    },
+    "/api/v1/ledger/bank-accounts/{id}": {
+      "patch": {
+        "description": "Requires `ledger.settings_manage` on the account's unit. The bank and the account number never\nchange: register the other account instead, then disable this one.",
+        "operationId": "ledger_update_ledger_bank_account",
+        "parameters": [
+          {
+            "description": "Id of the bank account.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerBankAccountChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LedgerBankAccount"
+                }
+              }
+            },
+            "description": "The bank account after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `ledger.settings_manage` (`permission_denied`) or not on the account's unit (`org_out_of_scope`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such bank account in your scope; code `ledger.bank_account_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (unknown bank feed, unknown status…); every problem in `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a bank account: name, bank feed, status.",
         "tags": [
           "ledger"
         ],
@@ -103779,6 +105108,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -103852,7 +105191,14 @@
         "tags": [
           "ledger"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "ledger.list_ledger_books",
         "x-permissions": [
           "ledger.read"
@@ -104270,6 +105616,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -104372,6 +105728,12 @@
             "description": "Only entries dated on or before this day.",
             "kind": "date",
             "name": "to",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -104824,6 +106186,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -104902,6 +106274,12 @@
             "description": "`open`, `resolved` or `ignored`.",
             "kind": "string",
             "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -105098,6 +106476,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -105182,6 +106570,12 @@
             "description": "Only rates into this currency, e.g. `VND`.",
             "kind": "string",
             "name": "quote",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -105841,6 +107235,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -105937,6 +107341,12 @@
             "description": "Only for this document.",
             "kind": "string",
             "name": "source_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -106096,6 +107506,36 @@
             }
           },
           {
+            "description": "Only payments of this amount, in the smallest unit of the currency (e.g. `150000` for\n150,000 VND) — to find the payment a bank transfer was meant for.",
+            "example": "150000",
+            "in": "query",
+            "name": "amount",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only payments in this currency (ISO 4217, e.g. `VND`).",
+            "example": "VND",
+            "in": "query",
+            "name": "currency",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only payments received by this unit (not the units below it).",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
             "example": 50,
             "in": "query",
@@ -106129,6 +107569,16 @@
                 "desc"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -106222,6 +107672,30 @@
             "description": "Only payments for this document.",
             "kind": "string",
             "name": "source_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only payments of this amount, in the smallest unit of the currency (e.g. `150000` for\n150,000 VND) — to find the payment a bank transfer was meant for.",
+            "kind": "string",
+            "name": "amount",
+            "operator": "eq"
+          },
+          {
+            "description": "Only payments in this currency (ISO 4217, e.g. `VND`).",
+            "kind": "string",
+            "name": "currency",
+            "operator": "eq"
+          },
+          {
+            "description": "Only payments received by this unit (not the units below it).",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -106819,6 +108293,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -106903,6 +108387,12 @@
             "description": "Only payouts to this seller.",
             "kind": "uuid",
             "name": "payee_org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -107201,6 +108691,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -107289,6 +108789,12 @@
             "description": "The book (required).",
             "kind": "uuid",
             "name": "book_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -107457,6 +108963,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -107530,7 +109046,14 @@
         "tags": [
           "ledger"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "ledger.list_ledger_reconciliations",
         "x-permissions": [
           "ledger.reconcile"
@@ -109563,6 +111086,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -109687,6 +111220,12 @@
             "description": "`true`: only images missing a text alternative (an image whose default `alt` is empty and\nthat is not marked `decorative`). `false`: every other item.",
             "kind": "boolean",
             "name": "alt_missing",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -109951,6 +111490,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -110029,6 +111578,12 @@
             "description": "Only the folders directly inside this one: a folder id, or `root`. Omit for every\nfolder.",
             "kind": "string",
             "name": "parent_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -110682,6 +112237,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -110761,6 +112326,12 @@
             "kind": "string",
             "name": "q",
             "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "media.list_media_tags",
@@ -113143,6 +114714,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -113221,6 +114802,12 @@
             "description": "Only the menus of this website (organization unit).",
             "kind": "uuid",
             "name": "owner_org",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -114141,6 +115728,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -114231,6 +115828,12 @@
           {
             "kind": "uuid",
             "name": "list_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -116029,6 +117632,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -116102,7 +117715,14 @@
         "tags": [
           "newsletter"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "newsletter.list_newsletter_lists",
         "x-permissions": [
           "newsletter.read"
@@ -117429,6 +119049,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -117530,6 +119160,12 @@
             "description": "`true`: only blocked subscribers (they get no mail); `false`: only the others.",
             "kind": "boolean",
             "name": "blocked",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -118059,6 +119695,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -118137,6 +119783,12 @@
             "description": "Part of the email address, any case.",
             "kind": "string",
             "name": "email",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -118983,6 +120635,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -119051,6 +120713,12 @@
             "description": "`true`: only unread notifications.",
             "kind": "boolean",
             "name": "unread",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -119713,6 +121381,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -119807,6 +121485,12 @@
           {
             "kind": "uuid",
             "name": "user_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -122481,6 +124165,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -122584,6 +124278,12 @@
             "kind": "string",
             "name": "q",
             "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "organizations.list_units",
@@ -124859,6 +126559,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -124946,6 +126656,12 @@
             "kind": "boolean",
             "name": "active",
             "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "plans.list_all_overrides",
@@ -124993,6 +126709,16 @@
                 "desc"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -125059,7 +126785,14 @@
         "tags": [
           "plans"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "plans.list_plans",
         "x-permissions": [
           "plans.plans.read"
@@ -125856,6 +127589,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -125934,6 +127677,12 @@
             "description": "Only provisionings in this state: `pending`, `running`, `failed` or `done`.",
             "kind": "string",
             "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -126338,6 +128087,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -126416,6 +128175,12 @@
             "description": "Only sign-ups in this state: `pending_email`, `awaiting_kyc`, `provisioning`, `completed`,\n`rejected` or `expired`.",
             "kind": "string",
             "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -127189,6 +128954,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -127269,6 +129044,12 @@
             "description": "Only the subscription of this tenant.",
             "kind": "uuid",
             "name": "tenant_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
             "operator": "eq"
           }
         ],
@@ -128918,6 +130699,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -128991,7 +130782,14 @@
         "tags": [
           "tax"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "tax.list_tax_profiles",
         "x-permissions": [
           "tax.read"
@@ -129851,6 +131649,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -129934,6 +131742,12 @@
               "active",
               "disabled"
             ]
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "webhooks.list_webhook_endpoints",
@@ -130097,6 +131911,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "`pending`, `succeeded` or `failed`.",
             "example": "failed",
             "in": "query",
@@ -130191,6 +132015,12 @@
           "webhooks"
         ],
         "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          },
           {
             "description": "`pending`, `succeeded` or `failed`.",
             "kind": "string",
@@ -130808,6 +132638,16 @@
             }
           },
           {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
             "in": "header",
             "name": "Accept-Language",
@@ -130891,7 +132731,14 @@
         "tags": [
           "webhooks"
         ],
-        "x-autoxide-filters": [],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
         "x-autoxide-list": "webhooks.list_webhook_deliveries",
         "x-permissions": [
           "webhooks.manage"

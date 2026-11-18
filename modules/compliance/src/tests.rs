@@ -219,6 +219,28 @@ async fn quy_tac_theo_ngay_hieu_luc_va_nhap_chi_them() {
         let (status, listed) = call(&app, "GET", "/rules", "staff", None).await;
         assert_eq!(status, StatusCode::OK, "{listed}");
         assert!(listed["data"].as_array().unwrap().iter().any(|rule| rule["version"] == 2));
+        // `as_of`: mỗi khoá chỉ còn bản có hiệu lực lúc đó.
+        let uri = "/rules?key=kyc.required_activities&jurisdiction=vn&as_of=2030-01-02T00:00:00Z";
+        let (status, at) = call(&app, "GET", uri, "staff", None).await;
+        assert_eq!(status, StatusCode::OK, "{at}");
+        let versions: Vec<i64> =
+            at["data"].as_array().unwrap().iter().map(|r| r["version"].as_i64().unwrap()).collect();
+        assert_eq!(versions, [2]);
+        let uri = "/rules?key=kyc.required_activities&as_of=2029-12-31T00:00:00Z";
+        let (_, before) = call(&app, "GET", uri, "staff", None).await;
+        assert!(before["data"].as_array().unwrap().iter().all(|rule| rule["version"] != 2));
+        let (_, all) = call(&app, "GET", "/rules?as_of=2030-01-02T00:00:00Z", "staff", None).await;
+        let mut keys: Vec<(String, String)> = all["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| (r["jurisdiction"].to_string(), r["key"].to_string()))
+            .collect();
+        let count = keys.len();
+        keys.dedup();
+        assert_eq!(keys.len(), count, "one version per rule: {all}");
+        let (status, problem) = call(&app, "GET", "/rules?as_of=yesterday", "staff", None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
 
         let bad = json!({"pack": {"jurisdiction": "vn", "rules": [{
             "key": "x", "version": 0, "effective_from": "2030-01-01T00:00:00Z",

@@ -20,8 +20,8 @@ use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::privacy::{DataCategory, Keep, PersonalData, deleted_user};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId, require_platform};
 use chrono::{DateTime, Utc};
-use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::sea_query::{Expr, ExprTrait as _};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -97,6 +97,21 @@ pub(crate) struct Purpose {
     pub active: bool,
     /// `default` (from the legal rules) or `tenant` (added or changed by the tenant).
     pub source: String,
+}
+
+/// A processing purpose with how many people consented to it and how many withdrew.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = CompliancePurposeWithCounts)]
+pub(crate) struct PurposeWithCounts {
+    #[serde(flatten)]
+    pub purpose: Purpose,
+    /// People (distinct email, phone or account) with a consent to this purpose now given, on at
+    /// least one channel.
+    #[schema(example = 1520)]
+    pub consented: i64,
+    /// People with a consent to this purpose withdrawn, on at least one channel.
+    #[schema(example = 34)]
+    pub withdrawn: i64,
 }
 
 /// Mục đích mặc định trong quy tắc.
@@ -374,9 +389,37 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-    ) -> Result<Vec<Purpose>, Error> {
+    ) -> Result<Vec<PurposeWithCounts>, Error> {
         principal.require(&PRIVACY_READ)?;
-        self.purposes(tenant).await
+        let purposes = self.purposes(tenant).await?;
+        // Một câu đếm cho mọi mục đích: số người (khoá chủ thể khác nhau) theo mục đích và trạng thái.
+        let rows: Vec<(String, String, i64)> = consent::Entity::find()
+            .scoped(tenant)
+            .select_only()
+            .column(consent::Column::Purpose)
+            .column(consent::Column::State)
+            .column_as(Expr::col(consent::Column::SubjectKey).count_distinct(), "people")
+            .group_by(consent::Column::Purpose)
+            .group_by(consent::Column::State)
+            .into_tuple()
+            .all(tenant.database().read())
+            .await?;
+        let mut counts: BTreeMap<String, (i64, i64)> = BTreeMap::new();
+        for (purpose, state, people) in rows {
+            let entry = counts.entry(purpose).or_default();
+            match state.as_str() {
+                "granted" => entry.0 = people,
+                "withdrawn" => entry.1 = people,
+                _ => {}
+            }
+        }
+        Ok(purposes
+            .into_iter()
+            .map(|purpose| {
+                let (consented, withdrawn) = counts.get(&purpose.key).copied().unwrap_or_default();
+                PurposeWithCounts { purpose, consented, withdrawn }
+            })
+            .collect())
     }
 
     /// Mục đích công khai (đang dùng), kèm nhà cung cấp mã theo dõi đang bật là bên nhận dữ liệu.
