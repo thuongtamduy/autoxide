@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
+  `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
+  `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
+  `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
+  tools `inventory.*`.
 - Module `catalog` (step 41, first part; `docs/CATALOG.md`): products with variants, options, SKU and barcode
   unique per tenant, sale modes (in stock, backorder, pre-order), bundles, images from `media`; a category tree;
   price lists per store, chain and customer group with append-only price history, scheduled and temporary prices,

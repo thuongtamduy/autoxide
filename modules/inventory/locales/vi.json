@@ -1,0 +1,11 @@
+{
+  "inventory.adjustment_not_found": "Không có phiếu điều chỉnh tồn `{id}` trong phạm vi của bạn.",
+  "inventory.currency_mismatch": "Giá vốn phải bằng {currency}, tiền tệ của hàng đang có trong kho này.",
+  "inventory.insufficient_stock": "Không đủ hàng cho {lines}. Hãy giảm số lượng hoặc chọn kho khác.",
+  "inventory.invalid_org_id": "`{value}` không phải mã nút (UUID).",
+  "inventory.level_not_found": "Không có dòng tồn `{id}` trong phạm vi của bạn.",
+  "inventory.not_a_warehouse": "Nút `{org_id}` không phải kho hay cửa hàng nên không giữ tồn được.",
+  "inventory.not_tracked": "Biến thể `{id}` không theo dõi tồn (hàng số, dịch vụ, combo): không có gì để đếm hay chuyển.",
+  "inventory.reason_required": "Mỗi lần điều chỉnh tồn cần một lý do trong danh sách `inventory.adjustment`.",
+  "inventory.variant_not_found": "Không có biến thể sản phẩm `{id}`."
+}
