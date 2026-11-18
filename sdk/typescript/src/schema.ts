@@ -6592,6 +6592,43 @@ export type Data_InventoryLevel = {
 };
 
 /** Envelope of a single result. */
+export type Data_InventoryReservation = {
+  /** Stock held for one order. */
+  data: {
+    expires_at?: string | null;
+    id: string;
+    lines: InventoryReservedLine[];
+    order_id: string;
+    /** The store or channel that sold. */
+    selling_org_id: string;
+    /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventorySources = {
+  /** Warehouses serving a store. */
+  data: {
+    sources: InventorySource[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryStoreSettings = {
+  /** How a store picks warehouses. */
+  data: {
+    /**
+     * Split an order over several warehouses when no single one has every line. Default
+     * `false`: one order, one warehouse.
+     */
+    allow_split: boolean;
+    /** Try warehouses in the buyer's province first (province from the units' public profile). */
+    prefer_nearby: boolean;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_InvitationResponse = {
   /** An invitation to work in this tenant. */
   data: {
@@ -8839,6 +8876,158 @@ export type Data_ShippingAddress = {
     phone: string;
     postal_code?: string | null;
     recipient_name: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingCarrierAccount = {
+  /** A carrier account. Credentials are never returned: only the names of the fields set. */
+  data: {
+    active: boolean;
+    carrier_code: string;
+    check_error_code?: string | null;
+    /**
+     * `never`, `ok` or `failed`: result of the last connection test, or of the last call the
+     * carrier refused for bad credentials.
+     */
+    check_status: string;
+    checked_at?: string | null;
+    credential_fields: string[];
+    id: string;
+    name: string;
+    org_id: string;
+    sandbox: boolean;
+    settings: unknown;
+    updated_at: string;
+    /**
+     * Only in the answer of the create call: the address the carrier posts status updates to.
+     * Keep it; it cannot be shown again.
+     */
+    webhook_path?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingCodDiscrepancy = {
+  /** A difference between a carrier statement and the shipments. */
+  data: {
+    created_at: string;
+    /** Amount of the shipment request. */
+    expected: Money;
+    id: string;
+    /** `amount_mismatch`, `unknown_tracking`, `not_delivered` or `overdue`. */
+    kind: string;
+    /** Amount on the statement. */
+    reported: Money;
+    resolution_code?: string | null;
+    resolution_note: string;
+    resolved_at?: string | null;
+    resolved_by?: string | null;
+    shipment_id?: string | null;
+    statement_line_id?: string | null;
+    /** `open` or `resolved`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingCodStatement = {
+  /** A carrier statement. */
+  data: {
+    carrier_account_id: string;
+    id: string;
+    imported_at: string;
+    net_paid: Money;
+    period_from: string;
+    period_to: string;
+    reference: string;
+    /** `reconciled` or `has_mismatch`. */
+    status: string;
+    total_cod: Money;
+    total_fee: Money;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingCodStatementDetail = {
+  /** A carrier statement with its lines. */
+  data: ShippingCodStatement & {
+    lines: ShippingCodStatementLine[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingMethod = {
+  /** A shipping method. */
+  data: {
+    active: boolean;
+    auto_book: boolean;
+    calendar_id?: string | null;
+    carrier_account_id?: string | null;
+    code: string;
+    countries: string[];
+    currency: string;
+    cutoff_minute?: number | null;
+    default_item_weight_grams?: number | null;
+    estimated_days?: ShippingDays | null;
+    free_over?: Money | null;
+    handling_fee: Money;
+    hold_days?: number | null;
+    id: string;
+    kind: ShippingMethodKind;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    pickup_points: ShippingPickupPoint[];
+    position: number;
+    /** Weight tiers (only in `GET /methods/{id}` and after changes). */
+    rates: ShippingRateTier[];
+    same_day: boolean;
+    service_code?: string | null;
+    tax_category: string;
+    updated_at: string;
+    volumetric_divisor: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingQuote = {
+  /** Shipping options of a cart. */
+  data: {
+    /** Cheapest first; empty when nothing in the cart needs shipping. */
+    options: ShippingOption[];
+    unavailable: ShippingUnavailableMethod[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingShipment = {
+  /** A shipment with its parcels, items and tracking history. */
+  data: ShippingShipmentSummary & {
+    events: ShippingTrackingEvent[];
+    items: ShippingShipmentItem[];
+    parcels: ShippingParcel[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingWebhookReceipt = {
+  /** Receipt of a carrier webhook. */
+  data: {
+    id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingZone = {
+  /** A shipping zone. */
+  data: {
+    id: string;
+    name: string;
+    org_id: string;
+    regions: ShippingRegion[];
     updated_at: string;
   };
 };
@@ -12514,6 +12703,27 @@ export type ImportRequest = {
   subscribers: ImportPersonRequest[];
 };
 
+/**
+ * A carrier statement to import: either the CSV file (columns `tracking_number`, `cod_amount`,
+ * `fee` in minor units) or `fetch: true` to read it from the carrier's API.
+ */
+export type ImportShippingCodStatement = {
+  carrier_account_id: string;
+  /** The CSV text. */
+  csv?: string | null;
+  /** ISO 4217 code of the amounts in the CSV (default `VND`). */
+  currency?: string | null;
+  /** Read the statement from the carrier's API instead. */
+  fetch?: boolean;
+  period_from: string;
+  period_to: string;
+  /**
+   * The carrier's reference of the statement; importing it again with the same content does
+   * nothing.
+   */
+  reference?: string | null;
+};
+
 /** A menu of the import, by key and language. */
 export type ImportedMenu = {
   key: string;
@@ -12642,6 +12852,68 @@ export type InventoryMovement = {
   source_type: string;
   unit_cost?: Money | null;
   variant_id: string;
+};
+
+/** Stock held for one order. */
+export type InventoryReservation = {
+  expires_at?: string | null;
+  id: string;
+  lines: InventoryReservedLine[];
+  order_id: string;
+  /** The store or channel that sold. */
+  selling_org_id: string;
+  /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+  status: string;
+};
+
+/** Part of an order line reserved in one warehouse. */
+export type InventoryReservedLine = {
+  /** Reserved beyond the available stock (the product may be sold out of stock). */
+  backordered: boolean;
+  /** The bundle variant of the order line, when it is a bundle. */
+  bundle_variant_id?: string | null;
+  fulfilled_quantity: number;
+  /** The order's line key. */
+  line_key: string;
+  /** Pre-order line. */
+  preordered: boolean;
+  quantity: number;
+  released_quantity: number;
+  /** The variant taken from stock (a component when the line is a bundle). */
+  variant_id: string;
+  warehouse_org_id: string;
+};
+
+/** One warehouse serving a store or channel. */
+export type InventorySource = {
+  /** `false` keeps the row but stops using the warehouse. */
+  active: boolean;
+  /** Lower is tried first. */
+  priority: number;
+  /** The warehouse or store whose stock is sold. */
+  warehouse_org_id: string;
+};
+
+/** Warehouses serving a store. */
+export type InventorySources = {
+  sources: InventorySource[];
+};
+
+/** The warehouses serving a store, replacing the current list. */
+export type InventorySourcesRequest = {
+  /** Up to 100 warehouses; empty: the store sells only its own stock. */
+  sources: InventorySource[];
+};
+
+/** How a store picks warehouses. */
+export type InventoryStoreSettings = {
+  /**
+   * Split an order over several warehouses when no single one has every line. Default
+   * `false`: one order, one warehouse.
+   */
+  allow_split: boolean;
+  /** Try warehouses in the buyer's province first (province from the units' public profile). */
+  prefer_nearby: boolean;
 };
 
 /** A new invitation. */
@@ -14712,6 +14984,58 @@ export type NewShippingAddress = {
   recipient_name: string;
 };
 
+/** A new carrier account. */
+export type NewShippingCarrierAccount = {
+  /** Code of an installed carrier connector, e.g. `ghn`. */
+  carrier_code: string;
+  /**
+   * Login fields the connector needs (e.g. `token`, `shop_id`, `webhook_secret`). Stored
+   * encrypted; never returned.
+   */
+  credentials: {
+    [key: string]: string;
+  };
+  /** Your name for the account (1 to 200 characters). */
+  name: string;
+  /** Organization unit owning the account; defaults to where you work when that is one unit. */
+  org_id?: string | null;
+  /** Test account of the carrier. */
+  sandbox?: boolean;
+  /** Settings that are not secret (pickup warehouse at the carrier…). */
+  settings?: unknown;
+};
+
+/** A shipment created by staff (e.g. a counter sale delivered later). */
+export type NewShippingShipment = {
+  address: ShippingPostalAddress;
+  buyer_id?: string | null;
+  cod_amount?: Money | null;
+  declared_value: Money;
+  direction?: ShippingDirection;
+  items: ShippingRequestItem[];
+  method_id: string;
+  note?: string;
+  order_id: string;
+  order_number: string;
+  /** The selling store. */
+  org_id: string;
+  /** The warehouse shipping (default: the store). */
+  origin_org_id?: string | null;
+  recipient_name: string;
+  recipient_phone: string;
+  /** Retry-safe key of this delivery within the order. */
+  request_key: string;
+};
+
+/** A new shipping zone. */
+export type NewShippingZone = {
+  /** 1 to 200 characters, e.g. `Inner Hanoi`. */
+  name: string;
+  /** Organization unit owning the zone; defaults to where you work when that is one unit. */
+  org_id?: string | null;
+  regions?: ShippingRegion[];
+};
+
 /** A tag to create. */
 export type NewTag = {
   /** A color of the fixed palette; `gray` by default. */
@@ -16444,6 +16768,22 @@ export type Page_InventoryMovement = {
 };
 
 /** One page of a list. */
+export type Page_InventoryReservation = {
+  /** The items of this page, in the requested order. */
+  data: {
+    expires_at?: string | null;
+    id: string;
+    lines: InventoryReservedLine[];
+    order_id: string;
+    /** The store or channel that sold. */
+    selling_org_id: string;
+    /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InvitationResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17751,6 +18091,160 @@ export type Page_ShippingAddress = {
     phone: string;
     postal_code?: string | null;
     recipient_name: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingCarrierAccount = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    carrier_code: string;
+    check_error_code?: string | null;
+    /**
+     * `never`, `ok` or `failed`: result of the last connection test, or of the last call the
+     * carrier refused for bad credentials.
+     */
+    check_status: string;
+    checked_at?: string | null;
+    credential_fields: string[];
+    id: string;
+    name: string;
+    org_id: string;
+    sandbox: boolean;
+    settings: unknown;
+    updated_at: string;
+    /**
+     * Only in the answer of the create call: the address the carrier posts status updates to.
+     * Keep it; it cannot be shown again.
+     */
+    webhook_path?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingCodDiscrepancy = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** Amount of the shipment request. */
+    expected: Money;
+    id: string;
+    /** `amount_mismatch`, `unknown_tracking`, `not_delivered` or `overdue`. */
+    kind: string;
+    /** Amount on the statement. */
+    reported: Money;
+    resolution_code?: string | null;
+    resolution_note: string;
+    resolved_at?: string | null;
+    resolved_by?: string | null;
+    shipment_id?: string | null;
+    statement_line_id?: string | null;
+    /** `open` or `resolved`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingCodStatement = {
+  /** The items of this page, in the requested order. */
+  data: {
+    carrier_account_id: string;
+    id: string;
+    imported_at: string;
+    net_paid: Money;
+    period_from: string;
+    period_to: string;
+    reference: string;
+    /** `reconciled` or `has_mismatch`. */
+    status: string;
+    total_cod: Money;
+    total_fee: Money;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingMethod = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    auto_book: boolean;
+    calendar_id?: string | null;
+    carrier_account_id?: string | null;
+    code: string;
+    countries: string[];
+    currency: string;
+    cutoff_minute?: number | null;
+    default_item_weight_grams?: number | null;
+    estimated_days?: ShippingDays | null;
+    free_over?: Money | null;
+    handling_fee: Money;
+    hold_days?: number | null;
+    id: string;
+    kind: ShippingMethodKind;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    pickup_points: ShippingPickupPoint[];
+    position: number;
+    /** Weight tiers (only in `GET /methods/{id}` and after changes). */
+    rates: ShippingRateTier[];
+    same_day: boolean;
+    service_code?: string | null;
+    tax_category: string;
+    updated_at: string;
+    volumetric_divisor: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingShipmentSummary = {
+  /** The items of this page, in the requested order. */
+  data: {
+    actual_fee?: Money | null;
+    address: Address;
+    carrier_code?: string | null;
+    cod_amount?: Money | null;
+    /** `none`, `pending`, `collected`, `settled` or `mismatch`. */
+    cod_status: string;
+    created_at: string;
+    declared_value: Money;
+    direction: ShippingDirection;
+    id: string;
+    /** Last refusal of the carrier when booking (`shipping.carrier_error`…). */
+    last_error_code?: string | null;
+    method_id: string;
+    order_id: string;
+    order_number: string;
+    org_id: string;
+    origin_org_id: string;
+    quoted_fee?: Money | null;
+    recipient_name: string;
+    recipient_phone: string;
+    request_key: string;
+    service_code?: string | null;
+    status: ShippingStatus;
+    status_at: string;
+    tracking_number?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingZone = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    name: string;
+    org_id: string;
+    regions: ShippingRegion[];
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -19857,6 +20351,17 @@ export type Resolution = {
   type: "gone";
 };
 
+/** How a discrepancy was resolved. */
+export type ResolveShippingCodDiscrepancy = {
+  /** Required (1 to 1000 characters): what was checked. */
+  note: string;
+  /**
+   * An active code of the reason list `shipping.cod_resolution` (`carrier_corrected`,
+   * `delivered_confirmed`, `returned_confirmed`, `written_off`, or the tenant's own).
+   */
+  resolution_code: string;
+};
+
 /** The record a code opens. */
 export type ResolvedView = {
   id: string;
@@ -20355,6 +20860,275 @@ export type ShippingAddressChanges = {
   recipient_name?: string | null;
 };
 
+/** A carrier account. Credentials are never returned: only the names of the fields set. */
+export type ShippingCarrierAccount = {
+  active: boolean;
+  carrier_code: string;
+  check_error_code?: string | null;
+  /**
+   * `never`, `ok` or `failed`: result of the last connection test, or of the last call the
+   * carrier refused for bad credentials.
+   */
+  check_status: string;
+  checked_at?: string | null;
+  credential_fields: string[];
+  id: string;
+  name: string;
+  org_id: string;
+  sandbox: boolean;
+  settings: unknown;
+  updated_at: string;
+  /**
+   * Only in the answer of the create call: the address the carrier posts status updates to.
+   * Keep it; it cannot be shown again.
+   */
+  webhook_path?: string | null;
+};
+
+/** Changes of a carrier account; leave out what stays. `credentials` replaces every field. */
+export type ShippingCarrierAccountChanges = {
+  active?: boolean | null;
+  credentials?: {
+    [key: string]: string;
+  } | null;
+  name?: string | null;
+  sandbox?: boolean | null;
+  settings?: unknown;
+};
+
+/** A difference between a carrier statement and the shipments. */
+export type ShippingCodDiscrepancy = {
+  created_at: string;
+  /** Amount of the shipment request. */
+  expected: Money;
+  id: string;
+  /** `amount_mismatch`, `unknown_tracking`, `not_delivered` or `overdue`. */
+  kind: string;
+  /** Amount on the statement. */
+  reported: Money;
+  resolution_code?: string | null;
+  resolution_note: string;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  shipment_id?: string | null;
+  statement_line_id?: string | null;
+  /** `open` or `resolved`. */
+  status: string;
+};
+
+/** A carrier statement. */
+export type ShippingCodStatement = {
+  carrier_account_id: string;
+  id: string;
+  imported_at: string;
+  net_paid: Money;
+  period_from: string;
+  period_to: string;
+  reference: string;
+  /** `reconciled` or `has_mismatch`. */
+  status: string;
+  total_cod: Money;
+  total_fee: Money;
+};
+
+/** A carrier statement with its lines. */
+export type ShippingCodStatementDetail = ShippingCodStatement & {
+  lines: ShippingCodStatementLine[];
+};
+
+/** A line of a carrier statement. */
+export type ShippingCodStatementLine = {
+  cod: Money;
+  fee: Money;
+  /** `matched`, `amount_mismatch`, `unknown_tracking` or `not_delivered`. */
+  match: string;
+  shipment_id?: string | null;
+  tracking_number: string;
+};
+
+/** Days a delivery takes, as declared by the method. */
+export type ShippingDays = {
+  max: number;
+  min: number;
+};
+
+/** Direction of a shipment: `outbound` (to the buyer) or `return` (picked up from the buyer). */
+export type ShippingDirection = "outbound" | "return";
+
+/** Expected delivery dates. */
+export type ShippingEta = {
+  earliest_date: string;
+  latest_date: string;
+  /** Order before this time to make today's dispatch. */
+  order_by?: string | null;
+  time_zone: string;
+};
+
+/** A shipping method. */
+export type ShippingMethod = {
+  active: boolean;
+  auto_book: boolean;
+  calendar_id?: string | null;
+  carrier_account_id?: string | null;
+  code: string;
+  countries: string[];
+  currency: string;
+  cutoff_minute?: number | null;
+  default_item_weight_grams?: number | null;
+  estimated_days?: ShippingDays | null;
+  free_over?: Money | null;
+  handling_fee: Money;
+  hold_days?: number | null;
+  id: string;
+  kind: ShippingMethodKind;
+  names: {
+    [key: string]: string;
+  };
+  org_id: string;
+  pickup_points: ShippingPickupPoint[];
+  position: number;
+  /** Weight tiers (only in `GET /methods/{id}` and after changes). */
+  rates: ShippingRateTier[];
+  same_day: boolean;
+  service_code?: string | null;
+  tax_category: string;
+  updated_at: string;
+  volumetric_divisor: number;
+};
+
+/**
+ * Fields of a shipping method. On create `code`, `kind`, `names` and `currency` are required;
+ * on change, leave out what stays (`code`, `kind`, `org_id`, `currency` cannot change).
+ */
+export type ShippingMethodFields = {
+  active?: boolean | null;
+  /**
+   * `carrier` methods: book the carrier as soon as an order asks for a shipment (default off:
+   * staff check the goods first).
+   */
+  auto_book?: boolean | null;
+  /** Delivery calendar (working days, holidays, cut-off times). */
+  calendar_id?: string | null;
+  /** `carrier` methods: the carrier account quoting the fee. */
+  carrier_account_id?: string | null;
+  /** Stable code, lower-case letters, digits and `-`, e.g. `standard`. */
+  code?: string | null;
+  /** Countries shipped to (ISO codes), default `["VN"]`. */
+  countries?: string[] | null;
+  /** ISO 4217 code of every amount of the method, e.g. `VND`. */
+  currency?: string | null;
+  /** Orders before this minute of the day (calendar time zone; 660 = 11:00) leave the same day. */
+  cutoff_minute?: number | null;
+  /**
+   * `table_rate` methods: weight of an item that has none, in grams; `null`: such items make the
+   * method unavailable (`shipping.weight_missing`).
+   */
+  default_item_weight_grams?: number | null;
+  estimated_days?: ShippingDays | null;
+  free_over?: Money | null;
+  handling_fee?: Money | null;
+  /** `pickup` methods: days the parcel waits for the buyer. */
+  hold_days?: number | null;
+  kind?: ShippingMethodKind | null;
+  /** Name per language, e.g. `{"vi": "Giao tieu chuan", "en": "Standard"}`. */
+  names?: {
+    [key: string]: string;
+  } | null;
+  /**
+   * Organization unit owning the method; units below inherit it unless they have a method with
+   * the same `code`.
+   */
+  org_id?: string | null;
+  /** Display order, smaller first. */
+  position?: number | null;
+  /** Delivered the same day when ordered before the cut-off. */
+  same_day?: boolean | null;
+  /** `carrier` methods: the carrier's service code; `null` for every service. */
+  service_code?: string | null;
+  /** Tax category of the shipping fee in the tax engine, default `vat.standard`. */
+  tax_category?: string | null;
+  /** Volumetric divisor: volumetric grams = length × width × height (mm³) / divisor. Default 6000. */
+  volumetric_divisor?: number | null;
+};
+
+/**
+ * Kind of shipping method: `table_rate` (the shop's own weight tiers per zone), `carrier` (the fee
+ * a carrier account quotes), `pickup` (collect in store).
+ */
+export type ShippingMethodKind = "table_rate" | "carrier" | "pickup";
+
+/** A way to ship the cart. */
+export type ShippingOption = {
+  /** Fee the buyer pays, VAT included; zero when free. */
+  amount: Money;
+  carrier_code?: string | null;
+  chargeable_weight_grams: number;
+  /** Days, as declared by the method: `[min, max]`. */
+  estimated_days?: number[] | null;
+  eta?: ShippingEta | null;
+  free_over?: Money | null;
+  free_shipping_applied: boolean;
+  /** Store pickup: days the parcel waits. */
+  hold_days?: number | null;
+  kind: ShippingMethodKind;
+  method_code: string;
+  method_id: string;
+  name: string;
+  /**
+   * Send back when placing the order; a different fee or destination answers
+   * `shipping.option_changed`.
+   */
+  option_key: string;
+  /** Store pickup: the store. */
+  pickup_org_id?: string | null;
+  /** Store pickup: when the order is ready. */
+  ready_at?: string | null;
+  service_code?: string | null;
+  /** Tax category of the fee (VAT line on the invoice). */
+  tax_category: string;
+};
+
+/** A parcel of a shipment. */
+export type ShippingParcel = {
+  height_mm?: number | null;
+  id: string;
+  length_mm?: number | null;
+  position: number;
+  tracking_number?: string | null;
+  weight_grams: number;
+  width_mm?: number | null;
+};
+
+/** A parcel. */
+export type ShippingParcelInput = {
+  height_mm?: number | null;
+  /** Order line keys packed in this parcel; lines not listed go in the first parcel. */
+  items?: string[];
+  length_mm?: number | null;
+  weight_grams: number;
+  width_mm?: number | null;
+};
+
+/** The parcels of a shipment. */
+export type ShippingParcels = {
+  parcels: ShippingParcelInput[];
+};
+
+/** A store where buyers collect their parcels. */
+export type ShippingPickupPoint = {
+  /** Shown to the buyer, e.g. where to park. */
+  instructions?: string;
+  /** The store: the method's unit or a unit below it. */
+  org_id: string;
+  /** Hours to get the order ready (0 to 720). */
+  prep_hours?: number;
+};
+
+/** The full list of pickup points of a `pickup` method. */
+export type ShippingPickupPoints = {
+  pickup_points: ShippingPickupPoint[];
+};
+
 /**
  * A postal address. In Vietnam: `province_code` and `commune_code` from the official list of
  * administrative units (`GET /api/v1/address/provinces`). Elsewhere: `province_code` is the
@@ -20373,6 +21147,194 @@ export type ShippingPostalAddress = {
   postal_code?: string | null;
   /** Vietnam: code of the province. Elsewhere: the region. */
   province_code: string;
+};
+
+/** Shipping options of a cart. */
+export type ShippingQuote = {
+  /** Cheapest first; empty when nothing in the cart needs shipping. */
+  options: ShippingOption[];
+  unavailable: ShippingUnavailableMethod[];
+};
+
+/** One line of the cart, with the figures of the variant (from the catalog). */
+export type ShippingQuoteItem = {
+  height_mm?: number | null;
+  length_mm?: number | null;
+  quantity: number;
+  /** `false` for digital goods and services: not weighed, not shipped. */
+  requires_shipping?: boolean;
+  sku?: string;
+  variant_id: string;
+  /** Weight of one item, grams. */
+  weight_grams?: number | null;
+  width_mm?: number | null;
+};
+
+/** A cart to quote. */
+export type ShippingQuoteRequest = {
+  /** Time of the order (default: now). */
+  at?: string | null;
+  destination?: ShippingPostalAddress | null;
+  items: ShippingQuoteItem[];
+  /** Language of method names (default `en`). */
+  locale?: string | null;
+  /** Order value after discounts, for free shipping. */
+  order_value: Money;
+  /** The selling store; methods of the units above it apply too. */
+  org_id: string;
+  /** The warehouse shipping, when known. */
+  origin_org_id?: string | null;
+};
+
+/** A weight tier of a method in one zone. */
+export type ShippingRateTier = {
+  amount: Money;
+  /** Longest side allowed, in mm; `null` for any size. */
+  max_side_mm?: number | null;
+  /** …up to, not including, this weight; `null` for no upper limit. */
+  max_weight_grams?: number | null;
+  /** The tier applies from this chargeable weight (grams)… */
+  min_weight_grams: number;
+  step_amount?: Money | null;
+  /** Each `step_grams` (or part) above `min_weight_grams` adds `step_amount`. */
+  step_grams?: number | null;
+  zone_id: string;
+};
+
+/** The full list of weight tiers of a method. */
+export type ShippingRates = {
+  rates: ShippingRateTier[];
+};
+
+/** One region of a zone: a country, or one province of it. */
+export type ShippingRegion = {
+  /** ISO 3166-1 alpha-2 country code. */
+  country: string;
+  /**
+   * Code of the province; `null` for the whole country. A zone listing the province of the
+   * destination wins over a zone for the whole country.
+   */
+  province_code?: string | null;
+};
+
+/** One line of a shipment request. */
+export type ShippingRequestItem = {
+  height_mm?: number | null;
+  length_mm?: number | null;
+  name?: string;
+  order_line_key: string;
+  quantity: number;
+  sku?: string;
+  variant_id: string;
+  weight_grams?: number | null;
+  width_mm?: number | null;
+};
+
+/** A shipment with its parcels, items and tracking history. */
+export type ShippingShipment = ShippingShipmentSummary & {
+  events: ShippingTrackingEvent[];
+  items: ShippingShipmentItem[];
+  parcels: ShippingParcel[];
+};
+
+/** An item of a shipment. */
+export type ShippingShipmentItem = {
+  name: string;
+  order_line_key: string;
+  parcel_id?: string | null;
+  quantity: number;
+  sku: string;
+  variant_id: string;
+};
+
+/** A shipment without its parcels, items and history. */
+export type ShippingShipmentSummary = {
+  actual_fee?: Money | null;
+  address: Address;
+  carrier_code?: string | null;
+  cod_amount?: Money | null;
+  /** `none`, `pending`, `collected`, `settled` or `mismatch`. */
+  cod_status: string;
+  created_at: string;
+  declared_value: Money;
+  direction: ShippingDirection;
+  id: string;
+  /** Last refusal of the carrier when booking (`shipping.carrier_error`…). */
+  last_error_code?: string | null;
+  method_id: string;
+  order_id: string;
+  order_number: string;
+  org_id: string;
+  origin_org_id: string;
+  quoted_fee?: Money | null;
+  recipient_name: string;
+  recipient_phone: string;
+  request_key: string;
+  service_code?: string | null;
+  status: ShippingStatus;
+  status_at: string;
+  tracking_number?: string | null;
+};
+
+/** Lines to move to a new shipment: order line key → quantity. */
+export type ShippingSplitRequest = {
+  lines: {
+    [key: string]: number;
+  };
+};
+
+/** Common status of a shipment, mapped from each carrier's own statuses. */
+export type ShippingStatus = "pending" | "booking" | "ready_to_ship" | "picked_up" | "in_transit" | "out_for_delivery" | "delivered" | "delivery_failed" | "returning" | "returned" | "ready_for_pickup" | "picked_up_by_buyer" | "cancelled" | "lost";
+
+/** A status set by staff. */
+export type ShippingStatusRequest = {
+  note?: string;
+  status: ShippingStatus;
+};
+
+/** A step of the tracking history (only added, never changed). */
+export type ShippingTrackingEvent = {
+  /** The carrier's own wording. */
+  carrier_status: string;
+  note: string;
+  occurred_at: string;
+  /** `carrier`, `staff` or `system`. */
+  source: string;
+  status: ShippingStatus;
+};
+
+/** A method that cannot ship this cart, and why. */
+export type ShippingUnavailableMethod = {
+  method_code: string;
+  /**
+   * `shipping.weight_missing`, `shipping.no_rate`, `shipping.country_not_served`,
+   * `shipping.no_pickup_point`, `shipping.carrier_unavailable`…
+   */
+  reason_code: string;
+};
+
+/** Receipt of a carrier webhook. */
+export type ShippingWebhookReceipt = {
+  id: string;
+};
+
+/** A shipping zone. */
+export type ShippingZone = {
+  id: string;
+  name: string;
+  org_id: string;
+  regions: ShippingRegion[];
+  updated_at: string;
+};
+
+/** Changes of a zone; leave out what stays. */
+export type ShippingZoneChanges = {
+  name?: string | null;
+};
+
+/** The full list of regions of a zone. */
+export type ShippingZoneRegions = {
+  regions: ShippingRegion[];
 };
 
 /** The answer to a sign-up: always the same. */
@@ -28234,6 +29196,79 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/reservations": {
+    /** List stock reservations of orders sold by units in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { order_id?: string | null; status?: "held" | "confirmed" | "fulfilled" | "released" | "expired" | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryReservation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/reservations/{id}/release": {
+    /** Release a stuck reservation by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryReservation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/settings/{org_id}": {
+    /** Get how a store picks warehouses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_InventoryStoreSettings;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Change how a store picks warehouses. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: InventoryStoreSettings;
+      responses: {
+        200: Data_InventoryStoreSettings;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/sources/{selling_org_id}": {
+    /** List the warehouses serving a store or channel, in the order they are tried. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { selling_org_id: string }; };
+      responses: {
+        200: Data_InventorySources;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the warehouses serving a store or channel. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { selling_org_id: string }; };
+      requestBody: InventorySourcesRequest;
+      responses: {
+        200: Data_InventorySources;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/invoices/archives": {
     /** List archive copies of the accounting records. */
     get: {
@@ -33006,6 +34041,145 @@ export interface paths {
       };
     };
   };
+  "/api/v1/shipping/carrier-accounts": {
+    /** List carrier accounts. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingCarrierAccount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Connect a carrier account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingCarrierAccount;
+      responses: {
+        201: Data_ShippingCarrierAccount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/carrier-accounts/{id}": {
+    /** Change a carrier account. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingCarrierAccountChanges;
+      responses: {
+        200: Data_ShippingCarrierAccount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/carrier-accounts/{id}/test": {
+    /** Test a carrier account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingCarrierAccount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/discrepancies": {
+    /** List cash-on-delivery discrepancies. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingCodDiscrepancy;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/discrepancies/{id}/refresh-tracking": {
+    /** Ask the carrier again for the tracking history of a discrepancy's shipment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingCodDiscrepancy;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/discrepancies/{id}/resolve": {
+    /** Resolve a cash-on-delivery discrepancy. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ResolveShippingCodDiscrepancy;
+      responses: {
+        200: Data_ShippingCodDiscrepancy;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/statements": {
+    /** List imported cash-on-delivery statements. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingCodStatement;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Import a cash-on-delivery statement of a carrier. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ImportShippingCodStatement;
+      responses: {
+        200: Data_ShippingCodStatement;
+        201: Data_ShippingCodStatement;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/statements/{id}": {
+    /** Get a cash-on-delivery statement with its lines. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingCodStatementDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/shipping/me/addresses": {
     /** List your saved delivery addresses. */
     get: {
@@ -33078,6 +34252,340 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/methods": {
+    /** List shipping methods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a shipping method. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ShippingMethodFields;
+      responses: {
+        201: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/methods/{id}": {
+    /** Get a shipping method with its tiers and pickup points. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a shipping method. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingMethodFields;
+      responses: {
+        200: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a shipping method with its tiers and pickup points. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/methods/{id}/pickup-points": {
+    /** Replace the pickup points of a `pickup` shipping method. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingPickupPoints;
+      responses: {
+        200: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/methods/{id}/rates": {
+    /** Replace the weight tiers of a shipping method. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingRates;
+      responses: {
+        200: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/quote": {
+    /** Quote shipping options for a cart. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ShippingQuoteRequest;
+      responses: {
+        200: Data_ShippingQuote;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments": {
+    /** List shipments. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { order_id?: string; status?: ShippingStatus; org_id?: string; tracking?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingShipmentSummary;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a shipment by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingShipment;
+      responses: {
+        200: Data_ShippingShipment;
+        201: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}": {
+    /** Get a shipment with its parcels, items and tracking history. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/book": {
+    /** Book a shipment with its carrier. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/cancel": {
+    /** Cancel a shipment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/label": {
+    /** Download the carrier label of a shipment. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Blob;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/parcels": {
+    /** Replace the parcels of a shipment. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingParcels;
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/split": {
+    /** Split a shipment (partial delivery). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingSplitRequest;
+      responses: {
+        201: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/status": {
+    /** Set the status of a shipment by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingStatusRequest;
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/webhooks/{carrier_code}/{token}": {
+    /** Receive a status webhook from a carrier. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { carrier_code: string; token: string }; };
+      requestBody: string;
+      responses: {
+        202: Data_ShippingWebhookReceipt;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        413: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/zones": {
+    /** List shipping zones. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingZone;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a shipping zone. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingZone;
+      responses: {
+        201: Data_ShippingZone;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/zones/{id}": {
+    /** Get a shipping zone. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingZone;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename a shipping zone. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingZoneChanges;
+      responses: {
+        200: Data_ShippingZone;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a shipping zone. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/zones/{id}/regions": {
+    /** Replace the regions of a shipping zone. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingZoneRegions;
+      responses: {
+        200: Data_ShippingZone;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

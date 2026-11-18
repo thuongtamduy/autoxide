@@ -211,8 +211,9 @@ trả khi vận đơn thuộc đơn của người hỏi, không thì `None`.
 - `Pickup`: các điểm nhận (nút cửa hàng có cờ), phí 0 hay phí đặt.
 - Địa chỉ đích phải hợp lệ theo `AdministrativeUnits` (xã thuộc tỉnh, còn hiệu lực); nước ngoài thì chỉ
   phương thức khai `countries` khác `VN`.
-- **GTGT trên phí giao** (B-b5, B-c9; D-208…D-218): phương thức có `tax_category`; báo giá trả dòng thuế
-  cho phí giao, `orders` ghi dòng thuế đó lên hoá đơn.
+- **GTGT trên phí giao** (B-b5, B-c9; D-208…D-218): phương thức có `tax_category`; phí trong báo giá đã gồm
+  thuế, mỗi lựa chọn mang `tax_category` để `orders` tách dòng thuế của phí giao bằng engine thuế khi lập hoá đơn
+  (D-20261118-step44-shipping-rates).
 
 ### Ngày giao dự kiến và lịch giao
 

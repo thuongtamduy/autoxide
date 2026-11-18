@@ -58,3 +58,12 @@ pub(crate) fn adjustment_not_found(id: Uuid) -> Error {
     )
     .with_param("id", id)
 }
+
+pub(crate) fn no_source(org: Uuid) -> Error {
+    Error::conflict(
+        "inventory.no_source",
+        "No warehouse serves the unit `{org_id}` yet: list its warehouses with `PUT \
+         /api/v1/inventory/sources/{org_id}`.",
+    )
+    .with_param("org_id", org)
+}
