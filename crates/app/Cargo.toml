@@ -33,6 +33,7 @@ autoxide-notifications.workspace = true
 autoxide-support.workspace = true
 autoxide-bookings.workspace = true
 autoxide-reporting.workspace = true
+autoxide-automations.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true

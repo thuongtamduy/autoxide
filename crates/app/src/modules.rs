@@ -79,6 +79,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.
         Box::new(autoxide_reporting::module()),
+        // Tự động hoá quy trình (bước 58): nghe event của mọi module và gọi tool MCP của mọi module
+        // qua sổ tool của kernel, nên đứng CUỐI CÙNG (sau cả `reporting`).
+        Box::new(autoxide_automations::module()),
     ]
 }
 
@@ -226,8 +229,9 @@ mod tests {
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
-            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 40);
+            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `automations` (luật tới hạn,
+            // dọn nhật ký — bước 58)) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 42);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);
