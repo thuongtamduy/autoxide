@@ -15,25 +15,19 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::migration::Migrator;
-use autoxide_kernel::storage::{ByteStream, Storage};
+use autoxide_kernel::storage::Storage;
 use autoxide_kernel::transfer::{CopiedTable, copy_modules};
-use futures_util::StreamExt as _;
-use serde_json::{Value, json};
-use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use serde_json::Value;
 
 use super::{report_failure, report_invalid_configuration, run_with_observability};
 use crate::runtime::{self, Migrations};
 use crate::settings::{self, Settings};
 
-const MANIFEST: &str = "backup.json";
-const DATABASE_FILE: &str = "database.sqlite";
-const FILES_DIR: &str = "files";
-/// Phiên bản của định dạng thư mục backup.
-const FORMAT: u64 = 1;
+use autoxide_kernel::backup::{
+    self, DATABASE_FILE, FILES_DIR, FORMAT, MANIFEST, open_sqlite, private_dir, read_file,
+};
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct BackupArguments {
@@ -75,35 +69,33 @@ fn finish(outcome: Result<String, String>) -> ExitCode {
     }
 }
 
-/// Tạo bản backup trong `directory`; trả nội dung in ra.
+/// Tạo bản backup trong `directory`; trả nội dung in ra. Lõi nằm ở `autoxide_kernel::backup`, dùng
+/// chung với job backup theo lịch.
 pub(crate) async fn run_backup(settings: Settings, directory: PathBuf) -> Result<String, String> {
     prepare_directory(&directory)?;
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
     let result = async {
         let migrator = runtime.modules.migrator().map_err(|error| error.to_string())?;
-        let copy = connect_sqlite(&directory.join(DATABASE_FILE), &migrator).await?;
         let names = runtime.modules.names();
-        let tables = copy_modules(&runtime.database, &copy, &names).await;
-        copy.close().await.map_err(|error| format!("backup database: {error}"))?;
-        let tables = tables.map_err(|error| error.to_string())?;
-        let (files, bytes) = match runtime.modules.api::<dyn Storage>() {
-            Some(storage) => save_files(storage, &directory.join(FILES_DIR)).await?,
-            None => (0, 0),
-        };
-        let manifest = json!({
-            "format": FORMAT,
-            "autoxide": env!("CARGO_PKG_VERSION"),
-            "created_at": chrono::Utc::now(),
-            "source": format!("{:?}", runtime.database.backend()).to_lowercase(),
-            "tables": tables.iter().map(|table| json!({"table": table.table, "rows": table.rows})).collect::<Vec<_>>(),
-            "files": files,
-            "file_bytes": bytes,
-        });
-        let text = serde_json::to_string_pretty(&manifest).map_err(|error| error.to_string())?;
-        tokio::fs::write(directory.join(MANIFEST), text)
-            .await
-            .map_err(|error| format!("cannot write {MANIFEST}: {error}"))?;
-        let mut text = summary("Backed up", &tables, files, &directory);
+        let scratch =
+            std::env::temp_dir().join(format!("autoxide-backup-{}", uuid::Uuid::now_v7()));
+        let manifest = backup::write_backup(
+            &runtime.database,
+            &migrator,
+            &names,
+            runtime.modules.api::<dyn Storage>(),
+            &backup::DirectorySink::new(&directory),
+            &scratch,
+        )
+        .await
+        .map_err(describe)?;
+        let mut text = format!(
+            "Backed up {} rows in {} tables and {} files ({}).\n",
+            manifest.rows(),
+            manifest.tables.len(),
+            manifest.files,
+            directory.display()
+        );
         text.push_str(&skipped_placements(runtime.modules.tenancy().as_ref()).await?);
         Ok(text)
     }
@@ -173,7 +165,7 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
         let copy = scratch.join(DATABASE_FILE);
         std::fs::copy(directory.join(DATABASE_FILE), &copy)
             .map_err(|error| format!("cannot read {DATABASE_FILE} of the backup: {error}"))?;
-        let source = connect_sqlite(&copy, &migrator).await?;
+        let source = open_sqlite(&copy, &migrator).await.map_err(describe)?;
         let runtime = match runtime::start(settings, Migrations::RequireApplied).await {
             Ok(runtime) => runtime,
             Err(error) => {
@@ -233,20 +225,6 @@ fn prepare_directory(directory: &Path) -> Result<(), String> {
     private_dir(directory).map_err(|error| format!("{}: {error}", directory.display()))
 }
 
-/// Tạo thư mục `path` (và các thư mục cha) rồi, trên Unix, chỉ để chủ của nó đọc / ghi / mở
-/// (`0700`). Backup chứa hash mật khẩu, secret webhook, MFA, và khoá ký khi nó nằm trong
-/// database: người dùng khác trên cùng máy không được đọc (D-158). Khoá thư mục là đủ — file bên
-/// trong không mở được qua thư mục đã khoá.
-fn private_dir(path: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(path)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
-    }
-    Ok(())
-}
-
 async fn read_manifest(directory: &Path) -> Result<Value, String> {
     let path = directory.join(MANIFEST);
     let text = tokio::fs::read_to_string(&path).await.map_err(|error| {
@@ -262,47 +240,6 @@ async fn read_manifest(directory: &Path) -> Result<Value, String> {
         ));
     }
     Ok(manifest)
-}
-
-/// File SQLite ở `path`, đã áp dụng mọi migration.
-async fn connect_sqlite(path: &Path, migrator: &Migrator) -> Result<Database, String> {
-    let url = format!("sqlite://{}?mode=rwc", path.display());
-    let source = ConfigSource::from_pairs([("DATABASE_URL", url.as_str())]);
-    let mut reader = ConfigReader::new(&source);
-    let config = DatabaseConfig::read(&mut reader);
-    let (config, _) = reader.finish(config).map_err(|errors| errors.to_string())?;
-    let database = Database::connect(&config).await.map_err(|error| error.to_string())?;
-    if let Err(error) = migrator.up(&database).await {
-        let _ = database.close().await;
-        return Err(error.to_string());
-    }
-    Ok(database)
-}
-
-/// Chép mọi file từ nơi lưu vào `directory`; trả số file và số byte.
-async fn save_files(storage: Arc<dyn Storage>, directory: &Path) -> Result<(u64, u64), String> {
-    let mut files = 0;
-    let mut bytes = 0;
-    for key in storage.keys().await.map_err(describe)? {
-        // File bị xoá trong lúc backup: bỏ qua.
-        let Some(stored) = storage.get(&key).await.map_err(describe)? else { continue };
-        let path = directory.join(&key);
-        if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent).await.map_err(|error| error.to_string())?;
-        }
-        let mut file = tokio::fs::File::create(&path)
-            .await
-            .map_err(|error| format!("{}: {error}", path.display()))?;
-        let mut content = stored.content;
-        while let Some(chunk) = content.next().await {
-            let chunk = chunk.map_err(describe)?;
-            bytes += chunk.len() as u64;
-            file.write_all(&chunk).await.map_err(|error| error.to_string())?;
-        }
-        file.sync_all().await.map_err(|error| error.to_string())?;
-        files += 1;
-    }
-    Ok((files, bytes))
 }
 
 /// Đưa mọi file trong `directory` (khoá = đường dẫn tương đối) vào nơi lưu.
@@ -336,31 +273,12 @@ async fn load_files(storage: Arc<dyn Storage>, directory: &Path) -> Result<u64, 
                 .components()
                 .map(|part| part.as_os_str().to_string_lossy().into_owned())
                 .collect();
-            storage.put(&key.join("/"), read_file(path).await?).await.map_err(describe)?;
+            let content = read_file(path).await.map_err(describe)?;
+            storage.put(&key.join("/"), content).await.map_err(describe)?;
             files += 1;
         }
     }
     Ok(files)
-}
-
-/// Nội dung file `path` dưới dạng luồng, đọc từng đoạn 64 KiB.
-async fn read_file(path: PathBuf) -> Result<ByteStream, String> {
-    let file = tokio::fs::File::open(&path)
-        .await
-        .map_err(|error| format!("{}: {error}", path.display()))?;
-    let stream = futures_util::stream::unfold(Some(file), |file| async move {
-        let mut file = file?;
-        let mut buffer = vec![0u8; 64 * 1024];
-        match file.read(&mut buffer).await {
-            Ok(0) => None,
-            Ok(read) => {
-                buffer.truncate(read);
-                Some((Ok(bytes::Bytes::from(buffer)), Some(file)))
-            }
-            Err(error) => Some((Err(Error::internal(error.to_string())), None)),
-        }
-    });
-    Ok(stream.boxed())
 }
 
 /// Lỗi kèm nguyên nhân gốc (lỗi nội bộ chỉ có câu chung chung).
@@ -375,9 +293,10 @@ fn describe(error: Error) -> String {
 mod tests {
     use super::*;
     use autoxide_auth::api::{Accounts, NewAccount};
+    use autoxide_kernel::config::ConfigSource;
     use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
-    use futures_util::TryStreamExt as _;
+    use futures_util::{StreamExt as _, TryStreamExt as _};
 
     /// Thư mục tạm của một bài test, xoá khi xong.
     struct Scratch(PathBuf);
